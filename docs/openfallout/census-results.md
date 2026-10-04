@@ -4,7 +4,7 @@
 
 ## What the census found
 
-- **No record failed to load.** All 1,561,956 records in the 16 plugins were counted, and the Failed column is 0 everywhere. No `Unknown subrecord` line was printed for any plugin. Every loader that exists accepts every record of its type in the real files. "Parsed" only means the loader did not throw: it does not mean the fields are right, or that the engine keeps them (the roadmap's section 2 lists what is discarded after parsing).
+- **No record failed to load.** All 1,561,956 records after each plugin's `TES4` header were counted, and the Failed column is 0 everywhere. (The reader consumes the `TES4` header record before the census starts, so it has no row and the files hold 16 more records than the tables show.) No `Unknown subrecord` line was printed for any plugin. Every loader that exists accepts every record of its type in the real files. "Parsed" only means the loader did not throw: it does not mean the fields are right, or that the engine keeps them (the roadmap's section 2 lists what is discarded after parsing).
 - **1,550,732 records (99.3%) have a loader and 11,224 have none.** The gap is in the number of record types, not in the volume. The big types (`REFR`, `CELL`, `LAND`, `INFO`, `DIAL`, `NAVM`, `PACK`, `NPC_`, `SCPT`) are all parsed.
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
@@ -37,6 +37,8 @@
 | `MercenaryPack.esm` | 1.32 | `FalloutNV.esm` | 7 | 6 | 1 | 0 |
 | `TribalPack.esm` | 1.32 | `FalloutNV.esm` | 5 | 4 | 1 | 0 |
 | **All 16** | | | **1,561,956** | **1,550,732** | **11,224** | **0** |
+
+Counts exclude each plugin's `TES4` header record.
 
 ## Record types with no loader
 
