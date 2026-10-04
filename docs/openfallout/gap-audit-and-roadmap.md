@@ -102,10 +102,11 @@ Ordered so each milestone unlocks the next. "Exit" is a check a person can run.
 
 **M0: Feedback loop.** Get a clean build and test run in a known environment, because the rename (see "Rename to OpenFallout") cannot be checked without one. Add a plugin census tool that, on a user's own FO3/FNV/TTW files, reports per record type: count, parse failures and unknown subrecords. Add synthetic-record test helpers so parsers can have unit tests without game data. Then rename in the stages listed below.
 *Exit:* CI green on this tree; census output committed for each game (counts only, no game content); the rename stages merged with the build green after each.
-*Progress:* the build baseline and the census tool (`esmtool census`) are described in `build-baseline.md`.
+*Progress:* the build baseline and the census tool (`esmtool census`) are described in `build-baseline.md`. The census has run on Fallout 3, New Vegas and their add-ons (16 plugins) and the counts are in `census-results.md`: no record failed to load, and 42 record types have no loader (28 in Fallout 3, all 42 in New Vegas). Tale of Two Wastelands is not censused yet, because no TTW files were on the machine. CI has still never run.
 
 **M1: Complete data.** Store the parsed-only records the engine needs, then add parsers for the missing record types in priority order: `GMST`/`GLOB`, `FACT`, `WTHR`/`CLMT`/`WATR`, `SPEL`/`ENCH`/`MGEF`/`PERK`/`AVIF`, then the rest. Stop skipping `SCDA` bytecode in `SCPT` and `INFO` records (decision 3).
 *Exit:* census reports zero skipped records for all three games.
+*Starting point:* the 2026-10-04 census (`census-results.md`) lists the 42 types with no loader, with the roadmap order in a column. The 14 types only New Vegas has (such as casino, Caravan, recipes, reputation and challenges) fall under "the rest". The missing types hold 0.7% of the records in the 16 plugins, so M1 means covering many record types, not many records.
 
 **M2: Walk the world.** Start in a chosen cell with a placeholder player, correct weather and sky, water, interior lighting and fog, collision for statics (real Havok data or an accepted substitute), NPC bodies with collision.
 *Exit:* walk Megaton and the Goodsprings start without crashes or invisible walls.
@@ -144,7 +145,7 @@ The census tool and every real-data check need the installed game folders, not t
 
 - **Preferred: a Remote Control session on Jacob's machine.** The project can already see Jacob's MacBook as a connected device. A session there runs the census and test tools against the installed files in place, and only counts and logs come back. Nothing needs uploading, which matters because the archives run to many gigabytes. Each folder is approved by Jacob before a session can use it.
 - **Fallback: upload to the cloud.** Files attached to the project are copied under `/mnt/project-files/uploads/hearth/`. I have not checked size limits, and multi-gigabyte archives may not fit, so this suits a few small plugins at most.
-- **If only installers exist**, they have to be unpacked first. Installer-only copies (for example offline GOG installers) can usually be unpacked with a tool such as `innoextract` on Jacob's machine.
+- **If only installers exist**, they have to be unpacked first. Installer-only copies (for example offline GOG installers) can usually be unpacked with a tool such as `innoextract` on Jacob's machine. This worked for New Vegas on 2026-10-04: the census ran on plugins unpacked from the GOG installer.
 - **Never commit game files.** They are copyrighted. Committed census output is counts only.
 
 ## Rename to OpenFallout
