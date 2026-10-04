@@ -32,8 +32,8 @@ namespace LuaUtil
         static ESM::RefNum loadRefNum(std::string_view data);
     };
 
-    // Serializer that can load Lua data from content files and saved games, but doesn't depend on apps/openmw.
-    // Instead of LObject/GObject (that are defined in apps/openmw) it loads refnums directly as ESM::RefNum.
+    // Serializer that can load Lua data from content files and saved games, but doesn't depend on apps/openfallout.
+    // Instead of LObject/GObject (that are defined in apps/openfallout) it loads refnums directly as ESM::RefNum.
     class BasicSerializer final : public UserdataSerializer
     {
     public:

@@ -136,8 +136,8 @@ namespace SceneUtil
     {
     public:
         CameraRelativeTransformSerializer()
-            : osgDB::ObjectWrapper(createInstanceFunc<osg::Group>, "MWRender::CameraRelativeTransform",
-                "osg::Object osg::Node osg::Group MWRender::CameraRelativeTransform")
+            : osgDB::ObjectWrapper(createInstanceFunc<osg::Group>, "OFRender::CameraRelativeTransform",
+                "osg::Object osg::Node osg::Group OFRender::CameraRelativeTransform")
         {
         }
     };
@@ -281,9 +281,9 @@ namespace SceneUtil
             // ignore the below for now to avoid warning spam
             const char* ignore[] = {
                 "Debug::DebugDrawer",
-                "MWRender::NifAnimBlendController",
-                "MWRender::BoneAnimBlendController",
-                "MWRender::BoneAnimBlendControllerWrapper",
+                "OFRender::NifAnimBlendController",
+                "OFRender::BoneAnimBlendController",
+                "OFRender::BoneAnimBlendControllerWrapper",
                 "SceneUtil::CompositeStateSetUpdater",
                 "SceneUtil::TemplateRef",
                 "SceneUtil::UBOManager",

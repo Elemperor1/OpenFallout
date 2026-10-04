@@ -1,0 +1,71 @@
+#ifndef OPENFALLOUT_MWGUI_ITEMWIDGET_H
+#define OPENFALLOUT_MWGUI_ITEMWIDGET_H
+
+#include <components/vfs/pathutil.hpp>
+
+#include <MyGUI_Widget.h>
+
+namespace OFWorld
+{
+    class Ptr;
+}
+
+namespace OFGui
+{
+
+    /// @brief A widget that shows an icon for an OFWorld::Ptr
+    class ItemWidget : public MyGUI::Widget
+    {
+        MYGUI_RTTI_DERIVED(ItemWidget)
+    public:
+        ItemWidget();
+
+        /// Register needed components with MyGUI's factory manager
+        static void registerComponents();
+
+        enum ItemState
+        {
+            None,
+            Equip,
+            Barter,
+            Magic
+        };
+
+        /// Set count to be displayed in a textbox over the item
+        void setCount(int count);
+
+        /// \a ptr may be empty
+        void setItem(const OFWorld::Ptr& ptr, ItemState state = None);
+
+        // Set icon and frame manually
+        void setIcon(VFS::Path::NormalizedView icon);
+        void setIcon(const OFWorld::Ptr& ptr);
+        void setFrame(const std::string& frame, const MyGUI::IntCoord& coord);
+
+        void setControllerFocus(bool focus);
+
+    protected:
+        void initialiseOverride() override;
+
+        MyGUI::ImageBox* mItem;
+        MyGUI::ImageBox* mItemShadow;
+        MyGUI::ImageBox* mFrame;
+        MyGUI::ImageBox* mControllerBorder;
+        MyGUI::TextBox* mText;
+
+        VFS::Path::Normalized mCurrentIcon;
+        std::string mCurrentFrame;
+
+        static std::map<std::string, float> mScales;
+    };
+
+    class SpellWidget : public ItemWidget
+    {
+        MYGUI_RTTI_DERIVED(SpellWidget)
+    public:
+        void setSpellIcon(VFS::Path::NormalizedView icon);
+    };
+
+}
+
+#endif

@@ -1,0 +1,21 @@
+#ifndef OPENFALLOUT_MWRENDER_RENDERMODE_H
+#define OPENFALLOUT_MWRENDER_RENDERMODE_H
+
+namespace OFRender
+{
+
+    enum RenderMode
+    {
+        Render_CollisionDebug,
+        Render_Wireframe,
+        Render_Pathgrid,
+        Render_Water,
+        Render_Scene,
+        Render_NavMesh,
+        Render_ActorsPaths,
+        Render_RecastMesh,
+    };
+
+}
+
+#endif

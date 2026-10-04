@@ -13,7 +13,7 @@
 
 #include "cellref.hpp"
 
-namespace MWWorld
+namespace OFWorld
 {
     class ESMStore;
 }
@@ -38,7 +38,7 @@ namespace ESM
 
         // The content file format does not support moving objects to an interior cell.
         // The save game format does support moving to interior cells, but uses a different mechanism
-        // (see the MovedRefTracker implementation in MWWorld::CellStore for more details).
+        // (see the MovedRefTracker implementation in OFWorld::CellStore for more details).
     };
 
     /// Overloaded compare operator used to search inside a list of cell refs.

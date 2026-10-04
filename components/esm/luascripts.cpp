@@ -11,15 +11,15 @@
 //
 // Records:
 // LUAL - LuaScriptsCfg - list of all scripts (in content files)
-// LUAM - MWLua::LuaManager (in saves)
+// LUAM - OFLua::LuaManager (in saves)
 //
 // Subrecords:
 // LUAF - LuaScriptCfg::mFlags and ESM::RecNameInts list
 // LUAW - Simulation time and last generated RefNum
-// LUAE - Start of MWLua::LocalEvent or MWLua::GlobalEvent (eventName)
+// LUAE - Start of OFLua::LocalEvent or OFLua::GlobalEvent (eventName)
 // LUAS - VFS path to a Lua script
 // LUAD - Serialized Lua variable
-// LUAT - MWLua::ScriptsContainer::Timer
+// LUAT - OFLua::ScriptsContainer::Timer
 // LUAC - Name of a timer callback (string)
 // LUAR - Attach script to a specific record (LuaScriptCfg::PerRecordCfg)
 // LUAI - Attach script to a specific instance (LuaScriptCfg::PerRefCfg)

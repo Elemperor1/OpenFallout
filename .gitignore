@@ -42,18 +42,18 @@ resources
 
 ## binaries
 /esmtool
-/openmw
+/openfallout
 /opencs
 /niftest
 /bsatool
-/openmw-cs
-/openmw-essimporter
-/openmw-iniimporter
-/openmw-launcher
-/openmw-wizard
+/openfallout-cs
+/openfallout-essimporter
+/openfallout-iniimporter
+/openfallout-launcher
+/openfallout-wizard
 
 ## generated objects
-apps/openmw/config.hpp
+apps/openfallout/config.hpp
 apps/launcher/ui_contentselector.h
 apps/launcher/ui_settingspage.h
 apps/opencs/ui_contentselector.h
