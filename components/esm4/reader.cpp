@@ -574,6 +574,22 @@ namespace ESM4
         mCtx.recordRead = mCtx.recordHeader.record.dataSize; // for getSubRecordHeader()
     }
 
+    void Reader::skipFailedRecord(const ReaderContext& recordStart)
+    {
+        if (mSavedStream)
+        {
+            // The record data was inflated, so the file stream already sits after the record.
+            mStream = std::move(mSavedStream);
+        }
+        else
+        {
+            mStream->clear();
+            mStream->seekg(recordStart.filePos
+                + static_cast<std::streamoff>(recordStart.recHeaderSize + recordStart.recordHeader.record.dataSize));
+        }
+        mCtx.recordRead = mCtx.recordHeader.record.dataSize; // for getSubRecordHeader()
+    }
+
     bool Reader::getSubRecordHeader()
     {
         bool result = false;

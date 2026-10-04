@@ -102,6 +102,7 @@ Ordered so each milestone unlocks the next. "Exit" is a check a person can run.
 
 **M0: Feedback loop.** Get a clean build and test run in a known environment, because the rename (see "Rename to OpenFallout") cannot be checked without one. Add a plugin census tool that, on a user's own FO3/FNV/TTW files, reports per record type: count, parse failures and unknown subrecords. Add synthetic-record test helpers so parsers can have unit tests without game data. Then rename in the stages listed below.
 *Exit:* CI green on this tree; census output committed for each game (counts only, no game content); the rename stages merged with the build green after each.
+*Progress:* the build baseline and the census tool (`esmtool census`) are described in `build-baseline.md`.
 
 **M1: Complete data.** Store the parsed-only records the engine needs, then add parsers for the missing record types in priority order: `GMST`/`GLOB`, `FACT`, `WTHR`/`CLMT`/`WATR`, `SPEL`/`ENCH`/`MGEF`/`PERK`/`AVIF`, then the rest. Stop skipping `SCDA` bytecode in `SCPT` and `INFO` records (decision 3).
 *Exit:* census reports zero skipped records for all three games.
