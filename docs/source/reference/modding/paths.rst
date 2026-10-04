@@ -134,7 +134,7 @@ Every configuration directory is allowed, but not required, to contain its own `
 Settings in ``settings.cfg`` only ever have one value, so it'll be taken from the highest priority ``settings.cfg`` that sets one.
 
 Special ``openfallout.cfg`` files
-""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""
 
 A local ``openfallout.cfg`` is one which is in the same directory as the OpenMW binary, e.g. ``openfallout.exe`` on Windows.
 It is always loaded if it exists.
@@ -151,7 +151,7 @@ It *can* be the local ``openfallout.cfg``, e.g. in a `Portable install`_, but we
 We also strongly recommend against using a global ``openfallout.cfg`` as the user ``openfallout.cfg``.
 
 ``openfallout.cfg`` syntax
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An ``openfallout.cfg`` file is a sequence of lines.
 Each line is either blank, contains an option, or contains a comment.
@@ -257,7 +257,7 @@ Portable install
 If you want to put OpenMW onto removable storage so you can play on multiple machines, or you want an entirely self-contained setup, you'll want to set up a portable install.
 
 Single ``openfallout.cfg`` file
-""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""
 
 Some users find it easiest if there's a single ``openfallout.cfg`` file with all their configuration, even if it means it's mixed in with the engine's default configuration.
 
@@ -310,7 +310,7 @@ You'll need to make sure that any ``data=…`` lines in your ``openfallout.cfg``
 If you add data directories via the launcher, you'll need to change them manually afterwards.
 
 Separate user ``openfallout.cfg`` file
-"""""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""""""""
 
 For most users, this is the type of portable OpenMW install we would recommend as it's the most similar to a regular install.
 You'll have a separate local ``openfallout.cfg`` with the engine's basic configuration and a user ``openfallout.cfg`` with your personal configuration.
