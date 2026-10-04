@@ -1,5 +1,6 @@
 #include <components/esm4/census.hpp>
 #include <components/esm4/common.hpp>
+#include <components/esm4/loadlvli.hpp>
 #include <components/esm4/loadstat.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
@@ -164,6 +165,53 @@ namespace
         EXPECT_EQ(stat.mFailed, 1u);
         ASSERT_EQ(stat.mFailures.size(), 1u);
         EXPECT_EQ(stat.mFailures.begin()->first, "ESM4::STAT::load - Unknown subrecord ZZZZ");
+    }
+
+    bool parseLevelledItem(ESM4::Reader& reader)
+    {
+        if (reader.hdr().record.typeId != ESM4::REC_LVLI)
+            return false;
+        reader.getRecordData();
+        ESM4::LevelledItem value;
+        value.load(reader);
+        return true;
+    }
+
+    TEST(ESM4CensusTest, withholdsLoaderMessagesThatEmbedRecordContents)
+    {
+        // The LVLO size error of the LVLI loader contains the editor ID of the record.
+        const std::string editorId = "SecretEditorId";
+        const std::string items
+            = record("LVLI", 1, subRecord("EDID", editorId + '\0') + subRecord("LVLO", std::string(5, '\0')));
+        const std::string plugin = header() + topGroup("LVLI", items);
+
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "census.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, parseLevelledItem);
+
+        const ESM4::CensusRecord& lvli = census.getRecords().at("LVLI");
+        EXPECT_EQ(lvli.mFailed, 1u);
+        ASSERT_EQ(lvli.mFailures.size(), 1u);
+        EXPECT_EQ(lvli.mFailures.begin()->first, "loader error (message withheld, it may contain record contents)");
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), Not(HasSubstr(editorId)));
+    }
+
+    TEST(ESM4CensusTest, keepsOnlyPrintableSubrecordCodesInUnknownSubrecordMessages)
+    {
+        const std::string statics = record("STAT", 1, subRecord("ZZ\n\x01", "1234")) + staticRecord(2, "Second");
+        const std::string plugin = header() + topGroup("STAT", statics);
+
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "census.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, parseStatic);
+
+        const ESM4::CensusRecord& stat = census.getRecords().at("STAT");
+        EXPECT_EQ(stat.mFailed, 1u);
+        ASSERT_EQ(stat.mFailures.size(), 1u);
+        EXPECT_EQ(stat.mFailures.begin()->first, "loader error (message withheld, it may contain record contents)");
     }
 
     TEST(ESM4ReaderUtilsTest, visitsTheLastRecordOfAFile)

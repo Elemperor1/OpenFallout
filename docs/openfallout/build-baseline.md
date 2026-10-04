@@ -27,7 +27,7 @@ cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \
 | `openmw-tests` | 529 tests, all pass |
 | Binaries produced | `openmw`, `esmtool`, `bsatool`, `niftest`, `openmw-essimporter`, `openmw-iniimporter`, `openmw-navmeshtool`, `openmw-bulletobjecttool` and the two test programs |
 
-With the census change and reader fixes from this document applied, the whole tree still builds and `components-tests` runs 1,600 tests (the five new ones included), all passing; `openmw-tests` is unchanged at 529. The setup script was run from scratch into an empty prefix and its printed CMake command configured successfully.
+With the census change and reader fixes from this document applied, the whole tree still builds and `components-tests` runs 1,602 tests (the seven new ones included), all passing; `openmw-tests` is unchanged at 529. The setup script was run from scratch into an empty prefix and its printed CMake command configured successfully.
 
 Not covered:
 
@@ -37,7 +37,7 @@ Not covered:
 
 ## Plugin census
 
-`esmtool census <plugin>` reads a TES4-format plugin (the format Oblivion, Fallout 3, New Vegas and Skyrim use) and prints how many records of each type it holds, how many were read by a loader, how many have no loader and how many a loader rejected, with the error messages of the rejected ones. It prints record types, counts and loader error messages only, never record contents, so its output can be shared without sharing game data.
+`esmtool census <plugin>` reads a TES4-format plugin (the format Oblivion, Fallout 3, New Vegas and Skyrim use) and prints how many records of each type it holds, how many were read by a loader, how many have no loader and how many a loader rejected, with the failure of each rejected one. It prints record types, counts and failure messages only, never record contents, so its output can be shared without sharing game data. Some loaders put record contents in their error messages (the LVLI, LVLC and LVLN loaders include the editor ID), so only the `Unknown subrecord` message, which names a loader and a four character subrecord code, is printed as it is. Any other loader failure is counted and printed as `loader error (message withheld, it may contain record contents)`; `esmtool dump` shows the full message.
 
 Example, on a small synthetic plugin built for this check:
 
@@ -67,4 +67,4 @@ The exit status is 0 when the whole file was read and non-zero when reading stop
 - **The last record of every plugin was never read.** `ReaderUtils::readItem` stopped when `hasMoreRecs()` was false right after reading a record header, but a record's data counts as read as soon as its header is, so that is always true for the final record. The engine's own plugin loading uses the same code, so it skipped the last record of every ESM4 plugin too. Found because the census test file ended on a record that was never counted. Now only a group header with nothing after it ends the read early.
 - **A loader that threw part-way through a record left the reader inside it.** `Reader::skipRecordData` assumes every subrecord seen so far was read in full, because sizes are counted when a subrecord header is read. After an exception the next header was taken from the middle of the record. `Reader::skipFailedRecord` moves to the end of the record using the position saved when its header was read, and it also handles compressed records.
 
-Both are covered by tests in `apps/components_tests/esm4/testcensus.cpp`. With the first fix removed, three of the five tests in that file fail.
+Both are covered by tests in `apps/components_tests/esm4/testcensus.cpp`. With the first fix removed, tests in that file fail because the last record of their synthetic plugins is never counted.

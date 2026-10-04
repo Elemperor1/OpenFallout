@@ -1,6 +1,7 @@
 #include "census.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <iomanip>
 #include <ostream>
@@ -21,6 +22,30 @@ namespace ESM4
         std::string firstLine(std::string_view message)
         {
             return std::string(message.substr(0, message.find('\n')));
+        }
+
+        bool isCodeChar(char c)
+        {
+            return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+        }
+
+        // Loader messages can embed record contents, for example the editor ID in the LVLO size errors of LVLI,
+        // LVLC and LVLN. Only the unknown subrecord message, which names a loader and a four character code, is
+        // known to hold nothing else, so it is the only one kept.
+        std::string describeFailure(std::string_view message)
+        {
+            constexpr std::string_view marker = " - Unknown subrecord ";
+            const std::size_t position = message.find(marker);
+            if (position != std::string_view::npos)
+            {
+                const std::string_view loader = message.substr(0, position);
+                const std::string_view code = message.substr(position + marker.size());
+                const auto isLoaderChar = [](char c) { return isCodeChar(c) || c == ':' || c == ' ' || c == '/'; };
+                if (code.size() == 4 && std::all_of(code.begin(), code.end(), isCodeChar)
+                    && std::all_of(loader.begin(), loader.end(), isLoaderChar))
+                    return std::string(message);
+            }
+            return "loader error (message withheld, it may contain record contents)";
         }
     }
 
@@ -61,7 +86,7 @@ namespace ESM4
             }
             catch (const std::exception& e)
             {
-                add(type, CensusOutcome::Failed, firstLine(e.what()));
+                add(type, CensusOutcome::Failed, describeFailure(firstLine(e.what())));
             }
             // The loader stopped part-way, so the stream is somewhere inside the record.
             r.skipFailedRecord(recordStart);
@@ -74,6 +99,7 @@ namespace ESM4
         }
         catch (const std::exception& e)
         {
+            // Raised by the reader while it walks record and group headers, so it holds offsets and sizes only.
             mFatalError = firstLine(e.what());
         }
     }

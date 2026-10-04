@@ -30,7 +30,8 @@ namespace ESM4
     };
 
     // Counts the records of a TES4-format plugin by type and remembers what could not be read.
-    // Only record types, counts and loader error messages are kept, never record contents.
+    // Only record types, counts and loader failures are kept, never record contents. A loader's error message is
+    // kept only when it names a loader and an unknown subrecord code; any other message is replaced.
     class Census
     {
     public:
