@@ -26,8 +26,8 @@ namespace
     {
         std::ifstream file;
         file.exceptions(std::ios::failbit | std::ios::badbit);
-        file.open(std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR } / "apps" / "components_tests" / "toutf8" / "data"
-            / Misc::StringUtils::stringToU8String(fileName));
+        file.open(std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR } / "apps" / "components_tests" / "toutf8"
+            / "data" / Misc::StringUtils::stringToU8String(fileName));
         std::stringstream buffer;
         buffer << file.rdbuf();
         return buffer.str();

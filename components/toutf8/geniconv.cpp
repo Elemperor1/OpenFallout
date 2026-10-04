@@ -88,7 +88,8 @@ int write_table(const std::string& charset, const std::string& tableName)
 int main()
 {
     // Write header guard
-    std::cout << "#ifndef OPENFALLOUT_COMPONENTS_TOUTF8_TABLESGEN_HPP\n#define OPENFALLOUT_COMPONENTS_TOUTF8_TABLESGEN_HPP\n\n";
+    std::cout << "#ifndef OPENFALLOUT_COMPONENTS_TOUTF8_TABLESGEN_HPP\n#define "
+                 "OPENFALLOUT_COMPONENTS_TOUTF8_TABLESGEN_HPP\n\n";
 
     // Write namespace
     std::cout << "namespace ToUTF8\n{\n\n";

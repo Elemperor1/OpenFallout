@@ -364,8 +364,7 @@ namespace MWGui
                    << "#{fontcolourhtml=header}#{OFShaders:InInteriors}: #{fontcolourhtml=normal} " << flagInterior
                    << "#{fontcolourhtml=header}   #{OFShaders:InExteriors}: #{fontcolourhtml=normal} " << flagExterior
                    << "#{fontcolourhtml=header}   #{OFShaders:Underwater}: #{fontcolourhtml=normal} " << flagUnderwater
-                   << "#{fontcolourhtml=header}   #{OFShaders:Abovewater}: #{fontcolourhtml=normal} "
-                   << flagAbovewater;
+                   << "#{fontcolourhtml=header}   #{OFShaders:Abovewater}: #{fontcolourhtml=normal} " << flagAbovewater;
                 break;
             }
             case Fx::Technique::Status::Parse_Error:

@@ -25,8 +25,8 @@ namespace Debug
         there are no uses of this class checked in. For now, add annotations locally when you need them.
 
         To use this class, add it to a StateSet just like any other StateAttribute. Prefer the string-only constructor.
-        You'll need OPENFALLOUT_DEBUG_OPENGL set to true, or shouldDebugOpenGL() redefined to just return true as otherwise
-        the extension function pointers won't get set up. That can maybe be cleaned up in the future.
+        You'll need OPENFALLOUT_DEBUG_OPENGL set to true, or shouldDebugOpenGL() redefined to just return true as
+       otherwise the extension function pointers won't get set up. That can maybe be cleaned up in the future.
 
         Beware that consecutive identical debug groups (i.e. pointers match) won't always get applied due to OSG
        thinking it's already applied them. Either avoid nesting the same object, add dummy groups so they're not

@@ -193,7 +193,8 @@ namespace MWLua
             mPlayerPackages = initPlayerPackages(localContext);
             mPlayerPackages.insert(mLocalPackages.begin(), mLocalPackages.end());
 
-            mGlobalScripts.addPackage("openfallout.storage", LuaUtil::LuaStorage::initGlobalPackage(view, &mGlobalStorage));
+            mGlobalScripts.addPackage(
+                "openfallout.storage", LuaUtil::LuaStorage::initGlobalPackage(view, &mGlobalStorage));
             mMenuScripts.addPackage(
                 "openfallout.storage", LuaUtil::LuaStorage::initMenuPackage(view, &mGlobalStorage, &mPlayerStorage));
             mLocalPackages["openfallout.storage"] = LuaUtil::LuaStorage::initLocalPackage(view, &mGlobalStorage);

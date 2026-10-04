@@ -95,11 +95,11 @@ namespace MWLua
             };
             addCoreTimeBindings(api, context);
 
-            api["magic"]
-                = context.cachePackage("openfallout_core_magic", [context]() { return initCoreMagicBindings(context); });
+            api["magic"] = context.cachePackage(
+                "openfallout_core_magic", [context]() { return initCoreMagicBindings(context); });
 
-            api["stats"]
-                = context.cachePackage("openfallout_core_stats", [context]() { return initCoreStatsBindings(context); });
+            api["stats"] = context.cachePackage(
+                "openfallout_core_stats", [context]() { return initCoreStatsBindings(context); });
 
             api["mwscripts"] = context.cachePackage(
                 "openfallout_core_mwscripts", [context]() { return initCoreMwScriptBindings(context); });
@@ -107,13 +107,13 @@ namespace MWLua
             api["land"]
                 = context.cachePackage("openfallout_core_land", [context]() { return initCoreLandBindings(context); });
 
-            api["weather"]
-                = context.cachePackage("openfallout_core_weather", [context]() { return initCoreWeatherBindings(context); });
+            api["weather"] = context.cachePackage(
+                "openfallout_core_weather", [context]() { return initCoreWeatherBindings(context); });
 
             api["factions"] = context.cachePackage(
                 "openfallout_core_factions", [context]() { return initCoreFactionBindings(context); });
-            api["regions"]
-                = context.cachePackage("openfallout_core_regions", [context]() { return initCoreRegionBindings(context); });
+            api["regions"] = context.cachePackage(
+                "openfallout_core_regions", [context]() { return initCoreRegionBindings(context); });
             api["dialogue"] = context.cachePackage(
                 "openfallout_core_dialogue", [context]() { return initCoreDialogueBindings(context); });
 
@@ -147,8 +147,8 @@ namespace MWLua
                     context.mLuaEvents->addGlobalEvent(
                         { std::move(eventName), LuaUtil::serialize(eventData, context.mSerializer) });
                 };
-                api["sound"]
-                    = context.cachePackage("openfallout_core_sound", [context]() { return initCoreSoundBindings(context); });
+                api["sound"] = context.cachePackage(
+                    "openfallout_core_sound", [context]() { return initCoreSoundBindings(context); });
             }
             else
             {

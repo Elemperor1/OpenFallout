@@ -27,7 +27,7 @@ namespace DetourNavigator
 
     std::ostream& operator<<(std::ostream& stream, Status value)
     {
-#define OPENFALLOUT_COMPONENTS_DETOURNAVIGATOR_DEBUG_STATUS_MESSAGE(name)                                                   \
+#define OPENFALLOUT_COMPONENTS_DETOURNAVIGATOR_DEBUG_STATUS_MESSAGE(name)                                              \
     case Status::name:                                                                                                 \
         return stream << "DetourNavigator::Status::" #name;
         switch (value)

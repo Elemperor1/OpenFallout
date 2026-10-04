@@ -161,7 +161,7 @@ struct VideoState {
 
     static int istream_read(void *user_data, uint8_t *buf, int buf_size);
 
-#if OPENMW_FFMPEG_CONST_WRITEPACKET
+#if OPENFALLOUT_FFMPEG_CONST_WRITEPACKET
     static int istream_write(void *, const unsigned char *, int);
 #else
     static int istream_write(void *, uint8_t *, int);
