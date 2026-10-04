@@ -140,9 +140,9 @@ def run_test(
     # --config is layered, and settings in a later layer override earlier ones. Pass
     # any caller-supplied directory as its own layer rather than concatenating its
     # settings.cfg into the generated one: two values for one key in a single file
-    # is a duplicate and openmw rejects it outright.
+    # is a duplicate and openfallout rejects it outright.
     #
-    # The generated directory stays last because openmw writes its runtime files
+    # The generated directory stays last because openfallout writes its runtime files
     # into the final layer, and openfallout.log is read back from there below.
     if config_source_dir is not None:
         command += ["--config", config_source_dir]
@@ -207,7 +207,7 @@ def run_test(
         if not quit_requested:
             fatal_errors.append("unexpected termination")
         if process.returncode != 0:
-            fatal_errors.append(f"openmw exited with code {process.returncode}")
+            fatal_errors.append(f"openfallout exited with code {process.returncode}")
     if os.path.exists(config_dir / "openfallout.log"):
         shutil.copyfile(config_dir / "openfallout.log", log_dir / f"{suite_name}.{time_str}.log")
     if fatal_errors and not args.verbose:
