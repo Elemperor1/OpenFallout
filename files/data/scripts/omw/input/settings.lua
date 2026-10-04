@@ -41,7 +41,8 @@ I.Settings.registerGroup({
 
 local interfaceL10n = core.l10n('interface')
 
-local bindingSection = storage.playerSection('OFInputBindings')
+-- The section name is stored in player_storage.bin, so renaming it would drop the bindings users already saved.
+local bindingSection = storage.playerSection('OMWInputBindings')
 
 local recording = nil
 

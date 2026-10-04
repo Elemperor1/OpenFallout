@@ -6,7 +6,7 @@ Simple usage using default user configuration:
 
 ```bash
 "${OPENFALLOUT_BINARY_DIR:?}/openfallout" \
-    --config "${OPENMW_SOURCE_DIR:?}/scripts/data/morrowind_tests" \
+    --config "${OPENFALLOUT_SOURCE_DIR:?}/scripts/data/morrowind_tests" \
     --data "${MORROWIND_DATA_DIR:?}"
 ```
 
