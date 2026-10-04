@@ -100,10 +100,10 @@ A search for `ESM4` in `apps/openmw/mwmechanics`, `mwdialogue`, `mwscript`, `mwi
 
 Ordered so each milestone unlocks the next. "Exit" is a check a person can run.
 
-**M0: Feedback loop.** Build and test in a known environment. Add a plugin census tool that, on a user's own FO3/FNV/TTW files, reports per record type: count, parse failures and unknown subrecords. Add synthetic-record test helpers so parsers can have unit tests without game data.
-*Exit:* CI green on this tree; census output committed for each game (counts only, no game content).
+**M0: Feedback loop.** Get a clean build and test run in a known environment, because the rename (see "Rename to OpenFallout") cannot be checked without one. Add a plugin census tool that, on a user's own FO3/FNV/TTW files, reports per record type: count, parse failures and unknown subrecords. Add synthetic-record test helpers so parsers can have unit tests without game data. Then rename in the stages listed below.
+*Exit:* CI green on this tree; census output committed for each game (counts only, no game content); the rename stages merged with the build green after each.
 
-**M1: Complete data.** Store the parsed-only records the engine needs, then add parsers for the missing record types in priority order: `GMST`/`GLOB`, `FACT`, `WTHR`/`CLMT`/`WATR`, `SPEL`/`ENCH`/`MGEF`/`PERK`/`AVIF`, then the rest. Keep `SCDA` bytecode.
+**M1: Complete data.** Store the parsed-only records the engine needs, then add parsers for the missing record types in priority order: `GMST`/`GLOB`, `FACT`, `WTHR`/`CLMT`/`WATR`, `SPEL`/`ENCH`/`MGEF`/`PERK`/`AVIF`, then the rest. Stop skipping `SCDA` bytecode in `SCPT` and `INFO` records (decision 3).
 *Exit:* census reports zero skipped records for all three games.
 
 **M2: Walk the world.** Start in a chosen cell with a placeholder player, correct weather and sky, water, interior lighting and fog, collision for statics (real Havok data or an accepted substitute), NPC bodies with collision.
@@ -112,7 +112,7 @@ Ordered so each milestone unlocks the next. "Exit" is a check a person can run.
 **M3: Living actors.** Skeleton animation, locomotion, FaceGen, equipment, creatures, AI packages, companion follow.
 *Exit:* NPCs idle, walk their schedules and visibly wear their gear.
 
-**M4: Scripts and quests.** A script virtual machine that runs the game's own scripts, quest stages, global variables and the engine function set the base games use.
+**M4: Scripts and quests.** A C++ virtual machine that decodes and runs the compiled `SCDA` bytecode (decision 3), plus quest stages, global variables and the engine function set the base games use.
 *Exit:* the first quest of each game can be completed from a clean start.
 
 **M5: Dialogue.** Topic selection, conditions (the `FUN_*` table), result scripts, voice and lip sync, dialogue UI.
@@ -125,13 +125,44 @@ Ordered so each milestone unlocks the next. "Exit" is a check a person can run.
 
 **M9: Fidelity, performance, portability.**
 
-## Decisions this audit cannot make
+## Decisions
 
-1. **Upstream relationship.** Keep merging OpenMW master (small, careful changes in shared code) or diverge. This sets how invasive M2 to M6 can be.
-2. **Where gameplay lives.** The tree already routes Fallout activation through Lua. The alternative is C++ systems next to `mwmechanics`. A faithful script VM (M4) is C++ in either case; the open question is everything around it.
-3. **Script path.** Run the compiled `SCDA` bytecode, as the original engine does, or compile the `SCTX` source. The parser currently keeps only the source (inferred: bytecode is the more faithful and avoids writing a compiler, but it needs a decoder for every function).
-4. **Test data.** Census and real-data checks need Fallout files on a machine this project can reach. The cloud container has none.
-5. **Naming and branding.** Whether the executables, namespace and docs stay `openmw` for now.
+Answered by Jacob on 2026-10-04, after reading the first version of this audit.
+
+| # | Question | Decision | What follows |
+|---|---|---|---|
+| 1 | Upstream relationship | **Diverge.** | No more merging OpenMW master, so shared code (`mwworld`, `mwrender`, `components`) can change freely. Upstream fixes would have to be ported by hand. The GPLv3 licence and the OpenMW contributor credits stay (see the rename plan). |
+| 2 | Where gameplay lives | **Whatever gives the best quality and performance.** | Default adopted: C++ for fidelity-critical and per-frame systems (script VM, AI, combat, physics, animation, dialogue conditions, saves). Lua stays for UI and extension hooks, which activation and terminals already use. Revisit a system if profiling says otherwise. |
+| 3 | Script path | **Run the compiled bytecode (`SCDA`).** | The VM decodes `SCDA` directly, as the original engine does, so no compiler is needed. First step: stop skipping `SCDA` in `ESM4::Script` and `ESM4::DialogInfo` (`loadscpt.cpp:79-110`, `loadinfo.cpp:116-118`). `SCTX` source stays for tooling and debugging. Each engine function the scripts call needs its own implementation. |
+| 4 | Test data | **Jacob can provide the files from their machine or upload them.** | See "Getting game data to the project". |
+| 5 | Naming | **Everything becomes OpenFallout.** | See "Rename to OpenFallout". |
+
+## Getting game data to the project
+
+The census tool and every real-data check need the installed game folders, not the installers: `Fallout3.esm`, `FalloutNV.esm`, the Tale of Two Wastelands plugin, and all the `*.bsa` archives from each `Data` folder.
+
+- **Preferred: a Remote Control session on Jacob's machine.** The project can already see Jacob's MacBook as a connected device. A session there runs the census and test tools against the installed files in place, and only counts and logs come back. Nothing needs uploading, which matters because the archives run to many gigabytes. Each folder is approved by Jacob before a session can use it.
+- **Fallback: upload to the cloud.** Files attached to the project are copied under `/mnt/project-files/uploads/hearth/`. I have not checked size limits, and multi-gigabyte archives may not fit, so this suits a few small plugins at most.
+- **If only installers exist**, they have to be unpacked first. Installer-only copies (for example offline GOG installers) can usually be unpacked with a tool such as `innoextract` on Jacob's machine.
+- **Never commit game files.** They are copyrighted. Committed census output is counts only.
+
+## Rename to OpenFallout
+
+Sizing at commit `f90f239d`, excluding `extern/`:
+
+- 1,206 tracked files mention "openmw" (5,720 lines). 1,010 paths contain "openmw", almost all under `apps/openmw/`.
+- 10 executables are named `openmw*` (`openmw`, `openmw-cs`, `openmw-launcher`, `openmw-wizard`, `openmw-iniimporter`, `openmw-essimporter`, `openmw-navmeshtool`, `openmw-bulletobjecttool` and two test binaries), plus the `openmw-lib` and `openmw-cs-lib` libraries.
+- Lua modules are named `openmw.*` (20 API files under `files/lua_api/openmw/`). `openmw.cfg` is mentioned 228 times. `OPENMW_*` guards and options are everywhere, and `OMWEngine` and `OMW*` symbols exist.
+- 792 files use `MW*` namespaces (`MWGui`, `MWWorld`, `MWLua`, `MWMechanics` and others). `MW` stands for Morrowind.
+- 206 files mention Morrowind outside `extern/` and the translations (launcher and wizard text, docs, data). Those belong with the new-game and launcher work in M2, not the rename.
+
+The rename lands in stages, each one buildable and passing the tests before the next starts, so a break is easy to trace:
+
+1. **Stage A, user-visible names.** Executable names, window titles, README and docs, config file and user-data directory names, packaging. Add an acknowledgement of OpenMW to the README.
+2. **Stage B, interfaces.** Lua module ids (`openmw.*` to `openfallout.*`), `OPENMW_*` CMake options and header guards, `OMW*` symbols.
+3. **Stage C, source layout.** `apps/openmw` to `apps/openfallout` using `git mv`, then `MW*` namespaces to `OF*` (for example `MWWorld` becomes `OFWorld`). `OF` is the default chosen here and is cheap to change before this stage starts.
+
+Not renamed: `AUTHORS.md`, `LICENSE` and the copyright notices in source files. GPLv3 requires keeping them, and the OpenMW contributors wrote most of this code. This is a plain reading of the licence, not legal advice.
 
 ## Appendix: how the counts were produced
 
