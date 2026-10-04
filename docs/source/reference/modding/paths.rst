@@ -474,12 +474,12 @@ E.g. if you've got a profile called *Morrowind* in your default configuration di
 
 .. code-block:: console
 
-    $ openmw --replace config --config ?userconfig?/Morrowind --config "?userconfig?/Morrowind/Total Overhaul"
+    $ openfallout --replace config --config ?userconfig?/Morrowind --config "?userconfig?/Morrowind/Total Overhaul"
 
 You can put this command into a script or shortcut and use it to easily launch OpenMW with that profile.
 
 The command exactly as it appears above will work in most common shells (e.g. Bash, Windows Command Prompt and PowerShell) if OpenMW is on the system path.
-Otherwise, the path to OpenMW must be specified instead of just the ``openmw`` command.
+Otherwise, the path to OpenMW must be specified instead of just the ``openfallout`` command.
 
 On Windows, you can create a desktop shortcut to run this command with these steps:
 
@@ -502,7 +502,7 @@ On most Linux distros, you can create a ``.desktop`` file like this:
 	GenericName=Role Playing Game
 	Comment=OpenMW with the Total Overhaul profile
 	Keywords=Morrowind;Reimplementation Mods;esm;bsa;
-	TryExec=openmw
-	Exec=openmw --replace config --config ?userconfig?/Morrowind --config "?userconfig?/Morrowind/Total Overhaul" 
+	TryExec=openfallout
+	Exec=openfallout --replace config --config ?userconfig?/Morrowind --config "?userconfig?/Morrowind/Total Overhaul" 
 	Icon=openmw
 	Categories=Game;RolePlaying;
