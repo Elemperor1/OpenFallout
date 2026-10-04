@@ -30,14 +30,17 @@ jobs:
     - name: Install Building Dependencies
       run: CI/before_install.macos.sh
 
+    # Homebrew has no bottles for the Intel macOS 26 image, so installing ccache there compiles LLVM from
+    # source and the job runs for hours. The Intel job builds without ccache instead.
     - name: Prime ccache
+      if: ${{ inputs.image != 'macos-26-intel' }}
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
         key: ${{ inputs.image }}-${{ inputs.build-type }}
         max-size: 1000M
 
     - name: Configure
-      run: CI/before_script.macos.sh -C
+      run: CI/before_script.macos.sh ${{ inputs.image != 'macos-26-intel' && '-C' || '' }}
     - name: Build
       run: CI/macos/build.sh
 
