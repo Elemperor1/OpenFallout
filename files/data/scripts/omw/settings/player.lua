@@ -1,5 +1,5 @@
-local types = require('openmw.types')
-local self = require('openmw.self')
+local types = require('openfallout.types')
+local self = require('openfallout.self')
 
 local common = require('scripts.omw.settings.common')
 
@@ -43,8 +43,8 @@ return {
     -- @context global|menu|player
     -- @usage
     -- -- In a player script
-    -- local storage = require('openmw.storage')
-    -- local I = require('openmw.interfaces')
+    -- local storage = require('openfallout.storage')
+    -- local I = require('openfallout.interfaces')
     -- I.Settings.registerPage {
     --     key = 'MyModPage',
     --     l10n = 'MyMod',

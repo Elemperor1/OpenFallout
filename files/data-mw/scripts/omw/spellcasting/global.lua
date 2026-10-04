@@ -1,10 +1,10 @@
-local types = require('openmw.types')
+local types = require('openfallout.types')
 local Actor = types.Actor
 local Lockable = types.Lockable
-local I = require('openmw.interfaces')
-local world = require('openmw.world')
-local core = require('openmw.core')
-local auxUtil = require('openmw_aux.util')
+local I = require('openfallout.interfaces')
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local auxUtil = require('openfallout_aux.util')
 local common = require('scripts.omw.spellcasting.common')
 
 I.Projectiles.addOnProjectileHitHandler(I.Projectiles.TYPES.Magic, function(projectile, hitResult)

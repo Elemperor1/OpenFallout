@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_LAYOUT_H
-#define OPENMW_MWGUI_LAYOUT_H
+#ifndef OPENFALLOUT_MWGUI_LAYOUT_H
+#define OPENFALLOUT_MWGUI_LAYOUT_H
 
 #include <string>
 #include <string_view>

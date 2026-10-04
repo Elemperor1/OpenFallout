@@ -1,4 +1,4 @@
-local util = require('openmw.util')
+local util = require('openfallout.util')
 
 local function shallowLayoutCopy(source, target)
     for k in pairs(target) do
@@ -13,9 +13,9 @@ end
 ---
 -- @type Templates
 -- @usage
--- local I = require('openmw.interfaces')
--- local ui = require('openmw.ui')
--- local auxUi = require('openmw_aux.ui')
+-- local I = require('openfallout.interfaces')
+-- local ui = require('openfallout.ui')
+-- local auxUi = require('openfallout_aux.ui')
 -- ui.create {
 --     template = I.MWUI.templates.textNormal,
 --     layer = 'Windows',
@@ -47,7 +47,7 @@ local templatesMeta = {
 ---
 -- @module MWUI
 -- @context menu|player
--- @usage require('openmw.interfaces').MWUI
+-- @usage require('openfallout.interfaces').MWUI
 local function TemplateOverrides(templates)
     return setmetatable({
         __templates = util.makeReadOnly(templates),
@@ -60,87 +60,87 @@ local templates = {}
 
 ---
 -- Container that adds padding around its content.
--- @field [parent=#Templates] openmw.ui#Template padding
+-- @field [parent=#Templates] openfallout.ui#Template padding
 
 ---
 -- Standard spacing interval
--- @field [parent=#Templates] openmw.ui#Template interval
+-- @field [parent=#Templates] openfallout.ui#Template interval
 require('scripts.omw.mwui.space')(templates)
 
 ---
 -- Standard rectangular borders
--- @field [parent=#Templates] openmw.ui#Template borders
+-- @field [parent=#Templates] openfallout.ui#Template borders
 
 ---
 -- Container wrapping the content with borders
--- @field [parent=#Templates] openmw.ui#Template box
+-- @field [parent=#Templates] openfallout.ui#Template box
 
 ---
 -- Same as box, but with a semi-transparent background
--- @field [parent=#Templates] openmw.ui#Template boxTransparent
+-- @field [parent=#Templates] openfallout.ui#Template boxTransparent
 
 ---
 -- Same as box, but with a solid background
--- @field [parent=#Templates] openmw.ui#Template boxSolid
+-- @field [parent=#Templates] openfallout.ui#Template boxSolid
 
 ---
 -- Expanding vertical line
--- @field [parent=#Templates] openmw.ui#Template verticalLine
+-- @field [parent=#Templates] openfallout.ui#Template verticalLine
 
 ---
 -- Expanding horizontal line
--- @field [parent=#Templates] openmw.ui#Template horizontalLine
+-- @field [parent=#Templates] openfallout.ui#Template horizontalLine
 
 ---
 -- Standard rectangular borders
--- @field [parent=#Templates] openmw.ui#Template bordersThick
+-- @field [parent=#Templates] openfallout.ui#Template bordersThick
 
 ---
 -- Container wrapping the content with borders
--- @field [parent=#Templates] openmw.ui#Template boxThick
+-- @field [parent=#Templates] openfallout.ui#Template boxThick
 
 ---
 -- Same as box, but with a semi-transparent background
--- @field [parent=#Templates] openmw.ui#Template boxTransparentThick
+-- @field [parent=#Templates] openfallout.ui#Template boxTransparentThick
 
 ---
 -- Same as box, but with a solid background
--- @field [parent=#Templates] openmw.ui#Template boxSolidThick
+-- @field [parent=#Templates] openfallout.ui#Template boxSolidThick
 
 ---
 -- Expanding vertical line
--- @field [parent=#Templates] openmw.ui#Template verticalLineThick
+-- @field [parent=#Templates] openfallout.ui#Template verticalLineThick
 
 ---
 -- Expanding horizontal line
--- @field [parent=#Templates] openmw.ui#Template horizontalLineThick
+-- @field [parent=#Templates] openfallout.ui#Template horizontalLineThick
 require('scripts.omw.mwui.borders')(templates)
 
 ---
 -- Standard "sand" colored text
--- @field [parent=#Templates] openmw.ui#Template textNormal
+-- @field [parent=#Templates] openfallout.ui#Template textNormal
 
 ---
 -- Header white colored text
--- @field [parent=#Templates] openmw.ui#Template textHeader
+-- @field [parent=#Templates] openfallout.ui#Template textHeader
 
 ---
 -- Standard "sand" colored multiline text
--- @field [parent=#Templates] openmw.ui#Template textParagraph
+-- @field [parent=#Templates] openfallout.ui#Template textParagraph
 require('scripts.omw.mwui.text')(templates)
 
 ---
 -- Single line text input
--- @field [parent=#Templates] openmw.ui#Template textEditLine
+-- @field [parent=#Templates] openfallout.ui#Template textEditLine
 
 ---
 -- Multiline text input
--- @field [parent=#Templates] openmw.ui#Template textEditBox
+-- @field [parent=#Templates] openfallout.ui#Template textEditBox
 require('scripts.omw.mwui.textEdit')(templates)
 
 ---
 -- Shades its children and makes them uninteractible
--- @field [parent=#Templates] openmw.ui#Template disabled
+-- @field [parent=#Templates] openfallout.ui#Template disabled
 require('scripts.omw.mwui.filters')(templates)
 
 ---

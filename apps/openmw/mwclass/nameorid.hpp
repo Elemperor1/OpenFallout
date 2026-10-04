@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWCLASS_NAMEORID_H
-#define OPENMW_MWCLASS_NAMEORID_H
+#ifndef OPENFALLOUT_MWCLASS_NAMEORID_H
+#define OPENFALLOUT_MWCLASS_NAMEORID_H
 
 #include <components/esm/refid.hpp>
 

@@ -21,5 +21,5 @@ Pursue another actor.
     - boolean [default=true]
     - whether to cancel all other AI packages
   * - target
-    - `GameObject <../openmw_core.html##(GameObject)>`_ [required]
+    - `GameObject <../openfallout_core.html##(GameObject)>`_ [required]
     - the actor to pursue

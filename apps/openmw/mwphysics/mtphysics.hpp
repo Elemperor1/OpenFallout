@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWPHYSICS_MTPHYSICS_H
-#define OPENMW_MWPHYSICS_MTPHYSICS_H
+#ifndef OPENFALLOUT_MWPHYSICS_MTPHYSICS_H
+#define OPENFALLOUT_MWPHYSICS_MTPHYSICS_H
 
 #include <atomic>
 #include <condition_variable>

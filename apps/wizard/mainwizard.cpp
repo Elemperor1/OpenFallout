@@ -23,7 +23,7 @@
 #include "languageselectionpage.hpp"
 #include "methodselectionpage.hpp"
 
-#ifdef OPENMW_USE_UNSHIELD
+#ifdef OPENFALLOUT_USE_UNSHIELD
 #include "installationpage.hpp"
 #endif
 
@@ -261,7 +261,7 @@ void Wizard::MainWizard::setupPages()
     setPage(Page_ExistingInstallation, new ExistingInstallationPage(this));
     setPage(Page_InstallationTarget, new InstallationTargetPage(this, mCfgMgr));
     setPage(Page_ComponentSelection, new ComponentSelectionPage(this));
-#ifdef OPENMW_USE_UNSHIELD
+#ifdef OPENFALLOUT_USE_UNSHIELD
     setPage(Page_Installation, new InstallationPage(this, mGameSettings));
 #endif
     setPage(Page_Import, new ImportPage(this));

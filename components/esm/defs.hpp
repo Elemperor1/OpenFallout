@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_DEFS_H
-#define OPENMW_ESM_DEFS_H
+#ifndef OPENFALLOUT_ESM_DEFS_H
+#define OPENFALLOUT_ESM_DEFS_H
 
 #include <stdexcept>
 #include <stdint.h>

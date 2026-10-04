@@ -40,12 +40,12 @@ endif()
 
 source_group(apps\\openfallout-tests FILES ${UNITTEST_SRC_FILES})
 
-openmw_add_executable(openfallout-tests ${UNITTEST_SRC_FILES})
+openfallout_add_executable(openfallout-tests ${UNITTEST_SRC_FILES})
 
 target_link_libraries(openfallout-tests
     GTest::GTest
     GMock::GMock
-    openmw-lib
+    openfallout-lib
 )
 
 # Fix for not visible pthreads functions for linker with glibc 2.15
@@ -63,8 +63,8 @@ if (BUILD_WITH_CODE_COVERAGE)
 endif()
 
 target_compile_definitions(openfallout-tests
-    PRIVATE OPENMW_DATA_DIR=u8"${CMAKE_CURRENT_BINARY_DIR}/data"
-            OPENMW_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
+    PRIVATE OPENFALLOUT_DATA_DIR=u8"${CMAKE_CURRENT_BINARY_DIR}/data"
+            OPENFALLOUT_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
     target_precompile_headers(openfallout-tests PRIVATE

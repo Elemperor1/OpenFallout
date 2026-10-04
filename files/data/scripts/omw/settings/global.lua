@@ -1,4 +1,4 @@
-local storage = require('openmw.storage')
+local storage = require('openfallout.storage')
 
 local common = require('scripts.omw.settings.common')
 common.getSection(true, common.groupSectionKey):setLifeTime(storage.LIFE_TIME.Temporary)

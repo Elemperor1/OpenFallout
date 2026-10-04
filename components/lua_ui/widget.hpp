@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_WIDGET
-#define OPENMW_LUAUI_WIDGET
+#ifndef OPENFALLOUT_LUAUI_WIDGET
+#define OPENFALLOUT_LUAUI_WIDGET
 
 #include <functional>
 #include <map>
@@ -234,4 +234,4 @@ namespace LuaUi
     };
 }
 
-#endif // !OPENMW_LUAUI_WIDGET
+#endif // !OPENFALLOUT_LUAUI_WIDGET

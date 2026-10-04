@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_SKYUTIL_H
-#define OPENMW_MWRENDER_SKYUTIL_H
+#ifndef OPENFALLOUT_MWRENDER_SKYUTIL_H
+#define OPENFALLOUT_MWRENDER_SKYUTIL_H
 
 #include <osg/Matrixf>
 #include <osg/Texture2D>

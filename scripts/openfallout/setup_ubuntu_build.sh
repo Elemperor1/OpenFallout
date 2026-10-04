@@ -84,8 +84,8 @@ Dependencies are ready. Configure and build from the repository root with:
   cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \\
       -DCMAKE_PREFIX_PATH="$PREFIX/mygui;$PREFIX/recast" \\
       -DBUILD_LAUNCHER=ON -DBUILD_WIZARD=ON -DBUILD_OPENCS=ON -DBUILD_OPENCS_TESTS=ON \\
-      -DBUILD_COMPONENTS_TESTS=ON -DBUILD_OPENMW_TESTS=ON \\
-      -DOPENMW_USE_SYSTEM_RECASTNAVIGATION=ON -DOPENMW_USE_SYSTEM_GOOGLETEST=ON
+      -DBUILD_COMPONENTS_TESTS=ON -DBUILD_OPENFALLOUT_TESTS=ON \\
+      -DOPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION=ON -DOPENFALLOUT_USE_SYSTEM_GOOGLETEST=ON
   cmake --build build
   build/components-tests && build/openfallout-tests && build/openfallout-cs-tests
 EOF

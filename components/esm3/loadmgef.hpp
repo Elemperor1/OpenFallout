@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_MGEF_H
-#define OPENMW_ESM_MGEF_H
+#ifndef OPENFALLOUT_ESM_MGEF_H
+#define OPENFALLOUT_ESM_MGEF_H
 
 #include <array>
 #include <map>

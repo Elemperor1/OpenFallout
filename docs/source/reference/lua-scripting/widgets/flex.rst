@@ -49,7 +49,7 @@ Properties
     - | Modulate `alpha` with parents `alpha`.
       | If the parent has `inheritAlpha` set to `true`, the value after modulating is passed to the child.
   * - cursor
-    - `CursorResource <../openmw_ui.html##(CursorResource)>`_
+    - `CursorResource <../openfallout_ui.html##(CursorResource)>`_
     - Sets the cursor to be displayed when hovering over this widget.
   * - horizontal
     - bool (false)
@@ -88,13 +88,13 @@ The event is still allowed to propagate if the event handler returns `true`.
     - first argument type
     - description
   * - keyPress
-    - `KeyboardEvent <../openmw_input.html##(KeyboardEvent)>`_
+    - `KeyboardEvent <../openfallout_input.html##(KeyboardEvent)>`_
     - A key was pressed with this widget in focus
   * - keyRelease
-    - `KeyboardEvent <../openmw_input.html##(KeyboardEvent)>`_
+    - `KeyboardEvent <../openfallout_input.html##(KeyboardEvent)>`_
     - A key was released with this widget in focus
   * - mouseMove
-    - `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    - `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - | Mouse cursor moved on this widget
       | `MouseEvent.button` is the mouse button being held
       | (nil when simply moving, and not dragging)
@@ -105,10 +105,10 @@ The event is still allowed to propagate if the event handler returns `true`.
     - nil
     - Widget was double clicked with left mouse button
   * - mousePress  
-    - `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    - `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - A mouse button was pressed on this widget
   * - mouseRelease  
-    -  `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    -  `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - A mouse button was released on this widget
   * - focusGain
     - nil
@@ -151,8 +151,8 @@ This example demonstrates creating a horizontal flex widget that incorporates wr
 
       .. code-block:: lua
 
-         local ui = require('openmw.ui')
-         local util = require('openmw.util')
+         local ui = require('openfallout.ui')
+         local util = require('openfallout.util')
   
         ui.create({
           layer = "Windows",
@@ -235,8 +235,8 @@ The second flex child has an external stretch property set. It is set to *1* so 
 
       .. code-block:: lua
 
-        local ui = require('openmw.ui')
-        local util = require('openmw.util')
+        local ui = require('openfallout.ui')
+        local util = require('openfallout.util')
 
         ui.create({
           layer = "Windows",
@@ -319,9 +319,9 @@ This example uses the `MWUI Interface <./../interface_mwui.html>`_ to style widg
 
       .. code-block:: lua
 
-        local ui = require('openmw.ui')
-        local util = require('openmw.util')
-        local mwui = require('openmw.interfaces').MWUI
+        local ui = require('openfallout.ui')
+        local util = require('openfallout.util')
+        local mwui = require('openfallout.interfaces').MWUI
 
         ui.create({
           layer = "Windows",
@@ -380,9 +380,9 @@ To better understand how the external grow property works, another example is pr
 
       .. code-block:: lua
 
-        local ui = require('openmw.ui')
-        local util = require('openmw.util')
-        local mwui = require('openmw.interfaces').MWUI
+        local ui = require('openfallout.ui')
+        local util = require('openfallout.util')
+        local mwui = require('openfallout.interfaces').MWUI
 
         ui.create({
           layer = "Windows",

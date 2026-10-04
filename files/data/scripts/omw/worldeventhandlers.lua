@@ -1,4 +1,4 @@
-local world = require('openmw.world')
+local world = require('openfallout.world')
 
 return {
     eventHandlers = {

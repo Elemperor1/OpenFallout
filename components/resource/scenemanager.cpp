@@ -915,7 +915,7 @@ namespace Resource
     unsigned int getOptimizationOptions()
     {
         using namespace SceneUtil;
-        const char* env = getenv("OPENMW_OPTIMIZE");
+        const char* env = getenv("OPENFALLOUT_OPTIMIZE");
         unsigned int options
             = Optimizer::FLATTEN_STATIC_TRANSFORMS | Optimizer::REMOVE_REDUNDANT_NODES | Optimizer::MERGE_GEOMETRY;
         if (env)

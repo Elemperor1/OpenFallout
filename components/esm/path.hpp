@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_ESM_PATH_H
-#define OPENMW_COMPONENTS_ESM_PATH_H
+#ifndef OPENFALLOUT_COMPONENTS_ESM_PATH_H
+#define OPENFALLOUT_COMPONENTS_ESM_PATH_H
 
 #include <components/vfs/pathutil.hpp>
 

@@ -31,7 +31,7 @@ namespace MWLua
         SelfObject* asSelfObject() const
         {
             if (!isSelfObject())
-                throw std::runtime_error("Allowed only in local scripts for 'openmw.self'.");
+                throw std::runtime_error("Allowed only in local scripts for 'openfallout.self'.");
             return std::get<SelfObject*>(mVariant);
         }
 

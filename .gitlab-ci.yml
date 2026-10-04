@@ -66,7 +66,7 @@ Ubuntu_GCC_preprocess:
   stage: build
   variables:
     CMAKE_EXE_LINKER_FLAGS: -fuse-ld=mold
-    OPENMW_CXX_FLAGS: "-Werror -Werror=implicit-fallthrough"
+    OPENFALLOUT_CXX_FLAGS: "-Werror -Werror=implicit-fallthrough"
   script:
     - df -h
     - export CCACHE_BASEDIR="`pwd`"
@@ -152,7 +152,7 @@ Coverity:
     - cov-analysis-linux64-*/bin/cov-build --dir cov-int cmake --build build -- -j $(nproc)
     - ccache -svv
     - tar cfz cov-int.tar.gz cov-int
-    - echo "OPENMW_JOB_ID=$CI_JOB_ID" >> build.env
+    - echo "OPENFALLOUT_JOB_ID=$CI_JOB_ID" >> build.env
   artifacts:
     expire_in: 1 day
     paths:
@@ -170,12 +170,12 @@ Coverity_Upload:
   before_script:
     - CI/install_debian_deps.sh coverity_upload
   script:
-    - echo "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$OPENMW_JOB_ID/artifacts/cov-int.tar.gz"
+    - echo "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$OPENFALLOUT_JOB_ID/artifacts/cov-int.tar.gz"
     - curl https://scan.coverity.com/builds?project=$COVERITY_SCAN_PROJECT_NAME
       --form token=$COVERITY_SCAN_TOKEN --form email=$GITLAB_USER_EMAIL
       --form version="$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA"
       --form description="CI_COMMIT_SHORT_SHA / $CI_COMMIT_TITLE / $CI_COMMIT_REF_NAME:$CI_PIPELINE_ID"
-      --form url="$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$OPENMW_JOB_ID/artifacts/cov-int.tar.gz"
+      --form url="$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$OPENFALLOUT_JOB_ID/artifacts/cov-int.tar.gz"
   needs:
     - Coverity
 
@@ -201,9 +201,9 @@ Ubuntu_GCC_asan:
     CMAKE_BUILD_TYPE: Debug
     CMAKE_CXX_FLAGS_DEBUG: -g -O1 -fno-omit-frame-pointer -fsanitize=address -fsanitize=pointer-subtract -fsanitize=leak
     CMAKE_EXE_LINKER_FLAGS: -fsanitize=address -fsanitize=pointer-subtract -fsanitize=leak -fuse-ld=mold
-    BUILD_OPENMW_ONLY: 1
+    BUILD_OPENFALLOUT_ONLY: 1
     # Disable -Werror due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105562
-    OPENMW_CXX_FLAGS: ""
+    OPENFALLOUT_CXX_FLAGS: ""
 
 Clang_Format:
   extends: .Ubuntu_Image
@@ -306,7 +306,7 @@ Ubuntu_GCC_tests_asan:
     CMAKE_EXE_LINKER_FLAGS: -fsanitize=address -fsanitize=pointer-subtract -fsanitize=leak -fuse-ld=mold
     ASAN_OPTIONS: halt_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1
     # Disable -Werror due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105562
-    OPENMW_CXX_FLAGS: ""
+    OPENFALLOUT_CXX_FLAGS: ""
   artifacts:
     paths: []
     name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
@@ -399,7 +399,7 @@ Ubuntu_GCC_tests_coverage:
   before_script:
     - CI/install_debian_deps.sh gcc openmw-deps openmw-deps-static
   variables:
-    CI_OPENMW_USE_STATIC_DEPS: 1
+    CI_OPENFALLOUT_USE_STATIC_DEPS: 1
     CC: gcc
     CXX: g++
     CXXFLAGS: -O0
@@ -522,7 +522,7 @@ Ubuntu_Clang_tests_Debug:
       - .cache/pip
       - apt-cache/
   before_script:
-    - CI/install_debian_deps.sh $OPENMW_DEPS
+    - CI/install_debian_deps.sh $OPENFALLOUT_DEPS
     - pip3 install --user --break-system-packages numpy matplotlib termtables click
   script:
     - CI/run_integration_tests.sh
@@ -548,7 +548,7 @@ Ubuntu_Clang_integration_tests:
   cache:
     key: Ubuntu_Clang_integration_tests.ubuntu_24.04.v4.$CI_COMMIT_REF_PROTECTED
   variables:
-    OPENMW_DEPS: openmw-integration-tests
+    OPENFALLOUT_DEPS: openmw-integration-tests
 
 Ubuntu_GCC_integration_tests_asan:
   extends: .Ubuntu_integration_tests_base
@@ -557,7 +557,7 @@ Ubuntu_GCC_integration_tests_asan:
   cache:
     key: Ubuntu_GCC_integration_tests_asan.ubuntu_24.04.v3.$CI_COMMIT_REF_PROTECTED
   variables:
-    OPENMW_DEPS: openmw-integration-tests libasan
+    OPENFALLOUT_DEPS: openmw-integration-tests libasan
     ASAN_OPTIONS: halt_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_leaks=0
 
 .MacOS:

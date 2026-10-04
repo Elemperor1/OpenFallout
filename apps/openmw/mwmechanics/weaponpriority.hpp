@@ -1,5 +1,5 @@
-#ifndef OPENMW_WEAPON_PRIORITY_H
-#define OPENMW_WEAPON_PRIORITY_H
+#ifndef OPENFALLOUT_WEAPON_PRIORITY_H
+#define OPENFALLOUT_WEAPON_PRIORITY_H
 
 #include <components/esm/refid.hpp>
 

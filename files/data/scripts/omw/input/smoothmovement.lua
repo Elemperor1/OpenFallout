@@ -1,9 +1,9 @@
-local input = require('openmw.input')
-local util = require('openmw.util')
-local async = require('openmw.async')
-local storage = require('openmw.storage')
-local types = require('openmw.types')
-local self = require('openmw.self')
+local input = require('openfallout.input')
+local util = require('openfallout.util')
+local async = require('openfallout.async')
+local storage = require('openfallout.storage')
+local types = require('openfallout.types')
+local self = require('openfallout.self')
 
 local NPC = types.NPC
 
@@ -17,7 +17,7 @@ for _, key in ipairs(moveActions) do
     local smoothKey = 'Smooth' .. key
     input.registerAction {
         key = smoothKey,
-        l10n = 'OMWControls',
+        l10n = 'OFControls',
         name = smoothKey .. '_name',
         description = smoothKey .. '_description',
         type = input.ACTION_TYPE.Range,

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CREA_H
-#define OPENMW_ESM_CREA_H
+#ifndef OPENFALLOUT_ESM_CREA_H
+#define OPENFALLOUT_ESM_CREA_H
 
 #include <map>
 #include <string>

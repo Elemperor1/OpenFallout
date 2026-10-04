@@ -87,7 +87,7 @@ namespace MWGui
     void SaveGameDialog::confirmDeleteSave()
     {
         ConfirmationDialog* dialog = MWBase::Environment::get().getWindowManager()->getConfirmationDialog();
-        dialog->askForConfirmation("#{OMWEngine:DeleteGameConfirmation}");
+        dialog->askForConfirmation("#{OFEngine:DeleteGameConfirmation}");
         dialog->eventOkClicked.clear();
         dialog->eventOkClicked += MyGUI::newDelegate(this, &SaveGameDialog::onDeleteSlotConfirmed);
         dialog->eventCancelClicked.clear();
@@ -226,7 +226,7 @@ namespace MWGui
                         className = "?"; // From an older savegame format that did not support custom classes properly.
                 }
 
-                title << " (#{OMWEngine:Level} " << signature.mPlayerLevel << " "
+                title << " (#{OFEngine:Level} " << signature.mPlayerLevel << " "
                       << MyGUI::TextIterator::toTagsString(MyGUI::UString(className)) << ")";
 
                 const MyGUI::UString playerDesc = MyGUI::LanguageManager::getInstance().replaceTags(title.str());
@@ -249,7 +249,7 @@ namespace MWGui
         }
         mCharacterSelection->setIndexSelected(selectedIndex);
         if (selectedIndex == MyGUI::ITEM_NONE)
-            mCharacterSelection->setCaptionWithReplacing("#{OMWEngine:SelectCharacter}");
+            mCharacterSelection->setCaptionWithReplacing("#{OFEngine:SelectCharacter}");
 
         fillSaveList();
     }
@@ -301,7 +301,7 @@ namespace MWGui
             if (mCurrentSlot != nullptr && !reallySure)
             {
                 ConfirmationDialog* dialog = MWBase::Environment::get().getWindowManager()->getConfirmationDialog();
-                dialog->askForConfirmation("#{OMWEngine:OverwriteGameConfirmation}");
+                dialog->askForConfirmation("#{OFEngine:OverwriteGameConfirmation}");
                 dialog->eventOkClicked.clear();
                 dialog->eventOkClicked += MyGUI::newDelegate(this, &SaveGameDialog::onConfirmationGiven);
                 dialog->eventCancelClicked.clear();
@@ -310,7 +310,7 @@ namespace MWGui
             }
             if (mSaveNameEdit->getCaption().empty())
             {
-                MWBase::Environment::get().getWindowManager()->messageBox("#{OMWEngine:EmptySaveNameError}");
+                MWBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:EmptySaveNameError}");
                 return;
             }
         }
@@ -322,7 +322,7 @@ namespace MWGui
             if (state == MWBase::StateManager::State_Running && !reallySure)
             {
                 ConfirmationDialog* dialog = MWBase::Environment::get().getWindowManager()->getConfirmationDialog();
-                dialog->askForConfirmation("#{OMWEngine:LoadGameConfirmation}");
+                dialog->askForConfirmation("#{OFEngine:LoadGameConfirmation}");
                 dialog->eventOkClicked.clear();
                 dialog->eventOkClicked += MyGUI::newDelegate(this, &SaveGameDialog::onConfirmationGiven);
                 dialog->eventCancelClicked.clear();
@@ -448,13 +448,13 @@ namespace MWGui
         if (slotPlayerName != profileSavedGame.mPlayerName)
             text << slotPlayerName << "\n";
 
-        text << "#{OMWEngine:Level} " << mCurrentSlot->mProfile.mPlayerLevel << "\n";
+        text << "#{OFEngine:Level} " << mCurrentSlot->mProfile.mPlayerLevel << "\n";
 
         if (mCurrentSlot->mProfile.mCurrentDay > 0)
             text << "#{Calendar:day} " << mCurrentSlot->mProfile.mCurrentDay << "\n";
 
         if (mCurrentSlot->mProfile.mMaximumHealth > 0)
-            text << "#{OMWEngine:Health} " << static_cast<int>(mCurrentSlot->mProfile.mCurrentHealth) << "/"
+            text << "#{OFEngine:Health} " << static_cast<int>(mCurrentSlot->mProfile.mCurrentHealth) << "/"
                  << static_cast<int>(mCurrentSlot->mProfile.mMaximumHealth) << "\n";
 
         int hour = int(mCurrentSlot->mProfile.mInGameTime.mGameHour);
@@ -471,7 +471,7 @@ namespace MWGui
 
         if (mCurrentSlot->mProfile.mTimePlayed > 0)
         {
-            text << "#{OMWEngine:TimePlayed}: " << formatTimeplayed(mCurrentSlot->mProfile.mTimePlayed) << "\n";
+            text << "#{OFEngine:TimePlayed}: " << formatTimeplayed(mCurrentSlot->mProfile.mTimePlayed) << "\n";
         }
 
         text << Misc::fileTimeToString(mCurrentSlot->mTimeStamp, "%Y.%m.%d %T") << "\n";
@@ -527,7 +527,7 @@ namespace MWGui
 
     ControllerButtons* SaveGameDialog::getControllerButtons()
     {
-        mControllerButtons.mY = mSaving ? "" : "#{OMWEngine:LoadingSelectCharacter}";
+        mControllerButtons.mY = mSaving ? "" : "#{OFEngine:LoadingSelectCharacter}";
         return &mControllerButtons;
     }
 

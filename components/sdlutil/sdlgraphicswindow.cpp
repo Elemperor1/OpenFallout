@@ -2,7 +2,7 @@
 
 #include <SDL_video.h>
 
-#ifdef OPENMW_GL4ES_MANUAL_INIT
+#ifdef OPENFALLOUT_GL4ES_MANUAL_INIT
 #include "gl4esinit.h"
 #endif
 
@@ -103,11 +103,11 @@ namespace SDLUtil
         SDL_Window* oldWin = SDL_GL_GetCurrentWindow();
         SDL_GLContext oldCtx = SDL_GL_GetCurrentContext();
 
-#if defined(ANDROID) || defined(OPENMW_GL4ES_MANUAL_INIT)
+#if defined(ANDROID) || defined(OPENFALLOUT_GL4ES_MANUAL_INIT)
         int major = 2;
         int minor = 0;
 
-        if (const char* const version_env = getenv("OPENMW_GLES_VERSION"))
+        if (const char* const version_env = getenv("OPENFALLOUT_GLES_VERSION"))
         {
             const std::string_view version(version_env);
 
@@ -145,7 +145,7 @@ namespace SDLUtil
             return;
         }
 
-#ifdef OPENMW_GL4ES_MANUAL_INIT
+#ifdef OPENFALLOUT_GL4ES_MANUAL_INIT
         openmw_gl4es_init(mWindow);
 #endif
 

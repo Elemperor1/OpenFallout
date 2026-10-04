@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_NPCSTATE_H
-#define OPENMW_ESM_NPCSTATE_H
+#ifndef OPENFALLOUT_ESM_NPCSTATE_H
+#define OPENFALLOUT_ESM_NPCSTATE_H
 
 #include "creaturestats.hpp"
 #include "inventorystate.hpp"

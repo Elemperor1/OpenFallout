@@ -1,6 +1,6 @@
 local testing = require('testing_util')
-local core = require('openmw.core')
-local util = require('openmw.util')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
 
 testing.registerGlobalTest('[weather] Should be able to change weather records', function()
     local record = core.weather.records['clear']

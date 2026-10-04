@@ -4,7 +4,7 @@ Post-Processing
 
 OpenMW supports a moddable post process framework for creating and
 controlling screenspace effects. This is integrated into OpenMW's Lua API, see
-`reference <../lua-scripting/openmw_postprocessing.html>`_ for details.
+`reference <../lua-scripting/openfallout_postprocessing.html>`_ for details.
 
 Basic concepts
 ==============

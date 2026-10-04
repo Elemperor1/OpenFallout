@@ -12,9 +12,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(OPENMW_GL4ES_MANUAL_INIT "Manually initialize gl4es. This is more reliable on platforms without a windowing system. Requires gl4es to be configured with -DNOEGL=ON -DNO_LOADER=ON -DNO_INIT_CONSTRUCTOR=ON." OFF)
-if(OPENMW_GL4ES_MANUAL_INIT)
-    add_compile_definitions(OPENMW_GL4ES_MANUAL_INIT)
+option(OPENFALLOUT_GL4ES_MANUAL_INIT "Manually initialize gl4es. This is more reliable on platforms without a windowing system. Requires gl4es to be configured with -DNOEGL=ON -DNO_LOADER=ON -DNO_INIT_CONSTRUCTOR=ON." OFF)
+if(OPENFALLOUT_GL4ES_MANUAL_INIT)
+    add_compile_definitions(OPENFALLOUT_GL4ES_MANUAL_INIT)
 endif()
 
 if (APPLE OR WIN32)
@@ -26,7 +26,7 @@ endif ()
 option(DEPLOY_QT_TRANSLATIONS "Deploy standard Qt translations to resources folder. Needed when OpenFallout applications are deployed with Qt libraries" ${DEPLOY_QT_TRANSLATIONS_DEFAULT})
 
 # Apps and tools
-option(BUILD_OPENMW             "Build OpenFallout" ON)
+option(BUILD_OPENFALLOUT             "Build OpenFallout" ON)
 option(BUILD_LAUNCHER           "Build Launcher" ON)
 option(BUILD_WIZARD             "Build Installation Wizard" ON)
 option(BUILD_MWINIIMPORTER      "Build MWiniImporter" ON)
@@ -42,7 +42,7 @@ option(BUILD_BENCHMARKS         "Build benchmarks with Google Benchmark" OFF)
 option(BUILD_NAVMESHTOOL        "Build navmesh tool" ON)
 option(BUILD_BULLETOBJECTTOOL   "Build Bullet object tool" ON)
 option(BUILD_OPENCS_TESTS       "Build OpenFallout Construction Set tests" OFF)
-option(BUILD_OPENMW_TESTS       "Build OpenFallout tests" OFF)
+option(BUILD_OPENFALLOUT_TESTS       "Build OpenFallout tests" OFF)
 option(PRECOMPILE_HEADERS_WITH_MSVC "Precompile most common used headers with MSVC (alternative to ccache)" ON)
 
 set(OpenGL_GL_PREFERENCE LEGACY)  # Use LEGACY as we use GL2; GLNVD is for GL3 and up.
@@ -71,25 +71,25 @@ endif (APPLE)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/)
 
 if (ANDROID)
-    set(CMAKE_FIND_ROOT_PATH ${OPENMW_DEPENDENCIES_DIR} "${CMAKE_FIND_ROOT_PATH}")
+    set(CMAKE_FIND_ROOT_PATH ${OPENFALLOUT_DEPENDENCIES_DIR} "${CMAKE_FIND_ROOT_PATH}")
 endif()
 
 # Version
 message(STATUS "Configuring OpenFallout...")
 
-set(OPENMW_VERSION_MAJOR 0)
-set(OPENMW_VERSION_MINOR 52)
-set(OPENMW_VERSION_RELEASE 0)
-set(OPENMW_LUA_API_REVISION 162)
-set(OPENMW_POSTPROCESSING_API_REVISION 5)
+set(OPENFALLOUT_VERSION_MAJOR 0)
+set(OPENFALLOUT_VERSION_MINOR 52)
+set(OPENFALLOUT_VERSION_RELEASE 0)
+set(OPENFALLOUT_LUA_API_REVISION 162)
+set(OPENFALLOUT_POSTPROCESSING_API_REVISION 5)
 
-set(OPENMW_VERSION_COMMITHASH "")
-set(OPENMW_VERSION_TAGHASH "")
-set(OPENMW_VERSION_COMMITDATE "")
+set(OPENFALLOUT_VERSION_COMMITHASH "")
+set(OPENFALLOUT_VERSION_TAGHASH "")
+set(OPENFALLOUT_VERSION_COMMITDATE "")
 
-set(OPENMW_VERSION "${OPENMW_VERSION_MAJOR}.${OPENMW_VERSION_MINOR}.${OPENMW_VERSION_RELEASE}")
+set(OPENFALLOUT_VERSION "${OPENFALLOUT_VERSION_MAJOR}.${OPENFALLOUT_VERSION_MINOR}.${OPENFALLOUT_VERSION_RELEASE}")
 
-set(OPENMW_DOC_BASEURL "https://openmw.readthedocs.io/en/")
+set(OPENFALLOUT_DOC_BASEURL "https://openmw.readthedocs.io/en/")
 
 set(GIT_CHECKOUT FALSE)
 if(EXISTS ${PROJECT_SOURCE_DIR}/.git)
@@ -106,16 +106,16 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/.git)
                 COMMAND ${GIT_EXECUTABLE} log -1 --format='%aI'
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 RESULT_VARIABLE EXITCODE3
-                OUTPUT_VARIABLE OPENMW_VERSION_COMMITDATE
+                OUTPUT_VARIABLE OPENFALLOUT_VERSION_COMMITDATE
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
         if(NOT EXITCODE3)
-            string(SUBSTRING ${OPENMW_VERSION_COMMITDATE} 1 10 OPENMW_VERSION_COMMITDATE)
+            string(SUBSTRING ${OPENFALLOUT_VERSION_COMMITDATE} 1 10 OPENFALLOUT_VERSION_COMMITDATE)
         endif(NOT EXITCODE3)
     endif(GIT_FOUND)
 endif(EXISTS ${PROJECT_SOURCE_DIR}/.git)
 
 # Macros
-include(OpenMWMacros)
+include(OpenFalloutMacros)
 include(WholeArchive)
 
 # doxygen main page
@@ -124,32 +124,32 @@ configure_file ("${OpenFallout_SOURCE_DIR}/docs/mainpage.hpp.cmake" "${OpenFallo
 
 option(QT_STATIC "Link static build of Qt into the binaries" FALSE)
 
-option(OPENMW_USE_SYSTEM_BULLET "Use system provided bullet physics library" ON)
-if(OPENMW_USE_SYSTEM_BULLET)
+option(OPENFALLOUT_USE_SYSTEM_BULLET "Use system provided bullet physics library" ON)
+if(OPENFALLOUT_USE_SYSTEM_BULLET)
     set(_bullet_static_default OFF)
 else()
     set(_bullet_static_default ON)
 endif()
 option(BULLET_STATIC "Link static build of Bullet into the binaries" ${_bullet_static_default})
 
-option(OPENMW_USE_SYSTEM_OSG "Use system provided OpenSceneGraph libraries" ON)
-if(OPENMW_USE_SYSTEM_OSG)
+option(OPENFALLOUT_USE_SYSTEM_OSG "Use system provided OpenSceneGraph libraries" ON)
+if(OPENFALLOUT_USE_SYSTEM_OSG)
     set(_osg_static_default OFF)
 else()
     set(_osg_static_default ON)
 endif()
 option(OSG_STATIC "Link static build of OpenSceneGraph into the binaries" ${_osg_static_default})
 
-option(OPENMW_USE_SYSTEM_MYGUI "Use system provided mygui library" ON)
-if(OPENMW_USE_SYSTEM_MYGUI)
+option(OPENFALLOUT_USE_SYSTEM_MYGUI "Use system provided mygui library" ON)
+if(OPENFALLOUT_USE_SYSTEM_MYGUI)
     set(_mygui_static_default OFF)
 else()
     set(_mygui_static_default ON)
 endif()
 option(MYGUI_STATIC "Link static build of Mygui into the binaries" ${_mygui_static_default})
 
-option(OPENMW_USE_SYSTEM_RECASTNAVIGATION "Use system provided recastnavigation library" OFF)
-if(OPENMW_USE_SYSTEM_RECASTNAVIGATION)
+option(OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION "Use system provided recastnavigation library" OFF)
+if(OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION)
     set(_recastnavigation_static_default OFF)
     find_package(RecastNavigation REQUIRED CONFIG)
 else()
@@ -157,27 +157,27 @@ else()
 endif()
 option(RECASTNAVIGATION_STATIC "Build recastnavigation static libraries" ${_recastnavigation_static_default})
 
-option(OPENMW_USE_SYSTEM_SQLITE3 "Use system provided SQLite3 library" ON)
+option(OPENFALLOUT_USE_SYSTEM_SQLITE3 "Use system provided SQLite3 library" ON)
 
-option(OPENMW_USE_SYSTEM_BENCHMARK "Use system Google Benchmark library." OFF)
-option(OPENMW_USE_SYSTEM_GOOGLETEST "Use system Google Test library." OFF)
+option(OPENFALLOUT_USE_SYSTEM_BENCHMARK "Use system Google Benchmark library." OFF)
+option(OPENFALLOUT_USE_SYSTEM_GOOGLETEST "Use system Google Test library." OFF)
 
-option(OPENMW_UNITY_BUILD "Use fewer compilation units to speed up compile time" FALSE)
-option(OPENMW_LTO_BUILD "Build OpenFallout with Link-Time Optimization (Needs ~2GB of RAM)" OFF)
+option(OPENFALLOUT_UNITY_BUILD "Use fewer compilation units to speed up compile time" FALSE)
+option(OPENFALLOUT_LTO_BUILD "Build OpenFallout with Link-Time Optimization (Needs ~2GB of RAM)" OFF)
 
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
-    if (OPENMW_MSBUILD_COMPILER_OVERRIDE)
-        if (NOT IS_ABSOLUTE OPENMW_MSBUILD_COMPILER_OVERRIDE)
-            find_program(OPENMW_MSBUILD_COMPILER_OVERRIDE_PATH "${OPENMW_MSBUILD_COMPILER_OVERRIDE}")
+    if (OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE)
+        if (NOT IS_ABSOLUTE OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE)
+            find_program(OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE_PATH "${OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE}")
         else()
-            set(OPENMW_MSBUILD_COMPILER_OVERRIDE_PATH "${OPENMW_MSBUILD_COMPILER_OVERRIDE}")
+            set(OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE_PATH "${OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE}")
         endif()
         if (DEFINED ENV{ChocolateyInstall})
             # if Chocolatey's installed, it's relatively likely that the command's a shim and won't work if copied
             # it's safer to shim it
-            execute_process(COMMAND "$ENV{ChocolateyInstall}/tools/shimgen.exe" -p "${OPENMW_MSBUILD_COMPILER_OVERRIDE_PATH}" -o "${CMAKE_BINARY_DIR}/cl.exe" -c cl.exe)
+            execute_process(COMMAND "$ENV{ChocolateyInstall}/tools/shimgen.exe" -p "${OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE_PATH}" -o "${CMAKE_BINARY_DIR}/cl.exe" -c cl.exe)
         else()
-            file(COPY_FILE "${OPENMW_MSBUILD_COMPILER_OVERRIDE_PATH}" "${CMAKE_BINARY_DIR}/cl.exe" ONLY_IF_DIFFERENT)
+            file(COPY_FILE "${OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE_PATH}" "${CMAKE_BINARY_DIR}/cl.exe" ONLY_IF_DIFFERENT)
         endif()
 
         list(APPEND CMAKE_VS_GLOBALS
@@ -194,13 +194,13 @@ if ((NOT CMAKE_GENERATOR MATCHES "Visual Studio") OR ("UseMultiToolTask=true" IN
 endif()
 
 if (MSVC)
-    option(OPENMW_MP_BUILD "Build OpenFallout with /MP flag" OFF)
-    if (OPENMW_MP_BUILD)
+    option(OPENFALLOUT_MP_BUILD "Build OpenFallout with /MP flag" OFF)
+    if (OPENFALLOUT_MP_BUILD)
         add_compile_options(/MP)
     endif()
 
     # \bigobj is required:
-    #  1) for OPENMW_UNITY_BUILD;
+    #  1) for OPENFALLOUT_UNITY_BUILD;
     #  2) to compile lua bindings in components, openmw and tests, because sol3 is heavily templated.
     # there should be no relevant downsides to having it on:
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
@@ -208,16 +208,16 @@ if (MSVC)
 
     add_compile_options(/Zc:__cplusplus)
 
-    if (CMAKE_CXX_COMPILER_LAUNCHER OR CMAKE_C_COMPILER_LAUNCHER OR OPENMW_MSBUILD_COMPILER_OVERRIDE)
+    if (CMAKE_CXX_COMPILER_LAUNCHER OR CMAKE_C_COMPILER_LAUNCHER OR OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE)
         if ((CMAKE_CXX_COMPILER_LAUNCHER OR CMAKE_C_COMPILER_LAUNCHER) AND CMAKE_GENERATOR MATCHES "Visual Studio")
             message(STATUS "A compiler launcher was specified, but will be unused by the current generator (${CMAKE_GENERATOR})")
         else()
             foreach (config_lower ${CMAKE_CONFIGURATION_TYPES})
                 string(TOUPPER "${config_lower}" config)
-                if (CMAKE_C_COMPILER_LAUNCHER STREQUAL "ccache" OR OPENMW_MSBUILD_COMPILER_OVERRIDE STREQUAL "ccache")
+                if (CMAKE_C_COMPILER_LAUNCHER STREQUAL "ccache" OR OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE STREQUAL "ccache")
                     string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}}")
                 endif()
-                if (CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "ccache" OR OPENMW_MSBUILD_COMPILER_OVERRIDE STREQUAL "ccache")
+                if (CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "ccache" OR OPENFALLOUT_MSBUILD_COMPILER_OVERRIDE STREQUAL "ccache")
                     string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_${config} "${CMAKE_CXX_FLAGS_${config}}")
                 endif()
             endforeach()
@@ -232,12 +232,12 @@ set(CMAKE_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/games/openfallout")
 
 # Set up common paths
 if (UNIX AND NOT APPLE)
-    set(OPENMW_LOCAL_INSTALL_DEFAULT OFF)
+    set(OPENFALLOUT_LOCAL_INSTALL_DEFAULT OFF)
 else()
-    set(OPENMW_LOCAL_INSTALL_DEFAULT ON)
+    set(OPENFALLOUT_LOCAL_INSTALL_DEFAULT ON)
 endif()
-option(OPENMW_LOCAL_INSTALL "Local install of OpenFallout instead of Global" ${OPENMW_LOCAL_INSTALL_DEFAULT})
-if (OPENMW_LOCAL_INSTALL)
+option(OPENFALLOUT_LOCAL_INSTALL "Local install of OpenFallout instead of Global" ${OPENFALLOUT_LOCAL_INSTALL_DEFAULT})
+if (OPENFALLOUT_LOCAL_INSTALL)
     set(CMAKE_INSTALL_BINDIR ".")
     set(CMAKE_INSTALL_LIBDIR "lib")
     set(CMAKE_INSTALL_DATADIR ".")
@@ -245,7 +245,7 @@ if (OPENMW_LOCAL_INSTALL)
 endif()
 
 if (APPLE)
-    set(OPENMW_RESOURCE_FILES "../Resources/resources")
+    set(OPENFALLOUT_RESOURCE_FILES "../Resources/resources")
 elseif(UNIX)
     # Paths
     SET(DATAROOTDIR "${CMAKE_INSTALL_DATAROOTDIR}" CACHE PATH "Sets the root of data directories to a non-default location")
@@ -255,7 +255,7 @@ elseif(UNIX)
 
     SET(GLOBAL_CONFIG_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/.." CACHE PATH "Set absolute config dir path for Global installs. This is baked into the binaries, so MUST be set to the final install path at build time.")
 
-    set(OPENMW_RESOURCE_FILES "${CMAKE_INSTALL_DATADIR}/resources")
+    set(OPENFALLOUT_RESOURCE_FILES "${CMAKE_INSTALL_DATADIR}/resources")
 endif(APPLE)
 
 if (WIN32)
@@ -309,23 +309,23 @@ set(USED_OSG_PLUGINS
     osgdb_serializers_osg
     osgdb_tga)
 
-option(OPENMW_USE_SYSTEM_ICU "Use system ICU library instead of internal. If disabled, requires autotools" ON)
-if(OPENMW_USE_SYSTEM_ICU)
+option(OPENFALLOUT_USE_SYSTEM_ICU "Use system ICU library instead of internal. If disabled, requires autotools" ON)
+if(OPENFALLOUT_USE_SYSTEM_ICU)
     find_package(ICU REQUIRED COMPONENTS uc i18n data)
 endif()
 
-option(OPENMW_USE_SYSTEM_YAML_CPP "Use system yaml-cpp library instead of internal." ON)
-if(OPENMW_USE_SYSTEM_YAML_CPP)
+option(OPENFALLOUT_USE_SYSTEM_YAML_CPP "Use system yaml-cpp library instead of internal." ON)
+if(OPENFALLOUT_USE_SYSTEM_YAML_CPP)
     set(_yaml_cpp_static_default OFF)
 else()
     set(_yaml_cpp_static_default ON)
 endif()
 option(YAML_CPP_STATIC "Link static build of yaml-cpp into the binaries" ${_yaml_cpp_static_default})
-if (OPENMW_USE_SYSTEM_YAML_CPP)
+if (OPENFALLOUT_USE_SYSTEM_YAML_CPP)
     find_package(yaml-cpp REQUIRED)
 endif()
 
-if ((BUILD_COMPONENTS_TESTS OR BUILD_OPENCS_TESTS OR BUILD_OPENMW_TESTS) AND OPENMW_USE_SYSTEM_GOOGLETEST)
+if ((BUILD_COMPONENTS_TESTS OR BUILD_OPENCS_TESTS OR BUILD_OPENFALLOUT_TESTS) AND OPENFALLOUT_USE_SYSTEM_GOOGLETEST)
     find_package(GTest 1.10 REQUIRED)
     find_package(GMock 1.10 REQUIRED)
 endif()
@@ -404,7 +404,7 @@ if (WIN32)
     )
 endif()
 
-if(OPENMW_USE_SYSTEM_BULLET)
+if(OPENFALLOUT_USE_SYSTEM_BULLET)
     set(REQUIRED_BULLET_VERSION 286) # Bullet 286 required due to runtime bugfixes for btCapsuleShape
     if (DEFINED ENV{TRAVIS_BRANCH} OR DEFINED ENV{APPVEYOR})
         set(REQUIRED_BULLET_VERSION 283) # but for build testing, 283 is fine
@@ -439,7 +439,7 @@ endif()
 
 if (NOT WIN32 AND BUILD_WIZARD) # windows users can just run the morrowind installer
     find_package(LIBUNSHIELD REQUIRED) # required only for non win32 when building openfallout-wizard
-    set(OPENMW_USE_UNSHIELD TRUE)
+    set(OPENFALLOUT_USE_UNSHIELD TRUE)
 endif()
 
 # Fix for not visible pthreads functions for linker with glibc 2.15
@@ -455,7 +455,7 @@ if(NOT HAVE_STDINT_H)
     message(FATAL_ERROR "stdint.h was not found" )
 endif()
 
-if(OPENMW_USE_SYSTEM_OSG)
+if(OPENFALLOUT_USE_SYSTEM_OSG)
     find_package(OpenSceneGraph 3.6.5 REQUIRED ${USED_OSG_COMPONENTS})  # Bump to 3.6.6 when released
 
     if(OSG_STATIC)
@@ -490,7 +490,7 @@ set(BOOST_COMPONENTS iostreams program_options)
 
 find_package(Boost 1.70.0 CONFIG REQUIRED COMPONENTS ${BOOST_COMPONENTS} OPTIONAL_COMPONENTS ${BOOST_OPTIONAL_COMPONENTS})
 
-if(OPENMW_USE_SYSTEM_MYGUI)
+if(OPENFALLOUT_USE_SYSTEM_MYGUI)
     find_package(MyGUI 3.4.3 REQUIRED)
 endif()
 find_package(SDL2 2.26 REQUIRED)
@@ -540,7 +540,7 @@ if (APPLE)
 endif (APPLE)
 
 if (NOT APPLE)  # this is modified for macOS use later in "apps/open[mw|cs]/CMakeLists.txt"
-    set(OPENMW_RESOURCES_ROOT ${OpenFallout_BINARY_DIR})
+    set(OPENFALLOUT_RESOURCES_ROOT ${OpenFallout_BINARY_DIR})
 endif ()
 
 add_subdirectory(files/)
@@ -601,14 +601,14 @@ if (NOT WIN32 AND NOT APPLE)
         "${OpenFallout_BINARY_DIR}/org.openfallout.cs.desktop")
 endif()
 
-if(OPENMW_LTO_BUILD)
+if(OPENFALLOUT_LTO_BUILD)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT HAVE_IPO OUTPUT HAVE_IPO_OUTPUT)
     if(HAVE_IPO)
         message(STATUS "LTO enabled for Release configuration.")
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
     else()
-        message(WARNING "Requested option OPENMW_LTO_BUILD not supported by this compiler: ${HAVE_IPO_OUTPUT}")
+        message(WARNING "Requested option OPENFALLOUT_LTO_BUILD not supported by this compiler: ${HAVE_IPO_OUTPUT}")
         if(MSVC)
             message(STATUS "Note: Flags used to be set manually for this setting with MSVC. We now rely on CMake for this. Upgrade CMake to at least 3.13 to re-enable this setting.")
         endif()
@@ -621,7 +621,7 @@ if (APPLE)
 endif()
 
 if (UNIX AND NOT APPLE)
-    if (OPENMW_LOCAL_INSTALL AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
+    if (OPENFALLOUT_LOCAL_INSTALL AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
         # file(RELATIVE_PATH ...) can't handle pure lexical relativity, but cmake_path only came with 3.20.0
         cmake_path(RELATIVE_PATH CMAKE_INSTALL_LIBDIR BASE_DIRECTORY "${CMAKE_INSTALL_BINDIR}" OUTPUT_VARIABLE origin_relative_libdir)
         set(CMAKE_INSTALL_RPATH "$ORIGIN/${origin_relative_libdir}")
@@ -659,7 +659,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT
         add_compile_options("/w1${d}")
     endforeach(d)
 
-    if(OPENMW_MSVC_WERROR)
+    if(OPENFALLOUT_MSVC_WERROR)
         add_compile_options("/WX")
     endif()
 else ()
@@ -678,16 +678,16 @@ else ()
     endif()
 endif ()
 
-if (OPENMW_CXX_FLAGS)
-    separate_arguments(OPENMW_CXX_FLAGS NATIVE_COMMAND "${OPENMW_CXX_FLAGS}")
-    add_compile_options(${OPENMW_CXX_FLAGS})
+if (OPENFALLOUT_CXX_FLAGS)
+    separate_arguments(OPENFALLOUT_CXX_FLAGS NATIVE_COMMAND "${OPENFALLOUT_CXX_FLAGS}")
+    add_compile_options(${OPENFALLOUT_CXX_FLAGS})
 endif()
 
 # Components
 add_subdirectory (components)
 
 # Apps and tools
-if (BUILD_OPENMW OR BUILD_OPENMW_TESTS)
+if (BUILD_OPENFALLOUT OR BUILD_OPENFALLOUT_TESTS)
     add_subdirectory( apps/openmw )
 endif()
 
@@ -743,23 +743,23 @@ if (BUILD_OPENCS_TESTS)
     add_subdirectory(apps/opencs_tests)
 endif()
 
-if (BUILD_OPENMW_TESTS)
+if (BUILD_OPENFALLOUT_TESTS)
     add_subdirectory(apps/openmw_tests)
 endif()
 
 if (WIN32)
     if (MSVC)
 
-        if (USE_DEBUG_CONSOLE AND BUILD_OPENMW)
+        if (USE_DEBUG_CONSOLE AND BUILD_OPENFALLOUT)
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE")
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:CONSOLE")
-        elseif (BUILD_OPENMW)
+        elseif (BUILD_OPENFALLOUT)
             # Turn off implicit console, you won't see stdout unless launching OpenFallout from a command line shell or look at openfallout.log
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:WINDOWS")
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS")
         endif()
 
-        if (BUILD_OPENMW)
+        if (BUILD_OPENFALLOUT)
             # Release builds don't use the debug console
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
             set_target_properties(openfallout PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
@@ -773,10 +773,10 @@ endif()
 
 
 # Core CPACK Setup
-set(CPACK_PACKAGE_VERSION ${OPENMW_VERSION})
-set(CPACK_PACKAGE_VERSION_MAJOR ${OPENMW_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${OPENMW_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${OPENMW_VERSION_RELEASE})
+set(CPACK_PACKAGE_VERSION ${OPENFALLOUT_VERSION})
+set(CPACK_PACKAGE_VERSION_MAJOR ${OPENFALLOUT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${OPENFALLOUT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${OPENFALLOUT_VERSION_RELEASE})
 set(CPACK_PACKAGE_NAME "OpenFallout")
 set(CPACK_PACKAGE_VENDOR "OpenFallout")
 set(CUSTOM_CPACK_OS_NAME "")
@@ -851,7 +851,7 @@ if (APPLE)
 
     set(CPACK_GENERATOR "DragNDrop")
 
-    set(INSTALLED_OPENMW_APP "\${CMAKE_INSTALL_PREFIX}/${APP_BUNDLE_NAME}")
+    set(INSTALLED_OPENFALLOUT_APP "\${CMAKE_INSTALL_PREFIX}/${APP_BUNDLE_NAME}")
     set(INSTALLED_OPENCS_APP "\${CMAKE_INSTALL_PREFIX}/${OPENCS_BUNDLE_NAME}")
 
     install(CODE "
@@ -907,13 +907,13 @@ if (APPLE)
     install_plugins_for_bundle("${APP_BUNDLE_NAME}" PLUGINS)
     install_plugins_for_bundle("${OPENCS_BUNDLE_NAME}" OPENCS_PLUGINS)
 
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/CHANGELOG.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/README.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/LICENSE" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/AUTHORS.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/CHANGELOG.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/README.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/LICENSE" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/AUTHORS.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
 
-    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENMW_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
-    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENMW_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
+    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENFALLOUT_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
+    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENFALLOUT_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
     set(OPENCS_PLUGINS ${OPENCS_PLUGINS} "${INSTALLED_OPENCS_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
     set(OPENCS_PLUGINS ${OPENCS_PLUGINS} "${INSTALLED_OPENCS_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
 
@@ -925,7 +925,7 @@ if (APPLE)
             endif()
         endfunction()
 
-        fixup_bundle(\"${INSTALLED_OPENMW_APP}\" \"${PLUGINS}\" \"\")
+        fixup_bundle(\"${INSTALLED_OPENFALLOUT_APP}\" \"${PLUGINS}\" \"\")
         fixup_bundle(\"${INSTALLED_OPENCS_APP}\" \"${OPENCS_PLUGINS}\" \"\")
         " COMPONENT Runtime)
 
@@ -996,7 +996,7 @@ elseif(NOT APPLE)
         SET(CPACK_RESOURCE_FILE_README "${OpenFallout_SOURCE_DIR}/README.md")
         SET(CPACK_PACKAGE_DESCRIPTION_FILE "${OpenFallout_SOURCE_DIR}/README.md")
         SET(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
-        SET(CPACK_NSIS_DISPLAY_NAME "OpenFallout ${OPENMW_VERSION}")
+        SET(CPACK_NSIS_DISPLAY_NAME "OpenFallout ${OPENFALLOUT_VERSION}")
         SET(CPACK_NSIS_HELP_LINK "https:\\\\\\\\github.com/Elemperor1/OpenFallout")
         SET(CPACK_NSIS_URL_INFO_ABOUT "https:\\\\\\\\github.com/Elemperor1/OpenFallout")
         SET(CPACK_NSIS_INSTALLED_ICON_NAME "openfallout-launcher.exe")
@@ -1038,10 +1038,10 @@ elseif(NOT APPLE)
                   "${RUNTIME_OUTPUT_DIRECTORY}/gamecontrollerdb.txt"
                   TYPE SYSCONF)
     
-    if (OPENMW_LOCAL_INSTALL)
+    if (OPENFALLOUT_LOCAL_INSTALL)
         install(FILES "${OpenFallout_SOURCE_DIR}/files/openfallout.cfg.local" TYPE SYSCONF RENAME "openfallout.cfg")
     else ()
-        install(CODE "set(OPENMW_RESOURCE_FILES \"\${CMAKE_INSTALL_PREFIX}/${OPENMW_RESOURCE_FILES}\")")
+        install(CODE "set(OPENFALLOUT_RESOURCE_FILES \"\${CMAKE_INSTALL_PREFIX}/${OPENFALLOUT_RESOURCE_FILES}\")")
         install(CODE "configure_file(\"${OpenFallout_SOURCE_DIR}/files/openfallout.cfg\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/openfallout.cfg\")")
     endif ()
 
@@ -1121,13 +1121,13 @@ if (USE_QT)
 
     if (BUILD_LAUNCHER OR BUILD_WIZARD)
         if (APPLE)
-            set(QT_OPENMW_TRANSLATIONS_PATH "${APP_BUNDLE_DIR}/Contents/Resources/resources/translations")
+            set(QT_OPENFALLOUT_TRANSLATIONS_PATH "${APP_BUNDLE_DIR}/Contents/Resources/resources/translations")
         else ()
             get_generator_is_multi_config(multi_config)
             if (multi_config)
-                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/$<CONFIG>/resources/translations")
+                set(QT_OPENFALLOUT_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/$<CONFIG>/resources/translations")
             else ()
-                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/resources/translations")
+                set(QT_OPENFALLOUT_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/resources/translations")
             endif ()
         endif ()
 
@@ -1165,8 +1165,8 @@ if (USE_QT)
         endif ()
 
         add_custom_target(qm-files
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${QT_OPENMW_TRANSLATIONS_PATH}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${QM_FILES} ${QT_OPENMW_TRANSLATIONS_PATH}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${QT_OPENFALLOUT_TRANSLATIONS_PATH}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${QM_FILES} ${QT_OPENFALLOUT_TRANSLATIONS_PATH}
             DEPENDS ${QM_FILES}
             COMMENT "Copy *.qm files to resources folder")
     endif ()

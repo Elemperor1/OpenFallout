@@ -1,5 +1,5 @@
-local I = require('openmw.interfaces')
-local auxUtil = require('openmw_aux.util')
+local I = require('openfallout.interfaces')
+local auxUtil = require('openfallout_aux.util')
 local common = require('scripts.omw.combat.common')
 common.registerSettingsGroup()
 

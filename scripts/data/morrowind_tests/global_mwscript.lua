@@ -1,6 +1,6 @@
 local testing = require('testing_util')
-local core = require('openmw.core')
-local world = require('openmw.world')
+local core = require('openfallout.core')
+local world = require('openfallout.world')
 
 function iterateOverVariables(variables)
     local first = nil

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_ITEMWIDGET_H
-#define OPENMW_MWGUI_ITEMWIDGET_H
+#ifndef OPENFALLOUT_MWGUI_ITEMWIDGET_H
+#define OPENFALLOUT_MWGUI_ITEMWIDGET_H
 
 #include <components/vfs/pathutil.hpp>
 

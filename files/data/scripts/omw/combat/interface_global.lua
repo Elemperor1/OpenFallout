@@ -1,4 +1,4 @@
-local util = require('openmw.util')
+local util = require('openfallout.util')
 
 return {
     interfaceName = 'Combat',

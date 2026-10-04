@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM3_POSITION_H
-#define OPENMW_ESM3_POSITION_H
+#ifndef OPENFALLOUT_ESM3_POSITION_H
+#define OPENFALLOUT_ESM3_POSITION_H
 
 #include <components/misc/concepts.hpp>
 #include <osg/Vec3f>

@@ -316,7 +316,7 @@ namespace MWLua
         api["remove"] = [context](std::string vfxId) {
             context.mLuaManager->addAction(
                 [vfxId = std::move(vfxId)] { MWBase::Environment::get().getWorld()->removeEffect(vfxId); },
-                "openmw.vfx.remove");
+                "openfallout.vfx.remove");
         };
 
         api["spawn"]
@@ -335,7 +335,7 @@ namespace MWLua
                               MWBase::Environment::get().getWorld()->spawnEffect(
                                   model, texture, worldPos, scale, magicVfx, useAmbientLight, vfxId, loop);
                           },
-                          "openmw.vfx.spawn");
+                          "openfallout.vfx.spawn");
                   }
                   else
                   {
@@ -343,7 +343,7 @@ namespace MWLua
                           [model = VFS::Path::Normalized(model), worldPos]() {
                               MWBase::Environment::get().getWorld()->spawnEffect(model, "", worldPos, 1.f);
                           },
-                          "openmw.vfx.spawn");
+                          "openfallout.vfx.spawn");
                   }
               };
 

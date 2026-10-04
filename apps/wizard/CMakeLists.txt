@@ -27,7 +27,7 @@ set(WIZARD_HEADER
     methodselectionpage.hpp
 )
 
-if (OPENMW_USE_UNSHIELD)
+if (OPENFALLOUT_USE_UNSHIELD)
     set (WIZARD
          ${WIZARD}
          installationpage.cpp
@@ -40,8 +40,8 @@ if (OPENMW_USE_UNSHIELD)
          unshield/inisettings.hpp
          unshield/unshieldworker.hpp
     )
-    add_compile_definitions(OPENMW_USE_UNSHIELD)
-endif (OPENMW_USE_UNSHIELD)
+    add_compile_definitions(OPENFALLOUT_USE_UNSHIELD)
+endif (OPENFALLOUT_USE_UNSHIELD)
 
 
 source_group(wizard FILES ${WIZARD} ${WIZARD_HEADER})
@@ -59,11 +59,11 @@ endif(WIN32)
 
 QT_ADD_RESOURCES(RCC_SRCS ${WIZARD_RES})
 
-if (OPENMW_USE_UNSHIELD)
+if (OPENFALLOUT_USE_UNSHIELD)
     include_directories(${LIBUNSHIELD_INCLUDE_DIRS})
 endif()
 
-openmw_add_executable(openfallout-wizard
+openfallout_add_executable(openfallout-wizard
     ${GUI_TYPE}
     ${WIZARD}
     ${WIZARD_HEADER}
@@ -78,7 +78,7 @@ target_link_libraries(openfallout-wizard
 
 target_link_libraries(openfallout-wizard Qt::Widgets Qt::Core Qt::Svg)
 
-if (OPENMW_USE_UNSHIELD)
+if (OPENFALLOUT_USE_UNSHIELD)
     target_link_libraries(openfallout-wizard ${LIBUNSHIELD_LIBRARIES})
 endif()
 

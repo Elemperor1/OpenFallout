@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_LAYERS
-#define OPENMW_LUAUI_LAYERS
+#ifndef OPENFALLOUT_LUAUI_LAYERS
+#define OPENFALLOUT_LUAUI_LAYERS
 
 #include <string>
 #include <string_view>
@@ -63,4 +63,4 @@ namespace LuaUi
     };
 }
 
-#endif // OPENMW_LUAUI_LAYERS
+#endif // OPENFALLOUT_LUAUI_LAYERS

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_RECORDS_H
-#define OPENMW_ESM_RECORDS_H
+#ifndef OPENFALLOUT_ESM_RECORDS_H
+#define OPENFALLOUT_ESM_RECORDS_H
 
 #include <components/esm3/loadacti.hpp>
 #include <components/esm3/loadalch.hpp>

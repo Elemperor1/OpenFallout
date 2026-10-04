@@ -46,20 +46,20 @@ namespace
     std::string_view textureFilteringToStr(const std::string& mipFilter, const std::string& magFilter)
     {
         if (mipFilter == "none")
-            return "#{OMWEngine:TextureFilteringDisabled}";
+            return "#{OFEngine:TextureFilteringDisabled}";
 
         if (magFilter == "linear")
         {
             if (mipFilter == "linear")
-                return "#{OMWEngine:TextureFilteringTrilinear}";
+                return "#{OFEngine:TextureFilteringTrilinear}";
             if (mipFilter == "nearest")
-                return "#{OMWEngine:TextureFilteringBilinear}";
+                return "#{OFEngine:TextureFilteringBilinear}";
         }
         else if (magFilter == "nearest")
-            return "#{OMWEngine:TextureFilteringNearest}";
+            return "#{OFEngine:TextureFilteringNearest}";
 
         Log(Debug::Warning) << "Warning: Invalid texture filtering options: " << mipFilter << ", " << magFilter;
-        return "#{OMWEngine:TextureFilteringOther}";
+        return "#{OFEngine:TextureFilteringOther}";
     }
 
     bool sortResolutions(std::pair<int, int> left, std::pair<int, int> right)
@@ -155,7 +155,7 @@ namespace
     {
         if (textBox != nullptr)
         {
-            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OMWEngine");
+            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OFEngine");
             std::string labelCaption
                 = l10n->formatMessage(scroller->getUserString("SettingLabelCaption"), argNames, args);
             textBox->setCaption(labelCaption);
@@ -274,7 +274,7 @@ namespace MWGui
 
         configureWidgets(mMainWidget, true);
 
-        setTitle("#{OMWEngine:SettingsWindow}");
+        setTitle("#{OFEngine:SettingsWindow}");
 
         getWidget(mSettingsTab, "SettingsTab");
         getWidget(mOkButton, "OkButton");
@@ -508,7 +508,7 @@ namespace MWGui
             return;
 
         ConfirmationDialog* dialog = MWBase::Environment::get().getWindowManager()->getConfirmationDialog();
-        dialog->askForConfirmation("#{OMWEngine:ConfirmResolution}");
+        dialog->askForConfirmation("#{OFEngine:ConfirmResolution}");
         dialog->eventOkClicked.clear();
         dialog->eventOkClicked += MyGUI::newDelegate(this, &SettingsWindow::onResolutionAccept);
         dialog->eventCancelClicked.clear();
@@ -583,7 +583,7 @@ namespace MWGui
         sender->setCaptionWithReplacing(sender->getItemNameAt(sender->getIndexSelected()));
 
         MWBase::Environment::get().getWindowManager()->interactiveMessageBox(
-            "#{OMWEngine:ChangeRequiresRestart}", { "#{Interface:OK}" }, true);
+            "#{OFEngine:ChangeRequiresRestart}", { "#{Interface:OK}" }, true);
 
         std::vector<std::string> currentLocales = Settings::general().mPreferredLocales;
         if (currentLocales.size() <= langPriority)
@@ -601,7 +601,7 @@ namespace MWGui
     void SettingsWindow::onGmstOverridesL10nChanged(MyGUI::Widget*)
     {
         MWBase::Environment::get().getWindowManager()->interactiveMessageBox(
-            "#{OMWEngine:ChangeRequiresRestart}", { "#{Interface:OK}" }, true);
+            "#{OFEngine:ChangeRequiresRestart}", { "#{Interface:OK}" }, true);
     }
 
     void SettingsWindow::onVSyncModeChanged(MyGUI::ComboBox* sender, size_t pos)
@@ -650,7 +650,7 @@ namespace MWGui
     {
         std::vector<std::string> buttons = { "#{Interface:Yes}", "#{Interface:No}" };
         MWBase::Environment::get().getWindowManager()->interactiveMessageBox(
-            "#{OMWEngine:LightingResetToDefaults}", buttons, true);
+            "#{OFEngine:LightingResetToDefaults}", buttons, true);
         int selectedButton = MWBase::Environment::get().getWindowManager()->readPressedButton();
         if (selectedButton == 1 || selectedButton == -1)
             return;
@@ -1090,7 +1090,7 @@ namespace MWGui
 
         sender->castType<MyGUI::Button>()->setCaptionWithReplacing("#{Interface:None}");
 
-        MWBase::Environment::get().getWindowManager()->staticMessageBox("#{OMWEngine:RebindAction}");
+        MWBase::Environment::get().getWindowManager()->staticMessageBox("#{OFEngine:RebindAction}");
         MWBase::Environment::get().getWindowManager()->disallowMouse();
 
         MWBase::Environment::get().getInputManager()->enableDetectingBindingMode(actionId, mKeyboardMode);
@@ -1108,7 +1108,7 @@ namespace MWGui
     void SettingsWindow::onResetDefaultBindings(MyGUI::Widget* /*sender*/)
     {
         ConfirmationDialog* dialog = MWBase::Environment::get().getWindowManager()->getConfirmationDialog();
-        dialog->askForConfirmation("#{OMWEngine:ConfirmResetBindings}");
+        dialog->askForConfirmation("#{OFEngine:ConfirmResetBindings}");
         dialog->eventOkClicked.clear();
         dialog->eventOkClicked += MyGUI::newDelegate(this, &SettingsWindow::onResetDefaultBindingsAccept);
         dialog->eventCancelClicked.clear();

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_IMPORTSPLM_H
-#define OPENMW_ESSIMPORT_IMPORTSPLM_H
+#ifndef OPENFALLOUT_ESSIMPORT_IMPORTSPLM_H
+#define OPENFALLOUT_ESSIMPORT_IMPORTSPLM_H
 
 #include <components/esm/esmcommon.hpp>
 #include <cstdint>

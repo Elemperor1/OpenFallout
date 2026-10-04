@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <fstream>
 
-#ifndef OPENMW_PROJECT_SOURCE_DIR
-#define OPENMW_PROJECT_SOURCE_DIR "."
+#ifndef OPENFALLOUT_PROJECT_SOURCE_DIR
+#define OPENFALLOUT_PROJECT_SOURCE_DIR "."
 #endif
 
 namespace
@@ -26,7 +26,7 @@ namespace
     {
         std::ifstream file;
         file.exceptions(std::ios::failbit | std::ios::badbit);
-        file.open(std::filesystem::path{ OPENMW_PROJECT_SOURCE_DIR } / "apps" / "components_tests" / "toutf8" / "data"
+        file.open(std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR } / "apps" / "components_tests" / "toutf8" / "data"
             / Misc::StringUtils::stringToU8String(fileName));
         std::stringstream buffer;
         buffer << file.rdbuf();

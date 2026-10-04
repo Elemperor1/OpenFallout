@@ -1,8 +1,8 @@
-local async = require('openmw.async')
-local core = require('openmw.core')
-local storage = require('openmw.storage')
-local I = require('openmw.interfaces')
-local types = require('openmw.types')
+local async = require('openfallout.async')
+local core = require('openfallout.core')
+local storage = require('openfallout.storage')
+local I = require('openfallout.interfaces')
+local types = require('openfallout.types')
 local Actor = types.Actor
 local Creature = types.Creature
 local NPC = types.NPC
@@ -14,8 +14,8 @@ local common = {}
 
 function common.registerSettingsPage()
     I.Settings.registerPage({
-      key = 'OMWCombat',
-      l10n = 'OMWCombat',
+      key = 'OFCombat',
+      l10n = 'OFCombat',
       name = 'Combat',
       description = 'combatSettingsPageDescription',
     })
@@ -34,8 +34,8 @@ function common.registerSettingsGroup()
 
     I.Settings.registerGroup({
         key = combatGroup,
-        page = 'OMWCombat',
-        l10n = 'OMWCombat',
+        page = 'OFCombat',
+        l10n = 'OFCombat',
         name = 'combatSettings',
         permanentStorage = false,
         order = 0,

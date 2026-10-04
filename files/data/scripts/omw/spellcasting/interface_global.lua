@@ -1,5 +1,5 @@
-local util = require('openmw.util')
-local I = require('openmw.interfaces')
+local util = require('openfallout.util')
+local I = require('openfallout.interfaces')
 
 return {
     interfaceName = 'SpellCasting',

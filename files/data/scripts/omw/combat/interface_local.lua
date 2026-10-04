@@ -1,6 +1,6 @@
-local I = require('openmw.interfaces')
-local util = require('openmw.util')
-local auxUtil = require('openmw_aux.util')
+local I = require('openfallout.interfaces')
+local util = require('openfallout.util')
+local auxUtil = require('openfallout_aux.util')
 
 local onHitHandlers = {}
 
@@ -27,10 +27,10 @@ local onHitHandlers = {}
 -- @field [parent=#AttackInfo] #boolean successful Whether the attack was successful or not.
 -- @field [parent=#AttackInfo] #AttackSourceType sourceType What class of attack this is.
 -- @field [parent=#AttackInfo] #AttackType type (Optional) Attack variant if applicable. For melee attacks this represents chop vs thrust vs slash. For unarmed creatures this implies which of its 3 possible attacks were used. For other attacks this field can be ignored.
--- @field [parent=#AttackInfo] openmw.types#Actor attacker (Optional) Attacking actor
--- @field [parent=#AttackInfo] openmw.types#Weapon weapon (Optional) Attacking weapon
+-- @field [parent=#AttackInfo] openfallout.types#Actor attacker (Optional) Attacking actor
+-- @field [parent=#AttackInfo] openfallout.types#Weapon weapon (Optional) Attacking weapon
 -- @field [parent=#AttackInfo] #string ammo (Optional) Ammo record ID
--- @field [parent=#AttackInfo] openmw.util#Vector3 hitPos (Optional) Where on the victim the attack is landing. Used to spawn blood effects. Blood effects are skipped if nil.
+-- @field [parent=#AttackInfo] openfallout.util#Vector3 hitPos (Optional) Where on the victim the attack is landing. Used to spawn blood effects. Blood effects are skipped if nil.
 -- @field [parent=#AttackInfo] #boolean ignoreArmor (Optional) Whether to ignore armor.
 -- @field [parent=#AttackInfo] #boolean ignoreDifficulty (Optional) Whether to ignore difficulty scaling.
 -- @field [parent=#AttackInfo] #boolean ignoreStagger (Optional) Whether to ignore stagger (knockdown and hit recovery).
@@ -38,7 +38,7 @@ local onHitHandlers = {}
 return {
     --- Basic combat interface
     -- @module Combat
-    -- @usage local I = require('openmw.interfaces')
+    -- @usage local I = require('openfallout.interfaces')
     --
     --I.Combat.addOnHitHandler(function(attack)
     --    -- Adds fatigue loss when hit by draining fatigue when taking health damage
@@ -72,7 +72,7 @@ return {
         -- to include other side effects.
         -- @function [parent=#Combat] adjustDamageForArmor
         -- @param #number Damage The numeric damage to adjust
-        -- @param openmw.core#GameObject actor The actor to calculate the armor rating for. In local contexts, this parameter is optional and defaults to self
+        -- @param openfallout.core#GameObject actor The actor to calculate the armor rating for. In local contexts, this parameter is optional and defaults to self
         -- @return #number Damage adjusted for armor
         adjustDamageForArmor = function(damage, actor) return damage end,
 
@@ -81,7 +81,7 @@ return {
         -- attacker are NPCs, or if both are Players.
         -- @function [parent=#Combat] adjustDamageForDifficulty
         -- @param #Attack attack The attack to adjust
-        -- @param openmw.core#GameObject defendant The defendant to make the difficulty adjustment for. In local contexts, this parameter is optional and defaults to self
+        -- @param openfallout.core#GameObject defendant The defendant to make the difficulty adjustment for. In local contexts, this parameter is optional and defaults to self
         adjustDamageForDifficulty = function(attack, defendant) end,
 
         --- (Local) Applies this character's armor to the attack. Adjusts damage, reduces item
@@ -102,7 +102,7 @@ return {
         -- Note that this interface function is read by the engine to update the UI.
         -- This function can still be overridden same as any other interface, but must not call any functions or interfaces that modify anything.
         -- @function [parent=#Combat] getArmorRating
-        -- @param openmw.core#GameObject actor The actor to calculate the armor rating for. In local contexts, this parameter is optional and defaults to self
+        -- @param openfallout.core#GameObject actor The actor to calculate the armor rating for. In local contexts, this parameter is optional and defaults to self
         -- @return #number
         getArmorRating = function(actor) return 0 end,
 
@@ -111,29 +111,29 @@ return {
         -- Note that this interface function is read by the engine to update the UI.
         -- This function can still be overridden same as any other interface, but must not call any functions or interfaces that modify anything.
         -- @function [parent=#Combat] getArmorSkill
-        -- @param openmw.core#GameObject item The item, Armor record, or Armor record ID
-        -- @return #string The armor skill identifier, or unarmored if the item was nil or not an instance of @{openmw.types#Armor}. Can return nil if unimplemented.
+        -- @param openfallout.core#GameObject item The item, Armor record, or Armor record ID
+        -- @return #string The armor skill identifier, or unarmored if the item was nil or not an instance of @{openfallout.types#Armor}. Can return nil if unimplemented.
         getArmorSkill = function(itemOrId) return nil end,
 
-        --- (Local, Global) Computes the armor rating of a single piece of @{openmw.types#Armor}, adjusted for skill
+        --- (Local, Global) Computes the armor rating of a single piece of @{openfallout.types#Armor}, adjusted for skill
         -- Note that this interface function is read by the engine to update the UI.
         -- This function can still be overridden same as any other interface, but must not call any functions or interfaces that modify anything.
         -- @function [parent=#Combat] getSkillAdjustedArmorRating
-        -- @param openmw.core#GameObject item The item, Armor record, or Armor record ID
-        -- @param openmw.core#GameObject actor The actor. In local contexts, this parameter is optional and defaults to self
+        -- @param openfallout.core#GameObject item The item, Armor record, or Armor record ID
+        -- @param openfallout.core#GameObject actor The actor. In local contexts, this parameter is optional and defaults to self
         -- @return #number
         getSkillAdjustedArmorRating = function(itemOrId, actor) return 0 end,
 
-        --- (Local, Global) Computes the effective armor rating of a single piece of @{openmw.types#Armor}, adjusted for skill and item condition
+        --- (Local, Global) Computes the effective armor rating of a single piece of @{openfallout.types#Armor}, adjusted for skill and item condition
         -- @function [parent=#Combat] getEffectiveArmorRating
-        -- @param openmw.core#GameObject item The item
-        -- @param openmw.core#GameObject actor The actor. In local contexts, this parameter is optional and defaults to self
+        -- @param openfallout.core#GameObject item The item
+        -- @param openfallout.core#GameObject actor The actor. In local contexts, this parameter is optional and defaults to self
         -- @return #number
         getEffectiveArmorRating = function(item, actor) return 0 end,
 
         --- (Local) Spawns a random blood effect at the given position
         -- @function [parent=#Combat] spawnBloodEffect
-        -- @param openmw.util#Vector3 position
+        -- @param openfallout.util#Vector3 position
         spawnBloodEffect = function(position) end,
 
         --- (Local) Hit this actor. Normally called as Hit event from the attacking actor, with the same parameters.
@@ -144,8 +144,8 @@ return {
         --- (Local, Global) Picks a random armor slot and returns the item equipped in that slot.
         -- Used to pick which armor to damage / skill to increase when hit during combat.
         -- @function [parent=#Combat] pickRandomArmor
-        -- @param openmw.core#GameObject actor The actor to pick armor from. In local contexts, this parameter is optional and defaults to self
-        -- @return openmw.core#GameObject The armor equipped in the chosen slot. nil if nothing was equipped in that slot.
+        -- @param openfallout.core#GameObject actor The actor to pick armor from. In local contexts, this parameter is optional and defaults to self
+        -- @return openfallout.core#GameObject The armor equipped in the chosen slot. nil if nothing was equipped in that slot.
         pickRandomArmor = function(actor) return nil end,
 
         --- @{#AttackSourceType}

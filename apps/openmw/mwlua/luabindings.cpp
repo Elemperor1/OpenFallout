@@ -33,12 +33,12 @@ namespace MWLua
         sol::state_view lua = context.mLua->unsafeState();
         MWWorld::DateTimeManager* tm = MWBase::Environment::get().getWorld()->getTimeManager();
         return {
-            { "openmw.async",
+            { "openfallout.async",
                 LuaUtil::getAsyncPackageInitializer(
                     lua, [tm] { return tm->getSimulationTime(); }, [tm] { return tm->getGameTime(); }) },
-            { "openmw.markup", initMarkupPackage(context) },
-            { "openmw.util", LuaUtil::initUtilPackage(lua) },
-            { "openmw.vfs", initVFSPackage(context) },
+            { "openfallout.markup", initMarkupPackage(context) },
+            { "openfallout.util", LuaUtil::initUtilPackage(lua) },
+            { "openfallout.vfs", initVFSPackage(context) },
         };
     }
 
@@ -47,9 +47,9 @@ namespace MWLua
         initObjectBindingsForGlobalScripts(context);
         initCellBindingsForGlobalScripts(context);
         return {
-            { "openmw.core", initCorePackage(context) },
-            { "openmw.types", initTypesPackage(context) },
-            { "openmw.world", initWorldPackage(context) },
+            { "openfallout.core", initCorePackage(context) },
+            { "openfallout.types", initTypesPackage(context) },
+            { "openfallout.world", initWorldPackage(context) },
         };
     }
 
@@ -59,41 +59,41 @@ namespace MWLua
         initCellBindingsForLocalScripts(context);
         LocalScripts::initializeSelfPackage(context);
         return {
-            { "openmw.animation", initAnimationPackage(context) },
-            { "openmw.core", initCorePackage(context) },
-            { "openmw.types", initTypesPackage(context) },
-            { "openmw.nearby", initNearbyPackage(context) },
+            { "openfallout.animation", initAnimationPackage(context) },
+            { "openfallout.core", initCorePackage(context) },
+            { "openfallout.types", initTypesPackage(context) },
+            { "openfallout.nearby", initNearbyPackage(context) },
         };
     }
 
     std::map<std::string, sol::object> initPlayerPackages(const Context& context)
     {
         return {
-            { "openmw.ambient", initAmbientPackage(context) },
-            { "openmw.camera", initCameraPackage(context.sol()) },
-            { "openmw.debug", initDebugPackage(context) },
-            { "openmw.input", initInputPackage(context) },
-            { "openmw.postprocessing", initPostprocessingPackage(context) },
-            { "openmw.ui", initUserInterfacePackage(context) },
+            { "openfallout.ambient", initAmbientPackage(context) },
+            { "openfallout.camera", initCameraPackage(context.sol()) },
+            { "openfallout.debug", initDebugPackage(context) },
+            { "openfallout.input", initInputPackage(context) },
+            { "openfallout.postprocessing", initPostprocessingPackage(context) },
+            { "openfallout.ui", initUserInterfacePackage(context) },
         };
     }
 
     std::map<std::string, sol::object> initMenuPackages(const Context& context)
     {
         return {
-            { "openmw.core", initCorePackage(context) },
-            { "openmw.ambient", initAmbientPackage(context) },
-            { "openmw.ui", initUserInterfacePackage(context) },
-            { "openmw.menu", initMenuPackage(context) },
-            { "openmw.input", initInputPackage(context) },
+            { "openfallout.core", initCorePackage(context) },
+            { "openfallout.ambient", initAmbientPackage(context) },
+            { "openfallout.ui", initUserInterfacePackage(context) },
+            { "openfallout.menu", initMenuPackage(context) },
+            { "openfallout.input", initInputPackage(context) },
         };
     }
 
     std::map<std::string, sol::object> initLoadPackages(const Context& context)
     {
         return {
-            { "openmw.core", initCorePackage(context) },
-            { "openmw.content", initContentPackage(context) },
+            { "openfallout.core", initCorePackage(context) },
+            { "openfallout.content", initContentPackage(context) },
         };
     }
 }

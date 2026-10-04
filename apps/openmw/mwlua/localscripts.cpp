@@ -72,7 +72,7 @@ namespace MWLua
         sol::usertype<SelfObject> selfAPI
             = lua.new_usertype<SelfObject>("SelfObject", sol::base_classes, sol::bases<LObject, Object>());
         selfAPI[sol::meta_function::to_string]
-            = [](SelfObject& self) { return "openmw.self[" + self.toString() + "]"; };
+            = [](SelfObject& self) { return "openfallout.self[" + self.toString() + "]"; };
         selfAPI["object"] = sol::readonly_property([](SelfObject& self) -> LObject { return LObject(self); });
         selfAPI["controls"] = sol::readonly_property([](SelfObject& self) { return &self.mControls; });
         selfAPI["isActive"] = [](SelfObject& self) -> bool { return self.mIsActive; };
@@ -241,7 +241,7 @@ namespace MWLua
         , mData(obj)
     {
         lua->protectedCall(
-            [&](LuaUtil::LuaView& view) { addPackage("openmw.self", sol::make_object(view.sol(), &mData)); });
+            [&](LuaUtil::LuaView& view) { addPackage("openfallout.self", sol::make_object(view.sol(), &mData)); });
         registerEngineHandlers({ &mOnActiveHandlers, &mOnInactiveHandlers, &mOnConsumeHandlers, &mOnActivatedHandlers,
             &mOnTeleportedHandlers, &mOnAnimationTextKeyHandlers, &mOnPlayAnimationHandlers, &mOnAnimationEndedHandlers,
             &mOnSkillUse, &mOnSkillLevelUp, &mOnJailTimeServed });

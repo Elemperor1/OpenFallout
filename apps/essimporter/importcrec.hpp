@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_CREC_H
-#define OPENMW_ESSIMPORT_CREC_H
+#ifndef OPENFALLOUT_ESSIMPORT_CREC_H
+#define OPENFALLOUT_ESSIMPORT_CREC_H
 
 #include "importinventory.hpp"
 #include <components/esm3/aipackage.hpp>

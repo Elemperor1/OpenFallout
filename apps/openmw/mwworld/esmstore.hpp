@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWWORLD_ESMSTORE_H
-#define OPENMW_MWWORLD_ESMSTORE_H
+#ifndef OPENFALLOUT_MWWORLD_ESMSTORE_H
+#define OPENFALLOUT_MWWORLD_ESMSTORE_H
 
 #include <filesystem>
 #include <memory>

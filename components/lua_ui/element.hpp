@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_ELEMENT
-#define OPENMW_LUAUI_ELEMENT
+#ifndef OPENFALLOUT_LUAUI_ELEMENT
+#define OPENFALLOUT_LUAUI_ELEMENT
 
 #include <map>
 #include <memory>
@@ -69,4 +69,4 @@ namespace LuaUi
     };
 }
 
-#endif // !OPENMW_LUAUI_ELEMENT
+#endif // !OPENFALLOUT_LUAUI_ELEMENT

@@ -1,5 +1,5 @@
-#ifndef OPENMW_WIDGETS_TAGS_H
-#define OPENMW_WIDGETS_TAGS_H
+#ifndef OPENFALLOUT_WIDGETS_TAGS_H
+#define OPENFALLOUT_WIDGETS_TAGS_H
 
 #include <MyGUI_UString.h>
 #include <string_view>

@@ -25,7 +25,7 @@ rm -f $OUTPUT_DIR/*.html
 data_paths=$($DOCS_SOURCE_DIR/luadoc_data_paths.sh)
 
 cd $FILES_DIR/lua_api
-openmwluadocumentor -f doc -d $OUTPUT_DIR openmw/*lua
+openmwluadocumentor -f doc -d $OUTPUT_DIR openfallout/*lua
 cd $FILES_DIR/data
 for path in $data_paths
 do

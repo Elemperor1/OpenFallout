@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_SOUN_H
-#define OPENMW_ESM_SOUN_H
+#ifndef OPENFALLOUT_ESM_SOUN_H
+#define OPENFALLOUT_ESM_SOUN_H
 
 #include <string>
 

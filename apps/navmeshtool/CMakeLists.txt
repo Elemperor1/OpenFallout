@@ -5,17 +5,17 @@ set(NAVMESHTOOL_LIB
 
 source_group(apps\\navmeshtool FILES ${NAVMESHTOOL_LIB} main.cpp)
 
-add_library(openmw-navmeshtool-lib STATIC ${NAVMESHTOOL_LIB})
+add_library(openfallout-navmeshtool-lib STATIC ${NAVMESHTOOL_LIB})
 
 if (ANDROID)
     add_library(openfallout-navmeshtool SHARED main.cpp)
 else()
-    openmw_add_executable(openfallout-navmeshtool main.cpp)
+    openfallout_add_executable(openfallout-navmeshtool main.cpp)
 endif()
 
-target_link_libraries(openfallout-navmeshtool openmw-navmeshtool-lib)
+target_link_libraries(openfallout-navmeshtool openfallout-navmeshtool-lib)
 
-target_link_libraries(openmw-navmeshtool-lib
+target_link_libraries(openfallout-navmeshtool-lib
     Boost::program_options
     components
 )

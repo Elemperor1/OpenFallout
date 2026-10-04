@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_COMPANIONWINDOW_H
-#define OPENMW_MWGUI_COMPANIONWINDOW_H
+#ifndef OPENFALLOUT_MWGUI_COMPANIONWINDOW_H
+#define OPENFALLOUT_MWGUI_COMPANIONWINDOW_H
 
 #include "referenceinterface.hpp"
 #include "windowbase.hpp"

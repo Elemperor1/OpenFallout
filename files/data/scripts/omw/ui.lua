@@ -1,8 +1,8 @@
-local ui = require('openmw.ui')
-local util = require('openmw.util')
-local self = require('openmw.self')
-local core = require('openmw.core')
-local ambient = require('openmw.ambient')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
+local self = require('openfallout.self')
+local core = require('openfallout.core')
+local ambient = require('openfallout.ambient')
 
 local MODE = ui._getAllUiModes()
 local WINDOW = ui._getAllWindowIds()
@@ -167,7 +167,7 @@ return {
     ---
     -- @module UI
     -- @context player
-    -- @usage require('openmw.interfaces').UI
+    -- @usage require('openfallout.interfaces').UI
     interface = {
         --- Interface version
         -- @field [parent=#UI] #number version

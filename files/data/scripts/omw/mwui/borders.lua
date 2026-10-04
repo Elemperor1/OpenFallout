@@ -1,7 +1,7 @@
-local ui = require('openmw.ui')
-local util = require('openmw.util')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
 
-local auxUi = require('openmw_aux.ui')
+local auxUi = require('openfallout_aux.ui')
 
 local constants = require('scripts.omw.mwui.constants')
 

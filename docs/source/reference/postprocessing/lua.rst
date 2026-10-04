@@ -6,7 +6,7 @@ Overview
 ########
 
 Every shader that is marked as ``dynamic`` can be controlled through the Lua scripting system. Shaders can be disabled and enabled,
-and their uniforms can be controlled via scripts. For details, reference the API documentation :doc:`here<../lua-scripting/openmw_postprocessing>`.
+and their uniforms can be controlled via scripts. For details, reference the API documentation :doc:`here<../lua-scripting/openfallout_postprocessing>`.
 
 Toggling Shaders With a Keybind
 ###############################
@@ -56,8 +56,8 @@ Below is a working example to illustrate this.
 
 .. code-block:: Lua
 
-    local input = require('openmw.input')
-    local postprocessing = require('openmw.postprocessing')
+    local input = require('openfallout.input')
+    local postprocessing = require('openfallout.postprocessing')
 
     local shader = postprocessing.load('desaturate')
 
@@ -116,8 +116,8 @@ Here, instead of disabling and enabling the shader we set the factor to ``0`` or
 
 .. code-block:: Lua
 
-    local input = require('openmw.input')
-    local postprocessing = require('openmw.postprocessing')
+    local input = require('openfallout.input')
+    local postprocessing = require('openfallout.postprocessing')
 
     local shader = postprocessing.load('desaturate')
     local factor = 0

@@ -1,8 +1,8 @@
 local testing = require('testing_util')
-local util = require('openmw.util')
-local world = require('openmw.world')
-local core = require('openmw.core')
-local types = require('openmw.types')
+local util = require('openfallout.util')
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
 
 testing.registerGlobalTest('[issues] Player should be able to walk up stairs in Ebonheart docks (#4247)', function()
     world.players[1]:teleport('', util.vector3(19867, -102180, -79), util.transform.rotateZ(math.rad(91)))

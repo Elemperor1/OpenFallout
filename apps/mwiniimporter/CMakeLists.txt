@@ -9,7 +9,7 @@ set(MWINIIMPORT_HEADER
 
 source_group(launcher FILES ${MWINIIMPORT} ${MWINIIMPORT_HEADER})
 
-openmw_add_executable(openfallout-iniimporter
+openfallout_add_executable(openfallout-iniimporter
     ${MWINIIMPORT}
 )
 

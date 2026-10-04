@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_SETTINGS_CATEGORIES_FOG_H
-#define OPENMW_COMPONENTS_SETTINGS_CATEGORIES_FOG_H
+#ifndef OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_FOG_H
+#define OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_FOG_H
 
 #include <components/settings/sanitizerimpl.hpp>
 #include <components/settings/settingvalue.hpp>

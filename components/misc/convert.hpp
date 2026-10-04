@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_MISC_CONVERT_H
-#define OPENMW_COMPONENTS_MISC_CONVERT_H
+#ifndef OPENFALLOUT_COMPONENTS_MISC_CONVERT_H
+#define OPENFALLOUT_COMPONENTS_MISC_CONVERT_H
 
 #include <components/esm/position.hpp>
 #include <components/esm3/loadpgrd.hpp>

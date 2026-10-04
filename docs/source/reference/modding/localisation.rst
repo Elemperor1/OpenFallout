@@ -3,7 +3,7 @@ Localisation
 
 OpenMW supports localisation of mods using ICU MessageFormat wrapped in YAML.
 Currently this is only possible using the
-`openmw.core.l10n <../lua-scripting/openmw_core.html##(core).l10n>`_ lua function.
+`openfallout.core.l10n <../lua-scripting/openfallout_core.html##(core).l10n>`_ lua function.
 
 Locales
 -------
@@ -45,9 +45,9 @@ VFS as files of the form ``l10n/<ContextName>/<Locale>.yaml``.
 
 In most cases one mod should have only one l10n context. Don't create a new context for each single message. Really big mods with hundreds and thousands of messages can have several l10n contexts. In this case all context names should start with the name of the mod. I.e. ``<ContextName> = <ModName><Subcontext>`` (or ``<AuthorName><ModName><Subcontext>``).
 
-L10n contexts with prefix "OMW" are reserved for the OpenMW itself (in particular for built-in scripts ``scripts/omw/``) and shouldn't be used in mods.
+L10n contexts with prefix "OF" are reserved for OpenFallout itself (in particular for built-in scripts ``scripts/omw/``) and shouldn't be used in mods.
 
-Built-in l10n contexts "Interface" and "Calendar" don't have the "OMW" prefix because these messages are more generic and can be reused in mods.
+Built-in l10n contexts "Interface" and "Calendar" don't have the "OF" prefix because these messages are more generic and can be reused in mods.
 
 **Format**
 

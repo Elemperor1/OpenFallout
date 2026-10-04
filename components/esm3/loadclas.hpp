@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CLAS_H
-#define OPENMW_ESM_CLAS_H
+#ifndef OPENFALLOUT_ESM_CLAS_H
+#define OPENFALLOUT_ESM_CLAS_H
 
 #include <array>
 #include <cstdint>

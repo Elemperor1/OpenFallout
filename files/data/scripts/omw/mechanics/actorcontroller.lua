@@ -1,6 +1,6 @@
-local self = require('openmw.self')
-local core = require('openmw.core')
-local types = require('openmw.types')
+local self = require('openfallout.self')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
 local Actor = types.Actor
 
 return {

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_RECASTMESH_H
-#define OPENMW_MWRENDER_RECASTMESH_H
+#ifndef OPENFALLOUT_MWRENDER_RECASTMESH_H
+#define OPENFALLOUT_MWRENDER_RECASTMESH_H
 
 #include <components/detournavigator/recastmeshtiles.hpp>
 #include <components/detournavigator/version.hpp>

@@ -53,7 +53,7 @@ extern "C" void Java_org_libsdl_app_SDLActivity_sendMouseButton(JNIEnv* env, jcl
 
 extern "C" int Java_org_libsdl_app_SDLActivity_nativeInit(JNIEnv* env, jclass cls, jobject obj)
 {
-    setenv("OPENMW_DECOMPRESS_TEXTURES", "1", 1);
+    setenv("OPENFALLOUT_DECOMPRESS_TEXTURES", "1", 1);
 
     // On Android, we use a virtual controller with guid="Virtual"
     SDL_GameControllerAddMapping(

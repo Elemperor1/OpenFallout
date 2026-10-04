@@ -1,20 +1,20 @@
-local camera = require('openmw.camera')
-local core = require('openmw.core')
-local debug = require('openmw.debug')
-local input = require('openmw.input')
-local util = require('openmw.util')
-local self = require('openmw.self')
-local nearby = require('openmw.nearby')
-local async = require('openmw.async')
-local storage = require('openmw.storage')
-local I = require('openmw.interfaces')
+local camera = require('openfallout.camera')
+local core = require('openfallout.core')
+local debug = require('openfallout.debug')
+local input = require('openfallout.input')
+local util = require('openfallout.util')
+local self = require('openfallout.self')
+local nearby = require('openfallout.nearby')
+local async = require('openfallout.async')
+local storage = require('openfallout.storage')
+local I = require('openfallout.interfaces')
 
-local Actor = require('openmw.types').Actor
-local Player = require('openmw.types').Player
+local Actor = require('openfallout.types').Actor
+local Player = require('openfallout.types').Player
 
 input.registerAction {
     key = 'TogglePOV',
-    l10n = 'OMWControls',
+    l10n = 'OFControls',
     name = 'TogglePOV_name',
     description = 'TogglePOV_description',
     type = input.ACTION_TYPE.Boolean,
@@ -23,7 +23,7 @@ input.registerAction {
 
 input.registerAction {
     key = 'Zoom3rdPerson',
-    l10n = 'OMWControls',
+    l10n = 'OFControls',
     name = 'Zoom3rdPerson_name',
     description = 'Zoom3rdPerson_description',
     type = input.ACTION_TYPE.Number,
@@ -248,7 +248,7 @@ return {
     ---
     -- @module Camera
     -- @context player
-    -- @usage require('openmw.interfaces').Camera
+    -- @usage require('openfallout.interfaces').Camera
     interface = {
         --- Interface version is 1
         -- @field [parent=#Camera] #number version
@@ -256,7 +256,7 @@ return {
 
         --- Return the primary mode (MODE.FirstPerson or MODE.ThirdPerson).
         -- @function [parent=#Camera] getPrimaryMode
-        -- @return #number @{openmw.camera#MODE}
+        -- @return #number @{openfallout.camera#MODE}
         getPrimaryMode = function() return primaryMode end,
 
         --- Get the base third person distance (without applying angle and speed modifiers).

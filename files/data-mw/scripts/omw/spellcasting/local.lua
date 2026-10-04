@@ -1,7 +1,7 @@
-local self = require('openmw.self')
-local types = require('openmw.types')
-local I = require('openmw.interfaces')
-local auxUtil = require('openmw_aux.util')
+local self = require('openfallout.self')
+local types = require('openfallout.types')
+local I = require('openfallout.interfaces')
+local auxUtil = require('openfallout_aux.util')
 local common = require('scripts.omw.spellcasting.common')
 local Actor = types.Actor
 

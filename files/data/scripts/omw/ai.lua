@@ -1,7 +1,7 @@
-local self = require('openmw.self')
-local interfaces = require('openmw.interfaces')
-local types = require('openmw.types')
-local util = require('openmw.util')
+local self = require('openfallout.self')
+local interfaces = require('openfallout.interfaces')
+local types = require('openfallout.types')
+local util = require('openfallout.util')
 
 local function startPackage(args)
     local cancelOther = args.cancelOther
@@ -59,7 +59,7 @@ return {
     --- Basic AI interface
     -- @module AI
     -- @context local
-    -- @usage require('openmw.interfaces').AI
+    -- @usage require('openfallout.interfaces').AI
     interface = {
         --- Interface version
         -- @field [parent=#AI] #number version
@@ -68,9 +68,9 @@ return {
         --- AI Package
         -- @type Package
         -- @field #string type Type of the AI package.
-        -- @field openmw.core#GameObject target Target (usually an actor) of the AI package (can be nil).
+        -- @field openfallout.core#GameObject target Target (usually an actor) of the AI package (can be nil).
         -- @field #boolean sideWithTarget Whether to help the target in combat (true or false).
-        -- @field openmw.util#Vector3 destPosition Destination point of the AI package.
+        -- @field openfallout.util#Vector3 destPosition Destination point of the AI package.
         -- @field #number distance Distance value (can be nil).
         -- @field #number duration Duration value (can be nil).
         -- @field #table idle Idle value (can be nil).
@@ -122,7 +122,7 @@ return {
         --- Return the target of the active package if the package has given type
         -- @function [parent=#AI] getActiveTarget
         -- @param #string packageType The expected type of the active package
-        -- @return openmw.core#GameObject The target (can be nil if the package has no target or has another type)
+        -- @return openfallout.core#GameObject The target (can be nil if the package has no target or has another type)
         getActiveTarget = function(packageType)
             local p = self:_getActiveAiPackage()
             if p and p.type == packageType then
@@ -135,7 +135,7 @@ return {
         --- Get a list of targets from all packages of the given type.
         -- @function [parent=#AI] getTargets
         -- @param #string packageType
-        -- @return #list<openmw.core#GameObject>
+        -- @return #list<openfallout.core#GameObject>
         getTargets = function(packageType)
             local res = {}
             filterPackages(function(p)

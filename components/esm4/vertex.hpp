@@ -24,8 +24,8 @@
   trial & error.  See http://en.uesp.net/wiki for details.
 
 */
-#ifndef OPENMW_COMPONENTS_ESM4_VERTEX_H
-#define OPENMW_COMPONENTS_ESM4_VERTEX_H
+#ifndef OPENFALLOUT_COMPONENTS_ESM4_VERTEX_H
+#define OPENFALLOUT_COMPONENTS_ESM4_VERTEX_H
 
 namespace ESM4
 {
@@ -37,4 +37,4 @@ namespace ESM4
     };
 }
 
-#endif // OPENMW_COMPONENTS_ESM4_VERTEX_H
+#endif // OPENFALLOUT_COMPONENTS_ESM4_VERTEX_H

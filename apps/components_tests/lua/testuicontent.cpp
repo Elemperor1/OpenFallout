@@ -15,7 +15,7 @@ namespace
         LuaUiContentTest()
         {
             mLuaState.addInternalLibSearchPath(
-                std::filesystem::path{ OPENMW_PROJECT_SOURCE_DIR } / "components" / "lua_ui");
+                std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR } / "components" / "lua_ui");
             mNew = LuaUi::loadContentConstructor(&mLuaState);
         }
 

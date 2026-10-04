@@ -1,6 +1,6 @@
-local types = require('openmw.types')
-local util = require('openmw.util')
-local world = require('openmw.world')
+local types = require('openfallout.types')
+local util = require('openfallout.util')
+local world = require('openfallout.world')
 
 local CELL_SIZE = 8192
 

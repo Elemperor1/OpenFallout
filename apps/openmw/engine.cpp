@@ -119,12 +119,12 @@ namespace
             if (filePath.empty())
             {
                 MWBase::Environment::get().getWindowManager()->scheduleMessageBox(
-                    "#{OMWEngine:ScreenshotFailed}", MWGui::ShowInDialogueMode_Never);
+                    "#{OFEngine:ScreenshotFailed}", MWGui::ShowInDialogueMode_Never);
 
                 return;
             }
 
-            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OMWEngine");
+            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OFEngine");
             std::string message = l10n->formatMessage("ScreenshotMade", { "file" }, { L10n::toUnicode(filePath) });
 
             MWBase::Environment::get().getWindowManager()->scheduleMessageBox(
@@ -971,9 +971,9 @@ void OMW::Engine::go()
     prepareEngine();
 
 #ifdef _WIN32
-    const auto* statsFile = _wgetenv(L"OPENMW_OSG_STATS_FILE");
+    const auto* statsFile = _wgetenv(L"OPENFALLOUT_OSG_STATS_FILE");
 #else
-    const auto* statsFile = std::getenv("OPENMW_OSG_STATS_FILE");
+    const auto* statsFile = std::getenv("OPENFALLOUT_OSG_STATS_FILE");
 #endif
 
     std::filesystem::path path;

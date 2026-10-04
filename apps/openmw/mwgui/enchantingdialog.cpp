@@ -62,7 +62,7 @@ namespace MWGui
 
         mControllerButtons.mA = "#{Interface:Select}";
         mControllerButtons.mB = "#{Interface:Cancel}";
-        mControllerButtons.mY = "#{OMWEngine:EnchantType}";
+        mControllerButtons.mY = "#{OFEngine:EnchantType}";
         mControllerButtons.mL1 = "#{Interface:Item}";
         mControllerButtons.mR1 = "#{Interface:Soul}";
     }

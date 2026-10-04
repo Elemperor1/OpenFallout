@@ -398,7 +398,7 @@ namespace DetourNavigator
         const Loading::ScopedLoad load(listener);
         if (listener != nullptr)
         {
-            listener->setLabel("#{OMWEngine:BuildingNavigationMesh}");
+            listener->setLabel("#{OFEngine:BuildingNavigationMesh}");
             listener->setProgressRange(maxProgress);
         }
         while (!mDone.wait_for(lock, std::chrono::milliseconds(20), isDone))

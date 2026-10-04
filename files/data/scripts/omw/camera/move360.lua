@@ -1,12 +1,12 @@
-local core = require('openmw.core')
-local camera = require('openmw.camera')
-local input = require('openmw.input')
-local self = require('openmw.self')
-local util = require('openmw.util')
-local I = require('openmw.interfaces')
+local core = require('openfallout.core')
+local camera = require('openfallout.camera')
+local input = require('openfallout.input')
+local self = require('openfallout.self')
+local util = require('openfallout.util')
+local I = require('openfallout.interfaces')
 
-local Actor = require('openmw.types').Actor
-local Player = require('openmw.types').Player
+local Actor = require('openfallout.types').Actor
+local Player = require('openfallout.types').Player
 
 local MODE = camera.MODE
 

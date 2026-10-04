@@ -21,7 +21,7 @@ Attack another actor.
     - boolean [default=true]
     - whether to cancel all other AI packages
   * - target
-    - `GameObject <../openmw_core.html##(GameObject)>`_ [required]
+    - `GameObject <../openfallout_core.html##(GameObject)>`_ [required]
     - the actor to attack
 
 **Examples**
@@ -29,7 +29,7 @@ Attack another actor.
 .. code-block:: Lua
 
     -- from local script add package to self
-    local AI = require('openmw.interfaces').AI
+    local AI = require('openfallout.interfaces').AI
     AI.startPackage({type='Combat', target=anotherActor})
 
     -- via event to any actor

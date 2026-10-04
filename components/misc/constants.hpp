@@ -1,5 +1,5 @@
-#ifndef OPENMW_CONSTANTS_H
-#define OPENMW_CONSTANTS_H
+#ifndef OPENFALLOUT_CONSTANTS_H
+#define OPENFALLOUT_CONSTANTS_H
 
 #include <string>
 

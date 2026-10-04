@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_IMPORTPROJ_H
-#define OPENMW_ESSIMPORT_IMPORTPROJ_H
+#ifndef OPENFALLOUT_ESSIMPORT_IMPORTPROJ_H
+#define OPENFALLOUT_ESSIMPORT_IMPORTPROJ_H
 
 #include <components/esm/esmcommon.hpp>
 #include <components/esm/vector3.hpp>

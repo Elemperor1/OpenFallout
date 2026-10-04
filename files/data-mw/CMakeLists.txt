@@ -1,4 +1,4 @@
-if (NOT DEFINED OPENMW_RESOURCES_ROOT)
+if (NOT DEFINED OPENFALLOUT_RESOURCES_ROOT)
     return()
 endif()
 
@@ -19,10 +19,10 @@ set(BUILTIN_DATA_MW_FILES
     l10n/Mechanics/gmst.yaml
 
     # L10n for OpenFallout menus and non-game-specific messages
-    l10n/OMWEngine/gmst.yaml
+    l10n/OFEngine/gmst.yaml
 
     # Game-specific settings for calendar.lua
-    openmw_aux/calendarconfig.lua
+    openfallout_aux/calendarconfig.lua
 
     scripts/omw/cellhandlers.lua
     scripts/omw/esmfallbacks.lua
@@ -41,7 +41,7 @@ set(BUILTIN_DATA_MW_FILES
 )
 
 foreach (f ${BUILTIN_DATA_MW_FILES})
-    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENMW_RESOURCES_ROOT}" "resources/vfs-mw/${f}")
+    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs-mw/${f}")
 endforeach (f)
 
 # Concat data/builtin.omwscripts and data-mw/builtin.omwscripts.in to create vfs-mw/builtin.omwscripts
@@ -53,4 +53,4 @@ if (NOT CMAKE_GENERATOR MATCHES "Ninja")
 endif()
 
 file(READ "${builtinBase}" BUILTIN_SCRIPTS)
-configure_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/builtin.omwscripts.in" "${OPENMW_RESOURCES_ROOT}" "resources/vfs-mw/builtin.omwscripts")
+configure_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/builtin.omwscripts.in" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs-mw/builtin.omwscripts")

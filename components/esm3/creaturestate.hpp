@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CREATURESTATE_H
-#define OPENMW_ESM_CREATURESTATE_H
+#ifndef OPENFALLOUT_ESM_CREATURESTATE_H
+#define OPENFALLOUT_ESM_CREATURESTATE_H
 
 #include "creaturestats.hpp"
 #include "inventorystate.hpp"

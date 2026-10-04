@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_WEAP_H
-#define OPENMW_ESM_WEAP_H
+#ifndef OPENFALLOUT_ESM_WEAP_H
+#define OPENFALLOUT_ESM_WEAP_H
 
 #include <array>
 #include <string>

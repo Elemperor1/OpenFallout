@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_EFFECTLIST_H
-#define OPENMW_ESM_EFFECTLIST_H
+#ifndef OPENFALLOUT_ESM_EFFECTLIST_H
+#define OPENFALLOUT_ESM_EFFECTLIST_H
 
 #include <cstdint>
 #include <vector>

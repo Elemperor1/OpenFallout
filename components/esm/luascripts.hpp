@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_LUASCRIPTS_H
-#define OPENMW_ESM_LUASCRIPTS_H
+#ifndef OPENFALLOUT_ESM_LUASCRIPTS_H
+#define OPENFALLOUT_ESM_LUASCRIPTS_H
 
 #include <components/esm/refid.hpp>
 #include <components/vfs/pathutil.hpp>

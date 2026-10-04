@@ -28,7 +28,7 @@ set(ESSIMPORTER_FILES
     convertplayer.cpp
 )
 
-openmw_add_executable(openfallout-essimporter
+openfallout_add_executable(openfallout-essimporter
     ${ESSIMPORTER_FILES}
 )
 

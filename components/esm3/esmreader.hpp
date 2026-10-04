@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_READER_H
-#define OPENMW_ESM_READER_H
+#ifndef OPENFALLOUT_ESM_READER_H
+#define OPENFALLOUT_ESM_READER_H
 
 #include <array>
 #include <cstdint>

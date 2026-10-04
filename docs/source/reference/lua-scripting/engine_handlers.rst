@@ -32,7 +32,7 @@ Engine handler is a function defined by a script, that can be called by the engi
       | the simulation time from the last update in seconds.
   * - onSave() -> savedData
     - | Called when the game is saving. May be called in inactive state,
-      | so it shouldn't use `openmw.nearby`.
+      | so it shouldn't use `openfallout.nearby`.
   * - onLoad(savedData, initData)
     - | Called on loading with the data previosly returned by
       | ``onSave``. During loading the object is always inactive. ``initData`` is
@@ -117,35 +117,35 @@ Engine handler is a function defined by a script, that can be called by the engi
       | and for UI that should work on pause.
       | `dt` is simulation time delta (0 when on pause).
   * - onKeyPress(key)
-    - | `Key <openmw_input.html##(KeyboardEvent)>`_ is pressed.
+    - | `Key <openfallout_input.html##(KeyboardEvent)>`_ is pressed.
       | Usage example:
       | ``if key.symbol == 'z' and key.withShift then ...``
   * - onKeyRelease(key)
-    - | `Key <openmw_input.html##(KeyboardEvent)>`_ is released.
+    - | `Key <openfallout_input.html##(KeyboardEvent)>`_ is released.
       | Usage example:
       | ``if key.symbol == 'z' and key.withShift then ...``
   * - onControllerButtonPress(id)
-    - | A `button <openmw_input.html##(CONTROLLER_BUTTON)>`_ on a game controller is pressed.
+    - | A `button <openfallout_input.html##(CONTROLLER_BUTTON)>`_ on a game controller is pressed.
       | Usage example:
       | ``if id == input.CONTROLLER_BUTTON.LeftStick then ...``
   * - onControllerButtonRelease(id)
-    - | A `button <openmw_input.html##(CONTROLLER_BUTTON)>`_ on a game controller is released.
+    - | A `button <openfallout_input.html##(CONTROLLER_BUTTON)>`_ on a game controller is released.
       | Usage example:
       | ``if id == input.CONTROLLER_BUTTON.LeftStick then ...``
   * - onInputAction(id)
-    - | (DEPRECATED, use `registerActionHandler <openmw_input.html##(registerActionHandler)>`_)
-      | `Game control <openmw_input.html##(ACTION)>`_ is pressed.
+    - | (DEPRECATED, use `registerActionHandler <openfallout_input.html##(registerActionHandler)>`_)
+      | `Game control <openfallout_input.html##(ACTION)>`_ is pressed.
       | Usage example:
       | ``if id == input.ACTION.ToggleWeapon then ...``
   * - onTouchPress(touchEvent)
     - | A finger pressed on a touch device.
-      | `Touch event <openmw_input.html##(TouchEvent)>`_.
+      | `Touch event <openfallout_input.html##(TouchEvent)>`_.
   * - onTouchRelease(touchEvent)
     - | A finger released a touch device.
-      | `Touch event <openmw_input.html##(TouchEvent)>`_.
+      | `Touch event <openfallout_input.html##(TouchEvent)>`_.
   * - onTouchMove(touchEvent)
     - | A finger moved on a touch device.
-      | `Touch event <openmw_input.html##(TouchEvent)>`_.
+      | `Touch event <openfallout_input.html##(TouchEvent)>`_.
   * - onMouseButtonPress(button)
     - | A mouse button was pressed
       | Button id
@@ -171,7 +171,7 @@ Engine handler is a function defined by a script, that can be called by the engi
   :widths: 20 80
 
   * - onKeyPress(key)
-    - | `Key <openmw_input.html##(KeyboardEvent)>`_ is pressed.
+    - | `Key <openfallout_input.html##(KeyboardEvent)>`_ is pressed.
       | Usage example:
       | ``if key.symbol == 'z' and key.withShift then ...``
   * - onQuestUpdate(questId, stage)
@@ -186,7 +186,7 @@ Engine handler is a function defined by a script, that can be called by the engi
 
   * - onStateChanged()
     - | Called whenever the current game changes
-      | (i. e. the result of `getState <openmw_menu.html##(menu).getState>`_ changes)
+      | (i. e. the result of `getState <openfallout_menu.html##(menu).getState>`_ changes)
 
 **Only for load scripts**
 

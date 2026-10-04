@@ -3,7 +3,7 @@ set(BULLETMESHTOOL
 )
 source_group(apps\\bulletobjecttool FILES ${BULLETMESHTOOL})
 
-openmw_add_executable(openfallout-bulletobjecttool ${BULLETMESHTOOL})
+openfallout_add_executable(openfallout-bulletobjecttool ${BULLETMESHTOOL})
 
 target_link_libraries(openfallout-bulletobjecttool
     Boost::program_options

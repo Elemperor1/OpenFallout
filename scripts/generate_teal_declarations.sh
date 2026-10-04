@@ -4,9 +4,9 @@ if [ -z "$1" ]; then
 fi
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-OPENMW_DIR=$(realpath $SCRIPTS_DIR/..)
-DOCS_DIR=$(realpath $OPENMW_DIR/docs)
-FILES_DIR=$(realpath $OPENMW_DIR/files)
+OPENFALLOUT_DIR=$(realpath $SCRIPTS_DIR/..)
+DOCS_DIR=$(realpath $OPENFALLOUT_DIR/docs)
+FILES_DIR=$(realpath $OPENFALLOUT_DIR/files)
 OUTPUT_DIR=$(realpath "$1")
 
 PATH=$PATH:~/lua-5.1.5/src
@@ -25,7 +25,7 @@ build_path() {
 }
 
 cd $FILES_DIR
-build_path "lua_api/openmw/*lua"
+build_path "lua_api/openfallout/*lua"
 
 data_paths=$($DOCS_DIR/source/luadoc_data_paths.sh)
 for path in $data_paths
@@ -35,7 +35,7 @@ done
 
 cd $OUTPUT_DIR
 
-mv lua_api/openmw ./
+mv lua_api/openfallout ./
 rm -r lua_api
 
 mv data/* ./

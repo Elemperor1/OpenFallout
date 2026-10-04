@@ -53,7 +53,7 @@ if(NOT WIN32)
 endif(NOT WIN32)
 
 # Main executable
-openmw_add_executable(openfallout-launcher
+openfallout_add_executable(openfallout-launcher
     ${GUI_TYPE}
     ${LAUNCHER}
     ${LAUNCHER_HEADER}

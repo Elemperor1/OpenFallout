@@ -40,12 +40,12 @@ namespace MWLua
 
     sol::table initInputPackage(const Context& context)
     {
-        sol::object cached = context.getTypePackage("openmw_input");
+        sol::object cached = context.getTypePackage("openfallout_input");
         if (cached != sol::nil)
             return cached;
         sol::state_view lua = context.sol();
 
-        context.cachePackage("openmw_input_keyevent", [&lua]() {
+        context.cachePackage("openfallout_input_keyevent", [&lua]() {
             sol::usertype<SDL_Keysym> keyEvent = lua.new_usertype<SDL_Keysym>("KeyEvent");
             keyEvent["symbol"] = sol::readonly_property([](const SDL_Keysym& e) {
                 if (e.sym > 0 && e.sym <= 255)
@@ -65,7 +65,7 @@ namespace MWLua
             return sol::table(lua, sol::create);
         });
 
-        context.cachePackage("openmw_input_touchpadevent", [&lua]() {
+        context.cachePackage("openfallout_input_touchpadevent", [&lua]() {
             auto touchpadEvent = lua.new_usertype<SDLUtil::TouchEvent>("TouchpadEvent");
             touchpadEvent["device"]
                 = sol::readonly_property([](const SDLUtil::TouchEvent& e) -> int { return e.mDevice; });
@@ -79,7 +79,7 @@ namespace MWLua
             return sol::table(lua, sol::create);
         });
 
-        context.cachePackage("openmw_input_inputactions", [&lua]() {
+        context.cachePackage("openfallout_input_inputactions", [&lua]() {
             auto inputActions = lua.new_usertype<LuaUtil::InputAction::Registry>("InputActions");
             inputActions[sol::meta_function::index]
                 = [](LuaUtil::InputAction::Registry& registry, std::string_view key) { return registry[key]; };
@@ -101,7 +101,7 @@ namespace MWLua
             return sol::table(lua, sol::create);
         });
 
-        context.cachePackage("openmw_input_actioninfo", [&lua]() {
+        context.cachePackage("openfallout_input_actioninfo", [&lua]() {
             auto actionInfo = lua.new_usertype<LuaUtil::InputAction::Info>("ActionInfo");
             actionInfo["key"] = sol::readonly_property(
                 [](const LuaUtil::InputAction::Info& info) -> std::string_view { return info.mKey; });
@@ -118,7 +118,7 @@ namespace MWLua
             return sol::table(lua, sol::create);
         });
 
-        context.cachePackage("openmw_input_inputtriggers", [&lua]() {
+        context.cachePackage("openfallout_input_inputtriggers", [&lua]() {
             auto inputTriggers = lua.new_usertype<LuaUtil::InputTrigger::Registry>("InputTriggers");
             inputTriggers[sol::meta_function::index]
                 = [](LuaUtil::InputTrigger::Registry& registry, std::string_view key) { return registry[key]; };
@@ -140,7 +140,7 @@ namespace MWLua
             return sol::table(lua, sol::create);
         });
 
-        context.cachePackage("openmw_input_triggerinfo", [&lua]() {
+        context.cachePackage("openfallout_input_triggerinfo", [&lua]() {
             auto triggerInfo = lua.new_usertype<LuaUtil::InputTrigger::Info>("TriggerInfo");
             triggerInfo["key"] = sol::readonly_property(
                 [](const LuaUtil::InputTrigger::Info& info) -> std::string_view { return info.mKey; });
@@ -484,7 +484,7 @@ namespace MWLua
             }));
 
         sol::table readOnlyApi = LuaUtil::makeReadOnly(api);
-        return context.setTypePackage(readOnlyApi, "openmw_input");
+        return context.setTypePackage(readOnlyApi, "openfallout_input");
     }
 
 }

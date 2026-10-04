@@ -1,11 +1,11 @@
-local camera = require('openmw.camera')
-local util = require('openmw.util')
-local self = require('openmw.self')
-local nearby = require('openmw.nearby')
-local async = require('openmw.async')
-local storage = require('openmw.storage')
+local camera = require('openfallout.camera')
+local util = require('openfallout.util')
+local self = require('openfallout.self')
+local nearby = require('openfallout.nearby')
+local async = require('openfallout.async')
+local storage = require('openfallout.storage')
 
-local Actor = require('openmw.types').Actor
+local Actor = require('openfallout.types').Actor
 
 local settings = storage.playerSection('SettingsOMWCameraThirdPerson')
 

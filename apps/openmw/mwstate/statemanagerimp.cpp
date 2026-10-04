@@ -148,7 +148,7 @@ void MWState::StateManager::askLoadRecent()
             std::vector<std::string> buttons;
             buttons.emplace_back("#{Interface:Yes}");
             buttons.emplace_back("#{Interface:No}");
-            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OMWEngine");
+            auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OFEngine");
             std::string message = l10n->formatMessage("AskLoadLastSave", { "save" }, { L10n::toUnicode(saveName) });
             MWBase::Environment::get().getWindowManager()->interactiveMessageBox(message, buttons);
             mAskLoadRecent = true;
@@ -302,7 +302,7 @@ void MWState::StateManager::saveGame(std::string_view description, const Slot* s
         Loading::Listener& listener = *MWBase::Environment::get().getWindowManager()->getLoadingScreen();
         // Using only Cells for progress information, since they typically have the largest records by far
         listener.setProgressRange(MWBase::Environment::get().getWorld()->countSavedGameCells());
-        listener.setLabel("#{OMWEngine:SavingInProgress}", true);
+        listener.setLabel("#{OFEngine:SavingInProgress}", true);
 
         Loading::ScopedLoad load(&listener);
 
@@ -375,7 +375,7 @@ void MWState::StateManager::quickSave(std::string name)
             && MWBase::Environment::get().getWindowManager()->isSavingAllowed()))
     {
         // You can not save your game right now
-        MWBase::Environment::get().getWindowManager()->messageBox("#{OMWEngine:SaveGameDenied}");
+        MWBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
         return;
     }
 
@@ -476,7 +476,7 @@ void MWState::StateManager::loadGame(const Character* character, const std::file
         Loading::Listener& listener = *MWBase::Environment::get().getWindowManager()->getLoadingScreen();
 
         listener.setProgressRange(100);
-        listener.setLabel("#{OMWEngine:LoadingInProgress}");
+        listener.setLabel("#{OFEngine:LoadingInProgress}");
 
         Loading::ScopedLoad load(&listener);
 
@@ -663,7 +663,7 @@ void MWState::StateManager::loadGame(const Character* character, const std::file
     }
     catch (const SaveVersionTooNewError& e)
     {
-        std::string error = "#{OMWEngine:LoadingRequiresNewVersionError}";
+        std::string error = "#{OFEngine:LoadingRequiresNewVersionError}";
         printSavegameFormatError(e.what(), error);
     }
     catch (const SaveVersionTooOldError& e)
@@ -678,13 +678,13 @@ void MWState::StateManager::loadGame(const Character* character, const std::file
             static_assert(ESM::MinSupportedSaveGameFormatVersion <= ESM::OpenMW0_49MinSaveGameFormatVersion);
             release = "OpenMW 0.52.0";
         }
-        auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OMWEngine");
+        auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OFEngine");
         std::string error = l10n->formatMessage("LoadingRequiresOldVersionError", { "version" }, { release });
         printSavegameFormatError(e.what(), error);
     }
     catch (const std::exception& e)
     {
-        std::string error = "#{OMWEngine:LoadingFailed}: " + std::string(e.what());
+        std::string error = "#{OFEngine:LoadingFailed}: " + std::string(e.what());
         printSavegameFormatError(e.what(), error);
     }
 }
@@ -808,9 +808,9 @@ bool MWState::StateManager::confirmLoading(const std::vector<std::string_view>& 
     buttons.emplace_back("#{Interface:Yes}");
     buttons.emplace_back("#{Interface:Copy}");
     buttons.emplace_back("#{Interface:No}");
-    std::string message = "#{OMWEngine:MissingContentFilesConfirmation}";
+    std::string message = "#{OFEngine:MissingContentFilesConfirmation}";
 
-    auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OMWEngine");
+    auto l10n = MWBase::Environment::get().getL10nManager()->getContext("OFEngine");
     message += l10n->formatMessage("MissingContentFilesList", { "files" }, { static_cast<int>(missingFiles.size()) });
     auto cappedSize = std::min(missingFiles.size(), missingPluginsDisplayLimit);
     if (cappedSize == missingFiles.size())

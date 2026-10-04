@@ -4,7 +4,7 @@ Collecting data
 ===============
 
 The data collected is the same as displayed by repeatedly pressing F3 and/or F4 while in the game (correspondance is shown below).
-We can select what should be collected by setting the `OPENMW_OSG_STATS_LIST` environment variables to a semi-colon separated list of metrics to collect. There can be any combination and order doesn't matter. Note that data collection can **significantly reduce** performance
+We can select what should be collected by setting the `OPENFALLOUT_OSG_STATS_LIST` environment variables to a semi-colon separated list of metrics to collect. There can be any combination and order doesn't matter. Note that data collection can **significantly reduce** performance
 
 | Metric to collect | Equivalent in-game profiler                                       |
 |-------------------|-------------------------------------------------------------------|
@@ -19,20 +19,20 @@ We can select what should be collected by setting the `OPENMW_OSG_STATS_LIST` en
 | `viewerobjects`   | Table shown when pressing F3 4 times                              |
 | `resource`        | Table shown when pressing F4                                      |
 
-It is necessary to write the collected metrics to a file which needs to be defined by the `OPENMW_OSG_STATS_FILE` environment variable.
+It is necessary to write the collected metrics to a file which needs to be defined by the `OPENFALLOUT_OSG_STATS_FILE` environment variable.
 
 Example
 -------
 
 Posix shell
 ```sh
-OPENMW_OSG_STATS_FILE=/tmp/stats OPENMW_OSG_STATS_LIST="resource;engine" /usr/local/bin/openfallout
+OPENFALLOUT_OSG_STATS_FILE=/tmp/stats OPENFALLOUT_OSG_STATS_LIST="resource;engine" /usr/local/bin/openfallout
 ```
 
 Windows PowerShell
 ```powershell
-$env:OPENMW_OSG_STATS_FILE="c:\stats"
-$env:OPENMW_OSG_STATS_LIST="resource;engine"
+$env:OPENFALLOUT_OSG_STATS_FILE="c:\stats"
+$env:OPENFALLOUT_OSG_STATS_LIST="resource;engine"
 openfallout
 ```
 

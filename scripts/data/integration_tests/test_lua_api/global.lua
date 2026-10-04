@@ -1,11 +1,11 @@
 ﻿local testing = require('testing_util')
-local core = require('openmw.core')
-local async = require('openmw.async')
-local util = require('openmw.util')
-local types = require('openmw.types')
-local vfs = require('openmw.vfs')
-local world = require('openmw.world')
-local I = require('openmw.interfaces')
+local core = require('openfallout.core')
+local async = require('openfallout.async')
+local util = require('openfallout.util')
+local types = require('openfallout.types')
+local vfs = require('openfallout.vfs')
+local world = require('openfallout.world')
+local I = require('openfallout.interfaces')
 
 local function initPlayer(player)
     player = player or world.players[1]
@@ -394,8 +394,8 @@ testing.registerGlobalTest('mwscript magic interactions', function()
     testing.expectEqual(globals.OpenMW_Tests_Failed, 0, 'OpenMW_Tests should run without issue')
 end)
 
-testing.registerGlobalTest('openmw.util math conventions', function()
-    -- Pins the semantics openmw.util exposes to mods, so any change to the
+testing.registerGlobalTest('openfallout.util math conventions', function()
+    -- Pins the semantics openfallout.util exposes to mods, so any change to the
     -- underlying C++ math implementation or to the utilpackage bindings
     -- that alters observable Lua behaviour is caught here rather than
     -- silently breaking existing mods. See components/lua/utilpackage.cpp.
@@ -420,7 +420,7 @@ testing.registerGlobalTest('openmw.util math conventions', function()
     testing.expectEqual(util.vector2(1, 2) * util.vector2(3, 4), 11, 'util.vector2 * util.vector2 must be the dot product')
 
     -- Transform composition applies in REVERSE order (right-to-left).
-    -- Documented at files/lua_api/openmw/util.lua:608-609.
+    -- Documented at files/lua_api/openfallout/util.lua:608-609.
     local rotPi = util.transform.rotateZ(math.pi)
     local move10x = util.transform.move(util.vector3(10, 0, 0))
     local v = util.vector3(1, 0, 0)

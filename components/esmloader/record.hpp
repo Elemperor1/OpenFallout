@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_ESMLOADER_RECORD_H
-#define OPENMW_COMPONENTS_ESMLOADER_RECORD_H
+#ifndef OPENFALLOUT_COMPONENTS_ESMLOADER_RECORD_H
+#define OPENFALLOUT_COMPONENTS_ESMLOADER_RECORD_H
 
 #include <components/esm3/loadcell.hpp>
 #include <components/misc/algorithm.hpp>

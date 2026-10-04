@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_DIAL_H
-#define OPENMW_ESM_DIAL_H
+#ifndef OPENFALLOUT_ESM_DIAL_H
+#define OPENFALLOUT_ESM_DIAL_H
 
 #include <list>
 #include <map>

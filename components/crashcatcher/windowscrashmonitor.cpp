@@ -246,7 +246,7 @@ namespace Crash
         };
 
         DWORD processId = GetProcessId(mAppProcessHandle);
-        const char* env = getenv("OPENMW_FULL_MEMDUMP");
+        const char* env = getenv("OPENFALLOUT_FULL_MEMDUMP");
 
         try
         {

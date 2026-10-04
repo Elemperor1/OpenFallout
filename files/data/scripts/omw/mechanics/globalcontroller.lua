@@ -1,8 +1,8 @@
-local types = require('openmw.types')
+local types = require('openfallout.types')
 local Lockable = types.Lockable
-local Item = require('openmw.types').Item
-local world = require('openmw.world')
-local core = require('openmw.core')
+local Item = require('openfallout.types').Item
+local world = require('openfallout.world')
+local core = require('openfallout.core')
 
 local function onConsumeItem(data)
     local item = data.item

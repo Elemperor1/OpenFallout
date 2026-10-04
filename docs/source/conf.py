@@ -79,17 +79,17 @@ ppApiRevision = "UNDEFINED"
 
 try:
     cmake_raw = open(project_root+'/CMakeLists.txt', 'r').read()
-    majorVersionMatch = re.search(r'set\(OPENMW_VERSION_MAJOR (\d+)\)', cmake_raw)
-    minorVersionMatch = re.search(r'set\(OPENMW_VERSION_MINOR (\d+)\)', cmake_raw)
-    releaseVersionMatch = re.search(r'set\(OPENMW_VERSION_RELEASE (\d+)\)', cmake_raw)
+    majorVersionMatch = re.search(r'set\(OPENFALLOUT_VERSION_MAJOR (\d+)\)', cmake_raw)
+    minorVersionMatch = re.search(r'set\(OPENFALLOUT_VERSION_MINOR (\d+)\)', cmake_raw)
+    releaseVersionMatch = re.search(r'set\(OPENFALLOUT_VERSION_RELEASE (\d+)\)', cmake_raw)
     if majorVersionMatch and minorVersionMatch and releaseVersionMatch:
         release = version = '.'.join((majorVersionMatch.group(1),
                                      minorVersionMatch.group(1),
                                      releaseVersionMatch.group(1)))
-    luaApiRevisionMatch = re.search(r'set\(OPENMW_LUA_API_REVISION (\d+)\)', cmake_raw)
+    luaApiRevisionMatch = re.search(r'set\(OPENFALLOUT_LUA_API_REVISION (\d+)\)', cmake_raw)
     if luaApiRevisionMatch:
         luaApiRevision = luaApiRevisionMatch.group(1)
-    ppApiRevisionMatch = re.search(r'set\(OPENMW_POSTPROCESSING_API_REVISION (\d+)\)', cmake_raw)
+    ppApiRevisionMatch = re.search(r'set\(OPENFALLOUT_POSTPROCESSING_API_REVISION (\d+)\)', cmake_raw)
     if ppApiRevisionMatch:
         ppApiRevision = ppApiRevisionMatch.group(1)
 
@@ -99,7 +99,7 @@ except Exception as ex:
 
 rst_prolog = f"""
 .. |luaApiRevision| replace:: {luaApiRevision}
-.. |luaApiRevisionBadge| replace:: :bdg-link-info-line:`API v{luaApiRevision} <openmw_core.html##(core).API_REVISION>`
+.. |luaApiRevisionBadge| replace:: :bdg-link-info-line:`API v{luaApiRevision} <openfallout_core.html##(core).API_REVISION>`
 
 .. |ppApiRevision| replace:: {ppApiRevision}
 .. |bdg-ctx-menu| replace:: :bdg-warning:`menu`

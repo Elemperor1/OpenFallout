@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_DOOR_H
-#define OPENMW_ESM_DOOR_H
+#ifndef OPENFALLOUT_ESM_DOOR_H
+#define OPENFALLOUT_ESM_DOOR_H
 
 #include <cstdint>
 #include <string>

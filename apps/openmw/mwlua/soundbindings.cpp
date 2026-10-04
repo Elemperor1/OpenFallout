@@ -139,8 +139,8 @@ namespace MWLua
     sol::table initAmbientPackage(const Context& context)
     {
         sol::state_view lua = context.sol();
-        if (lua["openmw_ambient"] != sol::nil)
-            return lua["openmw_ambient"];
+        if (lua["openfallout_ambient"] != sol::nil)
+            return lua["openfallout_ambient"];
 
         sol::table api(lua, sol::create);
 
@@ -204,8 +204,8 @@ namespace MWLua
             sndMgr->stopMusic();
         };
 
-        lua["openmw_ambient"] = LuaUtil::makeReadOnly(api);
-        return lua["openmw_ambient"];
+        lua["openfallout_ambient"] = LuaUtil::makeReadOnly(api);
+        return lua["openfallout_ambient"];
     }
 
     sol::table initCoreSoundBindings(const Context& context)

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MECHANICS_OBSTACLE_H
-#define OPENMW_MECHANICS_OBSTACLE_H
+#ifndef OPENFALLOUT_MECHANICS_OBSTACLE_H
+#define OPENFALLOUT_MECHANICS_OBSTACLE_H
 
 #include "apps/openmw/mwworld/movementdirection.hpp"
 

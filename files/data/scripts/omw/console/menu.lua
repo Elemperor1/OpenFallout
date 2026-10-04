@@ -1,6 +1,6 @@
-local menu = require('openmw.menu')
-local ui = require('openmw.ui')
-local util = require('openmw.util')
+local menu = require('openfallout.menu')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
 
 local menuModeName = 'Lua[Menu]'
 
@@ -11,7 +11,7 @@ help() - print this message
 exit() - exit Lua mode
 view(_G) - print content of the table `_G` (current environment)
     standard libraries (math, string, etc.) are loaded by default but not visible in `_G`
-view(menu, 2) - print table `menu` (i.e. `openmw.menu`) and its subtables (2 - traversal depth)]]
+view(menu, 2) - print table `menu` (i.e. `openfallout.menu`) and its subtables (2 - traversal depth)]]
     ui.printToConsole(msg, ui.CONSOLE_COLOR.Info)
 end
 
@@ -41,21 +41,21 @@ local function enterLuaMenuMode()
 end
 
 local env = {
-    I = require('openmw.interfaces'),
-    menu = require('openmw.menu'),
-    util = require('openmw.util'),
-    core = require('openmw.core'),
-    storage = require('openmw.storage'),
-    vfs = require('openmw.vfs'),
-    markup = require('openmw.markup'),
-    ambient = require('openmw.ambient'),
-    async = require('openmw.async'),
-    ui = require('openmw.ui'),
-    input = require('openmw.input'),
-    aux_util = require('openmw_aux.util'),
-    calendar = require('openmw_aux.calendar'),
-    time = require('openmw_aux.time'),
-    view = require('openmw_aux.util').deepToString,
+    I = require('openfallout.interfaces'),
+    menu = require('openfallout.menu'),
+    util = require('openfallout.util'),
+    core = require('openfallout.core'),
+    storage = require('openfallout.storage'),
+    vfs = require('openfallout.vfs'),
+    markup = require('openfallout.markup'),
+    ambient = require('openfallout.ambient'),
+    async = require('openfallout.async'),
+    ui = require('openfallout.ui'),
+    input = require('openfallout.input'),
+    aux_util = require('openfallout_aux.util'),
+    calendar = require('openfallout_aux.calendar'),
+    time = require('openfallout_aux.time'),
+    view = require('openfallout_aux.util').deepToString,
     print = printToConsole,
     exit = exitLuaMenuMode,
     help = printHelp,

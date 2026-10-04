@@ -1,5 +1,5 @@
-#ifndef OPENMW_CELLNAMELOADER_H
-#define OPENMW_CELLNAMELOADER_H
+#ifndef OPENFALLOUT_CELLNAMELOADER_H
+#define OPENFALLOUT_CELLNAMELOADER_H
 
 #include <QSet>
 #include <QString>
@@ -43,4 +43,4 @@ private:
     QString getCellName(ESM::ESMReader& esmReader);
 };
 
-#endif // OPENMW_CELLNAMELOADER_H
+#endif // OPENFALLOUT_CELLNAMELOADER_H

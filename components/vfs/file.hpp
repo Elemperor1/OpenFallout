@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_VFS_FILE_H
-#define OPENMW_COMPONENTS_VFS_FILE_H
+#ifndef OPENFALLOUT_COMPONENTS_VFS_FILE_H
+#define OPENFALLOUT_COMPONENTS_VFS_FILE_H
 
 #include <filesystem>
 #include <string>

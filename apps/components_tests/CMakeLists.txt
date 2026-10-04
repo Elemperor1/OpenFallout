@@ -102,7 +102,7 @@ file(GLOB UNITTEST_SRC_FILES
 
 source_group(apps\\components-tests FILES ${UNITTEST_SRC_FILES})
 
-openmw_add_executable(components-tests ${UNITTEST_SRC_FILES})
+openfallout_add_executable(components-tests ${UNITTEST_SRC_FILES})
 
 target_link_libraries(components-tests
     GTest::GTest
@@ -136,8 +136,8 @@ file(DOWNLOAD
 )
 
 target_compile_definitions(components-tests
-    PRIVATE OPENMW_DATA_DIR=u8"${CMAKE_CURRENT_BINARY_DIR}/data"
-            OPENMW_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
+    PRIVATE OPENFALLOUT_DATA_DIR=u8"${CMAKE_CURRENT_BINARY_DIR}/data"
+            OPENFALLOUT_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
     target_precompile_headers(components-tests PRIVATE

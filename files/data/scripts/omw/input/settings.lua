@@ -1,10 +1,10 @@
-local core = require('openmw.core')
-local input = require('openmw.input')
-local storage = require('openmw.storage')
-local ui = require('openmw.ui')
-local util = require('openmw.util')
-local async = require('openmw.async')
-local I = require('openmw.interfaces')
+local core = require('openfallout.core')
+local input = require('openfallout.input')
+local storage = require('openfallout.storage')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
+local async = require('openfallout.async')
+local I = require('openfallout.interfaces')
 local buttonScript = require('scripts.omw.input.button')
 
 local settingsGroup = 'SettingsOMWControls'
@@ -20,16 +20,16 @@ local function boolSetting(key, default)
 end
 
 I.Settings.registerPage({
-    key = 'OMWControls',
-    l10n = 'OMWControls',
+    key = 'OFControls',
+    l10n = 'OFControls',
     name = 'ControlsPage',
     description = 'ControlsPageDescription',
 })
 
 I.Settings.registerGroup({
     key = settingsGroup,
-    page = 'OMWControls',
-    l10n = 'OMWControls',
+    page = 'OFControls',
+    l10n = 'OFControls',
     name = 'MovementSettings',
     permanentStorage = true,
     settings = {
@@ -41,7 +41,7 @@ I.Settings.registerGroup({
 
 local interfaceL10n = core.l10n('interface')
 
-local bindingSection = storage.playerSection('OMWInputBindings')
+local bindingSection = storage.playerSection('OFInputBindings')
 
 local recording = nil
 

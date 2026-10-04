@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CONTAINERSTATE_H
-#define OPENMW_ESM_CONTAINERSTATE_H
+#ifndef OPENFALLOUT_ESM_CONTAINERSTATE_H
+#define OPENFALLOUT_ESM_CONTAINERSTATE_H
 
 #include "inventorystate.hpp"
 #include "objectstate.hpp"

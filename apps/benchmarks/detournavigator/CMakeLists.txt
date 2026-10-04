@@ -1,4 +1,4 @@
-openmw_add_executable(openfallout_detournavigator_navmeshtilescache_benchmark navmeshtilescache.cpp)
+openfallout_add_executable(openfallout_detournavigator_navmeshtilescache_benchmark navmeshtilescache.cpp)
 target_link_libraries(openfallout_detournavigator_navmeshtilescache_benchmark benchmark::benchmark components)
 
 if (UNIX AND NOT APPLE)

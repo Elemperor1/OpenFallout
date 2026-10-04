@@ -150,7 +150,7 @@ namespace MWLua
             for (const auto& [name, package] : initLoadPackages(context))
                 mLoadScripts.addPackage(name, package);
 
-            mLoadScripts.addPackage("openmw.storage", LuaUtil::LuaStorage::initLoadPackage(view, &mPlayerStorage));
+            mLoadScripts.addPackage("openfallout.storage", LuaUtil::LuaStorage::initLoadPackage(view, &mPlayerStorage));
 
             LuaUtil::LuaStorage::initLuaBindings(view);
         });
@@ -193,11 +193,11 @@ namespace MWLua
             mPlayerPackages = initPlayerPackages(localContext);
             mPlayerPackages.insert(mLocalPackages.begin(), mLocalPackages.end());
 
-            mGlobalScripts.addPackage("openmw.storage", LuaUtil::LuaStorage::initGlobalPackage(view, &mGlobalStorage));
+            mGlobalScripts.addPackage("openfallout.storage", LuaUtil::LuaStorage::initGlobalPackage(view, &mGlobalStorage));
             mMenuScripts.addPackage(
-                "openmw.storage", LuaUtil::LuaStorage::initMenuPackage(view, &mGlobalStorage, &mPlayerStorage));
-            mLocalPackages["openmw.storage"] = LuaUtil::LuaStorage::initLocalPackage(view, &mGlobalStorage);
-            mPlayerPackages["openmw.storage"]
+                "openfallout.storage", LuaUtil::LuaStorage::initMenuPackage(view, &mGlobalStorage, &mPlayerStorage));
+            mLocalPackages["openfallout.storage"] = LuaUtil::LuaStorage::initLocalPackage(view, &mGlobalStorage);
+            mPlayerPackages["openfallout.storage"]
                 = LuaUtil::LuaStorage::initPlayerPackage(view, &mGlobalStorage, &mPlayerStorage);
 
             mPlayerStorage.setActive(true);

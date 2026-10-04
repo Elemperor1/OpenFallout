@@ -1,6 +1,6 @@
-local auxUtil = require('openmw_aux.util')
-local core = require('openmw.core')
-local I = require('openmw.interfaces')
+local auxUtil = require('openfallout_aux.util')
+local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
 local types = {
     Magic = 'Magic',
     Weapon = 'Weapon',
@@ -25,7 +25,7 @@ local onProjectileHitHandlers = {}
 
 --- Projectiles interface
 -- @module Projectiles
--- @usage require('openmw.interfaces').Projectiles
+-- @usage require('openfallout.interfaces').Projectiles
 return {
     engineHandlers = {
         _onProjectileHit = function(projectile, hitResult)
@@ -43,7 +43,7 @@ return {
 
         --- Add new projectile hit handler.
         -- If `handler(projectile, hitResult)` returns false, other handlers for the same projectile
-        -- will be skipped. Two handler parameters are a @{#ProjectileInfo} and a @{openmw.nearby#RayCastingResult},
+        -- will be skipped. Two handler parameters are a @{#ProjectileInfo} and a @{openfallout.nearby#RayCastingResult},
         -- respectively. Note that in the current revision hitResult.hit will always be true. In later interface revisions, when
         -- lua-spawned projectiles are introduced, hitResult.hit may be false to indicate to scripts that a lua-spawned
         -- projectile was despawned, and should therefore be checked anyway.

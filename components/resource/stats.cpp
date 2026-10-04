@@ -154,7 +154,7 @@ namespace Resource
 
         void setupStatCollection()
         {
-            const char* envList = getenv("OPENMW_OSG_STATS_LIST");
+            const char* envList = getenv("OPENFALLOUT_OSG_STATS_LIST");
             if (envList == nullptr)
                 return;
 

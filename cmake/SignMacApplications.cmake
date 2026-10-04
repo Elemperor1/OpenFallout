@@ -3,10 +3,10 @@
 
 # Obviously, we only need to run this on Apple targets.
 if (APPLE)
-    set(OPENMW_APP "OpenFallout")
-    set(OPENMW_CS_APP "OpenFallout-CS")
+    set(OPENFALLOUT_APP "OpenFallout")
+    set(OPENFALLOUT_CS_APP "OpenFallout-CS")
 
-    set(APPLICATIONS "${OPENMW_APP}" "${OPENMW_CS_APP}")
+    set(APPLICATIONS "${OPENFALLOUT_APP}" "${OPENFALLOUT_CS_APP}")
     foreach(app_name IN LISTS APPLICATIONS)
         set(FULL_APP_PATH "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/ALL_IN_ONE/${app_name}.app")
         message(STATUS "Re-signing ${app_name}.app")

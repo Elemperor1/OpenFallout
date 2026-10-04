@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_KLST_H
-#define OPENMW_ESSIMPORT_KLST_H
+#ifndef OPENFALLOUT_ESSIMPORT_KLST_H
+#define OPENFALLOUT_ESSIMPORT_KLST_H
 
 #include <cstdint>
 #include <map>

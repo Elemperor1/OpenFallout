@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_WATER_H
-#define OPENMW_MWRENDER_WATER_H
+#ifndef OPENFALLOUT_MWRENDER_WATER_H
+#define OPENFALLOUT_MWRENDER_WATER_H
 
 #include <memory>
 #include <vector>

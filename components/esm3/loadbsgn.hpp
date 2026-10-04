@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_BSGN_H
-#define OPENMW_ESM_BSGN_H
+#ifndef OPENFALLOUT_ESM_BSGN_H
+#define OPENFALLOUT_ESM_BSGN_H
 
 #include <cstdint>
 #include <string>

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_PLAYER_H
-#define OPENMW_ESSIMPORT_PLAYER_H
+#ifndef OPENFALLOUT_ESSIMPORT_PLAYER_H
+#define OPENFALLOUT_ESSIMPORT_PLAYER_H
 
 #include <cstdint>
 #include <string>

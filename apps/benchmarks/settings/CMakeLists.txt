@@ -1,8 +1,8 @@
-openmw_add_executable(openfallout_settings_access_benchmark access.cpp)
+openfallout_add_executable(openfallout_settings_access_benchmark access.cpp)
 target_link_libraries(openfallout_settings_access_benchmark benchmark::benchmark components)
 
 target_compile_definitions(openfallout_settings_access_benchmark
-    PRIVATE OPENMW_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
+    PRIVATE OPENFALLOUT_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(openfallout_settings_access_benchmark ${CMAKE_THREAD_LIBS_INIT})

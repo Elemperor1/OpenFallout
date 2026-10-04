@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_NAVMESH_H
-#define OPENMW_MWRENDER_NAVMESH_H
+#ifndef OPENFALLOUT_MWRENDER_NAVMESH_H
+#define OPENFALLOUT_MWRENDER_NAVMESH_H
 
 #include <components/detournavigator/tileposition.hpp>
 #include <components/detournavigator/version.hpp>

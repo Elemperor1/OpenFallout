@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_UTIL_H
-#define OPENMW_MWRENDER_UTIL_H
+#ifndef OPENFALLOUT_MWRENDER_UTIL_H
+#define OPENFALLOUT_MWRENDER_UTIL_H
 
 #include <components/vfs/pathutil.hpp>
 

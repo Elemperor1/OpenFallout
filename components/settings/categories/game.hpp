@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_SETTINGS_CATEGORIES_GAME_H
-#define OPENMW_COMPONENTS_SETTINGS_CATEGORIES_GAME_H
+#ifndef OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_GAME_H
+#define OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_GAME_H
 
 #include <components/detournavigator/collisionshapetype.hpp>
 #include <components/settings/sanitizerimpl.hpp>

@@ -107,7 +107,7 @@ bool Wizard::ComponentSelectionPage::validatePage()
 
 int Wizard::ComponentSelectionPage::nextId() const
 {
-#ifdef OPENMW_USE_UNSHIELD
+#ifdef OPENFALLOUT_USE_UNSHIELD
     if (isCommitPage())
         return MainWizard::Page_Installation;
 #endif

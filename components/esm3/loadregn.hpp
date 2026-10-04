@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_REGN_H
-#define OPENMW_ESM_REGN_H
+#ifndef OPENFALLOUT_ESM_REGN_H
+#define OPENFALLOUT_ESM_REGN_H
 
 #include <array>
 #include <map>

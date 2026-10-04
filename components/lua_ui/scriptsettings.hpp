@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_SCRIPTSETTINGS
-#define OPENMW_LUAUI_SCRIPTSETTINGS
+#ifndef OPENFALLOUT_LUAUI_SCRIPTSETTINGS
+#define OPENFALLOUT_LUAUI_SCRIPTSETTINGS
 
 #include <memory>
 #include <string>
@@ -20,4 +20,4 @@ namespace LuaUi
     void attachPageAt(size_t index, LuaAdapter* adapter);
 }
 
-#endif // !OPENMW_LUAUI_SCRIPTSETTINGS
+#endif // !OPENFALLOUT_LUAUI_SCRIPTSETTINGS

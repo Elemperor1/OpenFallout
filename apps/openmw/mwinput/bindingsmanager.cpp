@@ -437,13 +437,13 @@ namespace MWInput
         switch (action)
         {
             case A_Screenshot:
-                return "#{OMWEngine:Screenshot}";
+                return "#{OFEngine:Screenshot}";
             case A_ZoomIn:
-                return "#{OMWEngine:CameraZoomIn}";
+                return "#{OFEngine:CameraZoomIn}";
             case A_ZoomOut:
-                return "#{OMWEngine:CameraZoomOut}";
+                return "#{OFEngine:CameraZoomOut}";
             case A_ToggleHUD:
-                return "#{OMWEngine:ToggleHUD}";
+                return "#{OFEngine:ToggleHUD}";
             case A_Use:
                 return "#{sUse}";
             case A_Activate:
@@ -469,7 +469,7 @@ namespace MWInput
             case A_CycleWeaponRight:
                 return "#{sNextWeapon}";
             case A_Console:
-                return "#{OMWEngine:ConsoleWindow}";
+                return "#{OFEngine:ConsoleWindow}";
             case A_Run:
                 return "#{sRun}";
             case A_Sneak:
@@ -515,7 +515,7 @@ namespace MWInput
             case A_QuickLoad:
                 return "#{sQuickLoadCmd}";
             case A_TogglePostProcessorHUD:
-                return "#{OMWEngine:TogglePostProcessorHUD}";
+                return "#{OFEngine:TogglePostProcessorHUD}";
             default:
                 return {}; // not configurable
         }

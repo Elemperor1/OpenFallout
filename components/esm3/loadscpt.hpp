@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_SCPT_H
-#define OPENMW_ESM_SCPT_H
+#ifndef OPENFALLOUT_ESM_SCPT_H
+#define OPENFALLOUT_ESM_SCPT_H
 
 #include <cstdint>
 #include <string>

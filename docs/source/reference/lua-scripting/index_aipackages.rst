@@ -17,7 +17,7 @@ There are two ways to start AI package:
 .. code-block:: Lua
 
     -- from local script add package to self
-    local AI = require('openmw.interfaces').AI
+    local AI = require('openfallout.interfaces').AI
     AI.startPackage(options)
 
     -- via event to any actor

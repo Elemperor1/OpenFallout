@@ -162,10 +162,10 @@ namespace MWWorld
         std::map<std::string, ContentLoader*> mLoaders;
     };
 
-    struct OMWScriptsLoader : public ContentLoader
+    struct OFScriptsLoader : public ContentLoader
     {
         ESMStore& mStore;
-        OMWScriptsLoader(ESMStore& store)
+        OFScriptsLoader(ESMStore& store)
             : mStore(store)
         {
         }
@@ -2798,7 +2798,7 @@ namespace MWWorld
         gameContentLoader.addLoader(".omwaddon", esmLoader);
         gameContentLoader.addLoader(".project", esmLoader);
 
-        OMWScriptsLoader omwScriptsLoader(mStore);
+        OFScriptsLoader omwScriptsLoader(mStore);
         gameContentLoader.addLoader(".omwscripts", omwScriptsLoader);
 
         int idx = 0;

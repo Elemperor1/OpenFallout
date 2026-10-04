@@ -672,7 +672,7 @@ namespace MWWorld
 
         Loading::Listener* loadingListener = MWBase::Environment::get().getWindowManager()->getLoadingScreen();
         Loading::ScopedLoad load(loadingListener);
-        loadingListener->setLabel("#{OMWEngine:LoadingExterior}");
+        loadingListener->setLabel("#{OFEngine:LoadingExterior}");
         loadingListener->setProgressRange(refsToLoad);
 
         sortCellsToLoad(playerCellX, playerCellY, cellsPositionsToLoad);
@@ -741,7 +741,7 @@ namespace MWWorld
         auto navigatorUpdateGuard = mNavigator.makeUpdateGuard();
         for (; it != cells.extEnd(); ++it)
         {
-            loadingListener->setLabel("#{OMWEngine:TestingExteriorCells} (" + std::to_string(i) + "/"
+            loadingListener->setLabel("#{OFEngine:TestingExteriorCells} (" + std::to_string(i) + "/"
                 + std::to_string(cells.getExtSize()) + ")...");
 
             CellStore& cell = mWorld.getWorldModel().getExterior(
@@ -807,7 +807,7 @@ namespace MWWorld
         auto navigatorUpdateGuard = mNavigator.makeUpdateGuard();
         for (; it != cells.intEnd(); ++it)
         {
-            loadingListener->setLabel("#{OMWEngine:TestingInteriorCells} (" + std::to_string(i) + "/"
+            loadingListener->setLabel("#{OFEngine:TestingInteriorCells} (" + std::to_string(i) + "/"
                 + std::to_string(cells.getIntSize()) + ")...");
 
             CellStore& cell = mWorld.getWorldModel().getInterior(it->mName);
@@ -937,7 +937,7 @@ namespace MWWorld
             MWBase::Environment::get().getWindowManager()->fadeScreenOut(0.5);
 
         Loading::Listener* loadingListener = MWBase::Environment::get().getWindowManager()->getLoadingScreen();
-        loadingListener->setLabel("#{OMWEngine:LoadingInterior}");
+        loadingListener->setLabel("#{OFEngine:LoadingInterior}");
         Loading::ScopedLoad load(loadingListener);
 
         if (mCurrentCell == &cell)
@@ -1295,7 +1295,7 @@ namespace MWWorld
         Loading::Listener* loadingListener = MWBase::Environment::get().getWindowManager()->getLoadingScreen();
         Loading::ScopedLoad load(loadingListener);
 
-        loadingListener->setLabel("#{OMWEngine:InitializingData}");
+        loadingListener->setLabel("#{OFEngine:InitializingData}");
 
         mPreloader->syncTerrainLoad(*loadingListener);
     }

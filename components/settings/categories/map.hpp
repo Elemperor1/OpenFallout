@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_SETTINGS_CATEGORIES_MAP_H
-#define OPENMW_COMPONENTS_SETTINGS_CATEGORIES_MAP_H
+#ifndef OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_MAP_H
+#define OPENFALLOUT_COMPONENTS_SETTINGS_CATEGORIES_MAP_H
 
 #include <components/misc/constants.hpp>
 #include <components/settings/sanitizerimpl.hpp>

@@ -1,5 +1,5 @@
-#ifndef OPENMW_BARRIER_H
-#define OPENMW_BARRIER_H
+#ifndef OPENFALLOUT_BARRIER_H
+#define OPENFALLOUT_BARRIER_H
 
 #include <condition_variable>
 #include <mutex>

@@ -1,4 +1,4 @@
-if (NOT DEFINED OPENMW_RESOURCES_ROOT)
+if (NOT DEFINED OPENFALLOUT_RESOURCES_ROOT)
     return()
 endif()
 
@@ -71,56 +71,56 @@ set(BUILTIN_DATA_FILES
     l10n/Interface/pl.yaml
 
     # L10n for scripts/omw
-    l10n/OMWCamera/de.yaml
-    l10n/OMWCamera/en.yaml
-    l10n/OMWCamera/ru.yaml
-    l10n/OMWCamera/sv.yaml
-    l10n/OMWCamera/fr.yaml
-    l10n/OMWCamera/pl.yaml
+    l10n/OFCamera/de.yaml
+    l10n/OFCamera/en.yaml
+    l10n/OFCamera/ru.yaml
+    l10n/OFCamera/sv.yaml
+    l10n/OFCamera/fr.yaml
+    l10n/OFCamera/pl.yaml
 
-    l10n/OMWCombat/de.yaml
-    l10n/OMWCombat/en.yaml
-    l10n/OMWCombat/fr.yaml
-    l10n/OMWCombat/ru.yaml
-    l10n/OMWCombat/sv.yaml
-    l10n/OMWCombat/pl.yaml
+    l10n/OFCombat/de.yaml
+    l10n/OFCombat/en.yaml
+    l10n/OFCombat/fr.yaml
+    l10n/OFCombat/ru.yaml
+    l10n/OFCombat/sv.yaml
+    l10n/OFCombat/pl.yaml
 
-    l10n/OMWControls/de.yaml
-    l10n/OMWControls/en.yaml
-    l10n/OMWControls/fr.yaml
-    l10n/OMWControls/ru.yaml
-    l10n/OMWControls/sv.yaml
-    l10n/OMWControls/pl.yaml
+    l10n/OFControls/de.yaml
+    l10n/OFControls/en.yaml
+    l10n/OFControls/fr.yaml
+    l10n/OFControls/ru.yaml
+    l10n/OFControls/sv.yaml
+    l10n/OFControls/pl.yaml
 
     # L10n for OpenFallout menus and non-game-specific messages
-    l10n/OMWEngine/de.yaml
-    l10n/OMWEngine/en.yaml
-    l10n/OMWEngine/ru.yaml
-    l10n/OMWEngine/sv.yaml
-    l10n/OMWEngine/fr.yaml
-    l10n/OMWEngine/pl.yaml
+    l10n/OFEngine/de.yaml
+    l10n/OFEngine/en.yaml
+    l10n/OFEngine/ru.yaml
+    l10n/OFEngine/sv.yaml
+    l10n/OFEngine/fr.yaml
+    l10n/OFEngine/pl.yaml
 
     # L10n for music system
-    l10n/OMWMusic/de.yaml
-    l10n/OMWMusic/en.yaml
-    l10n/OMWMusic/ru.yaml
-    l10n/OMWMusic/sv.yaml
-    l10n/OMWMusic/fr.yaml
-    l10n/OMWMusic/pl.yaml
+    l10n/OFMusic/de.yaml
+    l10n/OFMusic/en.yaml
+    l10n/OFMusic/ru.yaml
+    l10n/OFMusic/sv.yaml
+    l10n/OFMusic/fr.yaml
+    l10n/OFMusic/pl.yaml
 
     # L10n for post-processing HUD and built-in shaders
-    l10n/OMWShaders/de.yaml
-    l10n/OMWShaders/en.yaml
-    l10n/OMWShaders/ru.yaml
-    l10n/OMWShaders/sv.yaml
-    l10n/OMWShaders/fr.yaml
-    l10n/OMWShaders/pl.yaml
+    l10n/OFShaders/de.yaml
+    l10n/OFShaders/en.yaml
+    l10n/OFShaders/ru.yaml
+    l10n/OFShaders/sv.yaml
+    l10n/OFShaders/fr.yaml
+    l10n/OFShaders/pl.yaml
 
-    openmw_aux/util.lua
-    openmw_aux/time.lua
-    openmw_aux/calendar.lua
-    openmw_aux/calendarconfig.lua
-    openmw_aux/ui.lua
+    openfallout_aux/util.lua
+    openfallout_aux/time.lua
+    openfallout_aux/calendar.lua
+    openfallout_aux/calendarconfig.lua
+    openfallout_aux/ui.lua
 
     builtin.omwscripts
 
@@ -267,5 +267,5 @@ set(BUILTIN_DATA_FILES
 )
 
 foreach (f ${BUILTIN_DATA_FILES})
-    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENMW_RESOURCES_ROOT}" "resources/vfs/${f}")
+    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs/${f}")
 endforeach (f)

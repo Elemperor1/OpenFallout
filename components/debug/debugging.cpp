@@ -382,7 +382,7 @@ namespace Debug
 
     Level getDebugLevel()
     {
-        if (const char* env = getenv("OPENMW_DEBUG_LEVEL"))
+        if (const char* env = getenv("OPENFALLOUT_DEBUG_LEVEL"))
             return toLevel(env);
 
         return Verbose;
@@ -390,7 +390,7 @@ namespace Debug
 
     Level getRecastMaxLogLevel()
     {
-        if (const char* env = getenv("OPENMW_RECAST_MAX_LOG_LEVEL"))
+        if (const char* env = getenv("OPENFALLOUT_RECAST_MAX_LOG_LEVEL"))
             return toLevel(env);
 
         return Error;
@@ -456,7 +456,7 @@ namespace Debug
         int ret = 0;
         try
         {
-            if (const auto env = std::getenv("OPENMW_DISABLE_CRASH_CATCHER");
+            if (const auto env = std::getenv("OPENFALLOUT_DISABLE_CRASH_CATCHER");
                 env == nullptr || Misc::StringUtils::toNumeric<int>(env, 0) == 0)
             {
 #if defined(_WIN32)

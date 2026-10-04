@@ -1,14 +1,14 @@
-local self = require('openmw.self')
-local I = require('openmw.interfaces')
-local core = require('openmw.core')
-local auxUtil = require('openmw_aux.util')
-local NPC = require('openmw.types').NPC
+local self = require('openfallout.self')
+local I = require('openfallout.interfaces')
+local core = require('openfallout.core')
+local auxUtil = require('openfallout_aux.util')
+local NPC = require('openfallout.types').NPC
 local Skill = core.stats.Skill
 
 ---
 -- Table of skill use types defined by Morrowind.
 -- Each entry corresponds to an index into the available skill gain values
--- of a @{openmw.core#SkillRecord}
+-- of a @{openfallout.core#SkillRecord}
 -- @type SkillUseType
 -- @field #number Armor_HitByOpponent 0
 -- @field #number Block_Success 0
@@ -88,7 +88,7 @@ return {
     -- Allows to extend or override built-in skill progression mechanics.
     -- @module SkillProgression
     -- @context player
-    -- @usage local I = require('openmw.interfaces')
+    -- @usage local I = require('openfallout.interfaces')
     --
     -- -- Make jail time hurt sneak skill instead of benefitting it
     -- I.SkillProgression.addSkillLevelUpHandler(function(skillid, source, options) 

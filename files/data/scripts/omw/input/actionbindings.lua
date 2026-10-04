@@ -1,7 +1,7 @@
-local input = require('openmw.input')
-local util = require('openmw.util')
-local async = require('openmw.async')
-local storage = require('openmw.storage')
+local input = require('openfallout.input')
+local util = require('openfallout.util')
+local async = require('openfallout.async')
+local storage = require('openfallout.storage')
 
 local actionPressHandlers = {}
 local function onActionPress(id, handler)
@@ -53,7 +53,7 @@ do -- Actions and Triggers currently unused by builtin scripts
     for  key, action in pairs(triggers) do
         input.registerTrigger {
             key = key,
-            l10n = 'OMWControls',
+            l10n = 'OFControls',
             name = key .. '_name',
             description = key .. '_description',
         }
@@ -115,7 +115,7 @@ do
     end), { 'TogglePOV' })
 end
 
-local bindingSection = storage.playerSection('OMWInputBindings')
+local bindingSection = storage.playerSection('OFInputBindings')
 
 local devices = {
     keyboard = true,

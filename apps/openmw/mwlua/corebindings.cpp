@@ -73,7 +73,7 @@ namespace MWLua
     sol::table initCorePackage(const Context& context)
     {
         auto lua = context.sol();
-        sol::object cached = context.getTypePackage("openmw_core");
+        sol::object cached = context.getTypePackage("openfallout_core");
         if (cached != sol::nil)
             return cached;
 
@@ -96,26 +96,26 @@ namespace MWLua
             addCoreTimeBindings(api, context);
 
             api["magic"]
-                = context.cachePackage("openmw_core_magic", [context]() { return initCoreMagicBindings(context); });
+                = context.cachePackage("openfallout_core_magic", [context]() { return initCoreMagicBindings(context); });
 
             api["stats"]
-                = context.cachePackage("openmw_core_stats", [context]() { return initCoreStatsBindings(context); });
+                = context.cachePackage("openfallout_core_stats", [context]() { return initCoreStatsBindings(context); });
 
             api["mwscripts"] = context.cachePackage(
-                "openmw_core_mwscripts", [context]() { return initCoreMwScriptBindings(context); });
+                "openfallout_core_mwscripts", [context]() { return initCoreMwScriptBindings(context); });
 
             api["land"]
-                = context.cachePackage("openmw_core_land", [context]() { return initCoreLandBindings(context); });
+                = context.cachePackage("openfallout_core_land", [context]() { return initCoreLandBindings(context); });
 
             api["weather"]
-                = context.cachePackage("openmw_core_weather", [context]() { return initCoreWeatherBindings(context); });
+                = context.cachePackage("openfallout_core_weather", [context]() { return initCoreWeatherBindings(context); });
 
             api["factions"] = context.cachePackage(
-                "openmw_core_factions", [context]() { return initCoreFactionBindings(context); });
+                "openfallout_core_factions", [context]() { return initCoreFactionBindings(context); });
             api["regions"]
-                = context.cachePackage("openmw_core_regions", [context]() { return initCoreRegionBindings(context); });
+                = context.cachePackage("openfallout_core_regions", [context]() { return initCoreRegionBindings(context); });
             api["dialogue"] = context.cachePackage(
-                "openmw_core_dialogue", [context]() { return initCoreDialogueBindings(context); });
+                "openfallout_core_dialogue", [context]() { return initCoreDialogueBindings(context); });
 
             const MWWorld::Store<ESM::GameSetting>* gmstStore
                 = &MWBase::Environment::get().getESMStore()->get<ESM::GameSetting>();
@@ -148,7 +148,7 @@ namespace MWLua
                         { std::move(eventName), LuaUtil::serialize(eventData, context.mSerializer) });
                 };
                 api["sound"]
-                    = context.cachePackage("openmw_core_sound", [context]() { return initCoreSoundBindings(context); });
+                    = context.cachePackage("openfallout_core_sound", [context]() { return initCoreSoundBindings(context); });
             }
             else
             {
@@ -162,12 +162,12 @@ namespace MWLua
                 };
             }
         }
-        api["l10n"] = context.cachePackage("openmw_core_l10n",
+        api["l10n"] = context.cachePackage("openfallout_core_l10n",
             [lua]() { return LuaUtil::initL10nLoader(lua, MWBase::Environment::get().getL10nManager()); });
 
         api["getGameDifficulty"] = []() { return Settings::game().mDifficulty.get(); };
 
         sol::table readOnlyApi = LuaUtil::makeReadOnly(api);
-        return context.setTypePackage(readOnlyApi, "openmw_core");
+        return context.setTypePackage(readOnlyApi, "openfallout_core");
     }
 }

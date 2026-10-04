@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_LAND_H
-#define OPENMW_ESM_LAND_H
+#ifndef OPENFALLOUT_ESM_LAND_H
+#define OPENFALLOUT_ESM_LAND_H
 
 #include <array>
 #include <cstdint>

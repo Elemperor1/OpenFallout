@@ -16,7 +16,7 @@ namespace
         LuaUtilPackageTest()
         {
             mLuaState.addInternalLibSearchPath(
-                std::filesystem::path{ OPENMW_PROJECT_SOURCE_DIR } / "components" / "lua");
+                std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR } / "components" / "lua");
             sol::state_view sol = mLuaState.unsafeState();
             sol["util"] = LuaUtil::initUtilPackage(sol);
         }

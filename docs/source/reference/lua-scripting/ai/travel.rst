@@ -21,7 +21,7 @@ Go to given location.
     - boolean [default=true]
     - whether to cancel all other AI packages
   * - destPosition
-    - `3d vector <../openmw_util.html##(Vector3)>`_ [required]
+    - `3d vector <../openfallout_util.html##(Vector3)>`_ [required]
     - the point to travel to
   * - isRepeat
     - boolean [optional]

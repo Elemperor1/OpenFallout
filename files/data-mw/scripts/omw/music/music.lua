@@ -1,8 +1,8 @@
-local ambient = require('openmw.ambient')
-local core = require('openmw.core')
-local self = require('openmw.self')
-local storage = require('openmw.storage')
-local types = require('openmw.types')
+local ambient = require('openfallout.ambient')
+local core = require('openfallout.core')
+local self = require('openfallout.self')
+local storage = require('openfallout.storage')
+local types = require('openfallout.types')
 
 local musicSettings = storage.playerSection('SettingsOMWMusic')
 
@@ -155,6 +155,6 @@ return {
     },
     eventHandlers = {
         Died = playerDied,
-        OMWMusicCombatTargetsChanged = onCombatTargetsChanged
+        OFMusicCombatTargetsChanged = onCombatTargetsChanged
     }
 }

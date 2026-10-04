@@ -1,5 +1,5 @@
-#ifndef OPENMW_PROFILE_H
-#define OPENMW_PROFILE_H
+#ifndef OPENFALLOUT_PROFILE_H
+#define OPENFALLOUT_PROFILE_H
 
 #include <osg/Stats>
 #include <osg/Timer>

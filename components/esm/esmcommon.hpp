@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_COMMON_H
-#define OPENMW_ESM_COMMON_H
+#ifndef OPENFALLOUT_ESM_COMMON_H
+#define OPENFALLOUT_ESM_COMMON_H
 
 #include <cassert>
 #include <cstdint>

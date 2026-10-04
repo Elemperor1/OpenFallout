@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_NPCSTATS_H
-#define OPENMW_ESM_NPCSTATS_H
+#ifndef OPENFALLOUT_ESM_NPCSTATS_H
+#define OPENFALLOUT_ESM_NPCSTATS_H
 
 #include "loadskil.hpp"
 #include "statstate.hpp"

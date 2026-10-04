@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_DOORSTATE_H
-#define OPENMW_ESM_DOORSTATE_H
+#ifndef OPENFALLOUT_ESM_DOORSTATE_H
+#define OPENFALLOUT_ESM_DOORSTATE_H
 
 #include "objectstate.hpp"
 

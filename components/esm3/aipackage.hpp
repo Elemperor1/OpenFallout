@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_AIPACKAGE_H
-#define OPENMW_ESM_AIPACKAGE_H
+#ifndef OPENFALLOUT_ESM_AIPACKAGE_H
+#define OPENFALLOUT_ESM_AIPACKAGE_H
 
 #include <string>
 #include <vector>

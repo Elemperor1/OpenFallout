@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESMTOOL_ARGUMENTS_H
-#define OPENMW_ESMTOOL_ARGUMENTS_H
+#ifndef OPENFALLOUT_ESMTOOL_ARGUMENTS_H
+#define OPENFALLOUT_ESMTOOL_ARGUMENTS_H
 
 #include <filesystem>
 #include <optional>

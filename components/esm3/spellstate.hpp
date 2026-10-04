@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_SPELLSTATE_H
-#define OPENMW_ESM_SPELLSTATE_H
+#ifndef OPENFALLOUT_ESM_SPELLSTATE_H
+#define OPENFALLOUT_ESM_SPELLSTATE_H
 
 #include <map>
 #include <set>

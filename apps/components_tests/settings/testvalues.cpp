@@ -5,8 +5,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#ifndef OPENMW_PROJECT_SOURCE_DIR
-#define OPENMW_PROJECT_SOURCE_DIR "."
+#ifndef OPENFALLOUT_PROJECT_SOURCE_DIR
+#define OPENFALLOUT_PROJECT_SOURCE_DIR "."
 #endif
 
 namespace Settings
@@ -17,7 +17,7 @@ namespace Settings
 
         struct SettingsValuesTest : Test
         {
-            const std::filesystem::path mSettingsDefaultPath = std::filesystem::path{ OPENMW_PROJECT_SOURCE_DIR }
+            const std::filesystem::path mSettingsDefaultPath = std::filesystem::path{ OPENFALLOUT_PROJECT_SOURCE_DIR }
                 / "files" / Misc::StringUtils::stringToU8String("settings-default.cfg");
 
             SettingsValuesTest()

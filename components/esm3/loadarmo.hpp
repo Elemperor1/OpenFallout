@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_ARMO_H
-#define OPENMW_ESM_ARMO_H
+#ifndef OPENFALLOUT_ESM_ARMO_H
+#define OPENFALLOUT_ESM_ARMO_H
 
 #include <cstdint>
 #include <string>

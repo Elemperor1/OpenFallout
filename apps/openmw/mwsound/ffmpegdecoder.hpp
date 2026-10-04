@@ -86,7 +86,7 @@ namespace MWSound
 
         SwrContext* mSwr;
         enum AVSampleFormat mOutputSampleFormat;
-#if OPENMW_FFMPEG_5_OR_GREATER
+#if OPENFALLOUT_FFMPEG_5_OR_GREATER
         AVChannelLayout mOutputChannelLayout;
 #else
         int64_t mOutputChannelLayout;
@@ -118,7 +118,7 @@ namespace MWSound
         void applyArtShims();
 
         static int readPacket(void* userData, uint8_t* buf, int bufSize);
-#if OPENMW_FFMPEG_CONST_WRITEPACKET
+#if OPENFALLOUT_FFMPEG_CONST_WRITEPACKET
         static int writePacket(void* userData, const uint8_t* buf, int bufSize);
 #else
         static int writePacket(void* userData, uint8_t* buf, int bufSize);

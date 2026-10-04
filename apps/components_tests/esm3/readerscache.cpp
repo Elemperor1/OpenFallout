@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#ifndef OPENMW_DATA_DIR
-#error "OPENMW_DATA_DIR is not defined"
+#ifndef OPENFALLOUT_DATA_DIR
+#error "OPENFALLOUT_DATA_DIR is not defined"
 #endif
 
 namespace
@@ -39,7 +39,7 @@ namespace
     {
         static constexpr std::size_t sInitialOffset = 324;
         static constexpr std::size_t sSkip = 100;
-        const Files::PathContainer mDataDirs{ { std::filesystem::path{ OPENMW_DATA_DIR } } };
+        const Files::PathContainer mDataDirs{ { std::filesystem::path{ OPENFALLOUT_DATA_DIR } } };
         const Files::Collections mFileCollections{ mDataDirs };
         const std::string mContentFile = "template.omwgame";
         const std::filesystem::path mContentFilePath = mFileCollections.getCollection("omwgame").getPath(mContentFile);

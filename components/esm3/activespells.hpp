@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_ACTIVESPELLS_H
-#define OPENMW_ESM_ACTIVESPELLS_H
+#ifndef OPENFALLOUT_ESM_ACTIVESPELLS_H
+#define OPENFALLOUT_ESM_ACTIVESPELLS_H
 
 #include "cellref.hpp"
 #include "components/esm/defs.hpp"

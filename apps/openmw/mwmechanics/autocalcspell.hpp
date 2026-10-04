@@ -1,5 +1,5 @@
-#ifndef OPENMW_AUTOCALCSPELL_H
-#define OPENMW_AUTOCALCSPELL_H
+#ifndef OPENFALLOUT_AUTOCALCSPELL_H
+#define OPENFALLOUT_AUTOCALCSPELL_H
 
 #include "creaturestats.hpp"
 #include <components/esm/refid.hpp>

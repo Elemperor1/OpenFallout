@@ -1,8 +1,8 @@
-local debug = require('openmw.debug')
-local storage = require('openmw.storage')
-local vfs = require('openmw.vfs')
+local debug = require('openfallout.debug')
+local storage = require('openfallout.storage')
+local vfs = require('openfallout.vfs')
 
-local playlistsSection = storage.playerSection('OMWMusicPlaylistsTrackOrder')
+local playlistsSection = storage.playerSection('OFMusicPlaylistsTrackOrder')
 playlistsSection:setLifeTime(storage.LIFE_TIME.GameSession)
 
 local function getTracksFromDirectory(path)

@@ -529,22 +529,22 @@ if [ -n "$SINGLE_CONFIG" ]; then
 fi
 
 if [[ -n "$UNITY_BUILD" ]]; then
-	add_cmake_opts "-DOPENMW_UNITY_BUILD=True"
+	add_cmake_opts "-DOPENFALLOUT_UNITY_BUILD=True"
 fi
 
 if [ -n "$USE_CCACHE" ]; then
 	if [ -n "$NMAKE" ] || [ -n "$NINJA" ]; then
 		add_cmake_opts "-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
 	else
-		add_cmake_opts "-DOPENMW_MSBUILD_COMPILER_OVERRIDE=ccache"
+		add_cmake_opts "-DOPENFALLOUT_MSBUILD_COMPILER_OVERRIDE=ccache"
 	fi
 fi
 
 # turn on LTO by default
-add_cmake_opts "-DOPENMW_LTO_BUILD=True"
+add_cmake_opts "-DOPENFALLOUT_LTO_BUILD=True"
 
 if [[ -n "$USE_WERROR" ]]; then
-  add_cmake_opts "-DOPENMW_MSVC_WERROR=ON"
+  add_cmake_opts "-DOPENFALLOUT_MSVC_WERROR=ON"
 fi
 
 if [[ -n "$USE_CLANG_TIDY" ]]; then
@@ -737,11 +737,11 @@ cd $DEPS_INSTALL/..
 echo
 echo "Setting up OpenMW build..."
 if [[ -z "$USE_CCACHE" ]]; then
-	add_cmake_opts -DOPENMW_MP_BUILD=on
+	add_cmake_opts -DOPENFALLOUT_MP_BUILD=on
 fi
 add_cmake_opts -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
-add_cmake_opts -DOPENMW_USE_SYSTEM_SQLITE3=OFF
-add_cmake_opts -DOPENMW_USE_SYSTEM_YAML_CPP=OFF
+add_cmake_opts -DOPENFALLOUT_USE_SYSTEM_SQLITE3=OFF
+add_cmake_opts -DOPENFALLOUT_USE_SYSTEM_YAML_CPP=OFF
 if [ ! -z $CI ]; then
 	case $STEP in
 		components )
@@ -750,7 +750,7 @@ if [ ! -z $CI ]; then
 				-DBUILD_LAUNCHER=no \
 				-DBUILD_MWINIIMPORTER=no \
 				-DBUILD_OPENCS=no \
-				-DBUILD_OPENMW=no \
+				-DBUILD_OPENFALLOUT=no \
 				-DBUILD_WIZARD=no
 			;;
 		openmw )
@@ -766,13 +766,13 @@ if [ ! -z $CI ]; then
 			add_cmake_opts -DBUILD_ESSIMPORTER=no \
 				-DBUILD_LAUNCHER=no \
 				-DBUILD_MWINIIMPORTER=no \
-				-DBUILD_OPENMW=no \
+				-DBUILD_OPENFALLOUT=no \
 				-DBUILD_WIZARD=no
 			;;
 		misc )
 			echo "  Building subprojects: Misc."
 			add_cmake_opts -DBUILD_OPENCS=no \
-				-DBUILD_OPENMW=no
+				-DBUILD_OPENFALLOUT=no
 			;;
 	esac
 fi
@@ -842,7 +842,7 @@ fi
 if [ -n "${TEST_FRAMEWORK}" ]; then
 	add_cmake_opts -DBUILD_COMPONENTS_TESTS=ON
 	add_cmake_opts -DBUILD_OPENCS_TESTS=ON
-	add_cmake_opts -DBUILD_OPENMW_TESTS=ON
+	add_cmake_opts -DBUILD_OPENFALLOUT_TESTS=ON
 fi
 
 if [ -n "$ACTIVATE_MSVC" ]; then

@@ -107,11 +107,11 @@ jobs:
         -D LuaJit_LIBRARY='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/lib/lua51.lib'
         -D BUILD_BENCHMARKS=${{ ! inputs.package }}
         -D BUILD_COMPONENTS_TESTS=${{ ! inputs.package }}
-        -D BUILD_OPENMW_TESTS=${{ ! inputs.package }}
+        -D BUILD_OPENFALLOUT_TESTS=${{ ! inputs.package }}
         -D BUILD_OPENCS_TESTS=${{ ! inputs.package }}
-        -D OPENMW_USE_SYSTEM_SQLITE3=OFF
-        -D OPENMW_USE_SYSTEM_YAML_CPP=OFF
-        -D OPENMW_LTO_BUILD=ON
+        -D OPENFALLOUT_USE_SYSTEM_SQLITE3=OFF
+        -D OPENFALLOUT_USE_SYSTEM_YAML_CPP=OFF
+        -D OPENFALLOUT_LTO_BUILD=ON
         ${{ inputs.package && '-D "VCREDIST64=$env:VCToolsRedistDir/vc_redist.x64.exe"' || '' }}
         -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 

@@ -21,7 +21,7 @@ OpenFallout cannot play Fallout yet. What runs today is the OpenMW engine it inh
 
 The plan, with the milestones that lead from here to a playable game, is in [docs/openfallout/gap-audit-and-roadmap.md](docs/openfallout/gap-audit-and-roadmap.md). How to build the project and what the build and test baseline looks like is in [docs/openfallout/build-baseline.md](docs/openfallout/build-baseline.md).
 
-The project is being renamed from OpenMW in stages. Programs, configuration files, log files and settings directories already use the OpenFallout name (`openfallout`, `openfallout-launcher`, `openfallout.cfg`, `~/.config/openfallout`), so an existing OpenMW installation and its settings are not shared with OpenFallout. Internal names such as Lua module ids (`openmw.core`), `OPENMW_*` build options and the `apps/openmw` directory still carry the old name and are changed in later stages. The OpenMW logo and icons have not been replaced yet.
+The project is being renamed from OpenMW in stages. Programs, configuration files, log files and settings directories already use the OpenFallout name (`openfallout`, `openfallout-launcher`, `openfallout.cfg`, `~/.config/openfallout`), so an existing OpenMW installation and its settings are not shared with OpenFallout. Lua module ids (`openfallout.core`), build options and environment variables (`OPENFALLOUT_*`) and the built-in l10n contexts (`OFEngine`) follow it too, which means Lua mods written for OpenMW need their `require` lines changed. Still to change: the `apps/openmw` directory and the `MW*` namespaces, then shader, asset and file extension names (`omw_*` in shaders, `scripts/omw`, `.omwgame` and `.omwaddon`) and the OpenMW logo and icons.
 
 Acknowledgements
 ----------------

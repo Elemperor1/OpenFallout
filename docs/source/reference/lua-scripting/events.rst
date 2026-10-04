@@ -75,7 +75,7 @@ Modify the corresponding stat.
 
 **AddVfx**
 
-Calls the corresponding method in openmw.animation
+Calls the corresponding method in openfallout.animation
 
 .. code-block:: Lua
 
@@ -209,7 +209,7 @@ Equivalent to ``I.UI.setMode``, but can be sent from another object or global sc
 World events
 ------------
 
-Global events that just call the corresponding function in `openmw.world`.
+Global events that just call the corresponding function in `openfallout.world`.
 
 .. code-block:: Lua
 

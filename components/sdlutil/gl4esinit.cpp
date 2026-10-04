@@ -1,6 +1,6 @@
 // EGL does not work reliably for feature detection.
 // Instead, we initialize gl4es manually.
-#ifdef OPENMW_GL4ES_MANUAL_INIT
+#ifdef OPENFALLOUT_GL4ES_MANUAL_INIT
 #include "gl4esinit.h"
 
 // For glHint
@@ -34,4 +34,4 @@ extern "C"
 
 } // extern "C"
 
-#endif // OPENMW_GL4ES_MANUAL_INIT
+#endif // OPENFALLOUT_GL4ES_MANUAL_INIT

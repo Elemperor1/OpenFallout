@@ -156,15 +156,15 @@ if(APPLE)
     set (OPENCS_MAC_ICON "${CMAKE_SOURCE_DIR}/files/mac/openmw-cs.icns")
     set (OPENCS_CFG "${OpenFallout_BINARY_DIR}/defaults-cs.bin")
     set (OPENCS_DEFAULT_FILTERS_FILE "${OpenFallout_BINARY_DIR}/resources/defaultfilters")
-    set (OPENCS_OPENMW_CFG "${OpenFallout_BINARY_DIR}/openfallout.cfg")
+    set (OPENCS_OPENFALLOUT_CFG "${OpenFallout_BINARY_DIR}/openfallout.cfg")
 else()
     set (OPENCS_MAC_ICON "")
     set (OPENCS_CFG "")
     set (OPENCS_DEFAULT_FILTERS_FILE "")
-    set (OPENCS_OPENMW_CFG "")
+    set (OPENCS_OPENFALLOUT_CFG "")
 endif(APPLE)
 
-add_library(openmw-cs-lib STATIC
+add_library(openfallout-cs-lib STATIC
     ${OPENCS_SRC}
     ${OPENCS_UI_HDR}
     ${OPENCS_MOC_SRC}
@@ -172,17 +172,17 @@ add_library(openmw-cs-lib STATIC
 )
 
 if(BUILD_OPENCS)
-    openmw_add_executable(openfallout-cs
+    openfallout_add_executable(openfallout-cs
         MACOSX_BUNDLE
         ${OPENCS_MAC_ICON}
         ${OPENCS_CFG}
         ${OPENCS_DEFAULT_FILTERS_FILE}
-        ${OPENCS_OPENMW_CFG}
+        ${OPENCS_OPENFALLOUT_CFG}
         ${OPENCS_RC_FILE}
         main.cpp
     )
 
-    target_link_libraries(openfallout-cs openmw-cs-lib)
+    target_link_libraries(openfallout-cs openfallout-cs-lib)
 
     set_property(TARGET openfallout-cs PROPERTY AUTOMOC ON)
     set_property(TARGET openfallout-cs PROPERTY AUTOUIC_SEARCH_PATHS ui)
@@ -198,7 +198,7 @@ if(APPLE AND BUILD_OPENCS)
     set(OPENCS_BUNDLE_NAME "OpenFallout-CS")
     set(OPENCS_BUNDLE_RESOURCES_DIR "${OpenFallout_BINARY_DIR}/${OPENCS_BUNDLE_NAME}.app/Contents/Resources")
 
-    set(OPENMW_RESOURCES_ROOT ${OPENCS_BUNDLE_RESOURCES_DIR})
+    set(OPENFALLOUT_RESOURCES_ROOT ${OPENCS_BUNDLE_RESOURCES_DIR})
 
     add_subdirectory(../../files/ ${CMAKE_CURRENT_BINARY_DIR}/files)
 
@@ -208,8 +208,8 @@ if(APPLE AND BUILD_OPENCS)
         MACOSX_BUNDLE_ICON_FILE "openmw-cs.icns"
         MACOSX_BUNDLE_BUNDLE_NAME "OpenFallout-CS"
         MACOSX_BUNDLE_GUI_IDENTIFIER "org.openfallout.opencs"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING ${OPENMW_VERSION}
-        MACOSX_BUNDLE_BUNDLE_VERSION ${OPENMW_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${OPENFALLOUT_VERSION}
+        MACOSX_BUNDLE_BUNDLE_VERSION ${OPENFALLOUT_VERSION}
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/files/mac/openfallout-cs-Info.plist.in"
         )
 
@@ -219,7 +219,7 @@ if(APPLE AND BUILD_OPENCS)
         MACOSX_PACKAGE_LOCATION Resources)
     set_source_files_properties(${OPENCS_DEFAULT_FILTERS_FILE} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources/resources)
-    set_source_files_properties(${OPENCS_OPENMW_CFG} PROPERTIES
+    set_source_files_properties(${OPENCS_OPENFALLOUT_CFG} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources)
 
     add_custom_command(TARGET openfallout-cs
@@ -227,10 +227,10 @@ if(APPLE AND BUILD_OPENCS)
         COMMAND cp "${OpenFallout_BINARY_DIR}/resources/version" "${OPENCS_BUNDLE_RESOURCES_DIR}/resources")
 endif()
 
-target_link_libraries(openmw-cs-lib
+target_link_libraries(openfallout-cs-lib
     # CMake's built-in OSG finder does not use pkgconfig, so we have to
     # manually ensure the order is correct for inter-library dependencies.
-    # This only makes a difference with `-DOPENMW_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
+    # This only makes a difference with `-DOPENFALLOUT_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
     # https://gitlab.kitware.com/cmake/cmake/-/issues/21701
     ${OSGVIEWER_LIBRARIES}
     ${OSGFX_LIBRARIES}
@@ -243,7 +243,7 @@ target_link_libraries(openmw-cs-lib
     components_qt
 )
 
-target_link_libraries(openmw-cs-lib Qt::Widgets Qt::Core Qt::Network Qt::OpenGL Qt::OpenGLWidgets Qt::Svg)
+target_link_libraries(openfallout-cs-lib Qt::Widgets Qt::Core Qt::Network Qt::OpenGL Qt::OpenGLWidgets Qt::Svg)
 
 if (WIN32)
     target_sources(openfallout-cs PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
@@ -266,18 +266,18 @@ if(APPLE AND BUILD_OPENCS)
 endif()
 
 if(USE_QT)
-    set_property(TARGET openmw-cs-lib PROPERTY AUTOMOC ON)
-    set_property(TARGET openmw-cs-lib PROPERTY AUTOUIC_SEARCH_PATHS ui)
-    set_property(TARGET openmw-cs-lib PROPERTY AUTOUIC ON)
+    set_property(TARGET openfallout-cs-lib PROPERTY AUTOMOC ON)
+    set_property(TARGET openfallout-cs-lib PROPERTY AUTOUIC_SEARCH_PATHS ui)
+    set_property(TARGET openfallout-cs-lib PROPERTY AUTOUIC ON)
 endif(USE_QT)
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-cs-lib PRIVATE --coverage)
-    target_link_libraries(openmw-cs-lib gcov)
+    target_compile_options(openfallout-cs-lib PRIVATE --coverage)
+    target_link_libraries(openfallout-cs-lib gcov)
 endif()
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-cs-lib PRIVATE
+    target_precompile_headers(openfallout-cs-lib PRIVATE
         <boost/program_options/options_description.hpp>
 
         <algorithm>

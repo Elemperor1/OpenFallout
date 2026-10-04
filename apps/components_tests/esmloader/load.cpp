@@ -14,8 +14,8 @@
 
 #include <gtest/gtest.h>
 
-#ifndef OPENMW_DATA_DIR
-#error "OPENMW_DATA_DIR is not defined"
+#ifndef OPENFALLOUT_DATA_DIR
+#error "OPENFALLOUT_DATA_DIR is not defined"
 #endif
 
 namespace
@@ -25,7 +25,7 @@ namespace
 
     struct EsmLoaderTest : Test
     {
-        const Files::PathContainer mDataDirs{ { std::filesystem::path{ OPENMW_DATA_DIR } } };
+        const Files::PathContainer mDataDirs{ { std::filesystem::path{ OPENFALLOUT_DATA_DIR } } };
         const Files::Collections mFileCollections{ mDataDirs };
         const std::vector<std::string> mContentFiles{ { "template.omwgame" } };
     };

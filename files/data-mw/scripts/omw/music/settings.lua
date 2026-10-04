@@ -1,17 +1,17 @@
-local I = require('openmw.interfaces')
-local storage = require('openmw.storage')
+local I = require('openfallout.interfaces')
+local storage = require('openfallout.storage')
 
 I.Settings.registerPage({
-    key = 'OMWMusic',
-    l10n = 'OMWMusic',
+    key = 'OFMusic',
+    l10n = 'OFMusic',
     name = 'Music',
     description = 'settingsPageDescription',
 })
 
 I.Settings.registerGroup({
     key = "SettingsOMWMusic",
-    page = 'OMWMusic',
-    l10n = 'OMWMusic',
+    page = 'OFMusic',
+    l10n = 'OFMusic',
     name = 'musicSettings',
     permanentStorage = true,
     order = 0,

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWPHYSICS_ACTOR_H
-#define OPENMW_MWPHYSICS_ACTOR_H
+#ifndef OPENFALLOUT_MWPHYSICS_ACTOR_H
+#define OPENFALLOUT_MWPHYSICS_ACTOR_H
 
 #include <memory>
 #include <mutex>
