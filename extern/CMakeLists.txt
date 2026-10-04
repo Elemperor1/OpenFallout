@@ -3,7 +3,7 @@
 set_directory_properties(PROPERTIES EXCLUDE_FROM_ALL on)
 set(CMAKE_CXX_CLANG_TIDY "")
 
-if(NOT OPENMW_USE_SYSTEM_BULLET)
+if(NOT OPENFALLOUT_USE_SYSTEM_BULLET)
 
     set(BUILD_BULLET3 OFF CACHE BOOL "")
     set(BUILD_EXTRAS OFF CACHE BOOL "")
@@ -47,7 +47,7 @@ if(NOT OPENMW_USE_SYSTEM_BULLET)
     set(BULLET_LIBRARIES BulletCollision LinearMath PARENT_SCOPE)
 endif()
 
-if(NOT OPENMW_USE_SYSTEM_MYGUI)
+if(NOT OPENFALLOUT_USE_SYSTEM_MYGUI)
 
     set(MYGUI_RENDERSYSTEM 4 CACHE STRING "")
     set(MYGUI_DISABLE_PLUGINS TRUE CACHE BOOL "")
@@ -74,7 +74,7 @@ if(NOT OPENMW_USE_SYSTEM_MYGUI)
     set(MyGUI_LIBRARIES MyGUIEngine PARENT_SCOPE)
 endif()
 
-if(NOT OPENMW_USE_SYSTEM_OSG)
+if(NOT OPENFALLOUT_USE_SYSTEM_OSG)
 
     set(BUILD_OSG_APPLICATIONS OFF CACHE BOOL "")
     set(BUILD_OSG_DEPRECATED_SERIALIZERS OFF CACHE BOOL "")
@@ -148,7 +148,7 @@ if(NOT OPENMW_USE_SYSTEM_OSG)
     endforeach()
 endif()
 
-if(NOT OPENMW_USE_SYSTEM_RECASTNAVIGATION)
+if(NOT OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION)
     if(RECASTNAVIGATION_STATIC)
         set(BUILD_SHARED_LIBS OFF)
     else()
@@ -168,7 +168,7 @@ if(NOT OPENMW_USE_SYSTEM_RECASTNAVIGATION)
     FetchContent_MakeAvailable(recastnavigation)
 endif()
 
-if (NOT OPENMW_USE_SYSTEM_SQLITE3)
+if (NOT OPENFALLOUT_USE_SYSTEM_SQLITE3)
     include(FetchContent)
     FetchContent_Declare(sqlite3
         URL https://www.sqlite.org/2023/sqlite-amalgamation-3410100.zip
@@ -188,7 +188,7 @@ endif()
 
 add_subdirectory(smhasher)
 
-if (BUILD_BENCHMARKS AND NOT OPENMW_USE_SYSTEM_BENCHMARK)
+if (BUILD_BENCHMARKS AND NOT OPENFALLOUT_USE_SYSTEM_BENCHMARK)
 
     set(BENCHMARK_ENABLE_TESTING OFF)
     set(BENCHMARK_ENABLE_INSTALL OFF)
@@ -204,7 +204,7 @@ if (BUILD_BENCHMARKS AND NOT OPENMW_USE_SYSTEM_BENCHMARK)
     FetchContent_MakeAvailable(benchmark)
 endif()
 
-if (NOT OPENMW_USE_SYSTEM_YAML_CPP)
+if (NOT OPENFALLOUT_USE_SYSTEM_YAML_CPP)
     if(YAML_CPP_STATIC)
         set(YAML_BUILD_SHARED_LIBS OFF)
     else()
@@ -225,15 +225,15 @@ if (NOT OPENMW_USE_SYSTEM_YAML_CPP)
     endif()
 endif()
 
-if (NOT OPENMW_USE_SYSTEM_ICU)
+if (NOT OPENFALLOUT_USE_SYSTEM_ICU)
     set(ICU_ENV "ICU_DATA_FILTER_FILE=${CMAKE_CURRENT_SOURCE_DIR}/icufilters.json")
     if (ANDROID)
         # Note: Must be a build directory, not an install root, since the configure script
         # looks for a configuration file which does not get installed.
-        set(OPENMW_ICU_HOST_BUILD_DIR "" CACHE STRING "A pre-built ICU build directory for the host system if cross-compiling")
-        if (OPENMW_ICU_HOST_BUILD_DIR STREQUAL "")
+        set(OPENFALLOUT_ICU_HOST_BUILD_DIR "" CACHE STRING "A pre-built ICU build directory for the host system if cross-compiling")
+        if (OPENFALLOUT_ICU_HOST_BUILD_DIR STREQUAL "")
             message(FATAL_ERROR "If cross-compiling on android you must set the \
-            OPENMW_ICU_HOST_BUILD_DIR to the path of a pre-compiled build of \
+            OPENFALLOUT_ICU_HOST_BUILD_DIR to the path of a pre-compiled build of \
             ICU 70.1 for the system doing the build, as ICU needs to be able \
             to run its own executables as part of the build process.")
         endif()
@@ -252,7 +252,7 @@ if (NOT OPENMW_USE_SYSTEM_ICU)
             "CPPFLAGS=${ANDROID_COMPILER_FLAGS}"
             "LDFLAGS=${ANDROID_LINKER_FLAGS} -lc -lstdc++"
             )
-        set(ICU_ADDITIONAL_OPTS --disable-tools --host=${ICU_TOOLCHAIN_NAME}${ANDROIDVER} --with-cross-build=${OPENMW_ICU_HOST_BUILD_DIR})
+        set(ICU_ADDITIONAL_OPTS --disable-tools --host=${ICU_TOOLCHAIN_NAME}${ANDROIDVER} --with-cross-build=${OPENFALLOUT_ICU_HOST_BUILD_DIR})
     endif()
     include(ExternalProject)
     ExternalProject_Add(icu
@@ -280,7 +280,7 @@ if (NOT OPENMW_USE_SYSTEM_ICU)
     set(ICU_LIBRARIES ICU::i18n ICU::uc ICU::data PARENT_SCOPE)
 endif()
 
-if ((BUILD_COMPONENTS_TESTS OR BUILD_OPENCS_TESTS OR BUILD_OPENMW_TESTS) AND NOT OPENMW_USE_SYSTEM_GOOGLETEST)
+if ((BUILD_COMPONENTS_TESTS OR BUILD_OPENCS_TESTS OR BUILD_OPENFALLOUT_TESTS) AND NOT OPENFALLOUT_USE_SYSTEM_GOOGLETEST)
 
     include(FetchContent)
     FetchContent_Declare(googletest
