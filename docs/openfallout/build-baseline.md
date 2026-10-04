@@ -27,6 +27,8 @@ cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \
 | `openmw-tests` | 529 tests, all pass |
 | Binaries produced | `openmw`, `esmtool`, `bsatool`, `niftest`, `openmw-essimporter`, `openmw-iniimporter`, `openmw-navmeshtool`, `openmw-bulletobjecttool` and the two test programs |
 
+With the census change and reader fixes from this document applied, the whole tree still builds and `components-tests` runs 1,600 tests (the five new ones included), all passing; `openmw-tests` is unchanged at 529. The setup script was run from scratch into an empty prefix and its printed CMake command configured successfully.
+
 Not covered:
 
 - The launcher, installation wizard and OpenMW-CS are not built, so `openmw-cs-tests` is not run either. They need Qt 6.
