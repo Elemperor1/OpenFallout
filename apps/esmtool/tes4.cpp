@@ -11,6 +11,7 @@
 #include <components/esm/path.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
+#include <components/esm4/census.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
@@ -26,7 +27,7 @@ namespace EsmTool
             const bool mQuite;
 
             explicit Params(const Arguments& info)
-                : mQuite(info.quiet_given || info.mode == "clone")
+                : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census")
             {
             }
         };
@@ -597,5 +598,36 @@ namespace EsmTool
         }
 
         return 0;
+    }
+
+    int censusTes4(const Arguments& info, std::unique_ptr<std::ifstream>&& stream)
+    {
+        std::cout << "Census of TES4 file: " << info.filename << '\n';
+
+        try
+        {
+            const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
+            ESM4::Reader reader(std::move(stream), info.filename, nullptr, &encoder, true);
+            const Params params(info);
+
+            std::cout << "File format version: " << reader.esmVersionF() << '\n';
+            if (const std::vector<ESM::MasterData>& masterData = reader.getGameFiles(); !masterData.empty())
+            {
+                std::cout << "Masters:\n";
+                for (const auto& master : masterData)
+                    std::cout << "  " << master.name << '\n';
+            }
+            std::cout << '\n';
+
+            ESM4::Census census;
+            census.collect(reader, [&params](ESM4::Reader& r) { return readRecord(params, r); });
+            census.write(std::cout);
+            return census.getFatalError().empty() ? 0 : -1;
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "\nERROR:\n\n  " << e.what() << std::endl;
+            return -1;
+        }
     }
 }

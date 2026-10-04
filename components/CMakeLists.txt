@@ -200,6 +200,7 @@ add_component_dir (esmterrain
 add_component_dir (esm4
     actor
     cellgrid
+    census
     common
     dialogue
     effect

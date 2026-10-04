@@ -69,13 +69,20 @@ namespace ESM4
         template <typename RecordInvocable, typename GroupInvocable>
         static bool readItem(ESM4::Reader& reader, RecordInvocable&& recordInvocable, GroupInvocable&& groupInvocable)
         {
-            if (!reader.getRecordHeader() || !reader.hasMoreRecs())
+            if (!reader.getRecordHeader())
                 return false;
 
             const ESM4::RecordHeader& header = reader.hdr();
 
             if (header.record.typeId == ESM4::REC_GRUP)
+            {
+                if (!reader.hasMoreRecs())
+                    return false;
                 return readGroup(reader, recordInvocable, groupInvocable);
+            }
+
+            // A record's own data counts as read as soon as its header is, so hasMoreRecs() is already false for the
+            // last record of a file. Only a group header with nothing after it means there is nothing left to read.
 
             readRecord(reader, recordInvocable);
             return true;

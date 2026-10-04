@@ -310,6 +310,12 @@ namespace ESM4
         // Note: assumes the header was read correctly (partial skip is allowed)
         void skipRecordData();
 
+        // Skip the rest of a record after a loader gave up on it part-way through, for instance by throwing.
+        // skipRecordData() cannot be used then: the size of a sub record is counted when its header is read, so
+        // whatever the loader never reached would be left in the stream.
+        // Note: recordStart must come from getContext() called right after the record header was read
+        void skipFailedRecord(const ReaderContext& recordStart);
+
         // Skip the remaining part of the group
         // Note: assumes the header was read correctly and group was pushed onto the stack
         void skipGroupData();

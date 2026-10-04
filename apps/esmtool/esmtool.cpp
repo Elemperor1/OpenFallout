@@ -54,6 +54,8 @@ Allowed modes:
   dump   Dumps all readable data from the input file.
   clone  Clones the input file to the output file.
   comp   Compares the given files.
+  census Counts the records of a TES4-format file (Oblivion to Fallout 4) by type
+         and reports the ones that fail to parse. Prints no record contents.
 
 Allowed options)");
         auto addOption = desc.add_options();
@@ -137,7 +139,7 @@ Allowed options)");
             info.name = variables["name"].as<std::string>();
 
         info.mode = variables["mode"].as<std::string>();
-        if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp"))
+        if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -200,7 +202,7 @@ int main(int argc, char** argv)
         if (!parseOptions(argc, argv, info))
             return 1;
 
-        if (info.mode == "dump")
+        if (info.mode == "dump" || info.mode == "census")
             return load(info, nullptr);
         else if (info.mode == "clone")
             return clone(info);
@@ -456,8 +458,16 @@ namespace
         switch (format)
         {
             case ESM::Format::Tes3:
+                if (info.mode == "census")
+                {
+                    std::cout << "Census mode only supports TES4-format files: "
+                              << Files::pathToUnicodeString(info.filename) << '\n';
+                    return -1;
+                }
                 return loadTes3(info, std::move(stream), data);
             case ESM::Format::Tes4:
+                if (info.mode == "census")
+                    return censusTes4(info, std::move(stream));
                 if (data != nullptr)
                 {
                     std::cout << "Collecting data from esm file is not supported for TES4\n";
