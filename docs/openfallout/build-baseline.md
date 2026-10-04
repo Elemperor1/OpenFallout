@@ -4,21 +4,23 @@ Measured on 2026-10-04 on the cloud container this project works in: Ubuntu 24.0
 
 ## Building
 
-`scripts/openfallout/setup_ubuntu_build.sh` installs the packages and builds the two libraries Ubuntu does not provide in a usable version, then prints the CMake command. The steps it takes:
+`scripts/openfallout/setup_ubuntu_build.sh` installs the packages (Qt 6 and libunshield included) and builds the two libraries Ubuntu does not provide in a usable version, then prints the CMake command. The steps it takes:
 
-1. Install the distribution packages (Boost, FFmpeg, SDL2, OpenAL, Bullet, LuaJIT, OpenSceneGraph 3.6.5, yaml-cpp, ICU, SQLite, GoogleTest and others).
+1. Install the distribution packages (Boost, FFmpeg, SDL2, OpenAL, Bullet, LuaJIT, OpenSceneGraph 3.6.5, yaml-cpp, ICU, SQLite, GoogleTest, Qt 6, libunshield and others).
 2. Build MyGUI 3.4.3 and Recast 1.6.0 from the source packages in the Ubuntu archive. The build requires MyGUI 3.4.3 and a CMake config for Recast, and Ubuntu 24.04 ships MyGUI 3.4.2 and a Recast without one. CMake would download both from GitHub; this container's network policy blocks those downloads, and the archive is allowed. Both tarballs are checked against the SHA-256 sums in their Ubuntu source package.
-3. Configure with the Qt tools off and tests on:
+3. Configure with the Qt tools and all tests on:
 
 ```
 cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH="<prefix>/mygui;<prefix>/recast" \
-    -DBUILD_LAUNCHER=OFF -DBUILD_WIZARD=OFF -DBUILD_OPENCS=OFF \
+    -DBUILD_LAUNCHER=ON -DBUILD_WIZARD=ON -DBUILD_OPENCS=ON -DBUILD_OPENCS_TESTS=ON \
     -DBUILD_COMPONENTS_TESTS=ON -DBUILD_OPENMW_TESTS=ON \
     -DOPENMW_USE_SYSTEM_RECASTNAVIGATION=ON -DOPENMW_USE_SYSTEM_GOOGLETEST=ON
 ```
 
 ## Result on unmodified master (`f90f239d`)
+
+Program and test names in this section are the ones at that commit, before rename stage A (`openmw-tests` is now `openfallout-tests`, and so on).
 
 | Item | Result |
 |---|---|
@@ -29,11 +31,24 @@ cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \
 
 With the census change and reader fixes from this document applied, the whole tree still builds and `components-tests` runs 1,602 tests (the seven new ones included), all passing; `openmw-tests` is unchanged at 529. The setup script was run from scratch into an empty prefix and its printed CMake command configured successfully.
 
+## Result after rename stage A
+
+Measured on 2026-10-04 on the same container, from an empty build directory, with the Qt 6.4.2 tools, the benchmarks and the construction set tests switched on as well.
+
+| Item | Result |
+|---|---|
+| Build | 1,300 steps, no errors |
+| `components-tests` | 1,612 tests, all pass (10 more than above, the launcher settings tests that only build with Qt) |
+| `openfallout-tests` | 529 tests, all pass |
+| `openfallout-cs-tests` | 154 tests, all pass (run with `QT_QPA_PLATFORM=offscreen`) |
+| Benchmarks | the three `openfallout_*_benchmark` programs ran to completion |
+| Programs started | `openfallout --version` prints `OpenFallout version 0.52.0`, `openfallout`, `openfallout-launcher`, `openfallout-wizard` and `openfallout-cs` start without game data and write `openfallout.log`, `launcher.log`, `wizard.log` and `openfallout-cs.log` under `~/.config/openfallout`, the other tools print their `--help` with the new name |
+
 Not covered:
 
-- The launcher, installation wizard and OpenMW-CS are not built, so `openmw-cs-tests` is not run either. They need Qt 6.
-- The engine itself was not started. That needs game data and a display.
-- Nothing was run against real Fallout data.
+- The engine was not run with game data or a display. That needs game files, and nothing was run against real Fallout data.
+- The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built here.
+- GitHub Actions has never run in this repository, so no CI result exists for any commit.
 
 ## Plugin census
 
