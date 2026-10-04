@@ -115,7 +115,8 @@ do
     end), { 'TogglePOV' })
 end
 
-local bindingSection = storage.playerSection('OFInputBindings')
+-- The section name is stored in player_storage.bin, so renaming it would drop the bindings users already saved.
+local bindingSection = storage.playerSection('OMWInputBindings')
 
 local devices = {
     keyboard = true,

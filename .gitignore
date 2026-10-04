@@ -51,6 +51,11 @@ resources
 /openfallout-iniimporter
 /openfallout-launcher
 /openfallout-wizard
+/openfallout-navmeshtool
+/openfallout-bulletobjecttool
+/openfallout-tests
+/openfallout-cs-tests
+/openfallout_*_benchmark
 
 ## generated objects
 apps/openfallout/config.hpp
