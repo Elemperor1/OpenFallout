@@ -93,9 +93,9 @@ namespace
 
     const std::array configDirectoryFiles{
         FileType{ Role_LauncherLog, "launcher.log", false },
-        FileType{ Role_OpenMWCfg, "openmw.cfg", true },
-        FileType{ Role_OpenMWLog, "openmw.log", false },
-        FileType{ Role_OpenMWCSLog, "openmw-cs.log", false },
+        FileType{ Role_OpenMWCfg, "openfallout.cfg", true },
+        FileType{ Role_OpenMWLog, "openfallout.log", false },
+        FileType{ Role_OpenMWCSLog, "openfallout-cs.log", false },
         FileType{ Role_SettingsCfg, "settings.cfg", true },
     };
 }
@@ -431,20 +431,21 @@ void Launcher::SettingsPage::populateLoadedConfigs()
         {
             if (isMainUserConfig)
                 toolTipText = tr(
-                    "Local config directory used because it contains an openmw.cfg.\n"
+                    "Local config directory used because it contains an openfallout.cfg.\n"
                     "Logs and settings changed through the launcher and in-game will be saved here.");
             else
-                toolTipText = tr("Local config directory used because it contains an openmw.cfg.");
+                toolTipText = tr("Local config directory used because it contains an openfallout.cfg.");
         }
         else if (path == mCfgMgr.getGlobalPath())
         {
             if (isMainUserConfig)
                 toolTipText = tr(
-                    "Global config directory used because local directory did not contain an openmw.cfg.\n"
+                    "Global config directory used because local directory did not contain an openfallout.cfg.\n"
                     "Logs and settings changed through the launcher and in-game will be saved here.\n"
-                    "This is typically a symptom of a broken OpenMW installation or bad package.");
+                    "This is typically a symptom of a broken OpenFallout installation or bad package.");
             else
-                toolTipText = tr("Global config directory used because local directory did not contain an openmw.cfg.");
+                toolTipText
+                    = tr("Global config directory used because local directory did not contain an openfallout.cfg.");
         }
         else
         {
@@ -460,7 +461,7 @@ void Launcher::SettingsPage::populateLoadedConfigs()
 
             if (!configSetting.value.isEmpty())
             {
-                const QFileInfo configPathInfo = QFileInfo(configSetting.context + "/openmw.cfg");
+                const QFileInfo configPathInfo = QFileInfo(configSetting.context + "/openfallout.cfg");
                 if (isMainUserConfig)
                     toolTipText = tr(
                         "User config directory used because %1 contains the line config=%2.\n"

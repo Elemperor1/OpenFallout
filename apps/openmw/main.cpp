@@ -65,7 +65,7 @@ bool parseOptions(int argc, char** argv, OMW::Engine& engine, Files::Configurati
 
     cfgMgr.readConfiguration(variables, desc);
 
-    Debug::setupLogging(cfgMgr.getLogPath(), "OpenMW");
+    Debug::setupLogging(cfgMgr.getLogPath(), "OpenFallout");
     Log(Debug::Info) << Version::getOpenmwVersionDescription();
 
     Settings::Manager::load(cfgMgr);
@@ -240,7 +240,7 @@ extern "C" int SDL_main(int argc, char** argv)
 int main(int argc, char** argv)
 #endif
 {
-    return Debug::wrapApplication(&runApplication, argc, argv, "OpenMW");
+    return Debug::wrapApplication(&runApplication, argc, argv, "OpenFallout");
 }
 
 // Platform specific for Windows when there is no console built into the executable.

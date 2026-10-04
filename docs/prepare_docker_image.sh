@@ -1,5 +1,5 @@
 #!/bin/bash
 
 pushd $( dirname -- "$0"; )
-docker build -t openmw_doc .
+docker build -t openfallout_doc .
 popd

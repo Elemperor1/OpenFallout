@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2015 Alexandre Moine <nobrakal@gmail.com>
+Copyright 2020 Bret Curtis <psi29a@gmail.com>
+-->
+<component type="desktop">
+ <id>org.openfallout.launcher.desktop</id>
+ <metadata_license>CC0-1.0</metadata_license>
+ <project_license>GPL-3.0-or-later</project_license>
+ <name>OpenFallout</name>
+ <summary>Open source engine for Bethesda role playing games</summary>
+ <description>
+  <p>
+  OpenFallout is an open source game engine that aims to play Fallout 3, Fallout: New Vegas and Tale of Two Wastelands from your own copy of the games.
+  </p>
+  <p>
+  It is built on OpenMW and is at an early stage: it currently runs The Elder Scrolls III: Morrowind, and Fallout gameplay is still being developed.
+  </p>
+  <p>
+  You will still need the original game data to play OpenFallout.
+  </p>
+ </description>
+ <launchable type="desktop-id">org.openfallout.launcher.desktop</launchable>
+ <developer id="io.github.elemperor1">
+   <name>OpenFallout Contributors</name>
+ </developer>
+
+ <branding>
+  <color type="primary" scheme_preference="light">#dcccb8</color>
+  <color type="primary" scheme_preference="dark">#574526</color>
+ </branding>
+
+ <categories>
+  <category>Game</category>
+  <category>RolePlaying</category>
+ </categories>
+ <releases>
+  <release version="@OPENMW_VERSION@" date="@OPENMW_VERSION_COMMITDATE@"/>
+ </releases>
+ <url type="homepage">https://github.com/Elemperor1/OpenFallout</url>
+ <url type="bugtracker">https://github.com/Elemperor1/OpenFallout/issues</url>
+ <content_rating type="oars-1.1" />
+</component>

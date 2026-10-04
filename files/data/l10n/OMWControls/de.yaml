@@ -1,6 +1,6 @@
 # Source for most of the setting names: German Morrowind GOTY version
 
-ControlsPage: "OpenMW-Steuerung"
+ControlsPage: "OpenFallout-Steuerung"
 ControlsPageDescription: "Zusätzliche Einstellungen für Spielereingaben"
 
 MovementSettings: "Fortbewegung"

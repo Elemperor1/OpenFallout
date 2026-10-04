@@ -13,7 +13,7 @@ int main(int argc, char** argv)
 {
     try
     {
-        bpo::options_description desc(R"(Syntax: openmw-essimporter <options> infile.ess outfile.omwsave
+        bpo::options_description desc(R"(Syntax: openfallout-essimporter <options> infile.ess outfile.omwsave
 Allowed options)");
         bpo::positional_options_description positionalDesc;
         auto addOption = desc.add_options();

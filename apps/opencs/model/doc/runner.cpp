@@ -52,7 +52,7 @@ void CSMDoc::Runner::start(bool delayed)
     {
         mLog.clear();
 
-        QString path = "openmw";
+        QString path = "openfallout";
 #ifdef Q_OS_WIN
         path.append(QLatin1String(".exe"));
 #endif
@@ -62,7 +62,7 @@ void CSMDoc::Runner::start(bool delayed)
         dir.cdUp();
         dir.cdUp();
         dir.cdUp();
-        path.prepend("OpenMW.app/Contents/MacOS/");
+        path.prepend("OpenFallout.app/Contents/MacOS/");
 #endif
         path = dir.absoluteFilePath(path);
 
@@ -70,7 +70,7 @@ void CSMDoc::Runner::start(bool delayed)
         if (!mStartup->open())
         {
             Log(Debug::Error) << "Unable to open temporary file for --script-run source";
-            QMessageBox::critical(nullptr, tr("Error launching OpenMW"), tr("Unable to open temporary file."));
+            QMessageBox::critical(nullptr, tr("Error launching OpenFallout"), tr("Unable to open temporary file."));
             return;
         }
 

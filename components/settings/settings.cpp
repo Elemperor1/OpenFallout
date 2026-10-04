@@ -139,7 +139,7 @@ namespace Settings
         else
         {
             defaultSettingsFile = "defaults-cs.bin";
-            userSettingsFile = "openmw-cs.cfg";
+            userSettingsFile = "openfallout-cs.cfg";
         }
 
         // Create the settings manager and load default settings file.
@@ -151,7 +151,7 @@ namespace Settings
 
         const CategorySettingValueMap originalDefaultSettings = mDefaultSettings;
 
-        // Load "settings.cfg" or "openmw-cs.cfg" from every config dir except the last one as additional default
+        // Load "settings.cfg" or "openfallout-cs.cfg" from every config dir except the last one as additional default
         // settings.
         for (int i = 0; i < static_cast<int>(paths.size()) - 1; ++i)
         {
@@ -163,8 +163,8 @@ namespace Settings
         if (!loadEditorSettings)
             Settings::StaticValues::initDefaults();
 
-        // Load "settings.cfg" or "openmw-cs.cfg" from the last config dir as user settings. This path will be used to
-        // save modified settings.
+        // Load "settings.cfg" or "openfallout-cs.cfg" from the last config dir as user settings. This path will be used
+        // to save modified settings.
         auto settingspath = paths.back() / userSettingsFile;
         if (std::filesystem::exists(settingspath))
             parser.loadSettingsFile(settingspath, mUserSettings, false, false);

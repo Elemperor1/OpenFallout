@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIconFile</key>
-	<string>OpenMW.icns</string>
+	<string>OpenFallout.icns</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>openmw-launcher</string>
+	<string>openfallout-launcher</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.openmw.openmw</string>
+	<string>org.openfallout.openfallout</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLongVersionString</key>
 	<string></string>
 	<key>CFBundleName</key>
-	<string>OpenMW</string>
+	<string>OpenFallout</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleSignature</key>

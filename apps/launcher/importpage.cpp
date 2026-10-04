@@ -77,7 +77,7 @@ void Launcher::ImportPage::on_wizardButton_clicked()
 {
     mMain->writeSettings();
 
-    if (!mWizardInvoker->startProcess(QLatin1String("openmw-wizard"), false))
+    if (!mWizardInvoker->startProcess(QLatin1String("openfallout-wizard"), false))
         return;
 }
 
@@ -87,7 +87,7 @@ void Launcher::ImportPage::on_importerButton_clicked()
 
     // Create the file if it doesn't already exist, else the importer will fail
     auto path = mCfgMgr.getUserConfigPath();
-    path /= "openmw.cfg";
+    path /= "openfallout.cfg";
     QFile file(path);
 
     if (!file.exists())
@@ -96,7 +96,7 @@ void Launcher::ImportPage::on_importerButton_clicked()
         {
             // File cannot be created
             QMessageBox msgBox;
-            msgBox.setWindowTitle(tr("Error writing OpenMW configuration file"));
+            msgBox.setWindowTitle(tr("Error writing OpenFallout configuration file"));
             msgBox.setIcon(QMessageBox::Critical);
             msgBox.setStandardButtons(QMessageBox::Ok);
             msgBox.setText(
@@ -132,7 +132,7 @@ void Launcher::ImportPage::on_importerButton_clicked()
     // start the progress bar as a "bouncing ball"
     progressBar->setMaximum(0);
     progressBar->setValue(0);
-    if (!mImporterInvoker->startProcess(QLatin1String("openmw-iniimporter"), arguments, false))
+    if (!mImporterInvoker->startProcess(QLatin1String("openfallout-iniimporter"), arguments, false))
     {
         resetProgressBar();
     }

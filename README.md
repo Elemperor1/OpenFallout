@@ -1,49 +1,50 @@
-OpenMW
-======
+OpenFallout
+===========
 
-OpenMW is an open-source open-world RPG game engine that supports playing Morrowind by Bethesda Softworks. You need to own the game for OpenMW to play Morrowind.
+OpenFallout is an open-source game engine project that aims to play Fallout 3, Fallout: New Vegas and Tale of Two Wastelands from your own copy of the games. You need to own the games; none of their content is included or distributed.
 
-OpenMW also comes with OpenMW-CS, a replacement for Bethesda's Construction Set.
+It is built on [OpenMW](https://openmw.org), the open-source Morrowind engine, and starts from OpenMW's renderer, physics, audio, Lua scripting and content tools. OpenFallout is an independent project. It is not affiliated with or endorsed by the OpenMW team or Bethesda Softworks.
 
-* Version: 0.52.0
-* License: GPLv3 (see [LICENSE](https://gitlab.com/OpenMW/openmw/-/raw/master/LICENSE) for more information)
-* Website: https://www.openmw.org
-* IRC: #openmw on irc.libera.chat
-* Discord: https://discord.gg/bWuqq2e
-
+* Version: 0.52.0 (the OpenMW release it was started from, OpenFallout has not made a release yet)
+* License: GPLv3 (see [LICENSE](LICENSE) for more information)
+* Source code and bug tracker: https://github.com/Elemperor1/OpenFallout
 
 Font Licenses:
-* DejaVuLGCSansMono.ttf: custom (see [files/data/fonts/DejaVuFontLicense.txt](https://gitlab.com/OpenMW/openmw/-/raw/master/files/data/fonts/DejaVuFontLicense.txt) for more information)
-* DemonicLetters.ttf: SIL Open Font License (see [files/data/fonts/DemonicLettersFontLicense.txt](https://gitlab.com/OpenMW/openmw/-/raw/master/files/data/fonts/DemonicLettersFontLicense.txt) for more information)
-* MysticCards.ttf: SIL Open Font License (see [files/data/fonts/MysticCardsFontLicense.txt](https://gitlab.com/OpenMW/openmw/-/raw/master/files/data/fonts/MysticCardsFontLicense.txt) for more information)
+* DejaVuLGCSansMono.ttf: custom (see [files/data/fonts/DejaVuFontLicense.txt](files/data/fonts/DejaVuFontLicense.txt) for more information)
+* DemonicLetters.ttf: SIL Open Font License (see [files/data/fonts/DemonicLettersFontLicense.txt](files/data/fonts/DemonicLettersFontLicense.txt) for more information)
+* MysticCards.ttf: SIL Open Font License (see [files/data/fonts/MysticCardsFontLicense.txt](files/data/fonts/MysticCardsFontLicense.txt) for more information)
 
 Current Status
 --------------
 
-The main quests in Morrowind, Tribunal and Bloodmoon are all completable. Some issues with side quests are to be expected (but rare). Check the [bug tracker](https://gitlab.com/OpenMW/openmw/-/issues/?milestone_title=openmw-1.0) for a list of issues we need to resolve before the "1.0" release. Even before the "1.0" release, however, OpenMW boasts some new [features](https://wiki.openmw.org/index.php?title=Features), such as improved graphics and user interfaces.
+OpenFallout cannot play Fallout yet. What runs today is the OpenMW engine it inherited, which plays Morrowind. The Fallout 3 and New Vegas plugin readers exist and parse many record types, but quests, dialogue, scripts, actors, mechanics and saves for those games are not implemented.
 
-Pre-existing modifications created for the original Morrowind engine can be hit-and-miss. The OpenMW script compiler performs more thorough error-checking than Morrowind does, meaning that a mod created for Morrowind may not necessarily run in OpenMW. Some mods also rely on quirky behaviour or engine bugs in order to work. We are considering such compatibility issues on a case-by-case basis - in some cases adding a workaround to OpenMW may be feasible, in other cases fixing the mod will be the only option. If you know of any mods that work or don't work, feel free to add them to the [Mod status](https://wiki.openmw.org/index.php?title=Mod_status) wiki page.
+The plan, with the milestones that lead from here to a playable game, is in [docs/openfallout/gap-audit-and-roadmap.md](docs/openfallout/gap-audit-and-roadmap.md). How to build the project and what the build and test baseline looks like is in [docs/openfallout/build-baseline.md](docs/openfallout/build-baseline.md).
+
+The project is being renamed from OpenMW in stages. Programs, configuration files, log files and settings directories already use the OpenFallout name (`openfallout`, `openfallout-launcher`, `openfallout.cfg`, `~/.config/openfallout`), so an existing OpenMW installation and its settings are not shared with OpenFallout. Internal names such as Lua module ids (`openmw.core`), `OPENMW_*` build options and the `apps/openmw` directory still carry the old name and are changed in later stages. The OpenMW logo and icons have not been replaced yet.
+
+Acknowledgements
+----------------
+
+OpenFallout would not exist without the work of the OpenMW team and its contributors over more than fifteen years. Their names are kept in [AUTHORS.md](AUTHORS.md) and the copyright notices in the source files stay as they are. OpenMW's own project pages are at https://openmw.org and https://gitlab.com/OpenMW/openmw.
 
 Getting Started
 ---------------
 
-* [Official forums](https://forum.openmw.org/)
-* [Installation instructions](https://openmw.readthedocs.io/en/latest/manuals/installation/index.html)
-* [Build from source](https://wiki.openmw.org/index.php?title=Development_Environment_Setup)
-* [Testing the game](https://wiki.openmw.org/index.php?title=Testing)
-* [How to contribute](https://wiki.openmw.org/index.php?title=Contribution_Wanted)
-* [Report a bug](https://gitlab.com/OpenMW/openmw/issues) - read the [guidelines](https://wiki.openmw.org/index.php?title=Bug_Reporting_Guidelines) before submitting your first bug!
-* [Known issues](https://gitlab.com/OpenMW/openmw/issues?label_name%5B%5D=Bug)
+* [Build from source](docs/openfallout/build-baseline.md)
+* [Roadmap](docs/openfallout/gap-audit-and-roadmap.md)
+* [Report a bug](https://github.com/Elemperor1/OpenFallout/issues)
+* The manuals under [docs/source](docs/source) are OpenMW's and still describe the Morrowind engine that OpenFallout starts from. Program and file names in them have been updated.
 
 The data path
 -------------
 
-The data path tells OpenMW where to find your Morrowind files. If you run the launcher, OpenMW should be able to pick up the location of these files on its own, if both Morrowind and OpenMW are installed properly (installing Morrowind under WINE is considered a proper install).
+The data path tells OpenFallout where to find your Morrowind files. If you run the launcher, OpenFallout should be able to pick up the location of these files on its own, if both Morrowind and OpenFallout are installed properly (installing Morrowind under WINE is considered a proper install).
 
 Command line options
 --------------------
 
-    Syntax: openmw <options>
+    Syntax: openfallout <options>
     Allowed options:
       --config arg                          additional config directories
       --replace arg                         settings where the values from the
@@ -89,7 +90,7 @@ Command line options
       --skip-menu [=arg(=1)] (=0)           skip main menu on game startup
       --new-game [=arg(=1)] (=0)            run new game sequence (ignored if
                                             skip-menu=0)
-      --encoding arg (=win1252)             Character encoding used in OpenMW game
+      --encoding arg (=win1252)             Character encoding used in OpenFallout game
                                             messages:
 
                                             win1250 - Central and Eastern European

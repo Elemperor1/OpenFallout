@@ -4,8 +4,8 @@ set(OPENMW_SOURCES
 )
 
 set(OPENMW_RESOURCES
-    ${CMAKE_SOURCE_DIR}/files/windows/openmw.rc
-    ${CMAKE_SOURCE_DIR}/files/windows/openmw.exe.manifest
+    ${CMAKE_SOURCE_DIR}/files/windows/openfallout.rc
+    ${CMAKE_SOURCE_DIR}/files/windows/openfallout.exe.manifest
 )
 
 set(OPENMW_HEADERS
@@ -141,24 +141,24 @@ endif()
 
 if(BUILD_OPENMW)
     if (ANDROID)
-        add_library(openmw SHARED
+        add_library(openfallout SHARED
             main.cpp
             androidmain.cpp
         )
     else()
-        openmw_add_executable(openmw
+        openmw_add_executable(openfallout
             ${APPLE_BUNDLE_RESOURCES}
             ${OPENMW_RESOURCES}
             main.cpp
         )
     endif()
 
-    target_link_libraries(openmw openmw-lib)
+    target_link_libraries(openfallout openmw-lib)
 
     # Workaround necessary to ensure osgAnimation::MatrixLinearSampler dynamic casts work under Clang
     # NOTE: it's unclear whether the broken behavior is spec-compliant
     if (CMAKE_CXX_COMPILER_ID STREQUAL Clang)
-        set_target_properties(openmw PROPERTIES ENABLE_EXPORTS ON)
+        set_target_properties(openfallout PROPERTIES ENABLE_EXPORTS ON)
     endif()
 endif()
 
@@ -241,20 +241,20 @@ if(APPLE AND BUILD_OPENMW)
 
     add_subdirectory(../../files/ ${CMAKE_CURRENT_BINARY_DIR}/files)
 
-    configure_file("${OpenMW_BINARY_DIR}/defaults.bin" ${BUNDLE_RESOURCES_DIR} COPYONLY)
-    configure_file("${OpenMW_BINARY_DIR}/openmw.cfg" ${BUNDLE_RESOURCES_DIR} COPYONLY)
-    configure_file("${OpenMW_BINARY_DIR}/gamecontrollerdb.txt" ${BUNDLE_RESOURCES_DIR} COPYONLY)
+    configure_file("${OpenFallout_BINARY_DIR}/defaults.bin" ${BUNDLE_RESOURCES_DIR} COPYONLY)
+    configure_file("${OpenFallout_BINARY_DIR}/openfallout.cfg" ${BUNDLE_RESOURCES_DIR} COPYONLY)
+    configure_file("${OpenFallout_BINARY_DIR}/gamecontrollerdb.txt" ${BUNDLE_RESOURCES_DIR} COPYONLY)
 
-    add_custom_command(TARGET openmw
+    add_custom_command(TARGET openfallout
         POST_BUILD
-        COMMAND cp "${OpenMW_BINARY_DIR}/resources/version" "${BUNDLE_RESOURCES_DIR}/resources")
+        COMMAND cp "${OpenFallout_BINARY_DIR}/resources/version" "${BUNDLE_RESOURCES_DIR}/resources")
 
     find_library(COCOA_FRAMEWORK Cocoa)
     find_library(IOKIT_FRAMEWORK IOKit)
-    target_link_libraries(openmw ${COCOA_FRAMEWORK} ${IOKIT_FRAMEWORK})
+    target_link_libraries(openfallout ${COCOA_FRAMEWORK} ${IOKIT_FRAMEWORK})
 
     if (FFmpeg_FOUND)
-        target_link_options(openmw PRIVATE "LINKER:SHELL:-framework CoreVideo"
+        target_link_options(openfallout PRIVATE "LINKER:SHELL:-framework CoreVideo"
                                            "LINKER:SHELL:-framework CoreMedia"
                                            "LINKER:SHELL:-framework VideoToolbox"
                                            "LINKER:SHELL:-framework AudioToolbox"
@@ -266,11 +266,11 @@ if (BUILD_WITH_CODE_COVERAGE)
     target_compile_options(openmw-lib PRIVATE --coverage)
     target_link_libraries(openmw-lib gcov)
     if (NOT ANDROID AND BUILD_OPENMW)
-        target_compile_options(openmw PRIVATE --coverage)
-        target_link_libraries(openmw gcov)
+        target_compile_options(openfallout PRIVATE --coverage)
+        target_link_libraries(openfallout gcov)
     endif()
 endif()
 
 if (NOT APPLE AND BUILD_OPENMW)
-    INSTALL(TARGETS openmw)
+    INSTALL(TARGETS openfallout)
 endif()

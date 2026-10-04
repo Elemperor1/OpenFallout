@@ -368,7 +368,7 @@ ToUTF8::FromType ToUTF8::calculateEncoding(std::string_view encodingName)
         return ToUTF8::WINDOWS_1252;
     else
         throw std::runtime_error(
-            "Unknown encoding '" + std::string(encodingName) + "', see openmw --help for available options.");
+            "Unknown encoding '" + std::string(encodingName) + "', see openfallout --help for available options.");
 }
 
 std::string ToUTF8::encodingUsingMessage(std::string_view encodingName)
@@ -381,5 +381,5 @@ std::string ToUTF8::encodingUsingMessage(std::string_view encodingName)
         return "Using default (English) font encoding.";
     else
         throw std::runtime_error(
-            "Unknown encoding '" + std::string(encodingName) + "', see openmw --help for available options.");
+            "Unknown encoding '" + std::string(encodingName) + "', see openfallout --help for available options.");
 }

@@ -38,7 +38,7 @@ If reporting an issue with a specific open Merge Request, comment on the MR itse
 ## Logs and Settings
 
 <!--
-Please attach your openmw.log and settings.cfg files.
+Please attach your openfallout.log and settings.cfg files.
 If the issue is graphical or location-based, please paste the output of the 'bc' command below.
 (Open console with ` -> Click object -> type 'bc')
 -->

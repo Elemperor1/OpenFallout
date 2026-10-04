@@ -9,7 +9,7 @@ Groundcover Settings
    
 
    Allows the engine to use groundcover.
-   Groundcover objects are static and come from ESP files registered via "groundcover" entries in `openmw.cfg`,
+   Groundcover objects are static and come from ESP files registered via "groundcover" entries in `openfallout.cfg`,
    not via "content". These objects are assumed to have no collision and cannot be interacted with,
    allowing them to be merged and animated efficiently regardless of player distance.
 

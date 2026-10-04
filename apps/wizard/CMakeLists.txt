@@ -63,40 +63,40 @@ if (OPENMW_USE_UNSHIELD)
     include_directories(${LIBUNSHIELD_INCLUDE_DIRS})
 endif()
 
-openmw_add_executable(openmw-wizard
+openmw_add_executable(openfallout-wizard
     ${GUI_TYPE}
     ${WIZARD}
     ${WIZARD_HEADER}
     ${RCC_SRCS}
 )
 
-add_dependencies(openmw-wizard qm-files)
+add_dependencies(openfallout-wizard qm-files)
 
-target_link_libraries(openmw-wizard
+target_link_libraries(openfallout-wizard
     components_qt
 )
 
-target_link_libraries(openmw-wizard Qt::Widgets Qt::Core Qt::Svg)
+target_link_libraries(openfallout-wizard Qt::Widgets Qt::Core Qt::Svg)
 
 if (OPENMW_USE_UNSHIELD)
-    target_link_libraries(openmw-wizard ${LIBUNSHIELD_LIBRARIES})
+    target_link_libraries(openfallout-wizard ${LIBUNSHIELD_LIBRARIES})
 endif()
 
 if (WIN32)
-    target_sources(openmw-wizard PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-wizard PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-wizard PRIVATE --coverage)
-    target_link_libraries(openmw-wizard gcov)
+    target_compile_options(openfallout-wizard PRIVATE --coverage)
+    target_link_libraries(openfallout-wizard gcov)
 endif()
 
 if (NOT APPLE)
-    INSTALL(TARGETS openmw-wizard)
+    INSTALL(TARGETS openfallout-wizard)
 endif()
 
 if(USE_QT)
-    set_property(TARGET openmw-wizard PROPERTY AUTOMOC ON)
-    set_property(TARGET openmw-wizard PROPERTY AUTOUIC ON)
-    set_property(TARGET openmw-wizard PROPERTY AUTOUIC_SEARCH_PATHS ui)
+    set_property(TARGET openfallout-wizard PROPERTY AUTOMOC ON)
+    set_property(TARGET openfallout-wizard PROPERTY AUTOUIC ON)
+    set_property(TARGET openfallout-wizard PROPERTY AUTOUIC_SEARCH_PATHS ui)
 endif(USE_QT)

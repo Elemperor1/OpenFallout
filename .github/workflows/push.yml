@@ -43,11 +43,11 @@ jobs:
     - name: Run components tests
       run: ./components-tests
 
-    - name: Run OpenMW tests
-      run: ./openmw-tests
+    - name: Run OpenFallout tests
+      run: ./openfallout-tests
 
-    - name: Run OpenMW-CS tests
-      run: ./openmw-cs-tests
+    - name: Run OpenFallout-CS tests
+      run: ./openfallout-cs-tests
 
     # - name: Install
     #   shell: bash

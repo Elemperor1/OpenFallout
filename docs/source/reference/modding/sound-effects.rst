@@ -63,7 +63,7 @@ Ambient
    * - ``water layer``
      - When the player is near the water level
 
-.. note:: Names for these sounds can be changed in ``openmw.cfg`` but we strongly suggest they stay the same.
+.. note:: Names for these sounds can be changed in ``openfallout.cfg`` but we strongly suggest they stay the same.
     Another issue is with ``ashstorm``, ``blight``, ``blizzard`` which have missing or erroneous fallback lines,
     unless they were imported from Morrowind.
     These will be fixed with the planned dehardcoding of weather types and using Lua.

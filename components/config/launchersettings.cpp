@@ -304,7 +304,7 @@ void Config::LauncherSettings::setContentList(const GameSettings& gameSettings)
             files.push_back(file.value);
     }
 
-    // if openmw.cfg has no content, exit so we don't create an empty content list.
+    // if openfallout.cfg has no content, exit so we don't create an empty content list.
     if (dirs.isEmpty() || files.isEmpty())
     {
         return;

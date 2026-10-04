@@ -3593,7 +3593,7 @@ namespace MWWorld
 
     std::filesystem::path World::exportSceneGraph(const Ptr& ptr)
     {
-        auto file = mUserDataPath / "openmw.osgt";
+        auto file = mUserDataPath / "openfallout.osgt";
         if (!ptr.isEmpty())
         {
             mRendering->pagingBlacklistObject(mStore.find(ptr.getCellRef().getRefId()), ptr);

@@ -38,11 +38,11 @@ if (MSVC)
     )
 endif()
 
-source_group(apps\\openmw-tests FILES ${UNITTEST_SRC_FILES})
+source_group(apps\\openfallout-tests FILES ${UNITTEST_SRC_FILES})
 
-openmw_add_executable(openmw-tests ${UNITTEST_SRC_FILES})
+openmw_add_executable(openfallout-tests ${UNITTEST_SRC_FILES})
 
-target_link_libraries(openmw-tests
+target_link_libraries(openfallout-tests
     GTest::GTest
     GMock::GMock
     openmw-lib
@@ -50,24 +50,24 @@ target_link_libraries(openmw-tests
 
 # Fix for not visible pthreads functions for linker with glibc 2.15
 if (UNIX AND NOT APPLE)
-    target_link_libraries(openmw-tests ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(openfallout-tests ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 if (WIN32)
-    target_sources(openmw-tests PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-tests PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-tests PRIVATE --coverage)
-    target_link_libraries(openmw-tests gcov)
+    target_compile_options(openfallout-tests PRIVATE --coverage)
+    target_link_libraries(openfallout-tests gcov)
 endif()
 
-target_compile_definitions(openmw-tests
+target_compile_definitions(openfallout-tests
     PRIVATE OPENMW_DATA_DIR=u8"${CMAKE_CURRENT_BINARY_DIR}/data"
             OPENMW_PROJECT_SOURCE_DIR=u8"${PROJECT_SOURCE_DIR}")
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-tests PRIVATE
+    target_precompile_headers(openfallout-tests PRIVATE
         <boost/program_options/options_description.hpp>
 
         <gtest/gtest.h>

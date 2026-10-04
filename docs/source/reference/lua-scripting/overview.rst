@@ -68,7 +68,7 @@ Cell
     An area of the game world. A position in the world is a link to a cell and X, Y, Z coordinates in the cell. At a specific moment in time each cell can be active or inactive. Inactive cells don't perform physics updates.
 
 Global scripts
-    Lua scripts that are not attached to any game object and are always active. Global scripts can not be started or stopped during a game session. Lists of global scripts are defined by `omwscripts` files, which should be :ref:`registered <Lua scripting>` in `openmw.cfg`.
+    Lua scripts that are not attached to any game object and are always active. Global scripts can not be started or stopped during a game session. Lists of global scripts are defined by `omwscripts` files, which should be :ref:`registered <Lua scripting>` in `openfallout.cfg`.
 
 Menu scripts
     Lua scripts that are ran regardless of a game being loaded. They can be used to add features to the main menu and manage save files.
@@ -124,10 +124,10 @@ The options are:
 2. (not implemented yet) Add the script in OpenMW CS on "Lua scripts" view and save as "my_lua_mod.omwaddon".
 
 
-Enable it in ``openmw.cfg`` the same way as any other mod:
+Enable it in ``openfallout.cfg`` the same way as any other mod:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     data=path/to/my_lua_mod
     # or content=my_lua_mod.omwaddon
@@ -294,7 +294,7 @@ Engine handlers
 
 An engine handler is a function defined by a script, that can be called by the engine. I.e. it is an engine-to-script interaction.
 Not visible to other scripts. If several scripts register an engine handler with the same name,
-the engine calls all of them according to the load order (i.e. the order of ``content=`` entries in ``openmw.cfg``) and the order of scripts in ``omwaddon/omwscripts``.
+the engine calls all of them according to the load order (i.e. the order of ``content=`` entries in ``openfallout.cfg``) and the order of scripts in ``omwaddon/omwscripts``.
 
 Some engine handlers are allowed only for global, or only for local/player scripts. Some are universal.
 See :ref:`Engine handlers reference`.
@@ -466,7 +466,7 @@ Using the interface:
 
     return { engineHandlers = {onUpdate = onUpdate} }
 
-The order in which the scripts are started is important. So if one mod should override an interface provided by another mod, make sure that load order (i.e. the sequence of `content=*.omwscripts` in `openmw.cfg`) is correct.
+The order in which the scripts are started is important. So if one mod should override an interface provided by another mod, make sure that load order (i.e. the sequence of `content=*.omwscripts` in `openfallout.cfg`) is correct.
 
 Interfaces of built-in scripts
 ------------------------------

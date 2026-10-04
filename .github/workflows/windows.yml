@@ -92,7 +92,7 @@ jobs:
 
     - uses: seanmiddleditch/gha-setup-ninja@master
 
-    - name: Configure OpenMW
+    - name: Configure OpenFallout
       run: >
         cmake
         -S .
@@ -115,7 +115,7 @@ jobs:
         ${{ inputs.package && '-D "VCREDIST64=$env:VCToolsRedistDir/vc_redist.x64.exe"' || '' }}
         -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-    - name: Build OpenMW
+    - name: Build OpenFallout
       run: cmake --build ${{ github.workspace }}/build
 
     - name: Copy missing DLLs
@@ -156,11 +156,11 @@ jobs:
           $global:LASTEXITCODE = $null
         }
 
-    - name: Install OpenMW
+    - name: Install OpenFallout
       if: ${{ ! inputs.package }}
       run: cmake --install ${{ github.workspace }}/build --prefix ${{ github.workspace }}/install
 
-    - name: Package OpenMW
+    - name: Package OpenFallout
       if: ${{ inputs.package }}
       run: |
         cpack --config "${{ github.workspace }}/build/CPackConfig.cmake" -B "${{ github.workspace }}/install"
@@ -183,28 +183,28 @@ jobs:
         cp install/CI-ID.txt pdb/CI-ID.txt
         cp install/CI-ID.txt SymStore/CI-ID.txt
 
-    - name: Store OpenMW archived pdb files
+    - name: Store OpenFallout archived pdb files
       uses: actions/upload-artifact@v6
       with:
-        name: openmw-windows-${{ inputs.msvc }}-pdb-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-pdb-${{ github.sha }}
         path: ${{ github.workspace }}/pdb/*
 
-    - name: Store OpenMW build artifacts
+    - name: Store OpenFallout build artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openmw-windows-${{ inputs.msvc }}-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-${{ github.sha }}
         path: ${{ github.workspace }}/install/*
 
     - name: Store symbol server artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openmw-windows-${{ inputs.msvc }}-sym-store-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-sym-store-${{ github.sha }}
         path: ${{ github.workspace }}/SymStore/*
 
     - name: Store log etc. artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openmw-windows-${{ inputs.msvc }}-logs-and-stuff-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-logs-and-stuff-${{ github.sha }}
         path: |
           ${{ github.workspace }}/build/compile_commands.json
           ${{ github.workspace }}/build/**/*.log
@@ -232,25 +232,25 @@ jobs:
       if: ${{ ! inputs.package }}
       run: build/components-tests.exe
 
-    - name: Run OpenMW tests
+    - name: Run OpenFallout tests
       if: ${{ ! inputs.package }}
-      run: build/openmw-tests.exe
+      run: build/openfallout-tests.exe
 
-    - name: Run OpenMW-CS tests
+    - name: Run OpenFallout-CS tests
       if: ${{ ! inputs.package }}
-      run: build/openmw-cs-tests.exe
+      run: build/openfallout-cs-tests.exe
 
     - name: Run detournavigator navmeshtilescache benchmark
       if: ${{ ! inputs.package }}
-      run: build/openmw_detournavigator_navmeshtilescache_benchmark.exe
+      run: build/openfallout_detournavigator_navmeshtilescache_benchmark.exe
 
     - name: Run settings access benchmark
       if: ${{ ! inputs.package }}
-      run: build/openmw_settings_access_benchmark.exe
+      run: build/openfallout_settings_access_benchmark.exe
 
     - name: Run esm refid benchmark
       if: ${{ ! inputs.package }}
-      run: build/openmw_esm_refid_benchmark.exe
+      run: build/openfallout_esm_refid_benchmark.exe
 
     - name: Create prerelease
       if: ${{ inputs.release }}

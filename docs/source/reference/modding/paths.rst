@@ -13,19 +13,19 @@ To see how to customise this, look at `Custom configuration directories`_.
 Configuration files and log files
 ---------------------------------
 
-+--------------+-----------------------------------------------------------------------------------------------+
-| OS           | Location                                                                                      |
-+==============+===============================================================================================+
-| Linux        | ``$XDG_CONFIG_HOME/openmw`` or ``$HOME/.config/openmw``                                       |
-+--------------+-----------------------------------------------------------------------------------------------+
-| Mac          | ``$HOME/Library/Preferences/openmw``                                                          |
-+--------------+---------------+-------------------------------------------------------------------------------+
-| Windows      | File Explorer | ``Documents\My Games\OpenMW``                                                 |
-|              +---------------+-------------------------------------------------------------------------------+
-|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenMW"`` |
-|              +---------------+-------------------------------------------------------------------------------+
-|              | Example       | ``C:\Users\Username\Documents\My Games\OpenMW``                               |
-+--------------+---------------+-------------------------------------------------------------------------------+
++--------------+----------------------------------------------------------------------------------------------------+
+| OS           | Location                                                                                           |
++==============+====================================================================================================+
+| Linux        | ``$XDG_CONFIG_HOME/openfallout`` or ``$HOME/.config/openfallout``                                  |
++--------------+----------------------------------------------------------------------------------------------------+
+| Mac          | ``$HOME/Library/Preferences/openfallout``                                                          |
++--------------+---------------+------------------------------------------------------------------------------------+
+| Windows      | File Explorer | ``Documents\My Games\OpenFallout``                                                 |
+|              +---------------+------------------------------------------------------------------------------------+
+|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenFallout"`` |
+|              +---------------+------------------------------------------------------------------------------------+
+|              | Example       | ``C:\Users\Username\Documents\My Games\OpenFallout``                               |
++--------------+---------------+------------------------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_CONFIG_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/config``, so these files will be at ``$HOME/.var/app/org.openmw.OpenMW/config/openmw`` if you use the Flatpak.
@@ -33,19 +33,19 @@ Configuration files and log files
 Savegames
 ---------
 
-+--------------+-----------------------------------------------------------------------------------------------------+
-| OS           | Location                                                                                            |
-+==============+=====================================================================================================+
-| Linux        | ``$XDG_DATA_HOME/openmw/saves`` or ``$HOME/.local/share/openmw/saves``                              |
-+--------------+-----------------------------------------------------------------------------------------------------+
-| Mac          | ``$HOME/Library/Application\ Support/openmw/saves``                                                 |
-+--------------+---------------+-------------------------------------------------------------------------------------+
-| Windows      | File Explorer | ``Documents\My Games\OpenMW\saves``                                                 |
-|              +---------------+-------------------------------------------------------------------------------------+
-|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenMW\saves"`` |
-|              +---------------+-------------------------------------------------------------------------------------+
-|              | Example       | ``C:\Users\Username\Documents\My Games\OpenMW\saves``                               |
-+--------------+---------------+-------------------------------------------------------------------------------------+
++--------------+----------------------------------------------------------------------------------------------------------+
+| OS           | Location                                                                                                 |
++==============+==========================================================================================================+
+| Linux        | ``$XDG_DATA_HOME/openfallout/saves`` or ``$HOME/.local/share/openfallout/saves``                         |
++--------------+----------------------------------------------------------------------------------------------------------+
+| Mac          | ``$HOME/Library/Application\ Support/openfallout/saves``                                                 |
++--------------+---------------+------------------------------------------------------------------------------------------+
+| Windows      | File Explorer | ``Documents\My Games\OpenFallout\saves``                                                 |
+|              +---------------+------------------------------------------------------------------------------------------+
+|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenFallout\saves"`` |
+|              +---------------+------------------------------------------------------------------------------------------+
+|              | Example       | ``C:\Users\Username\Documents\My Games\OpenFallout\saves``                               |
++--------------+---------------+------------------------------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_DATA_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/data``, so saves will be at ``$HOME/.var/app/org.openmw.OpenMW/data/openmw/saves`` if you use the Flatpak.
@@ -53,19 +53,19 @@ Savegames
 Screenshots
 -----------
 
-+--------------+-----------------------------------------------------------------------------------------------------------+
-| OS           | Location                                                                                                  |
-+==============+===========================================================================================================+
-| Linux        | ``$XDG_DATA_HOME/openmw/screenshots`` or ``$HOME/.local/share/openmw/screenshots``                        |
-+--------------+-----------------------------------------------------------------------------------------------------------+
-| Mac          | ``$HOME/Library/Application\ Support/openmw/screenshots``                                                 |
-+--------------+---------------+-------------------------------------------------------------------------------------------+
-| Windows      | File Explorer | ``Documents\My Games\OpenMW\screenshots``                                                 |
-|              +---------------+-------------------------------------------------------------------------------------------+
-|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenMW\screenshots"`` |
-|              +---------------+-------------------------------------------------------------------------------------------+
-|              | Example       | ``C:\Users\Username\Documents\My Games\OpenMW\screenshots``                               |
-+--------------+---------------+-------------------------------------------------------------------------------------------+
++--------------+----------------------------------------------------------------------------------------------------------------+
+| OS           | Location                                                                                                       |
++==============+================================================================================================================+
+| Linux        | ``$XDG_DATA_HOME/openfallout/screenshots`` or ``$HOME/.local/share/openfallout/screenshots``                   |
++--------------+----------------------------------------------------------------------------------------------------------------+
+| Mac          | ``$HOME/Library/Application\ Support/openfallout/screenshots``                                                 |
++--------------+---------------+------------------------------------------------------------------------------------------------+
+| Windows      | File Explorer | ``Documents\My Games\OpenFallout\screenshots``                                                 |
+|              +---------------+------------------------------------------------------------------------------------------------+
+|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenFallout\screenshots"`` |
+|              +---------------+------------------------------------------------------------------------------------------------+
+|              | Example       | ``C:\Users\Username\Documents\My Games\OpenFallout\screenshots``                               |
++--------------+---------------+------------------------------------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_DATA_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/data``, so screenshots will be at ``$HOME/.var/app/org.openmw.OpenMW/data/openmw/screenshots`` if you use the Flatpak.
@@ -76,21 +76,21 @@ Override directory (data-local)
 This is the directory in which OpenMW-CS saves generated content files. 
 Additionally, this is always the last-loaded data directory in OpenMW, overriding any which came before it.
 This can be useful, for instance, for placing automatically-generated plugins created by external tools or to be very certain that particular assets are always overridden regardless of load order.
-You may define your own, custom ``data-local`` directory by using it as a key in ``openmw.cfg``, e.g. ``data-local=C:/Games/OpenMW/data``.
+You may define your own, custom ``data-local`` directory by using it as a key in ``openfallout.cfg``, e.g. ``data-local=C:/Games/OpenMW/data``.
 
-+--------------+----------------------------------------------------------------------------------------------------+
-| OS           | Location                                                                                           |
-+==============+====================================================================================================+
-| Linux        | ``$XDG_DATA_HOME/openmw/data`` or ``$HOME/.local/share/openmw/data``                               |
-+--------------+----------------------------------------------------------------------------------------------------+
-| Mac          | ``$HOME/Library/Application\ Support/openmw/data``                                                 |
-+--------------+---------------+------------------------------------------------------------------------------------+
-| Windows      | File Explorer | ``Documents\My Games\OpenMW\data``                                                 |
-|              +---------------+------------------------------------------------------------------------------------+
-|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenMW\data"`` |
-|              +---------------+------------------------------------------------------------------------------------+
-|              | Example       | ``C:\Users\Username\Documents\My Games\OpenMW\data``                               |
-+--------------+---------------+------------------------------------------------------------------------------------+
++--------------+---------------------------------------------------------------------------------------------------------+
+| OS           | Location                                                                                                |
++==============+=========================================================================================================+
+| Linux        | ``$XDG_DATA_HOME/openfallout/data`` or ``$HOME/.local/share/openfallout/data``                          |
++--------------+---------------------------------------------------------------------------------------------------------+
+| Mac          | ``$HOME/Library/Application\ Support/openfallout/data``                                                 |
++--------------+---------------+-----------------------------------------------------------------------------------------+
+| Windows      | File Explorer | ``Documents\My Games\OpenFallout\data``                                                 |
+|              +---------------+-----------------------------------------------------------------------------------------+
+|              | PowerShell    | ``Join-Path ([environment]::GetFolderPath("mydocuments")) "My Games\OpenFallout\data"`` |
+|              +---------------+-----------------------------------------------------------------------------------------+
+|              | Example       | ``C:\Users\Username\Documents\My Games\OpenFallout\data``                               |
++--------------+---------------+-----------------------------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_DATA_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/data``, so data-local will be set to ``$HOME/.var/app/org.openmw.OpenMW/data/openmw/data`` if you use the Flatpak.
@@ -110,50 +110,50 @@ Configuration sources
 Configuration for OpenMW is composed from several sources.
 From lowest to highest priority, these are:
 
-* The local or global ``openmw.cfg``.
-* Any ``openmw.cfg`` files in any other directories specified with the ``config`` option.
+* The local or global ``openfallout.cfg``.
+* Any ``openfallout.cfg`` files in any other directories specified with the ``config`` option.
 * Options specified on the command line.
 
 .. tip::
-    Any option that can be specified as ``option=value`` in ``openmw.cfg`` can also be specified as ``--option=value`` or ``--option value`` on the command line for the engine (but not other OpenMW tools).
+    Any option that can be specified as ``option=value`` in ``openfallout.cfg`` can also be specified as ``--option=value`` or ``--option value`` on the command line for the engine (but not other OpenMW tools).
 
 The command line is always the highest-priority source, even if it specifies extra configuration directories with ``--config``.
 This lets you quickly test with extra options even if you're not using your normal configuration directories.
 
-If one ``openmw.cfg`` specifies multiple configuration directories, they're all higher-priority than the one that specified them, and lower priority than any they go on to specify themselves.
-I.e. if ``dir1/openmw.cfg`` contains ``config=dir2`` then ``config=dir3``, and ``dir2/openmw.cfg`` contains ``config=dir4`` the priority order will be ``dir1``, ``dir2``, ``dir3``, ``dir4``.
+If one ``openfallout.cfg`` specifies multiple configuration directories, they're all higher-priority than the one that specified them, and lower priority than any they go on to specify themselves.
+I.e. if ``dir1/openfallout.cfg`` contains ``config=dir2`` then ``config=dir3``, and ``dir2/openfallout.cfg`` contains ``config=dir4`` the priority order will be ``dir1``, ``dir2``, ``dir3``, ``dir4``.
 This might be a surprise if you expect it to work like C's ``#include`` directive.
 
-Most settings in ``openmw.cfg`` only allow a single value, so will take the one from the highest-priority config source that sets one.
+Most settings in ``openfallout.cfg`` only allow a single value, so will take the one from the highest-priority config source that sets one.
 Others take several values which are combined together into a list.
 Values from low-priority sources are included earlier than ones from high-priority sources.
 If you don't want this, and would prefer that only values from the current source (and ones of higher priority) are used, you can specify this for each option with the ``replace`` option.
-E.g. passing ``--replace content --content Morrowind.esm`` on the command line will ignore any ``content=…`` lines in your ``openmw.cfg``\ (s) and run the game with only ``Morrowind.esm``.
+E.g. passing ``--replace content --content Morrowind.esm`` on the command line will ignore any ``content=…`` lines in your ``openfallout.cfg``\ (s) and run the game with only ``Morrowind.esm``.
 
 Every configuration directory is allowed, but not required, to contain its own ``settings.cfg``.
 Settings in ``settings.cfg`` only ever have one value, so it'll be taken from the highest priority ``settings.cfg`` that sets one.
 
-Special ``openmw.cfg`` files
+Special ``openfallout.cfg`` files
 """"""""""""""""""""""""""""
 
-A local ``openmw.cfg`` is one which is in the same directory as the OpenMW binary, e.g. ``openmw.exe`` on Windows.
+A local ``openfallout.cfg`` is one which is in the same directory as the OpenMW binary, e.g. ``openfallout.exe`` on Windows.
 It is always loaded if it exists.
 
-A global ``openmw.cfg`` is one in a special system-specific location for system-wide application configuration, e.g. ``/etc/openmw`` on some Linux systems.
-Not all systems have a directory like this – a global ``openmw.cfg`` only makes sense if there's a single system-wide OpenMW installation, e.g. from the operating system's package manager.
-It is only loaded if there's no local ``openmw.cfg``.
+A global ``openfallout.cfg`` is one in a special system-specific location for system-wide application configuration, e.g. ``/etc/openfallout`` on some Linux systems.
+Not all systems have a directory like this – a global ``openfallout.cfg`` only makes sense if there's a single system-wide OpenMW installation, e.g. from the operating system's package manager.
+It is only loaded if there's no local ``openfallout.cfg``.
 
-If there's no local or global ``openmw.cfg``, OpenMW won't launch.
+If there's no local or global ``openfallout.cfg``, OpenMW won't launch.
 
-The user ``openmw.cfg`` is the highest priority ``openmw.cfg`` file that's active.
+The user ``openfallout.cfg`` is the highest priority ``openfallout.cfg`` file that's active.
 This is the one that the launcher will edit, so it must be somewhere the user has write access.
-It *can* be the local ``openmw.cfg``, e.g. in a `Portable install`_, but we strongly recommend against installing OpenMW to a system protected directory (e.g. ``/usr/bin`` on Unix, ``C:\Program Files`` on Windows) if you decide to do this.
-We also strongly recommend against using a global ``openmw.cfg`` as the user ``openmw.cfg``.
+It *can* be the local ``openfallout.cfg``, e.g. in a `Portable install`_, but we strongly recommend against installing OpenMW to a system protected directory (e.g. ``/usr/bin`` on Unix, ``C:\Program Files`` on Windows) if you decide to do this.
+We also strongly recommend against using a global ``openfallout.cfg`` as the user ``openfallout.cfg``.
 
-``openmw.cfg`` syntax
+``openfallout.cfg`` syntax
 ^^^^^^^^^^^^^^^^^^^^^
 
-An ``openmw.cfg`` file is a sequence of lines.
+An ``openfallout.cfg`` file is a sequence of lines.
 Each line is either blank, contains an option, or contains a comment.
 
 Blank lines are ignored.
@@ -161,7 +161,7 @@ Blank lines are ignored.
 Lines where the first non-whitespace character is an octothorpe (``#``), also known as the hash symbol or pound sign, are comments.
 The line is ignored no matter what else it contains.
 You can use comments to make notes for yourself or temporarily make OpenMW ignore specific lines.
-Be aware that the launcher can only make a best effort to preserve comments when you use it to edit your user ``openmw.cfg``.
+Be aware that the launcher can only make a best effort to preserve comments when you use it to edit your user ``openfallout.cfg``.
 It has no way of knowing if you've written a comment to describe the lines above it versus below it (if a comment even goes with a particular line), so it has to guess.
 This can't change until computers are able to read minds.
 
@@ -185,7 +185,7 @@ OpenMW accepts Unix-style paths (separated by forward slashes (``/``)) on Unix, 
 Backward slashes have no special meaning and are not an escape character, so paths can be copied and pasted straight from your file browser on any platform.
 
 Paths can also use a quoted syntax.
-This is mainly useful if you want to make an ``openmw.cfg`` file that also works with older versions, where quoting was mandatory.
+This is mainly useful if you want to make an ``openfallout.cfg`` file that also works with older versions, where quoting was mandatory.
 It also lets you specify paths with whitespace at the beginning or end, which would otherwise be stripped.
 
 To quote a path, put a double quote mark (``"``) at the beginning and end.
@@ -198,7 +198,7 @@ Paths can be absolute, relative, or start with a token.
 
 Absolute paths start with a slash (``/`` or ``\``), or, on Windows, a drive identifier (e.g. ``C:\``).
 
-Relative paths are **relative to the** ``openmw.cfg`` **file they're in**, or the current working directory if they're passed via the command line.
+Relative paths are **relative to the** ``openfallout.cfg`` **file they're in**, or the current working directory if they're passed via the command line.
 
 Tokens are used to access platform-dependent paths where OpenMW can store specific kinds of data.
 The available tokens are ``?local?``, ``?userconfig?``, ``?userdata?`` and ``?global?``.
@@ -208,30 +208,30 @@ Tokens are used in the `Default paths`_.
 
 :``?userconfig?``: Platform-dependent:
 
-    +--------------+-----------------------------------------------------------+
-    | OS           | Location                                                  |
-    +==============+===========================================================+
-    | Linux        | ``$XDG_CONFIG_HOME/openmw/`` or ``$HOME/.config/openmw/`` |
-    +--------------+-----------------------------------------------------------+
-    | Mac          | ``$HOME/Library/Preferences/openmw/``                     |
-    +--------------+-----------------------------------------------------------+
-    | Windows      | ``Documents\My Games\OpenMW\``                            |
-    +--------------+-----------------------------------------------------------+
+    +--------------+---------------------------------------------------------------------+
+    | OS           | Location                                                            |
+    +==============+=====================================================================+
+    | Linux        | ``$XDG_CONFIG_HOME/openfallout/`` or ``$HOME/.config/openfallout/`` |
+    +--------------+---------------------------------------------------------------------+
+    | Mac          | ``$HOME/Library/Preferences/openfallout/``                          |
+    +--------------+---------------------------------------------------------------------+
+    | Windows      | ``Documents\My Games\OpenFallout\``                                 |
+    +--------------+---------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_CONFIG_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/config``, so ``?userconfig?`` will mean ``$HOME/.var/app/org.openmw.OpenMW/config/openmw/`` if you use the Flatpak.
 
 :``?userdata?``: Platform-dependent:
 
-    +--------------+--------------------------------------------------------------+
-    | OS           | Location                                                     |
-    +==============+==============================================================+
-    | Linux        | ``$XDG_DATA_HOME/openmw/`` or ``$HOME/.local/share/openmw/`` |
-    +--------------+--------------------------------------------------------------+
-    | Mac          | ``$HOME/Library/Application Support/openmw/``                |
-    +--------------+--------------------------------------------------------------+
-    | Windows      | ``Documents\My Games\OpenMW\``                               |
-    +--------------+--------------------------------------------------------------+
+    +--------------+------------------------------------------------------------------------+
+    | OS           | Location                                                               |
+    +==============+========================================================================+
+    | Linux        | ``$XDG_DATA_HOME/openfallout/`` or ``$HOME/.local/share/openfallout/`` |
+    +--------------+------------------------------------------------------------------------+
+    | Mac          | ``$HOME/Library/Application Support/openfallout/``                     |
+    +--------------+------------------------------------------------------------------------+
+    | Windows      | ``Documents\My Games\OpenFallout\``                                    |
+    +--------------+------------------------------------------------------------------------+
 
 .. note::
     Flatpak sets ``$XDG_DATA_HOME`` to ``$HOME/.var/app/$FLATPAK_ID/data``, so ``?userdata?`` will mean ``$HOME/.var/app/org.openmw.OpenMW/data/openmw/`` if you use the Flatpak.
@@ -256,24 +256,24 @@ Portable install
 
 If you want to put OpenMW onto removable storage so you can play on multiple machines, or you want an entirely self-contained setup, you'll want to set up a portable install.
 
-Single ``openmw.cfg`` file
+Single ``openfallout.cfg`` file
 """"""""""""""""""""""""""
 
-Some users find it easiest if there's a single ``openmw.cfg`` file with all their configuration, even if it means it's mixed in with the engine's default configuration.
+Some users find it easiest if there's a single ``openfallout.cfg`` file with all their configuration, even if it means it's mixed in with the engine's default configuration.
 
 To set up this kind of install, first install a fresh copy of OpenMW to a directory where you have write access.
-Navigate to the OpenMW installation directory, and open the ``openmw.cfg`` file it contains.
+Navigate to the OpenMW installation directory, and open the ``openfallout.cfg`` file it contains.
 
-By default, this contains a warning at the top telling you that this is the local ``openmw.cfg`` and not to modify it.
+By default, this contains a warning at the top telling you that this is the local ``openfallout.cfg`` and not to modify it.
 However, for this kind of install, it's okay to do so, so you can remove this warning.
 
 Change the start of the file from:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
-    # This is the local openmw.cfg file. Do not modify!
-    # Modifications should be done on the user openmw.cfg file instead
+    # This is the local openfallout.cfg file. Do not modify!
+    # Modifications should be done on the user openfallout.cfg file instead
     # (see: https://openmw.readthedocs.io/en/master/reference/modding/paths.html)
 
     data-local="?userdata?data"
@@ -290,7 +290,7 @@ Change the start of the file from:
 to:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     data-local=userdata/data
     user-data=userdata
@@ -303,31 +303,31 @@ to:
     fallback=LightAttenuation_UseLinear,1
 
 You can now run OpenMW's launcher to do first-time setup.
-This will import the basic data to play *Morrowind* into the ``openmw.cfg`` you just modified, and create a ``settings.cfg`` next to it.
+This will import the basic data to play *Morrowind* into the ``openfallout.cfg`` you just modified, and create a ``settings.cfg`` next to it.
 You can make any further changes you want to these files, or make changes in the launcher, which will modify them for you.
 
-You'll need to make sure that any ``data=…`` lines in your ``openmw.cfg`` use relative paths so that they're not dependent on the drive letter/mount point when moved to another computer.
+You'll need to make sure that any ``data=…`` lines in your ``openfallout.cfg`` use relative paths so that they're not dependent on the drive letter/mount point when moved to another computer.
 If you add data directories via the launcher, you'll need to change them manually afterwards.
 
-Separate user ``openmw.cfg`` file
+Separate user ``openfallout.cfg`` file
 """""""""""""""""""""""""""""""""
 
 For most users, this is the type of portable OpenMW install we would recommend as it's the most similar to a regular install.
-You'll have a separate local ``openmw.cfg`` with the engine's basic configuration and a user ``openmw.cfg`` with your personal configuration.
+You'll have a separate local ``openfallout.cfg`` with the engine's basic configuration and a user ``openfallout.cfg`` with your personal configuration.
 
 To set up this kind of install, first install a fresh copy of OpenMW to a directory where you have write access.
-Navigate to the OpenMW installation directory, and open the ``openmw.cfg`` file it contains.
+Navigate to the OpenMW installation directory, and open the ``openfallout.cfg`` file it contains.
 
-By default, this contains a warning at the top telling you that this is the local ``openmw.cfg`` and not to modify it.
+By default, this contains a warning at the top telling you that this is the local ``openfallout.cfg`` and not to modify it.
 However, you'll need to make a small change to create this kind of install.
 
 Change the start of the file from:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
-    # This is the local openmw.cfg file. Do not modify!
-    # Modifications should be done on the user openmw.cfg file instead
+    # This is the local openfallout.cfg file. Do not modify!
+    # Modifications should be done on the user openfallout.cfg file instead
     # (see: https://openmw.readthedocs.io/en/master/reference/modding/paths.html)
 
     data-local="?userdata?data"
@@ -344,10 +344,10 @@ Change the start of the file from:
 to:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
-    # This is the local openmw.cfg file. Do not modify!
-    # Modifications should be done on the user openmw.cfg file instead
+    # This is the local openfallout.cfg file. Do not modify!
+    # Modifications should be done on the user openfallout.cfg file instead
     # (see: https://openmw.readthedocs.io/en/master/reference/modding/paths.html)
 
     data-local="userdata/data"
@@ -362,11 +362,11 @@ to:
     fallback=LightAttenuation_UseLinear,1
 
 You can now run OpenMW's launcher to do first-time setup.
-This will import the basic data to play Morrowind into a new ``openmw.cfg`` in the ``config`` directory, and create a ``settings.cfg`` next to it.
+This will import the basic data to play Morrowind into a new ``openfallout.cfg`` in the ``config`` directory, and create a ``settings.cfg`` next to it.
 You can make any further changes you want to these files, or make changes in the launcher, which will modify them for you.
 
-You'll need to make sure that any ``data=…`` lines in your ``openmw.cfg`` use relative paths so that they're not dependent on the drive letter/mount point when moved to another computer.
-Remember that paths are relative to the ``openmw.cfg`` file they're in, not the OpenMW installation root.
+You'll need to make sure that any ``data=…`` lines in your ``openfallout.cfg`` use relative paths so that they're not dependent on the drive letter/mount point when moved to another computer.
+Remember that paths are relative to the ``openfallout.cfg`` file they're in, not the OpenMW installation root.
 If you add data directories via the launcher, you'll need to change them manually afterwards.
 
 Profiles
@@ -383,30 +383,30 @@ From scratch
 Start by installing OpenMW in the usual way.
 Don't bother with first-time setup (i.e. telling it the location of an existing *Morrowind* installation).
 
-In the default configuration directory (see `Configuration files and log files`_), create a file called ``openmw.cfg`` containing just
+In the default configuration directory (see `Configuration files and log files`_), create a file called ``openfallout.cfg`` containing just
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     # select the game profile
     config=Morrowind
 
 Now it's time to run the launcher to do first-time setup.
-This will put the basic setup required to play *Morrowind* into a new ``Morrowind`` directory of the default configuration directory, e.g. ``Documents\My Games\OpenMW\Morrowind\openmw.cfg`` on Windows.
+This will put the basic setup required to play *Morrowind* into a new ``Morrowind`` directory of the default configuration directory, e.g. ``Documents\My Games\OpenFallout\Morrowind\openfallout.cfg`` on Windows.
 
 Next, come up with a name for the subprofile you'll create for your mod list.
 If you're following a modding guide, they've probably already given it a name, e.g. *Total Overhaul*, so that's the example we'll use.
-Add a line to the ``Morrowind/openmw.cfg`` with the profile name like this:
+Add a line to the ``Morrowind/openfallout.cfg`` with the profile name like this:
 
 .. code-block:: openmwcfg
-    :caption: Morrowind/openmw.cfg
+    :caption: Morrowind/openfallout.cfg
 
     # select the mod list profile
     config=Total Overhaul
 
 Run the launcher again.
 
-You'll now have three separate levels of ``openmw.cfg`` and ``settings.cfg``.
+You'll now have three separate levels of ``openfallout.cfg`` and ``settings.cfg``.
 
 The ones in the base default configuration directory are used for all profiles, so they're best for machine-wide settings, like your monitor's resolution.
 
@@ -415,15 +415,15 @@ The ones in the ``Morrowind`` directory are used for all profiles for *Morrowind
 The ones in the ``Morrowind/Total Overhaul`` directory are only used for the *Total Overhaul* profile, so you can set up that mod list and any settings it requires here, and they won't affect any other profiles you set up later.
 Making changes within the launcher will affect these files and leave all the others alone.
 
-If you want the *Total Overhaul* profile to keep its saved games etc. in a dedicated location instead of mixing them in with ones from another profile, you can add a ``user-data=…`` line to your ``Morrowind/Total Overhaul/openmw.cfg``, like this:
+If you want the *Total Overhaul* profile to keep its saved games etc. in a dedicated location instead of mixing them in with ones from another profile, you can add a ``user-data=…`` line to your ``Morrowind/Total Overhaul/openfallout.cfg``, like this:
 
 .. code-block:: openmwcfg
-    :caption: Morrowind/Total Overhaul/openmw.cfg
+    :caption: Morrowind/Total Overhaul/openfallout.cfg
 
     # put saved games in a saves directory next to this file
     user-data=.
 
-When you want to set up another game or mod list, you can set up a new one just like the first – create another directory for it and change the ``config=…`` line in the ``openmw.cfg`` next to the directory to use that directory's name.
+When you want to set up another game or mod list, you can set up a new one just like the first – create another directory for it and change the ``config=…`` line in the ``openfallout.cfg`` next to the directory to use that directory's name.
 To switch back, just change the line back.
 
 Migrating an existing setup
@@ -434,23 +434,23 @@ That existing configuration can be moved out of the way and turned into a profil
 
 Start by creating a subdirectory in the default configuration directory (see `Configuration files and log files`_) to be the profile.
 Give it a meaningful name so you know what it is – this example will call it *Original*.
-You'll now have an empty directory e.g. at ``Documents\My Games\OpenMW\Original`` on Windows.
+You'll now have an empty directory e.g. at ``Documents\My Games\OpenFallout\Original`` on Windows.
 
 Next, move all the files that were already in the default configuration directory to the profile directory you just made.
 Afterwards, the default configuration directory should only contain the profile directory you made.
 
-Create a new ``openmw.cfg`` file in the default configuration directory containing:
+Create a new ``openfallout.cfg`` file in the default configuration directory containing:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     # select the profile
     config=Original
 
-In the ``openmw.cfg`` in the profile directory, add these lines:
+In the ``openfallout.cfg`` in the profile directory, add these lines:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     data-local=data
     user-data=.
@@ -462,13 +462,13 @@ You can now make other directories for other profiles as described in the `From 
 Launcher scripts and shortcuts
 """"""""""""""""""""""""""""""
 
-Once profiles have been set up, it might be a hassle to switch between them by editing ``config=…`` lines in ``openmw.cfg`` files.
+Once profiles have been set up, it might be a hassle to switch between them by editing ``config=…`` lines in ``openfallout.cfg`` files.
 Passing arguments on the command line lets you avoid this.
 
 .. note::
     This feature only works with the OpenMW engine, not tools like the launcher.
 
-The basic idea is that you need to pass ``--replace config`` to ignore the configuration directories that the engine would have loaded because they were specified in ``openmw.cfg`` files, and pass each one you want to use instead with ``--config <directory path here>``.
+The basic idea is that you need to pass ``--replace config`` to ignore the configuration directories that the engine would have loaded because they were specified in ``openfallout.cfg`` files, and pass each one you want to use instead with ``--config <directory path here>``.
 
 E.g. if you've got a profile called *Morrowind* in your default configuration directory, and it's got a *Total Overhaul* subprofile, you could load it by running:
 
@@ -484,7 +484,7 @@ Otherwise, the path to OpenMW must be specified instead of just the ``openmw`` c
 On Windows, you can create a desktop shortcut to run this command with these steps:
 
 * Navigate to the OpenMW install directory.
-* Right-click ``openmw.exe`` and choose *Send to* > *Desktop (create shortcut)*.
+* Right-click ``openfallout.exe`` and choose *Send to* > *Desktop (create shortcut)*.
 * Navigate to the Desktop, or minimise all windows.
 * Find the newly-created shortcut and give it a sensible name, e.g. *OpenMW - Total Overhaul*.
 * Right-click the shortcut and choose *Properties*.

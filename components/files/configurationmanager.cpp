@@ -22,9 +22,9 @@ namespace Files
     namespace
     {
 #if defined(_WIN32) || defined(__WINDOWS__)
-        constexpr auto sApplicationName = "OpenMW";
+        constexpr auto sApplicationName = "OpenFallout";
 #else
-        constexpr auto sApplicationName = "openmw";
+        constexpr auto sApplicationName = "openfallout";
 #endif
 
         using GetPath = const std::filesystem::path& (Files::FixedPath<>::*)() const;
@@ -110,8 +110,9 @@ namespace Files
             {
                 mActiveConfigPaths.resize(1);
                 parsedConfigs.resize(1);
-                Log(Debug::Info) << "Skipping previous configs except " << (mActiveConfigPaths.front() / "openmw.cfg")
-                                 << " due to replace=config in " << (path / "openmw.cfg");
+                Log(Debug::Info) << "Skipping previous configs except "
+                                 << (mActiveConfigPaths.front() / "openfallout.cfg") << " due to replace=config in "
+                                 << (path / "openfallout.cfg");
             }
             mActiveConfigPaths.emplace_back(std::move(path));
             if (config)
@@ -370,7 +371,7 @@ namespace Files
         const std::filesystem::path& path, const bpo::options_description& description) const
     {
         std::filesystem::path cfgFile(path);
-        cfgFile /= openmwCfgFile;
+        cfgFile /= openfalloutCfgFile;
         if (std::filesystem::is_regular_file(cfgFile))
         {
             if (!mSilent)

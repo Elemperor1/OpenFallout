@@ -6,7 +6,7 @@ if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-project(OpenMW)
+project(OpenFallout)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,14 +23,14 @@ else ()
     set(DEPLOY_QT_TRANSLATIONS_DEFAULT OFF)
 endif ()
 
-option(DEPLOY_QT_TRANSLATIONS "Deploy standard Qt translations to resources folder. Needed when OpenMW applications are deployed with Qt libraries" ${DEPLOY_QT_TRANSLATIONS_DEFAULT})
+option(DEPLOY_QT_TRANSLATIONS "Deploy standard Qt translations to resources folder. Needed when OpenFallout applications are deployed with Qt libraries" ${DEPLOY_QT_TRANSLATIONS_DEFAULT})
 
 # Apps and tools
-option(BUILD_OPENMW             "Build OpenMW" ON)
+option(BUILD_OPENMW             "Build OpenFallout" ON)
 option(BUILD_LAUNCHER           "Build Launcher" ON)
 option(BUILD_WIZARD             "Build Installation Wizard" ON)
 option(BUILD_MWINIIMPORTER      "Build MWiniImporter" ON)
-option(BUILD_OPENCS             "Build OpenMW Construction Set" ON)
+option(BUILD_OPENCS             "Build OpenFallout Construction Set" ON)
 option(BUILD_ESSIMPORTER        "Build ESS (Morrowind save game) importer" ON)
 option(BUILD_BSATOOL            "Build BSA extractor" ON)
 option(BUILD_ESMTOOL            "Build ESM inspector" ON)
@@ -41,8 +41,8 @@ option(BUILD_COMPONENTS_TESTS   "Build components library tests" OFF)
 option(BUILD_BENCHMARKS         "Build benchmarks with Google Benchmark" OFF)
 option(BUILD_NAVMESHTOOL        "Build navmesh tool" ON)
 option(BUILD_BULLETOBJECTTOOL   "Build Bullet object tool" ON)
-option(BUILD_OPENCS_TESTS       "Build OpenMW Construction Set tests" OFF)
-option(BUILD_OPENMW_TESTS       "Build OpenMW tests" OFF)
+option(BUILD_OPENCS_TESTS       "Build OpenFallout Construction Set tests" OFF)
+option(BUILD_OPENMW_TESTS       "Build OpenFallout tests" OFF)
 option(PRECOMPILE_HEADERS_WITH_MSVC "Precompile most common used headers with MSVC (alternative to ccache)" ON)
 
 set(OpenGL_GL_PREFERENCE LEGACY)  # Use LEGACY as we use GL2; GLNVD is for GL3 and up.
@@ -65,7 +65,7 @@ if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST) # prefer dylibs over frameworks
     set(APP_BUNDLE_NAME "${CMAKE_PROJECT_NAME}.app")
 
-    set(APP_BUNDLE_DIR "${OpenMW_BINARY_DIR}/${APP_BUNDLE_NAME}")
+    set(APP_BUNDLE_DIR "${OpenFallout_BINARY_DIR}/${APP_BUNDLE_NAME}")
 endif (APPLE)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/)
@@ -75,7 +75,7 @@ if (ANDROID)
 endif()
 
 # Version
-message(STATUS "Configuring OpenMW...")
+message(STATUS "Configuring OpenFallout...")
 
 set(OPENMW_VERSION_MAJOR 0)
 set(OPENMW_VERSION_MINOR 52)
@@ -120,7 +120,7 @@ include(WholeArchive)
 
 # doxygen main page
 
-configure_file ("${OpenMW_SOURCE_DIR}/docs/mainpage.hpp.cmake" "${OpenMW_BINARY_DIR}/docs/mainpage.hpp")
+configure_file ("${OpenFallout_SOURCE_DIR}/docs/mainpage.hpp.cmake" "${OpenFallout_BINARY_DIR}/docs/mainpage.hpp")
 
 option(QT_STATIC "Link static build of Qt into the binaries" FALSE)
 
@@ -163,7 +163,7 @@ option(OPENMW_USE_SYSTEM_BENCHMARK "Use system Google Benchmark library." OFF)
 option(OPENMW_USE_SYSTEM_GOOGLETEST "Use system Google Test library." OFF)
 
 option(OPENMW_UNITY_BUILD "Use fewer compilation units to speed up compile time" FALSE)
-option(OPENMW_LTO_BUILD "Build OpenMW with Link-Time Optimization (Needs ~2GB of RAM)" OFF)
+option(OPENMW_LTO_BUILD "Build OpenFallout with Link-Time Optimization (Needs ~2GB of RAM)" OFF)
 
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
     if (OPENMW_MSBUILD_COMPILER_OVERRIDE)
@@ -194,7 +194,7 @@ if ((NOT CMAKE_GENERATOR MATCHES "Visual Studio") OR ("UseMultiToolTask=true" IN
 endif()
 
 if (MSVC)
-    option(OPENMW_MP_BUILD "Build OpenMW with /MP flag" OFF)
+    option(OPENMW_MP_BUILD "Build OpenFallout with /MP flag" OFF)
     if (OPENMW_MP_BUILD)
         add_compile_options(/MP)
     endif()
@@ -227,8 +227,8 @@ endif()
 
 include(GNUInstallDirs)
 # todo: force this suffix to match sApplicationName in configurationmanager.cpp
-set(CMAKE_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_SYSCONFDIR}/openmw")
-set(CMAKE_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/games/openmw")
+set(CMAKE_INSTALL_SYSCONFDIR "${CMAKE_INSTALL_SYSCONFDIR}/openfallout")
+set(CMAKE_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/games/openfallout")
 
 # Set up common paths
 if (UNIX AND NOT APPLE)
@@ -236,7 +236,7 @@ if (UNIX AND NOT APPLE)
 else()
     set(OPENMW_LOCAL_INSTALL_DEFAULT ON)
 endif()
-option(OPENMW_LOCAL_INSTALL "Local install of OpenMW instead of Global" ${OPENMW_LOCAL_INSTALL_DEFAULT})
+option(OPENMW_LOCAL_INSTALL "Local install of OpenFallout instead of Global" ${OPENMW_LOCAL_INSTALL_DEFAULT})
 if (OPENMW_LOCAL_INSTALL)
     set(CMAKE_INSTALL_BINDIR ".")
     set(CMAKE_INSTALL_LIBDIR "lib")
@@ -251,7 +251,7 @@ elseif(UNIX)
     SET(DATAROOTDIR "${CMAKE_INSTALL_DATAROOTDIR}" CACHE PATH "Sets the root of data directories to a non-default location")
     SET(GLOBAL_DATA_PATH "${CMAKE_INSTALL_PREFIX}/share/games/" CACHE PATH "Set data path prefix")
     SET(ICONDIR "${DATAROOTDIR}/pixmaps" CACHE PATH "Set icon dir")
-    SET(LICDIR "${DATAROOTDIR}/licenses/openmw" CACHE PATH "Sets the openmw license directory to a non-default location.")
+    SET(LICDIR "${DATAROOTDIR}/licenses/openfallout" CACHE PATH "Sets the openfallout license directory to a non-default location.")
 
     SET(GLOBAL_CONFIG_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/.." CACHE PATH "Set absolute config dir path for Global installs. This is baked into the binaries, so MUST be set to the final install path at build time.")
 
@@ -259,7 +259,7 @@ elseif(UNIX)
 endif(APPLE)
 
 if (WIN32)
-    option(USE_DEBUG_CONSOLE "Whether a console should be displayed if OpenMW isn't launched from the command line. Does not affect the Release configuration." ON)
+    option(USE_DEBUG_CONSOLE "Whether a console should be displayed if OpenFallout isn't launched from the command line. Does not affect the Release configuration." ON)
 endif()
 
 if(MSVC)
@@ -416,7 +416,7 @@ if(OPENMW_USE_SYSTEM_BULLET)
     if (BULLET_FOUND)
         string(REPLACE "." "" _bullet_version_num ${BULLET_VERSION_STRING})
         if (_bullet_version_num VERSION_LESS REQUIRED_BULLET_VERSION)
-            message(FATAL_ERROR "System bullet version too old, OpenMW requires at least ${REQUIRED_BULLET_VERSION}, got ${_bullet_version_num}")
+            message(FATAL_ERROR "System bullet version too old, OpenFallout requires at least ${REQUIRED_BULLET_VERSION}, got ${_bullet_version_num}")
         endif()
         # Fix the relative include:
         set(BULLET_INCLUDE_DIRS "${BULLET_ROOT_DIR}/${BULLET_INCLUDE_DIRS}")
@@ -438,7 +438,7 @@ if(OPENMW_USE_SYSTEM_BULLET)
 endif()
 
 if (NOT WIN32 AND BUILD_WIZARD) # windows users can just run the morrowind installer
-    find_package(LIBUNSHIELD REQUIRED) # required only for non win32 when building openmw-wizard
+    find_package(LIBUNSHIELD REQUIRED) # required only for non win32 when building openfallout-wizard
     set(OPENMW_USE_UNSHIELD TRUE)
 endif()
 
@@ -511,8 +511,8 @@ if (NOT WIN32 AND NOT ANDROID)
 endif()
 
 # C++ library binding to Lua
-set(SOL_INCLUDE_DIR ${OpenMW_SOURCE_DIR}/extern/sol3)
-set(SOL_CONFIG_DIR ${OpenMW_SOURCE_DIR}/extern/sol_config)
+set(SOL_INCLUDE_DIR ${OpenFallout_SOURCE_DIR}/extern/sol3)
+set(SOL_CONFIG_DIR ${OpenFallout_SOURCE_DIR}/extern/sol_config)
 
 include_directories(
     BEFORE SYSTEM
@@ -532,15 +532,15 @@ if(MYGUI_STATIC)
 endif (MYGUI_STATIC)
 
 if (APPLE)
-    configure_file(${OpenMW_SOURCE_DIR}/files/mac/openmw-Info.plist.in
+    configure_file(${OpenFallout_SOURCE_DIR}/files/mac/openfallout-Info.plist.in
         "${APP_BUNDLE_DIR}/Contents/Info.plist")
 
-    configure_file(${OpenMW_SOURCE_DIR}/files/mac/openmw.icns
-        "${APP_BUNDLE_DIR}/Contents/Resources/OpenMW.icns" COPYONLY)
+    configure_file(${OpenFallout_SOURCE_DIR}/files/mac/openmw.icns
+        "${APP_BUNDLE_DIR}/Contents/Resources/OpenFallout.icns" COPYONLY)
 endif (APPLE)
 
 if (NOT APPLE)  # this is modified for macOS use later in "apps/open[mw|cs]/CMakeLists.txt"
-    set(OPENMW_RESOURCES_ROOT ${OpenMW_BINARY_DIR})
+    set(OPENMW_RESOURCES_ROOT ${OpenFallout_BINARY_DIR})
 endif ()
 
 add_subdirectory(files/)
@@ -557,9 +557,9 @@ else (APPLE)
     # It's better to set it definitively in one canonical place and reference that value elsewhere.
     get_generator_is_multi_config(multi_config)
     if (multi_config)
-        SET(RUNTIME_OUTPUT_DIRECTORY "${OpenMW_BINARY_DIR}/$<CONFIG>")
+        SET(RUNTIME_OUTPUT_DIRECTORY "${OpenFallout_BINARY_DIR}/$<CONFIG>")
     else ()
-        SET(RUNTIME_OUTPUT_DIRECTORY "${OpenMW_BINARY_DIR}")
+        SET(RUNTIME_OUTPUT_DIRECTORY "${OpenFallout_BINARY_DIR}")
     endif ()
 
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${RUNTIME_OUTPUT_DIRECTORY}")
@@ -568,37 +568,37 @@ endif (APPLE)
 
 # Other files
 
-pack_resource_file(${OpenMW_SOURCE_DIR}/files/settings-default.cfg
-    "${OpenMW_BINARY_DIR}" "defaults.bin")
+pack_resource_file(${OpenFallout_SOURCE_DIR}/files/settings-default.cfg
+    "${OpenFallout_BINARY_DIR}" "defaults.bin")
 
-configure_resource_file(${OpenMW_SOURCE_DIR}/files/openmw.appdata.xml
-    "${OpenMW_BINARY_DIR}" "openmw.appdata.xml")
+configure_resource_file(${OpenFallout_SOURCE_DIR}/files/openfallout.appdata.xml
+    "${OpenFallout_BINARY_DIR}" "openfallout.appdata.xml")
 
 if (APPLE)
-    configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg
-        "${OpenMW_BINARY_DIR}/openmw.cfg")
+    configure_file(${OpenFallout_SOURCE_DIR}/files/openfallout.cfg
+        "${OpenFallout_BINARY_DIR}/openfallout.cfg")
 else ()
-    configure_resource_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg.local
-        "${OpenMW_BINARY_DIR}" "openmw.cfg")
+    configure_resource_file(${OpenFallout_SOURCE_DIR}/files/openfallout.cfg.local
+        "${OpenFallout_BINARY_DIR}" "openfallout.cfg")
 endif ()
 
-pack_resource_file(${OpenMW_SOURCE_DIR}/files/openmw-cs.cfg
-    "${OpenMW_BINARY_DIR}" "defaults-cs.bin")
+pack_resource_file(${OpenFallout_SOURCE_DIR}/files/openfallout-cs.cfg
+    "${OpenFallout_BINARY_DIR}" "defaults-cs.bin")
 
 # Needs the copy version because the configure version assumes the end of the file has been reached when a null character is reached and there are no CMake expressions to evaluate.
-copy_resource_file(${OpenMW_SOURCE_DIR}/files/opencs/defaultfilters
-    "${OpenMW_BINARY_DIR}" "resources/defaultfilters")
+copy_resource_file(${OpenFallout_SOURCE_DIR}/files/opencs/defaultfilters
+    "${OpenFallout_BINARY_DIR}" "resources/defaultfilters")
 
-configure_resource_file(${OpenMW_SOURCE_DIR}/files/gamecontrollerdb.txt
-    "${OpenMW_BINARY_DIR}" "gamecontrollerdb.txt")
+configure_resource_file(${OpenFallout_SOURCE_DIR}/files/gamecontrollerdb.txt
+    "${OpenFallout_BINARY_DIR}" "gamecontrollerdb.txt")
 
 if (NOT WIN32 AND NOT APPLE)
-    configure_file(${OpenMW_SOURCE_DIR}/files/org.openmw.launcher.desktop
-        "${OpenMW_BINARY_DIR}/org.openmw.launcher.desktop")
-    configure_file(${OpenMW_SOURCE_DIR}/files/openmw.appdata.xml
-        "${OpenMW_BINARY_DIR}/openmw.appdata.xml")
-    configure_file(${OpenMW_SOURCE_DIR}/files/org.openmw.cs.desktop
-        "${OpenMW_BINARY_DIR}/org.openmw.cs.desktop")
+    configure_file(${OpenFallout_SOURCE_DIR}/files/org.openfallout.launcher.desktop
+        "${OpenFallout_BINARY_DIR}/org.openfallout.launcher.desktop")
+    configure_file(${OpenFallout_SOURCE_DIR}/files/openfallout.appdata.xml
+        "${OpenFallout_BINARY_DIR}/openfallout.appdata.xml")
+    configure_file(${OpenFallout_SOURCE_DIR}/files/org.openfallout.cs.desktop
+        "${OpenFallout_BINARY_DIR}/org.openfallout.cs.desktop")
 endif()
 
 if(OPENMW_LTO_BUILD)
@@ -751,18 +751,18 @@ if (WIN32)
     if (MSVC)
 
         if (USE_DEBUG_CONSOLE AND BUILD_OPENMW)
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE")
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:CONSOLE")
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE")
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:CONSOLE")
         elseif (BUILD_OPENMW)
-            # Turn off implicit console, you won't see stdout unless launching OpenMW from a command line shell or look at openmw.log
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:WINDOWS")
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS")
+            # Turn off implicit console, you won't see stdout unless launching OpenFallout from a command line shell or look at openfallout.log
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:WINDOWS")
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS")
         endif()
 
         if (BUILD_OPENMW)
             # Release builds don't use the debug console
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
-            set_target_properties(openmw PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+            set_target_properties(openfallout PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
         endif()
 
         if (MSVC_VERSION GREATER_EQUAL 1915 AND MSVC_VERSION LESS 1920)
@@ -777,8 +777,8 @@ set(CPACK_PACKAGE_VERSION ${OPENMW_VERSION})
 set(CPACK_PACKAGE_VERSION_MAJOR ${OPENMW_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${OPENMW_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${OPENMW_VERSION_RELEASE})
-set(CPACK_PACKAGE_NAME "OpenMW")
-set(CPACK_PACKAGE_VENDOR "OpenMW.org")
+set(CPACK_PACKAGE_NAME "OpenFallout")
+set(CPACK_PACKAGE_VENDOR "OpenFallout")
 set(CUSTOM_CPACK_OS_NAME "")
 set(CUSTOM_CPACK_ARCHITECTURE "")
 
@@ -835,16 +835,16 @@ if (APPLE)
     get_filename_component(QT_QSVG_ICON_PLUGIN_NAME "${QT_QSVG_ICON_PLUGIN_PATH}" NAME)
     configure_file("${QT_QSVG_ICON_PLUGIN_PATH}" "${APP_BUNDLE_DIR}/Contents/PlugIns/${QT_QSVG_ICON_PLUGIN_GROUP}/${QT_QSVG_ICON_PLUGIN_NAME}" COPYONLY)
 
-    configure_file("${OpenMW_SOURCE_DIR}/files/mac/qt.conf" "${APP_BUNDLE_DIR}/Contents/Resources/qt.conf" COPYONLY)
+    configure_file("${OpenFallout_SOURCE_DIR}/files/mac/qt.conf" "${APP_BUNDLE_DIR}/Contents/Resources/qt.conf" COPYONLY)
 
     if (BUILD_OPENCS)
-        get_property(OPENCS_BUNDLE_NAME_TMP TARGET openmw-cs PROPERTY OUTPUT_NAME)
+        get_property(OPENCS_BUNDLE_NAME_TMP TARGET openfallout-cs PROPERTY OUTPUT_NAME)
         set(OPENCS_BUNDLE_NAME "${OPENCS_BUNDLE_NAME_TMP}.app")
         configure_file("${QT_COCOA_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}" COPYONLY)
         configure_file("${QT_QMACSTYLE_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}" COPYONLY)
         configure_file("${QT_QSVG_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QSVG_PLUGIN_GROUP}/${QT_QSVG_PLUGIN_NAME}" COPYONLY)
         configure_file("${QT_QSVG_ICON_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QSVG_ICON_PLUGIN_GROUP}/${QT_QSVG_ICON_PLUGIN_NAME}" COPYONLY)
-        configure_file("${OpenMW_SOURCE_DIR}/files/mac/qt.conf" "${OPENCS_BUNDLE_NAME}/Contents/Resources/qt.conf" COPYONLY)
+        configure_file("${OpenFallout_SOURCE_DIR}/files/mac/qt.conf" "${OPENCS_BUNDLE_NAME}/Contents/Resources/qt.conf" COPYONLY)
     endif ()
 
     install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "." COMPONENT Runtime)
@@ -907,10 +907,10 @@ if (APPLE)
     install_plugins_for_bundle("${APP_BUNDLE_NAME}" PLUGINS)
     install_plugins_for_bundle("${OPENCS_BUNDLE_NAME}" OPENCS_PLUGINS)
 
-    INSTALL(FILES "${OpenMW_SOURCE_DIR}/CHANGELOG.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenMW_SOURCE_DIR}/README.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenMW_SOURCE_DIR}/LICENSE" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
-    INSTALL(FILES "${OpenMW_SOURCE_DIR}/AUTHORS.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/CHANGELOG.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/README.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/LICENSE" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
+    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/AUTHORS.md" DESTINATION "/${INSTALLED_OPENMW_APP}/..")
 
     set(PLUGINS ${PLUGINS} "${INSTALLED_OPENMW_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
     set(PLUGINS ${PLUGINS} "${INSTALLED_OPENMW_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
@@ -972,40 +972,40 @@ elseif(NOT APPLE)
                                                                                                                             PATTERN "Testing" EXCLUDE
                                                                                                                             PATTERN "tests_output" EXCLUDE
                                                                                                                             PATTERN "try-compile" EXCLUDE)
-        INSTALL(FILES "${OpenMW_SOURCE_DIR}/CHANGELOG.md" DESTINATION "." RENAME "CHANGELOG.txt")
-        INSTALL(FILES "${OpenMW_SOURCE_DIR}/README.md" DESTINATION "." RENAME "README.txt")
-        INSTALL(FILES "${OpenMW_SOURCE_DIR}/LICENSE" DESTINATION "." RENAME "LICENSE.txt")
-        INSTALL(FILES "${OpenMW_SOURCE_DIR}/AUTHORS.md" DESTINATION "." RENAME "AUTHORS.txt")
+        INSTALL(FILES "${OpenFallout_SOURCE_DIR}/CHANGELOG.md" DESTINATION "." RENAME "CHANGELOG.txt")
+        INSTALL(FILES "${OpenFallout_SOURCE_DIR}/README.md" DESTINATION "." RENAME "README.txt")
+        INSTALL(FILES "${OpenFallout_SOURCE_DIR}/LICENSE" DESTINATION "." RENAME "LICENSE.txt")
+        INSTALL(FILES "${OpenFallout_SOURCE_DIR}/AUTHORS.md" DESTINATION "." RENAME "AUTHORS.txt")
 
         SET(CPACK_GENERATOR "NSIS")
-        SET(CPACK_PACKAGE_EXECUTABLES "openmw;OpenMW")
+        SET(CPACK_PACKAGE_EXECUTABLES "openfallout;OpenFallout")
         IF(BUILD_LAUNCHER)
-            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openmw-launcher;OpenMW Launcher")
+            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openfallout-launcher;OpenFallout Launcher")
         ENDIF(BUILD_LAUNCHER)
         IF(BUILD_OPENCS)
-            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openmw-cs;OpenMW Construction Set")
+            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openfallout-cs;OpenFallout Construction Set")
         ENDIF(BUILD_OPENCS)
         IF(BUILD_WIZARD)
-            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openmw-wizard;OpenMW Wizard")
+            SET(CPACK_PACKAGE_EXECUTABLES "${CPACK_PACKAGE_EXECUTABLES};openfallout-wizard;OpenFallout Wizard")
         ENDIF(BUILD_WIZARD)
         SET(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut '\$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Readme.lnk' '\$INSTDIR\\\\README.txt'")
         SET(CPACK_NSIS_DELETE_ICONS_EXTRA "
             !insertmacro MUI_STARTMENU_GETFOLDER Application $MUI_TEMP
             Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Readme.lnk\\\"
             ")
-        SET(CPACK_RESOURCE_FILE_README "${OpenMW_SOURCE_DIR}/README.md")
-        SET(CPACK_PACKAGE_DESCRIPTION_FILE "${OpenMW_SOURCE_DIR}/README.md")
+        SET(CPACK_RESOURCE_FILE_README "${OpenFallout_SOURCE_DIR}/README.md")
+        SET(CPACK_PACKAGE_DESCRIPTION_FILE "${OpenFallout_SOURCE_DIR}/README.md")
         SET(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
-        SET(CPACK_NSIS_DISPLAY_NAME "OpenMW ${OPENMW_VERSION}")
-        SET(CPACK_NSIS_HELP_LINK "https:\\\\\\\\www.openmw.org")
-        SET(CPACK_NSIS_URL_INFO_ABOUT "https:\\\\\\\\www.openmw.org")
-        SET(CPACK_NSIS_INSTALLED_ICON_NAME "openmw-launcher.exe")
-        SET(CPACK_NSIS_MUI_FINISHPAGE_RUN "openmw-launcher.exe")
-        SET(CPACK_NSIS_MUI_ICON "${OpenMW_SOURCE_DIR}/files/windows/openmw.ico")
-        SET(CPACK_NSIS_MUI_UNIICON "${OpenMW_SOURCE_DIR}/files/windows/openmw.ico")
-        SET(CPACK_PACKAGE_ICON "${OpenMW_SOURCE_DIR}\\\\files\\\\openmw.bmp")
+        SET(CPACK_NSIS_DISPLAY_NAME "OpenFallout ${OPENMW_VERSION}")
+        SET(CPACK_NSIS_HELP_LINK "https:\\\\\\\\github.com/Elemperor1/OpenFallout")
+        SET(CPACK_NSIS_URL_INFO_ABOUT "https:\\\\\\\\github.com/Elemperor1/OpenFallout")
+        SET(CPACK_NSIS_INSTALLED_ICON_NAME "openfallout-launcher.exe")
+        SET(CPACK_NSIS_MUI_FINISHPAGE_RUN "openfallout-launcher.exe")
+        SET(CPACK_NSIS_MUI_ICON "${OpenFallout_SOURCE_DIR}/files/windows/openmw.ico")
+        SET(CPACK_NSIS_MUI_UNIICON "${OpenFallout_SOURCE_DIR}/files/windows/openmw.ico")
+        SET(CPACK_PACKAGE_ICON "${OpenFallout_SOURCE_DIR}\\\\files\\\\openmw.bmp")
 
-        SET(VCREDIST64 "${OpenMW_BINARY_DIR}/vcredist_x64.exe" CACHE FILEPATH "Path to vcredist_x64.exe")
+        SET(VCREDIST64 "${OpenFallout_BINARY_DIR}/vcredist_x64.exe" CACHE FILEPATH "Path to vcredist_x64.exe")
         if(EXISTS ${VCREDIST64})
             INSTALL(FILES ${VCREDIST64} DESTINATION "redist")
             get_filename_component(REDIST_FILENAME "${VCREDIST64}" NAME)
@@ -1024,12 +1024,12 @@ elseif(NOT APPLE)
         # Linux installation
 
         # Install icon and desktop file
-        INSTALL(FILES "${OpenMW_BINARY_DIR}/org.openmw.launcher.desktop" DESTINATION "${DATAROOTDIR}/applications" COMPONENT "openmw")
-        INSTALL(FILES "${OpenMW_SOURCE_DIR}/files/launcher/images/openmw.png" DESTINATION "${ICONDIR}" COMPONENT "openmw")
-        INSTALL(FILES "${OpenMW_BINARY_DIR}/openmw.appdata.xml" DESTINATION "${DATAROOTDIR}/metainfo" COMPONENT "openmw")
+        INSTALL(FILES "${OpenFallout_BINARY_DIR}/org.openfallout.launcher.desktop" DESTINATION "${DATAROOTDIR}/applications" COMPONENT "openfallout")
+        INSTALL(FILES "${OpenFallout_SOURCE_DIR}/files/launcher/images/openmw.png" DESTINATION "${ICONDIR}" COMPONENT "openfallout")
+        INSTALL(FILES "${OpenFallout_BINARY_DIR}/openfallout.appdata.xml" DESTINATION "${DATAROOTDIR}/metainfo" COMPONENT "openfallout")
         IF(BUILD_OPENCS)
-            INSTALL(FILES "${OpenMW_BINARY_DIR}/org.openmw.cs.desktop" DESTINATION "${DATAROOTDIR}/applications" COMPONENT "opencs")
-            INSTALL(FILES "${OpenMW_SOURCE_DIR}/files/opencs/openmw-cs.png" DESTINATION "${ICONDIR}" COMPONENT "opencs")
+            INSTALL(FILES "${OpenFallout_BINARY_DIR}/org.openfallout.cs.desktop" DESTINATION "${DATAROOTDIR}/applications" COMPONENT "opencs")
+            INSTALL(FILES "${OpenFallout_SOURCE_DIR}/files/opencs/openmw-cs.png" DESTINATION "${ICONDIR}" COMPONENT "opencs")
         ENDIF(BUILD_OPENCS)
 
     endif(WIN32)
@@ -1039,10 +1039,10 @@ elseif(NOT APPLE)
                   TYPE SYSCONF)
     
     if (OPENMW_LOCAL_INSTALL)
-        install(FILES "${OpenMW_SOURCE_DIR}/files/openmw.cfg.local" TYPE SYSCONF RENAME "openmw.cfg")
+        install(FILES "${OpenFallout_SOURCE_DIR}/files/openfallout.cfg.local" TYPE SYSCONF RENAME "openfallout.cfg")
     else ()
         install(CODE "set(OPENMW_RESOURCE_FILES \"\${CMAKE_INSTALL_PREFIX}/${OPENMW_RESOURCE_FILES}\")")
-        install(CODE "configure_file(\"${OpenMW_SOURCE_DIR}/files/openmw.cfg\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/openmw.cfg\")")
+        install(CODE "configure_file(\"${OpenFallout_SOURCE_DIR}/files/openfallout.cfg\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/openfallout.cfg\")")
     endif ()
 
     install(DIRECTORY "${RUNTIME_OUTPUT_DIRECTORY}/resources" TYPE DATA)
@@ -1055,24 +1055,24 @@ if ( BUILD_DOCS )
     FIND_PACKAGE( Doxygen REQUIRED )
 
     # Doxygen Target -- simply run 'make doc' or 'make doc_pages'
-    # output directory for 'make doc'       is "${OpenMW_BINARY_DIR}/docs/Doxygen"
+    # output directory for 'make doc'       is "${OpenFallout_BINARY_DIR}/docs/Doxygen"
     # output directory for 'make doc_pages' is "${DOXYGEN_PAGES_OUTPUT_DIR}" if defined
-    #                                       or "${OpenMW_BINARY_DIR}/docs/Pages" otherwise
+    #                                       or "${OpenFallout_BINARY_DIR}/docs/Pages" otherwise
 
     # determine output directory for doc_pages
     if (NOT DEFINED DOXYGEN_PAGES_OUTPUT_DIR)
-        set(DOXYGEN_PAGES_OUTPUT_DIR "${OpenMW_BINARY_DIR}/docs/Pages")
+        set(DOXYGEN_PAGES_OUTPUT_DIR "${OpenFallout_BINARY_DIR}/docs/Pages")
     endif ()
-    configure_file(${OpenMW_SOURCE_DIR}/docs/Doxyfile.cmake ${OpenMW_BINARY_DIR}/docs/Doxyfile @ONLY)
-    configure_file(${OpenMW_SOURCE_DIR}/docs/DoxyfilePages.cmake ${OpenMW_BINARY_DIR}/docs/DoxyfilePages @ONLY)
+    configure_file(${OpenFallout_SOURCE_DIR}/docs/Doxyfile.cmake ${OpenFallout_BINARY_DIR}/docs/Doxyfile @ONLY)
+    configure_file(${OpenFallout_SOURCE_DIR}/docs/DoxyfilePages.cmake ${OpenFallout_BINARY_DIR}/docs/DoxyfilePages @ONLY)
     add_custom_target(doc
-        ${DOXYGEN_EXECUTABLE} ${OpenMW_BINARY_DIR}/docs/Doxyfile
-        WORKING_DIRECTORY ${OpenMW_BINARY_DIR}
-        COMMENT "Generating Doxygen documentation at ${OpenMW_BINARY_DIR}/docs/Doxygen"
+        ${DOXYGEN_EXECUTABLE} ${OpenFallout_BINARY_DIR}/docs/Doxyfile
+        WORKING_DIRECTORY ${OpenFallout_BINARY_DIR}
+        COMMENT "Generating Doxygen documentation at ${OpenFallout_BINARY_DIR}/docs/Doxygen"
         VERBATIM)
     add_custom_target(doc_pages
-        ${DOXYGEN_EXECUTABLE} ${OpenMW_BINARY_DIR}/docs/DoxyfilePages
-        WORKING_DIRECTORY ${OpenMW_BINARY_DIR}
+        ${DOXYGEN_EXECUTABLE} ${OpenFallout_BINARY_DIR}/docs/DoxyfilePages
+        WORKING_DIRECTORY ${OpenFallout_BINARY_DIR}
         COMMENT "Generating documentation for the github-pages at ${DOXYGEN_PAGES_OUTPUT_DIR}" VERBATIM)
 endif ()
 
@@ -1125,9 +1125,9 @@ if (USE_QT)
         else ()
             get_generator_is_multi_config(multi_config)
             if (multi_config)
-                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenMW_BINARY_DIR}/$<CONFIG>/resources/translations")
+                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/$<CONFIG>/resources/translations")
             else ()
-                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenMW_BINARY_DIR}/resources/translations")
+                set(QT_OPENMW_TRANSLATIONS_PATH "${OpenFallout_BINARY_DIR}/resources/translations")
             endif ()
         endif ()
 

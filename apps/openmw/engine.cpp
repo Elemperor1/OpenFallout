@@ -469,7 +469,7 @@ void OMW::Engine::setResourceDir(const std::filesystem::path& parResDir)
     mResDir = parResDir;
     if (!Version::checkResourcesVersion(mResDir))
         Log(Debug::Error) << "Resources dir " << mResDir
-                          << " doesn't match OpenMW binary, the game may work incorrectly.";
+                          << " doesn't match OpenFallout binary, the game may work incorrectly.";
 }
 
 // Set start cell name
@@ -547,7 +547,7 @@ void OMW::Engine::createWindow()
     {
         while (!mWindow)
         {
-            mWindow = SDL_CreateWindow("OpenMW", posX, posY, width, height, flags);
+            mWindow = SDL_CreateWindow("OpenFallout", posX, posY, width, height, flags);
             if (!mWindow)
             {
                 // Try with a lower AA

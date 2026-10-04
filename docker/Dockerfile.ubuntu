@@ -17,7 +17,7 @@ RUN apt-get update \
 
 COPY build.sh /build.sh
 
-RUN mkdir /openmw
-WORKDIR /openmw
+RUN mkdir /openfallout
+WORKDIR /openfallout
 
 ENTRYPOINT ["/build.sh"]

@@ -25,7 +25,7 @@ DOXYFILE_ENCODING      = UTF-8
 # The PROJECT_NAME tag is a single word (or a sequence of words surrounded
 # by quotes) that should identify the project.
 
-PROJECT_NAME           = OpenMW
+PROJECT_NAME           = OpenFallout
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number.
 # This could be handy for archiving the generated documentation or
@@ -573,10 +573,10 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories
 # with spaces.
 
-INPUT                  = @OpenMW_SOURCE_DIR@/apps \
-                         @OpenMW_SOURCE_DIR@/components \
-                         @OpenMW_SOURCE_DIR@/libs \
-                         @OpenMW_BINARY_DIR@/docs/mainpage.hpp
+INPUT                  = @OpenFallout_SOURCE_DIR@/apps \
+                         @OpenFallout_SOURCE_DIR@/components \
+                         @OpenFallout_SOURCE_DIR@/libs \
+                         @OpenFallout_BINARY_DIR@/docs/mainpage.hpp
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is

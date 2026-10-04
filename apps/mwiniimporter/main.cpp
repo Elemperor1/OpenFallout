@@ -61,19 +61,19 @@ int wmain(int argc, wchar_t* wargv[])
 
     try
     {
-        bpo::options_description desc("Syntax: openmw-iniimporter <options> inifile configfile\nAllowed options");
+        bpo::options_description desc("Syntax: openfallout-iniimporter <options> inifile configfile\nAllowed options");
         bpo::positional_options_description positionalDesc;
         auto addOption = desc.add_options();
         addOption("help,h", "produce help message");
         addOption("verbose,v", "verbose output");
         addOption("ini,i", bpo::value<Files::MaybeQuotedPath>(), "morrowind.ini file");
-        addOption("cfg,c", bpo::value<Files::MaybeQuotedPath>(), "openmw.cfg file");
-        addOption("output,o", bpo::value<Files::MaybeQuotedPath>()->default_value({}), "openmw.cfg file");
+        addOption("cfg,c", bpo::value<Files::MaybeQuotedPath>(), "openfallout.cfg file");
+        addOption("output,o", bpo::value<Files::MaybeQuotedPath>()->default_value({}), "openfallout.cfg file");
         addOption("game-files,g", "import esm and esp files");
         addOption("fonts,f", "import bitmap fonts");
         addOption("no-archives,A", "disable bsa archives import");
         addOption("encoding,e", bpo::value<std::string>()->default_value("win1252"),
-            "Character encoding used in OpenMW game messages:\n"
+            "Character encoding used in OpenFallout game messages:\n"
             "\n\twin1250 - Central and Eastern European such as Polish, Czech, Slovak, Hungarian, Slovene, Bosnian, "
             "Croatian, Serbian (Latin script), Romanian and Albanian languages\n"
             "\n\twin1251 - Cyrillic alphabet such as Russian, Bulgarian, Serbian Cyrillic and other languages\n"

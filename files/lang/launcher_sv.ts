@@ -276,10 +276,10 @@
     </message>
     <message>
         <source>Fonts shipped with the original engine are blurry with UI scaling and support only a small amount of characters,
-so OpenMW provides another set of fonts to avoid these issues. These fonts use TrueType technology and are quite similar
-to default Morrowind fonts. Check this box if you still prefer original fonts over OpenMW ones or if you use custom bitmap fonts.</source>
+so OpenFallout provides another set of fonts to avoid these issues. These fonts use TrueType technology and are quite similar
+to default Morrowind fonts. Check this box if you still prefer original fonts over OpenFallout ones or if you use custom bitmap fonts.</source>
         <translation>Fonter som kommer med ordinarie spelmotor är suddiga med gränssnittsuppskalning och stödjer bara ett litet antal tecken,
-så OpenMW tillhandahåller andra fonter för att undvika dessa problem. Dessa fonter använder TrueType-teknologi och är ganska lika
+så OpenFallout tillhandahåller andra fonter för att undvika dessa problem. Dessa fonter använder TrueType-teknologi och är ganska lika
 de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordinarie fonter istället för OpenMWs, alternativt om du använder egna bitmapfonter.</translation>
     </message>
     <message>
@@ -382,16 +382,16 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Det här är den data-lokala katalogen och kan inte inaktiveras</translation>
     </message>
     <message>
-        <source>This directory is part of OpenMW and cannot be disabled</source>
-        <translation>Denna katalog är en del av OpenMW och kan inte inaktiveras</translation>
+        <source>This directory is part of OpenFallout and cannot be disabled</source>
+        <translation>Denna katalog är en del av OpenFallout och kan inte inaktiveras</translation>
     </message>
     <message>
-        <source>This directory is enabled in an openmw.cfg other than the user one</source>
-        <translation>Denna katalog är aktiverad i en annan openmw.cfg än användarens</translation>
+        <source>This directory is enabled in an openfallout.cfg other than the user one</source>
+        <translation>Denna katalog är aktiverad i en annan openfallout.cfg än användarens</translation>
     </message>
     <message>
-        <source>This archive is enabled in an openmw.cfg other than the user one</source>
-        <translation>Detta arkiv är aktiverat i en annan openmw.cfg än användarens</translation>
+        <source>This archive is enabled in an openfallout.cfg other than the user one</source>
+        <translation>Detta arkiv är aktiverat i en annan openfallout.cfg än användarens</translation>
     </message>
     <message>
         <source>&amp;Copy Path(s) to Clipboard</source>
@@ -444,8 +444,8 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
 <context>
     <name>Launcher::ImportPage</name>
     <message>
-        <source>Error writing OpenMW configuration file</source>
-        <translation>Det gick inte att skriva en OpenMW-konfigurationsfil</translation>
+        <source>Error writing OpenFallout configuration file</source>
+        <translation>Det gick inte att skriva en OpenFallout-konfigurationsfil</translation>
     </message>
     <message>
         <source>Morrowind configuration file (*.ini)</source>
@@ -471,16 +471,16 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Stäng</translation>
     </message>
     <message>
-        <source>Launch OpenMW</source>
-        <translation>Starta OpenMW</translation>
+        <source>Launch OpenFallout</source>
+        <translation>Starta OpenFallout</translation>
     </message>
     <message>
         <source>Help</source>
         <translation>Hjälp</translation>
     </message>
     <message>
-        <source>Error opening OpenMW configuration file</source>
-        <translation>Fel när OpenMW-konfigurationsfil skulle öppnas</translation>
+        <source>Error opening OpenFallout configuration file</source>
+        <translation>Fel när OpenFallout-konfigurationsfil skulle öppnas</translation>
     </message>
     <message>
         <source>First run</source>
@@ -495,12 +495,12 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Hoppa över</translation>
     </message>
     <message>
-        <source>OpenMW %1 release</source>
-        <translation>OpenMW version %1</translation>
+        <source>OpenFallout %1 release</source>
+        <translation>OpenFallout version %1</translation>
     </message>
     <message>
-        <source>OpenMW development (%1)</source>
-        <translation>OpenMW utvecklarversion (%1)</translation>
+        <source>OpenFallout development (%1)</source>
+        <translation>OpenFallout utvecklarversion (%1)</translation>
     </message>
     <message>
         <source>Compiled on %1 %2</source>
@@ -515,12 +515,12 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Kör &amp;Installationsguide...</translation>
     </message>
     <message>
-        <source>Error reading OpenMW configuration files</source>
-        <translation>Fel när OpenMW-konfigurationsfil skulle läsas</translation>
+        <source>Error reading OpenFallout configuration files</source>
+        <translation>Fel när OpenFallout-konfigurationsfil skulle läsas</translation>
     </message>
     <message>
-        <source>Error writing OpenMW configuration file</source>
-        <translation>Fel när OpenMW-konfigurationsfil skulle skrivas&gt;</translation>
+        <source>Error writing OpenFallout configuration file</source>
+        <translation>Fel när OpenFallout-konfigurationsfil skulle skrivas&gt;</translation>
     </message>
     <message>
         <source>Error writing user settings file</source>
@@ -535,8 +535,8 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Ingen spelfil vald</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Welcome to OpenMW!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;It is recommended to run the Installation Wizard.&lt;/p&gt;&lt;p&gt;The Wizard will let you select an existing Morrowind installation, or install Morrowind for OpenMW to use.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Välkommen till OpenMW!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Det är rekommenderat att du kör Installationsguiden.&lt;/p&gt;&lt;p&gt;Installationsguiden låter dig välja en befintlig Morrowindinstallation eller installera Morrowind för OpenMW.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Welcome to OpenFallout!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;It is recommended to run the Installation Wizard.&lt;/p&gt;&lt;p&gt;The Wizard will let you select an existing Morrowind installation, or install Morrowind for OpenFallout to use.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Välkommen till OpenFallout!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Det är rekommenderat att du kör Installationsguiden.&lt;/p&gt;&lt;p&gt;Installationsguiden låter dig välja en befintlig Morrowindinstallation eller installera Morrowind för OpenFallout.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not open %0 for reading:&lt;/b&gt;&lt;br&gt;&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Please make sure you have the right permissions and try again.&lt;br&gt;</source>
@@ -551,20 +551,20 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>&lt;br&gt;&lt;b&gt;Kunde inte hitta Data Files-platsen&lt;/b&gt;&lt;br&gt;&lt;br&gt;Katalogen som innehåller datafilerna hittades inte.</translation>
     </message>
     <message>
-        <source>&lt;br&gt;The problem may be due to an incomplete installation of OpenMW.&lt;br&gt;Reinstalling OpenMW may resolve the problem.&lt;br&gt;</source>
-        <translation>&lt;br&gt;Problemet kan bero på en ofullständig installation av OpenMW.&lt;br&gt;Ominstallation av OpenMW kan lösa problemet.&lt;br&gt;</translation>
+        <source>&lt;br&gt;The problem may be due to an incomplete installation of OpenFallout.&lt;br&gt;Reinstalling OpenFallout may resolve the problem.&lt;br&gt;</source>
+        <translation>&lt;br&gt;Problemet kan bero på en ofullständig installation av OpenFallout.&lt;br&gt;Ominstallation av OpenFallout kan lösa problemet.&lt;br&gt;</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not open or create %0 for writing&lt;/b&gt;&lt;br&gt;&lt;br&gt;Please make sure you have the right permissions and try again.&lt;br&gt;</source>
         <translation>&lt;br&gt;&lt;b&gt;Kunde inte öppna eller skapa %0 för att skriva&lt;/b&gt;&lt;br&gt;&lt;br&gt;Se till att du har rätt behörigheter och försök igen.&lt;br&gt;</translation>
     </message>
     <message>
-        <source>&lt;br&gt;&lt;b&gt;You do not have a game file selected.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenMW will not start without a game file selected.&lt;br&gt;</source>
-        <translation>&lt;br&gt;&lt;b&gt;Du har ingen spelfil markerad.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenMW kan inte starta utan en spelfil markerad.&lt;br&gt;</translation>
+        <source>&lt;br&gt;&lt;b&gt;You do not have a game file selected.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenFallout will not start without a game file selected.&lt;br&gt;</source>
+        <translation>&lt;br&gt;&lt;b&gt;Du har ingen spelfil markerad.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenFallout kan inte starta utan en spelfil markerad.&lt;br&gt;</translation>
     </message>
     <message>
-        <source>Error creating OpenMW configuration directory: code %0</source>
-        <translation>Kunde inte skapa konfigurationskatalog för OpenMW: kod %0</translation>
+        <source>Error creating OpenFallout configuration directory: code %0</source>
+        <translation>Kunde inte skapa konfigurationskatalog för OpenFallout: kod %0</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not create directory %0&lt;/b&gt;&lt;br&gt;&lt;br&gt;%1&lt;br&gt;</source>
@@ -586,30 +586,30 @@ de ordinarie fonterna i Morrowind. Bocka denna ruta om du ändå föredrar ordin
         <translation>Öppna %1</translation>
     </message>
     <message>
-        <source>Local config directory used because it contains an openmw.cfg.
+        <source>Local config directory used because it contains an openfallout.cfg.
 Logs and settings changed through the launcher and in-game will be saved here.</source>
-        <translation>Lokal konfigurationskatalog används eftersom den innehåller en openmw.cfg.
+        <translation>Lokal konfigurationskatalog används eftersom den innehåller en openfallout.cfg.
 Loggar och inställningar som ändras genom startaren och inne i spelet kommer sparas här.</translation>
     </message>
     <message>
-        <source>Local config directory used because it contains an openmw.cfg.</source>
-        <translation>Lokal konfigurationskatalog används eftersom den innehåller en openmw.cfg.</translation>
+        <source>Local config directory used because it contains an openfallout.cfg.</source>
+        <translation>Lokal konfigurationskatalog används eftersom den innehåller en openfallout.cfg.</translation>
     </message>
     <message>
         <source>Logs and settings changed through the launcher and in-game will be saved here.</source>
         <translation>Loggar och inställningar som ändras genom startaren och inne i spelet kommer sparas här.</translation>
     </message>
     <message>
-        <source>Global config directory used because local directory did not contain an openmw.cfg.
+        <source>Global config directory used because local directory did not contain an openfallout.cfg.
 Logs and settings changed through the launcher and in-game will be saved here.
-This is typically a symptom of a broken OpenMW installation or bad package.</source>
-        <translation>Global konfigurationskatalog används eftersom den lokala konfigurationskatalogen inte innehöll en openmw.cfg.
+This is typically a symptom of a broken OpenFallout installation or bad package.</source>
+        <translation>Global konfigurationskatalog används eftersom den lokala konfigurationskatalogen inte innehöll en openfallout.cfg.
 Loggar och inställningar som ändras genom startaren och inne i spelet kommer sparas här.
-Det här är oftast ett symtom på en trasig OpenMW-installation eller ett dåligt paket.</translation>
+Det här är oftast ett symtom på en trasig OpenFallout-installation eller ett dåligt paket.</translation>
     </message>
     <message>
-        <source>Global config directory used because local directory did not contain an openmw.cfg.</source>
-        <translation>Global konfigurationskatalog används eftersom den lokala konfigurationskatalogen inte innehöll en openmw.cfg.</translation>
+        <source>Global config directory used because local directory did not contain an openfallout.cfg.</source>
+        <translation>Global konfigurationskatalog används eftersom den lokala konfigurationskatalogen inte innehöll en openfallout.cfg.</translation>
     </message>
     <message>
         <source>User config directory used because %1 contains the line config=%2.
@@ -625,12 +625,12 @@ Loggar och inställningar som ändras genom startaren och inne i spelet kommer s
 <context>
     <name>MainWindow</name>
     <message>
-        <source>OpenMW Launcher</source>
-        <translation>OpenMW Startare</translation>
+        <source>OpenFallout Launcher</source>
+        <translation>OpenFallout Startare</translation>
     </message>
     <message>
-        <source>OpenMW version</source>
-        <translation>OpenMW version</translation>
+        <source>OpenFallout version</source>
+        <translation>OpenFallout version</translation>
     </message>
     <message>
         <source>toolBar</source>
@@ -1012,8 +1012,8 @@ Loggar och inställningar som ändras genom startaren och inne i spelet kommer s
         <translation>Dessa inställningar är avsedda för att testa moddar och kommer orsaka problem vid normalt spelande.</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMW will capture control of the cursor if this setting is true.&lt;/p&gt;&lt;p&gt;In “look mode”, OpenMW will center the cursor regardless of the value of this setting (since the cursor/crosshair is always centered in the OpenMW window). However, in GUI mode, this setting determines the behavior when the cursor is moved outside the OpenMW window. If true, the cursor movement stops at the edge of the window preventing access to other applications. If false, the cursor is allowed to move freely on the desktop.&lt;/p&gt;&lt;p&gt;This setting does not apply to the screen where escape has been pressed, where the cursor is never captured. Regardless of this setting “Alt-Tab” or some other operating system dependent key sequence can be used to allow the operating system to regain control of the mouse cursor. This setting interacts with the minimize on focus loss setting by affecting what counts as a focus loss. Specifically on a two-screen configuration it may be more convenient to access the second screen with setting disabled.&lt;/p&gt;&lt;p&gt;Note for developers: it’s desirable to have this setting disabled when running the game in a debugger, to prevent the mouse cursor from becoming unusable when the game pauses on a breakpoint.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMW kommer ta kontroll av muspekaren om denna inställning är aktiverad.&lt;/p&gt;&lt;p&gt;I ”tittläge” kommer OpenMW centrera muspekaren oavsett värdet på denna inställning (eftersom muspekaren/hårkorset alltid är centrerat i OpenMW-fönstret). I gränssnittsläge däremot kommer denna inställning bedöma beteendet när muspekaren flyttas utanför OpenMW-fönstret. Om på kommer muspekarrörelsen stanna vid kanten av fönstret, vilket förhindrar tillgång till  andra applikationer. Om av tillåts muspekaren att röras fritt över skrivbordet.&lt;/p&gt;&lt;p&gt;Denna inställning appliceras inte på skärmen där Escape har blivit tryckt, då muspekaren aldrig tas över. Oavsett denna inställning kan ”Alt-Tab” eller annan operativsystemberoende knappsekvens användas för att ge operativsystemet åter tillgång till muspekaren. Denna inställning interagerar med minimera vid fokusförlust-inställningen genom att påverka vad som räknas som en fokusförlust. Specifikt på en tvåskärmskonfiguration kan det vara mer smidigt att få tillgång till den andra skärmen med inställningen inaktiverad.&lt;/p&gt;&lt;p&gt;Notis för utvecklare: det är önskvärt att ha denna inställning inaktiverad när OpenMW körs i debug-läge för att förhindra att musen blir oanvändbar när spelet pausar vid en brytpunkt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenFallout will capture control of the cursor if this setting is true.&lt;/p&gt;&lt;p&gt;In “look mode”, OpenFallout will center the cursor regardless of the value of this setting (since the cursor/crosshair is always centered in the OpenFallout window). However, in GUI mode, this setting determines the behavior when the cursor is moved outside the OpenFallout window. If true, the cursor movement stops at the edge of the window preventing access to other applications. If false, the cursor is allowed to move freely on the desktop.&lt;/p&gt;&lt;p&gt;This setting does not apply to the screen where escape has been pressed, where the cursor is never captured. Regardless of this setting “Alt-Tab” or some other operating system dependent key sequence can be used to allow the operating system to regain control of the mouse cursor. This setting interacts with the minimize on focus loss setting by affecting what counts as a focus loss. Specifically on a two-screen configuration it may be more convenient to access the second screen with setting disabled.&lt;/p&gt;&lt;p&gt;Note for developers: it’s desirable to have this setting disabled when running the game in a debugger, to prevent the mouse cursor from becoming unusable when the game pauses on a breakpoint.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenFallout kommer ta kontroll av muspekaren om denna inställning är aktiverad.&lt;/p&gt;&lt;p&gt;I ”tittläge” kommer OpenFallout centrera muspekaren oavsett värdet på denna inställning (eftersom muspekaren/hårkorset alltid är centrerat i OpenFallout-fönstret). I gränssnittsläge däremot kommer denna inställning bedöma beteendet när muspekaren flyttas utanför OpenFallout-fönstret. Om på kommer muspekarrörelsen stanna vid kanten av fönstret, vilket förhindrar tillgång till  andra applikationer. Om av tillåts muspekaren att röras fritt över skrivbordet.&lt;/p&gt;&lt;p&gt;Denna inställning appliceras inte på skärmen där Escape har blivit tryckt, då muspekaren aldrig tas över. Oavsett denna inställning kan ”Alt-Tab” eller annan operativsystemberoende knappsekvens användas för att ge operativsystemet åter tillgång till muspekaren. Denna inställning interagerar med minimera vid fokusförlust-inställningen genom att påverka vad som räknas som en fokusförlust. Specifikt på en tvåskärmskonfiguration kan det vara mer smidigt att få tillgång till den andra skärmen med inställningen inaktiverad.&lt;/p&gt;&lt;p&gt;Notis för utvecklare: det är önskvärt att ha denna inställning inaktiverad när OpenFallout körs i debug-läge för att förhindra att musen blir oanvändbar när spelet pausar vid en brytpunkt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Browse…</source>

@@ -1,5 +1,18 @@
-How to contribute to OpenMW
-=======================
+How to contribute to OpenFallout
+================================
+
+OpenFallout is at an early stage. Start with the [roadmap](docs/openfallout/gap-audit-and-roadmap.md), then pick or open an issue at https://github.com/Elemperor1/OpenFallout/issues and send a pull request against `master`.
+
+* Keep each pull request to one change, and say in its description what you ran to check it. The build and test baseline is in [docs/openfallout/build-baseline.md](docs/openfallout/build-baseline.md).
+* Format C++ with the repository's `.clang-format`.
+* Keep the GPLv3 license and the copyright notices on everything inherited from OpenMW. New files are GPLv3 too.
+
+The rest of this file is OpenMW's contribution guide, inherited unchanged. Its links point at OpenMW's own GitLab, wiki and forum, and its scope rules are written for a Morrowind engine, so treat it as background until OpenFallout has its own.
+
+---
+
+OpenMW's guide: how to contribute
+=================================
 
 Not sure what to do with all your free time? Pick out a task from here:
 

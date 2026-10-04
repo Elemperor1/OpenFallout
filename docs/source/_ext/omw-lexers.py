@@ -5,7 +5,7 @@ from sphinx.highlighting import lexers
 class OMWConfigLexer(RegexLexer):
     name = 'openmwcfg'
     aliases = ['openmwcfg']
-    filenames = ['openmw.cfg']
+    filenames = ['openfallout.cfg']
 
     tokens = {
         'root': [

@@ -1,7 +1,9 @@
-Welcome to OpenMW's Documentation!
-==================================
+Welcome to OpenFallout's Documentation!
+=======================================
 
-This documentation covers all aspects of OpenMW development, scripting, and content creation.
+OpenFallout is built on OpenMW and is being renamed from it in stages. These pages are OpenMW's documentation. They describe the Morrowind engine that OpenFallout starts from, with program names, configuration file names and settings directories updated to OpenFallout's. Where a page still says OpenMW, it is describing that engine or a name that has not been changed yet. The plan for Fallout support is in ``docs/openfallout`` in the source tree.
+
+This documentation covers all aspects of development, scripting, and content creation.
 Use the categorized sections below to quickly access technical references, modding tools, and installation guides.
 
 .. dropdown:: Table of Contents

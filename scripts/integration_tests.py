@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="OpenMW integration tests.")
+    parser = argparse.ArgumentParser(description="OpenFallout integration tests.")
     parser.add_argument(
         "suites",
         nargs='*',
@@ -19,11 +19,11 @@ def parse_args():
         default=None,
         help="suites to run: a directory with suites or subdirectories containing them",
     )
-    parser.add_argument("--omw", type=str, default="openmw", help="path to openmw binary")
+    parser.add_argument("--omw", type=str, default="openfallout", help="path to openfallout binary")
     parser.add_argument(
         "--workdir", type=str, default="integration_tests_output", help="directory for temporary files and logs"
     )
-    parser.add_argument("--verbose", action='store_true', help="print all openmw output")
+    parser.add_argument("--verbose", action='store_true', help="print all openfallout output")
     parser.add_argument(
         "--test_filter", type=str, default=None,
         help="test cases to run (e.g. 'player.*running')",
@@ -42,7 +42,7 @@ def parse_args():
     )
     parser.add_argument(
         "--ini", type=str, default=None,
-        help="INI file to import fallback values from via openmw-iniimporter (found next to --omw)",
+        help="INI file to import fallback values from via openfallout-iniimporter (found next to --omw)",
     )
     parser.add_argument(
         "--resolution", type=str, default="640x480",
@@ -68,11 +68,11 @@ def discover_suites(suite_roots):
     for root in suite_roots:
         if not root.is_dir():
             sys.exit(f"{root} is not a directory")
-        if (root / "openmw.cfg").is_file():
+        if (root / "openfallout.cfg").is_file():
             all_suites[root.name] = root
         else:
             for entry in sorted(root.glob("test_*")):
-                if entry.is_dir() and (entry / "openmw.cfg").is_file():
+                if entry.is_dir() and (entry / "openfallout.cfg").is_file():
                     all_suites[entry.name] = entry
     if not all_suites:
         sys.exit(f"No suites found in: {', '.join(str(v) for v in suite_roots)}")
@@ -100,7 +100,7 @@ def write_generated_config(
 ):
     shutil.rmtree(config_dir, ignore_errors=True)
     config_dir.mkdir(parents=True)
-    base_cfg_path = config_dir / ("openmw.base.cfg" if args.ini else "openmw.cfg")
+    base_cfg_path = config_dir / ("openfallout.base.cfg" if args.ini else "openfallout.cfg")
     with open(base_cfg_path, "w", encoding="utf-8") as omw_cfg:
         omw_cfg.write(f'user-data="{userdata_dir}"\n')
         omw_cfg.write(f'data-local="{data_local_dir}"\n')
@@ -111,7 +111,7 @@ def write_generated_config(
                 iniimporter_binary,
                 "--ini", ini_path,
                 "--cfg", base_cfg_path,
-                "--output", config_dir / "openmw.cfg",
+                "--output", config_dir / "openfallout.cfg",
             ],
             check=True,
         )
@@ -143,7 +143,7 @@ def run_test(
     # is a duplicate and openmw rejects it outright.
     #
     # The generated directory stays last because openmw writes its runtime files
-    # into the final layer, and openmw.log is read back from there below.
+    # into the final layer, and openfallout.log is read back from there below.
     if config_source_dir is not None:
         command += ["--config", config_source_dir]
     # A suite outranks the shared directory.
@@ -208,8 +208,8 @@ def run_test(
             fatal_errors.append("unexpected termination")
         if process.returncode != 0:
             fatal_errors.append(f"openmw exited with code {process.returncode}")
-    if os.path.exists(config_dir / "openmw.log"):
-        shutil.copyfile(config_dir / "openmw.log", log_dir / f"{suite_name}.{time_str}.log")
+    if os.path.exists(config_dir / "openfallout.log"):
+        shutil.copyfile(config_dir / "openfallout.log", log_dir / f"{suite_name}.{time_str}.log")
     if fatal_errors and not args.verbose:
         sys.stdout.writelines(stdout_lines)
     if not args.list_tests:
@@ -238,7 +238,7 @@ def main():
         ini_path = Path(args.ini).resolve()
         if not ini_path.is_file():
             sys.exit(f"{ini_path} not found")
-        iniimporter_binary = openmw_binary.parent / f"openmw-iniimporter{openmw_binary.suffix}"
+        iniimporter_binary = openmw_binary.parent / f"openfallout-iniimporter{openmw_binary.suffix}"
         if not iniimporter_binary.is_file():
             sys.exit(f"{iniimporter_binary} not found")
 

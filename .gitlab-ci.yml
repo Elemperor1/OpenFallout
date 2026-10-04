@@ -82,16 +82,16 @@ Ubuntu_GCC_preprocess:
     - du -sh .
     - cmake --install .
     - if [[ "${BUILD_TESTS_ONLY}" ]]; then ./components-tests --gtest_output="xml:components-tests.xml"; fi
-    - if [[ "${BUILD_TESTS_ONLY}" ]]; then ./openmw-tests --gtest_output="xml:openmw-tests.xml"; fi
-    - if [[ "${BUILD_TESTS_ONLY}" ]]; then ./openmw-cs-tests --gtest_output="xml:openmw-cs-tests.xml"; fi
-    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openmw_detournavigator_navmeshtilescache_benchmark; fi
-    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openmw_esm_refid_benchmark; fi
-    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openmw_settings_access_benchmark; fi
+    - if [[ "${BUILD_TESTS_ONLY}" ]]; then ./openfallout-tests --gtest_output="xml:openfallout-tests.xml"; fi
+    - if [[ "${BUILD_TESTS_ONLY}" ]]; then ./openfallout-cs-tests --gtest_output="xml:openfallout-cs-tests.xml"; fi
+    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openfallout_detournavigator_navmeshtilescache_benchmark; fi
+    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openfallout_esm_refid_benchmark; fi
+    - if [[ "${BUILD_TESTS_ONLY}" && ! "${BUILD_WITH_CODE_COVERAGE}" ]]; then ./openfallout_settings_access_benchmark; fi
     - ccache -svv
     - df -h
     - if [[ "${BUILD_WITH_CODE_COVERAGE}" ]]; then ~/.local/bin/gcovr --merge-mode-functions merge-use-line-max --xml-pretty --exclude-unreachable-branches --gcov-ignore-parse-errors=negative_hits.warn_once_per_file --print-summary --root "${CI_PROJECT_DIR}" -j $(nproc) -o ../coverage.xml; fi
     # this line must be updated when artifacts are added or they'll be deleted, but if we get rid of it, we run out of disk space while archiving
-    - find * -type f | grep -v -e '^extern/' -e '^install/' -e 'CMakeCache\.txt$' -e '^components-tests.xml$' -e '^openmw-tests.xml$' -e '^openmw-cs-tests.xml$' | xargs rm -f
+    - find * -type f | grep -v -e '^extern/' -e '^install/' -e 'CMakeCache\.txt$' -e '^components-tests.xml$' -e '^openfallout-tests.xml$' -e '^openfallout-cs-tests.xml$' | xargs rm -f
     - cd ..
     - df -h
     - du -sh build/
@@ -476,7 +476,7 @@ Ubuntu_Clang_Tidy_openmw:
   needs:
     - Ubuntu_Clang_Tidy_components
   variables:
-    BUILD_TARGETS: openmw openmw-tests
+    BUILD_TARGETS: openfallout openfallout-tests
   timeout: 3h
 
 Ubuntu_Clang_Tidy_openmw-cs:
@@ -484,7 +484,7 @@ Ubuntu_Clang_Tidy_openmw-cs:
   needs:
     - Ubuntu_Clang_Tidy_components
   variables:
-    BUILD_TARGETS: openmw-cs openmw-cs-tests
+    BUILD_TARGETS: openfallout-cs openfallout-cs-tests
   timeout: 3h
 
 Ubuntu_Clang_Tidy_other:
@@ -492,7 +492,7 @@ Ubuntu_Clang_Tidy_other:
   needs:
     - Ubuntu_Clang_Tidy_components
   variables:
-    BUILD_TARGETS: components-tests bsatool esmtool openmw-launcher openmw-iniimporter openmw-essimporter openmw-wizard niftest openmw-navmeshtool openmw-bulletobjecttool
+    BUILD_TARGETS: components-tests bsatool esmtool openfallout-launcher openfallout-iniimporter openfallout-essimporter openfallout-wizard niftest openfallout-navmeshtool openfallout-bulletobjecttool
   timeout: 3h
 
 Ubuntu_Clang_tests_Debug:
@@ -527,9 +527,9 @@ Ubuntu_Clang_tests_Debug:
   script:
     - CI/run_integration_tests.sh
   after_script:
-    - if [[ -f /tmp/openmw-crash.log ]]; then cat /tmp/openmw-crash.log; fi
+    - if [[ -f /tmp/openfallout-crash.log ]]; then cat /tmp/openfallout-crash.log; fi
     - mkdir -p integration_tests_output
-    - if [[ -f /tmp/openmw-crash.log ]]; then cp -v /tmp/openmw-crash.log integration_tests_output/; fi
+    - if [[ -f /tmp/openfallout-crash.log ]]; then cp -v /tmp/openfallout-crash.log integration_tests_output/; fi
   artifacts:
     name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
     when: always
@@ -600,7 +600,7 @@ Ubuntu_GCC_integration_tests_asan:
     - ccache -svv
   artifacts:
     paths:
-      - build/OpenMW-*.dmg
+      - build/OpenFallout-*.dmg
       - "**/CMakeCache.txt"
 
 macOS26_Xcode26_amd64:
@@ -728,11 +728,11 @@ macOS26_Xcode26_arm64:
     - "*.zip"
 
 .variables-for-split-jobs: &target-group-one
-  targets: "openmw openmw-tests"
+  targets: "openfallout openfallout-tests"
   group_name: "group-one"
 
 .variables-for-split-jobs: &target-group-two
-  targets: "bsatool components-tests esmtool niftest openmw-cs openmw-cs-tests openmw_detournavigator_navmeshtilescache_benchmark openmw_esm_refid_benchmark openmw_settings_access_benchmark openmw-bulletobjecttool openmw-essimporter openmw-iniimporter openmw-launcher openmw-navmeshtool openmw-wizard"
+  targets: "bsatool components-tests esmtool niftest openfallout-cs openfallout-cs-tests openfallout_detournavigator_navmeshtilescache_benchmark openfallout_esm_refid_benchmark openfallout_settings_access_benchmark openfallout-bulletobjecttool openfallout-essimporter openfallout-iniimporter openfallout-launcher openfallout-navmeshtool openfallout-wizard"
   group_name: "group-two"
 
 .Windows_Ninja_Base:
@@ -856,7 +856,7 @@ macOS26_Xcode26_arm64:
   variables:
     config: "RelWithDebInfo"
     # Gitlab can't successfully execute following binaries due to unknown reason
-    # executables: "components-tests.exe,openmw-tests.exe,openmw-cs-tests.exe,openmw_detournavigator_navmeshtilescache_benchmark.exe"
+    # executables: "components-tests.exe,openfallout-tests.exe,openfallout-cs-tests.exe,openfallout_detournavigator_navmeshtilescache_benchmark.exe"
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "merge_request_event"
       # triggered by TriggerNinja - globbing expressions and job names live in its script
@@ -1121,7 +1121,7 @@ Windows_Ninja_CacheInit_RelWithDebInfo:
   variables:
     config: "RelWithDebInfo"
     # Gitlab can't successfully execute following binaries due to unknown reason
-    # executables: "components-tests.exe,openmw-tests.exe,openmw-cs-tests.exe,openmw_detournavigator_navmeshtilescache_benchmark.exe"
+    # executables: "components-tests.exe,openfallout-tests.exe,openfallout-cs-tests.exe,openfallout_detournavigator_navmeshtilescache_benchmark.exe"
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "merge_request_event"
 

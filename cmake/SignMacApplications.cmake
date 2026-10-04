@@ -1,10 +1,10 @@
-# This script re-signs OpenMW.app and OpenMW-CS.app after CPack packages them. This is necessary because CPack modifies
-# the library references used by OpenMW to App relative paths, invalidating the code signature.
+# This script re-signs OpenFallout.app and OpenFallout-CS.app after CPack packages them. This is necessary because CPack modifies
+# the library references used by OpenFallout to App relative paths, invalidating the code signature.
 
 # Obviously, we only need to run this on Apple targets.
 if (APPLE)
-    set(OPENMW_APP "OpenMW")
-    set(OPENMW_CS_APP "OpenMW-CS")
+    set(OPENMW_APP "OpenFallout")
+    set(OPENMW_CS_APP "OpenFallout-CS")
 
     set(APPLICATIONS "${OPENMW_APP}" "${OPENMW_CS_APP}")
     foreach(app_name IN LISTS APPLICATIONS)

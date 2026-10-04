@@ -92,7 +92,7 @@ set(BUILTIN_DATA_FILES
     l10n/OMWControls/sv.yaml
     l10n/OMWControls/pl.yaml
 
-    # L10n for OpenMW menus and non-game-specific messages
+    # L10n for OpenFallout menus and non-game-specific messages
     l10n/OMWEngine/de.yaml
     l10n/OMWEngine/en.yaml
     l10n/OMWEngine/ru.yaml

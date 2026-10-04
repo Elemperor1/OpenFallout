@@ -10,7 +10,7 @@ namespace Files
 {
     inline QString getUserConfigPathQString(const Files::ConfigurationManager& cfgMgr)
     {
-        return Files::pathToQString(cfgMgr.getUserConfigPath() / openmwCfgFile);
+        return Files::pathToQString(cfgMgr.getUserConfigPath() / openfalloutCfgFile);
     }
 
     inline QStringList getActiveConfigPathsQString(const Files::ConfigurationManager& cfgMgr)
@@ -19,7 +19,7 @@ namespace Files
         QStringList result;
         result.reserve(static_cast<int>(activePaths.size()));
         for (const auto& path : activePaths)
-            result.append(Files::pathToQString(path / openmwCfgFile));
+            result.append(Files::pathToQString(path / openfalloutCfgFile));
         return result;
     }
 }

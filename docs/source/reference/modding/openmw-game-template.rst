@@ -31,13 +31,13 @@ Define paths to .omwgame and data files
 =======================================
 
 OpenMW needs to be told where to look for the Template files. This is done in
-``openmw.cfg`` file where ``content=`` tells OpenMW which .omwgame file to use
+``openfallout.cfg`` file where ``content=`` tells OpenMW which .omwgame file to use
 and ``data=`` tells OpenMW what folders to look for meshes, textures, audio,
 and other assets. The required lines would look like this, but with the paths
 of course different on your system.
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     content=template.omwgame
     data="/home/someuser/example-suite/data"
@@ -48,12 +48,12 @@ Remove references to Morrowind files
 ====================================
 
 In case you have Morrowind installed and have run OpenMW's installation wizard,
-you need to remove or comment out the following lines from ``openmw.cfg``.
+you need to remove or comment out the following lines from ``openfallout.cfg``.
 Not doing so will either produce errors or load Morrowind content, which you
 probably do not want when you are making your own game.
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     fallback-archive=Morrowind.bsa
     fallback-archive=Tribunal.bsa

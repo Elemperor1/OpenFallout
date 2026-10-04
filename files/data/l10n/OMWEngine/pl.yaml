@@ -20,10 +20,10 @@ LoadingFailed: "Nie udało się wczytać zapisu gry"
 LoadingInterior: "Wczytywanie obszaru wewnętrznego"
 LoadingInProgress: "Wczytywanie zapisu gry"
 LoadingRequiresNewVersionError: |-
-    Ten zapis gry został utworzony w nowszej wersji OpenMW i nie jest obsługiwany.
-    Zaktualizuj OpenMW do najnowszej wersji, aby wczytać ten plik.
+    Ten zapis gry został utworzony w nowszej wersji OpenFallout i nie jest obsługiwany.
+    Zaktualizuj OpenFallout do najnowszej wersji, aby wczytać ten plik.
 LoadingRequiresOldVersionError: |-
-    Ten zapis gry został utworzony w starszej wersji OpenMW w formacie, który nie jest już obsługiwany.
+    Ten zapis gry został utworzony w starszej wersji OpenFallout w formacie, który nie jest już obsługiwany.
     Załaduj i zapisz ten plik przy użyciu wersji {version}, aby go zaktualizować.
 NewGameConfirmation: "Czy chcesz rozpocząć nową grę i porzucić obecną?"
 QuitGameConfirmation: "Wyjść z gry?"

@@ -94,7 +94,7 @@ A search for `ESM4` in `apps/openmw/mwmechanics`, `mwdialogue`, `mwscript`, `mwi
 
 - `apps/components_tests/esm4/includes.cpp` only checks that the headers compile. No parser has a behavioural test and no fixture data exists.
 - BSA and NIF physics have unit tests (`apps/components_tests/bsa`, `.../nif`).
-- `.github/workflows/push.yml` builds on Ubuntu and runs `components-tests`, `openmw-tests` and `openmw-cs-tests`. `.gitlab-ci.yml` and `CI/` are upstream leftovers.
+- `.github/workflows/push.yml` builds on Ubuntu and runs `components-tests`, `openfallout-tests` and `openfallout-cs-tests` (named `openmw-tests` and `openmw-cs-tests` before rename stage A). `.gitlab-ci.yml` and `CI/` are upstream leftovers.
 
 ## Recommended milestones
 
@@ -162,6 +162,8 @@ The rename lands in stages, each one buildable and passing the tests before the 
 1. **Stage A, user-visible names.** Executable names, window titles, README and docs, config file and user-data directory names, packaging. Add an acknowledgement of OpenMW to the README.
 2. **Stage B, interfaces.** Lua module ids (`openmw.*` to `openfallout.*`), `OPENMW_*` CMake options and header guards, `OMW*` symbols.
 3. **Stage C, source layout.** `apps/openmw` to `apps/openfallout` using `git mv`, then `MW*` namespaces to `OF*` (for example `MWWorld` becomes `OFWorld`). `OF` is the default chosen here and is cheap to change before this stage starts.
+
+Progress: stage A is done. The programs are `openfallout`, `openfallout-launcher`, `openfallout-wizard`, `openfallout-cs`, `openfallout-iniimporter`, `openfallout-essimporter`, `openfallout-navmeshtool`, `openfallout-bulletobjecttool`, `openfallout-tests`, `openfallout-cs-tests` and the three benchmarks. The CMake project, configuration and log files (`openfallout.cfg`, `openfallout.log`, `openfallout-cs.cfg`), settings directories (`~/.config/openfallout`), window titles, dialogs, translations, desktop and appdata entries, package and CI names, the README and `CONTRIBUTING.md` use the new name. Deliberately left for stage B or C: the `openmw-lib`, `openmw-cs-lib` and `openmw-navmeshtool-lib` libraries and the `openmw_add_executable` macro, Lua module ids and `OPENMW_*` names, `Role_OpenMW*` and `Version::getOpenmwVersionDescription` identifiers, the `OpenMW 0.48.0` and `OpenMW 0.52.0` names in the "save is too old" message (they name real OpenMW releases that can still read such a save), icon and logo artwork (`openmw.png`, `openmw.ico`, `openmw.icns`, `openmw_project_logo.webm` and the matching resource ids), `apps/openmw` and the `MW*` namespaces, and the OpenMW-owned documentation text under `docs/source`, which still describes the Morrowind engine.
 
 Not renamed: `AUTHORS.md`, `LICENSE` and the copyright notices in source files. GPLv3 requires keeping them, and the OpenMW contributors wrote most of this code. This is a plain reading of the licence, not legal advice.
 

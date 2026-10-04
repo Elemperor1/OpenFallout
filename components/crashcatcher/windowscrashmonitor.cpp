@@ -218,9 +218,9 @@ namespace Crash
             {
                 handleCrash(true);
                 TerminateProcess(mAppProcessHandle, 0xDEAD);
-                std::string message = "OpenMW has frozen.\nCrash dump saved to '"
+                std::string message = "OpenFallout has frozen.\nCrash dump saved to '"
                     + Misc::StringUtils::u8StringToString(getFreezeDumpPath(*mShm).u8string())
-                    + "'.\nPlease report this to https://gitlab.com/OpenMW/openmw/issues !";
+                    + "'.\nPlease report this to https://github.com/Elemperor1/OpenFallout/issues !";
                 SDL_ShowSimpleMessageBox(0, "Fatal Error", message.c_str(), nullptr);
             }
         }
@@ -329,9 +329,10 @@ namespace Crash
     {
         std::thread messageBoxThread([&]() {
             SDL_MessageBoxButtonData button = { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 0, "Abort" };
-            SDL_MessageBoxData messageBoxData = { SDL_MESSAGEBOX_ERROR, nullptr, "OpenMW has frozen",
-                "OpenMW has frozen. This should never happen. Press Abort to terminate it and generate a crash dump to "
-                "help diagnose the problem.\nOpenMW may unfreeze if you wait, and this message box will disappear "
+            SDL_MessageBoxData messageBoxData = { SDL_MESSAGEBOX_ERROR, nullptr, "OpenFallout has frozen",
+                "OpenFallout has frozen. This should never happen. Press Abort to terminate it and generate a crash "
+                "dump to "
+                "help diagnose the problem.\nOpenFallout may unfreeze if you wait, and this message box will disappear "
                 "after it becomes responsive.",
                 1, &button, nullptr };
 
