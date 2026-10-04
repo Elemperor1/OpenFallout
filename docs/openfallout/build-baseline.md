@@ -47,8 +47,8 @@ Measured on 2026-10-04 on the same container, from an empty build directory, wit
 Not covered:
 
 - The engine was not run with game data or a display. That needs game files, and nothing was run against real Fallout data.
-- The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built here.
-- GitHub Actions has never run in this repository, so no CI result exists for any commit.
+- The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built in the cloud container. GitHub Actions built them afterwards, see the next point.
+- GitHub Actions had no runs in this repository before the stage A branch was pushed on 2026-10-04. Since then, on the rename branches the Ubuntu, Windows and macOS arm64 (`macos-26`) jobs build and pass the tests. The macOS Intel (`macos-26-intel`) job has not finished in any run: it stops in the "Prime ccache" step and stays there, which also keeps hosted macOS runners busy so that later runs wait in the queue. The cause is not known yet.
 
 ## Result after rename stage B
 
