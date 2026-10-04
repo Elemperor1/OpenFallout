@@ -39,10 +39,16 @@ mkdir -p "$SRC"
 
 fetch() {
     local dir="$1" tarball="$2" sha256="$3"
-    if [ ! -f "$SRC/$tarball" ]; then
-        curl -fsSL -o "$SRC/$tarball" "$ARCHIVE/$dir/$tarball"
+    local file="$SRC/$tarball"
+    # Drop an archive left by an interrupted or corrupted earlier run so it is downloaded again.
+    if [ -f "$file" ] && ! echo "$sha256  $file" | sha256sum --check --status; then
+        rm -f "$file"
     fi
-    echo "$sha256  $SRC/$tarball" | sha256sum --check --status
+    if [ ! -f "$file" ]; then
+        curl -fsSL -o "$file.part" "$ARCHIVE/$dir/$tarball"
+        echo "$sha256  $file.part" | sha256sum --check --status
+        mv "$file.part" "$file"
+    fi
 }
 
 if [ ! -f "$PREFIX/mygui/lib/pkgconfig/MYGUI.pc" ]; then
