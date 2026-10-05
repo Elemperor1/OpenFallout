@@ -1,6 +1,6 @@
 # Plugin census results
 
-`esmtool census` run on 2026-10-04 on Jacob's MacBook, through a Remote Control session, on 16 plugins: Fallout 3, its five add-ons, Fallout: New Vegas and its nine add-ons and packs. The census program is the one merged in PR #2 (master `be6ca447`). This page holds counts only. Nothing on it was read out of a record.
+`esmtool census` run on 2026-10-04 on Jacob's MacBook, through a Remote Control session, on 16 plugins: Fallout 3, its five add-ons, Fallout: New Vegas and its nine add-ons and packs. The census program is the one merged in PR #2 (master `be6ca447`). This page holds counts only, plus each plugin's file name, format version and master list, which the reader takes from the plugin's `TES4` header. No other record content appears on it.
 
 ## What the census found
 
