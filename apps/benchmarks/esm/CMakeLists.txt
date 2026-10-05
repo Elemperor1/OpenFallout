@@ -1,4 +1,4 @@
-openmw_add_executable(openfallout_esm_refid_benchmark benchrefid.cpp)
+openfallout_add_executable(openfallout_esm_refid_benchmark benchrefid.cpp)
 target_link_libraries(openfallout_esm_refid_benchmark benchmark::benchmark components)
 
 if (UNIX AND NOT APPLE)

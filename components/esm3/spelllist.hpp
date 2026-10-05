@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_SPELLLIST_H
-#define OPENMW_ESM_SPELLLIST_H
+#ifndef OPENFALLOUT_ESM_SPELLLIST_H
+#define OPENFALLOUT_ESM_SPELLLIST_H
 
 #include <components/esm/refid.hpp>
 #include <string>

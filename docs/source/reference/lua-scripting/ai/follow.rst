@@ -21,7 +21,7 @@ Follow another actor.
     - boolean [default=true]
     - whether to cancel all other AI packages
   * - target
-    - `GameObject <../openmw_core.html##(GameObject)>`_ [required]
+    - `GameObject <../openfallout_core.html##(GameObject)>`_ [required]
     - the actor to follow
   * - destCell
     - Cell [optional]
@@ -30,7 +30,7 @@ Follow another actor.
     - number [optional]
     - duration in game time (will be rounded up to the next hour)
   * - destPosition
-    - `3d vector <../openmw_util.html##(Vector3)>`_ [optional]
+    - `3d vector <../openfallout_util.html##(Vector3)>`_ [optional]
     - the destination point
   * - isRepeat
     - boolean [optional]

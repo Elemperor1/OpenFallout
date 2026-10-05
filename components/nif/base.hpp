@@ -1,6 +1,6 @@
 /// This file holds the main classes of NIF Records used by everything else.
-#ifndef OPENMW_COMPONENTS_NIF_BASE_HPP
-#define OPENMW_COMPONENTS_NIF_BASE_HPP
+#ifndef OPENFALLOUT_COMPONENTS_NIF_BASE_HPP
+#define OPENFALLOUT_COMPONENTS_NIF_BASE_HPP
 
 #include "recordptr.hpp"
 

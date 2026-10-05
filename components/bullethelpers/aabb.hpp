@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_BULLETHELPERS_AABB_H
-#define OPENMW_COMPONENTS_BULLETHELPERS_AABB_H
+#ifndef OPENFALLOUT_COMPONENTS_BULLETHELPERS_AABB_H
+#define OPENFALLOUT_COMPONENTS_BULLETHELPERS_AABB_H
 
 #include <BulletCollision/CollisionShapes/btCollisionShape.h>
 #include <BulletCollision/Gimpact/btBoxCollision.h>

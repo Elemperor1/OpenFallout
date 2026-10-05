@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_MISC_H
-#define OPENMW_ESM_MISC_H
+#ifndef OPENFALLOUT_ESM_MISC_H
+#define OPENFALLOUT_ESM_MISC_H
 
 #include <string>
 

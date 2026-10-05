@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_STAT_H
-#define OPENMW_ESM_STAT_H
+#ifndef OPENFALLOUT_ESM_STAT_H
+#define OPENFALLOUT_ESM_STAT_H
 
 #include <components/esm/defs.hpp>
 #include <components/esm/path.hpp>

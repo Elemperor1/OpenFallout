@@ -2,4 +2,4 @@
 ///
 /// This is the source documentation for:
 ///
-/// OpenFallout @OPENMW_VERSION@
+/// OpenFallout @OPENFALLOUT_VERSION@

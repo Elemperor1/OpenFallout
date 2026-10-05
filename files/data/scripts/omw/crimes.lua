@@ -1,6 +1,6 @@
-local types = require('openmw.types')
-local world = require('openmw.world')
-local I = require('openmw.interfaces')
+local types = require('openfallout.types')
+local world = require('openfallout.world')
+local I = require('openfallout.interfaces')
 
 local function isAllowedToOpen(player, lockable)
     -- Lockables are always allowed when their global variable is non-zero
@@ -59,8 +59,8 @@ end
 ---
 -- Table with information needed to commit crimes.
 -- @type CommitCrimeInputs
--- @field openmw.core#GameObject victim The victim of the crime (optional)
--- @field openmw.types#OFFENSE_TYPE_IDS type The type of the crime to commit. See @{openmw.types#OFFENSE_TYPE_IDS} (required)
+-- @field openfallout.core#GameObject victim The victim of the crime (optional)
+-- @field openfallout.types#OFFENSE_TYPE_IDS type The type of the crime to commit. See @{openfallout.types#OFFENSE_TYPE_IDS} (required)
 -- @field #string faction ID of the faction the crime is committed against (optional)
 -- @field #number arg The amount to increase the player bounty by if the crime type is theft. Ignored otherwise (optional, defaults to 0)
 -- @field #boolean victimAware Whether the victim is aware of the crime (optional, defaults to false)
@@ -76,7 +76,7 @@ return {
     -- Allows to utilize built-in crime mechanics.
     -- @module Crimes
     -- @context global
-    -- @usage require('openmw.interfaces').Crimes
+    -- @usage require('openfallout.interfaces').Crimes
     interface = {
         --- Interface version
         -- @field [parent=#Crimes] #number version
@@ -85,7 +85,7 @@ return {
         ---
         -- Commits a crime as if done through an in-game action. Can only be used in global context.
         -- @function [parent=#Crimes] commitCrime
-        -- @param openmw.core#GameObject player The player committing the crime
+        -- @param openfallout.core#GameObject player The player committing the crime
         -- @param CommitCrimeInputs options A table of parameters describing the committed crime
         -- @return CommitCrimeOutputs A table containing information about the committed crime
         commitCrime = function(player, options)

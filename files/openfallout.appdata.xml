@@ -35,7 +35,7 @@ Copyright 2020 Bret Curtis <psi29a@gmail.com>
   <category>RolePlaying</category>
  </categories>
  <releases>
-  <release version="@OPENMW_VERSION@" date="@OPENMW_VERSION_COMMITDATE@"/>
+  <release version="@OPENFALLOUT_VERSION@" date="@OPENFALLOUT_VERSION_COMMITDATE@"/>
  </releases>
  <url type="homepage">https://github.com/Elemperor1/OpenFallout</url>
  <url type="bugtracker">https://github.com/Elemperor1/OpenFallout/issues</url>

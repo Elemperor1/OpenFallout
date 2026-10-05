@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_WIDGETLIST
-#define OPENMW_LUAUI_WIDGETLIST
+#ifndef OPENFALLOUT_LUAUI_WIDGETLIST
+#define OPENFALLOUT_LUAUI_WIDGETLIST
 
 #include <sol/table.hpp>
 #include <string>
@@ -20,4 +20,4 @@ namespace LuaUi
         const std::vector<std::string_view>& usedKeys, bool generateWarningStrings);
 }
 
-#endif // OPENMW_LUAUI_WIDGETLIST
+#endif // OPENFALLOUT_LUAUI_WIDGETLIST

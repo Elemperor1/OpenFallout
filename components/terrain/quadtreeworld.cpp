@@ -439,7 +439,7 @@ namespace Terrain
                 return;
             }
             cv->pushCurrentMask();
-            static bool debug = getenv("OPENMW_WATER_CULLING_DEBUG") != nullptr;
+            static bool debug = getenv("OPENFALLOUT_WATER_CULLING_DEBUG") != nullptr;
             for (unsigned int i = 0; i < vd->getNumEntries(); ++i)
             {
                 ViewDataEntry& entry = vd->getEntry(i);

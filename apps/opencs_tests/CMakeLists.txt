@@ -6,13 +6,13 @@ file(GLOB OPENCS_TESTS_SRC_FILES
 
 source_group(apps\\openfallout-cs-tests FILES ${OPENCS_TESTS_SRC_FILES})
 
-openmw_add_executable(openfallout-cs-tests ${OPENCS_TESTS_SRC_FILES})
+openfallout_add_executable(openfallout-cs-tests ${OPENCS_TESTS_SRC_FILES})
 
 target_include_directories(openfallout-cs-tests SYSTEM PRIVATE ${GTEST_INCLUDE_DIRS})
 target_include_directories(openfallout-cs-tests SYSTEM PRIVATE ${GMOCK_INCLUDE_DIRS})
 
 target_link_libraries(openfallout-cs-tests PRIVATE
-    openmw-cs-lib
+    openfallout-cs-lib
     GTest::GTest
     GMock::GMock
 )

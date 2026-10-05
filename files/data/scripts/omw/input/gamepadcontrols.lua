@@ -1,4 +1,4 @@
-local input = require('openmw.input')
+local input = require('openfallout.input')
 
 return {
 
@@ -7,7 +7,7 @@ return {
     -- Gamepad control interface
     -- @module GamepadControls
     -- @context player
-    -- @usage require('openmw.interfaces').GamepadControls
+    -- @usage require('openfallout.interfaces').GamepadControls
     interface = {
         --- Interface version
         -- @field [parent=#GamepadControls] #number version

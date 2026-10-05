@@ -2,7 +2,7 @@ project (Components)
 
 if(APPLE)
     set(BUNDLE_RESOURCES_DIR "${APP_BUNDLE_DIR}/Contents/Resources")
-    set(OPENMW_RESOURCES_ROOT ${BUNDLE_RESOURCES_DIR})
+    set(OPENFALLOUT_RESOURCES_ROOT ${BUNDLE_RESOURCES_DIR})
 endif(APPLE)
 
 # Version file
@@ -23,14 +23,14 @@ if (GIT_CHECKOUT)
             -DVERSION_RESOURCE_FILE_RELATIVE=${VERSION_RESOURCE_FILE_RELATIVE}
             -DVERSION_CPP_FILE_IN=${OpenFallout_SOURCE_DIR}/${VERSION_CPP_FILE}.in
             -DVERSION_CPP_FILE_OUT=${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}.out
-            -DOPENMW_VERSION_MAJOR=${OPENMW_VERSION_MAJOR}
-            -DOPENMW_VERSION_MINOR=${OPENMW_VERSION_MINOR}
-            -DOPENMW_VERSION_RELEASE=${OPENMW_VERSION_RELEASE}
-            -DOPENMW_LUA_API_REVISION=${OPENMW_LUA_API_REVISION}
-            -DOPENMW_POSTPROCESSING_API_REVISION=${OPENMW_POSTPROCESSING_API_REVISION}
-            -DOPENMW_VERSION=${OPENMW_VERSION}
-            -DOPENMW_DOC_BASEURL=${OPENMW_DOC_BASEURL}
-            -DMACROSFILE=${CMAKE_SOURCE_DIR}/cmake/OpenMWMacros.cmake
+            -DOPENFALLOUT_VERSION_MAJOR=${OPENFALLOUT_VERSION_MAJOR}
+            -DOPENFALLOUT_VERSION_MINOR=${OPENFALLOUT_VERSION_MINOR}
+            -DOPENFALLOUT_VERSION_RELEASE=${OPENFALLOUT_VERSION_RELEASE}
+            -DOPENFALLOUT_LUA_API_REVISION=${OPENFALLOUT_LUA_API_REVISION}
+            -DOPENFALLOUT_POSTPROCESSING_API_REVISION=${OPENFALLOUT_POSTPROCESSING_API_REVISION}
+            -DOPENFALLOUT_VERSION=${OPENFALLOUT_VERSION}
+            -DOPENFALLOUT_DOC_BASEURL=${OPENFALLOUT_DOC_BASEURL}
+            -DMACROSFILE=${CMAKE_SOURCE_DIR}/cmake/OpenFalloutMacros.cmake
             "-DCMAKE_CONFIGURATION_TYPES=${CMAKE_CONFIGURATION_TYPES}"
             -Dgenerator_is_multi_config_var=${multi_config}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/GitVersion.cmake
@@ -61,7 +61,7 @@ add_component_dir (lua
     luastate scriptscontainer asyncpackage utilpackage serialization configuration l10n storage utf8
     shapes/box inputactions yamlloader scripttracker luastateptr
     )
-copy_resource_file("lua/util.lua" "${OPENMW_RESOURCES_ROOT}" "resources/lua_libs/util.lua")
+copy_resource_file("lua/util.lua" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/lua_libs/util.lua")
 
 add_component_dir (l10n
     messagebundles manager
@@ -390,7 +390,7 @@ add_component_dir (lua_ui
     properties widget input element util layers content alignment resources
     adapter text textedit window image container flex padding
     )
-copy_resource_file("lua_ui/content.lua" "${OPENMW_RESOURCES_ROOT}" "resources/lua_libs/content.lua")
+copy_resource_file("lua_ui/content.lua" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/lua_libs/content.lua")
 
 
 if(WIN32)
@@ -578,7 +578,7 @@ endif()
 
 include_directories(${BULLET_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
 
-if (OPENMW_USE_SYSTEM_SQLITE3)
+if (OPENFALLOUT_USE_SYSTEM_SQLITE3)
     find_package(SQLite3 REQUIRED)
     if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
         add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
@@ -598,7 +598,7 @@ endif()
 target_link_libraries(components
     # CMake's built-in OSG finder does not use pkgconfig, so we have to
     # manually ensure the order is correct for inter-library dependencies.
-    # This only makes a difference with `-DOPENMW_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
+    # This only makes a difference with `-DOPENFALLOUT_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
     # https://gitlab.kitware.com/cmake/cmake/-/issues/21701
     ${OSGPARTICLE_LIBRARIES}
     ${OSGVIEWER_LIBRARIES}
@@ -690,7 +690,7 @@ if(OSG_STATIC)
     add_library(components_osg_plugins INTERFACE)
     foreach(_plugin ${USED_OSG_PLUGINS})
         string(TOUPPER ${_plugin} _plugin_uc)
-        if(OPENMW_USE_SYSTEM_OSG)
+        if(OPENFALLOUT_USE_SYSTEM_OSG)
             list(APPEND _osg_plugins_static_files ${${_plugin_uc}_LIBRARY})
         else()
             list(APPEND _osg_plugins_static_files $<TARGET_FILE:${${_plugin_uc}_LIBRARY}>)
@@ -703,7 +703,7 @@ if(OSG_STATIC)
     target_link_options(components_osg_plugins INTERFACE ${_opts})
     target_link_libraries(components components_osg_plugins ${COLLADA_DOM_LIBRARIES})
 
-    if(OPENMW_USE_SYSTEM_OSG)
+    if(OPENFALLOUT_USE_SYSTEM_OSG)
         # OSG plugin pkgconfig files are missing these dependencies.
         # https://github.com/openscenegraph/OpenSceneGraph/issues/1052
         find_package(Freetype REQUIRED)

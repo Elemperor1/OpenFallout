@@ -1,8 +1,8 @@
-local core = require('openmw.core')
-local nearby = require('openmw.nearby')
-local self = require('openmw.self')
-local types = require('openmw.types')
-local ui = require('openmw.ui')
+local core = require('openfallout.core')
+local nearby = require('openfallout.nearby')
+local self = require('openfallout.self')
+local types = require('openfallout.types')
+local ui = require('openfallout.ui')
 
 local cell = nil
 local autodoors = {}

@@ -22,9 +22,9 @@ The transparency of the black background will match the transparency setting tha
 
       .. code-block:: lua
 
-         local ui = require('openmw.ui')
-         local util = require('openmw.util')
-         local mwui = require('openmw.interfaces').MWUI
+         local ui = require('openfallout.ui')
+         local util = require('openfallout.util')
+         local mwui = require('openfallout.interfaces').MWUI
 
          ui.create({
             layer = "Windows",
@@ -63,9 +63,9 @@ Similar to the above example, a box will be rendered with text all styled in Mor
 
       .. code-block:: lua
 
-         local ui = require('openmw.ui')
-         local util = require('openmw.util')
-         local mwui = require('openmw.interfaces').MWUI
+         local ui = require('openfallout.ui')
+         local util = require('openfallout.util')
+         local mwui = require('openfallout.interfaces').MWUI
 
          ui.create({
             layer = "Windows",

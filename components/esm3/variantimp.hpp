@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_VARIANTIMP_H
-#define OPENMW_ESM_VARIANTIMP_H
+#ifndef OPENFALLOUT_ESM_VARIANTIMP_H
+#define OPENFALLOUT_ESM_VARIANTIMP_H
 
 #include <functional>
 #include <string>

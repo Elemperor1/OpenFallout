@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_OBJECTSTATE_H
-#define OPENMW_ESM_OBJECTSTATE_H
+#ifndef OPENFALLOUT_ESM_OBJECTSTATE_H
+#define OPENFALLOUT_ESM_OBJECTSTATE_H
 
 #include <string>
 #include <vector>

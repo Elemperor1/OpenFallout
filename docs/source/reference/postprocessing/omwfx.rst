@@ -504,7 +504,7 @@ To use the uniform you can reference it in any pass, it should **not** be declar
         }
     }
 
-You can use uniform arrays as well, but they are restricted to the `Lua API <../lua-scripting/openmw_postprocessing.html>`_ scripts.
+You can use uniform arrays as well, but they are restricted to the `Lua API <../lua-scripting/openfallout_postprocessing.html>`_ scripts.
 These uniform blocks must be defined with the new ``size`` parameter.
 
 .. code-block:: none

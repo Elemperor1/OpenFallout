@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_REPA_H
-#define OPENMW_ESM_REPA_H
+#ifndef OPENFALLOUT_ESM_REPA_H
+#define OPENFALLOUT_ESM_REPA_H
 
 #include <string>
 

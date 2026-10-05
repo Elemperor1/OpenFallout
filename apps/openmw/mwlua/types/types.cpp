@@ -169,8 +169,8 @@ namespace MWLua
     {
         auto lua = context.sol();
 
-        if (lua["openmw_types"] != sol::nil)
-            return lua["openmw_types"];
+        if (lua["openfallout_types"] != sol::nil)
+            return lua["openfallout_types"];
 
         sol::table types(lua, sol::create);
         auto addType = [&](std::string_view name, std::vector<ESM::RecNameInts> recTypes,
@@ -265,7 +265,7 @@ namespace MWLua
             packageToType[t] = type;
         }
 
-        lua["openmw_types"] = LuaUtil::makeReadOnly(types);
-        return lua["openmw_types"];
+        lua["openfallout_types"] = LuaUtil::makeReadOnly(types);
+        return lua["openfallout_types"];
     }
 }

@@ -985,13 +985,13 @@ namespace MWGui
         switch (mGuiMode)
         {
             case MWGui::GM_Companion:
-                mControllerButtons.mA = "#{OMWEngine:InventorySelect}";
+                mControllerButtons.mA = "#{OFEngine:InventorySelect}";
                 mControllerButtons.mB = "#{Interface:Close}";
                 mControllerButtons.mX.clear();
                 mControllerButtons.mR2 = "#{Interface:Share}";
                 break;
             case MWGui::GM_Container:
-                mControllerButtons.mA = "#{OMWEngine:InventorySelect}";
+                mControllerButtons.mA = "#{OFEngine:InventorySelect}";
                 mControllerButtons.mB = "#{Interface:Close}";
                 mControllerButtons.mX = "#{Interface:TakeAll}";
                 mControllerButtons.mR2 = "#{Interface:Container}";

@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_PROPERTIES
-#define OPENMW_LUAUI_PROPERTIES
+#ifndef OPENFALLOUT_LUAUI_PROPERTIES
+#define OPENFALLOUT_LUAUI_PROPERTIES
 
 #include <MyGUI_Colour.h>
 #include <MyGUI_Types.h>
@@ -91,4 +91,4 @@ namespace LuaUi
     }
 }
 
-#endif // !OPENMW_LUAUI_PROPERTIES
+#endif // !OPENFALLOUT_LUAUI_PROPERTIES

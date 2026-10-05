@@ -45,7 +45,7 @@ protected:
     AVCodecContext* mAudioContext;
     AVStream *mAVStream;
     enum AVSampleFormat mOutputSampleFormat;
-    #if OPENMW_FFMPEG_5_OR_GREATER
+    #if OPENFALLOUT_FFMPEG_5_OR_GREATER
     AVChannelLayout mOutputChannelLayout;
     #else
     uint64_t mOutputChannelLayout;

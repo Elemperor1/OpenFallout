@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_WINDOW
-#define OPENMW_LUAUI_WINDOW
+#ifndef OPENFALLOUT_LUAUI_WINDOW
+#define OPENFALLOUT_LUAUI_WINDOW
 
 #include <vector>
 
@@ -33,4 +33,4 @@ namespace LuaUi
     };
 }
 
-#endif // OPENMW_LUAUI_WINDOW
+#endif // OPENFALLOUT_LUAUI_WINDOW

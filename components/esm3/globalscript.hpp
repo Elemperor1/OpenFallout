@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_GLOBALSCRIPT_H
-#define OPENMW_ESM_GLOBALSCRIPT_H
+#ifndef OPENFALLOUT_ESM_GLOBALSCRIPT_H
+#define OPENFALLOUT_ESM_GLOBALSCRIPT_H
 
 #include "cellref.hpp"
 #include "components/esm/refid.hpp"

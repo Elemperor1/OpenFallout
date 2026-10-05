@@ -227,7 +227,7 @@ namespace
                 mIndexRowCount = MWGui::getCyrillicIndexPageCount();
 
             mControllerButtons.mA = "#{Interface:Select}";
-            mControllerButtons.mX = "#{OMWEngine:JournalQuests}";
+            mControllerButtons.mX = "#{OFEngine:JournalQuests}";
             mControllerButtons.mY = "#{Interface:Topics}";
 
             mQuestMode = false;
@@ -718,7 +718,7 @@ namespace
             }
             else if (mQuestMode)
             {
-                mControllerButtons.mR3 = "#{OMWEngine:JournalShowAll}";
+                mControllerButtons.mR3 = "#{OFEngine:JournalShowAll}";
             }
             return &mControllerButtons;
         }

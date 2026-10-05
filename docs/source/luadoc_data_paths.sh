@@ -1,5 +1,5 @@
 paths=(
-  openmw_aux/*lua
+  openfallout_aux/*lua
   scripts/omw/activationhandlers.lua
   scripts/omw/ai.lua
   scripts/omw/combat/interface_local.lua

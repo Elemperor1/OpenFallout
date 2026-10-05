@@ -1,5 +1,5 @@
-#ifndef OPENMW_RTT_H
-#define OPENMW_RTT_H
+#ifndef OPENFALLOUT_RTT_H
+#define OPENFALLOUT_RTT_H
 
 #include <osg/Node>
 

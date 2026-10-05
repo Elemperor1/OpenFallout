@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_MISC_RNG_H
-#define OPENMW_COMPONENTS_MISC_RNG_H
+#ifndef OPENFALLOUT_COMPONENTS_MISC_RNG_H
+#define OPENFALLOUT_COMPONENTS_MISC_RNG_H
 
 #include <cassert>
 #include <concepts>

@@ -99,7 +99,7 @@ Let's write a simple example of a `Player script`:
 
     -- Save to my_lua_mod/scripts/example/player.lua
 
-    local ui = require('openmw.ui')
+    local ui = require('openfallout.ui')
 
     return {
         engineHandlers = {
@@ -232,7 +232,7 @@ Here is an example of a basic script structure:
 
 .. code-block:: Lua
 
-    local util = require('openmw.util')
+    local util = require('openfallout.util')
 
     local function onUpdate(dt)
         ...
@@ -311,7 +311,7 @@ The saved state must be :ref:`serializable <Serializable data>`.
 Note that `onLoad` means loading a script rather than loading a game.
 If a script did not exist when a game was saved then `onLoad` will not be called, but `onInit` will.
 
-`onSave` and `onLoad` can be called even for objects in inactive state, so it shouldn't use `openmw.nearby`.
+`onSave` and `onLoad` can be called even for objects in inactive state, so it shouldn't use `openfallout.nearby`.
 
 An example:
 
@@ -367,7 +367,7 @@ Serializable value is one of:
 - a number
 - a string
 - a game object
-- a value of a type, defined by :ref:`openmw.util <Package openmw.util>`
+- a value of a type, defined by :ref:`openfallout.util <Package openfallout.util>`
 - a table whith serializable keys and values
 
 Serializable data can not contain:
@@ -391,8 +391,8 @@ Player scripts are local scripts that are attached to a player.
 Auxiliary packages
 ------------------
 
-``openmw_aux.*`` are built-in libraries that are themselves implemented in Lua. They can not do anything that is not possible with the basic API, they only make it more convenient.
-Sources can be found in ``resources/vfs/openmw_aux``. In theory mods can override them, but it is not recommended.
+``openfallout_aux.*`` are built-in libraries that are themselves implemented in Lua. They can not do anything that is not possible with the basic API, they only make it more convenient.
+Sources can be found in ``resources/vfs/openfallout_aux``. In theory mods can override them, but it is not recommended.
 
 .. include:: tables/aux_packages.rst
 
@@ -400,7 +400,7 @@ They can be loaded with ``require`` the same as API packages. For example:
 
 .. code-block:: Lua
 
-    local time = require('openmw_aux.time')
+    local time = require('openfallout_aux.time')
     time.runRepeatedly(doSomething, 15 * time.second)  -- run `doSomething()` every 15 seconds
 
 
@@ -437,7 +437,7 @@ Overriding the interface and adding a debug output:
             baseInterface.doSomething(x, y)  -- calls the original `doSomething`
 
             -- WRONG! Would lead to an infinite recursion.
-            -- local interfaces = require('openmw.interfaces')
+            -- local interfaces = require('openfallout.interfaces')
             -- interfaces.SomeUtils.doSomething(x, y)
         end,
     }
@@ -458,7 +458,7 @@ Using the interface:
 
 .. code-block:: Lua
 
-    local interfaces = require('openmw.interfaces')
+    local interfaces = require('openfallout.interfaces')
 
     local function onUpdate()
         interfaces.SomeUtils.doSomething(2, 3)
@@ -485,9 +485,9 @@ This is another kind of script-to-script interactions. The differences:
 
 There are a few methods for sending events:
 
-- `core.sendGlobalEvent <openmw_core.html##(sendGlobalEvent)>`_ to send events to global scripts
-- `GameObject:sendEvent <openmw_core.html##(GameObject).sendEvent>`_ to send events to local scripts attached to a game object
-- `types.Player.sendMenuEvent <openmw_types.html##(Player).sendMenuEvent>`_ to send events to menu scripts of the given player
+- `core.sendGlobalEvent <openfallout_core.html##(sendGlobalEvent)>`_ to send events to global scripts
+- `GameObject:sendEvent <openfallout_core.html##(GameObject).sendEvent>`_ to send events to local scripts attached to a game object
+- `types.Player.sendMenuEvent <openfallout_types.html##(Player).sendMenuEvent>`_ to send events to menu scripts of the given player
 
 Events are the main way of interacting between local and global scripts.
 They are not recommended for interactions between two global scripts, because in this case interfaces are more convenient.
@@ -503,8 +503,8 @@ At some moment it will send the 'DamagedByDarkPower' event to all nearby actors:
 
 .. code-block:: Lua
 
-    local self = require('openmw.self')
-    local nearby = require('openmw.nearby')
+    local self = require('openfallout.self')
+    local nearby = require('openfallout.nearby')
 
     local function onActivated()
         for i, actor in ipairs(nearby.actors) do
@@ -554,7 +554,7 @@ See :ref:`the list of events <Events>` that are used by built-in scripts.
 Timers
 ======
 
-Timers are in the :ref:`openmw.async <Package openmw.async>` package.
+Timers are in the :ref:`openfallout.async <Package openfallout.async>` package.
 They can be set either in simulation time or in game time.
 
 - `Simulation time`: the number of seconds in the game world (i.e. seconds when the game is not paused), passed from starting a new game.
@@ -579,7 +579,7 @@ An example:
 
 .. code-block:: Lua
 
-    local async = require('openmw.async')
+    local async = require('openfallout.async')
 
     local teleportWithDelayCallback = async:registerTimerCallback('teleport',
     function(data)
@@ -605,8 +605,8 @@ An example:
 
 .. code-block:: Lua
 
-    local async = require('openmw.async')
-    local ui = require('openmw.ui')
+    local async = require('openfallout.async')
+    local ui = require('openfallout.ui')
 
     return {
         engineHandlers = {
@@ -626,8 +626,8 @@ Also in `Auxiliary packages`_ is the helper function ``runRepeatedly``, it is im
 
 .. code-block:: Lua
 
-    local core = require('openmw.core')
-    local time = require('openmw_aux.time')
+    local core = require('openfallout.core')
+    local time = require('openfallout_aux.time')
 
     -- call `doSomething()` at the end of every game day.
     -- the second argument (`time.day`) is the interval.
@@ -678,12 +678,12 @@ You can add special hints to give LDT more information:
 
 .. code-block:: Lua
 
-    --- @param openmw.core#GameObject obj
+    --- @param openfallout.core#GameObject obj
     local function doSomething(obj)
         -- autocompletion now works with `obj`
     end
 
-    --- @field openmw.util#Vector3 c
+    --- @field openfallout.util#Vector3 c
     local c
 
     -- autocompletion now works with `c`
@@ -699,7 +699,7 @@ For example for the camera interface (defined in ``resources/vfs/scripts/omw/cam
     -- @field scripts.omw.camera#Interface Camera
     -- ... other interfaces here
     --- @field #Interfaces I
-    local I = require('openmw.interfaces')
+    local I = require('openfallout.interfaces')
 
     I.Camera.disableZoom()
 

@@ -1,5 +1,5 @@
-local core = require('openmw.core')
-local util = require('openmw.util')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
 
 local M = {}
 
@@ -107,7 +107,7 @@ end
 
 function M.makeUpdateMenu()
     return makeTestCoroutine(function()
-        local menu = require('openmw.menu')
+        local menu = require('openfallout.menu')
         print('Discovering tests...')
         menu.newGame({bypass = true})
         coroutine.yield()
@@ -288,8 +288,8 @@ M.menuEventHandlers = {
 -- used only in global scripts
 M.globalEventHandlers = {
     runTest = function(name)
-        local types = require('openmw.types')
-        local world = require('openmw.world')
+        local types = require('openfallout.types')
+        local world = require('openfallout.world')
         local fn = globalTests[name]
         if fn then
             globalTestRunner = coroutine.create(function()
@@ -315,8 +315,8 @@ M.globalEventHandlers = {
     end,
     runGlobalTest = function(name)
         local fn = globalTests[name]
-        local types = require('openmw.types')
-        local world = require('openmw.world')
+        local types = require('openfallout.types')
+        local world = require('openfallout.world')
         if not fn then
             types.Player.sendMenuEvent(world.players[1], 'globalTestFinished', {name=name, errMsg='Global test is not found'})
             return
@@ -334,8 +334,8 @@ M.globalEventHandlers = {
     end,
     discoverTests = function()
         globalTestRunner = coroutine.create(function()
-            local types = require('openmw.types')
-            local world = require('openmw.world')
+            local types = require('openfallout.types')
+            local world = require('openfallout.world')
             local localTestNames = waitForDiscovery(discoveredLocalTests, localDiscoveryTimeout,
                 function() world.players[1]:sendEvent('discoverLocalTests') end,
                 'local test discovery timed out: no localTestsDiscovered event from the local script')

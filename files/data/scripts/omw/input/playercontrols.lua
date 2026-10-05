@@ -1,14 +1,14 @@
-local core = require('openmw.core')
-local debug = require('openmw.debug')
-local input = require('openmw.input')
-local self = require('openmw.self')
-local storage = require('openmw.storage')
-local ui = require('openmw.ui')
-local async = require('openmw.async')
-local Actor = require('openmw.types').Actor
-local Player = require('openmw.types').Player
+local core = require('openfallout.core')
+local debug = require('openfallout.debug')
+local input = require('openfallout.input')
+local self = require('openfallout.self')
+local storage = require('openfallout.storage')
+local ui = require('openfallout.ui')
+local async = require('openfallout.async')
+local Actor = require('openfallout.types').Actor
+local Player = require('openfallout.types').Player
 
-local I = require('openmw.interfaces')
+local I = require('openfallout.interfaces')
 
 local settings = storage.playerSection('SettingsOMWControls')
 
@@ -22,7 +22,7 @@ do
     for _, key in ipairs(rangeActions) do
         input.registerAction {
             key = key,
-            l10n = 'OMWControls',
+            l10n = 'OFControls',
             name = key .. '_name',
             description = key .. '_description',
             type = input.ACTION_TYPE.Range,
@@ -38,7 +38,7 @@ do
     for _, key in ipairs(booleanActions) do
         input.registerAction {
             key = key,
-            l10n = 'OMWControls',
+            l10n = 'OFControls',
             name = key .. '_name',
             description = key .. '_description',
             type = input.ACTION_TYPE.Boolean,
@@ -60,7 +60,7 @@ do
     for _, key in ipairs(triggers) do
         input.registerTrigger {
             key = key,
-            l10n = 'OMWControls',
+            l10n = 'OFControls',
             name = key .. '_name',
             description = key .. '_description',
         }
@@ -255,7 +255,7 @@ return {
     ---
     -- @module Controls
     -- @context player
-    -- @usage require('openmw.interfaces').Controls
+    -- @usage require('openfallout.interfaces').Controls
     interface = {
         --- Interface version
         -- @field [parent=#Controls] #number version

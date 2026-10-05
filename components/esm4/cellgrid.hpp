@@ -24,8 +24,8 @@
   trial & error.  See http://en.uesp.net/wiki for details.
 
 */
-#ifndef OPENMW_COMPONENTS_ESM4_CELLGRID_H
-#define OPENMW_COMPONENTS_ESM4_CELLGRID_H
+#ifndef OPENFALLOUT_COMPONENTS_ESM4_CELLGRID_H
+#define OPENFALLOUT_COMPONENTS_ESM4_CELLGRID_H
 
 #include <variant>
 
@@ -37,4 +37,4 @@ namespace ESM4
     using CellGrid = std::variant<ESM::FormId, Grid>;
 }
 
-#endif // OPENMW_COMPONENTS_ESM4_CELLGRID_H
+#endif // OPENFALLOUT_COMPONENTS_ESM4_CELLGRID_H

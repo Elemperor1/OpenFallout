@@ -1,5 +1,5 @@
-#ifndef OPENMW_TEST_SUITE_DETOURNAVIGATOR_OPERATORS_H
-#define OPENMW_TEST_SUITE_DETOURNAVIGATOR_OPERATORS_H
+#ifndef OPENFALLOUT_TEST_SUITE_DETOURNAVIGATOR_OPERATORS_H
+#define OPENFALLOUT_TEST_SUITE_DETOURNAVIGATOR_OPERATORS_H
 
 #include <components/bullethelpers/operators.hpp>
 #include <components/detournavigator/debug.hpp>

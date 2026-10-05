@@ -179,7 +179,7 @@ namespace Debug
 
     bool shouldDebugOpenGL()
     {
-        const char* env = std::getenv("OPENMW_DEBUG_OPENGL");
+        const char* env = std::getenv("OPENFALLOUT_DEBUG_OPENGL");
         if (!env)
             return false;
         std::string str(env);
@@ -213,7 +213,7 @@ namespace Debug
     {
         if (!PushDebugGroup::sInstance->valid())
         {
-            Log(Error) << "OpenGL debug groups not supported on this system, or OPENMW_DEBUG_OPENGL environment "
+            Log(Error) << "OpenGL debug groups not supported on this system, or OPENFALLOUT_DEBUG_OPENGL environment "
                           "variable not set.";
             return;
         }

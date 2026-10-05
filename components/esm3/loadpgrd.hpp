@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_PGRD_H
-#define OPENMW_ESM_PGRD_H
+#ifndef OPENFALLOUT_ESM_PGRD_H
+#define OPENFALLOUT_ESM_PGRD_H
 
 #include <string>
 #include <vector>

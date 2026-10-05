@@ -188,7 +188,7 @@ namespace LuaUi
                     Log(Debug::Warning) << "UI event key must be a string";
                 else
                     Log(Debug::Warning) << "UI event handler for key \"" << name.as<std::string>()
-                                        << "\" must be an openmw.async.callback";
+                                        << "\" must be an openfallout.async.callback";
             });
         }
 

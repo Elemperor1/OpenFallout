@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_MAPPINGS_H
-#define OPENMW_ESM_MAPPINGS_H
+#ifndef OPENFALLOUT_ESM_MAPPINGS_H
+#define OPENFALLOUT_ESM_MAPPINGS_H
 
 #include <string>
 

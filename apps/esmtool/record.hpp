@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESMTOOL_RECORD_H
-#define OPENMW_ESMTOOL_RECORD_H
+#ifndef OPENFALLOUT_ESMTOOL_RECORD_H
+#define OPENFALLOUT_ESMTOOL_RECORD_H
 
 #include <memory>
 #include <string>

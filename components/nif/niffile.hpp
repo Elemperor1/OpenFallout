@@ -1,7 +1,7 @@
 /// Main header for reading .nif files
 
-#ifndef OPENMW_COMPONENTS_NIF_NIFFILE_HPP
-#define OPENMW_COMPONENTS_NIF_NIFFILE_HPP
+#ifndef OPENFALLOUT_COMPONENTS_NIF_NIFFILE_HPP
+#define OPENFALLOUT_COMPONENTS_NIF_NIFFILE_HPP
 
 #include <atomic>
 #include <cstdint>

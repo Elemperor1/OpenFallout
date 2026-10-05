@@ -1,23 +1,23 @@
-set(OPENMW_SOURCES
+set(OPENFALLOUT_SOURCES
     engine.cpp
     options.cpp
 )
 
-set(OPENMW_RESOURCES
+set(OPENFALLOUT_RESOURCES
     ${CMAKE_SOURCE_DIR}/files/windows/openfallout.rc
     ${CMAKE_SOURCE_DIR}/files/windows/openfallout.exe.manifest
 )
 
-set(OPENMW_HEADERS
+set(OPENFALLOUT_HEADERS
     doc.hpp
     engine.hpp
     options.hpp
     profile.hpp
 )
 
-source_group(apps/openmw FILES main.cpp androidmain.cpp ${OPENMW_SOURCES} ${OPENMW_HEADERS} ${OPENMW_RESOURCES})
+source_group(apps/openmw FILES main.cpp androidmain.cpp ${OPENFALLOUT_SOURCES} ${OPENFALLOUT_HEADERS} ${OPENFALLOUT_RESOURCES})
 
-add_openmw_dir (mwrender
+add_openfallout_dir (mwrender
     actors objects renderingmanager animation rotatecontroller sky skyutil npcanimation esm4npcanimation vismask
     creatureanimation effectmanager util renderinginterface pathgrid rendermode weaponanimation screenshotmanager
     bulletdebugdraw globalmap characterpreview camera localmap water terrainstorage ripplesimulation
@@ -26,12 +26,12 @@ add_openmw_dir (mwrender
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
     )
 
-add_openmw_dir (mwinput
+add_openfallout_dir (mwinput
     actions actionmanager bindingsmanager controllermanager controlswitch
     inputmanagerimp mousemanager keyboardmanager sensormanager gyromanager
     )
 
-add_openmw_dir (mwgui
+add_openfallout_dir (mwgui
     layout textinput widgets race class birth review windowmanagerimp console dialogue
     windowbase statswindow messagebox journalwindow charactercreation
     mapwindow windowpinnablebase tooltips scrollwindow bookwindow resourceskin
@@ -47,18 +47,18 @@ add_openmw_dir (mwgui
     postprocessorhud settings worlditemmodel itemtransfer controllerbuttonsoverlay inventorytabsoverlay
     )
 
-add_openmw_dir (mwdialogue
+add_openfallout_dir (mwdialogue
     dialoguemanagerimp journalimp journalentry quest topic filter selectwrapper keywordsearch scripttest
     )
 
-add_openmw_dir (mwscript
+add_openfallout_dir (mwscript
     locals scriptmanagerimp compilercontext interpretercontext cellextensions miscextensions
     guiextensions soundextensions skyextensions statsextensions containerextensions
     aiextensions controlextensions extensions globalscripts ref dialogueextensions
     animationextensions transformationextensions consoleextensions userextensions
     )
 
-add_openmw_dir (mwlua
+add_openfallout_dir (mwlua
     objectcache luamanagerimp object objectlists userdataserializer luaevents engineevents objectvariant loadscripts contentbindings
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
     mwscriptbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
@@ -70,12 +70,12 @@ add_openmw_dir (mwlua
     types/clothing types/levelledlist types/terminal magictypebindings
     )
 
-add_openmw_dir (mwsound
+add_openfallout_dir (mwsound
     soundmanagerimp openaloutput ffmpegdecoder headcache warmqueue sound soundbuffer sounddecoder soundoutput
     loudness movieaudiofactory alext efx efxpresets regionsoundselector watersoundupdater
     )
 
-add_openmw_dir (mwworld
+add_openfallout_dir (mwworld
     refdata worldimp scene globals class action nullaction actionteleport
     containerstore actiontalk actiontake manualref player cellvisitors failedaction
     worldmodel localscripts customdata inventorystore ptr actionopen actionread actionharvest
@@ -86,19 +86,19 @@ add_openmw_dir (mwworld
     positioncellgrid
     )
 
-add_openmw_dir (mwphysics
+add_openfallout_dir (mwphysics
     physicssystem trace collisiontype actor convert object heightfield closestnotmerayresultcallback
     contacttestresultcallback stepper movementsolver projectile
     actorconvexcallback raycasting mtphysics contacttestwrapper projectileconvexcallback
     )
 
-add_openmw_dir (mwclass
+add_openfallout_dir (mwclass
     classes activator creature npc weapon armor potion apparatus book clothing container door
     ingredient creaturelevlist itemlevlist light lockpick misc probe repair static actor bodypart
     esm4base esm4npc light4
     )
 
-add_openmw_dir (mwmechanics
+add_openfallout_dir (mwmechanics
     mechanicsmanagerimp stat creaturestats magiceffects movement actorutil spelllist
     drawstate spells activespells npcstats aipackage aisequence aipursue alchemy aiwander aitravel aifollow aiavoiddoor aibreathe
     aicast aiescort aiface aiactivate aicombat recharge repair enchanting pathfinding pathgrid security spellcasting spellresistance
@@ -107,20 +107,20 @@ add_openmw_dir (mwmechanics
     spelleffects
     )
 
-add_openmw_dir (mwstate
+add_openfallout_dir (mwstate
     statemanagerimp charactermanager character quicksavemanager
     )
 
-add_openmw_dir (mwbase
+add_openfallout_dir (mwbase
     environment world scriptmanager dialoguemanager journal soundmanager mechanicsmanager
     inputmanager windowmanager statemanager luamanager
     )
 
 # Main executable
 
-add_library(openmw-lib STATIC
-    ${OPENMW_FILES}
-    ${OPENMW_SOURCES}
+add_library(openfallout-lib STATIC
+    ${OPENFALLOUT_FILES}
+    ${OPENFALLOUT_SOURCES}
 )
 
 if (MSVC)
@@ -139,21 +139,21 @@ if (MSVC)
     )
 endif()
 
-if(BUILD_OPENMW)
+if(BUILD_OPENFALLOUT)
     if (ANDROID)
         add_library(openfallout SHARED
             main.cpp
             androidmain.cpp
         )
     else()
-        openmw_add_executable(openfallout
+        openfallout_add_executable(openfallout
             ${APPLE_BUNDLE_RESOURCES}
-            ${OPENMW_RESOURCES}
+            ${OPENFALLOUT_RESOURCES}
             main.cpp
         )
     endif()
 
-    target_link_libraries(openfallout openmw-lib)
+    target_link_libraries(openfallout openfallout-lib)
 
     # Workaround necessary to ensure osgAnimation::MatrixLinearSampler dynamic casts work under Clang
     # NOTE: it's unclear whether the broken behavior is spec-compliant
@@ -168,10 +168,10 @@ include_directories(
     ${FFmpeg_INCLUDE_DIRS}
 )
 
-target_link_libraries(openmw-lib
+target_link_libraries(openfallout-lib
     # CMake's built-in OSG finder does not use pkgconfig, so we have to
     # manually ensure the order is correct for inter-library dependencies.
-    # This only makes a difference with `-DOPENMW_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
+    # This only makes a difference with `-DOPENFALLOUT_USE_SYSTEM_OSG=ON -DOSG_STATIC=ON`.
     # https://gitlab.kitware.com/cmake/cmake/-/issues/21701
     ${OSGPARTICLE_LIBRARIES}
     ${OSGVIEWER_LIBRARIES}
@@ -192,7 +192,7 @@ target_link_libraries(openmw-lib
 )
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-lib PRIVATE
+    target_precompile_headers(openfallout-lib PRIVATE
         <boost/program_options/options_description.hpp>
 
         <sol/sol.hpp>
@@ -218,26 +218,26 @@ if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
 endif()
 
 if (ANDROID)
-    target_link_libraries(openmw-lib EGL android log z)
+    target_link_libraries(openfallout-lib EGL android log z)
 endif (ANDROID)
 
 if (USE_SYSTEM_TINYXML)
-    target_link_libraries(openmw-lib ${TinyXML_LIBRARIES})
+    target_link_libraries(openfallout-lib ${TinyXML_LIBRARIES})
 endif()
 
 if (NOT UNIX)
-    target_link_libraries(openmw-lib ${SDL2MAIN_LIBRARY})
+    target_link_libraries(openfallout-lib ${SDL2MAIN_LIBRARY})
 endif()
 
 # Fix for not visible pthreads functions for linker with glibc 2.15
 if (UNIX AND NOT APPLE)
-    target_link_libraries(openmw-lib ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(openfallout-lib ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-if(APPLE AND BUILD_OPENMW)
+if(APPLE AND BUILD_OPENFALLOUT)
     set(BUNDLE_RESOURCES_DIR "${APP_BUNDLE_DIR}/Contents/Resources")
 
-    set(OPENMW_RESOURCES_ROOT ${BUNDLE_RESOURCES_DIR})
+    set(OPENFALLOUT_RESOURCES_ROOT ${BUNDLE_RESOURCES_DIR})
 
     add_subdirectory(../../files/ ${CMAKE_CURRENT_BINARY_DIR}/files)
 
@@ -263,14 +263,14 @@ if(APPLE AND BUILD_OPENMW)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-lib PRIVATE --coverage)
-    target_link_libraries(openmw-lib gcov)
-    if (NOT ANDROID AND BUILD_OPENMW)
+    target_compile_options(openfallout-lib PRIVATE --coverage)
+    target_link_libraries(openfallout-lib gcov)
+    if (NOT ANDROID AND BUILD_OPENFALLOUT)
         target_compile_options(openfallout PRIVATE --coverage)
         target_link_libraries(openfallout gcov)
     endif()
 endif()
 
-if (NOT APPLE AND BUILD_OPENMW)
+if (NOT APPLE AND BUILD_OPENFALLOUT)
     INSTALL(TARGETS openfallout)
 endif()

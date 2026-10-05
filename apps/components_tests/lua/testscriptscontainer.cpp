@@ -128,7 +128,7 @@ return {
     constexpr VFS::Path::NormalizedView useInterfacePath("useinterface.lua");
 
     VFSTestFile useInterfaceScript(R"X(
-local interfaces = require('openmw.interfaces')
+local interfaces = require('openfallout.interfaces')
 return {
     engineHandlers = {
         onUpdate = function()

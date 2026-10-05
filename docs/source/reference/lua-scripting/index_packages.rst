@@ -7,25 +7,25 @@ Packages
 .. toctree::
     :hidden:
 
-    ambient <openmw_ambient>
-    animation <openmw_animation>
-    async <openmw_async>
-    camera <openmw_camera>
-    content <openmw_content>
-    core <openmw_core>
-    debug <openmw_debug>
-    input <openmw_input>
-    markup <openmw_markup>
-    menu <openmw_menu>
-    nearby <openmw_nearby>
-    postprocessing <openmw_postprocessing>
-    self <openmw_self>
-    storage <openmw_storage>
-    types <openmw_types>
-    ui <openmw_ui>
-    util <openmw_util>
-    vfs <openmw_vfs>
-    world <openmw_world>
+    ambient <openfallout_ambient>
+    animation <openfallout_animation>
+    async <openfallout_async>
+    camera <openfallout_camera>
+    content <openfallout_content>
+    core <openfallout_core>
+    debug <openfallout_debug>
+    input <openfallout_input>
+    markup <openfallout_markup>
+    menu <openfallout_menu>
+    nearby <openfallout_nearby>
+    postprocessing <openfallout_postprocessing>
+    self <openfallout_self>
+    storage <openfallout_storage>
+    types <openfallout_types>
+    ui <openfallout_ui>
+    util <openfallout_util>
+    vfs <openfallout_vfs>
+    world <openfallout_world>
 
 **API packages**
 

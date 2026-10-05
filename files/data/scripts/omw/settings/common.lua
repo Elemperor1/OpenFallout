@@ -1,4 +1,4 @@
-local storage = require('openmw.storage')
+local storage = require('openfallout.storage')
 
 local groupSectionKey = 'OmwSettingGroups'
 local conventionPrefix = 'Settings'
@@ -116,7 +116,7 @@ return {
         local argumentSection = contextSection(groupKey .. argumentSectionPostfix)
         argumentSection:set(settingKey, argument)
     end,
-    setGlobalEvent = 'OMWSettingsGlobalSet',
+    setGlobalEvent = 'OFSettingsGlobalSet',
     registerPageEvent = 'OmWSettingsRegisterPage',
     groupSectionKey = groupSectionKey,
     onLoad = function(saved)

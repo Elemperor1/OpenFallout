@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_RACE_H
-#define OPENMW_ESM_RACE_H
+#ifndef OPENFALLOUT_ESM_RACE_H
+#define OPENFALLOUT_ESM_RACE_H
 
 #include <array>
 #include <map>

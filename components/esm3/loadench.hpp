@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_ENCH_H
-#define OPENMW_ESM_ENCH_H
+#ifndef OPENFALLOUT_ESM_ENCH_H
+#define OPENFALLOUT_ESM_ENCH_H
 
 #include <cstdint>
 #include <string>

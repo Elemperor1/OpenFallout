@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_LOCALS_H
-#define OPENMW_ESM_LOCALS_H
+#ifndef OPENFALLOUT_ESM_LOCALS_H
+#define OPENFALLOUT_ESM_LOCALS_H
 
 #include <string>
 #include <vector>

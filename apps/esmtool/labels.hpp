@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESMTOOL_LABELS_H
-#define OPENMW_ESMTOOL_LABELS_H
+#ifndef OPENFALLOUT_ESMTOOL_LABELS_H
+#define OPENFALLOUT_ESMTOOL_LABELS_H
 
 #include <cstdint>
 #include <string>

@@ -802,7 +802,7 @@ namespace MWGui
 
     void Console::updateConsoleTitle()
     {
-        std::string title = "#{OMWEngine:ConsoleWindow}";
+        std::string title = "#{OFEngine:ConsoleWindow}";
         if (!mConsoleMode.empty())
             title = mConsoleMode + " " + title;
         if (!mPtr.isEmpty())

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_DIALOGUESTATE_H
-#define OPENMW_ESM_DIALOGUESTATE_H
+#ifndef OPENFALLOUT_ESM_DIALOGUESTATE_H
+#define OPENFALLOUT_ESM_DIALOGUESTATE_H
 
 #include <components/esm/refid.hpp>
 #include <map>

@@ -1,5 +1,5 @@
-#ifndef OPENMW_GUI_SPELLMODEL_H
-#define OPENMW_GUI_SPELLMODEL_H
+#ifndef OPENFALLOUT_GUI_SPELLMODEL_H
+#define OPENFALLOUT_GUI_SPELLMODEL_H
 
 #include "../mwworld/ptr.hpp"
 #include <components/esm3/effectlist.hpp>

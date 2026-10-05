@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CELL_H
-#define OPENMW_ESM_CELL_H
+#ifndef OPENFALLOUT_ESM_CELL_H
+#define OPENFALLOUT_ESM_CELL_H
 
 #include <list>
 #include <string>

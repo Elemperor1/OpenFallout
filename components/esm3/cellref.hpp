@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CELLREF_H
-#define OPENMW_ESM_CELLREF_H
+#ifndef OPENFALLOUT_ESM_CELLREF_H
+#define OPENFALLOUT_ESM_CELLREF_H
 
 #include <cstdint>
 #include <string>

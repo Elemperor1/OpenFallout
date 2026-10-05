@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_OBJECTPAGING_H
-#define OPENMW_MWRENDER_OBJECTPAGING_H
+#ifndef OPENFALLOUT_MWRENDER_OBJECTPAGING_H
+#define OPENFALLOUT_MWRENDER_OBJECTPAGING_H
 
 #include <components/esm3/refnum.hpp>
 #include <components/resource/resourcemanager.hpp>

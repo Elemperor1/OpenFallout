@@ -11,7 +11,7 @@ set(ESMTOOL
 source_group(apps\\esmtool FILES ${ESMTOOL})
 
 # Main executable
-openmw_add_executable(esmtool
+openfallout_add_executable(esmtool
     ${ESMTOOL}
 )
 

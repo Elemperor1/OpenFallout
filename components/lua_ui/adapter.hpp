@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_ADAPTER
-#define OPENMW_LUAUI_ADAPTER
+#ifndef OPENFALLOUT_LUAUI_ADAPTER
+#define OPENFALLOUT_LUAUI_ADAPTER
 
 #include <memory>
 
@@ -30,4 +30,4 @@ namespace LuaUi
     };
 }
 
-#endif // !OPENMW_LUAUI_ADAPTER
+#endif // !OPENFALLOUT_LUAUI_ADAPTER

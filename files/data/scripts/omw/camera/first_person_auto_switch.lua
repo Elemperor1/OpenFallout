@@ -1,7 +1,7 @@
-local camera = require('openmw.camera')
-local util = require('openmw.util')
-local nearby = require('openmw.nearby')
-local self = require('openmw.self')
+local camera = require('openfallout.camera')
+local util = require('openfallout.util')
+local nearby = require('openfallout.nearby')
+local self = require('openfallout.self')
 
 local forcedFirstPerson = false
 local limitSwitch = 40

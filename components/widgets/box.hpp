@@ -1,5 +1,5 @@
-#ifndef OPENMW_WIDGETS_BOX_H
-#define OPENMW_WIDGETS_BOX_H
+#ifndef OPENFALLOUT_WIDGETS_BOX_H
+#define OPENFALLOUT_WIDGETS_BOX_H
 
 #include <MyGUI_Button.h>
 #include <MyGUI_ComboBox.h>

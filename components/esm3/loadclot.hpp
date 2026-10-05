@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CLOT_H
-#define OPENMW_ESM_CLOT_H
+#ifndef OPENFALLOUT_ESM_CLOT_H
+#define OPENFALLOUT_ESM_CLOT_H
 
 #include <cstdint>
 #include <string>

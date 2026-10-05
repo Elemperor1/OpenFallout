@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESSIMPORT_CONVERTACDT_H
-#define OPENMW_ESSIMPORT_CONVERTACDT_H
+#ifndef OPENFALLOUT_ESSIMPORT_CONVERTACDT_H
+#define OPENFALLOUT_ESSIMPORT_CONVERTACDT_H
 
 #include <components/esm3/animationstate.hpp>
 #include <components/esm3/creaturestats.hpp>

@@ -1,7 +1,7 @@
 /// Functions used to read raw binary data from .nif files
 
-#ifndef OPENMW_COMPONENTS_NIF_NIFSTREAM_HPP
-#define OPENMW_COMPONENTS_NIF_NIFSTREAM_HPP
+#ifndef OPENFALLOUT_COMPONENTS_NIF_NIFSTREAM_HPP
+#define OPENFALLOUT_COMPONENTS_NIF_NIFSTREAM_HPP
 
 #include <array>
 #include <cassert>

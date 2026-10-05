@@ -49,7 +49,7 @@ Properties
     - | Modulate `alpha` with parents `alpha`.
       | If the parent has `inheritAlpha` set to `true`, the value after modulating is passed to the child.
   * - cursor
-    - `CursorResource <../openmw_ui.html##(CursorResource)>`_
+    - `CursorResource <../openfallout_ui.html##(CursorResource)>`_
     - Sets the cursor to be displayed when hovering over this widget.
   * - resource
     - ui.texture
@@ -79,13 +79,13 @@ The event is still allowed to propagate if the event handler returns `true`.
     - first argument type
     - description
   * - keyPress
-    - `KeyboardEvent <../openmw_input.html##(KeyboardEvent)>`_
+    - `KeyboardEvent <../openfallout_input.html##(KeyboardEvent)>`_
     - A key was pressed with this widget in focus
   * - keyRelease
-    - `KeyboardEvent <../openmw_input.html##(KeyboardEvent)>`_
+    - `KeyboardEvent <../openfallout_input.html##(KeyboardEvent)>`_
     - A key was released with this widget in focus
   * - mouseMove
-    - `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    - `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - | Mouse cursor moved on this widget
       | `MouseEvent.button` is the mouse button being held
       | (nil when simply moving, and not dragging)
@@ -96,10 +96,10 @@ The event is still allowed to propagate if the event handler returns `true`.
     - nil
     - Widget was double clicked with left mouse button
   * - mousePress  
-    - `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    - `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - A mouse button was pressed on this widget
   * - mouseRelease  
-    -  `MouseEvent <../openmw_ui.html##(MouseEvent)>`_
+    -  `MouseEvent <../openfallout_ui.html##(MouseEvent)>`_
     - A mouse button was released on this widget
   * - focusGain
     - nil

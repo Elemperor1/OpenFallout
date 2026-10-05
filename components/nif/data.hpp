@@ -1,5 +1,5 @@
-#ifndef OPENMW_COMPONENTS_NIF_DATA_HPP
-#define OPENMW_COMPONENTS_NIF_DATA_HPP
+#ifndef OPENFALLOUT_COMPONENTS_NIF_DATA_HPP
+#define OPENFALLOUT_COMPONENTS_NIF_DATA_HPP
 
 #include "nifkey.hpp"
 #include "niftypes.hpp" // NiTransform

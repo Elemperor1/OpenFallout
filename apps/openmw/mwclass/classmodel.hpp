@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWCLASS_CLASSMODEL_H
-#define OPENMW_MWCLASS_CLASSMODEL_H
+#ifndef OPENFALLOUT_MWCLASS_CLASSMODEL_H
+#define OPENFALLOUT_MWCLASS_CLASSMODEL_H
 
 #include "../mwworld/livecellref.hpp"
 #include "../mwworld/ptr.hpp"

@@ -1,6 +1,6 @@
-local anim = require('openmw.animation')
-local self = require('openmw.self')
-local auxUtil = require('openmw_aux.util')
+local anim = require('openfallout.animation')
+local self = require('openfallout.self')
+local auxUtil = require('openfallout_aux.util')
 
 local playBlendedHandlers = {}
 local function onPlayBlendedAnimation(groupname, options)
@@ -58,8 +58,8 @@ return {
     -- Animation controller interface
     -- @module AnimationController
     -- @context local
-    -- @usage local anim = require('openmw.animation')
-    -- local I = require('openmw.interfaces')
+    -- @usage local anim = require('openfallout.animation')
+    -- local I = require('openfallout.interfaces')
     --
     -- -- play spellcast animation 
     -- I.AnimationController.playBlendedAnimation('spellcast', { startkey = 'self start', stopkey = 'self stop', priority = {
@@ -105,10 +105,10 @@ return {
         --- AnimationController Package
         -- @type Package
         
-        --- Make this actor play an animation. Makes a call to @{openmw.animation#playBlended}, after invoking handlers added through addPlayBlendedAnimationHandler
+        --- Make this actor play an animation. Makes a call to @{openfallout.animation#playBlended}, after invoking handlers added through addPlayBlendedAnimationHandler
         -- @function [parent=#AnimationController] playBlendedAnimation
         -- @param #string groupname The animation group to be played
-        -- @param #table options The table of play options that will be passed to @{openmw.animation#playBlended}
+        -- @param #table options The table of play options that will be passed to @{openfallout.animation#playBlended}
         playBlendedAnimation = playBlendedAnimation,
 
         --- Add a new playBlendedAnimation handler for this actor

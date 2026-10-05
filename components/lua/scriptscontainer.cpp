@@ -45,7 +45,7 @@ namespace LuaUtil
             LoadedData& data = mData.emplace<LoadedData>();
             mLua.protectedCall([&](LuaView& view) {
                 data.mPublicInterfaces = sol::table(view.sol(), sol::create);
-                addPackage("openmw.interfaces", makeReadOnly(data.mPublicInterfaces));
+                addPackage("openfallout.interfaces", makeReadOnly(data.mPublicInterfaces));
             });
         }
     }
@@ -560,7 +560,7 @@ namespace LuaUtil
 
         mLua.protectedCall([&](LuaView& view) {
             data.mPublicInterfaces = sol::table(view.sol(), sol::create);
-            addPackage("openmw.interfaces", makeReadOnly(data.mPublicInterfaces));
+            addPackage("openfallout.interfaces", makeReadOnly(data.mPublicInterfaces));
 
             const double currentRealTime = getRealTime();
 
@@ -637,7 +637,7 @@ namespace LuaUtil
             return *data;
         UnloadedData data;
         save(view, data);
-        mAPI.erase("openmw.interfaces");
+        mAPI.erase("openfallout.interfaces");
         UnloadedData& out = mData.emplace<UnloadedData>(std::move(data));
         for (auto& [_, handlers] : mEngineHandlers)
             handlers->mList.clear();

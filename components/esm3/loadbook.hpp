@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_BOOK_H
-#define OPENMW_ESM_BOOK_H
+#ifndef OPENFALLOUT_ESM_BOOK_H
+#define OPENFALLOUT_ESM_BOOK_H
 
 #include <components/esm/defs.hpp>
 #include <components/esm/path.hpp>

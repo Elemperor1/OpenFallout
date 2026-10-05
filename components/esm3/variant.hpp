@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_VARIANT_H
-#define OPENMW_ESM_VARIANT_H
+#ifndef OPENFALLOUT_ESM_VARIANT_H
+#define OPENFALLOUT_ESM_VARIANT_H
 
 #include <iosfwd>
 #include <string>

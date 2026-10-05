@@ -159,8 +159,8 @@ def run_test(
         stderr=subprocess.STDOUT,
         encoding="utf-8",
         env={
-            "OPENMW_OSG_STATS_FILE": str(log_dir / f"{suite_name}.{time_str}.osg_stats.log"),
-            "OPENMW_OSG_STATS_LIST": "times",
+            "OPENFALLOUT_OSG_STATS_FILE": str(log_dir / f"{suite_name}.{time_str}.osg_stats.log"),
+            "OPENFALLOUT_OSG_STATS_LIST": "times",
             **os.environ,
         },
     ) as process:

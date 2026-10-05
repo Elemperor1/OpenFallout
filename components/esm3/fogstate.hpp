@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_FOGSTATE_H
-#define OPENMW_ESM_FOGSTATE_H
+#ifndef OPENFALLOUT_ESM_FOGSTATE_H
+#define OPENFALLOUT_ESM_FOGSTATE_H
 
 #include <cstdint>
 #include <vector>

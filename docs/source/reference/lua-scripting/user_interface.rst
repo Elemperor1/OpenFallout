@@ -8,15 +8,15 @@ Layouts
 
 Every widget is defined by a layout, which is a Lua table with the following fields (all of them are optional):
 
-1. `type`: One of the available widget types from `openmw.ui.TYPE`.
+1. `type`: One of the available widget types from `openfallout.ui.TYPE`.
 2. | `props`: A Lua table, containing all the properties values.
    | Properties define most of the information about the widget: its position, data it displays, etc.
    | See the widget pages (table below) for details on specific properties.
    | Properties of the basic Widget are inherited by all the other widgets.
-3. | `events`: A Lua table, containing `openmw.async.callback` values, which trigger on various interactions with the widget.
+3. | `events`: A Lua table, containing `openfallout.async.callback` values, which trigger on various interactions with the widget.
    | See the Widget pages for details on specific events.
    | Events of the basic Widget are inherited by all the other widgets.
-4. `content`: a Content (`openmw.ui.content`), which contains layouts for the children of this widget.
+4. `content`: a Content (`openfallout.ui.content`), which contains layouts for the children of this widget.
 5. | `name`: an arbitrary string, the only limitatiion is it being unique within a `Content`.
    | Helpful for navigatilng through the layouts.
 6. `layer`: only applies for the root widget. (Windows, HUD, etc)
@@ -68,7 +68,7 @@ Templates are Lua tables with the following (optional) fields:
 Events
 ------
 
-| A table mapping event names to `openmw.async.callback` s.
+| A table mapping event names to `openfallout.async.callback` s.
 | When an event triggers, the callback is called with two arguments:
    an event-specific value, and that widget's layout table.
 | See the Widget type pages for information on what events exist, and which first argument they pass. 
@@ -93,10 +93,10 @@ Example
 
       .. code-block:: lua
 
-         local ui = require('openmw.ui')
-         local util = require('openmw.util')
-         local calendar = require('openmw_aux.calendar')
-         local time = require('openmw_aux.time')
+         local ui = require('openfallout.ui')
+         local util = require('openfallout.util')
+         local calendar = require('openfallout_aux.calendar')
+         local time = require('openfallout_aux.time')
 
          local element = ui.create {
             -- important not to forget the layer

@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_LEVLISTS_H
-#define OPENMW_ESM_LEVLISTS_H
+#ifndef OPENFALLOUT_ESM_LEVLISTS_H
+#define OPENFALLOUT_ESM_LEVLISTS_H
 
 #include <string>
 #include <vector>

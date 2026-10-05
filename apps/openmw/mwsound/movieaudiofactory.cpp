@@ -47,7 +47,7 @@ namespace MWSound
 
         size_t getSampleOffset()
         {
-#if OPENMW_FFMPEG_5_OR_GREATER
+#if OPENFALLOUT_FFMPEG_5_OR_GREATER
             const ssize_t clockDelay = (mFrameSize - mFramePos) / mOutputChannelLayout.nb_channels
 #else
             const ssize_t clockDelay = (mFrameSize - mFramePos)

@@ -1,10 +1,10 @@
-local storage = require('openmw.storage')
-local async = require('openmw.async')
-local I = require('openmw.interfaces')
+local storage = require('openfallout.storage')
+local async = require('openfallout.async')
+local I = require('openfallout.interfaces')
 
 I.Settings.registerPage({
-    key = 'OMWCamera',
-    l10n = 'OMWCamera',
+    key = 'OFCamera',
+    l10n = 'OFCamera',
     name = 'Camera',
     description = 'settingsPageDescription',
 })
@@ -34,8 +34,8 @@ end
 
 I.Settings.registerGroup({
     key = thirdPersonGroup,
-    page = 'OMWCamera',
-    l10n = 'OMWCamera',
+    page = 'OFCamera',
+    l10n = 'OFCamera',
     name = 'thirdPersonSettings',
     permanentStorage = true,
     order = 0,
@@ -58,8 +58,8 @@ I.Settings.registerGroup({
 
 I.Settings.registerGroup({
     key = headBobbingGroup,
-    page = 'OMWCamera',
-    l10n = 'OMWCamera',
+    page = 'OFCamera',
+    l10n = 'OFCamera',
     name = 'headBobbingSettings',
     permanentStorage = true,
     order = 1,

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_REPAIR_H
-#define OPENMW_MWGUI_REPAIR_H
+#ifndef OPENFALLOUT_MWGUI_REPAIR_H
+#define OPENFALLOUT_MWGUI_REPAIR_H
 
 #include <memory>
 

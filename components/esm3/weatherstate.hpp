@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_WEATHERSTATE_H
-#define OPENMW_ESM_WEATHERSTATE_H
+#ifndef OPENFALLOUT_ESM_WEATHERSTATE_H
+#define OPENFALLOUT_ESM_WEATHERSTATE_H
 
 #include <components/esm/refid.hpp>
 #include <map>

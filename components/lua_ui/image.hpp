@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_IMAGE
-#define OPENMW_LUAUI_IMAGE
+#ifndef OPENFALLOUT_LUAUI_IMAGE
+#define OPENFALLOUT_LUAUI_IMAGE
 
 #include <vector>
 
@@ -38,4 +38,4 @@ namespace LuaUi
     };
 }
 
-#endif // OPENMW_LUAUI_IMAGE
+#endif // OPENFALLOUT_LUAUI_IMAGE

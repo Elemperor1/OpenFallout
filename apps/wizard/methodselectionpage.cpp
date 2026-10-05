@@ -17,7 +17,7 @@ Wizard::MethodSelectionPage::MethodSelectionPage(QWidget* parent)
     folderIcon->setIcon(Misc::ScalableIcon::load(":folder"));
     buyLinkButton->setIcon(Misc::ScalableIcon::load(":dollar"));
 
-#ifndef OPENMW_USE_UNSHIELD
+#ifndef OPENFALLOUT_USE_UNSHIELD
     retailDiscRadioButton->setEnabled(false);
     existingLocationRadioButton->setChecked(true);
 #endif

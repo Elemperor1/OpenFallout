@@ -1,5 +1,5 @@
 local testing = require('testing_util')
-local core = require('openmw.core')
+local core = require('openfallout.core')
 
 function iterateOverRecords(records)
     local firstRecordId = nil

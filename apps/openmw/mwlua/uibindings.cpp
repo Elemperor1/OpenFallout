@@ -414,7 +414,7 @@ namespace MWLua
 
     sol::table initUserInterfacePackage(const Context& context)
     {
-        if (context.initializeOnce("openmw_ui_usertypes"))
+        if (context.initializeOnce("openfallout_ui_usertypes"))
         {
             auto textureResource = context.sol().new_usertype<LuaUi::TextureResource>("TextureResource");
             textureResource[sol::meta_function::to_string] = [](const LuaUi::TextureResource& resource) {
@@ -471,13 +471,13 @@ namespace MWLua
                 = [](LuaUi::Layer& self) { return std::format("UiLayer({})", self.name()); };
         }
 
-        sol::object cached = context.getTypePackage("openmw_ui");
+        sol::object cached = context.getTypePackage("openfallout_ui");
         if (cached != sol::nil)
             return cached;
         else
         {
             sol::table api = LuaUtil::makeReadOnly(registerUiApi(context));
-            return context.setTypePackage(api, "openmw_ui");
+            return context.setTypePackage(api, "openfallout_ui");
         }
     }
 }

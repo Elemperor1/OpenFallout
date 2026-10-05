@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWRENDER_GROUNDCOVER_H
-#define OPENMW_MWRENDER_GROUNDCOVER_H
+#ifndef OPENFALLOUT_MWRENDER_GROUNDCOVER_H
+#define OPENFALLOUT_MWRENDER_GROUNDCOVER_H
 
 #include <components/esm3/loadcell.hpp>
 #include <components/resource/scenemanager.hpp>

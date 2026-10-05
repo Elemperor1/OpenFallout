@@ -1,8 +1,8 @@
-local async = require('openmw.async')
-local core = require('openmw.core')
-local types = require('openmw.types')
-local world = require('openmw.world')
-local auxUtil = require('openmw_aux.util')
+local async = require('openfallout.async')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
+local world = require('openfallout.world')
+local auxUtil = require('openfallout_aux.util')
 
 local EnableObject = async:registerTimerCallback('EnableObject', function(obj) obj.enabled = true end)
 
@@ -52,7 +52,7 @@ return {
     ---
     -- @module Activation
     -- @context global
-    -- @usage require('openmw.interfaces').Activation
+    -- @usage require('openfallout.interfaces').Activation
     interface = {
         --- Interface version
         -- @field [parent=#Activation] #number version
@@ -62,7 +62,7 @@ return {
         -- If `handler(object, actor)` returns false, other handlers for
         -- the same object (including type handlers) will be skipped.
         -- @function [parent=#Activation] addHandlerForObject
-        -- @param openmw.core#GameObject obj The object.
+        -- @param openfallout.core#GameObject obj The object.
         -- @param #function handler The handler.
         addHandlerForObject = function(obj, handler)
             local handlers = handlersPerObject[obj.id]
@@ -77,7 +77,7 @@ return {
         -- If `handler(object, actor)` returns false, other handlers for
         -- the same object (including type handlers) will be skipped.
         -- @function [parent=#Activation] addHandlerForType
-        -- @param #any type A type from the `openmw.types` package.
+        -- @param #any type A type from the `openfallout.types` package.
         -- @param #function handler The handler.
         addHandlerForType = function(type, handler)
             local handlers = handlersPerType[type]

@@ -4,7 +4,7 @@ set(NIFTEST
 source_group(components\\nif\\tests FILES ${NIFTEST})
 
 # Main executable
-openmw_add_executable(niftest
+openfallout_add_executable(niftest
     ${NIFTEST}
 )
 

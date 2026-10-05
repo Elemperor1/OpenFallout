@@ -1,6 +1,6 @@
-local core = require('openmw.core')
-local ui = require('openmw.ui')
-local util = require('openmw.util')
+local core = require('openfallout.core')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
 
 return {
     textNormalSize = ui._getDefaultFontSize(),

@@ -1,5 +1,5 @@
-#ifndef OPENMW_MECHANICS_AITIMER_H
-#define OPENMW_MECHANICS_AITIMER_H
+#ifndef OPENFALLOUT_MECHANICS_AITIMER_H
+#define OPENFALLOUT_MECHANICS_AITIMER_H
 
 #include <components/misc/rng.hpp>
 #include <components/misc/timer.hpp>

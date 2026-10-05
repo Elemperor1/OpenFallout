@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWPHYSICS_OBJECT_H
-#define OPENMW_MWPHYSICS_OBJECT_H
+#ifndef OPENFALLOUT_MWPHYSICS_OBJECT_H
+#define OPENFALLOUT_MWPHYSICS_OBJECT_H
 
 #include "ptrholder.hpp"
 #include <memory>

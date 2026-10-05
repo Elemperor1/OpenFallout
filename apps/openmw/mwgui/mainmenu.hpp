@@ -1,5 +1,5 @@
-#ifndef OPENMW_GAME_MWGUI_MAINMENU_H
-#define OPENMW_GAME_MWGUI_MAINMENU_H
+#ifndef OPENFALLOUT_GAME_MWGUI_MAINMENU_H
+#define OPENFALLOUT_GAME_MWGUI_MAINMENU_H
 
 #include <memory>
 #include <optional>

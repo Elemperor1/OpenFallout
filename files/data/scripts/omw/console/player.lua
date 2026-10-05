@@ -1,7 +1,7 @@
-local ui = require('openmw.ui')
-local util = require('openmw.util')
-local self = require('openmw.self')
-local core = require('openmw.core')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
+local self = require('openfallout.self')
+local core = require('openfallout.core')
 
 local function printHelp()
     local msg = [[
@@ -11,7 +11,7 @@ exit() - exit Lua mode
 selected - currently selected object (click on any object to change)
 view(_G) - print content of the table `_G` (current environment)
     standard libraries (math, string, etc.) are loaded by default but not visible in `_G`
-view(types, 2) - print table `types` (i.e. `openmw.types`) and its subtables (2 - traversal depth)]]
+view(types, 2) - print table `types` (i.e. `openfallout.types`) and its subtables (2 - traversal depth)]]
     ui.printToConsole(msg, ui.CONSOLE_COLOR.Info)
 end
 
@@ -66,27 +66,27 @@ local function setSelected(obj)
 end
 
 local env = {
-    I = require('openmw.interfaces'),
-    util = require('openmw.util'),
-    storage = require('openmw.storage'),
-    core = require('openmw.core'),
-    types = require('openmw.types'),
-    vfs = require('openmw.vfs'),
-    markup = require('openmw.markup'),
-    ambient = require('openmw.ambient'),
-    async = require('openmw.async'),
-    nearby = require('openmw.nearby'),
-    self = require('openmw.self'),
-    input = require('openmw.input'),
-    postprocessing = require('openmw.postprocessing'),
-    anim = require('openmw.animation'),
-    ui = require('openmw.ui'),
-    camera = require('openmw.camera'),
-    aux_util = require('openmw_aux.util'),
-    debug = require('openmw.debug'),
-    calendar = require('openmw_aux.calendar'),
-    time = require('openmw_aux.time'),
-    view = require('openmw_aux.util').deepToString,
+    I = require('openfallout.interfaces'),
+    util = require('openfallout.util'),
+    storage = require('openfallout.storage'),
+    core = require('openfallout.core'),
+    types = require('openfallout.types'),
+    vfs = require('openfallout.vfs'),
+    markup = require('openfallout.markup'),
+    ambient = require('openfallout.ambient'),
+    async = require('openfallout.async'),
+    nearby = require('openfallout.nearby'),
+    self = require('openfallout.self'),
+    input = require('openfallout.input'),
+    postprocessing = require('openfallout.postprocessing'),
+    anim = require('openfallout.animation'),
+    ui = require('openfallout.ui'),
+    camera = require('openfallout.camera'),
+    aux_util = require('openfallout_aux.util'),
+    debug = require('openfallout.debug'),
+    calendar = require('openfallout_aux.calendar'),
+    time = require('openfallout_aux.time'),
+    view = require('openfallout_aux.util').deepToString,
     print = printToConsole,
     exit = exitLuaMode,
     help = printHelp,
@@ -136,7 +136,7 @@ Usage: 'lua menu' or 'luam' - enter menu context
             setContext()
         elseif cmd == 'luas' then
             if selectedObject then
-                core.sendGlobalEvent('OMWConsoleStartLocal', {player=self.object, selected=selectedObject})
+                core.sendGlobalEvent('OFConsoleStartLocal', {player=self.object, selected=selectedObject})
             else
                 ui.printToConsole('No selected object', ui.CONSOLE_COLOR.Error)
             end
@@ -148,9 +148,9 @@ Usage: 'lua menu' or 'luam' - enter menu context
             executeLuaCode(cmd)
             if env.selected ~= selectedObject then setSelected(env.selected) end
         elseif currentSelf then
-            currentSelf:sendEvent('OMWConsoleEval', {player=self.object, code=cmd, selected=selectedObject})
+            currentSelf:sendEvent('OFConsoleEval', {player=self.object, code=cmd, selected=selectedObject})
         else
-            core.sendGlobalEvent('OMWConsoleEval', {player=self.object, code=cmd, selected=selectedObject})
+            core.sendGlobalEvent('OFConsoleEval', {player=self.object, code=cmd, selected=selectedObject})
         end
     end
 end
@@ -158,11 +158,11 @@ end
 return {
     engineHandlers = {onConsoleCommand = onConsoleCommand},
     eventHandlers = {
-        OMWConsolePrint = function(msg) ui.printToConsole(tostring(msg), ui.CONSOLE_COLOR.Info) end,
-        OMWConsoleError = function(msg) ui.printToConsole(tostring(msg), ui.CONSOLE_COLOR.Error) end,
-        OMWConsoleSetContext = setContext,
-        OMWConsoleSetSelected = setSelected,
-        OMWConsoleExit = exitLuaMode,
-        OMWConsoleHelp = printHelp,
+        OFConsolePrint = function(msg) ui.printToConsole(tostring(msg), ui.CONSOLE_COLOR.Info) end,
+        OFConsoleError = function(msg) ui.printToConsole(tostring(msg), ui.CONSOLE_COLOR.Error) end,
+        OFConsoleSetContext = setContext,
+        OFConsoleSetSelected = setSelected,
+        OFConsoleExit = exitLuaMode,
+        OFConsoleHelp = printHelp,
     }
 }

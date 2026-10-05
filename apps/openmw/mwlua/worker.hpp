@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWLUA_WORKER_H
-#define OPENMW_MWLUA_WORKER_H
+#ifndef OPENFALLOUT_MWLUA_WORKER_H
+#define OPENFALLOUT_MWLUA_WORKER_H
 
 #include <osg/Timer>
 #include <osg/ref_ptr>
@@ -64,4 +64,4 @@ namespace MWLua
     };
 }
 
-#endif // OPENMW_MWLUA_LUAWORKER_H
+#endif // OPENFALLOUT_MWLUA_LUAWORKER_H

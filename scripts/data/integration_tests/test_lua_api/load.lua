@@ -1,4 +1,4 @@
-local content = require('openmw.content')
+local content = require('openfallout.content')
 
 local function testApparatusContent()
     local apparatuses = content.apparatuses.records

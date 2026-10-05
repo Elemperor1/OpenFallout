@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CELLSTATE_H
-#define OPENMW_ESM_CELLSTATE_H
+#ifndef OPENFALLOUT_ESM_CELLSTATE_H
+#define OPENFALLOUT_ESM_CELLSTATE_H
 
 #include "components/esm/defs.hpp"
 #include "components/esm/refid.hpp"

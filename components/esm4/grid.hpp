@@ -24,8 +24,8 @@
   trial & error.  See http://en.uesp.net/wiki for details.
 
 */
-#ifndef OPENMW_COMPONENTS_ESM4_GRID_H
-#define OPENMW_COMPONENTS_ESM4_GRID_H
+#ifndef OPENFALLOUT_COMPONENTS_ESM4_GRID_H
+#define OPENFALLOUT_COMPONENTS_ESM4_GRID_H
 
 #include <cstdint>
 
@@ -38,4 +38,4 @@ namespace ESM4
     };
 }
 
-#endif // OPENMW_COMPONENTS_ESM4_GRID_H
+#endif // OPENFALLOUT_COMPONENTS_ESM4_GRID_H

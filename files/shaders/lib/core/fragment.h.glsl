@@ -1,5 +1,5 @@
-#ifndef OPENMW_FRAGMENT_H_GLSL
-#define OPENMW_FRAGMENT_H_GLSL
+#ifndef OPENFALLOUT_FRAGMENT_H_GLSL
+#define OPENFALLOUT_FRAGMENT_H_GLSL
 
 @link "lib/core/fragment.glsl" if !@useOVR_multiview
 @link "lib/core/fragment_multiview.glsl" if @useOVR_multiview
@@ -24,4 +24,4 @@ vec3 doSpecularLighting(vec2 screenCoord, vec3 viewPos, vec3 viewNormal);
 
 Material getMaterial();
 
-#endif  // OPENMW_FRAGMENT_H_GLSL
+#endif  // OPENFALLOUT_FRAGMENT_H_GLSL

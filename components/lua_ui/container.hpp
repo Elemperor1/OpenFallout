@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_CONTAINER
-#define OPENMW_LUAUI_CONTAINER
+#ifndef OPENFALLOUT_LUAUI_CONTAINER
+#define OPENFALLOUT_LUAUI_CONTAINER
 
 #include "widget.hpp"
 
@@ -25,4 +25,4 @@ namespace LuaUi
     };
 }
 
-#endif // !OPENMW_LUAUI_CONTAINER
+#endif // !OPENFALLOUT_LUAUI_CONTAINER

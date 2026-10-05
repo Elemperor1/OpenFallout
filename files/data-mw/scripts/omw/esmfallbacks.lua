@@ -1,4 +1,4 @@
-local content = require('openmw.content')
+local content = require('openfallout.content')
 
 local function asNumber(value)
     if type(value) ~= 'number' then

@@ -4,7 +4,7 @@ set(BSATOOL
 source_group(apps\\bsatool FILES ${BSATOOL})
 
 # Main executable
-openmw_add_executable(bsatool
+openfallout_add_executable(bsatool
     ${BSATOOL}
 )
 

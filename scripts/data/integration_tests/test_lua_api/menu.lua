@@ -1,6 +1,6 @@
 ﻿local testing = require('testing_util')
 local matchers = require('matchers')
-local menu = require('openmw.menu')
+local menu = require('openfallout.menu')
 
 testing.setSetupGlobalTest(function()
     menu.newGame({bypass = true})

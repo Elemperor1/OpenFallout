@@ -1,4 +1,4 @@
-if(OPENMW_USE_SYSTEM_BENCHMARK)
+if(OPENFALLOUT_USE_SYSTEM_BENCHMARK)
     find_package(benchmark REQUIRED)
 endif()
 

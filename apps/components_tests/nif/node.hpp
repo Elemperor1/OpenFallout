@@ -1,5 +1,5 @@
-#ifndef OPENMW_TEST_SUITE_NIF_NODE_H
-#define OPENMW_TEST_SUITE_NIF_NODE_H
+#ifndef OPENFALLOUT_TEST_SUITE_NIF_NODE_H
+#define OPENFALLOUT_TEST_SUITE_NIF_NODE_H
 
 #include <components/nif/data.hpp>
 #include <components/nif/node.hpp>

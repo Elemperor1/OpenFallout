@@ -6,7 +6,7 @@
         <Property key="Spacing" value="8"/>
 
         <Widget type="ComboBox" skin="MW_ComboBox" position="0 0 0 24" name="SelectCharacter">
-            <Property key="Caption" value="#{OMWEngine:SelectCharacter}"/>
+            <Property key="Caption" value="#{OFEngine:SelectCharacter}"/>
             <UserString key="HStretch" value="true"/>
         </Widget>
 
@@ -60,7 +60,7 @@
 
             <UserString key="HStretch" value="true"/>
             <Widget type="AutoSizedButton" skin="MW_Button" name="DeleteButton">
-                <Property key="Caption" value="#{OMWEngine:DeleteGame}"/>
+                <Property key="Caption" value="#{OFEngine:DeleteGame}"/>
             </Widget>
 
             <Widget type="EditBox" skin="MW_TextEdit" name="SaveNameEdit">

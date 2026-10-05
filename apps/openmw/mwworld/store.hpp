@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWWORLD_STORE_H
-#define OPENMW_MWWORLD_STORE_H
+#ifndef OPENFALLOUT_MWWORLD_STORE_H
+#define OPENFALLOUT_MWWORLD_STORE_H
 
 #include <map>
 #include <set>

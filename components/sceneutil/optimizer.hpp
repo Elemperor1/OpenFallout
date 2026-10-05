@@ -14,8 +14,8 @@
 
 /* Modified for OpenMW */
 
-#ifndef OPENMW_OSGUTIL_OPTIMIZER
-#define OPENMW_OSGUTIL_OPTIMIZER
+#ifndef OPENFALLOUT_OSGUTIL_OPTIMIZER
+#define OPENFALLOUT_OSGUTIL_OPTIMIZER
 
 #include <osg/NodeVisitor>
 #include <osg/Matrix>

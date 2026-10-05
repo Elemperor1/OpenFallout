@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_RESOURCES
-#define OPENMW_LUAUI_RESOURCES
+#ifndef OPENFALLOUT_LUAUI_RESOURCES
+#define OPENFALLOUT_LUAUI_RESOURCES
 
 #include <functional>
 #include <memory>
@@ -155,4 +155,4 @@ namespace LuaUi
     };
 }
 
-#endif // OPENMW_LUAUI_LAYERS
+#endif // OPENFALLOUT_LUAUI_LAYERS

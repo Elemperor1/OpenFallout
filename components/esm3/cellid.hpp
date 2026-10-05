@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_CELLID_H
-#define OPENMW_ESM_CELLID_H
+#ifndef OPENFALLOUT_ESM_CELLID_H
+#define OPENFALLOUT_ESM_CELLID_H
 
 #include <components/esm/refid.hpp>
 #include <cstdint>

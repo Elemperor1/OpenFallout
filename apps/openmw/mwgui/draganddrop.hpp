@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_DRAGANDDROP_H
-#define OPENMW_MWGUI_DRAGANDDROP_H
+#ifndef OPENFALLOUT_MWGUI_DRAGANDDROP_H
+#define OPENFALLOUT_MWGUI_DRAGANDDROP_H
 
 #include "itemmodel.hpp"
 #include "itemwidget.hpp"

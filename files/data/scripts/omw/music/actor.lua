@@ -1,13 +1,13 @@
-local AI = require("openmw.interfaces").AI
-local self = require("openmw.self")
-local types = require("openmw.types")
-local nearby = require("openmw.nearby")
+local AI = require("openfallout.interfaces").AI
+local self = require("openfallout.self")
+local types = require("openfallout.types")
+local nearby = require("openfallout.nearby")
 
 local targets = {}
 
 local function emitTargetsChanged()
     for _, actor in ipairs(nearby.players) do
-        actor:sendEvent("OMWMusicCombatTargetsChanged", { actor = self, targets = targets })
+        actor:sendEvent("OFMusicCombatTargetsChanged", { actor = self, targets = targets })
     end
 end
 

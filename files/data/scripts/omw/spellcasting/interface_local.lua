@@ -1,18 +1,18 @@
-local auxUtil = require('openmw_aux.util')
-local core = require('openmw.core')
-local I = require('openmw.interfaces')
+local auxUtil = require('openfallout_aux.util')
+local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
 
 ---
 -- Table describing a spell cast
 -- @type SpellCastInfo
 -- @field #string id Record ID of a spell, enchantment, enchanted item, potion, or ingredient
--- @field openmw.core#GameObject caster (Optional) The caster
--- @field openmw.core#GameObject target (Optional) The spell target (Normally nil, can be set to force a spell to hit the given target)
--- @field openmw.types#Item item (Optional) The enchanted item
+-- @field openfallout.core#GameObject caster (Optional) The caster
+-- @field openfallout.core#GameObject target (Optional) The spell target (Normally nil, can be set to force a spell to hit the given target)
+-- @field openfallout.types#Item item (Optional) The enchanted item
 
 --- Basic spell casting interface
 -- @module SpellCasting
--- @usage require('openmw.interfaces').SpellCasting
+-- @usage require('openfallout.interfaces').SpellCasting
 
 local applyMagicEffectsHandlers = {}
 
@@ -45,9 +45,9 @@ return {
         -- @param #SpellCastInfo spellCast The spell info
         -- @param #table options Explosion options
         --
-        --   * `position` - @{openmw.util#Vector3} world position of the explosion
-        --   * `range` - @{openmw.core#SpellRange} Which effects (self, touch, target) to consider. If not set, all effects with aoe will explode.
-        --   * `ignore` - @{#set<#string>} Set of unique ids (see @{openmw.core#GameObject.id}) of objects to be ignored by aoe.
+        --   * `position` - @{openfallout.util#Vector3} world position of the explosion
+        --   * `range` - @{openfallout.core#SpellRange} Which effects (self, touch, target) to consider. If not set, all effects with aoe will explode.
+        --   * `ignore` - @{#set<#string>} Set of unique ids (see @{openfallout.core#GameObject.id}) of objects to be ignored by aoe.
         explodeSpell = function(spellCast, options)
             core.sendGlobalEvent('ExplodeSpell', {spellCast = spellCast, options = options})
         end,
@@ -56,8 +56,8 @@ return {
         -- inflicts effects on the target, and does not explode the spell even if it has AOE effects.
         -- @function [parent=#SpellCasting] inflict
         -- @param #SpellCastInfo spellCast
-        -- @param openmw.core#GameObject target Must be either a @{openmw.types#Actor} or @{openmw.types#Lockable}
-        -- @param openmw.core#SpellRange range
+        -- @param openfallout.core#GameObject target Must be either a @{openfallout.types#Actor} or @{openfallout.types#Lockable}
+        -- @param openfallout.core#SpellRange range
         inflict = function(spellCast, target, range)
         end,
     },

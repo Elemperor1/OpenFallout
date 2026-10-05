@@ -7,27 +7,27 @@ namespace Version
 {
     std::string_view getVersion()
     {
-        return "@OPENMW_VERSION@";
+        return "@OPENFALLOUT_VERSION@";
     }
 
     std::string_view getCommitHash()
     {
-        return "@OPENMW_VERSION_COMMITHASH@";
+        return "@OPENFALLOUT_VERSION_COMMITHASH@";
     }
 
     std::string_view getTagHash()
     {
-        return "@OPENMW_VERSION_TAGHASH@";
+        return "@OPENFALLOUT_VERSION_TAGHASH@";
     }
 
     int getLuaApiRevision()
     {
-        return @OPENMW_LUA_API_REVISION@;
+        return @OPENFALLOUT_LUA_API_REVISION@;
     }
 
     int getPostprocessingApiRevision()
     {
-        return @OPENMW_POSTPROCESSING_API_REVISION@;
+        return @OPENFALLOUT_POSTPROCESSING_API_REVISION@;
     }
 
     std::string getOpenmwVersionDescription()
@@ -54,9 +54,9 @@ namespace Version
 
     std::string_view getDocumentationUrl()
     {
-        if constexpr (std::string_view("@OPENMW_VERSION_COMMITHASH@") == "@OPENMW_VERSION_TAGHASH@")
-            return "@OPENMW_DOC_BASEURL@openmw-@OPENMW_VERSION_MAJOR@.@OPENMW_VERSION_MINOR@.@OPENMW_VERSION_RELEASE@/";
+        if constexpr (std::string_view("@OPENFALLOUT_VERSION_COMMITHASH@") == "@OPENFALLOUT_VERSION_TAGHASH@")
+            return "@OPENFALLOUT_DOC_BASEURL@openmw-@OPENFALLOUT_VERSION_MAJOR@.@OPENFALLOUT_VERSION_MINOR@.@OPENFALLOUT_VERSION_RELEASE@/";
         else
-            return "@OPENMW_DOC_BASEURL@latest/";
+            return "@OPENFALLOUT_DOC_BASEURL@latest/";
     }
 }

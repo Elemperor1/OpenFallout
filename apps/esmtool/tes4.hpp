@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESMTOOL_TES4_H
-#define OPENMW_ESMTOOL_TES4_H
+#ifndef OPENFALLOUT_ESMTOOL_TES4_H
+#define OPENFALLOUT_ESMTOOL_TES4_H
 
 #include <fstream>
 #include <iosfwd>

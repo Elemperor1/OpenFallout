@@ -1,5 +1,5 @@
-#ifndef OPENMW_CONSTRAINEDFILESTREAM_H
-#define OPENMW_CONSTRAINEDFILESTREAM_H
+#ifndef OPENFALLOUT_CONSTRAINEDFILESTREAM_H
+#define OPENFALLOUT_CONSTRAINEDFILESTREAM_H
 
 #include "constrainedfilestreambuf.hpp"
 #include "istreamptr.hpp"

@@ -305,7 +305,7 @@ namespace MWLua
             };
         }
 
-        if (context.initializeOnce("openmw_cellbindings"))
+        if (context.initializeOnce("openfallout_cellbindings"))
         {
             auto pathGridT = view.new_usertype<ESM::Pathgrid>("ESM3_PathGrid");
             pathGridT[sol::meta_function::to_string] = [](const ESM::Pathgrid& rec) -> std::string {

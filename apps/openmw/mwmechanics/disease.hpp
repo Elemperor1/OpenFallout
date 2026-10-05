@@ -1,5 +1,5 @@
-#ifndef OPENMW_MECHANICS_DISEASE_H
-#define OPENMW_MECHANICS_DISEASE_H
+#ifndef OPENFALLOUT_MECHANICS_DISEASE_H
+#define OPENFALLOUT_MECHANICS_DISEASE_H
 
 #include <components/esm3/loadmgef.hpp>
 #include <components/misc/rng.hpp>

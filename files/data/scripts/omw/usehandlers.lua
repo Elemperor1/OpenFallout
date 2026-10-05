@@ -1,6 +1,6 @@
-local types = require('openmw.types')
-local world = require('openmw.world')
-local auxUtil = require('openmw_aux.util')
+local types = require('openfallout.types')
+local world = require('openfallout.world')
+local auxUtil = require('openfallout_aux.util')
 
 local handlersPerObject = {}
 local handlersPerType = {}
@@ -26,7 +26,7 @@ return {
     -- * can't intercept actions performed via quick keys menu.
     -- @module ItemUsage
     -- @context global
-    -- @usage local I = require('openmw.interfaces')
+    -- @usage local I = require('openfallout.interfaces')
     --
     -- -- Override Use action (global script).
     -- -- Forbid equipping armor with weight > 5
@@ -47,7 +47,7 @@ return {
         -- If `handler(object, actor, options)` returns false, other handlers for
         -- the same object (including type handlers) will be skipped.
         -- @function [parent=#ItemUsage] addHandlerForObject
-        -- @param openmw.core#GameObject obj The object.
+        -- @param openfallout.core#GameObject obj The object.
         -- @param #function handler The handler.
         addHandlerForObject = function(obj, handler)
             local handlers = handlersPerObject[obj.id]
@@ -62,7 +62,7 @@ return {
         -- If `handler(object, actor, options)` returns false, other handlers for
         -- the same object (including type handlers) will be skipped.
         -- @function [parent=#ItemUsage] addHandlerForType
-        -- @param #any type A type from the `openmw.types` package.
+        -- @param #any type A type from the `openfallout.types` package.
         -- @param #function handler The handler.
         addHandlerForType = function(type, handler)
             local handlers = handlersPerType[type]

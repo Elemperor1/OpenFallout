@@ -1,20 +1,20 @@
-local core = require('openmw.core')
-local I = require('openmw.interfaces')
-local self = require('openmw.self')
-local storage = require('openmw.storage')
-local types = require('openmw.types')
+local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
+local self = require('openfallout.self')
+local storage = require('openfallout.storage')
+local types = require('openfallout.types')
 local Actor = types.Actor
 local Player = types.Player
 local Creature = types.Creature
 local Armor = types.Armor
-local auxUtil = require('openmw_aux.util')
+local auxUtil = require('openfallout_aux.util')
 local isPlayer = Player.objectIsInstance(self)
 local common = require('scripts.omw.combat.common')
 
 local godMode = function() return false end
 if isPlayer then
-    -- openmw.debug is only allowed on player scripts
-    godMode = function() return require('openmw.debug').isGodMode() end
+    -- openfallout.debug is only allowed on player scripts
+    godMode = function() return require('openfallout.debug').isGodMode() end
 end
 
 local function applyArmor(attack)

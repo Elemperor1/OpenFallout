@@ -21,10 +21,10 @@ Escort another actor to the given location.
     - boolean [default=true]
     - whether to cancel all other AI packages
   * - target
-    - `GameObject <../openmw_core.html##(GameObject)>`_ [required]
+    - `GameObject <../openfallout_core.html##(GameObject)>`_ [required]
     - the actor to follow
   * - destPosition
-    - `3d vector <../openmw_util.html##(Vector3)>`_ [required]
+    - `3d vector <../openfallout_util.html##(Vector3)>`_ [required]
     - the destination point
   * - destCell
     - Cell [optional]

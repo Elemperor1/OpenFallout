@@ -1,5 +1,5 @@
-#ifndef OPENMW_MWGUI_MERCHANTREPAIR_H
-#define OPENMW_MWGUI_MERCHANTREPAIR_H
+#ifndef OPENFALLOUT_MWGUI_MERCHANTREPAIR_H
+#define OPENFALLOUT_MWGUI_MERCHANTREPAIR_H
 
 #include "../mwworld/ptr.hpp"
 #include "windowbase.hpp"

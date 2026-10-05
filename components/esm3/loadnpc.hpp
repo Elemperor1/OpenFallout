@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_NPC_H
-#define OPENMW_ESM_NPC_H
+#ifndef OPENFALLOUT_ESM_NPC_H
+#define OPENFALLOUT_ESM_NPC_H
 
 #include <map>
 #include <string>

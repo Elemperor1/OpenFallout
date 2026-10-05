@@ -1,5 +1,5 @@
-#ifndef OPENMW_LUAUI_FLEX
-#define OPENMW_LUAUI_FLEX
+#ifndef OPENFALLOUT_LUAUI_FLEX
+#define OPENFALLOUT_LUAUI_FLEX
 
 #include <vector>
 
@@ -69,4 +69,4 @@ namespace LuaUi
     };
 }
 
-#endif // OPENMW_LUAUI_FLEX
+#endif // OPENFALLOUT_LUAUI_FLEX

@@ -1,5 +1,5 @@
 local testing = require('testing_util')
-local core = require('openmw.core')
+local core = require('openfallout.core')
 
 if not core.contentFiles.has('Morrowind.esm') then
     error('This test requires Morrowind.esm')

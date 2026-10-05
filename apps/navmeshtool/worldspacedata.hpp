@@ -1,5 +1,5 @@
-﻿#ifndef OPENMW_NAVMESHTOOL_WORLDSPACEDATA_H
-#define OPENMW_NAVMESHTOOL_WORLDSPACEDATA_H
+﻿#ifndef OPENFALLOUT_NAVMESHTOOL_WORLDSPACEDATA_H
+#define OPENFALLOUT_NAVMESHTOOL_WORLDSPACEDATA_H
 
 #include <components/bullethelpers/collisionobject.hpp>
 #include <components/detournavigator/settings.hpp>

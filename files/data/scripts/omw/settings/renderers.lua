@@ -1,8 +1,8 @@
-local core = require('openmw.core')
-local ui = require('openmw.ui')
-local async = require('openmw.async')
-local util = require('openmw.util')
-local I = require('openmw.interfaces')
+local core = require('openfallout.core')
+local ui = require('openfallout.ui')
+local async = require('openfallout.async')
+local util = require('openfallout.util')
+local I = require('openfallout.interfaces')
 
 local function applyDefaults(argument, defaults)
     if not argument then return defaults end

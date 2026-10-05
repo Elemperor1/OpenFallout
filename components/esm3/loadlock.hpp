@@ -1,5 +1,5 @@
-#ifndef OPENMW_ESM_LOCK_H
-#define OPENMW_ESM_LOCK_H
+#ifndef OPENFALLOUT_ESM_LOCK_H
+#define OPENFALLOUT_ESM_LOCK_H
 
 #include <string>
 
