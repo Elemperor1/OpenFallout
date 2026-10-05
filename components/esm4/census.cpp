@@ -10,6 +10,9 @@
 
 #include <components/esm/common.hpp>
 
+#include "loadinfo.hpp"
+#include "loadqust.hpp"
+#include "loadscpt.hpp"
 #include "reader.hpp"
 #include "readerutils.hpp"
 
@@ -66,6 +69,38 @@ namespace ESM4
                 ++record.mFailures[std::string(failure)];
                 break;
         }
+    }
+
+    void Census::addScript(const std::string& type, const ScriptDefinition& script)
+    {
+        const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
+            || !script.scriptSource.empty() || !script.localVarData.empty() || !script.references.empty();
+        if (!holdsScript)
+            return;
+
+        CensusScripts& scripts = mScripts[type];
+        ++scripts.mCount;
+        scripts.mBytecode += script.compiledScript.size();
+        if (!script.isConsistent())
+            ++scripts.mInconsistent;
+    }
+
+    void Census::addScripts(const Script& record)
+    {
+        addScript("SCPT", record.mScript);
+    }
+
+    void Census::addScripts(const DialogInfo& record)
+    {
+        addScript("INFO", record.mScript);
+        addScript("INFO", record.mEndScript);
+    }
+
+    void Census::addScripts(const Quest& record)
+    {
+        for (const QuestStage& stage : record.mStages)
+            for (const QuestLogEntry& entry : stage.mLogEntries)
+                addScript("QUST", entry.mScript);
     }
 
     void Census::collect(Reader& reader, const std::function<bool(Reader&)>& parse)
@@ -148,6 +183,17 @@ namespace ESM4
                 stream << "  " << failures[i].second << " x " << failures[i].first << '\n';
             if (failures.size() > shown)
                 stream << "  ... and " << failures.size() - shown << " more distinct messages\n";
+        }
+
+        if (!mScripts.empty())
+        {
+            stream << "\nScripts held in line by records:\n"
+                   << std::left << std::setw(typeWidth) << "Record" << std::right << std::setw(countWidth) << "Scripts"
+                   << std::setw(countWidth) << "Bytecode" << std::setw(countWidth) << "Mismatched" << '\n';
+            for (const auto& [type, scripts] : mScripts)
+                stream << std::left << std::setw(typeWidth) << type << std::right << std::setw(countWidth)
+                       << scripts.mCount << std::setw(countWidth) << scripts.mBytecode << std::setw(countWidth)
+                       << scripts.mInconsistent << '\n';
         }
 
         if (!mFatalError.empty())

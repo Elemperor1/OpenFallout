@@ -37,9 +37,31 @@ void ESM4::Quest::load(ESM4::Reader& reader)
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
 
+    // The sub-records of a quest do not say which part of it they belong to: INDX starts a stage, QSDT starts a log
+    // entry in it, and the conditions, text and script that follow belong to that entry. QOBJ starts the objectives,
+    // whose conditions are not read yet.
+    enum class Section
+    {
+        Quest,
+        Stage,
+        Objective
+    };
+    Section section = Section::Quest;
+
+    // The log entry that is being read, if there is one.
+    auto currentLogEntry = [&]() -> QuestLogEntry* {
+        if (section != Section::Stage || mStages.empty() || mStages.back().mLogEntries.empty())
+            return nullptr;
+        return &mStages.back().mLogEntries.back();
+    };
+
     while (reader.getSubRecordHeader())
     {
         const ESM4::SubRecordHeader& subHdr = reader.subRecordHeader();
+        QuestLogEntry* logEntry = currentLogEntry();
+        if (logEntry != nullptr && logEntry->mScript.loadSubRecord(reader))
+            continue;
+
         switch (subHdr.typeId)
         {
             case ESM::fourCC("EDID"):
@@ -71,12 +93,20 @@ void ESM4::Quest::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("CTDA"): // FIXME: how to detect if 1st/2nd param is a formid?
             {
-                if (subHdr.dataSize == 24) // TES4
+                std::vector<TargetCondition>* conditions = &mTargetConditions;
+                if (section == Section::Stage)
+                    conditions = logEntry != nullptr ? &logEntry->mTargetConditions : nullptr;
+                else if (section == Section::Objective)
+                    conditions = nullptr; // FIXME: the conditions of an objective target
+
+                if (conditions == nullptr)
+                    reader.skipSubRecordData();
+                else if (subHdr.dataSize == 24) // TES4
                 {
                     TargetCondition cond;
                     reader.get(&cond, 24);
                     cond.reference = 0; // unused in TES4 but keep it clean
-                    mTargetConditions.push_back(cond);
+                    conditions->push_back(cond);
                 }
                 else if (subHdr.dataSize == 28)
                 {
@@ -84,7 +114,7 @@ void ESM4::Quest::load(ESM4::Reader& reader)
                     reader.get(cond); // FO3/FONV
                     if (cond.reference)
                         reader.adjustFormId(cond.reference);
-                    mTargetConditions.push_back(cond);
+                    conditions->push_back(cond);
                 }
                 else
                 {
@@ -95,28 +125,57 @@ void ESM4::Quest::load(ESM4::Reader& reader)
 
                 break;
             }
-            case ESM::fourCC("SCHR"):
-                reader.get(mScript.scriptHeader);
-                break;
-            case ESM::fourCC("SCDA"):
-                reader.skipSubRecordData();
-                break; // compiled script data
-            case ESM::fourCC("SCTX"):
-                reader.getString(mScript.scriptSource);
-                break;
-            case ESM::fourCC("SCRO"):
-                reader.getFormId(mScript.globReference);
-                break;
             case ESM::fourCC("INDX"):
+            {
+                section = Section::Stage;
+                QuestStage& stage = mStages.emplace_back();
+                if (subHdr.dataSize >= sizeof(stage.mIndex))
+                {
+                    reader.get(stage.mIndex);
+                    reader.skipSubRecordData(subHdr.dataSize - sizeof(stage.mIndex)); // TES5 has more
+                }
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            }
             case ESM::fourCC("QSDT"):
+            {
+                if (section == Section::Stage && !mStages.empty() && subHdr.dataSize == sizeof(QuestLogEntry::mFlags))
+                    reader.get(mStages.back().mLogEntries.emplace_back().mFlags);
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            }
             case ESM::fourCC("CNAM"):
+                if (logEntry != nullptr)
+                    reader.getLocalizedString(logEntry->mText);
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            case ESM::fourCC("NAM0"): // FO3
+                if (logEntry != nullptr && subHdr.dataSize == sizeof(ESM::FormId32))
+                    reader.getFormId(logEntry->mNextQuest);
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            case ESM::fourCC("QOBJ"):
+                section = Section::Objective;
+                reader.skipSubRecordData();
+                break;
+            // The script of a stage is read above. Any other script sub-record has no log entry to go to.
+            case ESM::fourCC("SCHR"):
+            case ESM::fourCC("SCDA"):
+            case ESM::fourCC("SCTX"):
+            case ESM::fourCC("SCRO"):
+            case ESM::fourCC("SLSD"):
+            case ESM::fourCC("SCVR"):
+            case ESM::fourCC("SCRV"):
             case ESM::fourCC("QSTA"):
             case ESM::fourCC("NNAM"): // FO3
-            case ESM::fourCC("QOBJ"): // FO3
-            case ESM::fourCC("NAM0"): // FO3
-            case ESM::fourCC("SLSD"): // FO3
-            case ESM::fourCC("SCVR"): // FO3
-            case ESM::fourCC("SCRV"): // FO3
             case ESM::fourCC("ANAM"): // TES5
             case ESM::fourCC("DNAM"): // TES5
             case ESM::fourCC("ENAM"): // TES5

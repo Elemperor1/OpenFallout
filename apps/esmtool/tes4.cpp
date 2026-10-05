@@ -25,9 +25,12 @@ namespace EsmTool
         struct Params
         {
             const bool mQuite;
+            // Where the census collects what it knows about the records that are read, if this is a census.
+            ESM4::Census* const mCensus;
 
-            explicit Params(const Arguments& info)
+            explicit Params(const Arguments& info, ESM4::Census* census = nullptr)
                 : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census")
+                , mCensus(census)
             {
             }
         };
@@ -142,6 +145,12 @@ namespace EsmTool
 
             T value;
             value.load(reader);
+
+            if constexpr (requires(ESM4::Census& census) { census.addScripts(value); })
+            {
+                if (params.mCensus != nullptr)
+                    params.mCensus->addScripts(value);
+            }
 
             if (params.mQuite)
                 return;
@@ -608,7 +617,8 @@ namespace EsmTool
         {
             const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
             ESM4::Reader reader(std::move(stream), info.filename, nullptr, &encoder, true);
-            const Params params(info);
+            ESM4::Census census;
+            const Params params(info, &census);
 
             std::cout << "File format version: " << reader.esmVersionF() << '\n';
             if (const std::vector<ESM::MasterData>& masterData = reader.getGameFiles(); !masterData.empty())
@@ -619,7 +629,6 @@ namespace EsmTool
             }
             std::cout << '\n';
 
-            ESM4::Census census;
             census.collect(reader, [&params](ESM4::Reader& r) { return readRecord(params, r); });
             census.write(std::cout);
             return census.getFatalError().empty() ? 0 : -1;

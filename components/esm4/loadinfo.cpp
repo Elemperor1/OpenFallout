@@ -41,11 +41,15 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
 
     mEditorId = ESM::RefId(mId).serializeText(); // FIXME: quick workaround to use existing code
 
-    bool ignore = false;
+    // A NEXT sub-record ends the first script and starts the second one.
+    bool inEndScript = false;
 
     while (reader.getSubRecordHeader())
     {
         const ESM4::SubRecordHeader& subHdr = reader.subRecordHeader();
+        if ((inEndScript ? mEndScript : mScript).loadSubRecord(reader))
+            continue;
+
         switch (subHdr.typeId)
         {
             case ESM::fourCC("QSTI"):
@@ -104,59 +108,9 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
 
                 break;
             }
-            case ESM::fourCC("SCHR"):
-            {
-                if (!ignore)
-                    reader.get(mScript.scriptHeader);
-                else
-                    reader.skipSubRecordData(); // TODO: does the second one ever used?
-
-                break;
-            }
-            case ESM::fourCC("SCDA"):
-                reader.skipSubRecordData();
-                break; // compiled script data
-            case ESM::fourCC("SCTX"):
-                reader.getString(mScript.scriptSource);
-                break;
-            case ESM::fourCC("SCRO"):
-                reader.getFormId(mScript.globReference);
-                break;
-            case ESM::fourCC("SLSD"):
-            {
-                ScriptLocalVariableData localVar;
-                reader.get(localVar.index);
-                reader.get(localVar.unknown1);
-                reader.get(localVar.unknown2);
-                reader.get(localVar.unknown3);
-                reader.get(localVar.type);
-                reader.get(localVar.unknown4);
-                mScript.localVarData.push_back(std::move(localVar));
-                // WARN: assumes SCVR will follow immediately
-
-                break;
-            }
-            case ESM::fourCC("SCVR"): // assumed always pair with SLSD
-            {
-                if (!mScript.localVarData.empty())
-                    reader.getZString(mScript.localVarData.back().variableName);
-                else
-                    reader.skipSubRecordData();
-
-                break;
-            }
-            case ESM::fourCC("SCRV"):
-            {
-                std::uint32_t index;
-                reader.get(index);
-
-                mScript.localRefVarIndex.push_back(index);
-
-                break;
-            }
             case ESM::fourCC("NEXT"): // FO3/FONV marker for next script header
             {
-                ignore = true;
+                inEndScript = true;
 
                 break;
             }
