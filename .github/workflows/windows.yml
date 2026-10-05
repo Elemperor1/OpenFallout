@@ -240,6 +240,7 @@ jobs:
       run: |
         rm -rf install/bin
         rm -rf install/_deps
+        find install -type f -iname '*.pdb' -delete
 
     - name: Generate CI-ID.txt
       shell: bash
