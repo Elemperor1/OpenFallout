@@ -22,6 +22,16 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    - name: Test incremental cache invalidation
+      run: python3 -m unittest discover -s CI -p test_build_cache.py -v
+
+    - name: Cache dependency downloads
+      uses: actions/cache@v5
+      with:
+        path: apt-cache/*.deb
+        key: apt-${{ runner.arch }}-${{ hashFiles('CI/install_debian_deps.sh') }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: apt-${{ runner.arch }}-${{ hashFiles('CI/install_debian_deps.sh') }}-
+
     - name: Add OpenMW PPA Dependencies
       run: sudo add-apt-repository ppa:openmw/openmw; sudo apt-get update
 
@@ -34,9 +44,26 @@ jobs:
         key: ubuntu-${{ runner.arch }}-${{ env.BUILD_TYPE }}
         max-size: 1000M
 
+    - name: Fingerprint build environment
+      id: build-env
+      run: |
+        dpkg-query -W -f='${Package}=${Version}\n' > "$RUNNER_TEMP/dependency-versions.txt"
+        echo "key=$(python3 CI/build_cache.py key --compiler gcc --mode '${{ env.BUILD_TYPE }}' --dependency-file "$RUNNER_TEMP/dependency-versions.txt")" >> "$GITHUB_OUTPUT"
+
+    - name: Restore incremental build
+      id: build-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: build
+        key: build-linux-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: build-linux-v1-${{ steps.build-env.outputs.key }}-
+
+    - name: Restore unchanged source timestamps
+      run: python3 CI/build_cache.py restore
+
     - name: Configure
       run: >
-        cmake .
+        cmake -S . -B build
         -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
         -D CMAKE_C_COMPILER_LAUNCHER=ccache
         -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -48,16 +75,25 @@ jobs:
         -D CMAKE_INSTALL_PREFIX=install
 
     - name: Build
-      run: cmake --build . --parallel "$(nproc)"
+      run: cmake --build build --parallel "$(nproc)"
 
     - name: Run components tests
-      run: ./components-tests
+      run: ./build/components-tests
 
     - name: Run OpenFallout tests
-      run: ./openfallout-tests
+      run: ./build/openfallout-tests
 
     - name: Run OpenFallout-CS tests
-      run: ./openfallout-cs-tests
+      run: ./build/openfallout-cs-tests
+
+    - name: Record source timestamps
+      run: python3 CI/build_cache.py snapshot
+
+    - name: Save incremental build
+      uses: actions/cache/save@v5
+      with:
+        path: build
+        key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
     # - name: Install
     #   shell: bash
@@ -97,3 +133,11 @@ jobs:
     uses: ./.github/workflows/windows.yml
     with:
       image: ${{ matrix.image }}
+
+  Windows-release:
+    name: Windows release packaging
+    uses: ./.github/workflows/windows.yml
+    with:
+      image: "2022"
+      build-type: Release
+      package: true

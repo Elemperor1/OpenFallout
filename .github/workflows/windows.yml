@@ -40,24 +40,42 @@ jobs:
     - shell: bash
       name: Add deps version env to GITHUB_ENV, stripping comments
       run: |
-        sed '/^\s*#/d; /^\s*$/d' "${{ github.workspace }}/CI/deps_versions.msvc.sh" >> $GITHUB_ENV
+        sed '/^\s*#/d; /^\s*$/d' "${{ github.workspace }}/CI/deps_versions.msvc.sh" >> "$GITHUB_ENV"
 
     - name: Create directories for dependencies
       run: |
         mkdir -p ${{ github.workspace }}/deps
         mkdir -p ${{ github.workspace }}/deps/Qt
 
-    - name: Download prebuilt vcpkg packages
+    - name: Fetch vcpkg dependency manifest
+      id: deps-manifest
       working-directory: ${{ github.workspace }}/deps
       run: |
         $MANIFEST = "vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}-manifest.txt"
         curl --fail --retry 3 -L -o "$MANIFEST" "https://gitlab.com/OpenMW/openmw-deps/-/raw/main/windows/$MANIFEST"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $digest = (Get-FileHash "$MANIFEST" -Algorithm SHA256).Hash
+        "digest=$digest" >> $env:GITHUB_OUTPUT
+
+    - name: Cache prebuilt vcpkg dependencies
+      id: vcpkg-cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}
+        key: vcpkg-${{ inputs.image }}-${{ inputs.msvc }}-${{ runner.arch }}-${{ env.VCPKG_TAG }}-${{ steps.deps-manifest.outputs.digest }}
+
+    - name: Download prebuilt vcpkg packages
+      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+      working-directory: ${{ github.workspace }}/deps
+      run: |
+        $MANIFEST = "vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}-manifest.txt"
         $lines = Get-Content "$MANIFEST"
         $URL = $lines[0]
         $split = -split $lines[1]
         $HASH = $split[0]
         $FILE = $split[1]
         curl --fail --retry 3 -L -o "$FILE" "$URL"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         $filehash = Get-FileHash "$FILE" -Algorithm SHA512
         if ( $filehash.hash -ne "$HASH" ) {
           exit 1
@@ -65,6 +83,7 @@ jobs:
         echo "archive=$FILE" >> $env:GITHUB_ENV
 
     - name: Extract archived prebuilt vcpkg packages
+      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
       working-directory: ${{ github.workspace }}/deps
       run: 7z x -y -ovcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }} $env:archive
 
@@ -92,6 +111,50 @@ jobs:
 
     - uses: seanmiddleditch/gha-setup-ninja@master
 
+    - name: Install prebuilt ccache
+      env:
+        CCACHE_VERSION: 4.14.1
+        CCACHE_SHA256: 6219f3865ca59aec41ee4b678df171d5d35855ecb2b6dbbbd20690b3a68af7b4
+      run: |
+        $archive = "$env:RUNNER_TEMP/ccache.zip"
+        curl --fail --retry 3 -L "https://github.com/ccache/ccache/releases/download/v$env:CCACHE_VERSION/ccache-$env:CCACHE_VERSION-windows-x86_64.zip" -o "$archive"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if ((Get-FileHash "$archive" -Algorithm SHA256).Hash -ne $env:CCACHE_SHA256) {
+          throw "ccache archive checksum mismatch"
+        }
+        Expand-Archive -Path "$archive" -DestinationPath "$env:RUNNER_TEMP" -Force
+        "$env:RUNNER_TEMP/ccache-$env:CCACHE_VERSION-windows-x86_64" >> $env:GITHUB_PATH
+
+    - name: Prime compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2.22
+      with:
+        install: 'no'
+        key: windows-${{ inputs.image }}-msvc-${{ inputs.msvc }}-${{ runner.arch }}-${{ inputs.build-type }}
+        max-size: 1000M
+
+    - name: Fingerprint build environment
+      id: build-env
+      run: |
+        $key = python CI/build_cache.py key --compiler cl --mode '${{ inputs.image }}-${{ inputs.msvc }}-${{ inputs.build-type }}-${{ inputs.package }}' --dependency-file 'deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}-manifest.txt'
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        "key=$key" >> $env:GITHUB_OUTPUT
+
+    - name: Restore incremental build
+      id: build-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          build
+          !build/symstore-venv
+          !build/_CPack_Packages
+        key: build-windows-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: build-windows-v1-${{ steps.build-env.outputs.key }}-
+
+    - name: Restore unchanged source timestamps
+      run: python CI/build_cache.py restore
+
+    # MSVC PCH and shared compiler PDBs prevent reusable compilation results.
+    # Embedded debug information still produces linker PDBs for symbol artifacts.
     - name: Configure OpenFallout
       run: >
         cmake
@@ -99,9 +162,14 @@ jobs:
         -B ${{ github.workspace }}/build
         -G Ninja
         -D CMAKE_BUILD_TYPE=${{ inputs.build-type }}
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -D CMAKE_POLICY_DEFAULT_CMP0141=NEW
+        -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+        -D PRECOMPILE_HEADERS_WITH_MSVC=OFF
         -D CMAKE_TOOLCHAIN_FILE='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/scripts/buildsystems/vcpkg.cmake'
         -D CMAKE_PREFIX_PATH='${{ github.workspace }}/deps/Qt/${{ env.QT_VER }}/msvc2019_64'
-        ${{ inputs.package && '-D CMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Zi"' || '' }}
+        ${{ inputs.package && '-D CMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Z7"' || '' }}
         ${{ inputs.package && '-D "CMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /OPT:REF /OPT:ICF /INCREMENTAL:NO"' || '' }}
         -D LuaJit_INCLUDE_DIR='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/include/luajit'
         -D LuaJit_LIBRARY='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/lib/lua51.lib'
@@ -134,13 +202,13 @@ jobs:
         cp bin/Qt6OpenGLWidgets.dll ${{ github.workspace }}/build
         cp bin/Qt6Widgets.dll ${{ github.workspace }}/build
         cp bin/Qt6Svg.dll ${{ github.workspace }}/build
-        mkdir ${{ github.workspace }}/build/styles
+        mkdir -Force ${{ github.workspace }}/build/styles
         cp plugins/styles/qwindowsvistastyle.dll ${{ github.workspace }}/build/styles
-        mkdir ${{ github.workspace }}/build/platforms
+        mkdir -Force ${{ github.workspace }}/build/platforms
         cp plugins/platforms/qwindows.dll ${{ github.workspace }}/build/platforms
-        mkdir ${{ github.workspace }}/build/imageformats
+        mkdir -Force ${{ github.workspace }}/build/imageformats
         cp plugins/imageformats/qsvg.dll ${{ github.workspace }}/build/imageformats
-        mkdir ${{ github.workspace }}/build/iconengines
+        mkdir -Force ${{ github.workspace }}/build/iconengines
         cp plugins/iconengines/qsvgicon.dll ${{ github.workspace }}/build/iconengines
 
     - name: Create symbol server directory structure
@@ -149,9 +217,9 @@ jobs:
         ${{ github.workspace }}\CI\Store-Symbols.ps1
         Move-Item ${{ github.workspace }}\build\SymStore ${{ github.workspace }}
 
-    - name: Move pdb files
+    - name: Copy pdb files
       run: |
-        robocopy build pdb *.pdb /MOVE
+        robocopy build pdb *.pdb
         if ($lastexitcode -lt 8) {
           $global:LASTEXITCODE = $null
         }
@@ -178,33 +246,32 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        job_url=$(gh run --repo ${{ github.repository }} view ${{ github.run_id }} --json jobs --jq '.jobs[] | select(.name == "windows-${{ inputs.msvc }}") | .url')
-        printf "Ref ${{ github.ref }}\nJob ${job_url}\nCommit ${{ github.sha }}\n" > install/CI-ID.txt
+        printf 'Ref %s\nRun %s\nCommit %s\n' "$GITHUB_REF" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$GITHUB_SHA" > install/CI-ID.txt
         cp install/CI-ID.txt pdb/CI-ID.txt
         cp install/CI-ID.txt SymStore/CI-ID.txt
 
     - name: Store OpenFallout archived pdb files
       uses: actions/upload-artifact@v6
       with:
-        name: openfallout-windows-${{ inputs.msvc }}-pdb-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-pdb-${{ github.sha }}
         path: ${{ github.workspace }}/pdb/*
 
     - name: Store OpenFallout build artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openfallout-windows-${{ inputs.msvc }}-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-${{ github.sha }}
         path: ${{ github.workspace }}/install/*
 
     - name: Store symbol server artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openfallout-windows-${{ inputs.msvc }}-sym-store-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-sym-store-${{ github.sha }}
         path: ${{ github.workspace }}/SymStore/*
 
     - name: Store log etc. artifacts
       uses: actions/upload-artifact@v6
       with:
-        name: openfallout-windows-${{ inputs.msvc }}-logs-and-stuff-${{ github.sha }}
+        name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-logs-and-stuff-${{ github.sha }}
         path: |
           ${{ github.workspace }}/build/compile_commands.json
           ${{ github.workspace }}/build/**/*.log
@@ -226,7 +293,7 @@ jobs:
 
     - name: Add install directory to PATH
       shell: bash
-      run: echo '${{ github.workspace }}/install' >> ${GITHUB_PATH}
+      run: echo '${{ github.workspace }}/install' >> "$GITHUB_PATH"
 
     - name: Run components tests
       if: ${{ ! inputs.package }}
@@ -259,3 +326,15 @@ jobs:
         files: ${{ github.workspace }}/install/*.exe
         prerelease: true
         draft: true
+
+    - name: Record source timestamps
+      run: python CI/build_cache.py snapshot
+
+    - name: Save incremental build
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          build
+          !build/symstore-venv
+          !build/_CPack_Packages
+        key: ${{ steps.build-cache.outputs.cache-primary-key }}
