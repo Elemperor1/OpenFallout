@@ -27,6 +27,13 @@ jobs:
     - run: echo "DMG_IDENTIFIER=arm64" >> "$GITHUB_ENV"
       if: ${{ inputs.image != 'macos-26-intel' }}
 
+    # The manifest comes from the main branch of openmw-deps, so its digest has to be part of the cache key.
+    - name: Fetch dependency manifest
+      id: deps-manifest
+      run: |
+        CI/macos/fetch_deps_manifest.sh "$RUNNER_TEMP/openmw-manifest.txt"
+        echo "digest=$(shasum -a 256 "$RUNNER_TEMP/openmw-manifest.txt" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
     - name: Cache building dependencies
       id: deps-cache
       uses: actions/cache@v5
@@ -34,7 +41,7 @@ jobs:
         path: |
           /tmp/Qt
           /tmp/openmw-deps
-        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/before_install.macos.sh') }}
+        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh') }}
 
     - name: Install Building Dependencies
       if: steps.deps-cache.outputs.cache-hit != 'true'
