@@ -9,7 +9,7 @@
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
 - **Tale of Two Wastelands: 17 `NPC_` records fail to load, and no unparsed record type is new.** The four TTW plugins hold 1,279,509 records after their headers. Every failure is an `NPC_` record: three are unknown subrecords (`DLVT` twice, `LSNA` once) and the other 14 are loader errors for which the census withholds the message. Every `NPC_` record in the vanilla `Fallout3.esm` and `FalloutNV.esm` loads, so the failing records exist only in the TTW-patched files. The files came from a community installer and were not checked against reference hashes, so the failures may come from the installer instead of from TTW's data.
-- **Compiled scripts line up with their headers, except for the variable count.** The 16 plugins hold 16,180 `INFO`, 2,437 `QUST` and 6,035 `SCPT` scripts, with 3.1 MB of bytecode. In every script the compiled size in the header equals the bytecode read, and the reference count equals the references read in all but one empty `INFO` script. The header's variable count does not equal the number of local variables read. See "Scripts held by records".
+- **Compiled scripts line up with their headers, except for the variable count.** The 16 plugins hold 16,180 `INFO`, 2,437 `QUST` and 6,035 `SCPT` scripts, with 3.1 MB of bytecode. In every script the compiled size in the header equals the bytecode read, and the reference count equals the references read in all but one source-only `INFO` script. The header's variable count does not equal the number of local variables read: it is above the highest declared index in 449 scripts. See "Scripts held by records".
 
 ## Where the files came from
 
@@ -331,7 +331,7 @@ The add-on plugins contain no unparsed type that is missing from this list.
 
 ## Scripts held by records
 
-Run on 2026-10-05 on the same Mac, with the branch that keeps script bytecode (PR #7). It adds a "Scripts held in line by records" table to the census output (see `build-baseline.md`). The record counts in the main tables did not change in any cell, for all 20 plugins, and the Failures lines are the same. Scripts are counted per script, not per record: an `INFO` record can hold a begin script and an end script, and a `QUST` record holds one script per log entry. A script counts only if it holds something (bytecode, a non-zero compiled size, source, variables or references).
+Run on 2026-10-05 on the same Mac, with the branch that keeps script bytecode (PR #7, commit `958266b1`; all 20 runs exited 0, the slowest took 3 seconds). It adds a "Scripts held in line by records" table to the census output (see `build-baseline.md`). The record counts in the main tables did not change in any cell, for all 20 plugins, and the Failures lines are the same. Scripts are counted per script, not per record: an `INFO` record can hold a begin script and an end script, and a `QUST` record holds one script per log entry. A script counts only if it holds something (bytecode, a non-zero compiled size, source, variables or references).
 
 | Plugin | `INFO` scripts | `INFO` bytecode (bytes) | `QUST` scripts | `QUST` bytecode (bytes) | `SCPT` scripts | `SCPT` bytecode (bytes) |
 |---|---:|---:|---:|---:|---:|---:|
@@ -353,18 +353,34 @@ Run on 2026-10-05 on the same Mac, with the branch that keeps script bytecode (P
 | `TribalPack.esm` | - | - | - | - | 1 | 143 |
 | **All 16** | **16,180** | **705,288** | **2,437** | **203,365** | **6,035** | **2,229,914** |
 
-A dash means the census printed no row, because that plugin has no script of that kind. The four Tale of Two Wastelands plugins hold copies of scripts from the vanilla plugins (the patched `FalloutNV.esm` is almost the same as the vanilla one), so their rows are not added to the totals above and are not repeated here.
+A dash means the census printed no row, because that plugin has no script of that kind. The four Tale of Two Wastelands plugins hold copies of scripts from the vanilla plugins (the patched `FalloutNV.esm` is almost the same as the vanilla one), so their rows are not added to the totals above and are not repeated here (the TTW check results are below).
 
 ### What the script header says against what was read
 
-Each script has a header with three numbers (compiled size, reference count, variable count). The loader checks each against what it read. The first run of the census compared all three together and reported a mismatch in every plugin, so a separate counting program (kept outside the repository, reading the raw plugins and printing numbers) was run on the same 20 plugins. It reproduced the Scripts and Bytecode cells exactly. Its findings:
+Each script has a header with three numbers (compiled size, reference count, variable count), and the census compares each with what the loader read. The final run, on branch head `958266b1`, printed this for the 16 installer plugins:
 
-- **The compiled size in the header equals the bytecode read, in every script of all 20 plugins.**
-- **The reference count equals the number of `SCRO` plus `SCRV` entries read, in every script but one.** The exception is one `INFO` script in `FalloutNV.esm` (and its copy in the TTW-patched file): the header says 1 reference, nothing was read, and the compiled size is 0.
-- **The variable count in the header is not the number of `SLSD` entries.** It is larger than the entry count in all but 6 scripts (3 `SCPT` in `FalloutNV.esm` and the same 3 in its TTW copy, where it is 1 smaller). In `Fallout3.esm`, 341 of the 1,257 `SCPT` scripts differ: 51 have no `SLSD` entry while the header says there are variables, and 250 have gaps in their `SLSD` index numbers, 229 of which have a header count equal to the highest index. Every `SCRV` entry points at an index that exists among the `SLSD` entries.
-- On the 16 installer plugins the combined check flagged 37 of 16,180 `INFO` scripts, 6 of 2,437 `QUST` scripts and 1,389 of 6,035 `SCPT` scripts (23.0%). Nearly all of those are the variable count.
+| Column | What it flags | Scripts flagged (of 24,652) |
+|---|---|---:|
+| Bad size | header compiled size differs from the `SCDA` bytes read | 0 |
+| Bad refs | header reference count differs from the `SCRO` plus `SCRV` entries read | 1 |
+| Bad vars | header variable count is lower than the highest `SLSD` index | 0 |
 
-So the loader now checks that the header variable count is at least the highest `SLSD` index, and reports size, reference and variable problems in separate columns (Bad size, Bad refs, Bad vars). The header count looks like the highest variable index ever used, which would leave it higher than the entry count wherever a variable was later deleted. That reading was not confirmed. The census has not yet been rerun on real data with the three separate columns, so the Bad vars column for the 6 smaller-header scripts is unmeasured. A virtual machine needs the bytecode size and the reference table to agree with the header, and they do.
+- **The one Bad refs script** is the end script of an `INFO` record in `FalloutNV.esm` (and its copy in the TTW-patched `FalloutNV.esm`). It has source text only, 65 bytes, no bytecode and no references. Its header says 1 reference and every other header field is 0.
+- **The four TTW plugins** have Bad size 0 and Bad refs 0 apart from that same copy. Bad vars flags 13 `SCPT` scripts: 12 in `TaleOfTwoWastelands.esm` and 1 in `YUPTTW.esm`. In each of them the header count equals the number of `SLSD` entries, but the entries carry indices above it (for example a count of 2 with indices 10 and 11). The patched `Fallout3.esm` and `FalloutNV.esm` have none. The census does not say why TTW's own scripts do this.
+- **The header variable count is not the number of `SLSD` entries.** The first version of the check compared the two and flagged 1,389 of 6,035 `SCPT` scripts, 23.0% (with 37 `INFO` and 6 `QUST`). A separate counting program, which reads the raw plugins and prints numbers only, found the cause. Against the highest `SLSD` index (H is the header count, M the highest index, M = 0 without `SLSD`):
+
+| Script holder | Scripts | H = M | H > M | H < M |
+|---|---:|---:|---:|---:|
+| `SCPT` | 6,035 | 5,625 | 410 | 0 |
+| `INFO` (begin 5,340, end 10,840) | 16,180 | 16,146 | 34 | 0 |
+| `QUST` log entries | 2,437 | 2,432 | 5 | 0 |
+| **All** | **24,652** | **24,203** | **449** | **0** |
+
+- **Where H is above M, the extra variables are not declared in the source.** All 449 scripts have source text. In the 206 with at least one `SLSD` entry, the number of lines declaring a variable (a line starting with `short`, `long`, `int`, `float` or `ref`) equals the number of entries in every one. The other 243 have no `SLSD` entry and no declaration line. Among the scripts where H = M and that have source, the declaration lines equal the entries in 24,200 of 24,202. So the header seems to count variables that are no longer declared, for example deleted ones. That is a reading of these counts, not something the files state.
+- **The 3 `SCPT` in `FalloutNV.esm` with a header count one below the entry count** (counts 7, 2 and 3 against 8, 3 and 4 entries) each list the index 1 twice, so H equals M and the check does not flag them.
+- **`SLSD` index order cannot be assumed.** No script has index 0. 14 `SCPT` scripts repeat an index (`Fallout3.esm` 2, `PointLookout.esm` 1, `Zeta.esm` 1, `FalloutNV.esm` 10). 915 of the 4,095 scripts with any `SLSD` entry list their indices out of ascending order (914 `SCPT`, 1 `QUST`); in 351 of those, the indices are exactly 1 to the entry count once sorted. Every `SCRV` entry points at an index that exists among the `SLSD` entries (checked on `Fallout3.esm`).
+
+So the compiled size and the reference table agree with the header in every installer-plugin script but one, which is what a virtual machine for the bytecode needs, and the variable count is the one number a virtual machine should not take from the header alone, because the header counts variables the record no longer declares.
 
 ## Notes
 
