@@ -385,7 +385,9 @@ namespace
             + valueSubRecord<std::uint32_t>("SCRO", 0x000a0001);
         const std::string wrong = zString("EDID", "Wrong") + scriptHeader(0, 99, 0) + subRecord("SCDA", bytecode);
         const std::string empty = zString("EDID", "Empty") + scriptHeader(0, 0, 0);
-        const std::string scripts = record("SCPT", 1, good) + record("SCPT", 2, wrong) + record("SCPT", 3, empty);
+        const std::string missingReferences = zString("EDID", "Refs") + scriptHeader(2, 0, 0);
+        const std::string scripts = record("SCPT", 1, good) + record("SCPT", 2, wrong) + record("SCPT", 3, empty)
+            + record("SCPT", 7, missingReferences);
 
         const std::string firstCode("\x01\x02\x03", 3);
         const std::string info
@@ -435,12 +437,12 @@ namespace
         EXPECT_EQ(census.getFatalError(), "");
         ASSERT_EQ(census.getScripts().size(), 3u);
 
-        // The empty script block is not counted.
+        // The empty script block is not counted, but a header that declares references is.
         const ESM4::CensusScripts& scpt = census.getScripts().at("SCPT");
-        EXPECT_EQ(scpt.mCount, 2u);
+        EXPECT_EQ(scpt.mCount, 3u);
         EXPECT_EQ(scpt.mBytecode, 2 * bytecode.size());
         EXPECT_EQ(scpt.mWrongSize, 1u);
-        EXPECT_EQ(scpt.mWrongReferences, 0u);
+        EXPECT_EQ(scpt.mWrongReferences, 1u);
         EXPECT_EQ(scpt.mWrongVariables, 0u);
 
         // Only the first script of the INFO record holds anything.

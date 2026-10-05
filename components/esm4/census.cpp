@@ -74,7 +74,8 @@ namespace ESM4
     void Census::addScript(const std::string& type, const ScriptDefinition& script)
     {
         const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
-            || !script.scriptSource.empty() || !script.localVarData.empty() || !script.references.empty();
+            || script.scriptHeader.refCount != 0 || !script.scriptSource.empty() || !script.localVarData.empty()
+            || !script.references.empty();
         if (!holdsScript)
             return;
 
