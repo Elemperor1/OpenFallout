@@ -30,7 +30,7 @@
 #include <stdexcept>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
 
 /// Load the current QUST record with stages and log entries, keeping their conditions separate.
 /// Objective data and scripts outside stage log entries are skipped.
@@ -45,15 +45,17 @@ void ESM4::Quest::load(ESM4::Reader& reader)
     // whose conditions are not read yet.
     enum class Section
     {
-        Quest,
+        Header,
         Stage,
         Objective
     };
-    Section section = Section::Quest;
+    Section section = Section::Header;
 
-    // The log entry that is being read, if there is one.
+    // The log entry that is being read, if there is one. A QSDT that cannot be read ends the entry before it, so
+    // the sub-records that follow are not added to it.
+    bool inLogEntry = false;
     auto currentLogEntry = [&]() -> QuestLogEntry* {
-        if (section != Section::Stage || mStages.empty() || mStages.back().mLogEntries.empty())
+        if (!inLogEntry || section != Section::Stage || mStages.empty() || mStages.back().mLogEntries.empty())
             return nullptr;
         return &mStages.back().mLogEntries.back();
     };
@@ -131,6 +133,7 @@ void ESM4::Quest::load(ESM4::Reader& reader)
             case ESM::fourCC("INDX"):
             {
                 section = Section::Stage;
+                inLogEntry = false;
                 QuestStage& stage = mStages.emplace_back();
                 if (subHdr.dataSize >= sizeof(stage.mIndex))
                 {
@@ -144,7 +147,9 @@ void ESM4::Quest::load(ESM4::Reader& reader)
             }
             case ESM::fourCC("QSDT"):
             {
-                if (section == Section::Stage && !mStages.empty() && subHdr.dataSize == sizeof(QuestLogEntry::mFlags))
+                inLogEntry
+                    = section == Section::Stage && !mStages.empty() && subHdr.dataSize == sizeof(QuestLogEntry::mFlags);
+                if (inLogEntry)
                     reader.get(mStages.back().mLogEntries.emplace_back().mFlags);
                 else
                     reader.skipSubRecordData();

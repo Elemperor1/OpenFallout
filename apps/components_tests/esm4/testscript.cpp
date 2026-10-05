@@ -233,7 +233,31 @@ namespace
         }
         catch (const std::exception& e)
         {
-            EXPECT_THAT(e.what(), HasSubstr("SCDA is longer than its record"));
+            EXPECT_THAT(e.what(), HasSubstr("longer than its record"));
+        }
+    }
+
+    /// Verify locals and references that are not the size of their fields are rejected, not read past their end.
+    TEST(ESM4ScriptTest, rejectsLocalsAndReferencesOfTheWrongSize)
+    {
+        for (const std::string_view type : { "SLSD", "SCRO", "SCRV" })
+        {
+            for (const std::string_view payload : { "", "ab", "abcdefghijklmnopqrstuvwxyz" })
+            {
+                const std::string first = zString("EDID", "Odd") + scriptHeader(1, 2, 1) + subRecord("SCDA", "ab")
+                    + subRecord(type, payload);
+                const std::string second = zString("EDID", "Next") + subRecord("SCDA", "cd");
+
+                try
+                {
+                    loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, first) + record("SCPT", 2, second));
+                    ADD_FAILURE() << type << " of " << payload.size() << " bytes was accepted";
+                }
+                catch (const std::exception& e)
+                {
+                    EXPECT_THAT(e.what(), HasSubstr("unexpected size")) << type << " of " << payload.size() << " bytes";
+                }
+            }
         }
     }
 
@@ -243,8 +267,7 @@ namespace
         const std::string data = zString("EDID", "Packed")
             + scriptHeader(0, static_cast<std::uint32_t>(bytecode.size()), 0) + subRecord("SCDA", bytecode);
 
-        const std::vector<ESM4::Script> scripts
-            = loadRecords<ESM4::Script>("SCPT", compressedRecord("SCPT", 1, data));
+        const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", compressedRecord("SCPT", 1, data));
 
         ASSERT_EQ(scripts.size(), 1u);
         const ESM4::ScriptDefinition& definition = scripts.front().mScript;
@@ -417,6 +440,44 @@ namespace
         EXPECT_EQ(quests[0].mStages[0].mLogEntries[0].mText, "Only entry");
         EXPECT_TRUE(quests[0].mStages[0].mLogEntries[0].mScript.compiledScript.empty());
         EXPECT_EQ(quests[1].mEditorId, "Next");
+    }
+
+    /// Verify a reference cut short at the end of a log entry is rejected, not read from the next record.
+    TEST(ESM4QuestTest, rejectsAReferenceThatIsShorterThanItsFieldAtTheEndOfAnEntry)
+    {
+        const std::string first = zString("EDID", "Short") + valueSubRecord<std::int16_t>("INDX", 10)
+            + valueSubRecord<std::uint8_t>("QSDT", 0) + zString("CNAM", "Entry") + scriptHeader(1, 2, 0)
+            + subRecord("SCDA", "ab") + subRecord("SCRV", "");
+        const std::string second = zString("EDID", "Next") + zString("FULL", "The next quest");
+
+        try
+        {
+            loadRecords<ESM4::Quest>("QUST", record("QUST", 1, first) + record("QUST", 2, second));
+            FAIL() << "an empty SCRV was accepted";
+        }
+        catch (const std::exception& e)
+        {
+            EXPECT_THAT(e.what(), HasSubstr("unexpected size"));
+        }
+    }
+
+    /// Verify the sub-records after a malformed QSDT are not added to the entry before it.
+    TEST(ESM4QuestTest, keepsTheSubrecordsOfAMalformedLogEntryOffTheEntryBeforeIt)
+    {
+        const std::string data = zString("EDID", "Odd") + valueSubRecord<std::int16_t>("INDX", 10)
+            + valueSubRecord<std::uint8_t>("QSDT", 0) + zString("CNAM", "Good entry")
+            + valueSubRecord<std::uint16_t>("QSDT", 7) + zString("CNAM", "Stray text")
+            + valueSubRecord<std::uint32_t>("NAM0", 0x000c0002) + condition(200);
+
+        const std::vector<ESM4::Quest> quests = loadRecords<ESM4::Quest>("QUST", record("QUST", 1, data));
+
+        ASSERT_EQ(quests.size(), 1u);
+        ASSERT_EQ(quests[0].mStages.size(), 1u);
+        ASSERT_EQ(quests[0].mStages[0].mLogEntries.size(), 1u);
+        const ESM4::QuestLogEntry& entry = quests[0].mStages[0].mLogEntries[0];
+        EXPECT_EQ(entry.mText, "Good entry");
+        EXPECT_EQ(entry.mNextQuest.mIndex, 0u);
+        EXPECT_TRUE(entry.mTargetConditions.empty());
     }
 
     /// Verify quest-level conditions load when the quest has no stages.
