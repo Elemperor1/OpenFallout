@@ -333,6 +333,15 @@ namespace ESM4
 
         inline const SubRecordHeader& subRecordHeader() const { return mCtx.subRecordHeader; }
 
+        // Whether the data size of the current subrecord ends inside the current record.
+        // Note: only meaningful after getSubRecordHeader(), before the next one is read
+        // Note: getRecordData() sets the size of a compressed record 4 bytes below the inflated size
+        inline bool subRecordFitsRecord() const
+        {
+            const std::uint32_t slack = (mCtx.recordHeader.record.flags & Rec_Compressed) != 0 ? 4 : 0;
+            return mCtx.recordRead <= mCtx.recordHeader.record.dataSize + slack;
+        }
+
         // Skip the data part of a subrecord
         // Note: assumes the header was read correctly and nothing else was read
         void skipSubRecordData();

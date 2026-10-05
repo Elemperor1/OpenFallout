@@ -10,7 +10,8 @@
 namespace ESM4
 {
     /// Consume a recognized script subrecord and return true; leave unknown subrecords unread.
-    /// Skip SCHR headers of unexpected size and throw std::runtime_error for truncated SCDA data.
+    /// Skip SCHR headers of unexpected size and throw std::runtime_error for truncated SCDA data,
+    /// or SCDA data that is declared longer than the rest of its record.
     bool ScriptDefinition::loadSubRecord(Reader& reader)
     {
         const SubRecordHeader& subHdr = reader.subRecordHeader();
@@ -23,6 +24,8 @@ namespace ESM4
                     reader.skipSubRecordData();
                 return true;
             case ESM::fourCC("SCDA"):
+                if (!reader.subRecordFitsRecord())
+                    throw std::runtime_error("ESM4::ScriptDefinition::loadSubRecord - SCDA is longer than its record");
                 compiledScript.resize(subHdr.dataSize);
                 if (!reader.get(compiledScript.data(), compiledScript.size()))
                     throw std::runtime_error("ESM4::ScriptDefinition::loadSubRecord - SCDA is shorter than its size");

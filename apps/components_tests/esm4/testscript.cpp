@@ -216,6 +216,42 @@ namespace
         EXPECT_ANY_THROW(loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data)));
     }
 
+    /// Verify an SCDA that promises more bytes than its record holds is rejected, not read from the next record.
+    TEST(ESM4ScriptTest, rejectsBytecodeThatCrossesItsRecord)
+    {
+        // The sub-record header promises ten bytes, the record holds four, and another record follows.
+        std::string crossing = "SCDA";
+        append<std::uint16_t>(crossing, 10);
+        crossing.append("\x01\x02\x03\x04", 4);
+        const std::string first = zString("EDID", "Cross") + crossing;
+        const std::string second = zString("EDID", "Next") + subRecord("SCDA", "ab");
+
+        try
+        {
+            loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, first) + record("SCPT", 2, second));
+            FAIL() << "the SCDA was read across the record boundary";
+        }
+        catch (const std::exception& e)
+        {
+            EXPECT_THAT(e.what(), HasSubstr("SCDA is longer than its record"));
+        }
+    }
+
+    /// Verify bytecode that ends a compressed record is still read in full.
+    TEST(ESM4ScriptTest, readsBytecodeThatEndsACompressedRecord)
+    {
+        const std::string data = zString("EDID", "Packed")
+            + scriptHeader(0, static_cast<std::uint32_t>(bytecode.size()), 0) + subRecord("SCDA", bytecode);
+
+        const std::vector<ESM4::Script> scripts
+            = loadRecords<ESM4::Script>("SCPT", compressedRecord("SCPT", 1, data));
+
+        ASSERT_EQ(scripts.size(), 1u);
+        const ESM4::ScriptDefinition& definition = scripts.front().mScript;
+        EXPECT_EQ(std::string(definition.compiledScript.begin(), definition.compiledScript.end()), bytecode);
+        EXPECT_TRUE(definition.hasConsistentSize());
+    }
+
     /// Verify delegating script subrecords still rejects an unknown SCPT subrecord.
     TEST(ESM4ScriptTest, stillRejectsUnknownSubrecords)
     {
