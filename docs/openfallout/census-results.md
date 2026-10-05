@@ -1,19 +1,20 @@
 # Plugin census results
 
-`esmtool census` run on 2026-10-04 on Jacob's MacBook, through a Remote Control session, on 16 plugins: Fallout 3, its five add-ons, Fallout: New Vegas and its nine add-ons and packs. The census program is the one merged in PR #2 (master `be6ca447`). This page holds counts only, plus each plugin's file name, format version and master list, which the reader takes from the plugin's `TES4` header. No other record content appears on it.
+`esmtool census` run on 2026-10-04 on Jacob's MacBook, through a Remote Control session, on 16 plugins: Fallout 3, its five add-ons, Fallout: New Vegas and its nine add-ons and packs. Later the same evening it was run on four Tale of Two Wastelands plugins (see "Tale of Two Wastelands plugins" below). The census program is the one merged in PR #2 (master `be6ca447`). This page holds counts only, plus each plugin's file name, format version and master list, which the reader takes from the plugin's `TES4` header. No other record content appears on it.
 
 ## What the census found
 
-- **No record failed to load.** All 1,561,956 records after each plugin's `TES4` header were counted, and the Failed column is 0 everywhere. (The reader consumes the `TES4` header record before the census starts, so it has no row and the files hold 16 more records than the tables show.) No `Unknown subrecord` line was printed for any plugin. Every loader that exists accepts every record of its type in the real files. "Parsed" only means the loader did not throw: it does not mean the fields are right, or that the engine keeps them (the roadmap's section 2 lists what is discarded after parsing).
+- **In the 16 plugins from the games' own installers, no record failed to load.** All 1,561,956 records after each plugin's `TES4` header were counted, and the Failed column is 0 everywhere in the first table. (The reader consumes the `TES4` header record before the census starts, so it has no row and the files hold 16 more records than the tables show.) No `Unknown subrecord` line was printed for any of them. Every loader that exists accepts every record of its type in those 16 plugins. "Parsed" only means the loader did not throw: it does not mean the fields are right, or that the engine keeps them (the roadmap's section 2 lists what is discarded after parsing).
 - **1,550,732 records (99.3%) have a loader and 11,224 have none.** The gap is in the number of record types, not in the volume. The big types (`REFR`, `CELL`, `LAND`, `INFO`, `DIAL`, `NAVM`, `PACK`, `NPC_`, `SCPT`) are all parsed.
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
+- **Tale of Two Wastelands: 17 `NPC_` records fail to load, and no unparsed record type is new.** The four TTW plugins hold 1,279,509 records after their headers. Every failure is an `NPC_` record: three are unknown subrecords (`DLVT` twice, `LSNA` once) and the other 14 are loader errors for which the census withholds the message. Every `NPC_` record in the vanilla `Fallout3.esm` and `FalloutNV.esm` loads, so the failing records exist only in the TTW-patched files. The files came from a community installer and were not checked against reference hashes, so the failures may come from the installer instead of from TTW's data.
 
 ## Where the files came from
 
-- **Fallout 3:** the installed `Data` folder.
+- **Fallout 3:** the installed `Data` folder. A later check against the checksums in the GOG installer found it unmodified: 157 of 158 game files identical, and the one missing is a GOG helper tool, not part of the game.
 - **New Vegas:** not installed on that Mac, only the GOG offline installer. The `.esm` plugins were unpacked from the installer with `innoextract` into a scratch folder outside the repository. This is the installer route the roadmap proposed, and it works.
-- **Tale of Two Wastelands:** no TTW files exist on that machine, so there is no TTW census yet.
+- **Tale of Two Wastelands:** the official installer (v3.4) was run under Wine on the Mac and showed no progress for about 30 minutes, with the output folder empty, so it was stopped. It was not shown to be hung and may only have been slow. The plugins on this page come from the community installer `TTW_Linux_Installer` (GPL-3, commit `936b0ae`), built from source on the Mac after its code was read (it has no network code and only reads the game folders). It ran on fresh unpacked copies of both games, each checked against its GOG installer's checksums, with the game folders read-only. The install took about 3 minutes. It ran 196,915 operations, and 2 failed: `libvorbis.dll` and `libvorbisfile.dll`, "Permission denied", which is the read-only game folder (inferred).
 - Each plugin was run from its own folder with a bare file name, so the headers hold no paths.
 
 ## Per plugin
@@ -40,7 +41,130 @@
 
 Counts exclude each plugin's `TES4` header record.
 
-## Record types with no loader
+## Tale of Two Wastelands plugins
+
+TTW builds its plugins from the player's own Fallout 3 and New Vegas files, so these four exist only after an installer has run (see "Where the files came from"). The installer also produced patched copies of the add-on plugins and more than 40 rebuilt `.bsa` archives, which were not censused. All four census runs exited with status 0.
+
+| Plugin | Format version | Master | Records | Parsed | No parser | Failed |
+|---|---|---|---:|---:|---:|---:|
+| `TaleOfTwoWastelands.esm` | 1.34 | 12 masters | 83,154 | 80,732 | 2,417 | 5 |
+| `YUPTTW.esm` | 1.34 | 13 masters, including `TaleofTwoWastelands.esm` | 27,118 | 26,786 | 332 | 0 |
+| `Fallout3.esm` (TTW-patched) | 1.34 | the New Vegas plugins (list not recorded) | 704,183 | 703,694 | 479 | 10 |
+| `FalloutNV.esm` (TTW-patched) | 1.34 | none | 465,054 | 459,550 | 5,502 | 2 |
+
+Counts exclude each plugin's `TES4` header record, as above.
+
+Compared with the vanilla files, the patched `Fallout3.esm` has 14,768 fewer records (704,183 against 718,951), 2,494 fewer with no parser, and format version 1.34 where the vanilla file has 0.94. The patched `FalloutNV.esm` has 38 more records (465,054 against 465,016) and 6 more with no parser. The census does not say why.
+
+### Records that fail to load
+
+| Plugin | Record | Failed | What the census printed |
+|---|---|---:|---|
+| `TaleOfTwoWastelands.esm` | `NPC_` | 5 of 2,529 | 4 loader errors (message withheld), 1 `ESM4::NPC_::load - Unknown subrecord DLVT` |
+| `Fallout3.esm` (TTW-patched) | `NPC_` | 10 of 1,642 | 8 loader errors (message withheld), 1 `Unknown subrecord DLVT`, 1 `Unknown subrecord LSNA` |
+| `FalloutNV.esm` (TTW-patched) | `NPC_` | 2 of 3,816 | 2 loader errors (message withheld) |
+
+`YUPTTW.esm` has no failures. In the vanilla files all 1,647 (Fallout 3) and 3,816 (New Vegas) `NPC_` records load. The census withholds loader error messages because they can contain record contents; the unknown-subrecord lines hold only a loader name and a four-letter code.
+
+### Record types with no loader
+
+28 of the 86 record types in `TaleOfTwoWastelands.esm` have no loader, and all of them are among the 42 listed in the next section. TTW adds no new unparsed type.
+
+### Every record type in `TaleOfTwoWastelands.esm`
+
+| Record | Records | Parsed | No parser | Failed |
+|---|---:|---:|---:|---:|
+| `ACHR` | 677 | 677 | 0 | 0 |
+| `ACRE` | 641 | 641 | 0 | 0 |
+| `ACTI` | 181 | 181 | 0 | 0 |
+| `ADDN` | 16 | 0 | 16 | 0 |
+| `ALCH` | 234 | 234 | 0 | 0 |
+| `ALOC` | 9 | 9 | 0 | 0 |
+| `AMEF` | 4 | 0 | 4 | 0 |
+| `AMMO` | 130 | 130 | 0 | 0 |
+| `ANIO` | 3 | 3 | 0 | 0 |
+| `ARMA` | 81 | 81 | 0 | 0 |
+| `ARMO` | 598 | 598 | 0 | 0 |
+| `ASPC` | 67 | 67 | 0 | 0 |
+| `AVIF` | 5 | 0 | 5 | 0 |
+| `BOOK` | 9 | 9 | 0 | 0 |
+| `BPTD` | 24 | 24 | 0 | 0 |
+| `CELL` | 3,818 | 3,818 | 0 | 0 |
+| `CHAL` | 194 | 0 | 194 | 0 |
+| `CLAS` | 29 | 29 | 0 | 0 |
+| `CONT` | 342 | 342 | 0 | 0 |
+| `CPTH` | 37 | 0 | 37 | 0 |
+| `CREA` | 1,282 | 1,282 | 0 | 0 |
+| `CSTY` | 1 | 0 | 1 | 0 |
+| `DEBR` | 2 | 0 | 2 | 0 |
+| `DIAL` | 2,942 | 2,942 | 0 | 0 |
+| `DOOR` | 166 | 166 | 0 | 0 |
+| `ECZN` | 6 | 0 | 6 | 0 |
+| `EFSH` | 10 | 0 | 10 | 0 |
+| `ENCH` | 129 | 0 | 129 | 0 |
+| `EXPL` | 18 | 0 | 18 | 0 |
+| `EYES` | 1 | 1 | 0 | 0 |
+| `FACT` | 588 | 0 | 588 | 0 |
+| `FLST` | 322 | 322 | 0 | 0 |
+| `FURN` | 9 | 9 | 0 | 0 |
+| `GLOB` | 23 | 23 | 0 | 0 |
+| `GMST` | 111 | 111 | 0 | 0 |
+| `HAIR` | 1 | 1 | 0 | 0 |
+| `HDPT` | 6 | 6 | 0 | 0 |
+| `IDLE` | 193 | 193 | 0 | 0 |
+| `IDLM` | 6 | 6 | 0 | 0 |
+| `IMAD` | 5 | 0 | 5 | 0 |
+| `IMOD` | 141 | 141 | 0 | 0 |
+| `INFO` | 11,146 | 11,146 | 0 | 0 |
+| `IPCT` | 15 | 0 | 15 | 0 |
+| `IPDS` | 9 | 0 | 9 | 0 |
+| `KEYM` | 28 | 28 | 0 | 0 |
+| `LAND` | 46 | 46 | 0 | 0 |
+| `LIGH` | 9 | 9 | 0 | 0 |
+| `LSCR` | 401 | 0 | 401 | 0 |
+| `LSCT` | 1 | 0 | 1 | 0 |
+| `LVLC` | 125 | 125 | 0 | 0 |
+| `LVLI` | 1,759 | 1,759 | 0 | 0 |
+| `LVLN` | 380 | 380 | 0 | 0 |
+| `MESG` | 185 | 0 | 185 | 0 |
+| `MGEF` | 73 | 0 | 73 | 0 |
+| `MISC` | 165 | 165 | 0 | 0 |
+| `MSET` | 40 | 40 | 0 | 0 |
+| `MSTT` | 12 | 12 | 0 | 0 |
+| `MUSC` | 1 | 1 | 0 | 0 |
+| `NAVI` | 1 | 1 | 0 | 0 |
+| `NAVM` | 247 | 247 | 0 | 0 |
+| `NOTE` | 435 | 435 | 0 | 0 |
+| `NPC_` | 2,529 | 2,524 | 0 | 5 |
+| `PACK` | 1,327 | 1,327 | 0 | 0 |
+| `PERK` | 101 | 0 | 101 | 0 |
+| `PGRE` | 677 | 677 | 0 | 0 |
+| `PROJ` | 135 | 0 | 135 | 0 |
+| `QUST` | 168 | 168 | 0 | 0 |
+| `RACE` | 2 | 2 | 0 | 0 |
+| `RCCT` | 4 | 0 | 4 | 0 |
+| `RCPE` | 352 | 0 | 352 | 0 |
+| `REFR` | 46,029 | 46,029 | 0 | 0 |
+| `REGN` | 11 | 11 | 0 | 0 |
+| `RGDL` | 3 | 0 | 3 | 0 |
+| `SCOL` | 15 | 15 | 0 | 0 |
+| `SCPT` | 1,263 | 1,263 | 0 | 0 |
+| `SOUN` | 574 | 574 | 0 | 0 |
+| `SPEL` | 78 | 0 | 78 | 0 |
+| `STAT` | 660 | 660 | 0 | 0 |
+| `TACT` | 59 | 59 | 0 | 0 |
+| `TERM` | 136 | 136 | 0 | 0 |
+| `TXST` | 240 | 240 | 0 | 0 |
+| `VTYP` | 2 | 0 | 2 | 0 |
+| `WATR` | 1 | 0 | 1 | 0 |
+| `WEAP` | 546 | 546 | 0 | 0 |
+| `WRLD` | 61 | 61 | 0 | 0 |
+| `WTHR` | 42 | 0 | 42 | 0 |
+| **All** | **83,154** | **80,732** | **2,417** | **5** |
+
+The tables for the other three TTW plugins are not on this page.
+
+## Record types with no loader in the 16 plugins
 
 Ordered by how many records the two base plugins hold. "M1 order" is the order the roadmap gives for adding loaders (1 `FACT`, 2 weather, climate and water, 3 effects, perks and actor values, 4 the rest).
 
@@ -206,6 +330,6 @@ The add-on plugins contain no unparsed type that is missing from this list.
 
 ## Notes
 
-- **One reader warning in `FalloutNV.esm`.** One compressed record, at file offset `0xb0cff20` (4,084 bytes compressed, 4,385 expected), failed zlib's data check. The reader's by-block retry (`components/esm4/reader.cpp:131`) read it, and the census counted the record as parsed. Reading the code, the retry stops once the expected 4,385 bytes are out and never reaches the checksum at the end of the stream, which fits a stream that is intact except for its checksum. That is a reading of the code. The checksum failure is in the file as GOG ships it: the file is byte-identical to the one in the GOG installer, and running the census on the unpacked game folder gives the same result, so the extraction did not cause it. A Steam copy was not checked.
-- **Not covered by the census:** `.bsa` archives, Tale of Two Wastelands, the correctness of the parsed fields, and player mods. Only record counts and loader results were checked.
+- **One reader warning in `FalloutNV.esm`.** One compressed record, at file offset `0xb0cff20` (4,084 bytes compressed, 4,385 expected), failed zlib's data check. The reader's by-block retry (`components/esm4/reader.cpp:131`) read it, and the census counted the record as parsed. Reading the code, the retry stops once the expected 4,385 bytes are out and never reaches the checksum at the end of the stream, which fits a stream that is intact except for its checksum. That is a reading of the code. The checksum failure is in the file as GOG ships it: the file is byte-identical to the one in the GOG installer, and running the census on the unpacked game folder gives the same result, so the extraction did not cause it. A Steam copy was not checked. In the TTW-patched `FalloutNV.esm` (330,921,809 bytes against 245,650,747 for the vanilla one) the warning does not appear, and none of the four TTW runs printed a zlib line.
+- **Not covered by the census:** `.bsa` archives (TTW's rebuilt ones included), the TTW-patched add-on plugins, the correctness of the parsed fields, the correctness of the community installer's output, and player mods. Only record counts and loader results were checked.
 - To reproduce: run `esmtool census <plugin>` from the plugin's folder. The header it prints (file name, format version, masters) is fine to share. See `build-baseline.md` for what the columns mean.
