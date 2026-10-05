@@ -279,7 +279,7 @@ CSVWidget::SceneToolRun* CSVRender::WorldspaceWidget::makeRunTool(CSVWidget::Sce
     std::sort(profiles.begin(), profiles.end());
 
     mRun = new CSVWidget::SceneToolRun(
-        parent, "Run OpenMW from the current camera position", ":scenetoolbar/play", profiles);
+        parent, "Run OpenFallout from the current camera position", ":scenetoolbar/play", profiles);
 
     connect(mRun, &CSVWidget::SceneToolRun::runRequest, this, &WorldspaceWidget::runRequest);
 

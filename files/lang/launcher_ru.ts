@@ -283,11 +283,11 @@
     </message>
     <message>
         <source>Fonts shipped with the original engine are blurry with UI scaling and support only a small amount of characters,
-so OpenMW provides another set of fonts to avoid these issues. These fonts use TrueType technology and are quite similar
-to default Morrowind fonts. Check this box if you still prefer original fonts over OpenMW ones or if you use custom bitmap fonts.</source>
+so OpenFallout provides another set of fonts to avoid these issues. These fonts use TrueType technology and are quite similar
+to default Morrowind fonts. Check this box if you still prefer original fonts over OpenFallout ones or if you use custom bitmap fonts.</source>
         <translation>Шрифты, поставляемые с оригинальной игрой, становятся размытыми при масштабировании интерфейса и поддерживают ограниченное количество символов,
-поэтому в комплекте с OpenMW идет набор шрифтов, не имеющих этих проблем. Они используют технологию TrueType и весьма похожи на шрифты Morrowind.
-Включите эту опцию, если вы все равно хотите использовать оригинальные шрифты вместо шрифтов OpenMW, или если вы используете сторонние растровые шрифты.</translation>
+поэтому в комплекте с OpenFallout идет набор шрифтов, не имеющих этих проблем. Они используют технологию TrueType и весьма похожи на шрифты Morrowind.
+Включите эту опцию, если вы все равно хотите использовать оригинальные шрифты вместо шрифтов OpenFallout, или если вы используете сторонние растровые шрифты.</translation>
     </message>
     <message>
         <source>Import Bitmap Fonts</source>
@@ -381,16 +381,16 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Это директория data-loсal, и она не может быть отключена</translation>
     </message>
     <message>
-        <source>This directory is part of OpenMW and cannot be disabled</source>
-        <translation>Это директория является частью OpenMW и не может быть отключена</translation>
+        <source>This directory is part of OpenFallout and cannot be disabled</source>
+        <translation>Это директория является частью OpenFallout и не может быть отключена</translation>
     </message>
     <message>
-        <source>This directory is enabled in an openmw.cfg other than the user one</source>
-        <translation>Это директория включена в openmw.cfg, не являющемся пользовательским</translation>
+        <source>This directory is enabled in an openfallout.cfg other than the user one</source>
+        <translation>Это директория включена в openfallout.cfg, не являющемся пользовательским</translation>
     </message>
     <message>
-        <source>This archive is enabled in an openmw.cfg other than the user one</source>
-        <translation>Этот архив включен в openmw.cfg, не являющемся пользовательским</translation>
+        <source>This archive is enabled in an openfallout.cfg other than the user one</source>
+        <translation>Этот архив включен в openfallout.cfg, не являющемся пользовательским</translation>
     </message>
     <message>
         <source>&amp;Copy Path(s) to Clipboard</source>
@@ -443,8 +443,8 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
 <context>
     <name>Launcher::ImportPage</name>
     <message>
-        <source>Error writing OpenMW configuration file</source>
-        <translation>Не удалось записать данные в файл с настройками OpenMW</translation>
+        <source>Error writing OpenFallout configuration file</source>
+        <translation>Не удалось записать данные в файл с настройками OpenFallout</translation>
     </message>
     <message>
         <source>Morrowind configuration file (*.ini)</source>
@@ -470,16 +470,16 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Закрыть</translation>
     </message>
     <message>
-        <source>Launch OpenMW</source>
-        <translation>Запустить OpenMW</translation>
+        <source>Launch OpenFallout</source>
+        <translation>Запустить OpenFallout</translation>
     </message>
     <message>
         <source>Help</source>
         <translation>Справка</translation>
     </message>
     <message>
-        <source>Error opening OpenMW configuration file</source>
-        <translation>Не удалось открыть файл с настройками OpenMW</translation>
+        <source>Error opening OpenFallout configuration file</source>
+        <translation>Не удалось открыть файл с настройками OpenFallout</translation>
     </message>
     <message>
         <source>First run</source>
@@ -494,12 +494,12 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Пропустить</translation>
     </message>
     <message>
-        <source>OpenMW %1 release</source>
-        <translation>OpenMW версии %1</translation>
+        <source>OpenFallout %1 release</source>
+        <translation>OpenFallout версии %1</translation>
     </message>
     <message>
-        <source>OpenMW development (%1)</source>
-        <translation>OpenMW ревизии %1</translation>
+        <source>OpenFallout development (%1)</source>
+        <translation>OpenFallout ревизии %1</translation>
     </message>
     <message>
         <source>Compiled on %1 %2</source>
@@ -514,12 +514,12 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Запустить &amp;Мастер установки...</translation>
     </message>
     <message>
-        <source>Error reading OpenMW configuration files</source>
-        <translation>Не удалось открыть файлы с настройками OpenMW</translation>
+        <source>Error reading OpenFallout configuration files</source>
+        <translation>Не удалось открыть файлы с настройками OpenFallout</translation>
     </message>
     <message>
-        <source>Error writing OpenMW configuration file</source>
-        <translation>Не удалось записать данные в файл с настройками OpenMW</translation>
+        <source>Error writing OpenFallout configuration file</source>
+        <translation>Не удалось записать данные в файл с настройками OpenFallout</translation>
     </message>
     <message>
         <source>Error writing user settings file</source>
@@ -534,8 +534,8 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Файл игры не выбран</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Welcome to OpenMW!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;It is recommended to run the Installation Wizard.&lt;/p&gt;&lt;p&gt;The Wizard will let you select an existing Morrowind installation, or install Morrowind for OpenMW to use.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Добро пожаловать в OpenMW!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Рекомендуется запустить Мастер установки.&lt;/p&gt;&lt;p&gt;Мастер позволит вам выбрать существующую установку Morrowind или же установить Morrowind для использования его OpenMW.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Welcome to OpenFallout!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;It is recommended to run the Installation Wizard.&lt;/p&gt;&lt;p&gt;The Wizard will let you select an existing Morrowind installation, or install Morrowind for OpenFallout to use.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;b&gt;Добро пожаловать в OpenFallout!&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Рекомендуется запустить Мастер установки.&lt;/p&gt;&lt;p&gt;Мастер позволит вам выбрать существующую установку Morrowind или же установить Morrowind для использования его OpenFallout.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not open %0 for reading:&lt;/b&gt;&lt;br&gt;&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Please make sure you have the right permissions and try again.&lt;br&gt;</source>
@@ -550,20 +550,20 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>&lt;br&gt;&lt;b&gt;Не удалось определить местоположение Data Files&lt;/b&gt;&lt;br&gt;&lt;br&gt;Не удалось найти директорию с файлами данных.</translation>
     </message>
     <message>
-        <source>&lt;br&gt;The problem may be due to an incomplete installation of OpenMW.&lt;br&gt;Reinstalling OpenMW may resolve the problem.&lt;br&gt;</source>
-        <translation>&lt;br&gt;Проблема могла возникнуть из-за неполной установки OpenMW.&lt;br&gt;Возможно, переустановка OpenMW поможет решить проблему.&lt;br&gt;</translation>
+        <source>&lt;br&gt;The problem may be due to an incomplete installation of OpenFallout.&lt;br&gt;Reinstalling OpenFallout may resolve the problem.&lt;br&gt;</source>
+        <translation>&lt;br&gt;Проблема могла возникнуть из-за неполной установки OpenFallout.&lt;br&gt;Возможно, переустановка OpenFallout поможет решить проблему.&lt;br&gt;</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not open or create %0 for writing&lt;/b&gt;&lt;br&gt;&lt;br&gt;Please make sure you have the right permissions and try again.&lt;br&gt;</source>
         <translation>&lt;br&gt;&lt;b&gt;Не удалось создать %0 или открыть его для записи&lt;/b&gt;&lt;br&gt;&lt;br&gt;Пожалуйста, проверьте права доступа и повторите попытку.&lt;br&gt;</translation>
     </message>
     <message>
-        <source>&lt;br&gt;&lt;b&gt;You do not have a game file selected.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenMW will not start without a game file selected.&lt;br&gt;</source>
-        <translation>&lt;br&gt;&lt;b&gt;У вас не выбрана игра.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenMW не может быть запущен без файла игры.&lt;br&gt;</translation>
+        <source>&lt;br&gt;&lt;b&gt;You do not have a game file selected.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenFallout will not start without a game file selected.&lt;br&gt;</source>
+        <translation>&lt;br&gt;&lt;b&gt;У вас не выбрана игра.&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenFallout не может быть запущен без файла игры.&lt;br&gt;</translation>
     </message>
     <message>
-        <source>Error creating OpenMW configuration directory: code %0</source>
-        <translation>Не удалось создать директорию для настроек OpenMW: код ошибки %0</translation>
+        <source>Error creating OpenFallout configuration directory: code %0</source>
+        <translation>Не удалось создать директорию для настроек OpenFallout: код ошибки %0</translation>
     </message>
     <message>
         <source>&lt;br&gt;&lt;b&gt;Could not create directory %0&lt;/b&gt;&lt;br&gt;&lt;br&gt;%1&lt;br&gt;</source>
@@ -585,30 +585,30 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>Открыть %1</translation>
     </message>
     <message>
-        <source>Local config directory used because it contains an openmw.cfg.
+        <source>Local config directory used because it contains an openfallout.cfg.
 Logs and settings changed through the launcher and in-game will be saved here.</source>
-        <translation>Локальная директория конфигурации используется, потому что содержит openmw.cfg.
+        <translation>Локальная директория конфигурации используется, потому что содержит openfallout.cfg.
 Лог-файлы и настройки, измененные через лаунчер и в игре, будут сохранены здесь.</translation>
     </message>
     <message>
-        <source>Local config directory used because it contains an openmw.cfg.</source>
-        <translation>Локальная директория конфигурации используется, потому что содержит openmw.cfg.</translation>
+        <source>Local config directory used because it contains an openfallout.cfg.</source>
+        <translation>Локальная директория конфигурации используется, потому что содержит openfallout.cfg.</translation>
     </message>
     <message>
         <source>Logs and settings changed through the launcher and in-game will be saved here.</source>
         <translation>Лог-файлы и настройки, измененные через лаунчер и в игре, будут сохранены здесь.</translation>
     </message>
     <message>
-        <source>Global config directory used because local directory did not contain an openmw.cfg.
+        <source>Global config directory used because local directory did not contain an openfallout.cfg.
 Logs and settings changed through the launcher and in-game will be saved here.
-This is typically a symptom of a broken OpenMW installation or bad package.</source>
-        <translation>Глобальная директория конфигурации используется, потому что локальная директория не содержит openmw.cfg.
+This is typically a symptom of a broken OpenFallout installation or bad package.</source>
+        <translation>Глобальная директория конфигурации используется, потому что локальная директория не содержит openfallout.cfg.
 Лог-файлы и настройки, измененные через лаунчер и в игре, будут сохранены здесь.
-Обычно это знак, что OpenMW установлен или упакован некорректно.</translation>
+Обычно это знак, что OpenFallout установлен или упакован некорректно.</translation>
     </message>
     <message>
-        <source>Global config directory used because local directory did not contain an openmw.cfg.</source>
-        <translation>Глобальная директория конфигурации используется, потому что локальная директория не содержит openmw.cfg.</translation>
+        <source>Global config directory used because local directory did not contain an openfallout.cfg.</source>
+        <translation>Глобальная директория конфигурации используется, потому что локальная директория не содержит openfallout.cfg.</translation>
     </message>
     <message>
         <source>User config directory used because %1 contains the line config=%2.
@@ -624,12 +624,12 @@ Logs and settings changed through the launcher and in-game will be saved here.</
 <context>
     <name>MainWindow</name>
     <message>
-        <source>OpenMW Launcher</source>
-        <translation>Лаунчер OpenMW</translation>
+        <source>OpenFallout Launcher</source>
+        <translation>Лаунчер OpenFallout</translation>
     </message>
     <message>
-        <source>OpenMW version</source>
-        <translation>Версия OpenMW</translation>
+        <source>OpenFallout version</source>
+        <translation>Версия OpenFallout</translation>
     </message>
     <message>
         <source>toolBar</source>
@@ -1227,8 +1227,8 @@ Logs and settings changed through the launcher and in-game will be saved here.</
         <translation>Эти настройки предназначены для отладки модов, и при их использовании для нормального игрового процесса возникнут проблемы.</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMW will capture control of the cursor if this setting is true.&lt;/p&gt;&lt;p&gt;In “look mode”, OpenMW will center the cursor regardless of the value of this setting (since the cursor/crosshair is always centered in the OpenMW window). However, in GUI mode, this setting determines the behavior when the cursor is moved outside the OpenMW window. If true, the cursor movement stops at the edge of the window preventing access to other applications. If false, the cursor is allowed to move freely on the desktop.&lt;/p&gt;&lt;p&gt;This setting does not apply to the screen where escape has been pressed, where the cursor is never captured. Regardless of this setting “Alt-Tab” or some other operating system dependent key sequence can be used to allow the operating system to regain control of the mouse cursor. This setting interacts with the minimize on focus loss setting by affecting what counts as a focus loss. Specifically on a two-screen configuration it may be more convenient to access the second screen with setting disabled.&lt;/p&gt;&lt;p&gt;Note for developers: it’s desirable to have this setting disabled when running the game in a debugger, to prevent the mouse cursor from becoming unusable when the game pauses on a breakpoint.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Когда эта настройка включена, OpenMW будет управлять курсором мыши.&lt;/p&gt;&lt;p&gt;В “режиме обзора”, OpenMW будет захватывать курсор в центре экрана вне зависимости от значения этой настройки (потому что курсор всегда расположен по центру в окне OpenMW). Однако в режиме меню эта настройка определяет поведение выхода курсора за пределы окна OpenMW. Если настройка включена, курсор остановится на краю окна, предотвращая доступ к другим приложениям. Если выключена, курсор может свободно перемещаться по рабочему столу.&lt;/p&gt;&lt;p&gt;Эта настройка не применяется к экрану, на котором нажата клавиша “Escape” (там курсор никогда не захватывается). Вне зависимости от значения этой настройки “Alt-Tab” и некоторые другие зависимые от операционной системы комбинации клавиш могут быть использованы, чтобы вернуть управление курсором операционной системе. Эта настройка также взаимодействует с настройкой &quot;minimize on focus loss&quot;, определяя, что именно считать потерей фокуса. На системах с двумя экранами может быть проще получить доступ ко второму экрану, если настройка выключена.&lt;/p&gt;&lt;p&gt;Замечание для разработчиков: лучше запускать игру с отключенной настройкой при запуске игры через отладчик, чтобы курсор не становился недоступен, когда игра останавливается на точке останова.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenFallout will capture control of the cursor if this setting is true.&lt;/p&gt;&lt;p&gt;In “look mode”, OpenFallout will center the cursor regardless of the value of this setting (since the cursor/crosshair is always centered in the OpenFallout window). However, in GUI mode, this setting determines the behavior when the cursor is moved outside the OpenFallout window. If true, the cursor movement stops at the edge of the window preventing access to other applications. If false, the cursor is allowed to move freely on the desktop.&lt;/p&gt;&lt;p&gt;This setting does not apply to the screen where escape has been pressed, where the cursor is never captured. Regardless of this setting “Alt-Tab” or some other operating system dependent key sequence can be used to allow the operating system to regain control of the mouse cursor. This setting interacts with the minimize on focus loss setting by affecting what counts as a focus loss. Specifically on a two-screen configuration it may be more convenient to access the second screen with setting disabled.&lt;/p&gt;&lt;p&gt;Note for developers: it’s desirable to have this setting disabled when running the game in a debugger, to prevent the mouse cursor from becoming unusable when the game pauses on a breakpoint.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Когда эта настройка включена, OpenFallout будет управлять курсором мыши.&lt;/p&gt;&lt;p&gt;В “режиме обзора”, OpenFallout будет захватывать курсор в центре экрана вне зависимости от значения этой настройки (потому что курсор всегда расположен по центру в окне OpenFallout). Однако в режиме меню эта настройка определяет поведение выхода курсора за пределы окна OpenFallout. Если настройка включена, курсор остановится на краю окна, предотвращая доступ к другим приложениям. Если выключена, курсор может свободно перемещаться по рабочему столу.&lt;/p&gt;&lt;p&gt;Эта настройка не применяется к экрану, на котором нажата клавиша “Escape” (там курсор никогда не захватывается). Вне зависимости от значения этой настройки “Alt-Tab” и некоторые другие зависимые от операционной системы комбинации клавиш могут быть использованы, чтобы вернуть управление курсором операционной системе. Эта настройка также взаимодействует с настройкой &quot;minimize on focus loss&quot;, определяя, что именно считать потерей фокуса. На системах с двумя экранами может быть проще получить доступ ко второму экрану, если настройка выключена.&lt;/p&gt;&lt;p&gt;Замечание для разработчиков: лучше запускать игру с отключенной настройкой при запуске игры через отладчик, чтобы курсор не становился недоступен, когда игра останавливается на точке останова.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Grab Cursor</source>
@@ -1264,7 +1264,7 @@ Logs and settings changed through the launcher and in-game will be saved here.</
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In third person, the camera will sway along with the movement animations of the player. Enabling this option disables this swaying by having the player character move independently of its animation. This was the default behavior of OpenMW 0.48 and earlier.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;В режиме вида от третьего лица камера перемещается согласно анимациям движения персонажа игрока. Включение этой настройки отключает это поведение, убирая зависимость движения персонажа игрока от состояния его анимаций. Такое поведение было в OpenMW версии 0.48 и ранее.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;В режиме вида от третьего лица камера перемещается согласно анимациям движения персонажа игрока. Включение этой настройки отключает это поведение, убирая зависимость движения персонажа игрока от состояния его анимаций. Такое поведение было в OpenFallout версии 0.48 и ранее.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Player Movement Ignores Animation</source>

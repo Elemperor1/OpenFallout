@@ -89,10 +89,10 @@ The behavior of such a model:
 
 4. During the night in interiors, it is in the "normal" mode.
 
-The actual state toggling time depends on the sunrise/sunset time settings in `openmw.cfg`:
+The actual state toggling time depends on the sunrise/sunset time settings in `openfallout.cfg`:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     fallback=Weather_Sunrise_Time,6
     fallback=Weather_Sunset_Time,18
@@ -104,7 +104,7 @@ These settings lead to the "night" starting at 20:00 and ending at 6:00.
 The engine checks if the weather is bright enough to support the "interior day" mode using the Glare_View setting. If it is >= 0.5, the engine considers the weather bright.
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     fallback=Weather_Clear_Glare_View,1
     fallback=Weather_Foggy_Glare_View,0.25
@@ -349,10 +349,10 @@ General advices to create assets for this feature:
 
 3. Smooth fading does not work for meshes, which have textures without alpha (e.g. rock).
 
-Groundcover mods can be registered in the openmw.cfg via "groundcover" entries instead of "content" ones:
+Groundcover mods can be registered in the openfallout.cfg via "groundcover" entries instead of "content" ones:
 
 .. code-block:: openmwcfg
-    :caption: openmw.cfg
+    :caption: openfallout.cfg
 
     groundcover=my_grass_mod.esp
 
@@ -371,7 +371,7 @@ Lua scripting
 OpenMW supports Lua scripts. See :ref:`Lua scripting documentation <Lua scripting>`.
 It is not compatible with MWSE. A mod with Lua scripts will work only if it was developed specifically for OpenMW.
 
-Installation of a Lua mod is the same as of any other mod: add ``data=`` and ``content=`` entries to ``openmw.cfg``.
+Installation of a Lua mod is the same as of any other mod: add ``data=`` and ``content=`` entries to ``openfallout.cfg``.
 Files with suffix ``.omwscripts`` are special type of content files and should also be enabled using ``content=`` entries.
 Note that for some mods load order can be important.
 

@@ -439,9 +439,9 @@ void Launcher::DataFilesPage::populateFileViews(const QString& contentModelName)
             if (currentDir.value == mDataLocal)
                 tooltip << tr("This is the data-local directory and cannot be disabled");
             else if (currentDir.value == resourcesVfs)
-                tooltip << tr("This directory is part of OpenMW and cannot be disabled");
+                tooltip << tr("This directory is part of OpenFallout and cannot be disabled");
             else
-                tooltip << tr("This directory is enabled in an openmw.cfg other than the user one");
+                tooltip << tr("This directory is enabled in an openfallout.cfg other than the user one");
         }
 
         // Add a "data file" icon if the directory contains a content file
@@ -497,7 +497,7 @@ void Launcher::DataFilesPage::populateFileViews(const QString& contentModelName)
             ui.archiveListWidget->item(row)->setFlags(
                 flags & ~(Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEnabled));
             ui.archiveListWidget->item(row)->setToolTip(
-                tr("This archive is enabled in an openmw.cfg other than the user one"));
+                tr("This archive is enabled in an openfallout.cfg other than the user one"));
         }
         row++;
     }
@@ -1097,7 +1097,7 @@ void Launcher::DataFilesPage::startNavMeshTool()
     if (ui.navMeshRemoveUnusedTilesCheckBox->checkState() == Qt::Checked)
         arguments.append("--remove-unused-tiles");
 
-    if (!mNavMeshToolInvoker->startProcess(QLatin1String("openmw-navmeshtool"), arguments))
+    if (!mNavMeshToolInvoker->startProcess(QLatin1String("openfallout-navmeshtool"), arguments))
         return;
 
     ui.cancelNavMeshButton->setEnabled(true);

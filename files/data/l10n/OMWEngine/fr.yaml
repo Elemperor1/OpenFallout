@@ -20,10 +20,10 @@ LoadingFailed: "Échec du chargement de la sauvegarde"
 LoadingInterior: "Chargement de la zone de jeu"
 LoadingInProgress: "Chargement de la sauvegarde"
 LoadingRequiresNewVersionError: |-
-    Ce fichier de sauvegarde provient d'une version plus récente d'OpenMW, il n'est par consequent pas supporté.
-    Mettez à jour votre version d'OpenMW afin de pouvoir charger cette sauvegarde.
+    Ce fichier de sauvegarde provient d'une version plus récente d'OpenFallout, il n'est par consequent pas supporté.
+    Mettez à jour votre version d'OpenFallout afin de pouvoir charger cette sauvegarde.
 LoadingRequiresOldVersionError: |-
-    Ce fichier de sauvegarde provient d'une version trop ancienne d'OpenMW, il n'est par consequent pas supporté.
+    Ce fichier de sauvegarde provient d'une version trop ancienne d'OpenFallout, il n'est par consequent pas supporté.
     Ouvrez et enregistez cette sauvegarde avec {version} pour la mettre à jour.
 NewGameConfirmation: "Voulez-vous démarrer une nouvelle partie ? Toute progression non sauvegardée sera perdue."
 QuitGameConfirmation: "Quitter la partie ?"

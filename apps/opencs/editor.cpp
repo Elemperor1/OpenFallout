@@ -42,10 +42,10 @@ CS::Editor::Editor(int argc, char** argv)
     : mConfigVariables(readConfiguration())
     , mSettingsState(mCfgMgr)
     , mDocumentManager(mCfgMgr)
-    , mPid(std::filesystem::temp_directory_path() / "openmw-cs.pid")
+    , mPid(std::filesystem::temp_directory_path() / "openfallout-cs.pid")
     , mLockFile(QFileInfo(Files::pathToQString(mPid)).absoluteFilePath() + ".lock")
     , mMerge(mDocumentManager)
-    , mIpcServerName("org.openmw.OpenCS")
+    , mIpcServerName("org.openfallout.OpenCS")
     , mServer(nullptr)
     , mClientSocket(nullptr)
 {
@@ -105,7 +105,7 @@ CS::Editor::~Editor()
 boost::program_options::variables_map CS::Editor::readConfiguration()
 {
     boost::program_options::variables_map variables;
-    boost::program_options::options_description desc("Syntax: openmw-cs <options>\nAllowed options");
+    boost::program_options::options_description desc("Syntax: openfallout-cs <options>\nAllowed options");
 
     auto addOption = desc.add_options();
     addOption("data",
@@ -138,7 +138,7 @@ boost::program_options::variables_map CS::Editor::readConfiguration()
 
     mCfgMgr.readConfiguration(variables, desc, false);
     Settings::Manager::load(mCfgMgr, true);
-    Debug::setupLogging(mCfgMgr.getLogPath(), "OpenMW-CS");
+    Debug::setupLogging(mCfgMgr.getLogPath(), "OpenFallout-CS");
 
     return variables;
 }
@@ -347,7 +347,7 @@ bool CS::Editor::makeIPCServer()
 
         if (!mLockFile.tryLock())
         {
-            Log(Debug::Error) << "Error: OpenMW-CS is already running.";
+            Log(Debug::Error) << "Error: OpenFallout-CS is already running.";
             return false;
         }
 

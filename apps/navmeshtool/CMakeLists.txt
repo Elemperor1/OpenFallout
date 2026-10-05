@@ -8,12 +8,12 @@ source_group(apps\\navmeshtool FILES ${NAVMESHTOOL_LIB} main.cpp)
 add_library(openmw-navmeshtool-lib STATIC ${NAVMESHTOOL_LIB})
 
 if (ANDROID)
-    add_library(openmw-navmeshtool SHARED main.cpp)
+    add_library(openfallout-navmeshtool SHARED main.cpp)
 else()
-    openmw_add_executable(openmw-navmeshtool main.cpp)
+    openmw_add_executable(openfallout-navmeshtool main.cpp)
 endif()
 
-target_link_libraries(openmw-navmeshtool openmw-navmeshtool-lib)
+target_link_libraries(openfallout-navmeshtool openmw-navmeshtool-lib)
 
 target_link_libraries(openmw-navmeshtool-lib
     Boost::program_options
@@ -21,18 +21,18 @@ target_link_libraries(openmw-navmeshtool-lib
 )
 
 if (WIN32)
-    target_sources(openmw-navmeshtool PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-navmeshtool PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-navmeshtool PRIVATE --coverage)
-    target_link_libraries(openmw-navmeshtool gcov)
+    target_compile_options(openfallout-navmeshtool PRIVATE --coverage)
+    target_link_libraries(openfallout-navmeshtool gcov)
 endif()
 
 if (NOT APPLE)
-    install(TARGETS openmw-navmeshtool)
+    install(TARGETS openfallout-navmeshtool)
 endif()
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-navmeshtool REUSE_FROM components)
+    target_precompile_headers(openfallout-navmeshtool REUSE_FROM components)
 endif()

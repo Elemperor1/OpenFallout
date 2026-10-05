@@ -32,7 +32,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = OpenMW
+PROJECT_NAME           = OpenFallout
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -58,7 +58,7 @@ PROJECT_LOGO           =
 # entered, it will be relative to the location where doxygen was started. If
 # left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = @OpenMW_BINARY_DIR@/docs/Doxygen
+OUTPUT_DIRECTORY       = @OpenFallout_BINARY_DIR@/docs/Doxygen
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 4096 sub-
 # directories (in 2 levels) under the output directory of each output format and
@@ -764,10 +764,10 @@ WARN_LOGFILE           =
 # spaces.
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = @OpenMW_SOURCE_DIR@/apps \
-                         @OpenMW_SOURCE_DIR@/components \
-                         @OpenMW_SOURCE_DIR@/libs \
-                         @OpenMW_BINARY_DIR@/docs/mainpage.hpp
+INPUT                  = @OpenFallout_SOURCE_DIR@/apps \
+                         @OpenFallout_SOURCE_DIR@/components \
+                         @OpenFallout_SOURCE_DIR@/libs \
+                         @OpenFallout_BINARY_DIR@/docs/mainpage.hpp
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -1212,7 +1212,7 @@ GENERATE_DOCSET        = NO
 # The default value is: Doxygen generated docs.
 # This tag requires that the tag GENERATE_DOCSET is set to YES.
 
-DOCSET_FEEDNAME        = "OpenMW Documentation"
+DOCSET_FEEDNAME        = "OpenFallout Documentation"
 
 # This tag specifies a string that should uniquely identify the documentation
 # set bundle. This should be a reverse domain-name style string, e.g.
@@ -1234,7 +1234,7 @@ DOCSET_PUBLISHER_ID    = org.openmw
 # The default value is: Publisher.
 # This tag requires that the tag GENERATE_DOCSET is set to YES.
 
-DOCSET_PUBLISHER_NAME  = OpenMW
+DOCSET_PUBLISHER_NAME  = OpenFallout
 
 # If the GENERATE_HTMLHELP tag is set to YES then doxygen generates three
 # additional HTML index files: index.hhp, index.hhc, and index.hhk. The

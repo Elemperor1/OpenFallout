@@ -3,26 +3,26 @@ set(BULLETMESHTOOL
 )
 source_group(apps\\bulletobjecttool FILES ${BULLETMESHTOOL})
 
-openmw_add_executable(openmw-bulletobjecttool ${BULLETMESHTOOL})
+openmw_add_executable(openfallout-bulletobjecttool ${BULLETMESHTOOL})
 
-target_link_libraries(openmw-bulletobjecttool
+target_link_libraries(openfallout-bulletobjecttool
     Boost::program_options
     components
 )
 
 if (WIN32)
-    target_sources(openmw-bulletobjecttool PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-bulletobjecttool PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-bulletobjecttool PRIVATE --coverage)
-    target_link_libraries(openmw-bulletobjecttool gcov)
+    target_compile_options(openfallout-bulletobjecttool PRIVATE --coverage)
+    target_link_libraries(openfallout-bulletobjecttool gcov)
 endif()
 
 if (NOT APPLE)
-    install(TARGETS openmw-bulletobjecttool)
+    install(TARGETS openfallout-bulletobjecttool)
 endif()
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-bulletobjecttool REUSE_FROM components)
+    target_precompile_headers(openfallout-bulletobjecttool REUSE_FROM components)
 endif()

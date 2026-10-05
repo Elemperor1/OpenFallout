@@ -63,7 +63,7 @@ int runApplication(int argc, char* argv[])
 
     Platform::Application application(argc, argv);
 
-    application.setDesktopFileName("org.openmw.cs");
+    application.setDesktopFileName("org.openfallout.cs");
     application.setWindowIcon(QIcon(":openmw-cs"));
 
     CS::Editor editor(argc, argv);
@@ -82,5 +82,5 @@ int runApplication(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    return Debug::wrapApplication(&runApplication, argc, argv, "OpenMW-CS");
+    return Debug::wrapApplication(&runApplication, argc, argv, "OpenFallout-CS");
 }

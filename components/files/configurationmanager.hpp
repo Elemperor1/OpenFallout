@@ -21,7 +21,7 @@ namespace boost::program_options
  */
 namespace Files
 {
-    inline constexpr std::string_view openmwCfgFile = "openmw.cfg";
+    inline constexpr std::string_view openfalloutCfgFile = "openfallout.cfg";
 
     /**
      * \struct ConfigurationManager

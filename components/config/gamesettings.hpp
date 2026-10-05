@@ -20,9 +20,9 @@ namespace Config
     struct SettingValue
     {
         QString value = "";
-        // value as found in openmw.cfg, e.g. relative path with ?slug?
+        // value as found in openfallout.cfg, e.g. relative path with ?slug?
         QString originalRepresentation = value;
-        // path of openmw.cfg, e.g. to resolve relative paths
+        // path of openfallout.cfg, e.g. to resolve relative paths
         QString context = "";
 
         friend std::strong_ordering operator<=>(const SettingValue&, const SettingValue&) = default;

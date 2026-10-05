@@ -8,10 +8,10 @@ ERROR: Unknown fallback name: FontColor_color_header
 :Symptoms:
 	OpenMW crashes at startup with
 	``ERROR: Unknown fallback name: FontColor_color_header``
-	message at the end of ``openmw.log``, located `here </docs/source/reference/modding/paths>`_.
+	message at the end of ``openfallout.log``, located `here </docs/source/reference/modding/paths>`_.
 
 :Cause:
-	The OpenMW `configuration file </docs/source/reference/modding/paths>`_ ``openmw.cfg``
+	The OpenMW `configuration file </docs/source/reference/modding/paths>`_ ``openfallout.cfg``
 	is severely lacking and missing fallback values
 	because "Settings Importer" was not run correctly.
 
@@ -26,7 +26,7 @@ Installing game files via Steam on macOS: DISK WRITE ERROR
 	The download will read "Paused: DISK WRITE ERROR".
 
 :Cause:
-	The OpenMW `configuration file </docs/source/reference/modding/paths>`_ ``openmw.cfg``
+	The OpenMW `configuration file </docs/source/reference/modding/paths>`_ ``openfallout.cfg``
 	is severely lacking and missing fallback values
 	because "Settings Importer" was not run correctly.
 

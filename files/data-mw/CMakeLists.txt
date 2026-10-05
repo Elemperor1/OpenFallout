@@ -18,7 +18,7 @@ set(BUILTIN_DATA_MW_FILES
     # L10n for game-specific mechanics
     l10n/Mechanics/gmst.yaml
 
-    # L10n for OpenMW menus and non-game-specific messages
+    # L10n for OpenFallout menus and non-game-specific messages
     l10n/OMWEngine/gmst.yaml
 
     # Game-specific settings for calendar.lua

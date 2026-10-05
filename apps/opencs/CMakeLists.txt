@@ -140,7 +140,7 @@ set (OPENCS_RES ${CMAKE_SOURCE_DIR}/files/opencs/resources.qrc
                 ${CMAKE_SOURCE_DIR}/files/launcher/launcher.qrc
     )
 
-source_group (openmw-cs FILES main.cpp ${OPENCS_SRC} ${OPENCS_HDR})
+source_group (openfallout-cs FILES main.cpp ${OPENCS_SRC} ${OPENCS_HDR})
 
 if(WIN32)
     set(OPENCS_RES ${OPENCS_RES} ${CMAKE_SOURCE_DIR}/files/windows/QWindowsVistaDark/dark.qrc)
@@ -154,9 +154,9 @@ qt_add_resources(OPENCS_RES_SRC ${OPENCS_RES})
 
 if(APPLE)
     set (OPENCS_MAC_ICON "${CMAKE_SOURCE_DIR}/files/mac/openmw-cs.icns")
-    set (OPENCS_CFG "${OpenMW_BINARY_DIR}/defaults-cs.bin")
-    set (OPENCS_DEFAULT_FILTERS_FILE "${OpenMW_BINARY_DIR}/resources/defaultfilters")
-    set (OPENCS_OPENMW_CFG "${OpenMW_BINARY_DIR}/openmw.cfg")
+    set (OPENCS_CFG "${OpenFallout_BINARY_DIR}/defaults-cs.bin")
+    set (OPENCS_DEFAULT_FILTERS_FILE "${OpenFallout_BINARY_DIR}/resources/defaultfilters")
+    set (OPENCS_OPENMW_CFG "${OpenFallout_BINARY_DIR}/openfallout.cfg")
 else()
     set (OPENCS_MAC_ICON "")
     set (OPENCS_CFG "")
@@ -172,7 +172,7 @@ add_library(openmw-cs-lib STATIC
 )
 
 if(BUILD_OPENCS)
-    openmw_add_executable(openmw-cs
+    openmw_add_executable(openfallout-cs
         MACOSX_BUNDLE
         ${OPENCS_MAC_ICON}
         ${OPENCS_CFG}
@@ -182,35 +182,35 @@ if(BUILD_OPENCS)
         main.cpp
     )
 
-    target_link_libraries(openmw-cs openmw-cs-lib)
+    target_link_libraries(openfallout-cs openmw-cs-lib)
 
-    set_property(TARGET openmw-cs PROPERTY AUTOMOC ON)
-    set_property(TARGET openmw-cs PROPERTY AUTOUIC_SEARCH_PATHS ui)
-    set_property(TARGET openmw-cs PROPERTY AUTOUIC ON)
+    set_property(TARGET openfallout-cs PROPERTY AUTOMOC ON)
+    set_property(TARGET openfallout-cs PROPERTY AUTOUIC_SEARCH_PATHS ui)
+    set_property(TARGET openfallout-cs PROPERTY AUTOUIC ON)
 
     if (BUILD_WITH_CODE_COVERAGE)
-        target_compile_options(openmw-cs PRIVATE --coverage)
-        target_link_libraries(openmw-cs gcov)
+        target_compile_options(openfallout-cs PRIVATE --coverage)
+        target_link_libraries(openfallout-cs gcov)
     endif()
 endif()
 
 if(APPLE AND BUILD_OPENCS)
-    set(OPENCS_BUNDLE_NAME "OpenMW-CS")
-    set(OPENCS_BUNDLE_RESOURCES_DIR "${OpenMW_BINARY_DIR}/${OPENCS_BUNDLE_NAME}.app/Contents/Resources")
+    set(OPENCS_BUNDLE_NAME "OpenFallout-CS")
+    set(OPENCS_BUNDLE_RESOURCES_DIR "${OpenFallout_BINARY_DIR}/${OPENCS_BUNDLE_NAME}.app/Contents/Resources")
 
     set(OPENMW_RESOURCES_ROOT ${OPENCS_BUNDLE_RESOURCES_DIR})
 
     add_subdirectory(../../files/ ${CMAKE_CURRENT_BINARY_DIR}/files)
 
-    set_target_properties(openmw-cs PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${OpenMW_BINARY_DIR}"
+    set_target_properties(openfallout-cs PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${OpenFallout_BINARY_DIR}"
         OUTPUT_NAME ${OPENCS_BUNDLE_NAME}
         MACOSX_BUNDLE_ICON_FILE "openmw-cs.icns"
-        MACOSX_BUNDLE_BUNDLE_NAME "OpenMW-CS"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "org.openmw.opencs"
+        MACOSX_BUNDLE_BUNDLE_NAME "OpenFallout-CS"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.openfallout.opencs"
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${OPENMW_VERSION}
         MACOSX_BUNDLE_BUNDLE_VERSION ${OPENMW_VERSION}
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/files/mac/openmw-cs-Info.plist.in"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/files/mac/openfallout-cs-Info.plist.in"
         )
 
     set_source_files_properties(${OPENCS_MAC_ICON} PROPERTIES
@@ -222,9 +222,9 @@ if(APPLE AND BUILD_OPENCS)
     set_source_files_properties(${OPENCS_OPENMW_CFG} PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources)
 
-    add_custom_command(TARGET openmw-cs
+    add_custom_command(TARGET openfallout-cs
         POST_BUILD
-        COMMAND cp "${OpenMW_BINARY_DIR}/resources/version" "${OPENCS_BUNDLE_RESOURCES_DIR}/resources")
+        COMMAND cp "${OpenFallout_BINARY_DIR}/resources/version" "${OPENCS_BUNDLE_RESOURCES_DIR}/resources")
 endif()
 
 target_link_libraries(openmw-cs-lib
@@ -246,12 +246,12 @@ target_link_libraries(openmw-cs-lib
 target_link_libraries(openmw-cs-lib Qt::Widgets Qt::Core Qt::Network Qt::OpenGL Qt::OpenGLWidgets Qt::Svg)
 
 if (WIN32)
-    target_sources(openmw-cs PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-cs PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (NOT APPLE AND BUILD_OPENCS)
-    INSTALL(TARGETS openmw-cs)
-    INSTALL(FILES "$<TARGET_FILE_DIR:openmw-cs>/defaults-cs.bin" DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}")
+    INSTALL(TARGETS openfallout-cs)
+    INSTALL(FILES "$<TARGET_FILE_DIR:openfallout-cs>/defaults-cs.bin" DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}")
 endif()
 
 if (MSVC)
@@ -262,7 +262,7 @@ if (MSVC)
 endif (MSVC)
 
 if(APPLE AND BUILD_OPENCS)
-    INSTALL(TARGETS openmw-cs BUNDLE DESTINATION "." COMPONENT Bundle)
+    INSTALL(TARGETS openfallout-cs BUNDLE DESTINATION "." COMPONENT Bundle)
 endif()
 
 if(USE_QT)

@@ -20,10 +20,10 @@ LoadingFailed: "Laden des Spielstandes fehlgeschlagen!"
 LoadingInterior: "Lade Bereich..."
 LoadingInProgress: "Lade Spielstand..."
 LoadingRequiresNewVersionError: |-
-   Der Spielstand wurde mit einer neueren Version von OpenMW erstellt und wird daher nicht unterstützt.
-   Bitte aktualisieren Sie Ihre OpenMW-Installation, um den Spielstand laden zu können.
+   Der Spielstand wurde mit einer neueren Version von OpenFallout erstellt und wird daher nicht unterstützt.
+   Bitte aktualisieren Sie Ihre OpenFallout-Installation, um den Spielstand laden zu können.
 LoadingRequiresOldVersionError: |-
-    Der Spielstand wurde mit einer älteren Version von OpenMW erstellt, deren Speicherformat nicht mehr unterstützt wird.
+    Der Spielstand wurde mit einer älteren Version von OpenFallout erstellt, deren Speicherformat nicht mehr unterstützt wird.
     Laden und speichern Sie den Spielstand mit Version {version}, um das Format anzupassen.
 NewGameConfirmation: "Neues Spiel starten und aktuellen Fortschritt verwerfen?"
 QuitGameConfirmation: "Spiel verlassen?"

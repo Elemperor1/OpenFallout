@@ -550,7 +550,7 @@ void CSMPrefs::State::declareSubcategory(const QString& label)
 }
 
 CSMPrefs::State::State(const Files::ConfigurationManager& configurationManager)
-    : mConfigFile("openmw-cs.cfg")
+    : mConfigFile("openfallout-cs.cfg")
     , mDefaultConfigFile("defaults-cs.bin")
     , mConfigurationManager(configurationManager)
     , mCurrentCategory(mCategories.end())

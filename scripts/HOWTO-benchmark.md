@@ -1,4 +1,4 @@
-OpenMW ships with its own benchmarking tool. This document describes how to collect performance data and vizualise it.
+OpenFallout ships with its own benchmarking tool. This document describes how to collect performance data and vizualise it.
 
 Collecting data
 ===============
@@ -9,7 +9,7 @@ We can select what should be collected by setting the `OPENMW_OSG_STATS_LIST` en
 | Metric to collect | Equivalent in-game profiler                                       |
 |-------------------|-------------------------------------------------------------------|
 | `frame_rate`      | Frame rate                                                        |
-| `engine`          | OpenMW specifics metric (white bars)                              |
+| `engine`          | OpenFallout specifics metric (white bars)                              |
 | `event`           | Event traversal bar                                               |
 | `update`          | Update traversal bar                                              |
 | `rendering`       | Draw bar                                                          |
@@ -26,14 +26,14 @@ Example
 
 Posix shell
 ```sh
-OPENMW_OSG_STATS_FILE=/tmp/stats OPENMW_OSG_STATS_LIST="resource;engine" /usr/local/bin/openmw
+OPENMW_OSG_STATS_FILE=/tmp/stats OPENMW_OSG_STATS_LIST="resource;engine" /usr/local/bin/openfallout
 ```
 
 Windows PowerShell
 ```powershell
 $env:OPENMW_OSG_STATS_FILE="c:\stats"
 $env:OPENMW_OSG_STATS_LIST="resource;engine"
-openmw
+openfallout
 ```
 
 

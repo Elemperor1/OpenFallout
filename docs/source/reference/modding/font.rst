@@ -1,15 +1,15 @@
 Fonts
 #####
 
-Default UI font and font used in magic scrolls are defined in ``openmw.cfg``:
+Default UI font and font used in magic scrolls are defined in ``openfallout.cfg``:
 
 .. code-block:: openmwcfg
-  :caption: openmw.cfg
+  :caption: openfallout.cfg
 
   fallback=Fonts_Font_0,MysticCards
   fallback=Fonts_Font_2,DemonicLetters
 
-When there are no ``Fonts_Font_*`` lines in user's ``openmw.cfg``, built-in TrueType fonts are used.
+When there are no ``Fonts_Font_*`` lines in user's ``openfallout.cfg``, built-in TrueType fonts are used.
 Font used by console and another debug windows is not configurable (so ``Fonts_Font_1`` is unused).
 
 Morrowind .fnt fonts
@@ -21,10 +21,10 @@ To our knowledge, the format is undocumented. OpenMW can load this format and co
 You can use --export-fonts command line option to write the converted font
 (a PNG image and an XML file describing the position of each glyph in the image) to the current directory.
 
-They can be used instead of TrueType fonts if needed by specifying their ``.fnt`` files names in the ``openmw.cfg``. For example:
+They can be used instead of TrueType fonts if needed by specifying their ``.fnt`` files names in the ``openfallout.cfg``. For example:
 
 .. code-block:: openmwcfg
-  :caption: openmw.cfg
+  :caption: openfallout.cfg
 
   fallback=Fonts_Font_0,magic_cards_regular
   fallback=Fonts_Font_2,daedric_font
@@ -32,23 +32,23 @@ They can be used instead of TrueType fonts if needed by specifying their ``.fnt`
 In this example OpenMW will search for ``magic_cards_regular.fnt`` and ``daedric_font.fnt`` in the ``Fonts`` folder in data directories.
 If they are not found, built-in TrueType fonts will be used as a fallback.
 Note that an import wizard copies values from ``Morrowind.ini``, so bitmap fonts will be used after import.
-If such behaviour is undesirable, ``Fonts_Font*`` entries should be removed from ``openmw.cfg``.
+If such behaviour is undesirable, ``Fonts_Font*`` entries should be removed from ``openfallout.cfg``.
 
 TrueType fonts
 --------------
 
 Unlike vanilla Morrowind, OpenMW directly supports TrueType (``.ttf``) fonts. This is the recommended fonts format.
 OpenMW has build-in TrueType fonts: MysticCards, DemonicLetters and DejaVuLGCSansMono, which are used by default.
-TrueType fonts are configured via ``openmw.cfg`` too:
+TrueType fonts are configured via ``openfallout.cfg`` too:
 
 .. code-block:: openmwcfg
-  :caption: openmw.cfg
+  :caption: openfallout.cfg
 
   fallback=Fonts_Font_0,MysticCards
   fallback=Fonts_Font_2,DemonicLetters
 
 In this example, OpenMW will scan ``Fonts`` folder in data directories for ``.omwfont`` files.
-These files are XML files with schema provided by MyGUI. OpenMW uses ``.omwfont`` files which name (without extension) matches ``openmw.cfg`` entries.
+These files are XML files with schema provided by MyGUI. OpenMW uses ``.omwfont`` files which name (without extension) matches ``openfallout.cfg`` entries.
 
 It is also possible to adjust the font size via ``settings.cfg`` file:
 

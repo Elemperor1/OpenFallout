@@ -946,9 +946,10 @@ namespace DetourNavigator
                     }
                     else if (message.find("UNIQUE constraint failed: tiles.tile_id") != std::string_view::npos)
                     {
-                        Log(Debug::Warning) << "Found duplicate navmeshdb tile_id, please report the "
-                                               "issue to https://gitlab.com/OpenMW/openmw/-/issues, attach openmw.log: "
-                                            << mNextTileId;
+                        Log(Debug::Warning)
+                            << "Found duplicate navmeshdb tile_id, please report the "
+                               "issue to https://github.com/Elemperor1/OpenFallout/issues, attach openfallout.log: "
+                            << mNextTileId;
                         try
                         {
                             mNextTileId = TileId(mDb->getMaxTileId() + 1);

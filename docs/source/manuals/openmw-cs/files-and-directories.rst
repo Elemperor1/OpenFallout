@@ -22,9 +22,9 @@ into the CS and depends on your operating system.
 ================  =========================================
 Operating System  User Directory
 ================  =========================================
-GNU/Linux         ``~/.config/openmw/``
-OS X              ``~/Library/Application Support/openmw/``
-Windows           ``C:\Users\ *Username* \Documents\my games\OpenMW``
+GNU/Linux         ``~/.config/openfallout/``
+OS X              ``~/Library/Application Support/openfallout/``
+Windows           ``C:\Users\ *Username* \Documents\my games\OpenFallout``
 ================  =========================================
 
 In addition to to this single hard-coded directory both OpenMW and OpenMW CS

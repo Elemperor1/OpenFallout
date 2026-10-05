@@ -14,7 +14,7 @@ namespace OpenMW
 {
     bpo::options_description makeOptionsDescription()
     {
-        bpo::options_description desc("Syntax: openmw <options>\nAllowed options");
+        bpo::options_description desc("Syntax: openfallout <options>\nAllowed options");
         Files::ConfigurationManager::addCommonOptions(desc);
 
         auto addOption = desc.add_options();
@@ -75,7 +75,7 @@ namespace OpenMW
             "run new game sequence (ignored if skip-menu=0)");
 
         addOption("encoding", bpo::value<std::string>()->default_value("win1252"),
-            "Character encoding used in OpenMW game messages:\n"
+            "Character encoding used in OpenFallout game messages:\n"
             "\n\twin1250 - Central and Eastern European such as Polish, Czech, Slovak, Hungarian, Slovene, Bosnian, "
             "Croatian, Serbian (Latin script), Romanian and Albanian languages\n"
             "\n\twin1251 - Cyrillic alphabet such as Russian, Bulgarian, Serbian Cyrillic and other languages\n"

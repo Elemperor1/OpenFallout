@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=OpenFallout Launcher
+GenericName=Role Playing Game
+Comment=An open source engine for Bethesda role playing games, based on OpenMW
+Keywords=Morrowind;Fallout;Reimplementation;Mods;esm;bsa;
+TryExec=openfallout-launcher
+Exec=openfallout-launcher
+Icon=openmw
+Categories=Game;RolePlaying;
+StartupWMClass=openfallout-launcher

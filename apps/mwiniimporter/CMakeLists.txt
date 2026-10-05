@@ -9,21 +9,21 @@ set(MWINIIMPORT_HEADER
 
 source_group(launcher FILES ${MWINIIMPORT} ${MWINIIMPORT_HEADER})
 
-openmw_add_executable(openmw-iniimporter
+openmw_add_executable(openfallout-iniimporter
     ${MWINIIMPORT}
 )
 
-target_link_libraries(openmw-iniimporter
+target_link_libraries(openfallout-iniimporter
     Boost::program_options
     components
 )
 
 if (WIN32)
-    target_sources(openmw-iniimporter PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-iniimporter PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (NOT APPLE)
-    INSTALL(TARGETS openmw-iniimporter)
+    INSTALL(TARGETS openfallout-iniimporter)
 endif()
 
 if (MINGW)
@@ -31,10 +31,10 @@ if (MINGW)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-iniimporter PRIVATE --coverage)
-    target_link_libraries(openmw-iniimporter gcov)
+    target_compile_options(openfallout-iniimporter PRIVATE --coverage)
+    target_link_libraries(openfallout-iniimporter gcov)
 endif()
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-iniimporter REUSE_FROM components)
+    target_precompile_headers(openfallout-iniimporter REUSE_FROM components)
 endif()

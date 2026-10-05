@@ -111,6 +111,6 @@ weather.
 Settings
 ********
 
-Colour and other settings for each weather type can be edited in ``openmw.cfg``
+Colour and other settings for each weather type can be edited in ``openfallout.cfg``
 configuration file.
 

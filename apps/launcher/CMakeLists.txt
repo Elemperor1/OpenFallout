@@ -53,44 +53,44 @@ if(NOT WIN32)
 endif(NOT WIN32)
 
 # Main executable
-openmw_add_executable(openmw-launcher
+openmw_add_executable(openfallout-launcher
     ${GUI_TYPE}
     ${LAUNCHER}
     ${LAUNCHER_HEADER}
     ${RCC_SRCS}
 )
 
-add_dependencies(openmw-launcher qm-files)
+add_dependencies(openfallout-launcher qm-files)
 
 if (NOT APPLE)
-    INSTALL(TARGETS openmw-launcher)
+    INSTALL(TARGETS openfallout-launcher)
 endif ()
 
-target_link_libraries(openmw-launcher
+target_link_libraries(openfallout-launcher
     SDL2::SDL2
     ${OPENAL_LIBRARY}
     components_qt
 )
 
-target_link_libraries(openmw-launcher Qt::Widgets Qt::Core Qt::Svg)
+target_link_libraries(openfallout-launcher Qt::Widgets Qt::Core Qt::Svg)
 
 if (WIN32)
-    target_sources(openmw-launcher PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
+    target_sources(openfallout-launcher PRIVATE ${CMAKE_SOURCE_DIR}/files/windows/other-apps.manifest)
 endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
-    target_compile_options(openmw-launcher PRIVATE --coverage)
-    target_link_libraries(openmw-launcher gcov)
+    target_compile_options(openfallout-launcher PRIVATE --coverage)
+    target_link_libraries(openfallout-launcher gcov)
 endif()
 
 if(USE_QT)
-    set_property(TARGET openmw-launcher PROPERTY AUTOMOC ON)
-    set_property(TARGET openmw-launcher PROPERTY AUTOUIC ON)
-    set_property(TARGET openmw-launcher PROPERTY AUTOUIC_SEARCH_PATHS ui)
+    set_property(TARGET openfallout-launcher PROPERTY AUTOMOC ON)
+    set_property(TARGET openfallout-launcher PROPERTY AUTOUIC ON)
+    set_property(TARGET openfallout-launcher PROPERTY AUTOUIC_SEARCH_PATHS ui)
 endif(USE_QT)
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openmw-launcher PRIVATE
+    target_precompile_headers(openfallout-launcher PRIVATE
         <boost/program_options/options_description.hpp>
 
         <algorithm>

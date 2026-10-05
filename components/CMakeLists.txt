@@ -6,23 +6,23 @@ if(APPLE)
 endif(APPLE)
 
 # Version file
-set (VERSION_RESOURCE_FILE_IN "${OpenMW_SOURCE_DIR}/files/version.in")
+set (VERSION_RESOURCE_FILE_IN "${OpenFallout_SOURCE_DIR}/files/version.in")
 set (VERSION_RESOURCE_FILE_RELATIVE "resources/version")
 set (VERSION_CPP_FILE "components/version/version.cpp")
 
 if (GIT_CHECKOUT)
     get_generator_is_multi_config(multi_config)
     add_custom_target (get-version
-       BYPRODUCTS "${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}"
-       DEPENDS "${OpenMW_SOURCE_DIR}/${VERSION_CPP_FILE}.in"
+       BYPRODUCTS "${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}"
+       DEPENDS "${OpenFallout_SOURCE_DIR}/${VERSION_CPP_FILE}.in"
        COMMAND ${CMAKE_COMMAND}
             -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
-            -DOpenMW_SOURCE_DIR=${OpenMW_SOURCE_DIR}
-            -DOpenMW_BINARY_DIR=${OpenMW_BINARY_DIR}
+            -DOpenFallout_SOURCE_DIR=${OpenFallout_SOURCE_DIR}
+            -DOpenFallout_BINARY_DIR=${OpenFallout_BINARY_DIR}
             -DVERSION_RESOURCE_FILE_IN=${VERSION_RESOURCE_FILE_IN}
             -DVERSION_RESOURCE_FILE_RELATIVE=${VERSION_RESOURCE_FILE_RELATIVE}
-            -DVERSION_CPP_FILE_IN=${OpenMW_SOURCE_DIR}/${VERSION_CPP_FILE}.in
-            -DVERSION_CPP_FILE_OUT=${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}.out
+            -DVERSION_CPP_FILE_IN=${OpenFallout_SOURCE_DIR}/${VERSION_CPP_FILE}.in
+            -DVERSION_CPP_FILE_OUT=${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}.out
             -DOPENMW_VERSION_MAJOR=${OPENMW_VERSION_MAJOR}
             -DOPENMW_VERSION_MINOR=${OPENMW_VERSION_MINOR}
             -DOPENMW_VERSION_RELEASE=${OPENMW_VERSION_RELEASE}
@@ -35,14 +35,14 @@ if (GIT_CHECKOUT)
             -Dgenerator_is_multi_config_var=${multi_config}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/GitVersion.cmake
         COMMAND ${CMAKE_COMMAND}
-            -E copy_if_different ${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}.out ${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}
+            -E copy_if_different ${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}.out ${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}
         VERBATIM)
 else (GIT_CHECKOUT)
-    configure_resource_file(${VERSION_RESOURCE_FILE_IN} ${OpenMW_BINARY_DIR} ${VERSION_RESOURCE_FILE_RELATIVE})
-    configure_file("${OpenMW_SOURCE_DIR}/${VERSION_CPP_FILE}.in" "${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}")
+    configure_resource_file(${VERSION_RESOURCE_FILE_IN} ${OpenFallout_BINARY_DIR} ${VERSION_RESOURCE_FILE_RELATIVE})
+    configure_file("${OpenFallout_SOURCE_DIR}/${VERSION_CPP_FILE}.in" "${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}")
 endif (GIT_CHECKOUT)
 
-list (APPEND COMPONENT_FILES "${OpenMW_BINARY_DIR}/${VERSION_CPP_FILE}")
+list (APPEND COMPONENT_FILES "${OpenFallout_BINARY_DIR}/${VERSION_CPP_FILE}")
 
 # OSG plugin checker
 # Helpfully, OSG doesn't export this to its CMake config as it doesn't have one
@@ -52,8 +52,8 @@ list(TRANSFORM USED_OSG_PLUGIN_NAMES_FORMATTED APPEND "\"")
 list(JOIN USED_OSG_PLUGIN_NAMES_FORMATTED ", " USED_OSG_PLUGIN_NAMES_FORMATTED)
 
 set(OSG_PLUGIN_CHECKER_CPP_FILE "components/misc/osgpluginchecker.cpp")
-configure_file("${OpenMW_SOURCE_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}.in" "${OpenMW_BINARY_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}")
-list(APPEND COMPONENT_FILES "${OpenMW_BINARY_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}")
+configure_file("${OpenFallout_SOURCE_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}.in" "${OpenFallout_BINARY_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}")
+list(APPEND COMPONENT_FILES "${OpenFallout_BINARY_DIR}/${OSG_PLUGIN_CHECKER_CPP_FILE}")
 
 # source files
 

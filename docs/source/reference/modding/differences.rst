@@ -23,11 +23,11 @@ This has many advantages, especially when it comes to uninstalling mods and prev
 
 To install mods via this new feature:
 
-#.	Open ``openmw.cfg`` with your preferred text editor. It is located as described in :doc:`paths` and *not* in your OpenMW root directory.
+#.	Open ``openfallout.cfg`` with your preferred text editor. It is located as described in :doc:`paths` and *not* in your OpenMW root directory.
 #.	Find or search for ``data=``. This is located very near the bottom of the file.
 #.	Add a new line below this line and make a new entry of the format ``data="path/to/your/mod"``
 #.	Make as many of these entries as you need for each mod folder you want to include.
-#.	Save ``openmw.cfg``
+#.	Save ``openfallout.cfg``
 
 .. note::
 	All mod folders must adhere to the same file structure as ``~/Morrowind/Data Files/``.
@@ -55,7 +55,7 @@ Settings.cfg
 ------------
 
 The ``settings.cfg`` file is essentially the same as the INI files for Morrowind. 
-It is located in the same directory as ``openmw.cfg``. This is where many video, audio, GUI, input, etc. 
+It is located in the same directory as ``openfallout.cfg``. This is where many video, audio, GUI, input, etc. 
 settings can be modified. Some are available in-game, but many are only available in this configuration file. 
 Please see https://wiki.openmw.org/index.php?title=Settings for the complete listing.
 

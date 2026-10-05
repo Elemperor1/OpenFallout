@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs everything needed to build and test OpenFallout on Ubuntu 24.04 (the Qt tools are left out).
+# Installs everything needed to build and test OpenFallout on Ubuntu 24.04, the Qt tools included.
 #
 # Ubuntu ships MyGUI 3.4.2 and a Recast without CMake package files, but the build needs MyGUI 3.4.3 and a CMake
 # config for Recast. CMake would normally download both from GitHub. Where that is blocked, this script builds them
@@ -33,7 +33,8 @@ $SUDO apt-get install -y --no-install-recommends \
     libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
     libsdl2-dev libopenal-dev libbullet-dev liblz4-dev libpng-dev libjpeg-dev libluajit-5.1-dev \
     libsqlite3-dev libicu-dev libyaml-cpp-dev libopenscenegraph-dev libgl-dev libfreetype-dev \
-    libgtest-dev libgmock-dev googletest
+    libgtest-dev libgmock-dev googletest \
+    libunshield-dev qt6-base-dev qt6-svg-dev qt6-tools-dev qt6-tools-dev-tools
 
 mkdir -p "$SRC"
 
@@ -82,9 +83,9 @@ Dependencies are ready. Configure and build from the repository root with:
   export PKG_CONFIG_PATH="$PREFIX/mygui/lib/pkgconfig"
   cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release \\
       -DCMAKE_PREFIX_PATH="$PREFIX/mygui;$PREFIX/recast" \\
-      -DBUILD_LAUNCHER=OFF -DBUILD_WIZARD=OFF -DBUILD_OPENCS=OFF \\
+      -DBUILD_LAUNCHER=ON -DBUILD_WIZARD=ON -DBUILD_OPENCS=ON -DBUILD_OPENCS_TESTS=ON \\
       -DBUILD_COMPONENTS_TESTS=ON -DBUILD_OPENMW_TESTS=ON \\
       -DOPENMW_USE_SYSTEM_RECASTNAVIGATION=ON -DOPENMW_USE_SYSTEM_GOOGLETEST=ON
   cmake --build build
-  build/components-tests && build/openmw-tests
+  build/components-tests && build/openfallout-tests && build/openfallout-cs-tests
 EOF

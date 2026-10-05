@@ -11,7 +11,7 @@ Sound Settings
    This setting determines which audio device to use. A blank or missing setting means to use the default device,
    which should usually be sufficient, but if you need to explicitly specify a device use this setting.
 
-   The names of detected devices can be found in the openmw.log file in your configuration directory.
+   The names of detected devices can be found in the openfallout.log file in your configuration directory.
 
 .. omw-setting::
    :title: master volume
@@ -134,7 +134,7 @@ Sound Settings
 
    This setting specifies which HRTF profile to use when HRTF is enabled. Blank means use the default.
    This setting has no effect if HRTF is not enabled based on the hrtf enable setting.
-   Allowed values for this field are enumerated in openmw.log file is an HRTF enabled audio system is installed.
+   Allowed values for this field are enumerated in openfallout.log file is an HRTF enabled audio system is installed.
    The default value is empty, which uses the default profile.
 
 

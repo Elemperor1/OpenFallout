@@ -339,11 +339,11 @@ void CSVDoc::View::setupDebugMenu()
         [this](const std::string& profile) { this->run(profile, ""); });
 
     QAction* runDebug = debug->addMenu(mGlobalDebugProfileMenu);
-    runDebug->setText(tr("Run OpenMW"));
+    runDebug->setText(tr("Run OpenFallout"));
     setupShortcut("document-debug-run", runDebug);
     runDebug->setIcon(Misc::ScalableIcon::load(":run-openmw"));
 
-    QAction* stopDebug = createMenuEntry("Stop OpenMW", ":stop-openmw", debug, "document-debug-shutdown");
+    QAction* stopDebug = createMenuEntry("Stop OpenFallout", ":stop-openmw", debug, "document-debug-shutdown");
     connect(stopDebug, &QAction::triggered, this, &View::stop);
     mStopDebug = stopDebug;
 
@@ -361,7 +361,7 @@ void CSVDoc::View::setupHelpMenu()
     QAction* tutorial = createMenuEntry("Tutorial", ":info", help, "document-help-tutorial");
     connect(tutorial, &QAction::triggered, this, &View::tutorial);
 
-    QAction* about = createMenuEntry("About OpenMW-CS", ":info", help, "document-help-about");
+    QAction* about = createMenuEntry("About OpenFallout-CS", ":info", help, "document-help-about");
     connect(about, &QAction::triggered, this, &View::infoAbout);
 
     QAction* aboutQt = createMenuEntry("About Qt", ":qt", help, "document-help-qt");
@@ -809,29 +809,30 @@ void CSVDoc::View::infoAbout()
 #endif
 
     // Get current year
-    const auto copyrightInfo = Misc::timeToString(std::chrono::system_clock::now(), "Copyright © 2008-%Y OpenMW Team");
+    const auto copyrightInfo = Misc::timeToString(
+        std::chrono::system_clock::now(), "Copyright © 2008-%Y OpenMW Team and OpenFallout contributors");
 
-    QString aboutText = QString(
-        "<p style=\"white-space: pre-wrap;\">"
-        "<b><h2>OpenMW Construction Set</h2></b>"
-        "%1\n\n"
-        "%2\n\n"
-        "%3\n\n"
-        "<table>"
-        "<tr><td>%4</td><td><a href=\"https://openmw.org\">https://openmw.org</a></td></tr>"
-        "<tr><td>%5</td><td><a href=\"https://forum.openmw.org\">https://forum.openmw.org</a></td></tr>"
-        "<tr><td>%6</td><td><a "
-        "href=\"https://gitlab.com/OpenMW/openmw/issues\">https://gitlab.com/OpenMW/openmw/issues</a></td></tr>"
-        "<tr><td>%7</td><td><a href=\"https://web.libera.chat/#openmw\">ircs://irc.libera.chat/#openmw</a></td></tr>"
-        "</table>"
-        "</p>")
-                            .arg(versionInfo,
-                                tr("OpenMW-CS is a content file editor for OpenMW, a modern, free and open source game "
-                                   "engine."),
-                                tr(copyrightInfo.c_str()), tr("Home Page:"), tr("Forum:"), tr("Bug Tracker:"),
-                                tr("IRC:"));
+    QString aboutText
+        = QString(
+            "<p style=\"white-space: pre-wrap;\">"
+            "<b><h2>OpenFallout Construction Set</h2></b>"
+            "%1\n\n"
+            "%2\n\n"
+            "%3\n\n"
+            "<table>"
+            "<tr><td>%4</td><td><a "
+            "href=\"https://github.com/Elemperor1/OpenFallout\">https://github.com/Elemperor1/OpenFallout</a></td></tr>"
+            "<tr><td>%5</td><td><a "
+            "href=\"https://github.com/Elemperor1/OpenFallout/issues\">https://github.com/Elemperor1/OpenFallout/"
+            "issues</a></td></tr>"
+            "</table>"
+            "</p>")
+              .arg(versionInfo,
+                  tr("OpenFallout-CS is a content file editor for OpenFallout, a free and open source game "
+                     "engine based on OpenMW."),
+                  tr(copyrightInfo.c_str()), tr("Home Page:"), tr("Bug Tracker:"));
 
-    QMessageBox::about(this, "About OpenMW-CS", aboutText);
+    QMessageBox::about(this, "About OpenFallout-CS", aboutText);
 }
 
 void CSVDoc::View::infoAboutQt()

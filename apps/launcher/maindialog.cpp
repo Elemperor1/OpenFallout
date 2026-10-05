@@ -55,7 +55,7 @@ Launcher::MainDialog::MainDialog(const Files::ConfigurationManager& configuratio
         &MainDialog::wizardFinished);
 
     buttonBox->button(QDialogButtonBox::Close)->setText(tr("Close"));
-    buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Launch OpenMW"));
+    buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Launch OpenFallout"));
     buttonBox->button(QDialogButtonBox::Help)->setText(tr("Help"));
 
     buttonBox->button(QDialogButtonBox::Ok)->setMinimumWidth(160);
@@ -149,7 +149,7 @@ Launcher::FirstRunDialogResult Launcher::MainDialog::showFirstRunDialog()
         std::error_code ec;
         if (!create_directories(userConfigDir, ec))
         {
-            cfgError(tr("Error creating OpenMW configuration directory: code %0").arg(ec.value()),
+            cfgError(tr("Error creating OpenFallout configuration directory: code %0").arg(ec.value()),
                 tr("<br><b>Could not create directory %0</b><br><br>"
                    "%1<br>")
                     .arg(Files::pathToQString(userConfigDir))
@@ -165,10 +165,10 @@ Launcher::FirstRunDialogResult Launcher::MainDialog::showFirstRunDialog()
         msgBox.setIcon(QMessageBox::Question);
         msgBox.setStandardButtons(QMessageBox::NoButton);
         msgBox.setText(
-            tr("<html><head/><body><p><b>Welcome to OpenMW!</b></p>"
+            tr("<html><head/><body><p><b>Welcome to OpenFallout!</b></p>"
                "<p>It is recommended to run the Installation Wizard.</p>"
                "<p>The Wizard will let you select an existing Morrowind installation, "
-               "or install Morrowind for OpenMW to use.</p></body></html>"));
+               "or install Morrowind for OpenFallout to use.</p></body></html>"));
 
         QAbstractButton* wizardButton
             = msgBox.addButton(tr("Run &Installation Wizard"), QMessageBox::AcceptRole); // ActionRole doesn't work?!
@@ -178,7 +178,7 @@ Launcher::FirstRunDialogResult Launcher::MainDialog::showFirstRunDialog()
 
         if (msgBox.clickedButton() == wizardButton)
         {
-            if (mWizardInvoker->startProcess(QLatin1String("openmw-wizard"), false))
+            if (mWizardInvoker->startProcess(QLatin1String("openfallout-wizard"), false))
                 return FirstRunDialogResultWizard;
         }
         else if (msgBox.clickedButton() == skipButton)
@@ -205,10 +205,10 @@ void Launcher::MainDialog::setVersionLabel()
 
     versionLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     if (!Version::getVersion().empty() && (revision.isEmpty() || revision == tag))
-        versionLabel->setText(
-            tr("OpenMW %1 release").arg(QString::fromUtf8(Version::getVersion().data(), Version::getVersion().size())));
+        versionLabel->setText(tr("OpenFallout %1 release")
+                                  .arg(QString::fromUtf8(Version::getVersion().data(), Version::getVersion().size())));
     else
-        versionLabel->setText(tr("OpenMW development (%1)").arg(revision.left(10)));
+        versionLabel->setText(tr("OpenFallout development (%1)").arg(revision.left(10)));
 
     // Add the compile date and time
     auto compileDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
@@ -325,7 +325,7 @@ bool Launcher::MainDialog::setupLauncherSettings()
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        cfgError(tr("Error opening OpenMW configuration file"),
+        cfgError(tr("Error opening OpenFallout configuration file"),
             tr("<br><b>Could not open %0 for reading:</b><br><br>%1<br><br>"
                "Please make sure you have the right permissions "
                "and try again.<br>")
@@ -355,7 +355,7 @@ bool Launcher::MainDialog::setupGameSettings()
         {
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
             {
-                cfgError(tr("Error opening OpenMW configuration file"),
+                cfgError(tr("Error opening OpenFallout configuration file"),
                     tr("<br><b>Could not open %0 for reading</b><br><br>"
                        "Please make sure you have the right permissions "
                        "and try again.<br>")
@@ -427,7 +427,7 @@ bool Launcher::MainDialog::setupGameData()
 
         if (msgBox.clickedButton() == wizardButton)
         {
-            if (!mWizardInvoker->startProcess(QLatin1String("openmw-wizard"), false))
+            if (!mWizardInvoker->startProcess(QLatin1String("openfallout-wizard"), false))
                 return false;
         }
     }
@@ -445,9 +445,9 @@ bool Launcher::MainDialog::setupGraphicsSettings()
     }
     catch (std::exception& e)
     {
-        cfgError(tr("Error reading OpenMW configuration files"),
-            tr("<br>The problem may be due to an incomplete installation of OpenMW.<br>"
-               "Reinstalling OpenMW may resolve the problem.<br>")
+        cfgError(tr("Error reading OpenFallout configuration files"),
+            tr("<br>The problem may be due to an incomplete installation of OpenFallout.<br>"
+               "Reinstalling OpenFallout may resolve the problem.<br>")
                 + e.what());
         return false;
     }
@@ -487,7 +487,7 @@ bool Launcher::MainDialog::writeSettings()
         std::error_code ec;
         if (!create_directories(userPath, ec))
         {
-            cfgError(tr("Error creating OpenMW configuration directory: code %0").arg(ec.value()),
+            cfgError(tr("Error creating OpenFallout configuration directory: code %0").arg(ec.value()),
                 tr("<br><b>Could not create directory %0</b><br><br>"
                    "%1<br>")
                     .arg(Files::pathToQString(userPath))
@@ -497,12 +497,12 @@ bool Launcher::MainDialog::writeSettings()
     }
 
     // Game settings
-    QFile file(userPath / Files::openmwCfgFile);
+    QFile file(userPath / Files::openfalloutCfgFile);
 
     if (!file.open(QIODevice::ReadWrite | QIODevice::Text))
     {
         // File cannot be opened or created
-        cfgError(tr("Error writing OpenMW configuration file"),
+        cfgError(tr("Error writing OpenFallout configuration file"),
             tr("<br><b>Could not open or create %0 for writing</b><br><br>"
                "Please make sure you have the right permissions "
                "and try again.<br>")
@@ -587,14 +587,14 @@ void Launcher::MainDialog::play()
         msgBox.setStandardButtons(QMessageBox::Ok);
         msgBox.setText(
             tr("<br><b>You do not have a game file selected.</b><br><br>"
-               "OpenMW will not start without a game file selected.<br>"));
+               "OpenFallout will not start without a game file selected.<br>"));
         msgBox.exec();
         return;
     }
 
     // Launch the game detached
 
-    if (mGameInvoker->startProcess(QLatin1String("openmw"), true))
+    if (mGameInvoker->startProcess(QLatin1String("openfallout"), true))
         return qApp->quit();
 }
 

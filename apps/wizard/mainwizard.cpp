@@ -39,7 +39,7 @@ Wizard::MainWizard::MainWizard(Files::ConfigurationManager&& cfgMgr, QWidget* pa
     setWizardStyle(QWizard::ClassicStyle);
 #endif
 
-    setWindowTitle(tr("OpenMW Wizard"));
+    setWindowTitle(tr("OpenFallout Wizard"));
     setWindowIcon(QIcon(QStringLiteral(":/images/openmw-wizard.png")));
     setMinimumWidth(550);
 
@@ -49,14 +49,15 @@ Wizard::MainWizard::MainWizard(Files::ConfigurationManager&& cfgMgr, QWidget* pa
     connect(mImporterInvoker->getProcess(), qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
         &MainWizard::importerFinished);
 
-    Log(Debug::Info) << "Started OpenMW Wizard on " << QDateTime::currentDateTime().toString().toUtf8().constData();
+    Log(Debug::Info) << "Started OpenFallout Wizard on "
+                     << QDateTime::currentDateTime().toString().toUtf8().constData();
 
     std::filesystem::create_directories(mCfgMgr.getUserConfigPath());
 
     const QString userPath(Files::pathToQString(mCfgMgr.getUserConfigPath()));
     if (!QDir(userPath).exists())
     {
-        const QString title = tr("Error creating OpenMW configuration directory");
+        const QString title = tr("Error creating OpenFallout configuration directory");
         const QString message = tr(
             "<html><head/><body><p><b>Could not create %1</b></p>"
             "<p>Please make sure you have the right permissions and try again.</p></body></html>");
@@ -82,7 +83,7 @@ Wizard::MainWizard::~MainWizard() = default;
 
 void Wizard::MainWizard::setupGameSettings()
 {
-    const QString title = tr("Error opening OpenMW configuration file");
+    const QString title = tr("Error opening OpenFallout configuration file");
     const QString message = tr(
         "<html><head/><body><p><b>Could not open %1 for reading</b></p>"
         "<p>Please make sure you have the right permissions and try again.</p></body></html>");
@@ -147,7 +148,7 @@ void Wizard::MainWizard::setupLauncherSettings()
     {
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         {
-            const QString title = tr("Error opening OpenMW configuration file");
+            const QString title = tr("Error opening OpenFallout configuration file");
             const QString message = tr(
                 "<html><head/><body><p><b>Could not open %1 for reading</b></p>"
                 "<p>Please make sure you have the right permissions "
@@ -223,7 +224,7 @@ void Wizard::MainWizard::runSettingsImporter()
     arguments.append(QStringLiteral("--cfg"));
     arguments.append(Files::getUserConfigPathQString(mCfgMgr));
 
-    if (!mImporterInvoker->startProcess(QStringLiteral("openmw-iniimporter"), arguments, false))
+    if (!mImporterInvoker->startProcess(QStringLiteral("openfallout-iniimporter"), arguments, false))
         return qApp->quit();
 }
 
@@ -323,7 +324,7 @@ void Wizard::MainWizard::writeSettings()
     // Game settings
     QFile file(Files::getUserConfigPathQString(mCfgMgr));
 
-    const QString writeTitle = tr("Error writing OpenMW configuration file");
+    const QString writeTitle = tr("Error writing OpenFallout configuration file");
     const QString writeMessage = tr(
         "<html><head/><body><p><b>Could not open %1 for writing</b></p>"
         "<p>Please make sure you have the right permissions "

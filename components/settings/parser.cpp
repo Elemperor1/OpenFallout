@@ -286,7 +286,7 @@ void Settings::SettingsFileParser::saveSettingsFile(
     if (!existing)
     {
         const std::string filename = Files::pathToUnicodeString(file.filename());
-        ostream << "# This is the OpenMW user '" << filename << "' file.  This file only contains" << std::endl;
+        ostream << "# This is the OpenFallout user '" << filename << "' file.  This file only contains" << std::endl;
         ostream << "# explicitly changed settings.  If you would like to revert a setting" << std::endl;
         ostream << "# to its default, simply remove it from this file." << std::endl;
 
@@ -298,7 +298,7 @@ void Settings::SettingsFileParser::saveSettingsFile(
             ostream << "#" << std::endl;
             ostream << "#   https://openmw.readthedocs.io/en/master/reference/modding/settings/index.html" << std::endl;
         }
-        else if (filename == "openmw-cs.cfg")
+        else if (filename == "openfallout-cs.cfg")
         {
             ostream << "# For available settings, see the file 'apps/opencs/model/prefs/values.hpp' in our source repo."
                     << std::endl;
