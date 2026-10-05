@@ -208,6 +208,19 @@ jobs:
         $parallel = if ('${{ inputs.package }}' -eq 'true') { 2 } else { [Environment]::ProcessorCount }
         cmake --build ${{ github.workspace }}/build --parallel $parallel
 
+    - name: Record source timestamps
+      run: python CI/build_cache.py snapshot
+
+    - name: Save incremental build
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          build/*
+          !build/symstore-venv
+          !build/_CPack_Packages
+        key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
     - name: Copy missing DLLs
       run: |
         cp -Force ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/Release/MyGUIEngine.dll ${{ github.workspace }}/build
@@ -270,8 +283,8 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         printf 'Ref %s\nRun %s\nCommit %s\n' "$GITHUB_REF" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$GITHUB_SHA" > install/CI-ID.txt
-        cp -Force install/CI-ID.txt pdb/CI-ID.txt
-        cp -Force install/CI-ID.txt SymStore/CI-ID.txt
+        cp install/CI-ID.txt pdb/CI-ID.txt
+        cp install/CI-ID.txt SymStore/CI-ID.txt
 
     - name: Store OpenFallout archived pdb files
       uses: actions/upload-artifact@v6
@@ -349,19 +362,6 @@ jobs:
         files: ${{ github.workspace }}/install/*.exe
         prerelease: true
         draft: true
-
-    - name: Record source timestamps
-      run: python CI/build_cache.py snapshot
-
-    - name: Save incremental build
-      if: steps.build-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: |
-          build/*
-          !build/symstore-venv
-          !build/_CPack_Packages
-        key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
     - name: Limit stored compiler cache
       if: ${{ always() && !inputs.package && steps.compiler-cache.outcome == 'success' }}
