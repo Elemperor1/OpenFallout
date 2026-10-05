@@ -147,7 +147,7 @@ jobs:
           build/*
           !build/symstore-venv
           !build/_CPack_Packages
-        key: build-windows-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: build-windows-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
         restore-keys: build-windows-v1-${{ steps.build-env.outputs.key }}-
 
     - name: Restore unchanged source timestamps
@@ -184,7 +184,10 @@ jobs:
         -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     - name: Build OpenFallout
-      run: cmake --build ${{ github.workspace }}/build
+      run: |
+        # Keep LTO releases within the memory available on standard runners.
+        $parallel = if ('${{ inputs.package }}' -eq 'true') { 2 } else { [Environment]::ProcessorCount }
+        cmake --build ${{ github.workspace }}/build --parallel $parallel
 
     - name: Copy missing DLLs
       run: |
@@ -332,6 +335,7 @@ jobs:
       run: python CI/build_cache.py snapshot
 
     - name: Save incremental build
+      if: steps.build-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: |

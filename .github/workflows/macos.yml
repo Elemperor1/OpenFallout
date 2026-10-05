@@ -79,7 +79,7 @@ jobs:
           build/*
           !build/*.dmg
           !build/_CPack_Packages
-        key: build-macos-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: build-macos-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
         restore-keys: build-macos-v1-${{ steps.build-env.outputs.key }}-
 
     - name: Restore unchanged source timestamps
@@ -88,12 +88,13 @@ jobs:
     - name: Configure
       run: CI/before_script.macos.sh -C -k
     - name: Build
-      run: CI/macos/build.sh
+      run: CI/macos/build.sh all
 
     - name: Record source timestamps
       run: python3 CI/build_cache.py snapshot
 
     - name: Save incremental build
+      if: steps.build-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: |
@@ -101,6 +102,21 @@ jobs:
           !build/*.dmg
           !build/_CPack_Packages
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Package disk image
+      run: |
+        for attempt in 1 2 3; do
+          if CI/macos/build.sh package > "$RUNNER_TEMP/package.log" 2>&1; then
+            cat "$RUNNER_TEMP/package.log"
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/package.log"
+          if ! grep -q 'hdiutil: create failed - Resource busy' "$RUNNER_TEMP/package.log" || [ "$attempt" -eq 3 ]; then
+            exit 1
+          fi
+          echo "Disk-image creation is busy; retrying in 10 seconds ($attempt/3)"
+          sleep 10
+        done
 
     - name: Store dmg
       uses: actions/upload-artifact@v6

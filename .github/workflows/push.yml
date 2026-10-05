@@ -6,6 +6,11 @@ on:
       - master
   pull_request:
   workflow_dispatch:
+    inputs:
+      validate-release:
+        description: Also validate Windows release packaging
+        type: boolean
+        default: false
 
 # PR branches are tested by pull_request; avoid rebuilding each commit twice.
 concurrency:
@@ -17,6 +22,7 @@ env:
 
 jobs:
   Ubuntu:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
     runs-on: ubuntu-latest
 
     steps:
@@ -55,7 +61,7 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: build
-        key: build-linux-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: build-linux-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
         restore-keys: build-linux-v1-${{ steps.build-env.outputs.key }}-
 
     - name: Restore unchanged source timestamps
@@ -90,6 +96,7 @@ jobs:
       run: python3 CI/build_cache.py snapshot
 
     - name: Save incremental build
+      if: steps.build-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: build
@@ -113,6 +120,7 @@ jobs:
     #     name: build_artifact.7z
 
   MacOS:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
     strategy:
       fail-fast: true
       matrix:
@@ -124,6 +132,7 @@ jobs:
       image: ${{ matrix.args.image }}
 
   Windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
     strategy:
       fail-fast: true
       matrix:
@@ -135,6 +144,7 @@ jobs:
       image: ${{ matrix.image }}
 
   Windows-release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate-release }}
     name: Windows release packaging
     uses: ./.github/workflows/windows.yml
     with:
