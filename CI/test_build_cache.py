@@ -97,6 +97,16 @@ class BuildCacheTests(unittest.TestCase):
             stream.write("\nadd_compile_definitions(CHANGED_RULES)\n")
         self.assertNotEqual(first, cache.build_key(self.root, "cc", [dependency], "Debug"))
 
+    def test_removed_resource_discards_stale_generated_files(self):
+        resource = self.root / "asset.txt"
+        resource.write_text("resource")
+        self.run_command("git", "add", "asset.txt")
+        (self.build / "asset.txt").write_text("resource")
+        cache.snapshot(self.root, self.build)
+        self.run_command("git", "rm", "-f", "asset.txt")
+        cache.restore(self.root, self.build)
+        self.assertFalse(self.build.exists())
+
     def test_incompatible_snapshot_is_discarded(self):
         (self.build / cache.STATE_FILE).write_text('{"version": 0}')
         cache.restore(self.root, self.build)

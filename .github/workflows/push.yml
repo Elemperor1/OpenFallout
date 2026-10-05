@@ -45,6 +45,7 @@ jobs:
       run: sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
 
     - name: Prime ccache
+      id: compiler-cache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
         key: ubuntu-${{ runner.arch }}-${{ env.BUILD_TYPE }}
@@ -101,6 +102,12 @@ jobs:
       with:
         path: build
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Limit stored compiler cache
+      if: always() && steps.compiler-cache.outcome == 'success'
+      run: |
+        ccache --max-size=384M
+        ccache --cleanup
 
     # - name: Install
     #   shell: bash

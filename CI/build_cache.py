@@ -94,16 +94,22 @@ def restore(root, build):
         shutil.rmtree(build)
         print("Discarded incomplete/incompatible build cache")
         return
+    current_files = [relative for relative in tracked_files(root)
+                     if (root / relative).is_file() and not (root / relative).is_symlink()]
+    # CMake copy-only resources can survive removal of their source. A fresh
+    # tree prevents a deleted asset from being shipped from an older snapshot.
+    if files.keys() - {relative.as_posix() for relative in current_files}:
+        shutil.rmtree(build)
+        print("Discarded build cache because tracked files were removed")
+        return
     unchanged = changed = 0
     # New/changed files must be newer than all restored build outputs, even if
     # a checkout or filesystem supplied an older timestamp.
     newest_output = max((path.stat().st_mtime_ns for path in build.rglob("*")
                          if path.is_file()), default=0)
     changed_time = max(time.time_ns(), newest_output + 1_000_000_000)
-    for relative in tracked_files(root):
+    for relative in current_files:
         path = root / relative
-        if not path.is_file() or path.is_symlink():
-            continue
         previous = files.get(relative.as_posix(), {})
         if previous.get("sha256") == digest(path):
             modified = previous["mtime_ns"]

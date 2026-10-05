@@ -112,6 +112,7 @@ jobs:
     - uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: Install prebuilt ccache
+      if: ${{ ! inputs.package }}
       env:
         CCACHE_VERSION: 4.14.1
         CCACHE_SHA256: 6219f3865ca59aec41ee4b678df171d5d35855ecb2b6dbbbd20690b3a68af7b4
@@ -125,12 +126,29 @@ jobs:
         Expand-Archive -Path "$archive" -DestinationPath "$env:RUNNER_TEMP" -Force
         "$env:RUNNER_TEMP/ccache-$env:CCACHE_VERSION-windows-x86_64" >> $env:GITHUB_PATH
 
+    - name: Install prebuilt sccache
+      if: ${{ inputs.package }}
+      env:
+        SCCACHE_VERSION: 0.18.0
+        SCCACHE_SHA256: 8965c74d5e8a225244f741e18ad2f3f504f48228dc1bac948fc22761a348363d
+      run: |
+        $archive = "$env:RUNNER_TEMP/sccache.zip"
+        curl --fail --retry 3 -L "https://github.com/mozilla/sccache/releases/download/v$env:SCCACHE_VERSION/sccache-v$env:SCCACHE_VERSION-x86_64-pc-windows-msvc.zip" -o "$archive"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if ((Get-FileHash "$archive" -Algorithm SHA256).Hash -ne $env:SCCACHE_SHA256) {
+          throw "sccache archive checksum mismatch"
+        }
+        Expand-Archive -Path "$archive" -DestinationPath "$env:RUNNER_TEMP" -Force
+        "$env:RUNNER_TEMP/sccache-v$env:SCCACHE_VERSION-x86_64-pc-windows-msvc" >> $env:GITHUB_PATH
+
     - name: Prime compiler cache
+      id: compiler-cache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
         install: 'no'
+        variant: ${{ inputs.package && 'sccache' || 'ccache' }}
         key: windows-${{ inputs.image }}-msvc-${{ inputs.msvc }}-${{ runner.arch }}-${{ inputs.build-type }}
-        max-size: 1000M
+        max-size: ${{ inputs.package && '384M' || '1000M' }}
 
     - name: Fingerprint build environment
       id: build-env
@@ -153,8 +171,8 @@ jobs:
     - name: Restore unchanged source timestamps
       run: python CI/build_cache.py restore
 
-    # MSVC PCH and shared compiler PDBs prevent reusable compilation results.
-    # Embedded debug information still produces linker PDBs for symbol artifacts.
+    # Release LTO needs external debug information to keep static libraries under
+    # MSVC's 4 GB limit. Give sccache a separate compiler PDB for each object.
     - name: Configure OpenFallout
       run: >
         cmake
@@ -162,14 +180,15 @@ jobs:
         -B ${{ github.workspace }}/build
         -G Ninja
         -D CMAKE_BUILD_TYPE=${{ inputs.build-type }}
-        -D CMAKE_C_COMPILER_LAUNCHER=ccache
-        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -D CMAKE_C_COMPILER_LAUNCHER=${{ inputs.package && 'sccache' || 'ccache' }}
+        -D CMAKE_CXX_COMPILER_LAUNCHER=${{ inputs.package && 'sccache' || 'ccache' }}
         -D CMAKE_POLICY_DEFAULT_CMP0141=NEW
-        -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+        -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=${{ inputs.package && 'ProgramDatabase' || 'Embedded' }}
+        -D CMAKE_PROJECT_OpenFallout_INCLUDE='${{ github.workspace }}/CI/msvc_object_pdb.cmake'
         -D PRECOMPILE_HEADERS_WITH_MSVC=OFF
         -D CMAKE_TOOLCHAIN_FILE='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/scripts/buildsystems/vcpkg.cmake'
         -D CMAKE_PREFIX_PATH='${{ github.workspace }}/deps/Qt/${{ env.QT_VER }}/msvc2019_64'
-        ${{ inputs.package && '-D CMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Z7"' || '' }}
+        ${{ inputs.package && '-D CMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /DNDEBUG /Zi"' || '' }}
         ${{ inputs.package && '-D "CMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /OPT:REF /OPT:ICF /INCREMENTAL:NO"' || '' }}
         -D LuaJit_INCLUDE_DIR='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/include/luajit'
         -D LuaJit_LIBRARY='${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/lib/lua51.lib'
@@ -191,28 +210,28 @@ jobs:
 
     - name: Copy missing DLLs
       run: |
-        cp ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/Release/MyGUIEngine.dll ${{ github.workspace }}/build
-        cp -Filter *.dll -Recurse ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/osgPlugins-3.6.5 ${{ github.workspace }}/build
-        cp ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/*.dll ${{ github.workspace }}/build
+        cp -Force ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/Release/MyGUIEngine.dll ${{ github.workspace }}/build
+        cp -Force -Filter *.dll -Recurse ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/osgPlugins-3.6.5 ${{ github.workspace }}/build
+        cp -Force ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}/installed/x64-windows/bin/*.dll ${{ github.workspace }}/build
 
     - name: Copy Qt DLLs
       working-directory: ${{ github.workspace }}/deps/Qt/${{ env.QT_VER }}/msvc2019_64
       run: |
-        cp bin/Qt6Core.dll ${{ github.workspace }}/build
-        cp bin/Qt6Gui.dll ${{ github.workspace }}/build
-        cp bin/Qt6Network.dll ${{ github.workspace }}/build
-        cp bin/Qt6OpenGL.dll ${{ github.workspace }}/build
-        cp bin/Qt6OpenGLWidgets.dll ${{ github.workspace }}/build
-        cp bin/Qt6Widgets.dll ${{ github.workspace }}/build
-        cp bin/Qt6Svg.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6Core.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6Gui.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6Network.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6OpenGL.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6OpenGLWidgets.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6Widgets.dll ${{ github.workspace }}/build
+        cp -Force bin/Qt6Svg.dll ${{ github.workspace }}/build
         mkdir -Force ${{ github.workspace }}/build/styles
-        cp plugins/styles/qwindowsvistastyle.dll ${{ github.workspace }}/build/styles
+        cp -Force plugins/styles/qwindowsvistastyle.dll ${{ github.workspace }}/build/styles
         mkdir -Force ${{ github.workspace }}/build/platforms
-        cp plugins/platforms/qwindows.dll ${{ github.workspace }}/build/platforms
+        cp -Force plugins/platforms/qwindows.dll ${{ github.workspace }}/build/platforms
         mkdir -Force ${{ github.workspace }}/build/imageformats
-        cp plugins/imageformats/qsvg.dll ${{ github.workspace }}/build/imageformats
+        cp -Force plugins/imageformats/qsvg.dll ${{ github.workspace }}/build/imageformats
         mkdir -Force ${{ github.workspace }}/build/iconengines
-        cp plugins/iconengines/qsvgicon.dll ${{ github.workspace }}/build/iconengines
+        cp -Force plugins/iconengines/qsvgicon.dll ${{ github.workspace }}/build/iconengines
 
     - name: Create symbol server directory structure
       working-directory: ${{ github.workspace }}/build
@@ -251,8 +270,8 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         printf 'Ref %s\nRun %s\nCommit %s\n' "$GITHUB_REF" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$GITHUB_SHA" > install/CI-ID.txt
-        cp install/CI-ID.txt pdb/CI-ID.txt
-        cp install/CI-ID.txt SymStore/CI-ID.txt
+        cp -Force install/CI-ID.txt pdb/CI-ID.txt
+        cp -Force install/CI-ID.txt SymStore/CI-ID.txt
 
     - name: Store OpenFallout archived pdb files
       uses: actions/upload-artifact@v6
@@ -343,3 +362,9 @@ jobs:
           !build/symstore-venv
           !build/_CPack_Packages
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Limit stored compiler cache
+      if: ${{ always() && !inputs.package && steps.compiler-cache.outcome == 'success' }}
+      run: |
+        ccache --max-size=384M
+        ccache --cleanup

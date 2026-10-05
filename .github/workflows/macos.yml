@@ -60,6 +60,7 @@ jobs:
         echo "$RUNNER_TEMP/ccache-${CCACHE_VERSION}-darwin" >> "$GITHUB_PATH"
 
     - name: Prime ccache
+      id: compiler-cache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
         install: 'no'
@@ -102,6 +103,12 @@ jobs:
           !build/*.dmg
           !build/_CPack_Packages
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Limit stored compiler cache
+      if: always() && steps.compiler-cache.outcome == 'success'
+      run: |
+        ccache --max-size=384M
+        ccache --cleanup
 
     - name: Package disk image
       run: |
