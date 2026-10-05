@@ -47,8 +47,8 @@ Measured on 2026-10-04 on the same container, from an empty build directory, wit
 Not covered:
 
 - The engine was not run with game data or a display. That needs game files, and nothing was run against real Fallout data.
-- The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built here.
-- GitHub Actions has never run in this repository, so no CI result exists for any commit.
+- The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built in the cloud container. GitHub Actions built them afterwards, see the next point.
+- GitHub Actions had no runs in this repository before the stage A branch was pushed on 2026-10-04. Since then, on the rename branches the Ubuntu and Windows jobs build and pass the tests, and the macOS jobs (`macos-26` on Apple Silicon, `macos-26-intel`) build the app and the disk image (the macOS workflow runs no tests). The Intel job first sat for hours in the "Prime ccache" step: on that image Homebrew has no prebuilt packages, so installing ccache compiled Python and LLVM from source, which also kept hosted macOS runners busy so that later runs waited in the queue. The Intel job now skips ccache and finishes in about 75 minutes (checked on the stage A, B and C branches). A release run goes through the same macOS workflow and uses the same skip.
 
 ## Result after rename stage B
 
@@ -88,6 +88,19 @@ Measured on 2026-10-04 on the same container, from an empty build directory, wit
 
 The stage C rename moved 832 files with `git mv` and changed 859 files in all (about 13,800 uses of the old namespace names and about 100 path references). `clang-format` shows the same warnings as master and stage B on the files it touches, because `MW` and `OF` have the same length. No identifier named `OF*` existed before, so the new namespaces collide with nothing.
 
+## Building `esmtool` on macOS
+
+Measured on 2026-10-04 on an Apple Silicon Mac (macOS 27, Apple clang 21, Ninja, Release) while running the census on Jacob's game files. Only `esmtool` was built, from master before the rename, so the build was done with the old option names. The names below are the OpenFallout ones from stage B, which have not been tried on the Mac. `esmtool` built with no errors. After stage A its binary lands in `build/OpenFallout.app/Contents/MacOS/esmtool` (it was `OpenMW.app` when measured).
+
+Homebrew already had Boost, Bullet, OpenSceneGraph 3.6.5, LZ4, yaml-cpp, ICU, FFmpeg, SDL2, LuaJIT and SQLite. Four things needed handling:
+
+1. **MyGUI and Recast have no Homebrew formulae.** Configure with `-DOPENFALLOUT_USE_SYSTEM_MYGUI=OFF` and CMake fetches MyGUI 3.4.3 and Recast with their pinned hashes.
+2. **Homebrew's Bullet 3.25 is single precision and the build needs double.** Configure with `-DOPENFALLOUT_USE_SYSTEM_BULLET=OFF`, which fetches Bullet 3.17, and add `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`, because that Bullet's CMake files predate the minimum version CMake now accepts.
+3. **The "Apple bundling" block in the root `CMakeLists.txt` runs even when only `esmtool` is built.** It asks for Qt plugin targets and OSG plugins that Homebrew's OSG does not have. The Mac run changed that block's `if (APPLE)` to `if (APPLE AND BUILD_OPENMW)` in a scratch clone (`BUILD_OPENFALLOUT` now). That change is not in this repository: the block also bundles the construction set, and macOS bundling cannot be tested from the cloud container. It is an open item.
+4. **If Homebrew's regular `lua` formula (5.5) is installed, its headers shadow LuaJIT.** The bundled sol3 prefers `<lua/lua.hpp>`, and `/opt/homebrew/include/lua` wins, so `components/lua` fails to compile. The fix used was a small directory holding `lua/lua.h`, `lauxlib.h`, `lualib.h`, `luaconf.h` and `lua.hpp`, each one including the matching LuaJIT header, passed with `-DCMAKE_CXX_FLAGS=-I<shimdir>`. It has to be `-I`: `-isystem` lost to `/opt/homebrew/include`.
+
+The rest of the configuration: `-G Ninja -DCMAKE_BUILD_TYPE=Release`, every `BUILD_*` option off except `BUILD_ESMTOOL=ON`, `CMAKE_PREFIX_PATH` set to the Homebrew prefix plus `icu4c` and `luajit`, then `cmake --build build --target esmtool`.
+
 ## Plugin census
 
 `esmtool census <plugin>` reads a TES4-format plugin (the format Oblivion, Fallout 3, New Vegas and Skyrim use) and prints how many records of each type it holds, how many were read by a loader, how many have no loader and how many a loader rejected, with the failure of each rejected one. The table holds record types, counts and failure messages only, never record contents, so it can be shared without sharing game data. The lines above the table also show the file name as given on the command line, the format version and the master plugin names, so check those before sharing the output. Some loaders put record contents in their error messages (the LVLI, LVLC and LVLN loaders include the editor ID), so only the `Unknown subrecord` message, which names a loader and a four character subrecord code, is printed as it is. Any other loader failure is counted and printed as `loader error (message withheld, it may contain record contents)`; `esmtool dump` shows the full message.
@@ -106,6 +119,8 @@ Failures in STAT records:
   1 x ESM4::STAT::load - Unknown subrecord QQQQ
   1 x ESM4::STAT::load - Unknown subrecord ZZZZ
 ```
+
+The results on the real Fallout 3 and New Vegas plugins are in [census-results.md](census-results.md).
 
 What the columns mean:
 
