@@ -76,7 +76,7 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: |
-          build
+          build/*
           !build/*.dmg
           !build/_CPack_Packages
         key: build-macos-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -97,7 +97,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: |
-          build
+          build/*
           !build/*.dmg
           !build/_CPack_Packages
         key: ${{ steps.build-cache.outputs.cache-primary-key }}

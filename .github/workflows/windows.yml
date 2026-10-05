@@ -144,7 +144,7 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: |
-          build
+          build/*
           !build/symstore-venv
           !build/_CPack_Packages
         key: build-windows-v1-${{ steps.build-env.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -335,7 +335,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: |
-          build
+          build/*
           !build/symstore-venv
           !build/_CPack_Packages
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
