@@ -25,14 +25,14 @@ OpenMW already ships a Bethesda-generation (ESM4) layer written for Oblivion and
 | Area | Status | Evidence | Gap for FO3/FNV/TTW |
 |---|---|---|---|
 | ESM4 plugin reader | Present | `components/esm4/reader.cpp` (zlib record decompression at `:35`, `:80`); FO3/FNV version constants `components/esm/common.hpp:27-34` | Reads headers, groups and compressed records; per-record fidelity varies (see section 2). |
-| Plugin dispatch | Present | `apps/openmw/mwworld/esmloader.cpp` sends `Tes4` files to `ESMStore::loadESM4`; FormID remapping via `updateModIndices` | Multi-master FormID remapping exists. TTW needs FO3 and FNV masters loaded together (inferred); never tried. |
+| Plugin dispatch | Present | `apps/openfallout/mwworld/esmloader.cpp` sends `Tes4` files to `ESMStore::loadESM4`; FormID remapping via `updateModIndices` | Multi-master FormID remapping exists. TTW needs FO3 and FNV masters loaded together (inferred); never tried. |
 | Archives | Present | BSA versions 0x67 (TES4), 0x68 (FO3) and 0x69 (SSE) in `components/bsa/compressedbsafile.hpp:55-57`; BA2 in `components/bsa/ba2*.cpp` | Never checked against real FO3/FNV archives. A search for "invalidat" in `components/vfs`, `components/bsa`, `components/files` and `engine.cpp` finds nothing, so archive invalidation is not handled. |
 | Launcher content list | Partial | `components/contentselector/model/contentmodel.cpp:460` reads Tes4 headers | Launcher and install wizard text and defaults are Morrowind-specific (`apps/wizard`, `apps/launcher`). |
 | `esmtool` | Missing for ESM4 | `apps/esmtool/esmtool.cpp:437` prints "Printing raw TES4 file is not supported" | No tool to dump or census a Fallout plugin. |
 
 ### 2. Records
 
-`components/esm4` has 79 `load*.hpp` headers. 77 of them declare a record type (the other two are `GRUP` and `TES4`). Of those 77, **39 are stored** in `ESMStore` and **38 are parsed and then discarded**. The stored list is the `ESM4::` entries of `StoreTuple` in `apps/openmw/mwworld/esmstore.hpp:130-156`; a record without a store is skipped after parsing (`components/esm4/readerutils.hpp:29`, `esmstore.cpp:268-295`).
+`components/esm4` has 79 `load*.hpp` headers. 77 of them declare a record type (the other two are `GRUP` and `TES4`). Of those 77, **39 are stored** in `ESMStore` and **38 are parsed and then discarded**. The stored list is the `ESM4::` entries of `StoreTuple` in `apps/openfallout/mwworld/esmstore.hpp:130-156`; a record without a store is skipped after parsing (`components/esm4/readerutils.hpp:29`, `esmstore.cpp:268-295`).
 
 Parsed but not stored (a loader exists, the engine never sees the data):
 
@@ -55,10 +55,10 @@ Other record-level notes:
 | Area | Status | Evidence | Gap |
 |---|---|---|---|
 | NIF meshes (FO3/FNV) | Present | `components/nif/niffile.hpp:31,35` (version 20.2.0.7, Bethesda version 34); shader properties `BSShaderPPLighting`/`NoLighting` handled in `components/nifosg/nifloader.cpp:2573,2587,2836` | Visual fidelity of FO3 shaders is unverified. |
-| Statics, doors, activators, containers, lights | Present | classes registered at `apps/openmw/mwclass/classes.cpp:78-103` | Needs real-data check. |
+| Statics, doors, activators, containers, lights | Present | classes registered at `apps/openfallout/mwclass/classes.cpp:78-103` | Needs real-data check. |
 | Exterior terrain | Present | `components/esmterrain/storage.cpp:92,365,389` (ESM4 land, layers, blendmaps) | Not verified on FO3/FNV worldspaces. |
-| Distant objects | Present | `apps/openmw/mwrender/objectpaging.cpp:24-26` includes ESM4 activator, container and door types | Static LOD files (`.btr`/`.bto`) not handled (inferred). |
-| Interior lighting and fog | Partial | `apps/openmw/mwworld/cell.cpp:62` "TODO: use ESM4::Lighting fog parameters"; fog density is hard-coded to 1 | Fallout fog and light-template behaviour. |
+| Distant objects | Present | `apps/openfallout/mwrender/objectpaging.cpp:24-26` includes ESM4 activator, container and door types | Static LOD files (`.btr`/`.bto`) not handled (inferred). |
+| Interior lighting and fog | Partial | `apps/openfallout/mwworld/cell.cpp:62` "TODO: use ESM4::Lighting fog parameters"; fog density is hard-coded to 1 | Fallout fog and light-template behaviour. |
 | Weather, sky, climate | Missing | no `WTHR`/`CLMT` parser | The Capital Wasteland and Mojave skies. |
 | Water | Partial | height taken from cell or worldspace (`cell.cpp:57-72`); no `WATR` parser | Water appearance and effects. |
 | Interior/exterior navigation data | Parsed only | `NAVM`/`NAVI` not stored | OpenMW builds its own navmesh at runtime, so this may not be needed (inferred). |
@@ -67,27 +67,27 @@ Other record-level notes:
 
 | Area | Status | Evidence | Gap |
 |---|---|---|---|
-| NPC appearance | Partial | `apps/openmw/mwrender/esm4npcanimation.cpp` (189 lines) assembles race body parts, armor addons and head parts; line 44 notes "no easy way to distinguish TES5 and FO3" | No FaceGen morphs (the file never mentions them) and it never adds an animation source or `.kf` file. |
-| NPC collision | Missing | `apps/openmw/mwclass/esm4npc.hpp:45-50`: `insertObjectPhysics` body is commented out | NPCs have no physics body. |
+| NPC appearance | Partial | `apps/openfallout/mwrender/esm4npcanimation.cpp` (189 lines) assembles race body parts, armor addons and head parts; line 44 notes "no easy way to distinguish TES5 and FO3" | No FaceGen morphs (the file never mentions them) and it never adds an animation source or `.kf` file. |
+| NPC collision | Missing | `apps/openfallout/mwclass/esm4npc.hpp:45-50`: `insertObjectPhysics` body is commented out | NPCs have no physics body. |
 | Creatures | Partial | `ESM4Named<ESM4::Creature>` generic class (`classes.cpp:83`) | Same as NPCs. |
 | Statics collision | Hack | `components/nifbullet/bulletnifloader.cpp:134` "FIXME: hack, using rendered geometry instead of Bethesda Havok data" | Havok shapes are never read for collision. |
-| Animation | Missing | no ESM4 hits in `apps/openmw/mwmechanics` | Idle, locomotion, combat and VATS animation (`.kf`). |
+| Animation | Missing | no ESM4 hits in `apps/openfallout/mwmechanics` | Idle, locomotion, combat and VATS animation (`.kf`). |
 
 ### 5. Gameplay systems
 
-A search for `ESM4` in `apps/openmw/mwmechanics`, `mwdialogue`, `mwscript`, `mwinput`, `mwstate` and `mwphysics` returns nothing. In `mwgui` it finds three files (`bookwindow.cpp`, `scrollwindow.cpp`, `console.cpp`).
+A search for `ESM4` in `apps/openfallout/mwmechanics`, `mwdialogue`, `mwscript`, `mwinput`, `mwstate` and `mwphysics` returns nothing. In `mwgui` it finds three files (`bookwindow.cpp`, `scrollwindow.cpp`, `console.cpp`).
 
 | System | Status | Evidence | Gap |
 |---|---|---|---|
-| Script execution | Missing | script source kept, bytecode skipped; the existing script runner is the Morrowind one (`apps/openmw/mwscript`) | The whole FO3/FNV script language (ObScript) and its engine functions. |
+| Script execution | Missing | script source kept, bytecode skipped; the existing script runner is the Morrowind one (`apps/openfallout/mwscript`) | The whole FO3/FNV script language (ObScript) and its engine functions. |
 | Quests and dialogue | Parsed only | `QUST`/`DIAL`/`INFO` parsed, not stored | Topics, conditions, result scripts, voice, UI. |
 | Stats, perks, skills | Missing | no `AVIF`/`PERK`/`FACT` parsers | Actor values, leveling, S.P.E.C.I.A.L. |
 | Combat, weapons, VATS | Missing | weapons are stored as items only | Everything. |
 | AI packages | Parsed only | `PACK` parsed, not stored | Schedules, follow, sandbox, travel (companions depend on this). |
-| Item use and activation | Partial | `esm4base.hpp:140` says activation "can be handled in Lua"; `ESM4Terminal` exposes text to Lua (`apps/openmw/mwlua/types/terminal.cpp`) | Lua is the only gameplay hook today. |
+| Item use and activation | Partial | `esm4base.hpp:140` says activation "can be handled in Lua"; `ESM4Terminal` exposes text to Lua (`apps/openfallout/mwlua/types/terminal.cpp`) | Lua is the only gameplay hook today. |
 | Lua API coverage | Partial | 17 ESM4 object types in `files/lua_api/openmw/types.lua`; none for NPC, creature, container, furniture or tree | Needed before Lua can drive actors or containers. |
-| Audio | Partial | `SOUN`/`SNDR` buffers (`apps/openmw/mwsound/soundbuffer.cpp:111-113,202-212`) | Music (`MUSC` parsed only), voice and lip files. |
-| Save and load | Missing | `apps/openmw/mwworld/cellstore.cpp:151-156`: "TODO: Implement loading/saving of REFR4 and ACHR4"; ESM4 references are skipped on save | No save game can round-trip Fallout state. |
+| Audio | Partial | `SOUN`/`SNDR` buffers (`apps/openfallout/mwsound/soundbuffer.cpp:111-113,202-212`) | Music (`MUSC` parsed only), voice and lip files. |
+| Save and load | Missing | `apps/openfallout/mwworld/cellstore.cpp:151-156`: "TODO: Implement loading/saving of REFR4 and ACHR4"; ESM4 references are skipped on save | No save game can round-trip Fallout state. |
 | New game | Unverified | `World::startNewGame` (`worldimp.cpp:266`) skips character generation when a start cell is given (`:297-310`), but the cell lookup (`findInteriorPosition`, `:2641`) searches for Morrowind marker names, and `ESMStore::checkPlayer` (`esmstore.cpp:801`, used when loading saves) expects a Morrowind player, race and class | Whether a Fallout-only content list starts at all was not tried. |
 
 ### 6. Tests and CI
@@ -151,7 +151,7 @@ The census tool and every real-data check need the installed game folders, not t
 
 Sizing at commit `f90f239d`, excluding `extern/`:
 
-- 1,206 tracked files mention "openmw" (5,720 lines). 1,010 paths contain "openmw", almost all under `apps/openmw/`.
+- 1,206 tracked files mention "openmw" (5,720 lines). 1,010 paths contain "openmw", almost all under `apps/openfallout/`.
 - 10 executables are named `openmw*` (`openmw`, `openmw-cs`, `openmw-launcher`, `openmw-wizard`, `openmw-iniimporter`, `openmw-essimporter`, `openmw-navmeshtool`, `openmw-bulletobjecttool` and two test binaries), plus the `openmw-lib` and `openmw-cs-lib` libraries.
 - Lua modules are named `openmw.*` (20 API files under `files/lua_api/openmw/`). `openmw.cfg` is mentioned 228 times. `OPENMW_*` guards and options are everywhere, and `OMWEngine` and `OMW*` symbols exist.
 - 792 files use `MW*` namespaces (`MWGui`, `MWWorld`, `MWLua`, `MWMechanics` and others). `MW` stands for Morrowind.
@@ -162,16 +162,18 @@ The rename lands in stages, each one buildable and passing the tests before the 
 1. **Stage A, user-visible names.** Executable names, window titles, README and docs, config file and user-data directory names, packaging. Add an acknowledgement of OpenMW to the README.
 2. **Stage B, interfaces.** Lua module ids (`openmw.*` to `openfallout.*`), `OPENMW_*` CMake options and header guards, `OMW*` symbols.
 3. **Stage C, source layout.** `apps/openmw` to `apps/openfallout` using `git mv`, then `MW*` namespaces to `OF*` (for example `MWWorld` becomes `OFWorld`). `OF` is the default chosen here and is cheap to change before this stage starts.
-4. **Stage D, what stages A to C leave (proposed, not yet agreed).** GLSL names (`omw_*`, `OMW_*`), virtual file system and asset directories (`scripts/omw`, `openmw.png` and the other artwork), the `omw.*` settings keys, the `OMWInputBindings` section in `player_storage.bin` (kept at stage B so saved bindings survive; renaming it needs a migration), the `OMW_Generated_*` record ids, and the file extensions `.omwgame`, `.omwaddon`, `.omwscripts` and `.omwsave`. Several of these are formats other tools read and write, so each needs its own decision on whether to keep reading the old name.
+4. **Stage D, what stages A to C leave (proposed; Jacob agreed to keep reading the old `.omw*` extensions).** GLSL names (`omw_*`, `OMW_*`), virtual file system and asset directories (`scripts/omw`, `openmw.png` and the other artwork), the `omw.*` settings keys, the `OMWInputBindings` section in `player_storage.bin` (kept at stage B so saved bindings survive; renaming it needs a migration), the `OMW_Generated_*` record ids, and the file extensions `.omwgame`, `.omwaddon`, `.omwscripts` and `.omwsave`. Several of these are formats other tools read and write, so each needs its own decision on whether to keep reading the old name.
 
 Progress: stage A is done. The programs are `openfallout`, `openfallout-launcher`, `openfallout-wizard`, `openfallout-cs`, `openfallout-iniimporter`, `openfallout-essimporter`, `openfallout-navmeshtool`, `openfallout-bulletobjecttool`, `openfallout-tests`, `openfallout-cs-tests` and the three benchmarks. The CMake project, configuration and log files (`openfallout.cfg`, `openfallout.log`, `openfallout-cs.cfg`), settings directories (`~/.config/openfallout`), window titles, dialogs, translations, desktop and appdata entries, package and CI names, the README and `CONTRIBUTING.md` use the new name. Deliberately left for stage B or C: the `openmw-lib`, `openmw-cs-lib` and `openmw-navmeshtool-lib` libraries and the `openmw_add_executable` macro, Lua module ids and `OPENMW_*` names, `Role_OpenMW*` and `Version::getOpenmwVersionDescription` identifiers, the `OpenMW 0.48.0` and `OpenMW 0.52.0` names in the "save is too old" message (they name real OpenMW releases that can still read such a save), icon and logo artwork (`openmw.png`, `openmw.ico`, `openmw.icns`, `openmw_project_logo.webm` and the matching resource ids), `apps/openmw` and the `MW*` namespaces, and the OpenMW-owned documentation text under `docs/source`, which still describes the Morrowind engine.
 
 Progress, stage B: done. Lua module ids are `openfallout.*` and `openfallout_aux.*` (the API files are under `files/lua_api/openfallout/`, the auxiliary modules under `files/data/openfallout_aux/`), the CMake options and variables are `OPENFALLOUT_*`, the internal libraries are `openfallout-lib`, `openfallout-cs-lib` and `openfallout-navmeshtool-lib`, the macros are `openfallout_add_executable` and `add_openfallout_dir` (`cmake/OpenFalloutMacros.cmake`), header guards, preprocessor macros and environment variables use `OPENFALLOUT_`, and the `OMW*` l10n contexts and Lua event names (`OMWEngine`, `OMWShaders`, `OMWConsoleEval` and the others) are `OF*`. A Lua mod written for OpenMW has to change its `require` ids to run here, and its `l10n` contexts if it used the engine's. Verification, including the startup smoke test that loads the built-in Lua scripts, is in `build-baseline.md`. Deliberately left: `apps/openmw` and the `MW*` and `OMW` namespaces (stage C), and everything in stage D above.
 
+Progress, stage C: done. The engine sources are in `apps/openfallout` and their unit tests in `apps/openfallout_tests`. The C++ namespaces are `OFWorld`, `OFBase`, `OFMechanics`, `OFGui`, `OFRender`, `OFLua`, `OFPhysics`, `OFDialogue`, `OFSound`, `OFState`, `OFClass`, `OFInput` and `OFScript`, and `OMW` is `OF` (so `OMW::Engine` is `OF::Engine`). The `MWScript` name is kept where it means the Morrowind script language, as in the Lua API documentation. Deliberately left for stage D: the lower-case directory names under `apps/openfallout` (`mwworld`, `mwgui` and the rest) and `apps/mwiniimporter`, widget and skin names (`MWSkill`, `MWList`, `MW_Button` and the rest, which layout files refer to by name), `MWShadowTechnique`, the `MWUI` Lua interface that mods call, and the `BUILD_MWINIIMPORTER` option.
+
 Not renamed: `AUTHORS.md`, `LICENSE` and the copyright notices in source files. GPLv3 requires keeping them, and the OpenMW contributors wrote most of this code. This is a plain reading of the licence, not legal advice.
 
 ## Appendix: how the counts were produced
 
-- **Stored vs parsed-only.** For each `components/esm4/load*.hpp` that declares `sRecordId`, find the enclosing top-level struct and check whether `Store<ESM4::Name>` appears in `apps/openmw/mwworld/esmstore.hpp`. Result: 77 headers, 39 stored, 38 parsed-only. `loadgrup.hpp` and `loadtes4.hpp` declare no record id. The tuple also holds `Store<ESM4::ActorCreature>`, which has no header of its own, so the count is per header, not per store.
+- **Stored vs parsed-only.** For each `components/esm4/load*.hpp` that declares `sRecordId`, find the enclosing top-level struct and check whether `Store<ESM4::Name>` appears in `apps/openfallout/mwworld/esmstore.hpp`. Result: 77 headers, 39 stored, 38 parsed-only. `loadgrup.hpp` and `loadtes4.hpp` declare no record id. The tuple also holds `Store<ESM4::ActorCreature>`, which has no header of its own, so the count is per header, not per store.
 - **Record types with no parser.** Absence of a matching `components/esm4/load*.cpp` file. The list of Fallout record types is from memory of public format references, so a name on it may be wrong.
-- **Gameplay-side ESM4 usage.** `rg -il esm4 apps/openmw/mwmechanics apps/openmw/mwdialogue apps/openmw/mwscript apps/openmw/mwinput apps/openmw/mwstate apps/openmw/mwphysics` returns nothing.
+- **Gameplay-side ESM4 usage.** `rg -il esm4 apps/openfallout/mwmechanics apps/openfallout/mwdialogue apps/openfallout/mwscript apps/openfallout/mwinput apps/openfallout/mwstate apps/openfallout/mwphysics` returns nothing.

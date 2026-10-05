@@ -73,6 +73,21 @@ The unit tests never load the Lua scripts and l10n files under `files/data`, so 
 - As a control, one `require('openfallout.ui')` in a copy of the resources was changed back to `openmw.ui`. The script fails and prints `Can't start Menu[scripts/omw/settings/menu.lua]; Lua error: module not found: openmw.ui` and the three scripts that depend on it.
 - Limit: only scripts for the `MENU` context start, because the synthetic file has no cell to start a new game in. The `GLOBAL`, `PLAYER` and `NPC` scripts are listed in the log but not started. For them stage B relies on a static check that every `require` id in `files/data` and `files/data-mw` is either registered in C++ or a file in the virtual file system, and that every `l10n(...)` context and `#{Context:Key}` reference has a matching directory.
 
+## Result after rename stage C
+
+Measured on 2026-10-04 on the same container, from an empty build directory, with the same options as stage B.
+
+| Item | Result |
+|---|---|
+| Build | 1,300 steps, no errors |
+| `components-tests` | 1,612 tests, all pass |
+| `openfallout-tests` | 529 tests, all pass (the program now builds from `apps/openfallout_tests`) |
+| `openfallout-cs-tests` | 154 tests, all pass |
+| Benchmarks and tools | the three benchmarks ran to completion, every program starts as at stage B |
+| Startup smoke test | passes; the log of the stage C binary is identical to the stage B one (263 lines, compared after removing timestamps, paths and the revision, and sorting) |
+
+The stage C rename moved 832 files with `git mv` and changed 859 files in all (about 13,800 uses of the old namespace names and about 100 path references). `clang-format` shows the same warnings as master and stage B on the files it touches, because `MW` and `OF` have the same length. No identifier named `OF*` existed before, so the new namespaces collide with nothing.
+
 ## Plugin census
 
 `esmtool census <plugin>` reads a TES4-format plugin (the format Oblivion, Fallout 3, New Vegas and Skyrim use) and prints how many records of each type it holds, how many were read by a loader, how many have no loader and how many a loader rejected, with the failure of each rejected one. The table holds record types, counts and failure messages only, never record contents, so it can be shared without sharing game data. The lines above the table also show the file name as given on the command line, the format version and the master plugin names, so check those before sharing the output. Some loaders put record contents in their error messages (the LVLI, LVLC and LVLN loaders include the editor ID), so only the `Unknown subrecord` message, which names a loader and a four character subrecord code, is printed as it is. Any other loader failure is counted and printed as `loader error (message withheld, it may contain record contents)`; `esmtool dump` shows the full message.

@@ -58,7 +58,7 @@ resources
 /openfallout_*_benchmark
 
 ## generated objects
-apps/openmw/config.hpp
+apps/openfallout/config.hpp
 apps/launcher/ui_contentselector.h
 apps/launcher/ui_settingspage.h
 apps/opencs/ui_contentselector.h

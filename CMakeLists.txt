@@ -392,7 +392,7 @@ if (WIN32)
     add_compile_definitions(
         NOMINMAX # name conflict with std::min, std::max
         WIN32_LEAN_AND_MEAN
-        NOMB # name conflict with MWGui::MessageBox
+        NOMB # name conflict with OFGui::MessageBox
         NOGDI # name conflict with osgAnimation::MorphGeometry::RELATIVE
     )
 
@@ -688,7 +688,7 @@ add_subdirectory (components)
 
 # Apps and tools
 if (BUILD_OPENFALLOUT OR BUILD_OPENFALLOUT_TESTS)
-    add_subdirectory( apps/openmw )
+    add_subdirectory( apps/openfallout )
 endif()
 
 if (BUILD_BSATOOL)
@@ -744,7 +744,7 @@ if (BUILD_OPENCS_TESTS)
 endif()
 
 if (BUILD_OPENFALLOUT_TESTS)
-    add_subdirectory(apps/openmw_tests)
+    add_subdirectory(apps/openfallout_tests)
 endif()
 
 if (WIN32)
