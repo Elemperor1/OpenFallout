@@ -14,12 +14,14 @@
 // The layout is Oblivion's: records have a 20 byte header, which ESM4::Reader detects from the TES4 record.
 namespace ESM4Test
 {
+    /// Append the object representation of value to the synthetic plugin bytes.
     template <class T>
     void append(std::string& out, T value)
     {
         out.append(reinterpret_cast<const char*>(&value), sizeof(value));
     }
 
+    /// Build a subrecord from a four-character type, a 16-bit payload size and raw data.
     inline std::string subRecord(std::string_view type, std::string_view data)
     {
         std::string result(type);
@@ -28,13 +30,13 @@ namespace ESM4Test
         return result;
     }
 
-    // A sub-record that holds a null terminated string.
+    /// Build a subrecord containing text followed by a null terminator.
     inline std::string zString(std::string_view type, std::string_view text)
     {
         return subRecord(type, std::string(text) + '\0');
     }
 
-    // A sub-record that holds one value.
+    /// Build a subrecord containing the object representation of a single value.
     template <class T>
     std::string valueSubRecord(std::string_view type, T value)
     {
@@ -43,6 +45,7 @@ namespace ESM4Test
         return subRecord(type, data);
     }
 
+    /// Wrap raw subrecords in an Oblivion record header with the given type, form ID and flags.
     inline std::string record(std::string_view type, std::uint32_t id, std::string_view data, std::uint32_t flags = 0)
     {
         std::string result(type);
@@ -54,6 +57,8 @@ namespace ESM4Test
         return result;
     }
 
+    /// Build a record with a zlib-compressed payload and its uncompressed size.
+    /// Throws std::runtime_error if compression fails.
     inline std::string compressedRecord(std::string_view type, std::uint32_t id, std::string_view data)
     {
         uLongf compressedSize = compressBound(static_cast<uLong>(data.size()));
@@ -70,6 +75,7 @@ namespace ESM4Test
         return record(type, id, payload, ESM4::Rec_Compressed);
     }
 
+    /// Wrap child records in a top-level GRUP labelled with their four-character record type.
     inline std::string topGroup(std::string_view recordType, std::string_view children)
     {
         std::string result("GRUP");
@@ -82,6 +88,7 @@ namespace ESM4Test
         return result;
     }
 
+    /// Build the minimal TES4/HEDR record used to select Oblivion headers in the test reader.
     inline std::string header()
     {
         std::string hedr;

@@ -28,6 +28,7 @@ namespace EsmTool
             // Where the census collects what it knows about the records that are read, if this is a census.
             ESM4::Census* const mCensus;
 
+            /// Derive quiet mode from the command and retain an optional, non-owning script census pointer.
             explicit Params(const Arguments& info, ESM4::Census* census = nullptr)
                 : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census")
                 , mCensus(census)
@@ -138,6 +139,8 @@ namespace EsmTool
             return Debug::writeFlags(stream, write.mValue, cellFlags);
         }
 
+        /// Load the current record as T, collect its scripts when supported, and print it unless quiet.
+        /// Reader and loader errors propagate to the caller.
         template <class T>
         void readTypedRecord(const Params& params, ESM4::Reader& reader)
         {
@@ -609,6 +612,8 @@ namespace EsmTool
         return 0;
     }
 
+    /// Read a TES4 plugin and print record and script census tables to standard output.
+    /// Return 0 after a complete scan, or -1 on a fatal read error or exception.
     int censusTes4(const Arguments& info, std::unique_ptr<std::ifstream>&& stream)
     {
         std::cout << "Census of TES4 file: " << info.filename << '\n';

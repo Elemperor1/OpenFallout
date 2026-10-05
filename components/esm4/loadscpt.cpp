@@ -31,6 +31,8 @@
 #include "reader.hpp"
 //#include "writer.hpp"
 
+/// Load the current SCPT record, preserving its bytecode, source, locals and ordered references.
+/// Throws on unknown subrecords or script loading errors.
 void ESM4::Script::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();

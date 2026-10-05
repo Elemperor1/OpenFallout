@@ -23,7 +23,8 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
-    // Loads every record of a type from a plugin that holds nothing else, in file order.
+    /// Load all records as T from a synthetic plugin containing one group, preserving file order.
+    /// Loader and reader errors propagate to the caller.
     template <class T>
     std::vector<T> loadRecords(std::string_view group, const std::string& records)
     {
@@ -41,6 +42,7 @@ namespace
         return result;
     }
 
+    /// Build an enabled SCHR subrecord with the supplied reference, bytecode and variable counts.
     std::string scriptHeader(
         std::uint32_t refCount, std::uint32_t compiledSize, std::uint32_t variableCount, std::uint16_t type = 0)
     {
@@ -54,7 +56,7 @@ namespace
         return subRecord("SCHR", data);
     }
 
-    // SLSD and the SCVR that names the variable.
+    /// Build an SLSD local variable followed by the SCVR subrecord containing its name.
     std::string localVariable(std::uint32_t index, std::string_view name)
     {
         std::string data;
@@ -67,6 +69,7 @@ namespace
         return subRecord("SLSD", data) + zString("SCVR", name);
     }
 
+    /// Build a FO3/FONV CTDA condition comparing the given function on the subject to 1.
     std::string condition(std::uint32_t functionIndex)
     {
         std::string data;
@@ -83,6 +86,7 @@ namespace
     // Bytes with a zero, the top bit set and a newline: nothing that would survive being read as text.
     const std::string bytecode("\x1d\x00\x06\x00\x72\x01\x00\xff\n\x80", 10);
 
+    /// Verify SCPT preserves binary bytecode, source, locals and the mixed reference order.
     TEST(ESM4ScriptTest, keepsEverythingTheBytecodeNames)
     {
         const std::string data = zString("EDID", "TestScript")
@@ -119,6 +123,7 @@ namespace
         EXPECT_TRUE(definition.isConsistent());
     }
 
+    /// Verify a source-only script loads with empty bytecode and references and consistent counts.
     TEST(ESM4ScriptTest, readsAScriptWithoutBytecode)
     {
         const std::string data
@@ -132,6 +137,7 @@ namespace
         EXPECT_TRUE(scripts.front().mScript.isConsistent());
     }
 
+    /// Verify size, reference and variable inconsistencies are detected independently.
     TEST(ESM4ScriptTest, noticesWhenTheHeaderDisagreesWithTheContent)
     {
         const std::string wrongSize = zString("EDID", "A") + scriptHeader(0, 4, 0) + subRecord("SCDA", bytecode);
@@ -161,6 +167,7 @@ namespace
         EXPECT_FALSE(scripts[2].mScript.isConsistent());
     }
 
+    /// Verify gaps and removed locals are allowed when the header covers the highest variable index.
     TEST(ESM4ScriptTest, acceptsAVariableCountAboveTheNumberOfVariables)
     {
         // The game files have scripts whose header counts more variables than the record lists: the ones deleted
@@ -180,6 +187,7 @@ namespace
         EXPECT_TRUE(scripts[1].mScript.isConsistent());
     }
 
+    /// Verify an unexpected SCHR size is skipped without losing later subrecords or records.
     TEST(ESM4ScriptTest, skipsAScriptHeaderOfAnotherSizeAndKeepsReading)
     {
         const std::string odd = zString("EDID", "Odd") + subRecord("SCHR", std::string(12, '\x07'))
@@ -196,6 +204,7 @@ namespace
         EXPECT_EQ(scripts[1].mEditorId, "Next");
     }
 
+    /// Verify a truncated SCDA payload raises a loading error.
     TEST(ESM4ScriptTest, rejectsBytecodeThatIsCutShort)
     {
         // The sub-record header promises ten bytes and the file ends after four.
@@ -207,6 +216,7 @@ namespace
         EXPECT_ANY_THROW(loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data)));
     }
 
+    /// Verify delegating script subrecords still rejects an unknown SCPT subrecord.
     TEST(ESM4ScriptTest, stillRejectsUnknownSubrecords)
     {
         const std::string data = zString("EDID", "Bad") + subRecord("ZZZZ", "1234");
@@ -214,6 +224,7 @@ namespace
         EXPECT_ANY_THROW(loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data)));
     }
 
+    /// Verify NEXT separates INFO begin and end bytecode, source, locals and references.
     TEST(ESM4DialogInfoTest, keepsTheFirstAndSecondScriptApart)
     {
         const std::string firstCode("\x01\x02\x03", 3);
@@ -249,6 +260,7 @@ namespace
         EXPECT_TRUE(info.mEndScript.isConsistent());
     }
 
+    /// Verify dialogue text loads when neither response script is present.
     TEST(ESM4DialogInfoTest, readsAResponseWithNoScript)
     {
         const std::string data = valueSubRecord<std::uint32_t>("QSTI", 0x000b0001) + zString("NAM1", "Hello");
@@ -261,6 +273,7 @@ namespace
         EXPECT_TRUE(infos.front().mEndScript.compiledScript.empty());
     }
 
+    /// Build quest DATA with flags 1, priority 50 and a five-second delay.
     std::string questData()
     {
         std::string data;
@@ -271,6 +284,8 @@ namespace
         return subRecord("DATA", data);
     }
 
+    /// Verify quest stages retain separate log entries, scripts, text, conditions and next quests.
+    /// Quest conditions stay separate and objective conditions are skipped.
     TEST(ESM4QuestTest, putsConditionsTextAndScriptsInTheLogEntryTheyBelongTo)
     {
         const std::string firstCode("\x01\x02\x03", 3);
@@ -346,6 +361,7 @@ namespace
         EXPECT_TRUE(other.mLogEntries[0].mScript.isConsistent());
     }
 
+    /// Verify scripts outside stage log entries are skipped without disrupting later quest records.
     TEST(ESM4QuestTest, skipsScriptDataThatHasNoLogEntryAndKeepsReading)
     {
         // A script before any stage, and one after the objectives start.
@@ -367,6 +383,7 @@ namespace
         EXPECT_EQ(quests[1].mEditorId, "Next");
     }
 
+    /// Verify quest-level conditions load when the quest has no stages.
     TEST(ESM4QuestTest, readsAQuestWithoutStages)
     {
         const std::string data = zString("EDID", "NoStages") + questData() + condition(100);
@@ -378,6 +395,8 @@ namespace
         EXPECT_EQ(quests.front().mTargetConditions.size(), 1u);
     }
 
+    /// Verify SCPT, INFO and QUST script totals, bytecode sizes and header mismatch counts.
+    /// Empty blocks are excluded, while headers declaring missing references are counted.
     TEST(ESM4CensusTest, countsTheScriptsRecordsHoldInLine)
     {
         const std::string good = zString("EDID", "Good")

@@ -57,8 +57,8 @@ namespace ESM4
         // Empty unless reading stopped before the end of the file.
         const std::string& getFatalError() const { return mFatalError; }
 
-        // Keyed by the four character code of the record type that holds the script. Empty unless addScripts() was
-        // called.
+        /// Return script statistics keyed by the owning record type's four-character code.
+        /// The map is empty until addScripts() encounters a nonempty script.
         const std::map<std::string, CensusScripts>& getScripts() const { return mScripts; }
 
         void add(const std::string& type, CensusOutcome outcome, std::string_view failure = {});
@@ -68,14 +68,17 @@ namespace ESM4
         // the census; an error that leaves the reader in an unknown state does.
         void collect(Reader& reader, const std::function<bool(Reader&)>& parse);
 
-        // Counts the scripts of a record that a loader has just read. Sizes and counts only, never script text.
+        /// Count the loaded SCPT script, retaining only sizes and counts.
         void addScripts(const Script& record);
+        /// Count the loaded INFO begin and end scripts, retaining only sizes and counts.
         void addScripts(const DialogInfo& record);
+        /// Count each loaded QUST stage log entry's script, retaining only sizes and counts.
         void addScripts(const Quest& record);
 
         void write(std::ostream& stream) const;
 
     private:
+        /// Accumulate statistics for one nonempty script under its owning record type.
         void addScript(const std::string& type, const ScriptDefinition& script);
 
         std::map<std::string, CensusRecord> mRecords;

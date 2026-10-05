@@ -32,6 +32,9 @@
 #include "reader.hpp"
 //#include "writer.hpp"
 
+/// Load the current QUST record with stages and log entries, keeping their conditions separate.
+/// Objective data and scripts outside stage log entries are skipped.
+/// Throws on unknown subrecords or script loading errors.
 void ESM4::Quest::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();

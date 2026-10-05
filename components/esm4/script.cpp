@@ -9,6 +9,8 @@
 
 namespace ESM4
 {
+    /// Consume a recognized script subrecord and return true; leave unknown subrecords unread.
+    /// Skip SCHR headers of unexpected size and throw std::runtime_error for truncated SCDA data.
     bool ScriptDefinition::loadSubRecord(Reader& reader)
     {
         const SubRecordHeader& subHdr = reader.subRecordHeader();
@@ -67,26 +69,31 @@ namespace ESM4
         }
     }
 
+    /// Return whether the SCHR compiled size equals the number of stored SCDA bytes.
     bool ScriptDefinition::hasConsistentSize() const
     {
         return scriptHeader.compiledSize == compiledScript.size();
     }
 
+    /// Return whether SCHR counts exactly the stored SCRO and SCRV entries together.
     bool ScriptDefinition::hasConsistentReferences() const
     {
         return scriptHeader.refCount == references.size();
     }
 
+    /// Return whether the SCHR variable count covers every stored SLSD variable index.
     bool ScriptDefinition::hasConsistentVariables() const
     {
         return scriptHeader.variableCount >= highestVariableIndex();
     }
 
+    /// Return whether size, reference count and variable indices all agree with SCHR.
     bool ScriptDefinition::isConsistent() const
     {
         return hasConsistentSize() && hasConsistentReferences() && hasConsistentVariables();
     }
 
+    /// Return the greatest stored SLSD variable index, or zero when there are no locals.
     std::uint32_t ScriptDefinition::highestVariableIndex() const
     {
         std::uint32_t result = 0;

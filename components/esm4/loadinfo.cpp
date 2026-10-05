@@ -34,6 +34,8 @@
 #include "reader.hpp"
 //#include "writer.hpp"
 
+/// Load the current INFO record, retaining separate response begin and end scripts.
+/// Throws on unknown subrecords or script loading errors.
 void ESM4::DialogInfo::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();

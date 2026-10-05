@@ -71,6 +71,8 @@ namespace ESM4
         }
     }
 
+    /// Accumulate script count, bytecode size and header mismatches for the owning record type.
+    /// Ignore blocks without bytecode, source, locals, references or declared bytecode/references.
     void Census::addScript(const std::string& type, const ScriptDefinition& script)
     {
         const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
@@ -90,17 +92,20 @@ namespace ESM4
             ++scripts.mWrongVariables;
     }
 
+    /// Add the loaded SCPT record's script to the census without retaining its contents.
     void Census::addScripts(const Script& record)
     {
         addScript("SCPT", record.mScript);
     }
 
+    /// Add both response scripts of a loaded INFO record to the census.
     void Census::addScripts(const DialogInfo& record)
     {
         addScript("INFO", record.mScript);
         addScript("INFO", record.mEndScript);
     }
 
+    /// Add every stage log entry's script from a loaded QUST record to the census.
     void Census::addScripts(const Quest& record)
     {
         for (const QuestStage& stage : record.mStages)
@@ -144,6 +149,7 @@ namespace ESM4
         }
     }
 
+    /// Write record totals, bounded failure summaries, optional script totals and any fatal error.
     void Census::write(std::ostream& stream) const
     {
         CensusRecord total;
