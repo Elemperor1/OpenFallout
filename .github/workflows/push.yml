@@ -1,8 +1,16 @@
 name: Build and test
 
 on:
-- push
-- pull_request
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+# PR branches are tested by pull_request; avoid rebuilding each commit twice.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   BUILD_TYPE: RelWithDebInfo
@@ -21,15 +29,17 @@ jobs:
       run: sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
 
     - name: Prime ccache
-      uses: hendrikmuhs/ccache-action@v1
+      uses: hendrikmuhs/ccache-action@v1.2.22
       with:
-        key: ${{ matrix.os }}-${{ env.BUILD_TYPE }}
+        key: ubuntu-${{ runner.arch }}-${{ env.BUILD_TYPE }}
         max-size: 1000M
 
     - name: Configure
       run: >
         cmake .
         -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        -D CMAKE_C_COMPILER_LAUNCHER=ccache
+        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
         -D OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION=ON
         -D USE_SYSTEM_TINYXML=ON
         -D BUILD_COMPONENTS_TESTS=ON
@@ -38,7 +48,7 @@ jobs:
         -D CMAKE_INSTALL_PREFIX=install
 
     - name: Build
-      run: cmake --build . -- -j$(nproc)
+      run: cmake --build . --parallel "$(nproc)"
 
     - name: Run components tests
       run: ./components-tests
