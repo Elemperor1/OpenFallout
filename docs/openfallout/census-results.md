@@ -9,6 +9,7 @@
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
 - **Tale of Two Wastelands: 17 `NPC_` records fail to load, and no unparsed record type is new.** The four TTW plugins hold 1,279,509 records after their headers. Every failure is an `NPC_` record: three are unknown subrecords (`DLVT` twice, `LSNA` once) and the other 14 are loader errors for which the census withholds the message. Every `NPC_` record in the vanilla `Fallout3.esm` and `FalloutNV.esm` loads, so the failing records exist only in the TTW-patched files. The files came from a community installer and were not checked against reference hashes, so the failures may come from the installer instead of from TTW's data.
+- **Compiled scripts line up with their headers, except for the variable count.** The 16 plugins hold 16,180 `INFO`, 2,437 `QUST` and 6,035 `SCPT` scripts, with 3.1 MB of bytecode. In every script the compiled size in the header equals the bytecode read, and the reference count equals the references read in all but one empty `INFO` script. The header's variable count does not equal the number of local variables read. See "Scripts held by records".
 
 ## Where the files came from
 
@@ -327,6 +328,43 @@ The add-on plugins contain no unparsed type that is missing from this list.
 | `WRLD` | yes | 32 | 14 |
 | `WTHR` | no | 27 | 63 |
 | **All** | | **718,951** | **465,016** |
+
+## Scripts held by records
+
+Run on 2026-10-05 on the same Mac, with the branch that keeps script bytecode (PR #7). It adds a "Scripts held in line by records" table to the census output (see `build-baseline.md`). The record counts in the main tables did not change in any cell, for all 20 plugins, and the Failures lines are the same. Scripts are counted per script, not per record: an `INFO` record can hold a begin script and an end script, and a `QUST` record holds one script per log entry. A script counts only if it holds something (bytecode, a non-zero compiled size, source, variables or references).
+
+| Plugin | `INFO` scripts | `INFO` bytecode (bytes) | `QUST` scripts | `QUST` bytecode (bytes) | `SCPT` scripts | `SCPT` bytecode (bytes) |
+|---|---:|---:|---:|---:|---:|---:|
+| `Fallout3.esm` | 5,704 | 187,924 | 871 | 88,435 | 1,257 | 413,561 |
+| `Anchorage.esm` | 176 | 6,420 | 32 | 2,927 | 192 | 85,385 |
+| `BrokenSteel.esm` | 619 | 16,203 | 143 | 14,746 | 252 | 114,948 |
+| `PointLookout.esm` | 215 | 6,663 | 126 | 8,270 | 209 | 78,732 |
+| `ThePitt.esm` | 327 | 10,937 | 61 | 6,369 | 127 | 28,338 |
+| `Zeta.esm` | 217 | 5,207 | 102 | 8,395 | 283 | 153,393 |
+| `FalloutNV.esm` | 7,372 | 414,338 | 737 | 44,303 | 2,576 | 848,781 |
+| `DeadMoney.esm` | 679 | 19,453 | 107 | 8,463 | 347 | 127,255 |
+| `HonestHearts.esm` | 360 | 15,280 | 101 | 12,555 | 239 | 94,567 |
+| `OldWorldBlues.esm` | 353 | 15,613 | 107 | 6,366 | 278 | 143,800 |
+| `LonesomeRoad.esm` | 140 | 5,089 | 50 | 2,536 | 242 | 131,980 |
+| `GunRunnersArsenal.esm` | 18 | 2,161 | - | - | 28 | 8,472 |
+| `ClassicPack.esm` | - | - | - | - | 2 | 237 |
+| `CaravanPack.esm` | - | - | - | - | 1 | 161 |
+| `MercenaryPack.esm` | - | - | - | - | 1 | 161 |
+| `TribalPack.esm` | - | - | - | - | 1 | 143 |
+| **All 16** | **16,180** | **705,288** | **2,437** | **203,365** | **6,035** | **2,229,914** |
+
+A dash means the census printed no row, because that plugin has no script of that kind. The four Tale of Two Wastelands plugins hold copies of scripts from the vanilla plugins (the patched `FalloutNV.esm` is almost the same as the vanilla one), so their rows are not added to the totals above and are not repeated here.
+
+### What the script header says against what was read
+
+Each script has a header with three numbers (compiled size, reference count, variable count). The loader checks each against what it read. The first run of the census compared all three together and reported a mismatch in every plugin, so a separate counting program (kept outside the repository, reading the raw plugins and printing numbers) was run on the same 20 plugins. It reproduced the Scripts and Bytecode cells exactly. Its findings:
+
+- **The compiled size in the header equals the bytecode read, in every script of all 20 plugins.**
+- **The reference count equals the number of `SCRO` plus `SCRV` entries read, in every script but one.** The exception is one `INFO` script in `FalloutNV.esm` (and its copy in the TTW-patched file): the header says 1 reference, nothing was read, and the compiled size is 0.
+- **The variable count in the header is not the number of `SLSD` entries.** It is larger than the entry count in all but 6 scripts (3 `SCPT` in `FalloutNV.esm` and the same 3 in its TTW copy, where it is 1 smaller). In `Fallout3.esm`, 341 of the 1,257 `SCPT` scripts differ: 51 have no `SLSD` entry while the header says there are variables, and 250 have gaps in their `SLSD` index numbers, 229 of which have a header count equal to the highest index. Every `SCRV` entry points at an index that exists among the `SLSD` entries.
+- On the 16 installer plugins the combined check flagged 37 of 16,180 `INFO` scripts, 6 of 2,437 `QUST` scripts and 1,389 of 6,035 `SCPT` scripts (23.0%). Nearly all of those are the variable count.
+
+So the loader now checks that the header variable count is at least the highest `SLSD` index, and reports size, reference and variable problems in separate columns (Bad size, Bad refs, Bad vars). The header count looks like the highest variable index ever used, which would leave it higher than the entry count wherever a variable was later deleted. That reading was not confirmed. The census has not yet been rerun on real data with the three separate columns, so the Bad vars column for the 6 smaller-header scripts is unmeasured. A virtual machine needs the bytecode size and the reference table to agree with the header, and they do.
 
 ## Notes
 
