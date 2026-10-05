@@ -398,8 +398,19 @@ namespace ESM4
         // Returns false and reads nothing for any other sub-record. Throws if the compiled script is cut short.
         bool loadSubRecord(Reader& reader);
 
-        // Whether the sizes in the header match what was read: bytecode, references and local variables.
+        // SCHR counts what the script holds, and these compare the counts with what was read.
+        // The compiled size is the number of SCDA bytes.
+        bool hasConsistentSize() const;
+        // The reference count is the number of SCRO and SCRV entries together.
+        bool hasConsistentReferences() const;
+        // The variable count is not the number of SLSD entries. In the game files it is often higher, with indices
+        // missing from the middle or the end, which looks like the highest index ever used and not the number of
+        // variables the script has now. It is consistent when no variable has an index above it.
+        bool hasConsistentVariables() const;
         bool isConsistent() const;
+
+        // The highest SLSD index, or 0 when the script has no local variables.
+        std::uint32_t highestVariableIndex() const;
     };
 }
 

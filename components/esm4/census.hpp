@@ -39,7 +39,10 @@ namespace ESM4
     {
         std::size_t mCount = 0; // scripts that hold anything; an empty script block is not counted
         std::size_t mBytecode = 0; // bytes of compiled script, all scripts together
-        std::size_t mInconsistent = 0; // scripts whose header disagrees with what was read, see ScriptDefinition
+        // Scripts whose SCHR header disagrees with what was read, see ScriptDefinition. A script can be in several.
+        std::size_t mWrongSize = 0;
+        std::size_t mWrongReferences = 0;
+        std::size_t mWrongVariables = 0;
     };
 
     // Counts the records of a TES4-format plugin by type and remembers what could not be read.

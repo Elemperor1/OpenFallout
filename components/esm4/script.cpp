@@ -1,5 +1,6 @@
 #include "script.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 #include <components/esm/common.hpp>
@@ -66,9 +67,31 @@ namespace ESM4
         }
     }
 
+    bool ScriptDefinition::hasConsistentSize() const
+    {
+        return scriptHeader.compiledSize == compiledScript.size();
+    }
+
+    bool ScriptDefinition::hasConsistentReferences() const
+    {
+        return scriptHeader.refCount == references.size();
+    }
+
+    bool ScriptDefinition::hasConsistentVariables() const
+    {
+        return scriptHeader.variableCount >= highestVariableIndex();
+    }
+
     bool ScriptDefinition::isConsistent() const
     {
-        return scriptHeader.compiledSize == compiledScript.size() && scriptHeader.refCount == references.size()
-            && scriptHeader.variableCount == localVarData.size();
+        return hasConsistentSize() && hasConsistentReferences() && hasConsistentVariables();
+    }
+
+    std::uint32_t ScriptDefinition::highestVariableIndex() const
+    {
+        std::uint32_t result = 0;
+        for (const ScriptLocalVariableData& variable : localVarData)
+            result = std::max(result, variable.index);
+        return result;
     }
 }

@@ -137,16 +137,47 @@ namespace
         const std::string wrongSize = zString("EDID", "A") + scriptHeader(0, 4, 0) + subRecord("SCDA", bytecode);
         const std::string wrongRefCount
             = zString("EDID", "B") + scriptHeader(2, 0, 0) + valueSubRecord<std::uint32_t>("SCRO", 1);
-        const std::string wrongVariableCount = zString("EDID", "C") + scriptHeader(0, 0, 1);
+        const std::string wrongVariableCount
+            = zString("EDID", "C") + scriptHeader(0, 0, 1) + localVariable(1, "iOne") + localVariable(2, "iTwo");
 
         const std::string records
             = record("SCPT", 1, wrongSize) + record("SCPT", 2, wrongRefCount) + record("SCPT", 3, wrongVariableCount);
         const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", records);
 
         ASSERT_EQ(scripts.size(), 3u);
+        EXPECT_FALSE(scripts[0].mScript.hasConsistentSize());
+        EXPECT_TRUE(scripts[0].mScript.hasConsistentReferences());
+        EXPECT_TRUE(scripts[0].mScript.hasConsistentVariables());
         EXPECT_FALSE(scripts[0].mScript.isConsistent());
+
+        EXPECT_TRUE(scripts[1].mScript.hasConsistentSize());
+        EXPECT_FALSE(scripts[1].mScript.hasConsistentReferences());
+        EXPECT_TRUE(scripts[1].mScript.hasConsistentVariables());
         EXPECT_FALSE(scripts[1].mScript.isConsistent());
+
+        EXPECT_TRUE(scripts[2].mScript.hasConsistentSize());
+        EXPECT_TRUE(scripts[2].mScript.hasConsistentReferences());
+        EXPECT_FALSE(scripts[2].mScript.hasConsistentVariables());
         EXPECT_FALSE(scripts[2].mScript.isConsistent());
+    }
+
+    TEST(ESM4ScriptTest, acceptsAVariableCountAboveTheNumberOfVariables)
+    {
+        // The game files have scripts whose header counts more variables than the record lists: the ones deleted
+        // from the middle or the end of the list leave their index behind.
+        const std::string gaps
+            = zString("EDID", "Gaps") + scriptHeader(0, 0, 5) + localVariable(2, "iTwo") + localVariable(4, "iFour");
+        const std::string none = zString("EDID", "None") + scriptHeader(0, 0, 3);
+
+        const std::vector<ESM4::Script> scripts
+            = loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, gaps) + record("SCPT", 2, none));
+
+        ASSERT_EQ(scripts.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.localVarData.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.highestVariableIndex(), 4u);
+        EXPECT_TRUE(scripts[0].mScript.isConsistent());
+        EXPECT_EQ(scripts[1].mScript.highestVariableIndex(), 0u);
+        EXPECT_TRUE(scripts[1].mScript.isConsistent());
     }
 
     TEST(ESM4ScriptTest, skipsAScriptHeaderOfAnotherSizeAndKeepsReading)
@@ -408,19 +439,21 @@ namespace
         const ESM4::CensusScripts& scpt = census.getScripts().at("SCPT");
         EXPECT_EQ(scpt.mCount, 2u);
         EXPECT_EQ(scpt.mBytecode, 2 * bytecode.size());
-        EXPECT_EQ(scpt.mInconsistent, 1u);
+        EXPECT_EQ(scpt.mWrongSize, 1u);
+        EXPECT_EQ(scpt.mWrongReferences, 0u);
+        EXPECT_EQ(scpt.mWrongVariables, 0u);
 
         // Only the first script of the INFO record holds anything.
         const ESM4::CensusScripts& info4 = census.getScripts().at("INFO");
         EXPECT_EQ(info4.mCount, 1u);
         EXPECT_EQ(info4.mBytecode, firstCode.size());
-        EXPECT_EQ(info4.mInconsistent, 0u);
+        EXPECT_EQ(info4.mWrongSize + info4.mWrongReferences + info4.mWrongVariables, 0u);
 
         // One script in each of the two stages.
         const ESM4::CensusScripts& qust = census.getScripts().at("QUST");
         EXPECT_EQ(qust.mCount, 2u);
         EXPECT_EQ(qust.mBytecode, 2 * firstCode.size());
-        EXPECT_EQ(qust.mInconsistent, 0u);
+        EXPECT_EQ(qust.mWrongSize + qust.mWrongReferences + qust.mWrongVariables, 0u);
 
         std::ostringstream out;
         census.write(out);

@@ -134,14 +134,15 @@ When the file holds scripts that records carry in line (`SCPT`, `INFO` and the l
 
 ```
 Scripts held in line by records:
-Record      Scripts   Bytecode Mismatched
-INFO              2         16          1
-SCPT              2         16          1
+Record      Scripts   Bytecode   Bad size   Bad refs   Bad vars
+INFO              2         16          1          0          0
+SCPT              2         16          1          0          0
 ```
 
 - **Scripts** counts the scripts that hold anything. An empty script block, which many `INFO` records have, is not counted, and an `INFO` record counts once for its begin script and once for its end script.
 - **Bytecode** is the total size in bytes of the compiled scripts (`SCDA`).
-- **Mismatched** counts the scripts whose `SCHR` header disagrees with what the loader read: a different number of bytecode bytes, of references (`SCRO` and `SCRV` together) or of local variables (`SLSD`). A script that is not mismatched has all the parts a bytecode interpreter needs.
+- **Bad size**, **Bad refs** and **Bad vars** count the scripts whose `SCHR` header disagrees with what the loader read. A script can be in more than one column. *Size* compares the header's compiled size with the number of `SCDA` bytes, *refs* compares its reference count with the number of `SCRO` and `SCRV` entries together, and *vars* flags a header variable count that is lower than the highest `SLSD` index. The header count is not compared with the number of `SLSD` entries, because real files have more variables in the header than in the record (see [census-results.md](census-results.md)).
+- A script with none of the three has all the parts a bytecode interpreter needs: the bytecode, the references it indexes and the slots for its variables.
 
 Only sizes and counts are printed, never script text.
 

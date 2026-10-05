@@ -81,8 +81,12 @@ namespace ESM4
         CensusScripts& scripts = mScripts[type];
         ++scripts.mCount;
         scripts.mBytecode += script.compiledScript.size();
-        if (!script.isConsistent())
-            ++scripts.mInconsistent;
+        if (!script.hasConsistentSize())
+            ++scripts.mWrongSize;
+        if (!script.hasConsistentReferences())
+            ++scripts.mWrongReferences;
+        if (!script.hasConsistentVariables())
+            ++scripts.mWrongVariables;
     }
 
     void Census::addScripts(const Script& record)
@@ -189,11 +193,13 @@ namespace ESM4
         {
             stream << "\nScripts held in line by records:\n"
                    << std::left << std::setw(typeWidth) << "Record" << std::right << std::setw(countWidth) << "Scripts"
-                   << std::setw(countWidth) << "Bytecode" << std::setw(countWidth) << "Mismatched" << '\n';
+                   << std::setw(countWidth) << "Bytecode" << std::setw(countWidth) << "Bad size"
+                   << std::setw(countWidth) << "Bad refs" << std::setw(countWidth) << "Bad vars" << '\n';
             for (const auto& [type, scripts] : mScripts)
                 stream << std::left << std::setw(typeWidth) << type << std::right << std::setw(countWidth)
                        << scripts.mCount << std::setw(countWidth) << scripts.mBytecode << std::setw(countWidth)
-                       << scripts.mInconsistent << '\n';
+                       << scripts.mWrongSize << std::setw(countWidth) << scripts.mWrongReferences
+                       << std::setw(countWidth) << scripts.mWrongVariables << '\n';
         }
 
         if (!mFatalError.empty())
