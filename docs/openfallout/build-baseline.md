@@ -48,7 +48,7 @@ Not covered:
 
 - The engine was not run with game data or a display. That needs game files, and nothing was run against real Fallout data.
 - The macOS and Windows packaging paths (bundle names, NSIS, the `.rc` and manifest files) were edited but not built in the cloud container. GitHub Actions built them afterwards, see the next point.
-- GitHub Actions had no runs in this repository before the stage A branch was pushed on 2026-10-04. Since then, on the rename branches the Ubuntu, Windows and macOS arm64 (`macos-26`) jobs build and pass the tests. The macOS Intel (`macos-26-intel`) job has not finished in any run: it stops in the "Prime ccache" step and stays there, which also keeps hosted macOS runners busy so that later runs wait in the queue. The cause is not known yet.
+- GitHub Actions had no runs in this repository before the stage A branch was pushed on 2026-10-04. Since then, on the rename branches the Ubuntu and Windows jobs build and pass the tests, and the macOS jobs (`macos-26` on Apple Silicon, `macos-26-intel`) build the app and the disk image (the macOS workflow runs no tests). The Intel job first sat for hours in the "Prime ccache" step: on that image Homebrew has no prebuilt packages, so installing ccache compiled Python and LLVM from source, which also kept hosted macOS runners busy so that later runs waited in the queue. The Intel job now skips ccache and finishes in about 75 minutes (checked on the stage A, B and C branches). A release run goes through the same macOS workflow and uses the same skip.
 
 ## Result after rename stage B
 
