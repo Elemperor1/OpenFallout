@@ -215,6 +215,30 @@ namespace
         EXPECT_THAT(survey.getFatalErrors(), IsEmpty());
     }
 
+    TEST(ESM4SurveyTest, reportsAnExtendedSubrecordThatRunsPastItsRecordAndKeepsReading)
+    {
+        // The XXXX sub-record promises 300 bytes, and 4 are there
+        std::string size;
+        append<std::uint32_t>(size, 300);
+        const std::string overrunning
+            = subRecord("AAAA", "1") + subRecord("XXXX", size) + subRecord("BBBB", "") + "1234";
+        const std::string plugin = header()
+            + topGroup("ZZZZ",
+                record("ZZZZ", 1, overrunning) + record("ZZZZ", 2, subRecord("CCCC", std::string(400, 'x')))
+                    + record("ZZZZ", 3, subRecord("AAAA", "1")));
+        ESM4::Survey survey;
+        collect(survey, plugin);
+
+        const ESM4::SurveyType& type = survey.getTypes().at("ZZZZ");
+        EXPECT_EQ(type.mTotal, 3u);
+        EXPECT_EQ(type.mSurveyed, 3u);
+        EXPECT_EQ(type.mOverrunning, 1u);
+        EXPECT_EQ(type.mSubRecords.at("AAAA").mRecords, 2u);
+        EXPECT_EQ(type.mSubRecords.count("BBBB"), 0u);
+        EXPECT_THAT(type.mSubRecords.at("CCCC").mSizes, UnorderedElementsAre(Pair(400u, 1u)));
+        EXPECT_THAT(survey.getFatalErrors(), IsEmpty());
+    }
+
     TEST(ESM4SurveyTest, skipsTheListingOfACompressedRecordThatDoesNotInflateAndKeepsReading)
     {
         std::string payload;

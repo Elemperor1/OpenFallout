@@ -622,7 +622,7 @@ namespace ESM4
         const std::uint32_t recordEnd = mCtx.recordHeader.record.dataSize + slack;
         mUnreadRecordBytes = mCtx.recordRead < recordEnd ? recordEnd - mCtx.recordRead : 0;
         // NOTE: some SubRecords have 0 dataSize (e.g. SUB_RDSD in one of REC_REGN records in Oblivion.esm).
-        if (recordEnd - mCtx.recordRead >= sizeof(mCtx.subRecordHeader))
+        if (mUnreadRecordBytes >= sizeof(mCtx.subRecordHeader))
         {
             result = getExact(mCtx.subRecordHeader);
             // HACK: below assumes sub-record data will be read or skipped in full;

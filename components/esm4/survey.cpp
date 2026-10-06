@@ -83,19 +83,22 @@ namespace ESM4
             while (true)
             {
                 const bool found = reader.getSubRecordHeader();
-                // The reader skips a sub-record with an extended size, they come before the one it found.
-                for (const ExtendedSubRecord& extended : reader.skippedExtendedSubRecords())
-                    add(extended.mType, extended.mSize);
-                if (!found)
-                    break;
-
-                const SubRecordHeader& header = reader.subRecordHeader();
-                if (!reader.subRecordFitsRecord())
+                const bool fits = reader.subRecordFitsRecord();
+                // The reader skips a sub-record with an extended size, they come before the one it found. When one of
+                // them runs past its record the reader stops there, and that is the last one it skipped.
+                const auto& extended = reader.skippedExtendedSubRecords();
+                const std::size_t listed = !found && !fits && !extended.empty() ? extended.size() - 1 : extended.size();
+                for (std::size_t i = 0; i < listed; ++i)
+                    add(extended[i].mType, extended[i].mSize);
+                if (!fits)
                 {
                     overrunning = true;
                     break;
                 }
+                if (!found)
+                    break;
 
+                const SubRecordHeader& header = reader.subRecordHeader();
                 add(header.typeId, header.dataSize);
                 reader.skipSubRecordData();
             }
