@@ -29,6 +29,7 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include "cellgrid.hpp"
 #include "common.hpp"
@@ -97,6 +98,13 @@ namespace ESM4
     };
 #pragma pack(pop)
 
+    /// A sub-record that the sub-record XXXX gave an extended size, for those that do not fit the 16 bits of a header.
+    struct ExtendedSubRecord
+    {
+        std::uint32_t mType;
+        std::uint32_t mSize;
+    };
+
     //                                                   bytes read from group, updated by
     //                                                   getRecordHeader() in advance
     //                                                     |
@@ -148,6 +156,7 @@ namespace ESM4
     {
         VFS::Manager const* mVFS;
         Header mHeader; // ESM4 header
+        unsigned int mFileFormVersion = 0; // the form version of the TES4 record, which is 0 where records have none
 
         ReaderContext mCtx;
 
@@ -170,6 +179,11 @@ namespace ESM4
 
         // Bytes of the current record that the last getSubRecordHeader() had not read when it was called.
         std::uint32_t mUnreadRecordBytes = 0;
+
+        // The sub-records the last getSubRecordHeader() skipped, because a XXXX sub-record gave them an extended size.
+        std::vector<ExtendedSubRecord> mExtendedSubRecords;
+
+        bool readSubRecordHeader();
 
         void buildLStringIndex(LocalizedStringType stringType, std::string_view prefix);
 
@@ -261,6 +275,10 @@ namespace ESM4
         inline bool hasFormVersion() const { return mCtx.recHeaderSize == sizeof(RecordHeader); }
         inline unsigned int formVersion() const { return mCtx.recordHeader.record.version; }
 
+        // Whether the file is one of Fallout 3 or New Vegas, as opposed to Oblivion, Skyrim or Fallout 4, which have
+        // records of the same types with other sub-records. It does not depend on the record that was read last.
+        bool isFalloutFile() const;
+
         void buildLStringIndex();
         void getLocalizedString(std::string& str);
 
@@ -319,6 +337,12 @@ namespace ESM4
         // Note: recordStart must come from getContext() called right after the record header was read
         void skipFailedRecord(const ReaderContext& recordStart);
 
+        // Go back to the first sub-record of the current record, to read it a second time. A compressed record is
+        // inflated again if getRecordData() has not been called for it.
+        // Note: recordStart must come from getContext() called right after the record header was read, and the
+        // record data must not have been given up since (by skipFailedRecord() or by reading the next header)
+        void rewindRecordData(const ReaderContext& recordStart);
+
         // Skip the remaining part of the group
         // Note: assumes the header was read correctly and group was pushed onto the stack
         void skipGroupData();
@@ -329,7 +353,13 @@ namespace ESM4
         void skipGroup();
 
         // Read 6 bytes of header. The caller can then decide whether to process or skip the data.
+        // Note: a sub-record that a XXXX sub-record gave an extended size is skipped together with the XXXX, and the
+        // header of the sub-record after it is returned, see skippedExtendedSubRecords()
         bool getSubRecordHeader();
+
+        // The type and the extended size of each sub-record that the last getSubRecordHeader() skipped. They come
+        // before the sub-record that it returned, if it returned one.
+        inline const std::vector<ExtendedSubRecord>& skippedExtendedSubRecords() const { return mExtendedSubRecords; }
 
         // Manally update (i.e. increase) the bytes read after SUB_XXXX
         inline void updateRecordRead(std::uint32_t subSize) { mCtx.recordRead += subSize; }

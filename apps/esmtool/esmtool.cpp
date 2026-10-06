@@ -56,6 +56,10 @@ Allowed modes:
   comp   Compares the given files.
   census Counts the records of a TES4-format file (Oblivion to Fallout 4) by type
          and reports the ones that fail to parse. Prints no record contents.
+  survey Lists which sub-records (four character codes, how often, which data
+         sizes, in which order) the records of one or more TES4-format files
+         hold, optionally only for some record types (--type) or only for the
+         records a loader rejects (--failed). Prints no record contents.
 
 Allowed options)");
         auto addOption = desc.add_options();
@@ -69,7 +73,7 @@ Allowed options)");
         // with other modes including clone, dump, and raw.
         addOption("type,t", bpo::value<std::vector<std::string>>(),
             "Show only records of this type (four character record code).  May "
-            "be specified multiple times.  Only affects dump mode.");
+            "be specified multiple times.  Only affects dump and survey modes.");
         addOption("name,n", bpo::value<std::string>(), "Show only the record with this name.  Only affects dump mode.");
         addOption("plain,p",
             "Print contents of dialogs, books and scripts. "
@@ -77,6 +81,7 @@ Allowed options)");
             "Only affects dump mode.");
         addOption("quiet,q", "Suppress all record information. Useful for speed tests.");
         addOption("loadcells,C", "Browse through contents of all cells.");
+        addOption("failed", "Survey only the records that a loader rejects.  Only affects survey mode.");
 
         addOption("encoding,e", bpo::value<std::string>(&(info.encoding))->default_value("win1252"),
             "Character encoding used in ESMTool:\n"
@@ -96,7 +101,7 @@ Allowed options)");
         addHiddenOption("input-file,i", bpo::value<Files::MaybeQuotedPathContainer>(), "input file");
 
         bpo::positional_options_description p;
-        p.add("mode", 1).add("input-file", 2);
+        p.add("mode", 1).add("input-file", -1);
 
         // there might be a better way to do this
         bpo::options_description all;
@@ -139,7 +144,8 @@ Allowed options)");
             info.name = variables["name"].as<std::string>();
 
         info.mode = variables["mode"].as<std::string>();
-        if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"))
+        if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
+                || info.mode == "survey"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -161,8 +167,16 @@ Allowed options)");
               }*/
 
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
+        // Only a survey takes any number of files, the other modes take an input file and an output file.
+        if (info.mode != "survey" && inputFiles.size() > 2)
+        {
+            std::cout << "\nERROR: more than two files specified\n\n";
+            std::cout << desc << finalText << std::endl;
+            return false;
+        }
         info.filename = inputFiles[0].u8string(); // This call to u8string is redundant, but required to build on
                                                   // MSVC 14.26 due to implementation bugs.
+        info.inputFiles.assign(inputFiles.begin(), inputFiles.end());
         if (inputFiles.size() > 1)
             info.outname = inputFiles[1].u8string(); // This call to u8string is redundant, but required to build on
                                                      // MSVC 14.26 due to implementation bugs.
@@ -173,6 +187,7 @@ Allowed options)");
         info.quiet_given = variables.count("quiet") != 0;
         info.loadcells_given = variables.count("loadcells") != 0;
         info.plain_given = variables.count("plain") != 0;
+        info.failed_given = variables.count("failed") != 0;
 
         // Font encoding settings
         info.encoding = variables["encoding"].as<std::string>();
@@ -204,6 +219,8 @@ int main(int argc, char** argv)
 
         if (info.mode == "dump" || info.mode == "census")
             return load(info, nullptr);
+        else if (info.mode == "survey")
+            return surveyTes4(info);
         else if (info.mode == "clone")
             return clone(info);
         else if (info.mode == "comp")

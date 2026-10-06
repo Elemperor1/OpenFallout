@@ -36,6 +36,18 @@ namespace ESM4Test
         return result;
     }
 
+    /// Build a subrecord that is longer than a 16-bit size can say: a XXXX subrecord with the size, then a subrecord
+    /// whose header says that it has no data, then the data.
+    inline std::string extendedSubRecord(std::string_view type, std::string_view data)
+    {
+        std::string size;
+        append<std::uint32_t>(size, static_cast<std::uint32_t>(data.size()));
+        std::string result = subRecord("XXXX", size);
+        result.append(subRecord(type, ""));
+        result.append(data);
+        return result;
+    }
+
     /// Build a subrecord containing text followed by a null terminator.
     inline std::string zString(std::string_view type, std::string_view text)
     {
@@ -51,6 +63,30 @@ namespace ESM4Test
         return subRecord(type, data);
     }
 
+    /// Bytes that are all different, so that a field that holds them can be told from its neighbours.
+    inline std::string bytePattern(std::size_t size, std::uint8_t first)
+    {
+        std::string result(size, '\0');
+        for (std::size_t i = 0; i < size; ++i)
+            result[i] = static_cast<char>(first + i);
+        return result;
+    }
+
+    /// The data of a CTDA subrecord as Fallout 3 and New Vegas write it, 28 bytes.
+    inline std::string conditionData(
+        std::uint32_t type, float comparison, std::uint32_t function, std::uint32_t reference)
+    {
+        std::string data;
+        append(data, type);
+        append(data, comparison);
+        append(data, function);
+        append<std::uint32_t>(data, 7); // first parameter
+        append<std::uint32_t>(data, 8); // second parameter
+        append<std::uint32_t>(data, 1); // run on
+        append(data, reference);
+        return data;
+    }
+
     /// Wrap raw subrecords in an Oblivion record header with the given type, form ID and flags.
     inline std::string record(std::string_view type, std::uint32_t id, std::string_view data, std::uint32_t flags = 0)
     {
@@ -59,6 +95,21 @@ namespace ESM4Test
         append<std::uint32_t>(result, flags);
         append<std::uint32_t>(result, id);
         append<std::uint32_t>(result, 0); // revision
+        result.append(data);
+        return result;
+    }
+
+    /// Wrap raw subrecords in the 24 byte record header of Fallout 3 and the games after it, which has a form version.
+    inline std::string versionedRecord(
+        std::string_view type, std::uint32_t id, std::string_view data, std::uint16_t formVersion)
+    {
+        std::string result(type);
+        append<std::uint32_t>(result, static_cast<std::uint32_t>(data.size()));
+        append<std::uint32_t>(result, 0); // flags
+        append<std::uint32_t>(result, id);
+        append<std::uint32_t>(result, 0); // revision
+        append<std::uint16_t>(result, formVersion);
+        append<std::uint16_t>(result, 0); // version control information
         result.append(data);
         return result;
     }

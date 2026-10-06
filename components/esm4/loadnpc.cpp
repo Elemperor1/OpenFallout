@@ -29,9 +29,32 @@
 #include <cstring>
 #include <stdexcept>
 #include <string> // getline
+#include <vector>
 
 #include "reader.hpp"
 //#include "writer.hpp"
+
+namespace
+{
+    // The face generation coefficients of 17 characters in the Tale of Two Wastelands plugins are sub-records with no
+    // data at all, which reads as no coefficients. Anything between that and the full count is not a layout any game
+    // has.
+    void readCoefficients(ESM4::Reader& reader, std::vector<float>& coefficients, std::size_t count)
+    {
+        const std::uint32_t size = reader.subRecordHeader().dataSize;
+        coefficients.clear();
+        if (size == 0)
+            return;
+        if (size != count * sizeof(float))
+        {
+            const std::string name = ESM::printName(reader.subRecordHeader().typeId);
+            throw std::runtime_error("ESM4::NPC_::load - " + name + " has an unexpected size");
+        }
+        coefficients.resize(count);
+        for (float& coefficient : coefficients)
+            reader.get(coefficient);
+    }
+}
 
 void ESM4::Npc::load(ESM4::Reader& reader)
 {
@@ -190,29 +213,14 @@ void ESM4::Npc::load(ESM4::Reader& reader)
                 reader.getFormId(mBaseTemplate);
                 break;
             case ESM::fourCC("FGGS"):
-            {
-                mSymShapeModeCoefficients.resize(50);
-                for (std::size_t i = 0; i < 50; ++i)
-                    reader.get(mSymShapeModeCoefficients.at(i));
-
+                readCoefficients(reader, mSymShapeModeCoefficients, 50);
                 break;
-            }
             case ESM::fourCC("FGGA"):
-            {
-                mAsymShapeModeCoefficients.resize(30);
-                for (std::size_t i = 0; i < 30; ++i)
-                    reader.get(mAsymShapeModeCoefficients.at(i));
-
+                readCoefficients(reader, mAsymShapeModeCoefficients, 30);
                 break;
-            }
             case ESM::fourCC("FGTS"):
-            {
-                mSymTextureModeCoefficients.resize(50);
-                for (std::size_t i = 0; i < 50; ++i)
-                    reader.get(mSymTextureModeCoefficients.at(i));
-
+                readCoefficients(reader, mSymTextureModeCoefficients, 50);
                 break;
-            }
             case ESM::fourCC("FNAM"):
             {
                 reader.get(mFgRace);

@@ -205,6 +205,7 @@ namespace ESM4
         getRecordHeader();
         if (mCtx.recordHeader.record.typeId == REC_TES4)
         {
+            mFileFormVersion = hasFormVersion() ? formVersion() : 0;
             mHeader.load(*this);
             mCtx.fileRead += mCtx.recordHeader.record.dataSize;
 
@@ -297,6 +298,18 @@ namespace ESM4
     void Reader::setRecHeaderSize(const std::size_t size)
     {
         mCtx.recHeaderSize = size;
+    }
+
+    bool Reader::isFalloutFile() const
+    {
+        const unsigned int version = esmVersion();
+        if (version == ESM::VER_132 || version == ESM::VER_133 || version == ESM::VER_134)
+            return true;
+        // Fallout 3 has the header version of Skyrim LE. The records cannot tell them apart, because Skyrim.esm has
+        // records with form versions from 14 on, but the TES4 record of a file has the form version of the game: 15
+        // in Fallout 3 and 43 or more in Skyrim LE.
+        constexpr unsigned int firstSkyrimFormVersion = 40;
+        return version == ESM::VER_094 && hasFormVersion() && mFileFormVersion < firstSkyrimFormVersion;
     }
 
     void Reader::buildLStringIndex()
@@ -536,11 +549,12 @@ namespace ESM4
             const std::uint32_t recordSize = mCtx.recordHeader.record.dataSize - sizeof(std::uint32_t);
             std::vector<char> compressed(recordSize);
             mStream->read(compressed.data(), recordSize);
-            mSavedStream = std::move(mStream);
 
-            mCtx.recordHeader.record.dataSize = uncompressedSize - sizeof(uncompressedSize);
-
+            // Inflate before the file stream is put aside, so that it stays in use if the data does not inflate.
             auto memoryStreamPtr = decompress(position, compressed, uncompressedSize);
+
+            mSavedStream = std::move(mStream);
+            mCtx.recordHeader.record.dataSize = uncompressedSize - sizeof(uncompressedSize);
 
             // For debugging only
             // #if 0
@@ -590,7 +604,30 @@ namespace ESM4
         mCtx.recordRead = mCtx.recordHeader.record.dataSize; // for getSubRecordHeader()
     }
 
+    void Reader::rewindRecordData(const ReaderContext& recordStart)
+    {
+        mStream->clear();
+        if (mSavedStream)
+        {
+            // The data was inflated, and the inflated stream starts with the first sub-record.
+            mStream->seekg(0);
+        }
+        else
+        {
+            mStream->seekg(recordStart.filePos + static_cast<std::streamoff>(recordStart.recHeaderSize));
+            if ((mCtx.recordHeader.record.flags & Rec_Compressed) != 0)
+                getRecordData();
+        }
+        mCtx.recordRead = 0; // for getSubRecordHeader()
+    }
+
     bool Reader::getSubRecordHeader()
+    {
+        mExtendedSubRecords.clear();
+        return readSubRecordHeader();
+    }
+
+    bool Reader::readSubRecordHeader()
     {
         bool result = false;
         // The size of a compressed record is 4 bytes below the size of its data, see getRecordData()
@@ -598,7 +635,7 @@ namespace ESM4
         const std::uint32_t recordEnd = mCtx.recordHeader.record.dataSize + slack;
         mUnreadRecordBytes = mCtx.recordRead < recordEnd ? recordEnd - mCtx.recordRead : 0;
         // NOTE: some SubRecords have 0 dataSize (e.g. SUB_RDSD in one of REC_REGN records in Oblivion.esm).
-        if (recordEnd - mCtx.recordRead >= sizeof(mCtx.subRecordHeader))
+        if (mUnreadRecordBytes >= sizeof(mCtx.subRecordHeader))
         {
             result = getExact(mCtx.subRecordHeader);
             // HACK: below assumes sub-record data will be read or skipped in full;
@@ -625,12 +662,13 @@ namespace ESM4
         {
             std::uint32_t extDataSize;
             get(extDataSize);
-            if (!getSubRecordHeader())
+            if (!readSubRecordHeader())
                 return false;
 
+            mExtendedSubRecords.push_back({ mCtx.subRecordHeader.typeId, extDataSize });
             skipSubRecordData(extDataSize);
             mCtx.recordRead += extDataSize - mCtx.subRecordHeader.dataSize;
-            return getSubRecordHeader();
+            return readSubRecordHeader();
         }
 
         return result;

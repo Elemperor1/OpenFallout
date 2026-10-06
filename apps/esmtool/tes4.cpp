@@ -5,9 +5,11 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <set>
 
 #include <components/debug/writeflags.hpp>
 #include <components/esm/esmcommon.hpp>
+#include <components/esm/format.hpp>
 #include <components/esm/path.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
@@ -15,7 +17,10 @@
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
+#include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
+#include <components/files/conversion.hpp>
+#include <components/files/openfile.hpp>
 #include <components/toutf8/toutf8.hpp>
 
 namespace EsmTool
@@ -30,7 +35,7 @@ namespace EsmTool
 
             /// Derive quiet mode from the command and retain an optional, non-owning script census pointer.
             explicit Params(const Arguments& info, ESM4::Census* census = nullptr)
-                : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census")
+                : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census" || info.mode == "survey")
                 , mCensus(census)
             {
             }
@@ -198,6 +203,18 @@ namespace EsmTool
             std::cout << '\n';
         }
 
+        /// Load the current record as T if the file is one of Fallout 3 or New Vegas, as readTypedRecord does. The
+        /// loaders that only know the layouts of those games are not used for the records of other games. Return false
+        /// and read nothing for those.
+        template <class T>
+        bool readFalloutRecord(const Params& params, ESM4::Reader& reader)
+        {
+            if (!reader.isFalloutFile())
+                return false;
+            readTypedRecord<T>(params, reader);
+            return true;
+        }
+
         bool readRecord(const Params& params, ESM4::Reader& reader)
         {
             switch (static_cast<ESM4::RecordTypes>(reader.hdr().record.typeId))
@@ -214,6 +231,8 @@ namespace EsmTool
                     readTypedRecord<ESM4::Activator>(params, reader);
                     return true;
                 case ESM4::REC_ADDN:
+                    if (readFalloutRecord<ESM4::AddonNode>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_ALCH:
                     readTypedRecord<ESM4::Potion>(params, reader);
@@ -221,6 +240,8 @@ namespace EsmTool
                 case ESM4::REC_ALOC:
                     readTypedRecord<ESM4::MediaLocationController>(params, reader);
                     return true;
+                case ESM4::REC_AMEF:
+                    break;
                 case ESM4::REC_AMMO:
                     readTypedRecord<ESM4::Ammunition>(params, reader);
                     return true;
@@ -244,6 +265,8 @@ namespace EsmTool
                 case ESM4::REC_ASTP:
                     break;
                 case ESM4::REC_AVIF:
+                    if (readFalloutRecord<ESM4::ActorValueInfo>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_BOOK:
                     readTypedRecord<ESM4::Book>(params, reader);
@@ -252,12 +275,20 @@ namespace EsmTool
                     readTypedRecord<ESM4::BodyPartData>(params, reader);
                     return true;
                 case ESM4::REC_CAMS:
+                    if (readFalloutRecord<ESM4::CameraShot>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_CCRD:
+                    break;
+                case ESM4::REC_CDCK:
                     break;
                 case ESM4::REC_CELL:
                     readTypedRecord<ESM4::Cell>(params, reader);
                     return true;
+                case ESM4::REC_CHAL:
+                    break;
+                case ESM4::REC_CHIP:
+                    break;
                 case ESM4::REC_CLAS:
                     readTypedRecord<ESM4::Class>(params, reader);
                     return true;
@@ -265,6 +296,8 @@ namespace EsmTool
                     readTypedRecord<ESM4::Colour>(params, reader);
                     return true;
                 case ESM4::REC_CLMT:
+                    if (readFalloutRecord<ESM4::Climate>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_CLOT:
                     readTypedRecord<ESM4::Clothing>(params, reader);
@@ -279,13 +312,23 @@ namespace EsmTool
                     readTypedRecord<ESM4::Container>(params, reader);
                     return true;
                 case ESM4::REC_CPTH:
+                    if (readFalloutRecord<ESM4::CameraPath>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_CREA:
                     readTypedRecord<ESM4::Creature>(params, reader);
                     return true;
+                case ESM4::REC_CSNO:
+                    break;
                 case ESM4::REC_CSTY:
+                    if (readFalloutRecord<ESM4::CombatStyle>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_DEBR:
+                    if (readFalloutRecord<ESM4::Debris>(params, reader))
+                        return true;
+                    break;
+                case ESM4::REC_DEHY:
                     break;
                 case ESM4::REC_DIAL:
                     readTypedRecord<ESM4::Dialogue>(params, reader);
@@ -303,14 +346,20 @@ namespace EsmTool
                 case ESM4::REC_DUAL:
                     break;
                 case ESM4::REC_ECZN:
+                    if (readFalloutRecord<ESM4::EncounterZone>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_EFSH:
+                    if (readFalloutRecord<ESM4::EffectShader>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_ENCH:
                     break;
                 case ESM4::REC_EQUP:
                     break;
                 case ESM4::REC_EXPL:
+                    if (readFalloutRecord<ESM4::Explosion>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_EYES:
                     readTypedRecord<ESM4::Eyes>(params, reader);
@@ -350,6 +399,8 @@ namespace EsmTool
                 case ESM4::REC_HDPT:
                     readTypedRecord<ESM4::HeadPart>(params, reader);
                     return true;
+                case ESM4::REC_HUNG:
+                    break;
                 case ESM4::REC_IDLE:
                     readTypedRecord<ESM4::IdleAnimation>(params, reader);
                     return true;
@@ -358,8 +409,12 @@ namespace EsmTool
                     readTypedRecord<ESM4::IdleMarker>(params, reader);
                     return true;
                 case ESM4::REC_IMAD:
+                    if (readFalloutRecord<ESM4::ImageSpaceModifier>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_IMGS:
+                    if (readFalloutRecord<ESM4::ImageSpace>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_IMOD:
                     readTypedRecord<ESM4::ItemMod>(params, reader);
@@ -371,8 +426,12 @@ namespace EsmTool
                     readTypedRecord<ESM4::Ingredient>(params, reader);
                     return true;
                 case ESM4::REC_IPCT:
+                    if (readFalloutRecord<ESM4::ImpactData>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_IPDS:
+                    if (readFalloutRecord<ESM4::ImpactDataSet>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_KEYM:
                     readTypedRecord<ESM4::Key>(params, reader);
@@ -393,6 +452,12 @@ namespace EsmTool
                     readTypedRecord<ESM4::Light>(params, reader);
                     return true;
                 case ESM4::REC_LSCR:
+                    if (readFalloutRecord<ESM4::LoadScreen>(params, reader))
+                        return true;
+                    break;
+                case ESM4::REC_LSCT:
+                    if (readFalloutRecord<ESM4::LoadScreenType>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_LTEX:
                     readTypedRecord<ESM4::LandTexture>(params, reader);
@@ -416,6 +481,10 @@ namespace EsmTool
                 case ESM4::REC_MESG:
                     break;
                 case ESM4::REC_MGEF:
+                    break;
+                case ESM4::REC_MICN:
+                    if (readFalloutRecord<ESM4::MenuIcon>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_MISC:
                     readTypedRecord<ESM4::MiscItem>(params, reader);
@@ -462,6 +531,8 @@ namespace EsmTool
                 case ESM4::REC_PHZD:
                     break;
                 case ESM4::REC_PROJ:
+                    if (readFalloutRecord<ESM4::Projectile>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_PWAT:
                     readTypedRecord<ESM4::PlaceableWater>(params, reader);
@@ -472,6 +543,12 @@ namespace EsmTool
                 case ESM4::REC_RACE:
                     readTypedRecord<ESM4::Race>(params, reader);
                     return true;
+                case ESM4::REC_RADS:
+                    break;
+                case ESM4::REC_RCCT:
+                    break;
+                case ESM4::REC_RCPE:
+                    break;
                 case ESM4::REC_REFR:
                     readTypedRecord<ESM4::Reference>(params, reader);
                     return true;
@@ -480,9 +557,15 @@ namespace EsmTool
                     return true;
                 case ESM4::REC_RELA:
                     break;
+                case ESM4::REC_REPU:
+                    break;
                 case ESM4::REC_REVB:
                     break;
                 case ESM4::REC_RFCT:
+                    break;
+                case ESM4::REC_RGDL:
+                    if (readFalloutRecord<ESM4::Ragdoll>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_ROAD:
                     readTypedRecord<ESM4::Road>(params, reader);
@@ -509,6 +592,8 @@ namespace EsmTool
                 case ESM4::REC_SLGM:
                     readTypedRecord<ESM4::SoulGem>(params, reader);
                     return true;
+                case ESM4::REC_SLPD:
+                    break;
                 case ESM4::REC_SMBN:
                     break;
                 case ESM4::REC_SMEN:
@@ -548,8 +633,12 @@ namespace EsmTool
                     readTypedRecord<ESM4::TextureSet>(params, reader);
                     return true;
                 case ESM4::REC_VTYP:
+                    if (readFalloutRecord<ESM4::VoiceType>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_WATR:
+                    if (readFalloutRecord<ESM4::Water>(params, reader))
+                        return true;
                     break;
                 case ESM4::REC_WEAP:
                     readTypedRecord<ESM4::Weapon>(params, reader);
@@ -560,6 +649,8 @@ namespace EsmTool
                     readTypedRecord<ESM4::World>(params, reader);
                     return true;
                 case ESM4::REC_WTHR:
+                    if (readFalloutRecord<ESM4::Weather>(params, reader))
+                        return true;
                     break;
             }
 
@@ -644,5 +735,49 @@ namespace EsmTool
             std::cout << "\nERROR:\n\n  " << e.what() << std::endl;
             return -1;
         }
+    }
+    /// Survey every file named on the command line, as one list of sub-records, and print it to standard output.
+    /// Return 0 when every file was read to its end, or -1 if one could not be opened or read.
+    int surveyTes4(const Arguments& info)
+    {
+        ESM4::Survey survey(std::set<std::string>(info.types.begin(), info.types.end()), info.failed_given);
+        const Params params(info);
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
+        int result = 0;
+
+        for (const std::filesystem::path& path : info.inputFiles)
+        {
+            const std::string name = Files::pathToUnicodeString(path.filename());
+            try
+            {
+                auto stream = Files::openBinaryInputFileStream(path);
+                if (!stream->is_open())
+                {
+                    std::cout << "Failed to open file " << name << ": " << std::generic_category().message(errno)
+                              << '\n';
+                    result = -1;
+                    continue;
+                }
+                if (ESM::readFormat(*stream) != ESM::Format::Tes4)
+                {
+                    std::cout << "Survey mode only supports TES4-format files: " << name << '\n';
+                    result = -1;
+                    continue;
+                }
+                stream->seekg(0);
+
+                ESM4::Reader reader(std::move(stream), path, nullptr, &encoder, true);
+                survey.collect(reader, [&params](ESM4::Reader& r) { return readRecord(params, r); });
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "\nERROR in " << name << ":\n\n  " << e.what() << std::endl;
+                result = -1;
+            }
+        }
+
+        std::cout << "Surveyed " << info.inputFiles.size() << " files\n\n";
+        survey.write(std::cout);
+        return survey.getFatalErrors().empty() ? result : -1;
     }
 }
