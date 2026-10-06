@@ -60,6 +60,9 @@ SCENARIOS = [
 
 WALK_SECONDS = 12
 
+# The eight cells around the exterior cell 0,0 that the player starts in.
+NEIGHBOURS = [(x, y) for x in (-1, 0, 1) for y in (-1, 0, 1) if (x, y) != (0, 0)]
+
 # What the engine logs about the lighting of the cell: its own ambient and sun colours and fog near distance, and the
 # fog colour and far distance that it takes from its lighting template.
 LIGHTING_LINE = ("Cell lighting: ambient {}, directional {}, fog {}, fog range {:.6f} to {:.6f}".format(
@@ -167,6 +170,14 @@ def check(text, scenario):
         problems.append("the engine did not make placeholder records, so the content had a player record")
     if f"Loading cell {scenario.loaded}" not in text:
         problems.append(f"the engine did not load the cell {scenario.loaded}")
+    if scenario.exterior:
+        # The worldspace has one cell record, so the engine makes the cells around it. Each must be loaded once, under
+        # its own coordinates: two made cells that shared an id would load one of them twice and the other never.
+        loaded = re.findall(rf"Loading cell {plugin.WORLD_NAME} \((-?\d+), (-?\d+)\)", text)
+        for dx, dy in NEIGHBOURS:
+            if loaded.count((str(dx), str(dy))) != 1:
+                problems.append(f"the cell {plugin.WORLD_NAME} ({dx}, {dy}) next to the start was loaded "
+                                f"{loaded.count((str(dx), str(dy)))} times, expected once")
     if scenario.lit and LIGHTING_LINE not in text:
         lines = [line.split("]", 1)[-1].strip() for line in text.splitlines() if "Cell lighting" in line]
         problems.append(f"the log has no line '{LIGHTING_LINE}', the lighting of the cell is: {lines or 'not logged'}")
