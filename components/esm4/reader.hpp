@@ -168,6 +168,9 @@ namespace ESM4
 
         bool mIgnoreMissingLocalizedStrings = false;
 
+        // Bytes of the current record that the last getSubRecordHeader() had not read when it was called.
+        std::uint32_t mUnreadRecordBytes = 0;
+
         void buildLStringIndex(LocalizedStringType stringType, std::string_view prefix);
 
         void buildLStringIndex(LocalizedStringType stringType, std::istream& stream);
@@ -341,6 +344,15 @@ namespace ESM4
             const std::uint32_t slack = (mCtx.recordHeader.record.flags & Rec_Compressed) != 0 ? 4 : 0;
             return mCtx.recordRead <= mCtx.recordHeader.record.dataSize + slack;
         }
+
+        // How many bytes of the current record were still unread when the last getSubRecordHeader() was called. A
+        // record that is read in full leaves none. getSubRecordHeader() also returns false when fewer bytes are left
+        // than a sub-record header, and when the file ends inside the header, so only this tells that apart from the
+        // end of the record.
+        // Note: the size of a compressed record is 4 bytes low, which is allowed for (see subRecordFitsRecord()), but
+        // a last sub-record of 9 bytes or less in a compressed record is not seen by getSubRecordHeader() and is
+        // counted here
+        inline std::uint32_t unreadRecordBytes() const { return mUnreadRecordBytes; }
 
         // Skip the data part of a subrecord
         // Note: assumes the header was read correctly and nothing else was read

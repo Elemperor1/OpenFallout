@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -215,6 +216,62 @@ namespace
         {
             EXPECT_THAT(e.what(), HasSubstr("longer than its record"));
         }
+    }
+
+    /// Verify bytes that are too few for another sub-record header at the end of a record are refused, not ignored.
+    TEST(ESM4FactionTest, rejectsBytesLeftOverAfterTheLastSubrecord)
+    {
+        const std::string edid = zString("EDID", "Left");
+
+        for (const std::size_t extra : { 1u, 3u, 5u })
+            EXPECT_THAT(loadFailure(edid + std::string(extra, '\x01')), HasSubstr("unread bytes")) << extra;
+    }
+
+    /// Verify a file that ends inside the header of the next sub-record is refused, not read as a complete record.
+    TEST(ESM4FactionTest, rejectsAFileThatEndsInsideASubrecordHeader)
+    {
+        // The record promises the whole header of an XNAM and the file ends after three of its six bytes.
+        std::string header = "XNAM";
+        append<std::uint16_t>(header, 12);
+        const std::string data = zString("EDID", "Cut") + header;
+
+        try
+        {
+            loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 3);
+            FAIL() << "the cut header was accepted";
+        }
+        catch (const std::exception& e)
+        {
+            EXPECT_THAT(e.what(), HasSubstr("unread bytes"));
+        }
+    }
+
+    /// Verify records that end exactly at their last sub-record are not mistaken for records that end too early: a
+    /// plain one, a compressed one and one that ends with a sub-record that has no bytes.
+    TEST(ESM4FactionTest, acceptsRecordsThatEndExactlyAtTheirLastSubrecord)
+    {
+        const std::string data = zString("EDID", "Exact") + subRecord("DATA", "\x01") + relation(0x000a0001, 1, 0);
+        const std::string emptyTitle
+            = zString("EDID", "Empty") + valueSubRecord<std::int32_t>("RNAM", 0) + subRecord("MNAM", "");
+
+        EXPECT_EQ(loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data)).size(), 1u);
+        EXPECT_EQ(loadRecords<ESM4::Faction>("FACT", compressedRecord("FACT", 1, data)).size(), 1u);
+        EXPECT_EQ(loadRecords<ESM4::Faction>("FACT", record("FACT", 1, emptyTitle)).size(), 1u);
+    }
+
+    /// Verify a compressed record whose last sub-record is too short for the reader to see is refused, not read
+    /// without it. The reader takes the end of a compressed record to be 4 bytes early, so it stops before a last
+    /// sub-record of 9 bytes or less.
+    TEST(ESM4FactionTest, rejectsACompressedRecordWhoseLastSubrecordTheReaderDoesNotSee)
+    {
+        const std::string data = zString("EDID", "Short") + relation(0x000a0001, 1, 0) + subRecord("DATA", "\x01");
+
+        EXPECT_THAT([&] { loadRecords<ESM4::Faction>("FACT", compressedRecord("FACT", 1, data)); },
+            ThrowsMessage<std::runtime_error>(HasSubstr("unread bytes")));
+        // The same record is read in full when it is not compressed.
+        const std::vector<ESM4::Faction> plain = loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data));
+        ASSERT_EQ(plain.size(), 1u);
+        EXPECT_EQ(plain.front().mFactionFlags, 1);
     }
 
     /// Verify a file that ends inside a field is refused, not read as zeros.

@@ -593,6 +593,9 @@ namespace ESM4
     bool Reader::getSubRecordHeader()
     {
         bool result = false;
+        const std::uint32_t slack = (mCtx.recordHeader.record.flags & Rec_Compressed) != 0 ? 4 : 0;
+        const std::uint64_t recordEnd = static_cast<std::uint64_t>(mCtx.recordHeader.record.dataSize) + slack;
+        mUnreadRecordBytes = mCtx.recordRead < recordEnd ? static_cast<std::uint32_t>(recordEnd - mCtx.recordRead) : 0;
         // NOTE: some SubRecords have 0 dataSize (e.g. SUB_RDSD in one of REC_REGN records in Oblivion.esm).
         if (mCtx.recordHeader.record.dataSize - mCtx.recordRead >= sizeof(mCtx.subRecordHeader))
         {

@@ -71,8 +71,8 @@ namespace ESM4
         std::vector<Rank> mRanks; // RNAM, MNAM, FNAM and INAM
         ESM::FormId mReputation; // WMI1, a REPU record, New Vegas only
 
-        /// Throws on unknown subrecords, on sizes that no known version of the record has, and on a rank title that
-        /// has no RNAM before it.
+        /// Throws on unknown subrecords, on sizes that no known version of the record has, on a rank title that has no
+        /// RNAM before it, and on bytes of the record that no sub-record accounts for.
         void load(ESM4::Reader& reader);
 
         static constexpr ESM::RecNameInts sRecordId = ESM::REC_FACT4;

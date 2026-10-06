@@ -105,5 +105,10 @@ namespace ESM4
                     throw std::runtime_error("ESM4::FACT::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
             }
         }
+
+        // getSubRecordHeader() also returns false for bytes that are too few for another header and for a file that
+        // ends inside one, which would otherwise read as a faction that is complete.
+        if (reader.unreadRecordBytes() != 0)
+            fail("record has unread bytes after its last sub-record");
     }
 }
