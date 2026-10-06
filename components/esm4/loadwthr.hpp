@@ -10,6 +10,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "alternatetexture.hpp"
+
 namespace ESM4
 {
     class Reader;
@@ -61,7 +63,7 @@ namespace ESM4
         ESM::Path mModel; // MODL, the model
         float mBoundRadius = 0; // MODB
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
-        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::vector<AlternateTexture> mModelAlternateTextures; // MODS
         std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         std::array<ESM::FormId, 6> mImageSpaceModifiers; // \x00IAD and others, IMAD records for sunrise, day, sunset,
                                                          // night, high noon and midnight

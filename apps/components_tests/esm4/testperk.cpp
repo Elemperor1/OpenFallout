@@ -283,4 +283,53 @@ namespace
                 "ESM4::PERK::load - EPFD has an unexpected size")
                 << int(type);
     }
+
+    TEST(ESM4PerkTest, readsFunctionDataOfATypeTheFormatReferenceDoesNotList)
+    {
+        const std::vector<ESM4::Perk> perks = loadRecords<ESM4::Perk>("PERK",
+            record("PERK", 1, functionData(9, bytePattern(3, 1)) + functionData(9, "") + functionData(200, "ab")));
+
+        ASSERT_EQ(perks.size(), 1u);
+        ASSERT_EQ(perks[0].mEntries.size(), 3u);
+        EXPECT_EQ(perks[0].mEntries[0].mFunctionType, 9);
+        EXPECT_EQ(perks[0].mEntries[0].mFunctionData.size(), 3u);
+        EXPECT_TRUE(perks[0].mEntries[1].mFunctionData.empty());
+        EXPECT_EQ(perks[0].mEntries[2].mFunctionType, 200);
+        EXPECT_EQ(perks[0].mEntries[2].mFunctionData.size(), 2u);
+    }
+
+    TEST(ESM4PerkTest, readsTheRunOnOfAConditionGroupAsASignedByte)
+    {
+        const std::vector<ESM4::Perk> perks = loadRecords<ESM4::Perk>("PERK",
+            record("PERK", 1, subRecord("PRKE", bytePattern(3, 1)) + valueSubRecord<std::uint8_t>("PRKC", 0xFF)));
+
+        ASSERT_EQ(perks.size(), 1u);
+        ASSERT_EQ(perks[0].mEntries.size(), 1u);
+        ASSERT_EQ(perks[0].mEntries[0].mConditionGroups.size(), 1u);
+        EXPECT_EQ(perks[0].mEntries[0].mConditionGroups[0].mRunOn, -1);
+    }
+
+    TEST(ESM4PerkTest, adjustsTheFormIdsToTheLoadOrder)
+    {
+        const std::string quest
+            = subRecord("PRKE", std::string("\x00\x01\x02", 3)) + subRecord("DATA", questStageData());
+        const std::string nullQuest
+            = subRecord("PRKE", std::string("\x00\x01\x02", 3)) + subRecord("DATA", std::string(8, '\0'));
+        const std::string ability
+            = subRecord("PRKE", std::string("\x01\x01\x02", 3)) + valueSubRecord<std::uint32_t>("DATA", 0x00000006);
+        std::string leveled;
+        append<std::uint32_t>(leveled, 0x00000008);
+        const std::string condition = subRecord("CTDA", conditionData(0x40, 1.f, 14, 0x00000009));
+
+        const std::vector<ESM4::Perk> perks = loadRecords<ESM4::Perk>("PERK",
+            record("PERK", 1, condition + quest + nullQuest + ability + functionData(3, leveled)), 0, nullptr, 3);
+
+        ASSERT_EQ(perks.size(), 1u);
+        EXPECT_EQ(perks[0].mConditions[0].reference, 0x03000009u);
+        ASSERT_EQ(perks[0].mEntries.size(), 4u);
+        EXPECT_EQ(perks[0].mEntries[0].mQuest, (ESM::FormId{ 0x10005, 3 }));
+        EXPECT_EQ(perks[0].mEntries[1].mQuest.toUint32(), 0u);
+        EXPECT_EQ(perks[0].mEntries[2].mAbility, (ESM::FormId{ 6, 3 }));
+        EXPECT_EQ(perks[0].mEntries[3].mLeveledItem, (ESM::FormId{ 8, 3 }));
+    }
 }

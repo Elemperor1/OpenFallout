@@ -14,12 +14,14 @@ namespace ESM4
                 return true;
             case ESM::fourCC("EFIT"):
             {
-                // The size is checked before the position, so that a size no game uses is reported as such.
+                // EFID is optional in the format reference, so an EFIT that does not follow an EFID without data of its
+                // own is an effect that has no base effect.
                 EffectData data;
                 in.value(data);
-                if (effects.empty())
-                    in.fail("EFIT comes before EFID");
+                if (effects.empty() || effects.back().mHasData)
+                    effects.emplace_back();
                 effects.back().mData = data;
+                effects.back().mHasData = true;
                 return true;
             }
             case ESM::fourCC("CTDA"):

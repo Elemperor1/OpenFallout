@@ -133,9 +133,54 @@ namespace
             "ESM4::ENCH::load - record has unread bytes after its last sub-record");
     }
 
-    TEST(ESM4EnchantmentTest, rejectsAnEffectThatComesBeforeItsId)
+    TEST(ESM4EnchantmentTest, readsEffectsWhoseIdIsMissingOrWhoseDataIsMissing)
     {
-        EXPECT_EQ(loadFailure(subRecord("EFIT", dataEffect(1))), "ESM4::ENCH::load - EFIT comes before EFID");
+        // EFID is optional in the format reference. An EFIT starts an effect of its own unless the last effect has an
+        // EFID and no EFIT yet.
+        const auto records = loadRecords<ESM4::Enchantment>("ENCH",
+            record("ENCH", 1,
+                subRecord("EFIT", dataEffect(1)) + subRecord("EFIT", dataEffect(10))
+                    + valueSubRecord<std::uint32_t>("EFID", 0x00010001) + subRecord("EFIT", dataEffect(20))
+                    + valueSubRecord<std::uint32_t>("EFID", 0x00010002)
+                    + valueSubRecord<std::uint32_t>("EFID", 0x00010003) + subRecord("EFIT", dataEffect(30))));
+
+        ASSERT_EQ(records.size(), 1u);
+        const std::vector<ESM4::EffectEntry>& effects = records[0].mEffects;
+        ASSERT_EQ(effects.size(), 5u);
+        EXPECT_TRUE(effects[0].mHasData);
+        EXPECT_TRUE(effects[0].mBaseEffect.isZeroOrUnset());
+        EXPECT_EQ(effects[0].mData.mMagnitude, 100001u);
+        EXPECT_TRUE(effects[1].mHasData);
+        EXPECT_TRUE(effects[1].mBaseEffect.isZeroOrUnset());
+        EXPECT_EQ(effects[1].mData.mMagnitude, 100010u);
+        EXPECT_EQ(effects[2].mBaseEffect.toUint32(), 0x00010001u);
+        EXPECT_EQ(effects[2].mData.mMagnitude, 100020u);
+        EXPECT_EQ(effects[3].mBaseEffect.toUint32(), 0x00010002u);
+        EXPECT_FALSE(effects[3].mHasData);
+        EXPECT_EQ(effects[4].mBaseEffect.toUint32(), 0x00010003u);
+        EXPECT_EQ(effects[4].mData.mMagnitude, 100030u);
+    }
+
+    TEST(ESM4EnchantmentTest, adjustsTheFormIdsOfItsEffectsToTheLoadOrder)
+    {
+        const auto records = loadRecords<ESM4::Enchantment>("ENCH",
+            record("ENCH", 1,
+                subRecord("CTDA", conditionData(0x40, 1.f, 14, 0x00000009))
+                    + valueSubRecord<std::uint32_t>("EFID", 0x00000123) + subRecord("EFIT", dataEffect(1))
+                    + subRecord("CTDA", conditionData(0x40, 1.f, 14, 0x00000008))
+                    + subRecord("CTDA", conditionData(0x40, 1.f, 14, 0)) + valueSubRecord<std::uint32_t>("EFID", 0)
+                    + subRecord("EFIT", dataEffect(2))),
+            0, nullptr, 3);
+
+        ASSERT_EQ(records.size(), 1u);
+        ASSERT_EQ(records[0].mConditions.size(), 1u);
+        EXPECT_EQ(records[0].mConditions[0].reference, 0x03000009u);
+        ASSERT_EQ(records[0].mEffects.size(), 2u);
+        EXPECT_EQ(records[0].mEffects[0].mBaseEffect, (ESM::FormId{ 0x123, 3 }));
+        ASSERT_EQ(records[0].mEffects[0].mConditions.size(), 2u);
+        EXPECT_EQ(records[0].mEffects[0].mConditions[0].reference, 0x03000008u);
+        EXPECT_EQ(records[0].mEffects[0].mConditions[1].reference, 0u);
+        EXPECT_EQ(records[0].mEffects[1].mBaseEffect.toUint32(), 0u);
     }
 
     TEST(ESM4EnchantmentTest, keepsAConditionThatComesBeforeTheFirstEffect)

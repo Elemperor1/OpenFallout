@@ -7,6 +7,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "alternatetexture.hpp"
+
 namespace ESM4
 {
     class RecordReader;
@@ -43,7 +45,7 @@ namespace ESM4
     {
         ESM::Path mModel; // DMDL
         std::vector<std::uint8_t> mTextures; // DMDT, texture hashes, not decoded
-        std::vector<std::uint8_t> mAlternateTextures; // DMDS, not decoded
+        std::vector<AlternateTexture> mAlternateTextures; // DMDS
     };
 
     /// The destruction data of a record: DEST, then for each stage DSTD with its optional models and DSTF.

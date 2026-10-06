@@ -94,6 +94,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testimagespacemodifier.cpp
     esm4/testimpactdata.cpp
     esm4/testimpactdataset.cpp
+    esm4/testloadorder.cpp
     esm4/testloadscreen.cpp
     esm4/testloadscreentype.cpp
     esm4/testmagiceffect.cpp

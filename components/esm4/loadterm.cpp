@@ -26,6 +26,8 @@
 */
 #include "loadterm.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <stdexcept>
 
 #include "reader.hpp"
@@ -41,10 +43,57 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
     // because the loader is shared with the later games, whose menu items are different.
     RecordReader in(reader, "TERM");
 
+    // The sub-records of a menu item come in this order: ITXT, RNAM, ANAM, INAM, TNAM, the script and CTDA. ITXT is
+    // optional in the format reference, so a sub-record that is not after the one that the item last had starts the
+    // next item.
+    enum ItemPart
+    {
+        Part_Text,
+        Part_Result,
+        Part_Flags,
+        Part_Note,
+        Part_SubMenu,
+        Part_Script,
+        Part_Condition,
+    };
+    int lastPart = Part_Condition;
+    const auto startItem = [&](ItemPart part) -> MenuItem& {
+        if (mMenuItems.empty() || part <= lastPart)
+            mMenuItems.emplace_back();
+        lastPart = part;
+        return mMenuItems.back();
+    };
+    // A string that can be localized. The reader cannot read a string that has no bytes at all, which is empty.
+    const auto itemString = [&](std::string& value) {
+        if (in.size() == 0)
+            value.clear();
+        else
+            reader.getLocalizedString(value);
+    };
+
     while (reader.getSubRecordHeader())
     {
         const ESM4::SubRecordHeader& subHdr = reader.subRecordHeader();
         // The script of a menu item follows its ANAM and INAM
+        switch (subHdr.typeId)
+        {
+            case ESM::fourCC("SCHR"):
+                // A script has one header, so another one is the script of the next item.
+                if (subHdr.dataSize == sizeof(ScriptHeader))
+                    startItem(Part_Script);
+                break;
+            case ESM::fourCC("SCDA"):
+            case ESM::fourCC("SCTX"):
+            case ESM::fourCC("SLSD"):
+            case ESM::fourCC("SCVR"):
+            case ESM::fourCC("SCRO"):
+            case ESM::fourCC("SCRV"):
+                if (!mMenuItems.empty())
+                    lastPart = std::max<int>(lastPart, Part_Script);
+                break;
+            default:
+                break;
+        }
         if (!mMenuItems.empty() && mMenuItems.back().mScript.loadSubRecord(reader))
             continue;
 
@@ -54,10 +103,10 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 reader.getZString(mEditorId);
                 break;
             case ESM::fourCC("FULL"):
-                reader.getLocalizedString(mFullName);
+                itemString(mFullName);
                 break;
             case ESM::fourCC("DESC"):
-                reader.getLocalizedString(mText);
+                itemString(mText);
                 break;
             case ESM::fourCC("SCRI"):
                 reader.getFormId(mScriptId);
@@ -76,34 +125,47 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 reader.getZString(mModel);
                 break;
             case ESM::fourCC("ITXT"):
-                reader.getLocalizedString(mMenuItems.emplace_back().mText);
+                mMenuItems.emplace_back();
+                lastPart = Part_Text;
+                itemString(mMenuItems.back().mText);
                 break;
             case ESM::fourCC("RNAM"):
-                reader.getZString(mResultText);
-                if (!mMenuItems.empty())
-                    mMenuItems.back().mResultText = mResultText;
+            {
+                MenuItem& item = startItem(Part_Result);
+                in.string(mResultText);
+                item.mResultText = mResultText;
                 break;
+            }
             case ESM::fourCC("ANAM"):
-                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(std::uint8_t))
-                    reader.get(mMenuItems.back().mFlags);
+                if (subHdr.dataSize == sizeof(std::uint8_t))
+                    reader.get(startItem(Part_Flags).mFlags);
                 else
                     reader.skipSubRecordData();
                 break;
             case ESM::fourCC("INAM"):
-                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(ESM::FormId32))
-                    in.formId(mMenuItems.back().mDisplayNote);
+                if (subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(startItem(Part_Note).mDisplayNote);
                 else
                     reader.skipSubRecordData();
                 break;
             case ESM::fourCC("TNAM"):
-                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(ESM::FormId32))
-                    in.formId(mMenuItems.back().mSubMenu);
+                if (subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(startItem(Part_SubMenu).mSubMenu);
                 else
                     reader.skipSubRecordData();
                 break;
             case ESM::fourCC("CTDA"):
-                if (subHdr.dataSize == sizeof(TargetCondition))
-                    in.condition((mMenuItems.empty() ? mConditions : mMenuItems.back().mConditions).emplace_back());
+                // The conditions of the record come before its first menu item.
+                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn))
+                {
+                    if (mMenuItems.empty())
+                        in.conditionOrOlder(mConditions.emplace_back());
+                    else
+                    {
+                        lastPart = Part_Condition;
+                        in.conditionOrOlder(mMenuItems.back().mConditions.emplace_back());
+                    }
+                }
                 else
                     reader.skipSubRecordData();
                 break;

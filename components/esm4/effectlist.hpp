@@ -29,14 +29,16 @@ namespace ESM4
     /// CTDA sub-records that follow are the conditions under which it applies.
     struct EffectEntry
     {
-        ESM::FormId mBaseEffect; // EFID, an MGEF
+        ESM::FormId mBaseEffect; // EFID, an MGEF; null when the effect has no EFID
         EffectData mData; // EFIT
+        bool mHasData = false; // whether the effect has an EFIT
         std::vector<TargetCondition> mConditions; // CTDA
     };
 
     /// Reads the current sub-record if it is EFID, EFIT or CTDA, which spells and enchantments hold in the order EFID,
     /// EFIT, CTDA*, and returns true. Returns false and reads nothing for any other sub-record. A CTDA before the
-    /// first EFID is added to `leadingConditions`; an EFIT before the first EFID throws.
+    /// first effect is added to `leadingConditions`. EFID starts an effect; EFIT fills the effect that has an EFID and
+    /// no EFIT yet, and starts one without a base effect otherwise.
     bool readEffectSubRecord(
         RecordReader& in, std::vector<EffectEntry>& effects, std::vector<TargetCondition>& leadingConditions);
 }

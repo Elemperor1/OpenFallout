@@ -199,6 +199,7 @@ add_component_dir (esmterrain
 
 add_component_dir (esm4
     actor
+    alternatetexture
     cellgrid
     census
     common

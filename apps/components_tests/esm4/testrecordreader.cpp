@@ -47,6 +47,7 @@ namespace
         ESM4::TargetCondition mCondition{};
         std::vector<std::uint8_t> mSized;
         ESM4::RawSubRecord mRaw;
+        std::vector<ESM4::AlternateTexture> mTextures;
 
         void load(ESM4::Reader& reader)
         {
@@ -90,6 +91,9 @@ namespace
                         break;
                     case ESM::fourCC("RAWS"):
                         in.raw(mRaw);
+                        break;
+                    case ESM::fourCC("MODS"):
+                        in.alternateTextures(mTextures);
                         break;
                     default:
                         in.unknown();
@@ -248,6 +252,44 @@ namespace
         std::uint32_t global = 1;
         std::memcpy(&global, &sample.mCondition.comparison, sizeof(global));
         EXPECT_EQ(global, 0u);
+    }
+
+    TEST(ESM4RecordReaderTest, readsAlternateTexturesAndAdjustsTheirTextures)
+    {
+        const std::vector<Sample> samples = loadRecords<Sample>("SMPL",
+            record("SMPL", 1,
+                subRecord("MODS", alternateTextureData({ { "Part", 0x00000123, 4 }, { "", 0, -1 } }))
+                    + subRecord("MODS", alternateTextureData({}))),
+            0, nullptr, 3);
+
+        ASSERT_EQ(samples.size(), 1u);
+        ASSERT_EQ(samples[0].mTextures.size(), 2u);
+        EXPECT_EQ(samples[0].mTextures[0].mName, "Part");
+        EXPECT_EQ(samples[0].mTextures[0].mTexture, (ESM::FormId{ 0x123, 3 }));
+        EXPECT_EQ(samples[0].mTextures[0].mIndex, 4);
+        // A texture that is null stays null.
+        EXPECT_EQ(samples[0].mTextures[1].mName, "");
+        EXPECT_EQ(samples[0].mTextures[1].mTexture.toUint32(), 0u);
+        EXPECT_EQ(samples[0].mTextures[1].mIndex, -1);
+    }
+
+    TEST(ESM4RecordReaderTest, rejectsAlternateTexturesWhoseSizesDoNotAddUp)
+    {
+        const std::string good = alternateTextureData({ { "Part", 0x00000123, 4 } });
+        EXPECT_EQ(loadFailure(subRecord("MODS", "")), "ESM4::SMPL::load - MODS has an unexpected size");
+        EXPECT_EQ(loadFailure(subRecord("MODS", good.substr(0, good.size() - 1))),
+            "ESM4::SMPL::load - MODS has an unexpected size");
+        EXPECT_EQ(loadFailure(subRecord("MODS", good + "x")), "ESM4::SMPL::load - MODS has an unexpected size");
+
+        // A count that the sub-record is too short for.
+        std::string tooMany = good;
+        tooMany[0] = 2;
+        EXPECT_EQ(loadFailure(subRecord("MODS", tooMany)), "ESM4::SMPL::load - MODS has an unexpected size");
+
+        // A name whose length runs past the sub-record.
+        std::string longName = good;
+        longName[4] = 100;
+        EXPECT_EQ(loadFailure(subRecord("MODS", longName)), "ESM4::SMPL::load - MODS has an unexpected size");
     }
 
     TEST(ESM4RecordReaderTest, rejectsAListWhoseSizeIsNotAWholeNumberOfItems)

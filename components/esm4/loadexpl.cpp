@@ -46,7 +46,7 @@ namespace ESM4
                     in.value(mBoundRadius);
                     break;
                 case ESM::fourCC("MODS"):
-                    in.bytes(mModelAlternateTextures);
+                    in.alternateTextures(mModelAlternateTextures);
                     break;
                 case ESM::fourCC("MODD"):
                     in.value(mModelFlags);

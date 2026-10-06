@@ -10,6 +10,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "alternatetexture.hpp"
 #include "destruction.hpp"
 #include "objectbounds.hpp"
 
@@ -33,7 +34,7 @@ namespace ESM4
         std::string mSmallIcon; // MICO
         float mBoundRadius = 0; // MODB
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
-        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::vector<AlternateTexture> mModelAlternateTextures; // MODS
         std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         Destruction mDestruction; // DEST, DSTD, DMDL, DMDT, DMDS and DSTF
 

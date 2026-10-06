@@ -113,7 +113,7 @@ namespace ESM4
                 }
                 case ESM::fourCC("PRKC"):
                 {
-                    std::uint8_t runOn;
+                    std::int8_t runOn;
                     in.value(runOn);
                     if (mEntries.empty())
                         in.fail("PRKC comes before PRKE");

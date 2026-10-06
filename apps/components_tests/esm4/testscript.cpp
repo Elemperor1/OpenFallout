@@ -41,8 +41,8 @@ namespace
         return subRecord("SCHR", data);
     }
 
-    /// Build an SLSD local variable followed by the SCVR subrecord containing its name.
-    std::string localVariable(std::uint32_t index, std::string_view name)
+    /// Build an SLSD local variable.
+    std::string localVariableData(std::uint32_t index)
     {
         std::string data;
         append(data, index);
@@ -51,7 +51,13 @@ namespace
         append<std::uint32_t>(data, 0);
         append<std::uint32_t>(data, 1); // type
         append<std::uint32_t>(data, 0);
-        return subRecord("SLSD", data) + zString("SCVR", name);
+        return subRecord("SLSD", data);
+    }
+
+    /// Build an SLSD local variable followed by the SCVR subrecord containing its name.
+    std::string localVariable(std::uint32_t index, std::string_view name)
+    {
+        return localVariableData(index) + zString("SCVR", name);
     }
 
     /// Build a FO3/FONV CTDA condition comparing the given function on the subject to 1.
@@ -106,6 +112,36 @@ namespace
         EXPECT_EQ(definition.references[2].formId.mIndex, 0x0a0002u);
 
         EXPECT_TRUE(definition.isConsistent());
+    }
+
+    /// Verify a null script reference stays null, and the others are adjusted to the load order.
+    TEST(ESM4ScriptTest, keepsANullReferenceNullAndAdjustsTheOthers)
+    {
+        const std::string data = scriptHeader(2, 0, 0) + valueSubRecord<std::uint32_t>("SCRO", 0)
+            + valueSubRecord<std::uint32_t>("SCRO", 0x00000123);
+
+        const std::vector<ESM4::Script> scripts
+            = loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data), 0, nullptr, 3);
+
+        ASSERT_EQ(scripts.size(), 1u);
+        ASSERT_EQ(scripts[0].mScript.references.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.references[0].formId.toUint32(), 0u);
+        EXPECT_TRUE(scripts[0].mScript.references[0].formId.isZeroOrUnset());
+        EXPECT_EQ(scripts[0].mScript.references[1].formId, (ESM::FormId{ 0x123, 3 }));
+    }
+
+    /// Verify a local variable whose name sub-record has no bytes at all has an empty name.
+    TEST(ESM4ScriptTest, readsALocalVariableWithoutAName)
+    {
+        const std::string data
+            = scriptHeader(0, 0, 2) + localVariableData(1) + subRecord("SCVR", "") + localVariable(2, "iNext");
+
+        const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data));
+
+        ASSERT_EQ(scripts.size(), 1u);
+        ASSERT_EQ(scripts[0].mScript.localVarData.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.localVarData[0].variableName, "");
+        EXPECT_EQ(scripts[0].mScript.localVarData[1].variableName, "iNext");
     }
 
     /// Verify a source-only script loads with empty bytecode and references and consistent counts.

@@ -33,7 +33,7 @@ namespace ESM4
         struct ConditionGroup
         {
             bool mHasRunOn = false;
-            std::uint8_t mRunOn = 0;
+            std::int8_t mRunOn = 0; // int8 in the format reference
             std::vector<TargetCondition> mConditions;
         };
 

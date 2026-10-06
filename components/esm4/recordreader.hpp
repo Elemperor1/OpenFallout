@@ -14,6 +14,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "alternatetexture.hpp"
 #include "reader.hpp"
 #include "script.hpp"
 
@@ -104,6 +105,11 @@ namespace ESM4
 
         // A sub-record that holds a whole number of form IDs, which are added to `values`.
         void formIds(std::vector<ESM::FormId>& values);
+
+        // The alternate textures of a model (MODS and the like, DMDS): a count, then for each a name that has its
+        // length before it, a texture and an index. The sizes must add up to the size of the sub-record exactly, and
+        // the texture is adjusted to the load order the way formId() does.
+        void alternateTextures(std::vector<AlternateTexture>& values);
 
         // A CTDA of Fallout 3 and New Vegas: its reference, and its comparison value when that is a global variable,
         // are adjusted to the load order. The parameters are not, because which of them are form IDs depends on the

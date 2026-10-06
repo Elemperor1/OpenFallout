@@ -50,7 +50,7 @@ namespace ESM4
                     in.bytes(stageModel().mTextures);
                     break;
                 case ESM::fourCC("DMDS"):
-                    in.bytes(stageModel().mAlternateTextures);
+                    in.alternateTextures(stageModel().mAlternateTextures);
                     break;
                 case ESM::fourCC("DSTF"):
                     in.expectSize(0);
@@ -71,7 +71,7 @@ namespace ESM4
                     in.value(mBoundRadius);
                     break;
                 case ESM::fourCC("MODS"):
-                    in.bytes(mModelAlternateTextures);
+                    in.alternateTextures(mModelAlternateTextures);
                     break;
                 case ESM::fourCC("MODD"):
                     in.value(mModelFlags);

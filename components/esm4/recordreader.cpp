@@ -91,6 +91,44 @@ namespace ESM4
         }
     }
 
+    void RecordReader::alternateTextures(std::vector<AlternateTexture>& values)
+    {
+        std::vector<std::uint8_t> data;
+        bytes(data);
+
+        std::size_t position = 0;
+        const auto read = [&](void* out, std::size_t count) {
+            if (data.size() - position < count)
+                badSize();
+            std::memcpy(out, data.data() + position, count);
+            position += count;
+        };
+
+        std::uint32_t count = 0;
+        read(&count, sizeof(count));
+        // Each entry has at least the length of its name, the texture and the index.
+        constexpr std::size_t minimumEntrySize = 3 * sizeof(std::uint32_t);
+        if (count > (data.size() - position) / minimumEntrySize)
+            badSize();
+        for (; count > 0; --count)
+        {
+            AlternateTexture& value = values.emplace_back();
+            std::uint32_t nameLength = 0;
+            read(&nameLength, sizeof(nameLength));
+            if (data.size() - position < nameLength)
+                badSize();
+            value.mName.assign(reinterpret_cast<const char*>(data.data()) + position, nameLength);
+            position += nameLength;
+            ESM::FormId32 texture = 0;
+            read(&texture, sizeof(texture));
+            adjustReference(texture);
+            value.mTexture = ESM::FormId::fromUint32(texture);
+            read(&value.mIndex, sizeof(value.mIndex));
+        }
+        if (position != data.size())
+            badSize();
+    }
+
     void RecordReader::condition(TargetCondition& value)
     {
         this->value(value, &TargetCondition::reference);

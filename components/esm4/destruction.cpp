@@ -30,7 +30,7 @@ namespace ESM4
                 in.bytes(stageModel().mTextures);
                 return true;
             case ESM::fourCC("DMDS"):
-                in.bytes(stageModel().mAlternateTextures);
+                in.alternateTextures(stageModel().mAlternateTextures);
                 return true;
             case ESM::fourCC("DSTF"):
                 in.expectSize(0);

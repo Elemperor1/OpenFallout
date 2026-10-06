@@ -22,7 +22,7 @@ namespace ESM4
                     in.string(mFullName);
                     break;
                 case ESM::fourCC("DATA"):
-                    in.value(mData);
+                    in.value(mData, &Data::mCurrency, &Data::mWinningsQuest);
                     break;
                 case ESM::fourCC("MODL"):
                     in.string(mModels.emplace_back());
@@ -41,6 +41,19 @@ namespace ESM4
                     break;
                 case ESM::fourCC("ICO2"):
                     in.string(mIcons2.emplace_back());
+                    break;
+                case ESM::fourCC("MODB"):
+                case ESM::fourCC("MODT"):
+                case ESM::fourCC("MODS"):
+                case ESM::fourCC("MODD"):
+                case ESM::fourCC("MO2T"):
+                case ESM::fourCC("MO2S"):
+                case ESM::fourCC("MO3T"):
+                case ESM::fourCC("MO3S"):
+                case ESM::fourCC("MOSD"):
+                case ESM::fourCC("MO4T"):
+                case ESM::fourCC("MO4S"):
+                    in.raw(mModelData.emplace_back());
                     break;
                 default:
                     in.unknown();
