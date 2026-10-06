@@ -31,6 +31,7 @@ namespace ESM4
 
         std::string mEditorId; // EDID
         std::string mIcon; // ICON
+        std::string mSmallIcon; // MICO, New Vegas only
         std::string mDescription; // DESC
         std::vector<Location> mLocations; // LNAM, where the load screen is used
         ESM::FormId mLoadScreenType; // WMI1, an LSCT, New Vegas only

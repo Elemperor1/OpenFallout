@@ -167,6 +167,13 @@ Allowed options)");
               }*/
 
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
+        // Only a survey takes any number of files, the other modes take an input file and an output file.
+        if (info.mode != "survey" && inputFiles.size() > 2)
+        {
+            std::cout << "\nERROR: more than two files specified\n\n";
+            std::cout << desc << finalText << std::endl;
+            return false;
+        }
         info.filename = inputFiles[0].u8string(); // This call to u8string is redundant, but required to build on
                                                   // MSVC 14.26 due to implementation bugs.
         info.inputFiles.assign(inputFiles.begin(), inputFiles.end());

@@ -27,15 +27,16 @@ namespace
 
     std::string everySubRecord()
     {
-        return zString("EDID", "Text of EDID") + zString("ICON", "Text of ICON") + zString("DESC", "Text of DESC")
-            + subRecord("LNAM", dataLocations(4)) + subRecord("LNAM", dataLocations(14))
-            + valueSubRecord<std::uint32_t>("WMI1", 0x00010005);
+        return zString("EDID", "Text of EDID") + zString("ICON", "Text of ICON") + zString("MICO", "Text of MICO")
+            + zString("DESC", "Text of DESC") + subRecord("LNAM", dataLocations(4))
+            + subRecord("LNAM", dataLocations(14)) + valueSubRecord<std::uint32_t>("WMI1", 0x00010005);
     }
 
     void expectEverySubRecord(const ESM4::LoadScreen& result)
     {
         EXPECT_EQ(result.mEditorId, "Text of EDID");
         EXPECT_EQ(result.mIcon, "Text of ICON");
+        EXPECT_EQ(result.mSmallIcon, "Text of MICO");
         EXPECT_EQ(result.mDescription, "Text of DESC");
         ASSERT_EQ(result.mLocations.size(), 2u);
         EXPECT_EQ(result.mLocations[0].mDirect, 0x00010004u);
