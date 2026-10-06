@@ -8,6 +8,7 @@
 - **1,550,732 records (99.3%) have a loader and 11,224 have none.** The gap is in the number of record types, not in the volume. The big types (`REFR`, `CELL`, `LAND`, `INFO`, `DIAL`, `NAVM`, `PACK`, `NPC_`, `SCPT`) are all parsed.
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
+- **Update 2026-10-06: `FACT` now has a loader** (PR #10) and none of its 2,528 records in the 20 plugins fails. The tables below were made before it and still show `FACT` as having no loader, so the counts in this list and in the tables are the first runs'. See "Faction records".
 - **Tale of Two Wastelands: 17 `NPC_` records fail to load, and no unparsed record type is new.** The four TTW plugins hold 1,279,509 records after their headers. Every failure is an `NPC_` record: three are unknown subrecords (`DLVT` twice, `LSNA` once) and the other 14 are loader errors for which the census withholds the message. Every `NPC_` record in the vanilla `Fallout3.esm` and `FalloutNV.esm` loads, so the failing records exist only in the TTW-patched files. The files came from a community installer and were not checked against reference hashes, so the failures may come from the installer instead of from TTW's data.
 - **Compiled scripts line up with their headers, except for the variable count.** The 16 plugins hold 16,180 `INFO`, 2,437 `QUST` and 6,035 `SCPT` scripts, with 3.1 MB of bytecode. In every script the compiled size in the header equals the bytecode read, and the reference count equals the references read in all but one source-only `INFO` script. The header's variable count does not equal the number of local variables read: it is above the highest declared index in 449 scripts. See "Scripts held by records".
 
@@ -381,6 +382,39 @@ Each script has a header with three numbers (compiled size, reference count, var
 - **`SLSD` index order cannot be assumed.** No script has index 0. 14 `SCPT` scripts repeat an index (`Fallout3.esm` 2, `PointLookout.esm` 1, `Zeta.esm` 1, `FalloutNV.esm` 10). 915 of the 4,095 scripts with any `SLSD` entry list their indices out of ascending order (914 `SCPT`, 1 `QUST`); in 351 of those, the indices are exactly 1 to the entry count once sorted. Every `SCRV` entry points at an index that exists among the `SLSD` entries (checked on `Fallout3.esm`).
 
 So the compiled size and the reference table agree with the header in every installer-plugin script but one, which is what a virtual machine for the bytecode needs, and the variable count is the one number a virtual machine should not take from the header alone, because the header counts variables the record no longer declares.
+
+## Faction records
+
+Run on 2026-10-06 on the same Mac with the branch that adds the `FACT` loader (PR #10, commit `1d1ff5f2`; all 20 runs exited 0). The two later review commits on that branch only change how the `FULL` name string is read, and the census was not rerun for them. `Fallout3.esm` had 326 `FACT` records and `FalloutNV.esm` 682 in the "No parser" column of the first runs. They are now in "Parsed", every `FACT` record in all 20 plugins loads, and **no other cell of the main tables moved in any plugin**: the only differences from the earlier runs are the `FACT` rows and the totals row. The Failures lines are unchanged (the 17 `NPC_` records), and the "Scripts held in line by records" table is unchanged. The tables above this section are from the earlier runs, so they still show `FACT` as having no loader.
+
+| Plugin | `FACT` records | Failed | `XNAM` relations | With `CNAM` | With `WMI1` | With ranks | Most ranks in one record |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `Fallout3.esm` | 326 | 0 | 666 | 35 | 0 | 51 | 8 |
+| `Anchorage.esm` | 24 | 0 | 58 | 0 | 0 | 9 | 1 |
+| `BrokenSteel.esm` | 38 | 0 | 33 | 0 | 0 | 1 | 1 |
+| `PointLookout.esm` | 21 | 0 | 17 | 0 | 0 | 0 | - |
+| `ThePitt.esm` | 32 | 0 | 33 | 0 | 0 | 0 | - |
+| `Zeta.esm` | 10 | 0 | 40 | 0 | 0 | 1 | 5 |
+| `FalloutNV.esm` | 682 | 0 | 1,314 | 34 | 46 | 57 | 9 |
+| `DeadMoney.esm` | 14 | 0 | 17 | 0 | 0 | 0 | - |
+| `HonestHearts.esm` | 36 | 0 | 159 | 0 | 0 | 1 | 1 |
+| `OldWorldBlues.esm` | 25 | 0 | 29 | 0 | 0 | 0 | - |
+| `LonesomeRoad.esm` | 13 | 0 | 28 | 0 | 2 | 0 | - |
+| `GunRunnersArsenal.esm` | 2 | 0 | 0 | 0 | 0 | 0 | - |
+| **All 16** | **1,223** | **0** | **2,394** | **69** | **48** | **120** | **9** |
+| `TaleOfTwoWastelands.esm` | 588 | 0 | 1,270 | 0 | 39 | 59 | 8 |
+| `YUPTTW.esm` | 9 | 0 | 53 | 0 | 1 | 0 | - |
+| `Fallout3.esm` (TTW-patched) | 26 | 0 | 232 | 0 | 0 | 6 | 8 |
+| `FalloutNV.esm` (TTW-patched) | 682 | 0 | 1,314 | 0 | 46 | 57 | 9 |
+
+The four add-on packs (`ClassicPack.esm`, `CaravanPack.esm`, `MercenaryPack.esm`, `TribalPack.esm`) have no `FACT` records. The TTW rows are not added to the total, as with the scripts.
+
+What the 2,528 records show about the layout, which the loader was written from public format references and not from these files:
+
+- **Every one of the 5,263 `XNAM` sub-records is 12 bytes**, in `Fallout3.esm` too. The 8-byte layout that the references give for Fallout 3 does not occur in these plugins (it is Oblivion's), so the loader accepts both and the third value is part of every relation. Only the sizes were counted, so what Fallout 3 puts in that third value is not known; New Vegas names it the group combat reaction.
+- `DATA` is 1 byte in 103 records and 4 bytes in 2,425, never 2 or 3. `CNAM` is 4 bytes and appears in 69 records (35 in `Fallout3.esm`, 34 in `FalloutNV.esm`). `WMI1` is 4 bytes and appears in 134 records, all in New Vegas-based plugins. Every `RNAM` is 4 bytes.
+- 242 records have ranks and the most in one record is 9. No rank title has zero bytes, none comes before its `RNAM`, and no `FACT` sub-record type outside the loader's list occurs.
+- The Tale of Two Wastelands copies of `Fallout3.esm` and `FalloutNV.esm` have no `CNAM` at all, where the vanilla files have 35 and 34, although the `DATA` sizes in the TTW `FalloutNV.esm` equal the vanilla ones. This was not looked into.
 
 ## Notes
 

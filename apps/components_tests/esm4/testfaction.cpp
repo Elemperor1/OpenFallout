@@ -14,7 +14,7 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
-    /// Build an XNAM relation in the Fallout 3 layout, which stops after the modifier.
+    /// Build an XNAM relation in the 8 byte layout of older plugins, which stops after the modifier.
     std::string relation(std::uint32_t target, std::int32_t modifier)
     {
         std::string data;
@@ -23,7 +23,7 @@ namespace
         return subRecord("XNAM", data);
     }
 
-    /// Build an XNAM relation in the New Vegas layout, with the group combat reaction.
+    /// Build an XNAM relation in the 12 byte layout of Fallout 3 and New Vegas, with the group combat reaction.
     std::string relation(std::uint32_t target, std::int32_t modifier, std::uint32_t reaction)
     {
         std::string data;
@@ -57,11 +57,11 @@ namespace
         return {};
     }
 
-    /// Verify a Fallout 3 faction keeps its relations, flags and ranks in file order.
-    TEST(ESM4FactionTest, readsAFallout3Faction)
+    /// Verify a faction keeps its relations, flags and ranks in file order.
+    TEST(ESM4FactionTest, readsRelationsFlagsAndRanks)
     {
         const std::string data = zString("EDID", "TestFaction") + zString("FULL", "Test Faction")
-            + relation(0x000a0001, 10) + relation(0x000a0002, -20) + flags(0x05, 0x03)
+            + relation(0x000a0001, 10, 2) + relation(0x000a0002, -20, 0) + flags(0x05, 0x03)
             + valueSubRecord<float>("CNAM", 1.5f) + valueSubRecord<std::int32_t>("RNAM", 0)
             + zString("MNAM", "Initiate") + zString("FNAM", "Initiatrix") + zString("INAM", "icon.dds")
             + valueSubRecord<std::int32_t>("RNAM", 1) + zString("MNAM", "Knight");
@@ -75,7 +75,7 @@ namespace
         ASSERT_EQ(faction.mRelations.size(), 2u);
         EXPECT_EQ(faction.mRelations[0].mTarget.toUint32(), 0x000a0001u);
         EXPECT_EQ(faction.mRelations[0].mModifier, 10);
-        EXPECT_EQ(faction.mRelations[0].mGroupCombatReaction, ESM4::Faction::Reaction_Neutral);
+        EXPECT_EQ(faction.mRelations[0].mGroupCombatReaction, ESM4::Faction::Reaction_Ally);
         EXPECT_EQ(faction.mRelations[1].mTarget.toUint32(), 0x000a0002u);
         EXPECT_EQ(faction.mRelations[1].mModifier, -20);
         EXPECT_EQ(faction.mFactionFlags, ESM4::Faction::Flag_HiddenFromPlayer | ESM4::Faction::Flag_SpecialCombat);
@@ -93,8 +93,9 @@ namespace
         EXPECT_TRUE(faction.mReputation.isZeroOrUnset());
     }
 
-    /// Verify New Vegas relations keep the group combat reaction and the faction keeps its reputation.
-    TEST(ESM4FactionTest, readsTheGroupCombatReactionAndReputation)
+    /// Verify relations keep the group combat reaction, or have none in the 8 byte layout, and the faction keeps its
+    /// reputation.
+    TEST(ESM4FactionTest, readsBothRelationLayoutsAndTheReputation)
     {
         const std::string data = zString("EDID", "VegasFaction") + relation(0x000a0001, 0, 3) + relation(0x000a0002, 1)
             + relation(0x000a0003, -1, 1) + valueSubRecord<std::uint32_t>("WMI1", 0x000a0009);
@@ -113,7 +114,7 @@ namespace
     }
 
     /// Verify DATA with one or two bytes leaves the flags it does not hold at zero, and a faction can have none.
-    TEST(ESM4FactionTest, readsFlagsOfEveryKnownSize)
+    TEST(ESM4FactionTest, readsFlagsOfEverySupportedSize)
     {
         const std::string one = zString("EDID", "One") + subRecord("DATA", std::string("\x02", 1));
         const std::string two = zString("EDID", "Two") + subRecord("DATA", std::string("\x04\x01", 2));

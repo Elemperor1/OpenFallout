@@ -45,7 +45,7 @@ namespace ESM4
                     break;
                 case ESM::fourCC("XNAM"):
                 {
-                    // Fallout 3 stops after the modifier, New Vegas adds the group combat reaction.
+                    // Oblivion stops after the modifier. Every XNAM in the Fallout 3 and New Vegas plugins is 12 bytes.
                     if (subHdr.dataSize != 8 && subHdr.dataSize != 12)
                         fail("XNAM has an unexpected size");
                     Relation& relation = mRelations.emplace_back();
@@ -57,7 +57,8 @@ namespace ESM4
                 }
                 case ESM::fourCC("DATA"):
                 {
-                    // One byte of flags in the oldest plugins, two bytes of flags and two unused ones in the others.
+                    // The plugins of both games have one byte or four: two bytes of flags and two unused ones. The
+                    // flags come first, so a size in between is read the same way.
                     if (subHdr.dataSize < 1 || subHdr.dataSize > 4)
                         fail("DATA has an unexpected size");
                     std::uint8_t data[4] = {};

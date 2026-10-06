@@ -31,7 +31,9 @@ namespace ESM4
             Flag_AllowSell = 0x02
         };
 
-        // How the members of a faction react to a fight that involves a faction they know. Only New Vegas has it.
+        // How the members of a faction react to a fight that involves a faction they know. These are the names New
+        // Vegas gives the values. Every XNAM in the Fallout 3 and New Vegas plugins has the field, and what Fallout 3
+        // puts in it has not been checked.
         enum GroupCombatReaction : std::uint32_t
         {
             Reaction_Neutral = 0,
@@ -45,7 +47,7 @@ namespace ESM4
         {
             ESM::FormId mTarget; // a FACT or a RACE
             std::int32_t mModifier = 0;
-            std::uint32_t mGroupCombatReaction = Reaction_Neutral; // not in Fallout 3
+            std::uint32_t mGroupCombatReaction = Reaction_Neutral; // not in the 8 byte XNAM of older plugins
         };
 
         // RNAM starts a rank, MNAM, FNAM and INAM that follow belong to it.
