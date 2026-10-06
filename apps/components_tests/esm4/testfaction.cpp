@@ -273,9 +273,11 @@ namespace
         EXPECT_EQ(factions.front().mRelations.size(), 1u);
     }
 
-    /// Verify a file that ends one byte early, in the terminator of a string, is refused, not read as complete.
+    /// Verify a file that ends one byte early, in the terminator of a string, is refused, not read as complete. A
+    /// reader with an encoder reads strings by another path than one without, and the engine uses an encoder.
     TEST(ESM4FactionTest, rejectsAStringWhoseTerminatorTheFileEndsBefore)
     {
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
         const std::string edid = zString("EDID", "Cut");
         const std::vector<std::pair<std::string, std::string>> cases = {
             { "EDID", zString("EDID", "Name") },
@@ -283,18 +285,43 @@ namespace
             { "MNAM", edid + valueSubRecord<std::int32_t>("RNAM", 1) + zString("MNAM", "Title") },
         };
 
-        for (const auto& [type, data] : cases)
+        for (const ToUTF8::StatelessUtf8Encoder* reader :
+            { static_cast<const ToUTF8::StatelessUtf8Encoder*>(nullptr), &encoder })
         {
-            try
+            for (const auto& [type, data] : cases)
             {
-                loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 1);
-                ADD_FAILURE() << type << " cut before its terminator was accepted";
-            }
-            catch (const std::exception& e)
-            {
-                EXPECT_THAT(e.what(), HasSubstr("shorter than its size")) << type;
+                try
+                {
+                    loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 1, reader);
+                    ADD_FAILURE() << type << " cut before its terminator was accepted";
+                }
+                catch (const std::exception& e)
+                {
+                    EXPECT_THAT(e.what(), HasSubstr("shorter than its size"))
+                        << type << (reader ? " with encoder" : "");
+                }
             }
         }
+    }
+
+    /// Verify the strings of a faction are read without their terminator by a reader with an encoder as well.
+    TEST(ESM4FactionTest, readsStringsWithAnEncoder)
+    {
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        const std::string data = zString("EDID", "Coded") + zString("FULL", "Full Name")
+            + valueSubRecord<std::int32_t>("RNAM", 0) + zString("MNAM", "Boss") + zString("FNAM", "")
+            + subRecord("INAM", "");
+
+        const std::vector<ESM4::Faction> factions
+            = loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 0, &encoder);
+
+        ASSERT_EQ(factions.size(), 1u);
+        EXPECT_EQ(factions.front().mEditorId, "Coded");
+        EXPECT_EQ(factions.front().mFullName, "Full Name");
+        ASSERT_EQ(factions.front().mRanks.size(), 1u);
+        EXPECT_EQ(factions.front().mRanks.front().mMaleTitle, "Boss");
+        EXPECT_EQ(factions.front().mRanks.front().mFemaleTitle, "");
+        EXPECT_EQ(factions.front().mRanks.front().mInsignia, "");
     }
 
     /// Verify a file that ends inside a field is refused, not read as zeros.
@@ -312,16 +339,22 @@ namespace
             { "MNAM", edid + valueSubRecord<std::int32_t>("RNAM", 1) + zString("MNAM", "Title") },
         };
 
-        for (const auto& [type, data] : cases)
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        for (const ToUTF8::StatelessUtf8Encoder* reader :
+            { static_cast<const ToUTF8::StatelessUtf8Encoder*>(nullptr), &encoder })
         {
-            try
+            for (const auto& [type, data] : cases)
             {
-                loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 2);
-                ADD_FAILURE() << type << " cut by two bytes was accepted";
-            }
-            catch (const std::exception& e)
-            {
-                EXPECT_THAT(e.what(), HasSubstr("shorter than its size")) << type;
+                try
+                {
+                    loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 2, reader);
+                    ADD_FAILURE() << type << " cut by two bytes was accepted";
+                }
+                catch (const std::exception& e)
+                {
+                    EXPECT_THAT(e.what(), HasSubstr("shorter than its size"))
+                        << type << (reader ? " with encoder" : "");
+                }
             }
         }
     }
