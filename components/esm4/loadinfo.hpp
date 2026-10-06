@@ -75,7 +75,8 @@ namespace ESM4
         TargetCondition mTargetCondition;
         ESM::FormId mParam3; // TES5 only
 
-        ScriptDefinition mScript; // FIXME: ignoring the second one after the NEXT sub-record
+        ScriptDefinition mScript; // runs when the response starts (FO3/FONV)
+        ScriptDefinition mEndScript; // the script after the NEXT sub-record, runs when the response ends (FO3/FONV)
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

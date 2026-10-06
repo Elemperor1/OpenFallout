@@ -70,6 +70,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     esm4/includes.cpp
     esm4/testcensus.cpp
+    esm4/testscript.cpp
 
     fx/lexer.cpp
     fx/technique.cpp

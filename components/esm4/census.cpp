@@ -10,6 +10,9 @@
 
 #include <components/esm/common.hpp>
 
+#include "loadinfo.hpp"
+#include "loadqust.hpp"
+#include "loadscpt.hpp"
 #include "reader.hpp"
 #include "readerutils.hpp"
 
@@ -68,6 +71,48 @@ namespace ESM4
         }
     }
 
+    /// Accumulate script count, bytecode size and header mismatches for the owning record type.
+    /// Ignore blocks without bytecode, source, locals, references or declared bytecode/references.
+    void Census::addScript(const std::string& type, const ScriptDefinition& script)
+    {
+        const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
+            || script.scriptHeader.refCount != 0 || !script.scriptSource.empty() || !script.localVarData.empty()
+            || !script.references.empty();
+        if (!holdsScript)
+            return;
+
+        CensusScripts& scripts = mScripts[type];
+        ++scripts.mCount;
+        scripts.mBytecode += script.compiledScript.size();
+        if (!script.hasConsistentSize())
+            ++scripts.mWrongSize;
+        if (!script.hasConsistentReferences())
+            ++scripts.mWrongReferences;
+        if (!script.hasConsistentVariables())
+            ++scripts.mWrongVariables;
+    }
+
+    /// Add the loaded SCPT record's script to the census without retaining its contents.
+    void Census::addScripts(const Script& record)
+    {
+        addScript("SCPT", record.mScript);
+    }
+
+    /// Add both response scripts of a loaded INFO record to the census.
+    void Census::addScripts(const DialogInfo& record)
+    {
+        addScript("INFO", record.mScript);
+        addScript("INFO", record.mEndScript);
+    }
+
+    /// Add every stage log entry's script from a loaded QUST record to the census.
+    void Census::addScripts(const Quest& record)
+    {
+        for (const QuestStage& stage : record.mStages)
+            for (const QuestLogEntry& entry : stage.mLogEntries)
+                addScript("QUST", entry.mScript);
+    }
+
     void Census::collect(Reader& reader, const std::function<bool(Reader&)>& parse)
     {
         auto visitRecord = [&](Reader& r) {
@@ -104,6 +149,7 @@ namespace ESM4
         }
     }
 
+    /// Write record totals, bounded failure summaries, optional script totals and any fatal error.
     void Census::write(std::ostream& stream) const
     {
         CensusRecord total;
@@ -148,6 +194,19 @@ namespace ESM4
                 stream << "  " << failures[i].second << " x " << failures[i].first << '\n';
             if (failures.size() > shown)
                 stream << "  ... and " << failures.size() - shown << " more distinct messages\n";
+        }
+
+        if (!mScripts.empty())
+        {
+            stream << "\nScripts held in line by records:\n"
+                   << std::left << std::setw(typeWidth) << "Record" << std::right << std::setw(countWidth) << "Scripts"
+                   << std::setw(countWidth) << "Bytecode" << std::setw(countWidth) << "Bad size"
+                   << std::setw(countWidth) << "Bad refs" << std::setw(countWidth) << "Bad vars" << '\n';
+            for (const auto& [type, scripts] : mScripts)
+                stream << std::left << std::setw(typeWidth) << type << std::right << std::setw(countWidth)
+                       << scripts.mCount << std::setw(countWidth) << scripts.mBytecode << std::setw(countWidth)
+                       << scripts.mWrongSize << std::setw(countWidth) << scripts.mWrongReferences
+                       << std::setw(countWidth) << scripts.mWrongVariables << '\n';
         }
 
         if (!mFatalError.empty())

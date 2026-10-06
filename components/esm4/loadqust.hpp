@@ -50,6 +50,29 @@ namespace ESM4
     };
 #pragma pack(pop)
 
+    // One entry of a quest stage's log, which carries the text the player reads and the script that runs when the
+    // quest reaches the stage.
+    struct QuestLogEntry
+    {
+        enum LogFlags
+        {
+            Flag_CompleteQuest = 0x01,
+            Flag_FailQuest = 0x02
+        };
+
+        std::uint8_t mFlags = 0; // QSDT, see LogFlags
+        std::vector<TargetCondition> mTargetConditions; // CTDA that follow QSDT
+        std::string mText; // CNAM
+        ScriptDefinition mScript; // SCHR, SCDA and the rest, run when the quest reaches the stage
+        ESM::FormId mNextQuest; // NAM0
+    };
+
+    struct QuestStage
+    {
+        std::uint16_t mIndex = 0; // INDX
+        std::vector<QuestLogEntry> mLogEntries;
+    };
+
     struct Quest
     {
         // NOTE: these values are for TES4
@@ -70,9 +93,9 @@ namespace ESM4
 
         QuestData mData;
 
-        std::vector<TargetCondition> mTargetConditions;
+        std::vector<TargetCondition> mTargetConditions; // the conditions before the first stage
 
-        ScriptDefinition mScript;
+        std::vector<QuestStage> mStages;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

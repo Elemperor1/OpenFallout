@@ -367,14 +367,51 @@ namespace ESM4
         std::string variableName;
     };
 
+    // One entry of the table a compiled script uses to name things outside itself. The bytecode counts SCRO and SCRV
+    // entries together, in the order they appear in the record, so a reference in the bytecode is an index into
+    // ScriptDefinition::references and the two kinds cannot be told apart by their position.
+    struct ScriptReference
+    {
+        bool isVariable = false; // true for SCRV, false for SCRO
+        ESM::FormId formId; // SCRO: the object, quest, global variable or other record the script names
+        std::uint32_t variableIndex = 0; // SCRV: index of the local variable that holds the reference
+    };
+
+    class Reader;
+
+    // The script that a SCPT, INFO, QUST (one per log entry) or other record carries in line: a SCHR header, the
+    // compiled bytecode (SCDA), the source (SCTX), the local variables (SLSD and SCVR) and the reference table (SCRO
+    // and SCRV). A virtual machine that runs the bytecode needs all of it, because the bytecode names variables and
+    // references by index.
     struct ScriptDefinition
     {
-        ScriptHeader scriptHeader;
-        // SDCA compiled source
+        ScriptHeader scriptHeader{};
+        // SCTX: the text the script was compiled from. Not needed to run it.
         std::string scriptSource;
+        // SCDA: the compiled script. scriptHeader.compiledSize says how many bytes there should be.
+        std::vector<std::uint8_t> compiledScript;
         std::vector<ScriptLocalVariableData> localVarData;
-        std::vector<std::uint32_t> localRefVarIndex;
-        ESM::FormId globReference;
+        // SCRO and SCRV in file order. scriptHeader.refCount says how many there should be.
+        std::vector<ScriptReference> references;
+
+        /// Reads the current sub-record if it is one of SCHR, SCDA, SCTX, SLSD, SCVR, SCRO or SCRV and returns true.
+        /// Returns false and reads nothing for any other sub-record. Throws if the compiled script is cut short.
+        bool loadSubRecord(Reader& reader);
+
+        /// SCHR counts what the script holds, and these compare the counts with what was read.
+        /// The compiled size is the number of SCDA bytes.
+        bool hasConsistentSize() const;
+        /// The reference count is the number of SCRO and SCRV entries together.
+        bool hasConsistentReferences() const;
+        /// The variable count is not the number of SLSD entries. In the game files it is often higher, with indices
+        /// missing from the middle or the end, which looks like the highest index ever used and not the number of
+        /// variables the script has now. It is consistent when no variable has an index above it.
+        bool hasConsistentVariables() const;
+        /// Return whether all three SCHR consistency checks pass.
+        bool isConsistent() const;
+
+        /// The highest SLSD index, or 0 when the script has no local variables.
+        std::uint32_t highestVariableIndex() const;
     };
 }
 

@@ -130,6 +130,22 @@ What the columns mean:
 
 The exit status is 0 when the whole file was read and non-zero when reading stopped early or the file could not be opened. Records that fail do not stop the census.
 
+When the file holds scripts that records carry in line (`SCPT`, `INFO` and the log entries of `QUST`), the table is followed by a second one:
+
+```
+Scripts held in line by records:
+Record      Scripts   Bytecode   Bad size   Bad refs   Bad vars
+INFO              2         16          1          0          0
+SCPT              2         16          1          0          0
+```
+
+- **Scripts** counts the scripts that hold anything. An empty script block, which many `INFO` records have, is not counted, and an `INFO` record counts once for its begin script and once for its end script.
+- **Bytecode** is the total size in bytes of the compiled scripts (`SCDA`).
+- **Bad size**, **Bad refs** and **Bad vars** count the scripts whose `SCHR` header disagrees with what the loader read. A script can be in more than one column. *Size* compares the header's compiled size with the number of `SCDA` bytes, *refs* compares its reference count with the number of `SCRO` and `SCRV` entries together, and *vars* flags a header variable count that is lower than the highest `SLSD` index. The header count is not compared with the number of `SLSD` entries, because real files have more variables in the header than in the record (see [census-results.md](census-results.md#scripts-held-by-records)).
+- A script with none of the three has all the parts a bytecode interpreter needs: the bytecode, the references it indexes and the slots for its variables.
+
+Only sizes and counts are printed, never script text.
+
 ## Reader fixes made while building the census
 
 - **The last record of every plugin was never read.** `ReaderUtils::readItem` stopped when `hasMoreRecs()` was false right after reading a record header, but a record's data counts as read as soon as its header is, so that is always true for the final record. The engine's own plugin loading uses the same code, so it skipped the last record of every ESM4 plugin too. Found because the census test file ended on a record that was never counted. Now only a group header with nothing after it ends the read early.
