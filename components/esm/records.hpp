@@ -62,6 +62,7 @@
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadland.hpp>
+#include <components/esm4/loadlgtm.hpp>
 #include <components/esm4/loadligh.hpp>
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadlvlc.hpp>

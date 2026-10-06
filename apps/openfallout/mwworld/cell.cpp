@@ -5,7 +5,9 @@
 #include "../mwbase/environment.hpp"
 
 #include <components/esm3/loadcell.hpp>
+#include <components/esm4/lighting.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadlgtm.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/misc/algorithm.hpp>
 
@@ -14,8 +16,60 @@
 
 namespace OFWorld
 {
+    ESM4::Lighting resolveLighting(
+        const ESM4::Lighting& own, const ESM4::Lighting* lightingTemplate, std::uint32_t inheritFlags)
+    {
+        ESM4::Lighting result = own;
+        if (lightingTemplate == nullptr)
+            return result;
+
+        if (inheritFlags & 0x001)
+            result.ambient = lightingTemplate->ambient;
+        if (inheritFlags & 0x002)
+            result.directional = lightingTemplate->directional;
+        if (inheritFlags & 0x004)
+            result.fogColor = lightingTemplate->fogColor;
+        if (inheritFlags & 0x008)
+            result.fogNear = lightingTemplate->fogNear;
+        if (inheritFlags & 0x010)
+            result.fogFar = lightingTemplate->fogFar;
+        if (inheritFlags & 0x020)
+        {
+            result.rotationXY = lightingTemplate->rotationXY;
+            result.rotationZ = lightingTemplate->rotationZ;
+        }
+        if (inheritFlags & 0x040)
+            result.fogDirFade = lightingTemplate->fogDirFade;
+        if (inheritFlags & 0x080)
+            result.fogClipDist = lightingTemplate->fogClipDist;
+        if (inheritFlags & 0x100)
+            result.fogPower = lightingTemplate->fogPower;
+        return result;
+    }
+
     namespace
     {
+        MoodData readMood(const ESM4::Cell& cell)
+        {
+            const ESM4::LightingTemplate* lightingTemplate = nullptr;
+            if (cell.mLightingTemplateFlags != 0 && !cell.mLightingTemplate.isZeroOrUnset())
+                lightingTemplate = OFBase::Environment::get().getESMStore()->get<ESM4::LightingTemplate>().search(
+                    ESM::RefId(cell.mLightingTemplate));
+
+            const ESM4::Lighting lighting = resolveLighting(cell.mLighting,
+                lightingTemplate != nullptr ? &lightingTemplate->mLighting : nullptr, cell.mLightingTemplateFlags);
+
+            return MoodData{
+                .mAmbiantColor = lighting.ambient,
+                .mDirectionalColor = lighting.directional,
+                .mFogColor = lighting.fogColor,
+                // Fallout fog is a range, not a share of the view distance
+                .mFogDensity = 1.f,
+                .mFogNear = lighting.fogNear,
+                .mFogFar = lighting.fogFar,
+            };
+        }
+
         std::string getDescription(const ESM4::World& value)
         {
             if (!value.mEditorId.empty())
@@ -55,13 +109,7 @@ namespace OFWorld
         , mId(cell.mId)
         , mParent(cell.mParent)
         , mWaterHeight(cell.mWaterHeight)
-        , mMood{
-            .mAmbiantColor = cell.mLighting.ambient,
-            .mDirectionalColor = cell.mLighting.directional,
-            .mFogColor = cell.mLighting.fogColor,
-            // TODO: use ESM4::Lighting fog parameters
-            .mFogDensity = 1.f,
-        }
+        , mMood(readMood(cell))
     {
         const ESM4::World* world = OFBase::Environment::get().getESMStore()->get<ESM4::World>().search(mParent);
         if (isExterior())
