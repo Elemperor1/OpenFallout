@@ -1,7 +1,6 @@
 #ifndef OPENFALLOUT_COMPONENTS_ESM4_LOADREPU_H
 #define OPENFALLOUT_COMPONENTS_ESM4_LOADREPU_H
 
-#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -22,7 +21,7 @@ namespace ESM4
         std::string mEditorId; // EDID
         std::string mFullName; // FULL
         std::string mIcon; // ICON
-        std::array<std::uint8_t, 4> mData{}; // DATA, not known
+        float mValue = 0; // DATA
         std::string mSmallIcon; // MICO
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of

@@ -18,7 +18,7 @@ namespace
     std::string everySubRecord()
     {
         return zString("EDID", "Text of EDID") + zString("FULL", "Text of FULL") + zString("ICON", "Text of ICON")
-            + subRecord("DATA", bytePattern(4, 14));
+            + valueSubRecord<float>("DATA", -12.5f);
     }
 
     void expectEverySubRecord(const ESM4::Reputation& result)
@@ -26,7 +26,7 @@ namespace
         EXPECT_EQ(result.mEditorId, "Text of EDID");
         EXPECT_EQ(result.mFullName, "Text of FULL");
         EXPECT_EQ(result.mIcon, "Text of ICON");
-        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), bytePattern(4, 14));
+        EXPECT_EQ(result.mValue, -12.5f);
     }
 
     std::string loadFailure(const std::string& data)

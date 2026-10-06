@@ -15,11 +15,22 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
+    std::string challengeData()
+    {
+        std::string data;
+        append<std::uint32_t>(data, 11); // type
+        append<std::uint32_t>(data, 500); // threshold
+        append<std::uint32_t>(data, 6); // flags
+        append<std::uint32_t>(data, 30); // interval
+        data += bytePattern(8, 15);
+        return data;
+    }
+
     std::string everySubRecord()
     {
         return zString("EDID", "Text of EDID") + zString("FULL", "Text of FULL")
             + valueSubRecord<std::uint32_t>("SCRI", 0x00010003) + zString("DESC", "Text of DESC")
-            + subRecord("DATA", bytePattern(24, 15)) + valueSubRecord<std::uint32_t>("SNAM", 0x00010006)
+            + subRecord("DATA", challengeData()) + valueSubRecord<std::uint32_t>("SNAM", 0x00010006)
             + valueSubRecord<std::uint32_t>("XNAM", 0x00010007);
     }
 
@@ -29,7 +40,11 @@ namespace
         EXPECT_EQ(result.mFullName, "Text of FULL");
         EXPECT_EQ(result.mScript.toUint32(), 0x00010003u);
         EXPECT_EQ(result.mDescription, "Text of DESC");
-        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), bytePattern(24, 15));
+        EXPECT_EQ(result.mData.mType, 11u);
+        EXPECT_EQ(result.mData.mThreshold, 500u);
+        EXPECT_EQ(result.mData.mFlags, 6u);
+        EXPECT_EQ(result.mData.mInterval, 30u);
+        EXPECT_EQ(std::string(result.mData.mTypeData.begin(), result.mData.mTypeData.end()), bytePattern(8, 15));
         EXPECT_EQ(result.mSnam.toUint32(), 0x00010006u);
         EXPECT_EQ(result.mXnam.toUint32(), 0x00010007u);
     }
