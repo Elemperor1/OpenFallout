@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <set>
 #include <sstream>
@@ -189,6 +190,55 @@ namespace
         EXPECT_EQ(type.mSubRecords.at("AAAA").mRecords, 2u);
         EXPECT_THAT(survey.getFatalErrors(), IsEmpty());
         EXPECT_THAT(written(survey), HasSubstr("1 listed records have a sub-record that runs past the end"));
+    }
+
+    TEST(ESM4SurveyTest, listsASubrecordThatHasAnExtendedSizeWithThatSizeAndKeepsReading)
+    {
+        const std::string longData(70000, 'x');
+        const std::string plugin = header()
+            + topGroup("ZZZZ",
+                record(
+                    "ZZZZ", 1, subRecord("AAAA", "1") + extendedSubRecord("BBBB", longData) + subRecord("CCCC", "12"))
+                    + record("ZZZZ", 2, extendedSubRecord("BBBB", longData))
+                    + record("ZZZZ", 3, subRecord("AAAA", "1")));
+        ESM4::Survey survey;
+        collect(survey, plugin);
+
+        const ESM4::SurveyType& type = survey.getTypes().at("ZZZZ");
+        EXPECT_EQ(type.mTotal, 3u);
+        EXPECT_EQ(type.mSurveyed, 3u);
+        EXPECT_EQ(type.mOverrunning, 0u);
+        EXPECT_EQ(type.mSubRecords.at("BBBB").mRecords, 2u);
+        EXPECT_THAT(type.mSubRecords.at("BBBB").mSizes, UnorderedElementsAre(Pair(70000u, 2u)));
+        EXPECT_THAT(type.mSubRecords.at("CCCC").mSizes, UnorderedElementsAre(Pair(2u, 1u)));
+        EXPECT_THAT(type.mOrders, UnorderedElementsAre(Pair("AAAA BBBB CCCC", 1u), Pair("BBBB", 1u), Pair("AAAA", 1u)));
+        EXPECT_THAT(survey.getFatalErrors(), IsEmpty());
+    }
+
+    TEST(ESM4SurveyTest, skipsTheListingOfACompressedRecordThatDoesNotInflateAndKeepsReading)
+    {
+        std::string payload;
+        append<std::uint32_t>(payload, 100); // the size of the data once inflated
+        payload.append("not zlib data at all");
+        const std::string plugin = header()
+            + topGroup("STAT",
+                record("STAT", 1, payload, ESM4::Rec_Compressed) + record("STAT", 2, zString("EDID", "Good"))
+                    + record("STAT", 3, payload, ESM4::Rec_Compressed));
+
+        // A loader reads the record data before it fails, a survey without a loader does not
+        for (const auto& parse :
+            { std::function<bool(ESM4::Reader&)>(parseStatic), std::function<bool(ESM4::Reader&)>() })
+        {
+            ESM4::Survey survey;
+            collect(survey, plugin, parse);
+
+            const ESM4::SurveyType& type = survey.getTypes().at("STAT");
+            EXPECT_EQ(type.mTotal, 3u);
+            EXPECT_EQ(type.mSurveyed, 1u);
+            EXPECT_EQ(type.mFailed, parse ? 2u : 0u);
+            EXPECT_THAT(type.mOrders, UnorderedElementsAre(Pair("EDID", 1u)));
+            EXPECT_THAT(survey.getFatalErrors(), IsEmpty());
+        }
     }
 
     TEST(ESM4SurveyTest, listsAnEmptyRecord)

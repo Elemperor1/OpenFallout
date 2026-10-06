@@ -36,6 +36,18 @@ namespace ESM4Test
         return result;
     }
 
+    /// Build a subrecord that is longer than a 16-bit size can say: a XXXX subrecord with the size, then a subrecord
+    /// whose header says that it has no data, then the data.
+    inline std::string extendedSubRecord(std::string_view type, std::string_view data)
+    {
+        std::string size;
+        append<std::uint32_t>(size, static_cast<std::uint32_t>(data.size()));
+        std::string result = subRecord("XXXX", size);
+        result.append(subRecord(type, ""));
+        result.append(data);
+        return result;
+    }
+
     /// Build a subrecord containing text followed by a null terminator.
     inline std::string zString(std::string_view type, std::string_view text)
     {

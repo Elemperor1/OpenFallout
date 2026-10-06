@@ -29,6 +29,7 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include "cellgrid.hpp"
 #include "common.hpp"
@@ -96,6 +97,13 @@ namespace ESM4
         std::uint16_t dataSize;
     };
 #pragma pack(pop)
+
+    /// A sub-record that the sub-record XXXX gave an extended size, for those that do not fit the 16 bits of a header.
+    struct ExtendedSubRecord
+    {
+        std::uint32_t mType;
+        std::uint32_t mSize;
+    };
 
     //                                                   bytes read from group, updated by
     //                                                   getRecordHeader() in advance
@@ -170,6 +178,11 @@ namespace ESM4
 
         // Bytes of the current record that the last getSubRecordHeader() had not read when it was called.
         std::uint32_t mUnreadRecordBytes = 0;
+
+        // The sub-records the last getSubRecordHeader() skipped, because a XXXX sub-record gave them an extended size.
+        std::vector<ExtendedSubRecord> mExtendedSubRecords;
+
+        bool readSubRecordHeader();
 
         void buildLStringIndex(LocalizedStringType stringType, std::string_view prefix);
 
@@ -335,7 +348,13 @@ namespace ESM4
         void skipGroup();
 
         // Read 6 bytes of header. The caller can then decide whether to process or skip the data.
+        // Note: a sub-record that a XXXX sub-record gave an extended size is skipped together with the XXXX, and the
+        // header of the sub-record after it is returned, see skippedExtendedSubRecords()
         bool getSubRecordHeader();
+
+        // The type and the extended size of each sub-record that the last getSubRecordHeader() skipped. They come
+        // before the sub-record that it returned, if it returned one.
+        inline const std::vector<ExtendedSubRecord>& skippedExtendedSubRecords() const { return mExtendedSubRecords; }
 
         // Manally update (i.e. increase) the bytes read after SUB_XXXX
         inline void updateRecordRead(std::uint32_t subSize) { mCtx.recordRead += subSize; }

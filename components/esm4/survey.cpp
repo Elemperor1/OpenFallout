@@ -63,19 +63,11 @@ namespace ESM4
                     order += '*' + std::to_string(run);
             };
 
-            while (reader.getSubRecordHeader())
-            {
-                const SubRecordHeader& header = reader.subRecordHeader();
-                if (!reader.subRecordFitsRecord())
-                {
-                    overrunning = true;
-                    break;
-                }
-
-                const std::string code = codeName(header.typeId);
+            const auto add = [&](std::uint32_t typeId, std::uint32_t size) {
+                const std::string code = codeName(typeId);
                 SurveySubRecord& subRecord = type.mSubRecords[code];
                 ++subRecord.mTotal;
-                ++subRecord.mSizes[header.dataSize];
+                ++subRecord.mSizes[size];
                 ++counts[code];
 
                 if (run != 0 && code == lastCode)
@@ -86,6 +78,25 @@ namespace ESM4
                     lastCode = code;
                     run = 1;
                 }
+            };
+
+            while (true)
+            {
+                const bool found = reader.getSubRecordHeader();
+                // The reader skips a sub-record with an extended size, they come before the one it found.
+                for (const ExtendedSubRecord& extended : reader.skippedExtendedSubRecords())
+                    add(extended.mType, extended.mSize);
+                if (!found)
+                    break;
+
+                const SubRecordHeader& header = reader.subRecordHeader();
+                if (!reader.subRecordFitsRecord())
+                {
+                    overrunning = true;
+                    break;
+                }
+
+                add(header.typeId, header.dataSize);
                 reader.skipSubRecordData();
             }
             endRun();
@@ -148,8 +159,16 @@ namespace ESM4
 
             if (!mFailedOnly || outcome == CensusOutcome::Failed)
             {
-                r.rewindRecordData(recordStart);
-                addSubRecords(r, type);
+                try
+                {
+                    r.rewindRecordData(recordStart);
+                    addSubRecords(r, type);
+                }
+                catch (const std::exception&)
+                {
+                    // The record data cannot be read again, for instance because it does not inflate. Only its
+                    // sub-record listing is lost, the record is counted above.
+                }
             }
             // Whatever was read of the record, the stream is somewhere inside it now.
             r.skipFailedRecord(recordStart);

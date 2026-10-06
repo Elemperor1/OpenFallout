@@ -73,7 +73,7 @@ Allowed options)");
         // with other modes including clone, dump, and raw.
         addOption("type,t", bpo::value<std::vector<std::string>>(),
             "Show only records of this type (four character record code).  May "
-            "be specified multiple times.  Only affects dump mode.");
+            "be specified multiple times.  Only affects dump and survey modes.");
         addOption("name,n", bpo::value<std::string>(), "Show only the record with this name.  Only affects dump mode.");
         addOption("plain,p",
             "Print contents of dialogs, books and scripts. "
@@ -145,7 +145,7 @@ Allowed options)");
 
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
-              || info.mode == "survey"))
+                || info.mode == "survey"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;

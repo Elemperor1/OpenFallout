@@ -272,4 +272,13 @@ namespace
         EXPECT_EQ(samples[0].mEditorId, "Compressed");
         EXPECT_THAT(samples[0].mBlob, ElementsAre('a', 'b'));
     }
+
+    TEST(ESM4RecordReaderTest, rejectsASubrecordWithAnExtendedSizeInsteadOfLosingIt)
+    {
+        const std::string longData(70000, 'x');
+        EXPECT_EQ(loadFailure(zString("EDID", "x") + extendedSubRecord("BLOB", longData) + zString("FULL", "y")),
+            "ESM4::SMPL::load - sub-record with an extended size, which the reader does not read");
+        EXPECT_EQ(loadFailure(zString("EDID", "x") + extendedSubRecord("BLOB", longData)),
+            "ESM4::SMPL::load - sub-record with an extended size, which the reader does not read");
+    }
 }

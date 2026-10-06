@@ -36,7 +36,10 @@ namespace ESM4
 
     bool RecordReader::next()
     {
-        if (!mReader.getSubRecordHeader())
+        const bool found = mReader.getSubRecordHeader();
+        if (!mReader.skippedExtendedSubRecords().empty())
+            fail("sub-record with an extended size, which the reader does not read");
+        if (!found)
             return false;
         if (!mReader.subRecordFitsRecord())
             fail("sub-record is longer than its record");

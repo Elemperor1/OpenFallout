@@ -536,11 +536,12 @@ namespace ESM4
             const std::uint32_t recordSize = mCtx.recordHeader.record.dataSize - sizeof(std::uint32_t);
             std::vector<char> compressed(recordSize);
             mStream->read(compressed.data(), recordSize);
-            mSavedStream = std::move(mStream);
 
-            mCtx.recordHeader.record.dataSize = uncompressedSize - sizeof(uncompressedSize);
-
+            // Inflate before the file stream is put aside, so that it stays in use if the data does not inflate.
             auto memoryStreamPtr = decompress(position, compressed, uncompressedSize);
+
+            mSavedStream = std::move(mStream);
+            mCtx.recordHeader.record.dataSize = uncompressedSize - sizeof(uncompressedSize);
 
             // For debugging only
             // #if 0
@@ -609,6 +610,12 @@ namespace ESM4
 
     bool Reader::getSubRecordHeader()
     {
+        mExtendedSubRecords.clear();
+        return readSubRecordHeader();
+    }
+
+    bool Reader::readSubRecordHeader()
+    {
         bool result = false;
         // The size of a compressed record is 4 bytes below the size of its data, see getRecordData()
         const std::uint32_t slack = (mCtx.recordHeader.record.flags & Rec_Compressed) != 0 ? 4 : 0;
@@ -642,12 +649,13 @@ namespace ESM4
         {
             std::uint32_t extDataSize;
             get(extDataSize);
-            if (!getSubRecordHeader())
+            if (!readSubRecordHeader())
                 return false;
 
+            mExtendedSubRecords.push_back({ mCtx.subRecordHeader.typeId, extDataSize });
             skipSubRecordData(extDataSize);
             mCtx.recordRead += extDataSize - mCtx.subRecordHeader.dataSize;
-            return getSubRecordHeader();
+            return readSubRecordHeader();
         }
 
         return result;
