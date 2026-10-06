@@ -27,6 +27,9 @@ namespace ESM4
                 case ESM::fourCC("DATA"):
                     in.value(mData);
                     break;
+                case ESM::fourCC("MICO"):
+                    in.string(mSmallIcon);
+                    break;
                 default:
                     in.unknown();
             }

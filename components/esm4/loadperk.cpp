@@ -122,6 +122,9 @@ namespace ESM4
                     mEntries.back().mButtonFlags = flags;
                     break;
                 }
+                case ESM::fourCC("MICO"):
+                    in.string(mSmallIcon);
+                    break;
                 default:
                     // SCHR, SCDA, SCTX, SLSD, SCVR, SCRO and SCRV, a script that an entry runs.
                     if (!(mEntries.empty() ? mScript : mEntries.back().mScript).loadSubRecord(reader))

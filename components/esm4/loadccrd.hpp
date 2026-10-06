@@ -32,6 +32,13 @@ namespace ESM4
         std::string mBackFace; // TX01
         std::vector<std::uint32_t> mIntegers; // INTV, two numbers for the card, not decoded
         std::uint32_t mValue = 0; // DATA
+        std::string mSmallIcon; // MICO
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
+        ESM::FormId mPickUpSound; // YNAM
+        ESM::FormId mDropSound; // ZNAM
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

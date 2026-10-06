@@ -36,6 +36,12 @@ namespace ESM4
                 case ESM::fourCC("XNAM"):
                     in.formId(mXnam);
                     break;
+                case ESM::fourCC("ICON"):
+                    in.string(mIcon);
+                    break;
+                case ESM::fourCC("MICO"):
+                    in.string(mSmallIcon);
+                    break;
                 default:
                     in.unknown();
             }

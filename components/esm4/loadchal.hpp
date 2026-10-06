@@ -26,6 +26,8 @@ namespace ESM4
         std::array<std::uint8_t, 24> mData{}; // DATA, type, threshold, flags, interval and two values; not decoded
         ESM::FormId mSnam; // SNAM, not known
         ESM::FormId mXnam; // XNAM, not known
+        std::string mIcon; // ICON
+        std::string mSmallIcon; // MICO
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

@@ -45,6 +45,27 @@ namespace ESM4
                 case ESM::fourCC("DATA"):
                     in.value(mValue);
                     break;
+                case ESM::fourCC("MICO"):
+                    in.string(mSmallIcon);
+                    break;
+                case ESM::fourCC("MODB"):
+                    in.value(mBoundRadius);
+                    break;
+                case ESM::fourCC("MODT"):
+                    in.bytes(mModelTextures);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
+                    break;
+                case ESM::fourCC("YNAM"):
+                    in.formId(mPickUpSound);
+                    break;
+                case ESM::fourCC("ZNAM"):
+                    in.formId(mDropSound);
+                    break;
                 default:
                     in.unknown();
             }

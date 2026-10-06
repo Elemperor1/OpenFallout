@@ -32,6 +32,24 @@ namespace ESM4
                         &Data::mObjectDisplayShader, &Data::mEffectSound, &Data::mBoltSound, &Data::mHitSound,
                         &Data::mAreaSound);
                     break;
+                case ESM::fourCC("ICON"):
+                    in.string(mIcon);
+                    break;
+                case ESM::fourCC("MICO"):
+                    in.string(mSmallIcon);
+                    break;
+                case ESM::fourCC("MODB"):
+                    in.value(mBoundRadius);
+                    break;
+                case ESM::fourCC("MODT"):
+                    in.bytes(mModelTextures);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
+                    break;
                 default:
                     in.unknown();
             }

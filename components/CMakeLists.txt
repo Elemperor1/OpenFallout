@@ -202,6 +202,7 @@ add_component_dir (esm4
     cellgrid
     census
     common
+    destruction
     dialogue
     effect
     effectlist

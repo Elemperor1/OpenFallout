@@ -114,6 +114,14 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
+            case ESM::fourCC("MODB"):
+            case ESM::fourCC("MODD"):
+            case ESM::fourCC("DEST"): // Destruction data
+            case ESM::fourCC("DSTD"):
+            case ESM::fourCC("DSTF"):
+            case ESM::fourCC("DMDL"):
+            case ESM::fourCC("DMDT"):
+            case ESM::fourCC("DMDS"):
             case ESM::fourCC("SCDA"):
             case ESM::fourCC("SCHR"):
             case ESM::fourCC("SCRO"):

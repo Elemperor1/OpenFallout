@@ -1,5 +1,6 @@
 #include <components/esm4/actor.hpp>
 #include <components/esm4/common.hpp>
+#include <components/esm4/destruction.hpp>
 #include <components/esm4/dialogue.hpp>
 #include <components/esm4/effect.hpp>
 #include <components/esm4/inventory.hpp>

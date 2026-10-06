@@ -23,6 +23,7 @@ namespace ESM4
         std::string mFullName; // FULL
         std::string mIcon; // ICON
         std::array<std::uint8_t, 4> mData{}; // DATA, not known
+        std::string mSmallIcon; // MICO
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

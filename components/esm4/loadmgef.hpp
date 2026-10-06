@@ -50,6 +50,12 @@ namespace ESM4
         std::string mDescription; // DESC
         ESM::Path mModel; // MODL, the model
         Data mData; // DATA
+        std::string mIcon; // ICON
+        std::string mSmallIcon; // MICO
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

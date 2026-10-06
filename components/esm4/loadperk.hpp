@@ -63,6 +63,7 @@ namespace ESM4
         Data mData; // DATA before the first entry
         std::vector<Entry> mEntries; // PRKE starts an entry, the sub-records up to PRKF belong to it
         ScriptDefinition mScript; // a script that comes before the first entry
+        std::string mSmallIcon; // MICO
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.
