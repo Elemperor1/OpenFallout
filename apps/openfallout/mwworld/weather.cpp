@@ -523,10 +523,20 @@ namespace OFWorld
         return chances;
     }
 
-    std::pair<float, float> fogRange(const OFRender::WeatherResult& result, float viewDistance)
+    std::pair<float, float> fogRange(
+        const OFRender::WeatherResult& result, float viewDistance, const DistantFog* distantFog)
     {
         if (result.mHasFogRange)
             return { result.mFogNear, result.mFogFar };
+
+        // The same as FogManager::configure makes of the density
+        if (distantFog != nullptr)
+        {
+            const float factor = result.mDLFogFactor;
+            const float offset = result.mDLFogOffset / 100.f;
+            return { factor * (distantFog->mLandFogStart - offset * distantFog->mLandFogEnd),
+                factor * (1.f - offset) * distantFog->mLandFogEnd };
+        }
         if (result.mFogDepth <= 0.f)
             return { viewDistance, viewDistance };
         return { viewDistance * (1.f - result.mFogDepth), viewDistance };
@@ -1642,13 +1652,16 @@ namespace OFWorld
         mResult.mSunDiscColor = lerp(current.mSunDiscColor, other.mSunDiscColor, factor);
         mResult.mFogDepth = lerp(current.mFogDepth, other.mFogDepth, factor);
         // With a weather that says where its fog starts and one that does not, the one that does not has the range that
-        // its share of the view distance makes, so that the fog goes from one to the other without a jump
+        // the renderer makes of its density, so that the fog goes from one to the other without a jump
         mResult.mHasFogRange = current.mHasFogRange || other.mHasFogRange;
         if (mResult.mHasFogRange)
         {
             const float viewDistance = mRendering.getViewDistance();
-            const auto [currentNear, currentFar] = fogRange(current, viewDistance);
-            const auto [otherNear, otherFar] = fogRange(other, viewDistance);
+            const DistantFog distantFog{ Settings::fog().mDistantLandFogStart.get(),
+                Settings::fog().mDistantLandFogEnd.get() };
+            const DistantFog* distant = Settings::fog().mUseDistantFog.get() ? &distantFog : nullptr;
+            const auto [currentNear, currentFar] = fogRange(current, viewDistance, distant);
+            const auto [otherNear, otherFar] = fogRange(other, viewDistance, distant);
             mResult.mFogNear = lerp(currentNear, otherNear, factor);
             mResult.mFogFar = lerp(currentFar, otherFar, factor);
         }

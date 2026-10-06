@@ -1017,7 +1017,7 @@ namespace OFWorld
             result.mFogFar = 9000.f;
             result.mFogDepth = 0.5f;
 
-            const auto [fogNear, fogFar] = fogRange(result, 8192.f);
+            const auto [fogNear, fogFar] = fogRange(result, 8192.f, nullptr);
             EXPECT_EQ(fogNear, 100.f);
             EXPECT_EQ(fogFar, 9000.f);
         }
@@ -1027,9 +1027,22 @@ namespace OFWorld
             OFRender::WeatherResult result{};
             result.mFogDepth = 0.25f;
 
-            const auto [fogNear, fogFar] = fogRange(result, 8000.f);
+            const auto [fogNear, fogFar] = fogRange(result, 8000.f, nullptr);
             EXPECT_EQ(fogNear, 6000.f);
             EXPECT_EQ(fogFar, 8000.f);
+        }
+
+        TEST(OFWorldWeatherTest, withDistantFogTheFogRangeOfAResultWithoutOneIsTheDistantLandFog)
+        {
+            OFRender::WeatherResult result{};
+            result.mFogDepth = 0.25f;
+            result.mDLFogFactor = 2.f;
+            result.mDLFogOffset = 10.f;
+            const DistantFog distantFog{ 0.f, 1000.f };
+
+            const auto [fogNear, fogFar] = fogRange(result, 8000.f, &distantFog);
+            EXPECT_FLOAT_EQ(fogNear, -200.f);
+            EXPECT_FLOAT_EQ(fogFar, 1800.f);
         }
 
         TEST(OFWorldWeatherTest, aResultWithoutAnyFogHasNoFogBeforeTheEndOfTheView)
@@ -1037,7 +1050,7 @@ namespace OFWorld
             OFRender::WeatherResult result{};
             result.mFogDepth = 0.f;
 
-            const auto [fogNear, fogFar] = fogRange(result, 8000.f);
+            const auto [fogNear, fogFar] = fogRange(result, 8000.f, nullptr);
             EXPECT_EQ(fogNear, 8000.f);
             EXPECT_EQ(fogFar, 8000.f);
         }

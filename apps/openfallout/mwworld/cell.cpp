@@ -11,7 +11,7 @@
 #include <components/esm4/loadwrld.hpp>
 #include <components/misc/algorithm.hpp>
 
-#include <cstddef>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -20,15 +20,13 @@ namespace OFWorld
     ESM::FormId resolveClimate(
         const ESM4::World& world, const std::function<const ESM4::World*(ESM::FormId)>& findWorld)
     {
-        // A chain that is longer than this is a loop in the data
-        constexpr std::size_t maxDepth = 16;
+        // The worldspaces on the way up, so that a loop in the data ends the walk and a long chain does not
+        std::set<ESM::FormId> visited{ world.mId };
         const ESM4::World* current = &world;
-        for (std::size_t depth = 0; depth < maxDepth; ++depth)
+        while (!current->mParent.isZeroOrUnset() && (current->mParentUseFlags & ESM4::World::UseFlag_Climate))
         {
-            if (current->mParent.isZeroOrUnset() || !(current->mParentUseFlags & ESM4::World::UseFlag_Climate))
-                break;
             const ESM4::World* parent = findWorld(current->mParent);
-            if (parent == nullptr)
+            if (parent == nullptr || !visited.insert(parent->mId).second)
                 break;
             current = parent;
         }

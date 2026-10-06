@@ -80,6 +80,15 @@ namespace OFWorld
             EXPECT_EQ(worlds.climateOf(0x12), formId(0x100));
         }
 
+        TEST(OFWorldResolveClimateTest, aLongChainOfParentsIsFollowedToTheEnd)
+        {
+            Worlds worlds;
+            worlds.add(makeWorld(0x10, 0x100, 0, 0));
+            for (std::uint32_t id = 0x11; id < 0x11 + 40; ++id)
+                worlds.add(makeWorld(id, 0, id - 1, ESM4::World::UseFlag_Climate));
+            EXPECT_EQ(worlds.climateOf(0x11 + 39), formId(0x100));
+        }
+
         TEST(OFWorldResolveClimateTest, aParentThatIsNotLoadedLeavesTheOwnClimate)
         {
             Worlds worlds;
