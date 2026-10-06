@@ -213,4 +213,25 @@ namespace
         EXPECT_THAT(text, HasSubstr(" 24:1 ... and 6 more sizes, the largest 30\n"));
         EXPECT_THAT(text, Not(HasSubstr("25:1")));
     }
+    TEST(ESM4SurveyTest, writesBytesThatAreNotPrintableAsEscapes)
+    {
+        // Some real sub-record codes start with a byte below 0x20, and a line feed would cut the line of the report.
+        const std::string plugin = header()
+            + topGroup("ZZZZ",
+                record("ZZZZ", 1,
+                    subRecord(std::string_view("\x0a"
+                                               "IAD",
+                                  4),
+                        "1")
+                        + subRecord(std::string_view("\0IAD", 4), "22") + subRecord("A\\BC", "333")));
+        ESM4::Survey survey;
+        collect(survey, plugin);
+
+        const std::string text = written(survey);
+        EXPECT_THAT(text, HasSubstr("  \\x0aIAD: in 1 records, 1 each, 1 in all, sizes 1:1\n"));
+        EXPECT_THAT(text, HasSubstr("  \\x00IAD: in 1 records, 1 each, 1 in all, sizes 2:1\n"));
+        EXPECT_THAT(text, HasSubstr("  A\\x5cBC: in 1 records, 1 each, 1 in all, sizes 3:1\n"));
+        EXPECT_THAT(text, HasSubstr("    1 x \\x0aIAD \\x00IAD A\\x5cBC\n"));
+        EXPECT_EQ(text.find('\0'), std::string::npos);
+    }
 }

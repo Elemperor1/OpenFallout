@@ -24,6 +24,26 @@ namespace ESM4
             return std::string(message.substr(0, message.find('\n')));
         }
 
+        // A code is written as it is except for bytes that are not printable ASCII, which are written as \xNN. Some
+        // sub-record codes start with a byte below 0x20, and a line feed in a code would cut its line in two.
+        std::string codeName(std::uint32_t typeId)
+        {
+            constexpr char digits[] = "0123456789abcdef";
+            std::string result;
+            for (const unsigned char c : ESM::printName(typeId))
+            {
+                if (c >= 0x20 && c <= 0x7e && c != '\\')
+                    result += static_cast<char>(c);
+                else
+                {
+                    result += "\\x";
+                    result += digits[c >> 4];
+                    result += digits[c & 0xf];
+                }
+            }
+            return result;
+        }
+
         // Add the sub-records of the current record, which the reader has been rewound to the start of.
         void addSubRecords(Reader& reader, SurveyType& type)
         {
@@ -52,7 +72,7 @@ namespace ESM4
                     break;
                 }
 
-                const std::string code = ESM::printName(header.typeId);
+                const std::string code = codeName(header.typeId);
                 SurveySubRecord& subRecord = type.mSubRecords[code];
                 ++subRecord.mTotal;
                 ++subRecord.mSizes[header.dataSize];
@@ -93,9 +113,10 @@ namespace ESM4
     void Survey::collect(Reader& reader, const std::function<bool(Reader&)>& parse)
     {
         auto visitRecord = [&](Reader& r) {
-            const std::string code = ESM::printName(r.hdr().record.typeId);
-            if (!mSelected.empty() && !mSelected.contains(code))
+            if (!mSelected.empty() && !mSelected.contains(ESM::printName(r.hdr().record.typeId)))
                 return false; // nothing has been read, the record data is skipped
+
+            const std::string code = codeName(r.hdr().record.typeId);
 
             const ReaderContext recordStart = r.getContext();
             SurveyType& type = mTypes[code];

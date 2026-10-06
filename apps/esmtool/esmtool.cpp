@@ -101,7 +101,7 @@ Allowed options)");
         addHiddenOption("input-file,i", bpo::value<Files::MaybeQuotedPathContainer>(), "input file");
 
         bpo::positional_options_description p;
-        p.add("mode", 1).add("input-file", 2);
+        p.add("mode", 1).add("input-file", -1);
 
         // there might be a better way to do this
         bpo::options_description all;
