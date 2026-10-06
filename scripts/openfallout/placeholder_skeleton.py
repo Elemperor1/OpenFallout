@@ -3,10 +3,10 @@
 
 The engine builds every actor, the player included, on a base skeleton that Morrowind supplies as `meshes/base_anim.nif`
 and a few siblings. A game without them, Fallout 3 and New Vegas, has no such file under that name, and the world
-refuses to place the player. This file stands in at those paths, one level below any game data: a game that has its own
-file shadows it. It draws nothing and carries no animation, so an actor on it is invisible and does not move its
-limbs. It does have the bounding box node that the physics reads the size of an actor from, a human 40 units wide and
-128 tall.
+refuses to place the player. This file stands in at those paths from resources/vfs-fallback, which the engine adds
+below every archive and data directory: a game that has its own file shadows it. It draws nothing and carries no
+animation, so an actor on it is invisible and does not move its limbs. It does have the bounding box node that the
+physics reads the size of an actor from, a human 40 units wide and 128 tall.
 It is a stop-gap for walking the world, not the Fallout skeleton, which comes with the actor work of a later milestone.
 
     scripts/openfallout/placeholder_skeleton.py files/data/meshes/placeholder_skeleton.nif
