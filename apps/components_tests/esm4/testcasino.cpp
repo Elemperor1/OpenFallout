@@ -111,27 +111,60 @@ namespace
         EXPECT_EQ(records[1].mData.mWinningsQuest, 0u);
     }
 
+    std::string modelSubRecords(std::uint32_t texture)
+    {
+        const std::string textures = alternateTextureData({ { "Name of MODS", texture, 4 } });
+        return zString("MODL", "First of MODL") + valueSubRecord<float>("MODB", 2.5f)
+            + subRecord("MODT", bytePattern(5, 10)) + subRecord("MODS", textures)
+            + valueSubRecord<std::uint8_t>("MODD", 3) + zString("MOD2", "Text of MOD2")
+            + subRecord("MO2T", bytePattern(4, 20)) + subRecord("MO2S", alternateTextureData({}))
+            + zString("MOD3", "Text of MOD3") + subRecord("MO3T", bytePattern(3, 30)) + subRecord("MO3S", textures)
+            + valueSubRecord<std::uint8_t>("MOSD", 1) + zString("MOD4", "Text of MOD4")
+            + subRecord("MO4T", bytePattern(2, 40)) + subRecord("MO4S", textures);
+    }
+
     TEST(ESM4CasinoTest, keepsTheModelSubrecordsTheReferenceDoesNotListForACasino)
     {
-        const std::vector<ESM4::Casino> records = loadRecords<ESM4::Casino>("CSNO",
-            record("CSNO", 1,
-                zString("MODL", "First of MODL") + valueSubRecord<float>("MODB", 2.5f)
-                    + subRecord("MODT", bytePattern(5, 10)) + subRecord("MODS", alternateTextureData({}))
-                    + valueSubRecord<std::uint8_t>("MODD", 3) + zString("MOD2", "Text of MOD2")
-                    + subRecord("MO2T", bytePattern(4, 20)) + subRecord("MO2S", alternateTextureData({}))
-                    + zString("MOD3", "Text of MOD3") + subRecord("MO3T", bytePattern(3, 30))
-                    + subRecord("MO3S", alternateTextureData({})) + valueSubRecord<std::uint8_t>("MOSD", 1)
-                    + zString("MOD4", "Text of MOD4") + subRecord("MO4T", bytePattern(2, 40))
-                    + subRecord("MO4S", alternateTextureData({}))));
+        const std::vector<ESM4::Casino> records
+            = loadRecords<ESM4::Casino>("CSNO", record("CSNO", 1, modelSubRecords(0x00000123)));
 
         ASSERT_EQ(records.size(), 1u);
         const std::vector<ESM4::RawSubRecord>& data = records[0].mModelData;
-        ASSERT_EQ(data.size(), 11u);
+        ASSERT_EQ(data.size(), 7u);
         EXPECT_EQ(data[0].mType, ESM::fourCC("MODB"));
         EXPECT_EQ(std::string(data[1].mData.begin(), data[1].mData.end()), bytePattern(5, 10));
-        EXPECT_EQ(data[4].mType, ESM::fourCC("MO2T"));
-        EXPECT_EQ(data[8].mType, ESM::fourCC("MOSD"));
-        EXPECT_EQ(data[10].mType, ESM::fourCC("MO4S"));
+        EXPECT_EQ(data[3].mType, ESM::fourCC("MO2T"));
+        EXPECT_EQ(data[5].mType, ESM::fourCC("MOSD"));
+        EXPECT_EQ(data[6].mType, ESM::fourCC("MO4T"));
+    }
+
+    TEST(ESM4CasinoTest, decodesTheAlternateTexturesOfTheModelsAndAdjustsTheirFormIds)
+    {
+        const std::vector<ESM4::Casino> records = loadRecords<ESM4::Casino>("CSNO",
+            record("CSNO", 1, modelSubRecords(0x00000123)) + record("CSNO", 2, modelSubRecords(0)), 0, nullptr, 3);
+
+        ASSERT_EQ(records.size(), 2u);
+        const std::vector<ESM4::Casino::ModelTextures>& models = records[0].mModelTextures;
+        ASSERT_EQ(models.size(), 4u);
+        EXPECT_EQ(models[0].mType, ESM::fourCC("MODS"));
+        EXPECT_EQ(models[1].mType, ESM::fourCC("MO2S"));
+        EXPECT_EQ(models[2].mType, ESM::fourCC("MO3S"));
+        EXPECT_EQ(models[3].mType, ESM::fourCC("MO4S"));
+        EXPECT_TRUE(models[1].mTextures.empty());
+        for (const std::size_t i : { 0u, 2u, 3u })
+        {
+            ASSERT_EQ(models[i].mTextures.size(), 1u) << i;
+            EXPECT_EQ(models[i].mTextures[0].mName, "Name of MODS");
+            EXPECT_EQ(models[i].mTextures[0].mTexture.toUint32(), 0x03000123u) << i;
+            EXPECT_EQ(models[i].mTextures[0].mIndex, 4);
+            EXPECT_TRUE(records[1].mModelTextures[i].mTextures[0].mTexture.isZeroOrUnset()) << i;
+        }
+    }
+
+    TEST(ESM4CasinoTest, rejectsAlternateTexturesThatDoNotAddUp)
+    {
+        EXPECT_EQ(
+            loadFailure(subRecord("MO2S", std::string(3, 'x'))), "ESM4::CSNO::load - MO2S has an unexpected size");
     }
 
     TEST(ESM4CasinoTest, rejectsAnUnknownSubrecord)

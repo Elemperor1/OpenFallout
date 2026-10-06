@@ -44,17 +44,23 @@ namespace ESM4
                     break;
                 case ESM::fourCC("MODB"):
                 case ESM::fourCC("MODT"):
-                case ESM::fourCC("MODS"):
                 case ESM::fourCC("MODD"):
                 case ESM::fourCC("MO2T"):
-                case ESM::fourCC("MO2S"):
                 case ESM::fourCC("MO3T"):
-                case ESM::fourCC("MO3S"):
                 case ESM::fourCC("MOSD"):
                 case ESM::fourCC("MO4T"):
-                case ESM::fourCC("MO4S"):
                     in.raw(mModelData.emplace_back());
                     break;
+                case ESM::fourCC("MODS"):
+                case ESM::fourCC("MO2S"):
+                case ESM::fourCC("MO3S"):
+                case ESM::fourCC("MO4S"):
+                {
+                    ModelTextures& model = mModelTextures.emplace_back();
+                    model.mType = in.type();
+                    in.alternateTextures(model.mTextures);
+                    break;
+                }
                 default:
                     in.unknown();
             }

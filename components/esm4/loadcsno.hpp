@@ -9,6 +9,7 @@
 #include <components/esm/defs.hpp>
 #include <components/esm/formid.hpp>
 
+#include "alternatetexture.hpp"
 #include "recordreader.hpp"
 
 namespace ESM4
@@ -33,6 +34,13 @@ namespace ESM4
 #pragma pack(pop)
         static_assert(sizeof(Data) == 56);
 
+        /// The alternate textures of one model, from the sub-record with the code mType.
+        struct ModelTextures
+        {
+            std::uint32_t mType = 0;
+            std::vector<AlternateTexture> mTextures;
+        };
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
@@ -45,10 +53,12 @@ namespace ESM4
         std::string mModel4; // MOD4
         std::vector<std::string> mIcons; // ICON, seven of them
         std::vector<std::string> mIcons2; // ICO2, four of them
-        // MODB, MODT, MODS and MODD, and MO2T, MO2S, MO3T, MO3S, MOSD, MO4T and MO4S: the format reference does not
-        // list them for a casino, which has eight models, so they cannot be told apart by what they follow. Kept with
-        // their codes and not decoded.
+        // MODB, MODT and MODD, and MO2T, MO3T, MOSD and MO4T: the format reference does not list them for a casino,
+        // which has eight models, so they cannot be told apart by what they follow. Kept with their codes and not
+        // decoded.
         std::vector<RawSubRecord> mModelData;
+        // MODS, MO2S, MO3S and MO4S, which hold alternate textures whatever model they belong to, in file order.
+        std::vector<ModelTextures> mModelTextures;
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.
