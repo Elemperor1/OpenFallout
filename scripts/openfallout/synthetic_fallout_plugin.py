@@ -23,7 +23,16 @@ PILLAR_ID = 0x803
 MARKER_ID = 0x804
 MARKER_REF_ID = 0x805
 TEMPLATE_ID = 0x806
+WORLD_ID = 0x807
+EXTERIOR_CELL_ID = 0x808
+EXTERIOR_LAND_ID = 0x809
+EXTERIOR_PILLAR_ID = 0x80A
+EXTERIOR_MARKER_REF_ID = 0x80B
 CELL_NAME = "OFTestCell"
+WORLD_NAME = "OFTestWorld"
+# The size of an exterior cell of Fallout 3 and New Vegas, in game units. The exterior cell 0,0 covers x and y from 0 to
+# this, and the player starts at its centre.
+EXTERIOR_CELL_SIZE = 4096.0
 # Edge of the cube in game units. The floor is the cube scaled up so that its top face is at height 0, where the
 # player starts, and the pillar is the cube as it is, standing on the floor PILLAR_DISTANCE units north of the start.
 CUBE = 256.0
@@ -83,8 +92,44 @@ def lighting(ambient, directional, fog, fog_near, fog_far):
     return data
 
 
+def land():
+    """A LAND record: a flat terrain at height 0 over the whole cell, 33 by 33 vertices with normals pointing up and no
+    textures (the engine uses the default one of the game)."""
+    flags = 0x1 | 0x2  # has normals and heights
+    normals = bytes((0, 0, 127)) * (33 * 33)
+    # The height of the first vertex, then for each vertex the difference to the one before it (a signed byte, in steps
+    # of 8 units), then 3 bytes of padding.
+    heights = struct.pack("<f", 0.0) + bytes(33 * 33) + bytes(3)
+    return record(b"LAND", EXTERIOR_LAND_ID, [sub(b"DATA", struct.pack("<I", flags)), sub(b"VNML", normals),
+                                              sub(b"VHGT", heights)])
+
+
+def worldspace():
+    """The WRLD record of OFTestWorld followed by its children: the exterior cell 0,0 in an exterior block and sub-block
+    (both labelled with the grid 0,0), with its references in the temporary children group of the cell."""
+    land_level, water_level = -2700.0, -14000.0
+    wrld = record(b"WRLD", WORLD_ID, [zstr(b"EDID", WORLD_NAME), zstr(b"FULL", "OpenFallout Test World"),
+                                      sub(b"NAM0", struct.pack("<ff", -4096.0, -4096.0)),
+                                      sub(b"NAM9", struct.pack("<ff", 8192.0, 8192.0)),
+                                      sub(b"DATA", b"\x00"), sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
+    # DATA of an exterior cell is its flags (0: not an interior, no water), XCLC the grid and the flags of the land.
+    cell = record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
+                                              sub(b"XCLC", struct.pack("<iiI", 0, 0, 0))])
+    half = EXTERIOR_CELL_SIZE / 2
+    refs = group(struct.pack("<I", EXTERIOR_CELL_ID), 9, [
+        land(),
+        refr(EXTERIOR_PILLAR_ID, CUBE_ID, (half, half + PILLAR_DISTANCE, CUBE / 2)),
+        refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
+    ])
+    children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
+    grid = struct.pack("<hh", 0, 0)
+    sub_block = group(grid, 5, [cell, children])
+    block = group(grid, 4, [sub_block])
+    return [wrld, group(struct.pack("<I", WORLD_ID), 1, [block])]
+
+
 def plugin():
-    hedr = struct.pack("<fiI", 0.94, 9, TEMPLATE_ID + 1)
+    hedr = struct.pack("<fiI", 0.94, 14, EXTERIOR_MARKER_REF_ID + 2)
     header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"),
                                  zstr(b"SNAM", "synthetic test plugin")], flags=1)
     half = int(CUBE / 2)
@@ -110,7 +155,7 @@ def plugin():
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
     return (header + top_group(b"STAT", [cube, marker]) + top_group(b"LGTM", [template])
-            + top_group(b"CELL", [block]))
+            + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 
 def cube_mesh():
