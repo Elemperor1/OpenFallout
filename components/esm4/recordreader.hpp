@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -11,11 +12,20 @@
 
 #include <components/esm/common.hpp>
 #include <components/esm/formid.hpp>
+#include <components/esm/path.hpp>
 
 #include "reader.hpp"
+#include "script.hpp"
 
 namespace ESM4
 {
+    // A sub-record that a loader keeps as it is, with the code that names it.
+    struct RawSubRecord
+    {
+        std::uint32_t mType = 0;
+        std::vector<std::uint8_t> mData;
+    };
+
     // Walks the sub-records of the current record for a loader, with the checks every loader of this kind needs: a
     // sub-record that runs past its record, a size that no known version of the record has, a file that ends inside
     // a field and bytes of the record that no sub-record accounts for all throw, with the record's name in the
@@ -56,22 +66,69 @@ namespace ESM4
         // A zero-terminated string. A sub-record without bytes is an empty string, the reader cannot read one.
         void string(std::string& value);
 
-        // The object representation of a trivially copyable value, which must be what the whole sub-record holds.
-        template <class T>
-        void value(T& value)
+        // A zero-terminated path, which is a string that is also kept normalized.
+        void path(ESM::Path& value);
+
+        // The object representation of a trivially copyable value, which must be what the whole sub-record holds. The
+        // members named after it are form IDs in the value, which are adjusted to the load order the way
+        // Reader::getFormId does:
+        //
+        //     in.value(mData, &Data::mOwner, &Data::mLight);
+        template <class T, class... FormIds>
+        void value(T& value, FormIds... formIds)
         {
             static_assert(std::is_trivially_copyable_v<T>);
             bytes(&value, sizeof(T));
+            (adjust(value, formIds), ...);
+        }
+
+        // A sub-record that holds a whole number of T, which are added to `values`. The size must be a multiple of
+        // sizeof(T), no more is asked. The form IDs are the same as for value().
+        template <class T, class... FormIds>
+        void values(std::vector<T>& values, FormIds... formIds)
+        {
+            static_assert(std::is_trivially_copyable_v<T>);
+            if (size() % sizeof(T) != 0)
+                badSize();
+            for (std::uint32_t count = size() / sizeof(T); count > 0; --count)
+            {
+                T& value = values.emplace_back();
+                readExact(&value, sizeof(T));
+                (adjust(value, formIds), ...);
+            }
         }
 
         // A form ID, adjusted to the load order the way Reader::getFormId does.
         void formId(ESM::FormId& value);
+
+        // A sub-record that holds a whole number of form IDs, which are added to `values`.
+        void formIds(std::vector<ESM::FormId>& values);
+
+        // A CTDA of Fallout 3 and New Vegas: its reference, and its comparison value when that is a global variable,
+        // are adjusted to the load order. The parameters are not, because which of them are form IDs depends on the
+        // function.
+        void condition(TargetCondition& value);
+
+        // Adjusts the form ID that a member of a packed struct holds. A reference cannot bind to such a member.
+        template <class T>
+        void adjust(T& object, ESM::FormId32 T::*member) const
+        {
+            ESM::FormId32 id = object.*member;
+            mReader.adjustFormId(id);
+            object.*member = id;
+        }
 
         // Exactly `count` bytes, which must be what the whole sub-record holds.
         void bytes(void* data, std::size_t count);
 
         // The whole sub-record, whatever its size.
         void bytes(std::vector<std::uint8_t>& data);
+
+        // The whole sub-record, which must have one of the sizes.
+        void bytes(std::vector<std::uint8_t>& data, std::initializer_list<std::uint32_t> sizes);
+
+        // The whole sub-record and its code, for sub-records that the loader lists without knowing their names.
+        void raw(RawSubRecord& value);
 
         // Fails when the sub-record does not hold exactly the size.
         void expectSize(std::uint32_t size) const;
@@ -89,6 +146,8 @@ namespace ESM4
         [[noreturn]] void fail(std::string_view message) const;
 
     private:
+        void readExact(void* data, std::size_t count);
+
         Reader& mReader;
         std::string mName;
     };

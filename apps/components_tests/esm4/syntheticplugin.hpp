@@ -51,6 +51,30 @@ namespace ESM4Test
         return subRecord(type, data);
     }
 
+    /// Bytes that are all different, so that a field that holds them can be told from its neighbours.
+    inline std::string bytePattern(std::size_t size, std::uint8_t first)
+    {
+        std::string result(size, '\0');
+        for (std::size_t i = 0; i < size; ++i)
+            result[i] = static_cast<char>(first + i);
+        return result;
+    }
+
+    /// The data of a CTDA subrecord as Fallout 3 and New Vegas write it, 28 bytes.
+    inline std::string conditionData(
+        std::uint32_t type, float comparison, std::uint32_t function, std::uint32_t reference)
+    {
+        std::string data;
+        append(data, type);
+        append(data, comparison);
+        append(data, function);
+        append<std::uint32_t>(data, 7); // first parameter
+        append<std::uint32_t>(data, 8); // second parameter
+        append<std::uint32_t>(data, 1); // run on
+        append(data, reference);
+        return data;
+    }
+
     /// Wrap raw subrecords in an Oblivion record header with the given type, form ID and flags.
     inline std::string record(std::string_view type, std::uint32_t id, std::string_view data, std::uint32_t flags = 0)
     {
