@@ -137,9 +137,12 @@ namespace ESM4
         // The whole sub-record, which must have one of the sizes.
         void bytes(std::vector<std::uint8_t>& data, std::initializer_list<std::uint32_t> sizes);
 
-        // The whole sub-record, which must have a size from `minimum` to `maximum`, for a struct that the format
-        // reference allows to end after any of its members.
-        void bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum);
+        // The whole sub-record, for a struct that the format reference allows to end after any of its members: its
+        // size must be `minimum` plus a multiple of `step` up to `maximum`, or one of the sizes in `others`. Pass the
+        // size of the members as `step` when they all have one size, and list the boundaries between the smaller
+        // ones in `others`, so that a size that ends inside a member is rejected.
+        void bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum,
+            std::uint32_t step, std::initializer_list<std::uint32_t> others = {});
 
         // Adjusts the form IDs that a block of bytes, which the loader keeps as it is, holds at the offsets, unless
         // they are null or the block ends before them.

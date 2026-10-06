@@ -43,7 +43,7 @@ namespace ESM4
                     in.bytes(mData, { 2, 186 });
                     break;
                 case ESM::fourCC("DNAM"):
-                    in.bytesBetween(mVisualData, 184, 196);
+                    in.bytesBetween(mVisualData, 184, 196, 4);
                     break;
                 case ESM::fourCC("GNAM"):
                     in.value(mRelatedWaters, &RelatedWaters::mDaytime, &RelatedWaters::mNighttime,

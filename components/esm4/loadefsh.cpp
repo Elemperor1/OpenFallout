@@ -28,7 +28,7 @@ namespace ESM4
                     in.string(mHolesTexture);
                     break;
                 case ESM::fourCC("DATA"):
-                    in.bytesBetween(mData, 224, 308);
+                    in.bytesBetween(mData, 224, 308, 4);
                     // The debris of the addon models, when the struct goes that far.
                     in.adjustFormIds(mData, { 244 });
                     break;

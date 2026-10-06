@@ -127,6 +127,14 @@ namespace
         EXPECT_TRUE(loadFailure(subRecord("MNAM", "")).empty());
     }
 
+    TEST(ESM4WaterTest, rejectsVisualDataThatEndsInsideAMember)
+    {
+        for (const std::size_t size : { 185u, 186u, 187u, 193u, 195u })
+            EXPECT_EQ(loadFailure(subRecord("DNAM", std::string(size, 'x'))),
+                "ESM4::WATR::load - DNAM has an unexpected size")
+                << size;
+    }
+
     TEST(ESM4WaterTest, rejectsAnUnknownSubrecord)
     {
         EXPECT_EQ(

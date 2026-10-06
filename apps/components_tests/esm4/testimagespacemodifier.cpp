@@ -106,6 +106,15 @@ namespace
             loadFailure(subRecord("DNAM", std::string(187, 'x'))), "ESM4::IMAD::load - DNAM has an unexpected size");
     }
 
+    TEST(ESM4ImageSpaceModifierTest, rejectsDataThatEndsInsideAMember)
+    {
+        // The use of the target and the flags of the depth of field have a byte each, and two unused bytes follow.
+        for (const std::size_t size : { 189u, 190u, 191u, 227u, 229u, 243u })
+            EXPECT_EQ(loadFailure(subRecord("DNAM", std::string(size, 'x'))),
+                "ESM4::IMAD::load - DNAM has an unexpected size")
+                << size;
+    }
+
     TEST(ESM4ImageSpaceModifierTest, rejectsAnUnknownSubrecord)
     {
         EXPECT_EQ(

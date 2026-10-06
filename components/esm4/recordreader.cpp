@@ -182,9 +182,11 @@ namespace ESM4
             fail("sub-record is shorter than its size");
     }
 
-    void RecordReader::bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum)
+    void RecordReader::bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum,
+        std::uint32_t step, std::initializer_list<std::uint32_t> others)
     {
-        if (size() < minimum || size() > maximum)
+        const bool onBoundary = size() >= minimum && size() <= maximum && (size() - minimum) % step == 0;
+        if (!onBoundary && std::find(others.begin(), others.end(), size()) == others.end())
             badSize();
         bytes(data);
     }

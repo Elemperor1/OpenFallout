@@ -96,6 +96,15 @@ namespace
             loadFailure(subRecord("DATA", std::string(223, 'x'))), "ESM4::EFSH::load - DATA has an unexpected size");
     }
 
+    TEST(ESM4EffectShaderTest, rejectsDataThatEndsInsideAMember)
+    {
+        // Every member from the 224th byte on has four bytes.
+        for (const std::size_t size : { 225u, 226u, 227u, 245u, 307u })
+            EXPECT_EQ(loadFailure(subRecord("DATA", std::string(size, 'x'))),
+                "ESM4::EFSH::load - DATA has an unexpected size")
+                << size;
+    }
+
     TEST(ESM4EffectShaderTest, rejectsAnUnknownSubrecord)
     {
         EXPECT_EQ(
