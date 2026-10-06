@@ -156,6 +156,7 @@ namespace ESM4
     {
         VFS::Manager const* mVFS;
         Header mHeader; // ESM4 header
+        unsigned int mFileFormVersion = 0; // the form version of the TES4 record, which is 0 where records have none
 
         ReaderContext mCtx;
 
@@ -274,9 +275,9 @@ namespace ESM4
         inline bool hasFormVersion() const { return mCtx.recHeaderSize == sizeof(RecordHeader); }
         inline unsigned int formVersion() const { return mCtx.recordHeader.record.version; }
 
-        // Whether the record that was read last is from Fallout 3 or New Vegas, as opposed to Oblivion, Skyrim or
-        // Fallout 4, which have records of the same types with other sub-records.
-        bool isFalloutRecord() const;
+        // Whether the file is one of Fallout 3 or New Vegas, as opposed to Oblivion, Skyrim or Fallout 4, which have
+        // records of the same types with other sub-records. It does not depend on the record that was read last.
+        bool isFalloutFile() const;
 
         void buildLStringIndex();
         void getLocalizedString(std::string& str);

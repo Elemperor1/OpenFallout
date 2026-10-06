@@ -205,6 +205,7 @@ namespace ESM4
         getRecordHeader();
         if (mCtx.recordHeader.record.typeId == REC_TES4)
         {
+            mFileFormVersion = hasFormVersion() ? formVersion() : 0;
             mHeader.load(*this);
             mCtx.fileRead += mCtx.recordHeader.record.dataSize;
 
@@ -299,14 +300,16 @@ namespace ESM4
         mCtx.recHeaderSize = size;
     }
 
-    bool Reader::isFalloutRecord() const
+    bool Reader::isFalloutFile() const
     {
         const unsigned int version = esmVersion();
         if (version == ESM::VER_132 || version == ESM::VER_133 || version == ESM::VER_134)
             return true;
-        // Fallout 3 has the header version of Skyrim LE, which has no record with a form version below 40.
+        // Fallout 3 has the header version of Skyrim LE. The records cannot tell them apart, because Skyrim.esm has
+        // records with form versions from 14 on, but the TES4 record of a file has the form version of the game: 15
+        // in Fallout 3 and 43 or more in Skyrim LE.
         constexpr unsigned int firstSkyrimFormVersion = 40;
-        return version == ESM::VER_094 && hasFormVersion() && formVersion() < firstSkyrimFormVersion;
+        return version == ESM::VER_094 && hasFormVersion() && mFileFormVersion < firstSkyrimFormVersion;
     }
 
     void Reader::buildLStringIndex()

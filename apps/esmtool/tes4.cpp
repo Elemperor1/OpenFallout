@@ -203,13 +203,13 @@ namespace EsmTool
             std::cout << '\n';
         }
 
-        /// Load the current record as T if it is one of Fallout 3 or New Vegas, as readTypedRecord does. The loaders
-        /// that only know the layouts of those games are not used for the records of other games. Return false and
-        /// read nothing for those.
+        /// Load the current record as T if the file is one of Fallout 3 or New Vegas, as readTypedRecord does. The
+        /// loaders that only know the layouts of those games are not used for the records of other games. Return false
+        /// and read nothing for those.
         template <class T>
         bool readFalloutRecord(const Params& params, ESM4::Reader& reader)
         {
-            if (!reader.isFalloutRecord())
+            if (!reader.isFalloutFile())
                 return false;
             readTypedRecord<T>(params, reader);
             return true;
