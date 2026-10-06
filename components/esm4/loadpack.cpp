@@ -100,7 +100,8 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
                 else
                 {
                     reader.get(mTarget); // TES4
-                    if (mLocation.type != 2)
+                    // Only a reference (0) and an object ID (1) are form IDs; 2 is an object type.
+                    if (mTarget.type == 0 || mTarget.type == 1)
                         reader.adjustFormId(mTarget.target);
                 }
 
@@ -108,9 +109,11 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
             }
             case ESM::fourCC("CTDA"):
             {
-                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn))
+                // A CTDA of 24 bytes is also the form of Fallout 3 and New Vegas that has no reference.
+                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn)
+                    || (subHdr.dataSize == offsetof(TargetCondition, reference) && reader.isFalloutFile()))
                 {
-                    in.conditionOrOlder(mTargetConditions.emplace_back());
+                    in.condition(mTargetConditions.emplace_back());
                     break;
                 }
                 if (subHdr.dataSize != sizeof(CTDA))

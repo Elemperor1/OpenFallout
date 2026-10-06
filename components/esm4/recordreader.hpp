@@ -113,12 +113,10 @@ namespace ESM4
 
         // A CTDA of Fallout 3 and New Vegas: its reference, and its comparison value when that is a global variable,
         // are adjusted to the load order. The parameters are not, because which of them are form IDs depends on the
-        // function.
+        // function. The run on and the reference are optional in the format reference, so 20 bytes (neither) and 24
+        // bytes (no reference) are read too: what is missing is zero, which is the subject and no reference. The older
+        // flag "run on target" in the type becomes a run on of 1 (target), and is cleared, in every size.
         void condition(TargetCondition& value);
-
-        // The same, and also the older form of 20 bytes, which has no run on and no reference. Those are left at zero,
-        // which is the subject and none.
-        void conditionOrOlder(TargetCondition& value);
 
         // Adjusts the form ID that a member of a packed struct holds, unless it is null. A reference cannot bind to
         // such a member.
@@ -138,6 +136,23 @@ namespace ESM4
 
         // The whole sub-record, which must have one of the sizes.
         void bytes(std::vector<std::uint8_t>& data, std::initializer_list<std::uint32_t> sizes);
+
+        // The whole sub-record, which must have a size from `minimum` to `maximum`, for a struct that the format
+        // reference allows to end after any of its members.
+        void bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum);
+
+        // Adjusts the form IDs that a block of bytes, which the loader keeps as it is, holds at the offsets, unless
+        // they are null or the block ends before them.
+        void adjustFormIds(std::uint8_t* data, std::size_t size, std::initializer_list<std::size_t> offsets) const;
+        void adjustFormIds(std::vector<std::uint8_t>& data, std::initializer_list<std::size_t> offsets) const
+        {
+            adjustFormIds(data.data(), data.size(), offsets);
+        }
+        template <std::size_t N>
+        void adjustFormIds(std::array<std::uint8_t, N>& data, std::initializer_list<std::size_t> offsets) const
+        {
+            adjustFormIds(data.data(), data.size(), offsets);
+        }
 
         // The whole sub-record and its code, for sub-records that the loader lists without knowing their names.
         void raw(RawSubRecord& value);

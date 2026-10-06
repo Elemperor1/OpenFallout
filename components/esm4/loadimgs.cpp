@@ -19,7 +19,7 @@ namespace ESM4
                     in.string(mEditorId);
                     break;
                 case ESM::fourCC("DNAM"):
-                    in.bytes(mData, { 132, 148, 152 });
+                    in.bytesBetween(mData, 132, 152);
                     break;
                 default:
                     in.unknown();

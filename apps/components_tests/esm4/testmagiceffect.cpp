@@ -43,7 +43,8 @@ namespace
     std::string everySubRecord()
     {
         return zString("EDID", "Text of EDID") + zString("FULL", "Text of FULL") + zString("DESC", "Text of DESC")
-            + zString("MODL", "Text of MODL") + subRecord("DATA", dataData(5));
+            + zString("MODL", "Text of MODL") + subRecord("DATA", dataData(5))
+            + valueSubRecord<std::uint32_t>("ESCE", 0x00010030) + valueSubRecord<std::uint32_t>("ESCE", 0x00010031);
     }
 
     void expectEverySubRecord(const ESM4::MagicEffect& result)
@@ -71,6 +72,9 @@ namespace
         EXPECT_EQ(result.mData.mConstantEffectBarterFactor, 21.5f);
         EXPECT_EQ(result.mData.mArchetype, 100022u);
         EXPECT_EQ(result.mData.mActorValue, -100023);
+        ASSERT_EQ(result.mCounterEffects.size(), 2u);
+        EXPECT_EQ(result.mCounterEffects[0].toUint32(), 0x00010030u);
+        EXPECT_EQ(result.mCounterEffects[1].toUint32(), 0x00010031u);
     }
 
     std::string loadFailure(const std::string& data)
@@ -112,6 +116,8 @@ namespace
             loadFailure(subRecord("DATA", std::string(71, 'x'))), "ESM4::MGEF::load - DATA has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("DATA", std::string(73, 'x'))), "ESM4::MGEF::load - DATA has an unexpected size");
+        EXPECT_EQ(
+            loadFailure(subRecord("ESCE", std::string(3, 'x'))), "ESM4::MGEF::load - ESCE has an unexpected size");
     }
 
     TEST(ESM4MagicEffectTest, rejectsAnUnknownSubrecord)

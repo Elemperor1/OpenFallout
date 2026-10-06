@@ -93,6 +93,19 @@ namespace
             loadFailure(subRecord("RDSI", std::string(5, 'x'))), "ESM4::IMAD::load - RDSI has an unexpected size");
     }
 
+    TEST(ESM4ImageSpaceModifierTest, readsDataThatEndsAfterAnyMember)
+    {
+        for (const std::size_t size : { 188u, 192u, 225u, 226u, 232u, 236u, 240u, 244u })
+        {
+            const std::vector<ESM4::ImageSpaceModifier> records = loadRecords<ESM4::ImageSpaceModifier>(
+                "IMAD", record("IMAD", 1, subRecord("DNAM", bytePattern(size, 1))));
+            ASSERT_EQ(records.size(), 1u) << size;
+            EXPECT_EQ(records[0].mData.size(), size);
+        }
+        EXPECT_EQ(
+            loadFailure(subRecord("DNAM", std::string(187, 'x'))), "ESM4::IMAD::load - DNAM has an unexpected size");
+    }
+
     TEST(ESM4ImageSpaceModifierTest, rejectsAnUnknownSubrecord)
     {
         EXPECT_EQ(

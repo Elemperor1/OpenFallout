@@ -31,7 +31,7 @@ namespace ESM4
                     in.value(mWaterFlags);
                     break;
                 case ESM::fourCC("MNAM"):
-                    in.value(mMnam);
+                    in.bytes(mMnam);
                     break;
                 case ESM::fourCC("SNAM"):
                     in.formId(mSound);
@@ -43,7 +43,7 @@ namespace ESM4
                     in.bytes(mData, { 2, 186 });
                     break;
                 case ESM::fourCC("DNAM"):
-                    in.bytes(mVisualData, { 184, 196 });
+                    in.bytesBetween(mVisualData, 184, 196);
                     break;
                 case ESM::fourCC("GNAM"):
                     in.value(mRelatedWaters, &RelatedWaters::mDaytime, &RelatedWaters::mNighttime,

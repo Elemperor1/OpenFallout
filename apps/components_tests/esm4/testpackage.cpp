@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -104,6 +106,62 @@ namespace
         EXPECT_EQ(result[0].mTargetConditions[1].runOn, 0u);
         EXPECT_EQ(result[0].mTargetConditions[1].reference, 0u);
         EXPECT_EQ(result[0].mConditions.size(), 1u);
+    }
+
+    // Loads the one package of a plugin that is a Fallout 3 file, by its record only: the group headers of Fallout have
+    // another size than the synthetic plugins have.
+    ESM4::AIPackage loadFromAFalloutFile(const std::string& data)
+    {
+        std::string hedr;
+        append<float>(hedr, 1.34f);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+        const std::string plugin
+            = versionedRecord("TES4", 0, subRecord("HEDR", hedr), 15) + versionedRecord("PACK", 1, data, 15);
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        EXPECT_TRUE(reader.getRecordHeader());
+        EXPECT_TRUE(reader.isFalloutFile());
+        reader.getRecordData();
+        ESM4::AIPackage result;
+        result.load(reader);
+        return result;
+    }
+
+    TEST(ESM4PackageTest, readsAConditionOfTwentyFourBytesAsATargetConditionInAFalloutFile)
+    {
+        // Run on and no reference, which the format reference allows. The first is a global, so it is adjusted.
+        std::string condition;
+        append<std::uint32_t>(condition, 0x44);
+        append<std::uint32_t>(condition, 0x00000123);
+        for (const std::uint32_t value : { 14u, 7u, 8u, 3u })
+            append(condition, value);
+        const ESM4::AIPackage result = loadFromAFalloutFile(basics() + subRecord("CTDA", condition));
+
+        ASSERT_EQ(result.mTargetConditions.size(), 1u);
+        EXPECT_EQ(result.mTargetConditions[0].functionIndex, 14u);
+        EXPECT_EQ(result.mTargetConditions[0].runOn, 3u);
+        EXPECT_EQ(result.mTargetConditions[0].reference, 0u);
+        EXPECT_THAT(result.mConditions, IsEmpty());
+    }
+
+    TEST(ESM4PackageTest, adjustsTheTargetOfAPackageByTheTypeOfTheTarget)
+    {
+        const auto target = [](std::int32_t type) {
+            std::string data;
+            append(data, type);
+            append<std::uint32_t>(data, 0x00000123);
+            append<std::int32_t>(data, 5);
+            return subRecord("PTDT", data);
+        };
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>("PACK",
+            record("PACK", 1, basics() + target(0)) + record("PACK", 2, basics() + target(1))
+                + record("PACK", 3, basics() + target(2)),
+            0, nullptr, 3);
+
+        ASSERT_EQ(result.size(), 3u);
+        EXPECT_EQ(result[0].mTarget.target, 0x03000123u);
+        EXPECT_EQ(result[1].mTarget.target, 0x03000123u);
+        EXPECT_EQ(result[2].mTarget.target, 0x00000123u); // an object type is a number
     }
 
     TEST(ESM4PackageTest, ignoresSubrecordsThatNoEventClaims)

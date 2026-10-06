@@ -40,7 +40,7 @@ namespace
         EXPECT_EQ(result.mNoiseTexture, "Text of NNAM");
         EXPECT_EQ(result.mOpacity, 7);
         EXPECT_EQ(result.mWaterFlags, 8);
-        EXPECT_EQ(result.mMnam, 9);
+        EXPECT_THAT(result.mMnam, ElementsAre(9));
         EXPECT_EQ(result.mSound.toUint32(), 0x00010007u);
         EXPECT_EQ(result.mActorEffect.toUint32(), 0x00010008u);
         EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), bytePattern(2, 19));
@@ -94,10 +94,6 @@ namespace
         EXPECT_EQ(
             loadFailure(subRecord("FNAM", std::string(2, 'x'))), "ESM4::WATR::load - FNAM has an unexpected size");
         EXPECT_EQ(
-            loadFailure(subRecord("MNAM", std::string(0, 'x'))), "ESM4::WATR::load - MNAM has an unexpected size");
-        EXPECT_EQ(
-            loadFailure(subRecord("MNAM", std::string(2, 'x'))), "ESM4::WATR::load - MNAM has an unexpected size");
-        EXPECT_EQ(
             loadFailure(subRecord("SNAM", std::string(3, 'x'))), "ESM4::WATR::load - SNAM has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("SNAM", std::string(5, 'x'))), "ESM4::WATR::load - SNAM has an unexpected size");
@@ -113,6 +109,22 @@ namespace
             loadFailure(subRecord("GNAM", std::string(11, 'x'))), "ESM4::WATR::load - GNAM has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("GNAM", std::string(13, 'x'))), "ESM4::WATR::load - GNAM has an unexpected size");
+    }
+
+    TEST(ESM4WaterTest, readsAMaterialIdOfAnySizeAndVisualDataThatEndsAfterAnyMember)
+    {
+        // The format reference calls MNAM a string, and lets DNAM end after any member from the 184th byte on.
+        for (const std::size_t size : { 184u, 188u, 192u, 196u })
+        {
+            const std::vector<ESM4::Water> result = loadRecords<ESM4::Water>(
+                "WATR", record("WATR", 1, zString("MNAM", "Material") + subRecord("DNAM", bytePattern(size, 1))));
+            ASSERT_EQ(result.size(), 1u) << size;
+            EXPECT_EQ(result[0].mMnam.size(), 9u);
+            EXPECT_EQ(result[0].mVisualData.size(), size);
+        }
+        EXPECT_EQ(
+            loadFailure(subRecord("DNAM", std::string(183, 'x'))), "ESM4::WATR::load - DNAM has an unexpected size");
+        EXPECT_TRUE(loadFailure(subRecord("MNAM", "")).empty());
     }
 
     TEST(ESM4WaterTest, rejectsAnUnknownSubrecord)

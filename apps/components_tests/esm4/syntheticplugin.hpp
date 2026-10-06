@@ -72,6 +72,16 @@ namespace ESM4Test
         return result;
     }
 
+    /// Bytes that are all different, with the form ID id at each of the offsets.
+    inline std::string bytesWithFormIds(
+        std::size_t size, std::uint8_t first, const std::vector<std::size_t>& offsets, std::uint32_t id)
+    {
+        std::string result = bytePattern(size, first);
+        for (const std::size_t offset : offsets)
+            result.replace(offset, sizeof(id), reinterpret_cast<const char*>(&id), sizeof(id));
+        return result;
+    }
+
     /// One entry of the data of an alternate texture subrecord (MODS, DMDS and the like).
     struct TextureEntry
     {

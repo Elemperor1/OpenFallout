@@ -50,6 +50,9 @@ namespace ESM4
                 case ESM::fourCC("MODD"):
                     in.value(mModelFlags);
                     break;
+                case ESM::fourCC("ESCE"):
+                    in.formId(mCounterEffects.emplace_back());
+                    break;
                 default:
                     in.unknown();
             }

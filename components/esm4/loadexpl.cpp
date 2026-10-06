@@ -41,6 +41,8 @@ namespace ESM4
                     break;
                 case ESM::fourCC("DATA"):
                     in.value(mData);
+                    // The light, the two sounds and the impact data set.
+                    in.adjustFormIds(mData, { 12, 16, 28, 32 });
                     break;
                 case ESM::fourCC("MODB"):
                     in.value(mBoundRadius);

@@ -131,20 +131,24 @@ namespace ESM4
 
     void RecordReader::condition(TargetCondition& value)
     {
-        this->value(value, &TargetCondition::reference);
-        adjustComparison(value);
-    }
-
-    void RecordReader::conditionOrOlder(TargetCondition& value)
-    {
-        if (size() == offsetof(TargetCondition, runOn))
+        // The run on and the reference are optional in the format reference.
+        constexpr std::size_t withoutRunOn = offsetof(TargetCondition, runOn);
+        constexpr std::size_t withoutReference = offsetof(TargetCondition, reference);
+        if (size() == withoutRunOn || size() == withoutReference)
         {
             value = {};
-            readExact(&value, offsetof(TargetCondition, runOn));
-            adjustComparison(value);
+            readExact(&value, size());
         }
         else
-            condition(value);
+            this->value(value, &TargetCondition::reference);
+        // The older way to say that a condition is about the target, which the run on replaced. The format reference's
+        // tool turns it into the run on, whatever the size, and so does this.
+        if ((value.condition & CTF_RunOnTarget) != 0)
+        {
+            value.condition &= ~static_cast<std::uint32_t>(CTF_RunOnTarget);
+            value.runOn = 1;
+        }
+        adjustComparison(value);
     }
 
     void RecordReader::adjustComparison(TargetCondition& value) const
@@ -176,6 +180,27 @@ namespace ESM4
         data.resize(size());
         if (!data.empty() && !mReader.get(data.data(), data.size()))
             fail("sub-record is shorter than its size");
+    }
+
+    void RecordReader::bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum)
+    {
+        if (size() < minimum || size() > maximum)
+            badSize();
+        bytes(data);
+    }
+
+    void RecordReader::adjustFormIds(
+        std::uint8_t* data, std::size_t size, std::initializer_list<std::size_t> offsets) const
+    {
+        for (const std::size_t offset : offsets)
+        {
+            if (size < sizeof(ESM::FormId32) || offset > size - sizeof(ESM::FormId32))
+                continue;
+            ESM::FormId32 id = 0;
+            std::memcpy(&id, data + offset, sizeof(id));
+            adjustReference(id);
+            std::memcpy(data + offset, &id, sizeof(id));
+        }
     }
 
     void RecordReader::bytes(std::vector<std::uint8_t>& data, std::initializer_list<std::uint32_t> sizes)

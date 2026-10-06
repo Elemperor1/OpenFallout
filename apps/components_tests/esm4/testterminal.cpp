@@ -194,13 +194,18 @@ namespace
 
     TEST(ESM4TerminalTest, adjustsTheFormIdsOfItsItemsToTheLoadOrder)
     {
-        const std::string data = zString("ITXT", "Item") + subRecord("INAM", formIdData(0x00000123))
-            + subRecord("TNAM", formIdData(0)) + subRecord("SCHR", scriptHeader(1, 0, 0))
-            + subRecord("SCRO", formIdData(0x00000456)) + subRecord("CTDA", conditionData(0x40, 2.5f, 14, 0x00000789));
+        const std::string data = subRecord("SCRI", formIdData(0x00000321)) + subRecord("PNAM", formIdData(0))
+            + subRecord("SNAM", formIdData(0x00000322)) + zString("ITXT", "Item")
+            + subRecord("INAM", formIdData(0x00000123)) + subRecord("TNAM", formIdData(0))
+            + subRecord("SCHR", scriptHeader(1, 0, 0)) + subRecord("SCRO", formIdData(0x00000456))
+            + subRecord("CTDA", conditionData(0x40, 2.5f, 14, 0x00000789));
         const std::vector<ESM4::Terminal> result
             = loadRecords<ESM4::Terminal>("TERM", record("TERM", 1, data), 0, nullptr, 3);
 
         ASSERT_EQ(result.size(), 1u);
+        EXPECT_EQ(result[0].mScriptId, (ESM::FormId{ 0x321, 3 }));
+        EXPECT_EQ(result[0].mPasswordNote.toUint32(), 0u);
+        EXPECT_EQ(result[0].mSound, (ESM::FormId{ 0x322, 3 }));
         ASSERT_EQ(result[0].mMenuItems.size(), 1u);
         const ESM4::Terminal::MenuItem& item = result[0].mMenuItems[0];
         EXPECT_EQ(item.mDisplayNote, (ESM::FormId{ 0x123, 3 }));

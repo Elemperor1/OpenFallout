@@ -103,7 +103,7 @@ namespace
         EXPECT_EQ(
             loadFailure(subRecord("TNAM", std::string(5, 'x'))), "ESM4::MESG::load - TNAM has an unexpected size");
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::MESG::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::MESG::load - CTDA has an unexpected size");
     }
 
     TEST(ESM4MessageTest, rejectsAnUnknownSubrecord)

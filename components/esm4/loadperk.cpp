@@ -12,8 +12,8 @@ namespace ESM4
         struct QuestStageData
         {
             ESM::FormId32 mQuest = 0;
-            std::uint8_t mStage = 0;
-            std::array<std::uint8_t, 3> mUnused{};
+            std::uint16_t mStage = 0;
+            std::array<std::uint8_t, 2> mUnused{};
         };
 #pragma pack(pop)
         static_assert(sizeof(QuestStageData) == 8);

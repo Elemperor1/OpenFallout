@@ -109,14 +109,14 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 itemString(mText);
                 break;
             case ESM::fourCC("SCRI"):
-                reader.getFormId(mScriptId);
+                in.formId(mScriptId);
                 break;
             case ESM::fourCC("PNAM"):
-                reader.getFormId(mPasswordNote);
+                in.formId(mPasswordNote);
                 break;
             case ESM::fourCC("SNAM"):
                 if (subHdr.dataSize == 4)
-                    reader.getFormId(mSound);
+                    in.formId(mSound);
                 // FIXME: FO4 sound marker params
                 else
                     reader.skipSubRecordData();
@@ -156,14 +156,15 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("CTDA"):
                 // The conditions of the record come before its first menu item.
-                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn))
+                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn)
+                    || subHdr.dataSize == offsetof(TargetCondition, reference))
                 {
                     if (mMenuItems.empty())
-                        in.conditionOrOlder(mConditions.emplace_back());
+                        in.condition(mConditions.emplace_back());
                     else
                     {
                         lastPart = Part_Condition;
-                        in.conditionOrOlder(mMenuItems.back().mConditions.emplace_back());
+                        in.condition(mMenuItems.back().mConditions.emplace_back());
                     }
                 }
                 else

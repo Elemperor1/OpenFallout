@@ -58,6 +58,7 @@ namespace ESM4
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
         std::vector<AlternateTexture> mModelAlternateTextures; // MODS
         std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
+        std::vector<ESM::FormId> mCounterEffects; // ESCE, one MGEF each, as many as DATA says
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

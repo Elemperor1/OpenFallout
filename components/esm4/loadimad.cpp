@@ -44,7 +44,7 @@ namespace ESM4
                     in.string(mEditorId);
                     break;
                 case ESM::fourCC("DNAM"):
-                    in.bytes(mData, { 188, 236, 240, 244 });
+                    in.bytesBetween(mData, 188, 244);
                     break;
                 case ESM::fourCC("RDSD"):
                     in.formId(mRdsd);

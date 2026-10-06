@@ -118,7 +118,7 @@ namespace
         EXPECT_EQ(
             loadFailure(subRecord("EFIT", std::string(21, 'x'))), "ESM4::SPEL::load - EFIT has an unexpected size");
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::SPEL::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::SPEL::load - CTDA has an unexpected size");
     }
 
     TEST(ESM4SpellTest, rejectsAnUnknownSubrecord)

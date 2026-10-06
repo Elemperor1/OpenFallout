@@ -44,7 +44,7 @@ namespace ESM4
             std::uint8_t mPriority = 0;
             // DATA depends on the type of the entry:
             ESM::FormId mQuest; // a quest stage: a QUST
-            std::uint8_t mQuestStage = 0; // a quest stage
+            std::uint16_t mQuestStage = 0; // a quest stage
             ESM::FormId mAbility; // an ability: a SPEL
             std::uint8_t mEntryPoint = 0; // an entry point, which of the points of the format reference
             std::uint8_t mFunction = 0; // an entry point

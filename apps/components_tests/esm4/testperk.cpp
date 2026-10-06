@@ -133,7 +133,7 @@ namespace
         EXPECT_EQ(
             loadFailure(subRecord("EPF3", std::string(3, 'x'))), "ESM4::PERK::load - EPF3 has an unexpected size");
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::PERK::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::PERK::load - CTDA has an unexpected size");
     }
 
     TEST(ESM4PerkTest, rejectsAnUnknownSubrecord)
@@ -205,8 +205,8 @@ namespace
     {
         std::string data;
         append<std::uint32_t>(data, 0x00010005);
-        append<std::uint8_t>(data, 7);
-        data.append(3, '\0');
+        append<std::uint16_t>(data, 0x0107); // a stage above 255
+        data.append(2, '\0');
         return data;
     }
 
@@ -225,7 +225,7 @@ namespace
         ASSERT_EQ(perks.size(), 1u);
         ASSERT_EQ(perks[0].mEntries.size(), 3u);
         EXPECT_EQ(perks[0].mEntries[0].mQuest.toUint32(), 0x00010005u);
-        EXPECT_EQ(perks[0].mEntries[0].mQuestStage, 7);
+        EXPECT_EQ(perks[0].mEntries[0].mQuestStage, 0x0107);
         EXPECT_EQ(perks[0].mEntries[1].mAbility.toUint32(), 0x00010006u);
         EXPECT_EQ(perks[0].mEntries[2].mEntryPoint, 9);
         EXPECT_EQ(perks[0].mEntries[2].mFunction, 10);

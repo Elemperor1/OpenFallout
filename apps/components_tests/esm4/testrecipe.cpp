@@ -39,7 +39,8 @@ namespace
         EXPECT_EQ(result.mEditorId, "Text of EDID");
         EXPECT_EQ(result.mFullName, "Text of FULL");
         ASSERT_EQ(result.mConditions.size(), 1u);
-        EXPECT_EQ(result.mConditions[0].condition, 0x43u);
+        EXPECT_EQ(result.mConditions[0].condition, 0x41u); // the "run on target" flag, 0x02, is now the run on
+        EXPECT_EQ(result.mConditions[0].runOn, 1u);
         EXPECT_EQ(result.mConditions[0].comparison, 2.5f);
         EXPECT_EQ(result.mConditions[0].functionIndex, 14u);
         EXPECT_EQ(result.mConditions[0].reference, 0x00010003u);
@@ -93,7 +94,7 @@ namespace
     TEST(ESM4RecipeTest, rejectsASizeThatNoGameUses)
     {
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::RCPE::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::RCPE::load - CTDA has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("CTDA", std::string(32, 'x'))), "ESM4::RCPE::load - CTDA has an unexpected size");
         EXPECT_EQ(

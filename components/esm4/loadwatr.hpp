@@ -33,7 +33,7 @@ namespace ESM4
         std::string mNoiseTexture; // NNAM
         std::uint8_t mOpacity = 0; // ANAM
         std::uint8_t mWaterFlags = 0; // FNAM
-        std::uint8_t mMnam = 0; // MNAM, not known
+        std::vector<std::uint8_t> mMnam; // MNAM, one byte in the game files, a string in the format reference
         ESM::FormId mSound; // SNAM
         ESM::FormId mActorEffect; // XNAM
         std::vector<std::uint8_t> mData; // DATA, the damage in the shorter form, all settings in the longer

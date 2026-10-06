@@ -56,8 +56,9 @@ namespace
         data.mResistValue = 0x108; // an actor value, not a form ID
         data.mActorValue = 0x109;
 
-        const std::vector<ESM4::MagicEffect> records
-            = loadAsThirdPlugin<ESM4::MagicEffect>("MGEF", subRecord("DATA", objectBytes(data)));
+        const std::vector<ESM4::MagicEffect> records = loadAsThirdPlugin<ESM4::MagicEffect>("MGEF",
+            subRecord("DATA", objectBytes(data)) + valueSubRecord<std::uint32_t>("ESCE", 0x00000110)
+                + valueSubRecord<std::uint32_t>("ESCE", 0));
 
         ASSERT_EQ(records.size(), 1u);
         const ESM4::MagicEffect::Data& result = records[0].mData;
@@ -71,6 +72,9 @@ namespace
         EXPECT_EQ(result.mAreaSound, 0u);
         EXPECT_EQ(result.mResistValue, 0x108);
         EXPECT_EQ(result.mActorValue, 0x109);
+        ASSERT_EQ(records[0].mCounterEffects.size(), 2u);
+        EXPECT_EQ(records[0].mCounterEffects[0], adjusted(0x110));
+        EXPECT_EQ(records[0].mCounterEffects[1].toUint32(), 0u);
     }
 
     TEST(ESM4LoadOrderTest, adjustsTheActorEffectOfTheStagesOfTheSurvivalNeeds)

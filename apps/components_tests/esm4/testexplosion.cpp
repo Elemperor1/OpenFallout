@@ -27,12 +27,18 @@ namespace
         return data;
     }
 
+    // DATA with a form ID at each of the offsets that hold one: the light, two sounds and the impact data set.
+    std::string explosionData(std::uint32_t id)
+    {
+        return bytesWithFormIds(52, 19, { 12, 16, 28, 32 }, id);
+    }
+
     std::string everySubRecord()
     {
         return zString("EDID", "Text of EDID") + subRecord("OBND", dataBounds(2)) + zString("FULL", "Text of FULL")
             + zString("MODL", "Text of MODL") + subRecord("MODT", bytePattern(5, 15))
             + valueSubRecord<std::uint32_t>("EITM", 0x00010006) + valueSubRecord<std::uint32_t>("MNAM", 0x00010007)
-            + valueSubRecord<std::uint32_t>("INAM", 0x00010008) + subRecord("DATA", bytePattern(52, 19));
+            + valueSubRecord<std::uint32_t>("INAM", 0x00010008) + subRecord("DATA", explosionData(0x00010001));
     }
 
     void expectEverySubRecord(const ESM4::Explosion& result)
@@ -50,7 +56,7 @@ namespace
         EXPECT_EQ(result.mObjectEffect.toUint32(), 0x00010006u);
         EXPECT_EQ(result.mImageSpaceModifier.toUint32(), 0x00010007u);
         EXPECT_EQ(result.mPlacedImpactObject.toUint32(), 0x00010008u);
-        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), bytePattern(52, 19));
+        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), explosionData(0x00010001));
     }
 
     std::string loadFailure(const std::string& data)
@@ -84,6 +90,18 @@ namespace
 
         ASSERT_EQ(records.size(), 1u);
         expectEverySubRecord(records[0]);
+    }
+
+    TEST(ESM4ExplosionTest, adjustsTheFormIdsOfItsDataAndKeepsNullOnesNull)
+    {
+        const std::vector<ESM4::Explosion> result = loadRecords<ESM4::Explosion>("EXPL",
+            record("EXPL", 1, subRecord("DATA", explosionData(0x00000123)))
+                + record("EXPL", 2, subRecord("DATA", explosionData(0))),
+            0, nullptr, 3);
+
+        ASSERT_EQ(result.size(), 2u);
+        EXPECT_EQ(std::string(result[0].mData.begin(), result[0].mData.end()), explosionData(0x03000123));
+        EXPECT_EQ(std::string(result[1].mData.begin(), result[1].mData.end()), explosionData(0));
     }
 
     TEST(ESM4ExplosionTest, rejectsASizeThatNoGameUses)
