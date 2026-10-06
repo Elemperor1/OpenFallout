@@ -259,19 +259,42 @@ namespace
         EXPECT_EQ(loadRecords<ESM4::Faction>("FACT", record("FACT", 1, emptyTitle)).size(), 1u);
     }
 
-    /// Verify a compressed record whose last sub-record is too short for the reader to see is refused, not read
-    /// without it. The reader takes the end of a compressed record to be 4 bytes early, so it stops before a last
-    /// sub-record of 9 bytes or less.
-    TEST(ESM4FactionTest, rejectsACompressedRecordWhoseLastSubrecordTheReaderDoesNotSee)
+    /// Verify a compressed record whose last sub-record has 9 bytes or less is read in full. The size of a compressed
+    /// record is 4 bytes below the size of its data, which once hid such a sub-record from the reader.
+    TEST(ESM4FactionTest, readsAShortLastSubrecordOfACompressedRecord)
     {
         const std::string data = zString("EDID", "Short") + relation(0x000a0001, 1, 0) + subRecord("DATA", "\x01");
 
-        EXPECT_THAT([&] { loadRecords<ESM4::Faction>("FACT", compressedRecord("FACT", 1, data)); },
-            ThrowsMessage<std::runtime_error>(HasSubstr("unread bytes")));
-        // The same record is read in full when it is not compressed.
-        const std::vector<ESM4::Faction> plain = loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data));
-        ASSERT_EQ(plain.size(), 1u);
-        EXPECT_EQ(plain.front().mFactionFlags, 1);
+        const std::vector<ESM4::Faction> factions
+            = loadRecords<ESM4::Faction>("FACT", compressedRecord("FACT", 1, data));
+
+        ASSERT_EQ(factions.size(), 1u);
+        EXPECT_EQ(factions.front().mFactionFlags, 1);
+        EXPECT_EQ(factions.front().mRelations.size(), 1u);
+    }
+
+    /// Verify a file that ends one byte early, in the terminator of a string, is refused, not read as complete.
+    TEST(ESM4FactionTest, rejectsAStringWhoseTerminatorTheFileEndsBefore)
+    {
+        const std::string edid = zString("EDID", "Cut");
+        const std::vector<std::pair<std::string, std::string>> cases = {
+            { "EDID", zString("EDID", "Name") },
+            { "FULL", edid + zString("FULL", "Name") },
+            { "MNAM", edid + valueSubRecord<std::int32_t>("RNAM", 1) + zString("MNAM", "Title") },
+        };
+
+        for (const auto& [type, data] : cases)
+        {
+            try
+            {
+                loadRecords<ESM4::Faction>("FACT", record("FACT", 1, data), 1);
+                ADD_FAILURE() << type << " cut before its terminator was accepted";
+            }
+            catch (const std::exception& e)
+            {
+                EXPECT_THAT(e.what(), HasSubstr("shorter than its size")) << type;
+            }
+        }
     }
 
     /// Verify a file that ends inside a field is refused, not read as zeros.

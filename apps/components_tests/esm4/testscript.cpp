@@ -293,6 +293,18 @@ namespace
         EXPECT_TRUE(definition.hasConsistentSize());
     }
 
+    /// Verify a compressed record whose last sub-record has 9 bytes or less is read in full. The size of a compressed
+    /// record is 4 bytes below the size of its data, which once hid such a sub-record from the reader.
+    TEST(ESM4ScriptTest, readsAShortLastSubrecordOfACompressedRecord)
+    {
+        const std::string data = zString("EDID", "Packed") + scriptHeader(0, 0, 0) + subRecord("SCTX", "ab");
+
+        const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", compressedRecord("SCPT", 1, data));
+
+        ASSERT_EQ(scripts.size(), 1u);
+        EXPECT_EQ(scripts.front().mScript.scriptSource, "ab");
+    }
+
     /// Verify delegating script subrecords still rejects an unknown SCPT subrecord.
     TEST(ESM4ScriptTest, stillRejectsUnknownSubrecords)
     {

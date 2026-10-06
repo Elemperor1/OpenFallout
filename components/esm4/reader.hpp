@@ -349,9 +349,6 @@ namespace ESM4
         // record that is read in full leaves none. getSubRecordHeader() also returns false when fewer bytes are left
         // than a sub-record header, and when the file ends inside the header, so only this tells that apart from the
         // end of the record.
-        // Note: the size of a compressed record is 4 bytes low, which is allowed for (see subRecordFitsRecord()), but
-        // a last sub-record of 9 bytes or less in a compressed record is not seen by getSubRecordHeader() and is
-        // counted here
         inline std::uint32_t unreadRecordBytes() const { return mUnreadRecordBytes; }
 
         // Skip the data part of a subrecord

@@ -593,24 +593,25 @@ namespace ESM4
     bool Reader::getSubRecordHeader()
     {
         bool result = false;
+        // The size of a compressed record is 4 bytes below the size of its data, see getRecordData()
         const std::uint32_t slack = (mCtx.recordHeader.record.flags & Rec_Compressed) != 0 ? 4 : 0;
-        const std::uint64_t recordEnd = static_cast<std::uint64_t>(mCtx.recordHeader.record.dataSize) + slack;
-        mUnreadRecordBytes = mCtx.recordRead < recordEnd ? static_cast<std::uint32_t>(recordEnd - mCtx.recordRead) : 0;
+        const std::uint32_t recordEnd = mCtx.recordHeader.record.dataSize + slack;
+        mUnreadRecordBytes = mCtx.recordRead < recordEnd ? recordEnd - mCtx.recordRead : 0;
         // NOTE: some SubRecords have 0 dataSize (e.g. SUB_RDSD in one of REC_REGN records in Oblivion.esm).
-        if (mCtx.recordHeader.record.dataSize - mCtx.recordRead >= sizeof(mCtx.subRecordHeader))
+        if (recordEnd - mCtx.recordRead >= sizeof(mCtx.subRecordHeader))
         {
             result = getExact(mCtx.subRecordHeader);
             // HACK: below assumes sub-record data will be read or skipped in full;
             //       this hack aims to avoid updating mCtx.recordRead each time anything is read
             mCtx.recordRead += (sizeof(mCtx.subRecordHeader) + mCtx.subRecordHeader.dataSize);
         }
-        else if (mCtx.recordRead > mCtx.recordHeader.record.dataSize)
+        else if (mCtx.recordRead > recordEnd)
         {
             // try to correct any overshoot, seek to the end of the expected data
             // this will only work if mCtx.subRecordHeader.dataSize was fully read or skipped
             // (i.e. it will only correct mCtx.subRecordHeader.dataSize being incorrect)
             // TODO: not tested
-            std::uint32_t overshoot = (std::uint32_t)mCtx.recordRead - mCtx.recordHeader.record.dataSize;
+            std::uint32_t overshoot = (std::uint32_t)mCtx.recordRead - recordEnd;
 
             std::size_t pos = mStream->tellg();
             mStream->seekg(pos - overshoot);
@@ -884,8 +885,13 @@ namespace ESM4
             {
                 if (hasNull)
                 {
-                    char ch;
+                    char ch = '\0';
                     stream.read(&ch, 1); // read the null terminator
+                    if (stream.gcount() != 1)
+                    {
+                        str.clear();
+                        return false;
+                    }
                     if (ch != '\0')
                         throw std::runtime_error("ESM4::Reader::getString string is not terminated with a null");
                 }
