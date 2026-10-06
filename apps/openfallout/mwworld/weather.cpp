@@ -286,6 +286,11 @@ namespace OFWorld
         mFogFar = TimeOfDayInterpolator<float>(
             record.mFog.mDayFar, record.mFog.mDayFar, record.mFog.mDayFar, record.mFog.mNightFar);
 
+        // The transition delta is in 255 steps up to 0.25 per second (the scale is the one of the definitions of xEdit
+        // for the newer games, not checked on Fallout data). 0 keeps the one of the weather this is made from.
+        if (record.mData.mTransDelta > 0)
+            mTransitionDelta = record.mData.mTransDelta / 255.f * 0.25f;
+
         mWindSpeed = record.mData.mWindSpeed / 255.f;
         mGlareView = record.mData.mSunGlare / 255.f;
         // The storms of Morrowind move the characters and clouds, nothing of that is in the record
@@ -383,6 +388,15 @@ namespace OFWorld
     {
         mWeather = store.search(state.mWeather) != nullptr ? state.mWeather : ESM::RefId();
         mChances = state.mChances;
+
+        // The weathers the content no longer has are left out of the chances, and the others share their chance. A
+        // map that has none of them is kept as it is.
+        std::vector<std::pair<ESM::RefId, int>> weights;
+        for (const auto& [id, chance] : mChances)
+            if (store.search(id) != nullptr)
+                weights.emplace_back(id, chance);
+        if (weights.size() != mChances.size())
+            mChances = normaliseChances(weights);
     }
 
     RegionWeather::operator ESM::RegionWeatherState() const
@@ -507,6 +521,15 @@ namespace OFWorld
             ++chances[remainders[i].second];
 
         return chances;
+    }
+
+    std::pair<float, float> fogRange(const OFRender::WeatherResult& result, float viewDistance)
+    {
+        if (result.mHasFogRange)
+            return { result.mFogNear, result.mFogFar };
+        if (result.mFogDepth <= 0.f)
+            return { viewDistance, viewDistance };
+        return { viewDistance * (1.f - result.mFogDepth), viewDistance };
     }
 
     std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store)
@@ -1618,12 +1641,16 @@ namespace OFWorld
         mResult.mAmbientColor = lerp(current.mAmbientColor, other.mAmbientColor, factor);
         mResult.mSunDiscColor = lerp(current.mSunDiscColor, other.mSunDiscColor, factor);
         mResult.mFogDepth = lerp(current.mFogDepth, other.mFogDepth, factor);
-        // With a weather that says where its fog starts and one that does not, the fog is a share of the view distance
-        mResult.mHasFogRange = current.mHasFogRange && other.mHasFogRange;
+        // With a weather that says where its fog starts and one that does not, the one that does not has the range that
+        // its share of the view distance makes, so that the fog goes from one to the other without a jump
+        mResult.mHasFogRange = current.mHasFogRange || other.mHasFogRange;
         if (mResult.mHasFogRange)
         {
-            mResult.mFogNear = lerp(current.mFogNear, other.mFogNear, factor);
-            mResult.mFogFar = lerp(current.mFogFar, other.mFogFar, factor);
+            const float viewDistance = mRendering.getViewDistance();
+            const auto [currentNear, currentFar] = fogRange(current, viewDistance);
+            const auto [otherNear, otherFar] = fogRange(other, viewDistance);
+            mResult.mFogNear = lerp(currentNear, otherNear, factor);
+            mResult.mFogFar = lerp(currentFar, otherFar, factor);
         }
         mResult.mDLFogFactor = lerp(current.mDLFogFactor, other.mDLFogFactor, factor);
         mResult.mDLFogOffset = lerp(current.mDLFogOffset, other.mDLFogOffset, factor);

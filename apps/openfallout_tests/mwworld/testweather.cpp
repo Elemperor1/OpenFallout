@@ -860,6 +860,25 @@ namespace OFWorld
             EXPECT_FALSE(weather.mHasFogRange);
         }
 
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutTakesItsTransitionDeltaFromTheRecord)
+        {
+            ESM4::Weather record = makeRecord(4);
+            record.mData.mTransDelta = 51;
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+
+            EXPECT_FLOAT_EQ(weather.transitionDelta(), 0.05f);
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutWithoutATransitionDeltaKeepsTheDefault)
+        {
+            ESM4::Weather record = makeRecord(4);
+            record.mData.mTransDelta = 0;
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+            const Weather fallback(ESM::RefId::stringRefId("Clear"), 0, "Clear", 0.8f, 1.f, 0.f, {});
+
+            EXPECT_EQ(weather.transitionDelta(), fallback.transitionDelta());
+        }
+
         TEST(OFWorldWeatherTest, aWeatherOfMorrowindIsNotFromARecord)
         {
             const Weather weather(ESM::RefId::stringRefId("Clear"), 0, "Clear", 0.8f, 1.f, 0.f, {});
@@ -959,6 +978,68 @@ namespace OFWorld
             ESM::RegionWeatherState state = region;
             EXPECT_TRUE(state.mWeather.empty());
             EXPECT_EQ(state.mChances.at(formIdRefId(0x01000800)), 100);
+        }
+
+        TEST(OFWorldWeatherTest, aRegionLeavesRemovedWeathersOutOfTheSavedChances)
+        {
+            WeatherStore store;
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, makeRecord(4), 0.8f));
+            RegionWeather region(std::map<ESM::RefId, uint8_t>{});
+
+            region.load(ESM::RegionWeatherState{ .mWeather = formIdRefId(0x01000800),
+                            .mChances = { { formIdRefId(0x01000800), 50 }, { formIdRefId(0x01000999), 50 } } },
+                store);
+
+            EXPECT_EQ(region.getChance(formIdRefId(0x01000800)), 100);
+            EXPECT_EQ(region.getChance(formIdRefId(0x01000999)), 0);
+        }
+
+        TEST(OFWorldWeatherTest, aRegionKeepsSavedChancesThatAddUpToLessThan100)
+        {
+            WeatherStore store;
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, makeRecord(4), 0.8f));
+            store.insertStatic(Weather(formIdRefId(0x01000801), 1, makeRecord(4), 0.8f));
+            RegionWeather region(std::map<ESM::RefId, uint8_t>{});
+
+            region.load(ESM::RegionWeatherState{ .mWeather = formIdRefId(0x01000800),
+                            .mChances = { { formIdRefId(0x01000800), 30 }, { formIdRefId(0x01000801), 60 } } },
+                store);
+
+            EXPECT_EQ(region.getChance(formIdRefId(0x01000800)), 30);
+            EXPECT_EQ(region.getChance(formIdRefId(0x01000801)), 60);
+        }
+
+        TEST(OFWorldWeatherTest, theFogRangeOfAResultIsTheOneItHas)
+        {
+            OFRender::WeatherResult result{};
+            result.mHasFogRange = true;
+            result.mFogNear = 100.f;
+            result.mFogFar = 9000.f;
+            result.mFogDepth = 0.5f;
+
+            const auto [fogNear, fogFar] = fogRange(result, 8192.f);
+            EXPECT_EQ(fogNear, 100.f);
+            EXPECT_EQ(fogFar, 9000.f);
+        }
+
+        TEST(OFWorldWeatherTest, theFogRangeOfAResultWithoutOneComesFromItsShareOfTheViewDistance)
+        {
+            OFRender::WeatherResult result{};
+            result.mFogDepth = 0.25f;
+
+            const auto [fogNear, fogFar] = fogRange(result, 8000.f);
+            EXPECT_EQ(fogNear, 6000.f);
+            EXPECT_EQ(fogFar, 8000.f);
+        }
+
+        TEST(OFWorldWeatherTest, aResultWithoutAnyFogHasNoFogBeforeTheEndOfTheView)
+        {
+            OFRender::WeatherResult result{};
+            result.mFogDepth = 0.f;
+
+            const auto [fogNear, fogFar] = fogRange(result, 8000.f);
+            EXPECT_EQ(fogNear, 8000.f);
+            EXPECT_EQ(fogFar, 8000.f);
         }
 
         TEST(OFWorldWeatherTest, theChancesOfAClimateLeaveOutTheWeathersTheStoreDoesNotHave)

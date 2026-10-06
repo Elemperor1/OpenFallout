@@ -310,6 +310,10 @@ namespace OFWorld
     /// remainder.
     std::map<ESM::RefId, uint8_t> normaliseChances(const std::vector<std::pair<ESM::RefId, int>>& weights);
 
+    /// Where the fog of a weather result starts and ends in game units: the range the weather says, or the one that
+    /// its share of the view distance makes (no fog before the end of the view when it has none).
+    std::pair<float, float> fogRange(const OFRender::WeatherResult& result, float viewDistance);
+
     /// The chances of the weathers of a Fallout climate, for the weathers that the store has.
     std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store);
 
