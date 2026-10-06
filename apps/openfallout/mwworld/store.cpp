@@ -1190,6 +1190,7 @@ template class OFWorld::TypedDynamicStore<ESM4::LevelledCreature>;
 template class OFWorld::TypedDynamicStore<ESM4::LevelledItem>;
 template class OFWorld::TypedDynamicStore<ESM4::LevelledNpc>;
 template class OFWorld::TypedDynamicStore<ESM4::Light>;
+template class OFWorld::TypedDynamicStore<ESM4::LightingTemplate>;
 template class OFWorld::TypedDynamicStore<ESM4::MiscItem>;
 template class OFWorld::TypedDynamicStore<ESM4::MovableStatic>;
 template class OFWorld::TypedDynamicStore<ESM4::Npc>;

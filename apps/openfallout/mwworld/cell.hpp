@@ -1,6 +1,8 @@
 #ifndef OPENW_MWORLD_CELL
 #define OPENW_MWORLD_CELL
 
+#include <cstdint>
+
 #include <osg/Vec2i>
 
 #include <components/esm/esmbridge.hpp>
@@ -15,22 +17,35 @@ namespace ESM
 namespace ESM4
 {
     struct Cell;
+    struct Lighting;
 }
 
 namespace OFWorld
 {
     class CellStore;
 
+    /// The lighting of a cell as the renderer needs it.
+    struct MoodData
+    {
+        uint32_t mAmbiantColor;
+        uint32_t mDirectionalColor;
+        uint32_t mFogColor;
+        /// Morrowind cells give the share of the view distance that is fogged; Fallout cells give a range instead.
+        float mFogDensity;
+        /// The distances in game units where the fog starts and where it is complete, both 0 when the cell has none.
+        float mFogNear = 0.f;
+        float mFogFar = 0.f;
+
+        bool hasFogRange() const { return mFogFar > mFogNear; }
+    };
+
+    /// The lighting a Fallout cell is drawn with: its own values, except those that the inherit flags (bit 0 ambient
+    /// colour to bit 8 fog power, as in the LNAM sub-record of the cell) take from its lighting template.
+    ESM4::Lighting resolveLighting(
+        const ESM4::Lighting& own, const ESM4::Lighting* lightingTemplate, std::uint32_t inheritFlags);
+
     class Cell : public ESM::CellVariant
     {
-        struct MoodData
-        {
-            uint32_t mAmbiantColor;
-            uint32_t mDirectionalColor;
-            uint32_t mFogColor;
-            float mFogDensity;
-        };
-
     public:
         explicit Cell(const ESM4::Cell& cell);
         explicit Cell(const ESM::Cell& cell);

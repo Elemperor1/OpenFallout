@@ -4,7 +4,8 @@ without any game data.
 
 The plugin has the records of a plain room: a static that is a cube (used as a floor and as a pillar), the marker
 static that Fallout cells use for their entry point, an interior cell "OFTestCell" with the lighting of a Fallout 3
-cell, and three references that put them there. It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a
+cell, a lighting template that the cell takes its fog colour and far fog distance from, and three references that put
+them there. It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a
 cube, which the engine can load beside the NIF files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
@@ -21,12 +22,25 @@ FLOOR_ID = 0x802
 PILLAR_ID = 0x803
 MARKER_ID = 0x804
 MARKER_REF_ID = 0x805
+TEMPLATE_ID = 0x806
 CELL_NAME = "OFTestCell"
 # Edge of the cube in game units. The floor is the cube scaled up so that its top face is at height 0, where the
 # player starts, and the pillar is the cube as it is, standing on the floor PILLAR_DISTANCE units north of the start.
 CUBE = 256.0
 FLOOR_SCALE = 16.0
 PILLAR_DISTANCE = 600.0
+
+# The lighting of the cell, in the order of the XCLL sub-record. The cell inherits the fog colour and the far fog
+# distance of its lighting template (inherit flags 0x04 and 0x10), the rest is its own: what the engine should use is
+# the cell's ambient and directional colours, the template's fog colour and far distance, and the cell's near distance.
+AMBIENT = (90, 90, 100)
+DIRECTIONAL = (200, 190, 160)
+CELL_FOG = (20, 25, 30)
+CELL_FOG_FAR = 6000.0
+TEMPLATE_FOG = (120, 110, 100)
+TEMPLATE_FOG_FAR = 2500.0
+FOG_NEAR = 100.0
+INHERIT_FOG_COLOR_AND_FAR = 0x04 | 0x10
 
 
 def sub(code, data=b""):
@@ -60,8 +74,17 @@ def refr(form_id, base, position, scale=None):
     return record(b"REFR", form_id, subs)
 
 
+def lighting(ambient, directional, fog, fog_near, fog_far):
+    """A 40 byte lighting struct as Fallout 3 writes it, in the XCLL of a cell and in the DATA of a lighting template:
+    ambient, directional and fog colours (RGBA bytes), fog near and far, the direction as two integers, the fade and
+    clip distance of the fog and its power."""
+    data = struct.pack("<12Bffiifff", *ambient, 0, *directional, 0, *fog, 0, fog_near, fog_far, 0, 0, 1.0, 4000.0, 1.0)
+    assert len(data) == 40
+    return data
+
+
 def plugin():
-    hedr = struct.pack("<fiI", 0.94, 8, MARKER_REF_ID + 1)
+    hedr = struct.pack("<fiI", 0.94, 9, TEMPLATE_ID + 1)
     header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"),
                                  zstr(b"SNAM", "synthetic test plugin")], flags=1)
     half = int(CUBE / 2)
@@ -70,12 +93,14 @@ def plugin():
                                      zstr(b"MODL", "openfallout\\cube.osgt")])
     # The static that real cells use to say where to enter them, with no model.
     marker = record(b"STAT", MARKER_ID, [zstr(b"EDID", "COCMarkerHeading")])
-    # XCLL as Fallout 3 writes it: ambient, directional and fog colours (RGBA bytes), fog near and far, the direction
-    # as two integers, the fade and clip distance of the fog and its power: 40 bytes.
-    xcll = struct.pack("<4B4B4Bffiiffff", 90, 90, 100, 0, 200, 190, 160, 0, 20, 25, 30, 0,
-                       100.0, 6000.0, 0, 0, 1.0, 4000.0, 1.0, 0.0)
+    template = record(b"LGTM", TEMPLATE_ID, [
+        zstr(b"EDID", "OFTestLighting"),
+        sub(b"DATA", lighting((1, 2, 3), (4, 5, 6), TEMPLATE_FOG, 1.0, TEMPLATE_FOG_FAR))])
+    xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
     cell = record(b"CELL", CELL_ID, [zstr(b"EDID", CELL_NAME), zstr(b"FULL", "OpenFallout Test Cell"),
-                                     sub(b"DATA", b"\x01"), sub(b"XCLL", xcll)])
+                                     sub(b"DATA", b"\x01"), sub(b"XCLL", xcll),
+                                     sub(b"LTMP", struct.pack("<I", TEMPLATE_ID)),
+                                     sub(b"LNAM", struct.pack("<I", INHERIT_FOG_COLOR_AND_FAR))])
     refs = group(struct.pack("<I", CELL_ID), 9, [
         refr(FLOOR_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
@@ -84,7 +109,8 @@ def plugin():
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
-    return header + top_group(b"STAT", [cube, marker]) + top_group(b"CELL", [block])
+    return (header + top_group(b"STAT", [cube, marker]) + top_group(b"LGTM", [template])
+            + top_group(b"CELL", [block]))
 
 
 def cube_mesh():

@@ -50,7 +50,7 @@ void ESM4::LightingTemplate::load(ESM4::Reader& reader)
             case ESM::fourCC("DATA"):
                 if (subHdr.dataSize == 36) // TES4
                     reader.get(&mLighting, 36);
-                if (subHdr.dataSize == 40) // FO3/FONV
+                else if (subHdr.dataSize == 40) // FO3/FONV
                     reader.get(mLighting);
                 else if (subHdr.dataSize == 92) // TES5
                 {

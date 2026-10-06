@@ -525,7 +525,20 @@ namespace OFWorld
             mPhysics->disableWater();
 
         if (!cell.isExterior() && !cellVariant.isQuasiExterior())
+        {
             mRendering.configureAmbient(cellVariant);
+
+            const OFWorld::MoodData& mood = cellVariant.getMood();
+            const auto rgb = [](uint32_t colour) {
+                return std::to_string(colour & 0xff) + "," + std::to_string((colour >> 8) & 0xff) + ","
+                    + std::to_string((colour >> 16) & 0xff);
+            };
+            Log(Debug::Info) << "Cell lighting: ambient " << rgb(mood.mAmbiantColor) << ", directional "
+                             << rgb(mood.mDirectionalColor) << ", fog " << rgb(mood.mFogColor)
+                             << (mood.hasFogRange() ? ", fog range " + std::to_string(mood.mFogNear) + " to "
+                                            + std::to_string(mood.mFogFar)
+                                                    : ", fog density " + std::to_string(mood.mFogDensity));
+        }
 
         mPreloader->notifyLoaded(&cell);
     }

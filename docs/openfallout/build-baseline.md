@@ -75,7 +75,7 @@ The unit tests never load the Lua scripts and l10n files under `files/data`, so 
 
 ### The Fallout start smoke test
 
-`fallout_start_smoke_test.py` is the matching check for starting a game. It writes a Fallout 3 format plugin with one interior cell, a floor and a pillar (`synthetic_fallout_plugin.py`; the mesh is an OpenSceneGraph text file, since no game data is used), then starts `openfallout --skip-menu --start OFTestCell` on it under a virtual display with Mesa software rendering. A Lua player script waits three seconds, walks north, casts a ray down and quits after twelve. The script fails unless the log shows the placeholder records, the cell loaded, an interior position on the floor (height 0 to 2) for the whole run, a ray that hits the floor at 0, a stop at the pillar, no Lua or start error, and `Quitting peacefully`. It also checks that `files/data/meshes/placeholder_skeleton.nif` is what `placeholder_skeleton.py` writes.
+`fallout_start_smoke_test.py` is the matching check for starting a game. It writes a Fallout 3 format plugin with one interior cell, a floor and a pillar (`synthetic_fallout_plugin.py`; the mesh is an OpenSceneGraph text file, since no game data is used), then starts `openfallout --skip-menu --start OFTestCell` on it under a virtual display with Mesa software rendering. A Lua player script waits three seconds, walks north, casts a ray down and quits after twelve. The script fails unless the log shows the placeholder records, the cell loaded, an interior position on the floor (height 0 to 2) for the whole run, a ray that hits the floor at 0, a stop at the pillar, the lighting of the cell (the plugin has a lighting template that the cell takes its fog colour and far distance from, and the engine logs the resolved values in a `Cell lighting:` line), no Lua or start error, and `Quitting peacefully`. It also checks that `files/data/meshes/placeholder_skeleton.nif` is what `placeholder_skeleton.py` writes.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -84,6 +84,8 @@ It takes about 15 seconds. It is not part of the CI workflow, which runs unit te
 To start a game in a cell of real data, give the editor id of an interior cell (exterior cells have not been tried):
 
     openfallout --content Fallout3.esm --skip-menu --start <CellEditorId>
+
+The engine logs the light and fog it uses for an interior cell in one line, for example `Cell lighting: ambient 90,90,100, directional 200,190,160, fog 120,110,100, fog range 100.000000 to 2500.000000` (colours as red,green,blue from 0 to 255, distances in game units). Look for `Cell lighting` in `openfallout.log` to see what a real cell asks for.
 
 ## Result after rename stage C
 
