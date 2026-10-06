@@ -7,8 +7,9 @@ engine, so the world has to make placeholders to start. The unit tests cover tho
 together with the rest of the engine: the plugin and its mesh come from synthetic_fallout_plugin.py, the engine is
 started with `--skip-menu --start OFTestCell` under a virtual display (Xvfb with Mesa software rendering is enough),
 and a Lua player script walks north from the start for a few seconds, casts a ray down and quits. The checks are on
-the log: the cell is the one asked for, the player stands on the floor the whole time, stops at the pillar that is
-in the way, nothing logs an error from Lua, and the engine quits by itself.
+the log: the cell is the one asked for, the player stands on the floor the whole time, the camera is at eye height above
+the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine quits
+by itself.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -40,6 +41,9 @@ STOP_RANGE = (PILLAR_FACE - 60.0, PILLAR_FACE)
 
 WALK_SECONDS = 12
 
+# Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
+EYE_HEIGHT = (100.0, 140.0)
+
 # Waits for the player to settle, then walks north (the player faces north at the start) and logs once a second.
 WALK_SCRIPT = """\
 local self = require('openfallout.self')
@@ -47,6 +51,7 @@ local nearby = require('openfallout.nearby')
 local util = require('openfallout.util')
 local core = require('openfallout.core')
 local I = require('openfallout.interfaces')
+local camera = require('openfallout.camera')
 
 local elapsed = 0
 local nextLog = 0
@@ -66,8 +71,9 @@ return {
             end
             if elapsed >= nextLog then
                 nextLog = nextLog + 1
-                log(string.format('t=%%.1f exterior=%%s name=%%s pos=%%s', elapsed, tostring(self.cell.isExterior),
-                    tostring(self.cell.name), fmt(self.position)))
+                log(string.format('t=%%.1f exterior=%%s name=%%s pos=%%s cam=%%s', elapsed,
+                    tostring(self.cell.isExterior), tostring(self.cell.name), fmt(self.position),
+                    fmt(camera.getPosition())))
             end
             if elapsed >= 4 and not rayDone then
                 rayDone = true
@@ -82,7 +88,9 @@ return {
 }
 """ % WALK_SECONDS
 
-SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+NUMBER = r"(-?[\d.]+)"
+VECTOR = ",".join([NUMBER] * 3)
+SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
 
 
@@ -134,16 +142,16 @@ def check(text):
         problems.append("the engine did not make placeholder records, so the content had a player record")
     if f"Loading cell {plugin.CELL_NAME}" not in text:
         problems.append(f"the engine did not load the cell {plugin.CELL_NAME}")
-    samples = [(float(m.group(1)), m.group(2), m.group(3), tuple(float(m.group(i)) for i in (4, 5, 6)))
-               for m in map(SAMPLE.search, text.splitlines()) if m]
+    samples = [(float(m.group(1)), m.group(2), m.group(3), tuple(float(m.group(i)) for i in (4, 5, 6)),
+                tuple(float(m.group(i)) for i in (7, 8, 9))) for m in map(SAMPLE.search, text.splitlines()) if m]
     if len(samples) < WALK_SECONDS:
         problems.append(f"the walk script logged {len(samples)} positions, expected at least {WALK_SECONDS}")
         return problems
-    for _, exterior, _, _ in samples:
+    for _, exterior, _, _, _ in samples:
         if exterior != "false":
             problems.append("the player is not in an interior cell")
             break
-    for time_, _, _, (x, y, z) in samples:
+    for time_, _, _, (x, y, z), _ in samples:
         if not 0.0 <= z <= 2.0:
             problems.append(f"at {time_:.0f} s the player is {z:.1f} units high, not standing on the floor at 0")
             break
@@ -153,6 +161,14 @@ def check(text):
                         "(stopped by the pillar)")
     if abs(x) > 5.0:
         problems.append(f"the player drifted sideways to x={x:.1f}")
+    # The first person camera follows a node of the skeleton, and with none it stays at the world origin: it has to be
+    # above the player, at about the eye height of a human, from the second second on.
+    for time_, _, _, (px, py, pz), (cx, cy, cz) in samples:
+        above = EYE_HEIGHT[0] <= cz - pz <= EYE_HEIGHT[1]
+        if time_ >= 1.0 and not (abs(cx - px) < 40.0 and abs(cy - py) < 40.0 and above):
+            problems.append(f"at {time_:.0f} s the camera is at {cx:.0f},{cy:.0f},{cz:.0f} and the player at "
+                            f"{px:.0f},{py:.0f},{pz:.0f}, not at eye height above the player")
+            break
     rays = [RAY.search(line) for line in text.splitlines()]
     rays = [m for m in rays if m]
     if not rays or rays[0].group(1) != "true" or abs(float(rays[0].group(4))) > 1.0:
