@@ -31,7 +31,8 @@ EXTERIOR_MARKER_REF_ID = 0x80B
 CELL_NAME = "OFTestCell"
 WORLD_NAME = "OFTestWorld"
 # The size of an exterior cell of Fallout 3 and New Vegas, in game units. The exterior cell 0,0 covers x and y from 0 to
-# this, and the player starts at its centre.
+# this. The cell has an entry marker at its centre, which is where the player starts; a cell without a marker is
+# entered at its centre too.
 EXTERIOR_CELL_SIZE = 4096.0
 # Edge of the cube in game units. The floor is the cube scaled up so that its top face is at height 0, where the
 # player starts, and the pillar is the cube as it is, standing on the floor PILLAR_DISTANCE units north of the start.

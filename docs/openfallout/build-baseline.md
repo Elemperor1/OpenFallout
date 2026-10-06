@@ -81,7 +81,7 @@ The unit tests never load the Lua scripts and l10n files under `files/data`, so 
 
 It takes about 30 seconds, 15 for each start. It is not part of the CI workflow, which runs unit tests only, because running a window needs a virtual display on the runner.
 
-To start a game in a cell of real data, give the editor id of an interior cell, or the editor id of a worldspace and the grid coordinates of an exterior cell, separated by a colon and a comma (the coordinates are in cells of 4096 units, so `0,0` is the cell that holds the origin of the worldspace):
+To start a game in a cell of real data, give the editor id of an interior cell, or the editor id of a worldspace and the grid coordinates of an exterior cell, separated by a colon and a comma (the coordinates are in cells of 4096 units, so `0,0` is the cell that holds the origin of the worldspace). The player starts at the `COCMarkerHeading` or `XMarkerHeading` of the cell if it has one, as in the interior start, and at the centre of the cell if it has not:
 
     openfallout --content Fallout3.esm --skip-menu --start <CellEditorId>
     openfallout --content FalloutNV.esm --skip-menu --start WastelandNV:<x>,<y>
