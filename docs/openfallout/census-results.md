@@ -422,9 +422,9 @@ What the 2,528 records show about the layout, which the loader was written from 
 
 Run on 2026-10-06 on the same Mac, from the branch of PRs #11 and #12, on the same 20 plugins, each from its own folder with a bare file name. All runs exited 0 with nothing on standard error, no run printed an `ERROR` line or "Reading stopped early", and no census printed a Failures section. The tables above this section were made before these loaders and still show the earlier counts.
 
-Three runs: `e84c2fc0` (PR #11, the first 22 types and the `NPC_` fix), `003492d1` (the head of PR #11, which decides by game whether a file gets the new loaders) and `8fb3e4b4` (the head of PR #12, which adds the last 19 types and the `TERM` and `PACK` scripts). The first two outputs are identical in all 20 plugins, byte for byte, so the check that Fallout files are accepted rejected none. None of the 20 plugins is from another game, so this run cannot show that other games are turned away; the unit tests do that.
+Four runs: `e84c2fc0` (PR #11, the first 22 types and the `NPC_` fix), `003492d1` (the head of PR #11, which decides by game whether a file gets the new loaders), `8fb3e4b4` (the first head of PR #12, which adds the last 19 types and the `TERM` and `PACK` scripts) and `3896a171` (PR #12 after review, with stricter loaders: model alternate textures decoded, perk entry data read by its type, terminal menu items split where their sub-records start over, and the scripts of perks counted). The first two outputs are identical in all 20 plugins, byte for byte, so the check that Fallout files are accepted rejected none. None of the 20 plugins is from another game, so this run cannot show that other games are turned away; the unit tests do that. The run on `3896a171` differs from the one on `8fb3e4b4` in one place only: a `PERK` row appears in the scripts table of 7 plugins (see below). Every cell of the by-type tables, and every other row of the scripts table, is the same in all 20 plugins, so the stricter loaders rejected no record that the earlier ones read.
 
-Result of the last run: in every plugin Parsed equals Records, and No parser and Failed are 0. "No parser before" is the count of the run on `003492d1`, which is the same as on `e84c2fc0`.
+Result of the last run (`3896a171`, the same as on `8fb3e4b4`): in every plugin Parsed equals Records, and No parser and Failed are 0. All 20 runs exited 0 with nothing on standard error. "No parser before" is the count of the run on `003492d1`, which is the same as on `e84c2fc0`.
 
 | Plugin | Records | No parser before | No parser | Failed |
 |---|---:|---:|---:|---:|
@@ -474,7 +474,24 @@ The census now counts these scripts in its "Scripts held in line by records" tab
 | `Fallout3.esm` (TTW-patched) | 303 | 12,909 | 0 | 503 | 13,624 |
 | `FalloutNV.esm` (TTW-patched) | 208 | 11,293 | 0 | 480 | 12,526 |
 
-The add-on packs and `GunRunnersArsenal.esm` have no `TERM` or `PACK` script. The TTW rows are not added to the total, as before. In every `TERM` and `PACK` script the compiled size in the header equals the bytecode read, the variable-count check flags no script, and the reference count equals the references read except in three `TERM` scripts, one in each of `Anchorage.esm`, `DeadMoney.esm` and `OldWorldBlues.esm` (the TTW rows show none). That is a property of those scripts as shipped, since an independent recount of the scripts of `INFO`, `PACK`, `QUST`, `SCPT` and `TERM` straight from the plugin files, with a separate parser, equals this table in every cell of all 20 plugins.
+The add-on packs and `GunRunnersArsenal.esm` have no `TERM` or `PACK` script. The TTW rows are not added to the total, as before. In every `TERM` and `PACK` script the compiled size in the header equals the bytecode read, the variable-count check flags no script, and the reference count equals the references read except in three `TERM` scripts, one in each of `Anchorage.esm`, `DeadMoney.esm` and `OldWorldBlues.esm` (the TTW rows show none). That is a property of those scripts as shipped, since an independent recount of the scripts of `INFO`, `PACK`, `QUST`, `SCPT` and `TERM` straight from the plugin files, with a separate parser, equals this table in every cell of all 20 plugins. The `TERM` and `PACK` numbers are the same on `8fb3e4b4` and on `3896a171`, where a menu item ends and the next one starts by the order of the sub-records, not only at an `ITXT`: the three scripts with another reference count are therefore not menu items run together.
+
+### Scripts of `PERK` entries
+
+The run on `3896a171` is the first that counts the scripts of perks (the record's own, and the one of each entry). Only 23 scripts exist in the 20 plugins. Every one has the compiled size of its header, the reference count and the variable count that the header says (all bad-count columns are 0), and the independent recount equals the census in all five columns for every plugin, the new `PERK` row included.
+
+| Plugin | `PERK` scripts | `PERK` bytecode (bytes) |
+|---|---:|---:|
+| `Fallout3.esm` | 3 | 132 |
+| `FalloutNV.esm` | 5 | 354 |
+| `HonestHearts.esm` | 1 | 51 |
+| `OldWorldBlues.esm` | 1 | 39 |
+| **All 11** | **10** | **576** |
+| `TaleOfTwoWastelands.esm` | 4 | 396 |
+| `YUPTTW.esm` | 4 | 290 |
+| `FalloutNV.esm` (TTW-patched) | 5 | 354 |
+
+The other plugins, `Fallout3.esm` (TTW-patched) among them, have no `PERK` script. The TTW rows are not added to the total, as before.
 
 ## Notes
 
