@@ -75,15 +75,18 @@ The unit tests never load the Lua scripts and l10n files under `files/data`, so 
 
 ### The Fallout start smoke test
 
-`fallout_start_smoke_test.py` is the matching check for starting a game. It writes a Fallout 3 format plugin with one interior cell, a floor and a pillar (`synthetic_fallout_plugin.py`; the mesh is an OpenSceneGraph text file, since no game data is used), then starts `openfallout --skip-menu --start OFTestCell` on it under a virtual display with Mesa software rendering. A Lua player script waits three seconds, walks north, casts a ray down and quits after twelve. The script fails unless the log shows the placeholder records, the cell loaded, an interior position on the floor (height 0 to 2) for the whole run, a ray that hits the floor at 0, a stop at the pillar, the lighting of the cell (the plugin has a lighting template that the cell takes its fog colour and far distance from, and the engine logs the resolved values in a `Cell lighting:` line), no Lua or start error, and `Quitting peacefully`. It also checks that `files/data/meshes/placeholder_skeleton.nif` is what `placeholder_skeleton.py` writes.
+`fallout_start_smoke_test.py` is the matching check for starting a game. It writes a Fallout 3 format plugin with one interior cell, a floor and a pillar, and one exterior worldspace whose cell (0, 0) has flat terrain and the same pillar (`synthetic_fallout_plugin.py`; the mesh is an OpenSceneGraph text file, since no game data is used), then starts `openfallout --skip-menu --start OFTestCell` on it, and again with `--start OFTestWorld:0,0`, under a virtual display with Mesa software rendering. A Lua player script waits three seconds, walks north, casts a ray down and quits after twelve. The script fails unless the log shows the placeholder records, the cell loaded, a position on the floor (height 0 to 2) for the whole run, a ray that hits the floor (the terrain for the exterior start, which needs the heightfield collision of the `LAND` record: without the record the player falls and the check fails), a stop at the pillar, and, for the interior start, the lighting of the cell (the plugin has a lighting template that the cell takes its fog colour and far distance from, and the engine logs the resolved values in a `Cell lighting:` line), no Lua or start error, and `Quitting peacefully`. It also checks that `files/data/meshes/placeholder_skeleton.nif` is what `placeholder_skeleton.py` writes.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
-It takes about 15 seconds. It is not part of the CI workflow, which runs unit tests only, because running a window needs a virtual display on the runner.
+It takes about 30 seconds, 15 for each start. It is not part of the CI workflow, which runs unit tests only, because running a window needs a virtual display on the runner.
 
-To start a game in a cell of real data, give the editor id of an interior cell (exterior cells have not been tried):
+To start a game in a cell of real data, give the editor id of an interior cell, or the editor id of a worldspace and the grid coordinates of an exterior cell, separated by a colon and a comma (the coordinates are in cells of 4096 units, so `0,0` is the cell that holds the origin of the worldspace). The player starts at the `COCMarkerHeading` or `XMarkerHeading` of the cell if it has one, as in the interior start, and at the centre of the cell if it has not:
 
     openfallout --content Fallout3.esm --skip-menu --start <CellEditorId>
+    openfallout --content FalloutNV.esm --skip-menu --start WastelandNV:<x>,<y>
+
+The exterior start has only been checked on the synthetic plugin: the terrain and its collision load and the player stands on it, but the sky and the weather are still the Morrowind ones, which are missing from a Fallout-only content list (the engine logs `Failed to load 'meshes/sky_atmosphere.nif'` and six more sky meshes at start-up, for an interior start too, and uses its embedded error marker in their place).
 
 The engine logs the light and fog it uses for an interior cell in one line, for example `Cell lighting: ambient 90,90,100, directional 200,190,160, fog 120,110,100, fog range 100.000000 to 2500.000000` (colours as red,green,blue from 0 to 255, distances in game units). Look for `Cell lighting` in `openfallout.log` to see what a real cell asks for.
 

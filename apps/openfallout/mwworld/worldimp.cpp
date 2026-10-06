@@ -103,6 +103,7 @@
 #include "player.hpp"
 #include "projectilemanager.hpp"
 #include "weather.hpp"
+#include "worldspacestart.hpp"
 
 #include "contentloader.hpp"
 #include "esmloader.hpp"
@@ -2698,6 +2699,27 @@ namespace OFWorld
 
         if (cellStore != nullptr && !cellStore->isExterior())
             return ESM::RefId();
+
+        // A cell of a worldspace of a Fallout game: "WastelandNV:-2,-3"
+        if (!cellStore)
+        {
+            if (const std::optional<WorldspaceStart> start = parseWorldspaceStart(nameId))
+            {
+                const ESM4::World* worldspace = nullptr;
+                for (const ESM4::World& world : mStore.get<ESM4::World>())
+                {
+                    if (Misc::StringUtils::ciEqual(world.mEditorId, start->mWorldspace))
+                    {
+                        worldspace = &world;
+                        break;
+                    }
+                }
+                if (worldspace == nullptr)
+                    throw std::runtime_error("Can't find the worldspace " + std::string(start->mWorldspace));
+                cellStore = &mWorldModel.getExterior(
+                    ESM::ExteriorCellLocation(start->mX, start->mY, ESM::RefId(worldspace->mId)));
+            }
+        }
 
         if (!cellStore)
         {

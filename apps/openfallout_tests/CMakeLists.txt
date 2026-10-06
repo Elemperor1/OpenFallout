@@ -14,6 +14,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwworld/testpositioncellgrid.cpp
     mwworld/testplaceholderrecords.cpp
     mwworld/testcelllighting.cpp
+    mwworld/testworldspacestart.cpp
 
     mwdialogue/testkeywordsearch.cpp
 
