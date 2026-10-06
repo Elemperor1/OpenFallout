@@ -241,8 +241,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::MediaLocationController>(params, reader);
                     return true;
                 case ESM4::REC_AMEF:
-                    readTypedRecord<ESM4::AmmoEffect>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::AmmoEffect>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_AMMO:
                     readTypedRecord<ESM4::Ammunition>(params, reader);
                     return true;
@@ -280,20 +281,24 @@ namespace EsmTool
                         return true;
                     break;
                 case ESM4::REC_CCRD:
-                    readTypedRecord<ESM4::CaravanCard>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::CaravanCard>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_CDCK:
-                    readTypedRecord<ESM4::CaravanDeck>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::CaravanDeck>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_CELL:
                     readTypedRecord<ESM4::Cell>(params, reader);
                     return true;
                 case ESM4::REC_CHAL:
-                    readTypedRecord<ESM4::Challenge>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Challenge>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_CHIP:
-                    readTypedRecord<ESM4::PokerChip>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::PokerChip>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_CLAS:
                     readTypedRecord<ESM4::Class>(params, reader);
                     return true;
@@ -308,8 +313,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::Clothing>(params, reader);
                     return true;
                 case ESM4::REC_CMNY:
-                    readTypedRecord<ESM4::CaravanMoney>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::CaravanMoney>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_COBJ:
                     break;
                 case ESM4::REC_COLL:
@@ -325,8 +331,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::Creature>(params, reader);
                     return true;
                 case ESM4::REC_CSNO:
-                    readTypedRecord<ESM4::Casino>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Casino>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_CSTY:
                     if (readFalloutRecord<ESM4::CombatStyle>(params, reader))
                         return true;
@@ -336,8 +343,9 @@ namespace EsmTool
                         return true;
                     break;
                 case ESM4::REC_DEHY:
-                    readTypedRecord<ESM4::DehydrationStage>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::DehydrationStage>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_DIAL:
                     readTypedRecord<ESM4::Dialogue>(params, reader);
                     return true;
@@ -362,8 +370,9 @@ namespace EsmTool
                         return true;
                     break;
                 case ESM4::REC_ENCH:
-                    readTypedRecord<ESM4::Enchantment>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Enchantment>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_EQUP:
                     break;
                 case ESM4::REC_EXPL:
@@ -409,8 +418,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::HeadPart>(params, reader);
                     return true;
                 case ESM4::REC_HUNG:
-                    readTypedRecord<ESM4::HungerStage>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::HungerStage>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_IDLE:
                     readTypedRecord<ESM4::IdleAnimation>(params, reader);
                     return true;
@@ -489,11 +499,13 @@ namespace EsmTool
                 case ESM4::REC_MATT:
                     break;
                 case ESM4::REC_MESG:
-                    readTypedRecord<ESM4::Message>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Message>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_MGEF:
-                    readTypedRecord<ESM4::MagicEffect>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::MagicEffect>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_MICN:
                     if (readFalloutRecord<ESM4::MenuIcon>(params, reader))
                         return true;
@@ -533,8 +545,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::AIPackage>(params, reader);
                     return true;
                 case ESM4::REC_PERK:
-                    readTypedRecord<ESM4::Perk>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Perk>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_PGRD:
                     readTypedRecord<ESM4::Pathgrid>(params, reader);
                     return true;
@@ -557,14 +570,17 @@ namespace EsmTool
                     readTypedRecord<ESM4::Race>(params, reader);
                     return true;
                 case ESM4::REC_RADS:
-                    readTypedRecord<ESM4::RadiationStage>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::RadiationStage>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_RCCT:
-                    readTypedRecord<ESM4::RecipeCategory>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::RecipeCategory>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_RCPE:
-                    readTypedRecord<ESM4::Recipe>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Recipe>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_REFR:
                     readTypedRecord<ESM4::Reference>(params, reader);
                     return true;
@@ -574,8 +590,9 @@ namespace EsmTool
                 case ESM4::REC_RELA:
                     break;
                 case ESM4::REC_REPU:
-                    readTypedRecord<ESM4::Reputation>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Reputation>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_REVB:
                     break;
                 case ESM4::REC_RFCT:
@@ -610,8 +627,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::SoulGem>(params, reader);
                     return true;
                 case ESM4::REC_SLPD:
-                    readTypedRecord<ESM4::SleepDeprivationStage>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::SleepDeprivationStage>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_SMBN:
                     break;
                 case ESM4::REC_SMEN:
@@ -629,8 +647,9 @@ namespace EsmTool
                     readTypedRecord<ESM4::Sound>(params, reader);
                     return true;
                 case ESM4::REC_SPEL:
-                    readTypedRecord<ESM4::Spell>(params, reader);
-                    return true;
+                    if (readFalloutRecord<ESM4::Spell>(params, reader))
+                        return true;
+                    break;
                 case ESM4::REC_SPGD:
                     break;
                 case ESM4::REC_STAT:
