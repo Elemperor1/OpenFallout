@@ -98,7 +98,8 @@ namespace ESM4
             }
         }
 
-        // A form ID, adjusted to the load order the way Reader::getFormId does.
+        // A form ID, adjusted to the load order the way Reader::getFormId does, except that a null reference (zero)
+        // stays null.
         void formId(ESM::FormId& value);
 
         // A sub-record that holds a whole number of form IDs, which are added to `values`.
@@ -109,12 +110,13 @@ namespace ESM4
         // function.
         void condition(TargetCondition& value);
 
-        // Adjusts the form ID that a member of a packed struct holds. A reference cannot bind to such a member.
+        // Adjusts the form ID that a member of a packed struct holds, unless it is null. A reference cannot bind to
+        // such a member.
         template <class T>
         void adjust(T& object, ESM::FormId32 T::*member) const
         {
             ESM::FormId32 id = object.*member;
-            mReader.adjustFormId(id);
+            adjustReference(id);
             object.*member = id;
         }
 
@@ -147,6 +149,7 @@ namespace ESM4
 
     private:
         void readExact(void* data, std::size_t count);
+        void adjustReference(ESM::FormId32& id) const;
 
         Reader& mReader;
         std::string mName;

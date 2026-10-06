@@ -92,6 +92,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testnpc.cpp
     esm4/testprojectile.cpp
     esm4/testragdoll.cpp
+    esm4/testreadergame.cpp
     esm4/testrecordreader.cpp
     esm4/testscript.cpp
     esm4/testsurvey.cpp

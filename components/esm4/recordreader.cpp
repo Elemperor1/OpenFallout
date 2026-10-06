@@ -61,11 +61,20 @@ namespace ESM4
         value = std::move(text);
     }
 
+    void RecordReader::adjustReference(ESM::FormId32& id) const
+    {
+        // Zero is the null reference. Adjusting it would give it the index of the file that holds it.
+        if (id != 0)
+            mReader.adjustFormId(id);
+    }
+
     void RecordReader::formId(ESM::FormId& value)
     {
         expectSize(sizeof(ESM::FormId32));
-        if (!mReader.getFormId(value))
-            fail("sub-record is shorter than its size");
+        ESM::FormId32 id = 0;
+        readExact(&id, sizeof(id));
+        adjustReference(id);
+        value = ESM::FormId::fromUint32(id);
     }
 
     void RecordReader::formIds(std::vector<ESM::FormId>& values)
@@ -74,8 +83,10 @@ namespace ESM4
             badSize();
         for (std::uint32_t count = size() / sizeof(ESM::FormId32); count > 0; --count)
         {
-            if (!mReader.getFormId(values.emplace_back()))
-                fail("sub-record is shorter than its size");
+            ESM::FormId32 id = 0;
+            readExact(&id, sizeof(id));
+            adjustReference(id);
+            values.push_back(ESM::FormId::fromUint32(id));
         }
     }
 
@@ -87,7 +98,7 @@ namespace ESM4
             ESM::FormId32 global;
             static_assert(sizeof(global) == sizeof(value.comparison));
             std::memcpy(&global, &value.comparison, sizeof(global));
-            mReader.adjustFormId(global);
+            adjustReference(global);
             std::memcpy(&value.comparison, &global, sizeof(global));
         }
     }

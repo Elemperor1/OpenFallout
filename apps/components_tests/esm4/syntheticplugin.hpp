@@ -99,6 +99,21 @@ namespace ESM4Test
         return result;
     }
 
+    /// Wrap raw subrecords in the 24 byte record header of Fallout 3 and the games after it, which has a form version.
+    inline std::string versionedRecord(
+        std::string_view type, std::uint32_t id, std::string_view data, std::uint16_t formVersion)
+    {
+        std::string result(type);
+        append<std::uint32_t>(result, static_cast<std::uint32_t>(data.size()));
+        append<std::uint32_t>(result, 0); // flags
+        append<std::uint32_t>(result, id);
+        append<std::uint32_t>(result, 0); // revision
+        append<std::uint16_t>(result, formVersion);
+        append<std::uint16_t>(result, 0); // version control information
+        result.append(data);
+        return result;
+    }
+
     /// Build a record with a zlib-compressed payload and its uncompressed size.
     /// Throws std::runtime_error if compression fails.
     inline std::string compressedRecord(std::string_view type, std::uint32_t id, std::string_view data)

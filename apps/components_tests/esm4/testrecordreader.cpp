@@ -6,6 +6,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstring>
+#include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -172,6 +175,79 @@ namespace
         EXPECT_THAT(samples[0].mSized, ElementsAre('a', 'b', 'c', 'd'));
         EXPECT_EQ(samples[0].mRaw.mType, ESM::fourCC("RAWS"));
         EXPECT_THAT(samples[0].mRaw.mData, ElementsAre('x', 'y', 'z'));
+    }
+
+    // Loads the record of a plugin that has the load order index 3 and no masters.
+    Sample loadAsThirdPlugin(const std::string& data)
+    {
+        const std::string plugin = header() + topGroup("SMPL", record("SMPL", 1, data));
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        reader.setModIndex(3);
+        Sample result;
+        ESM4::ReaderUtils::readAll(
+            reader,
+            [&](ESM4::Reader& r) {
+                r.getRecordData();
+                result.load(r);
+                return true;
+            },
+            [](ESM4::Reader&) {});
+        return result;
+    }
+
+    TEST(ESM4RecordReaderTest, adjustsFormIdsToTheLoadOrder)
+    {
+        std::string comparison;
+        append<std::uint32_t>(comparison, 0x00000456);
+        std::string condition;
+        append<std::uint32_t>(condition, ESM4::CTF_UseGlobal);
+        condition.append(comparison);
+        for (const std::uint32_t value : { 14u, 7u, 8u, 1u, 0x00000789u })
+            append(condition, value);
+
+        const Sample sample = loadAsThirdPlugin(valueSubRecord<std::uint32_t>("TRGT", 0x00000123)
+            + subRecord("LINK", link(1, 0x00000124)) + subRecord("LNKS", link(1, 0x00000125))
+            + subRecord("TRGS", std::string("\x26\x01\0\0", 4)) + subRecord("CTDA", condition));
+
+        EXPECT_EQ(sample.mTarget, (ESM::FormId{ 0x123, 3 }));
+        EXPECT_EQ(sample.mLink.mTarget, 0x03000124u);
+        ASSERT_EQ(sample.mLinks.size(), 1u);
+        EXPECT_EQ(sample.mLinks[0].mTarget, 0x03000125u);
+        ASSERT_EQ(sample.mTargets.size(), 1u);
+        EXPECT_EQ(sample.mTargets[0], (ESM::FormId{ 0x126, 3 }));
+        std::uint32_t global = 0;
+        std::memcpy(&global, &sample.mCondition.comparison, sizeof(global));
+        EXPECT_EQ(global, 0x03000456u);
+        EXPECT_EQ(sample.mCondition.reference, 0x03000789u);
+    }
+
+    TEST(ESM4RecordReaderTest, keepsNullReferencesNull)
+    {
+        // The comparison value of a condition is a global variable only when the flag says so. This one is a zero
+        // reference to one.
+        std::string condition;
+        append<std::uint32_t>(condition, ESM4::CTF_UseGlobal);
+        append<std::uint32_t>(condition, 0);
+        for (const std::uint32_t value : { 14u, 7u, 8u, 1u, 0u })
+            append(condition, value);
+
+        const Sample sample = loadAsThirdPlugin(valueSubRecord<std::uint32_t>("TRGT", 0) + subRecord("LINK", link(1, 0))
+            + subRecord("LNKS", link(1, 0) + link(2, 0x00000125)) + subRecord("TRGS", std::string(8, '\0'))
+            + subRecord("CTDA", condition));
+
+        EXPECT_TRUE(sample.mTarget.isZeroOrUnset());
+        EXPECT_EQ(sample.mTarget.toUint32(), 0u);
+        EXPECT_EQ(sample.mLink.mTarget, 0u);
+        ASSERT_EQ(sample.mLinks.size(), 2u);
+        EXPECT_EQ(sample.mLinks[0].mTarget, 0u);
+        EXPECT_EQ(sample.mLinks[1].mTarget, 0x03000125u);
+        ASSERT_EQ(sample.mTargets.size(), 2u);
+        EXPECT_EQ(sample.mTargets[0].toUint32(), 0u);
+        EXPECT_EQ(sample.mTargets[1].toUint32(), 0u);
+        EXPECT_EQ(sample.mCondition.reference, 0u);
+        std::uint32_t global = 1;
+        std::memcpy(&global, &sample.mCondition.comparison, sizeof(global));
+        EXPECT_EQ(global, 0u);
     }
 
     TEST(ESM4RecordReaderTest, rejectsAListWhoseSizeIsNotAWholeNumberOfItems)

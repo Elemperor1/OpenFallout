@@ -274,6 +274,10 @@ namespace ESM4
         inline bool hasFormVersion() const { return mCtx.recHeaderSize == sizeof(RecordHeader); }
         inline unsigned int formVersion() const { return mCtx.recordHeader.record.version; }
 
+        // Whether the record that was read last is from Fallout 3 or New Vegas, as opposed to Oblivion, Skyrim or
+        // Fallout 4, which have records of the same types with other sub-records.
+        bool isFalloutRecord() const;
+
         void buildLStringIndex();
         void getLocalizedString(std::string& str);
 

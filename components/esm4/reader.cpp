@@ -299,6 +299,16 @@ namespace ESM4
         mCtx.recHeaderSize = size;
     }
 
+    bool Reader::isFalloutRecord() const
+    {
+        const unsigned int version = esmVersion();
+        if (version == ESM::VER_132 || version == ESM::VER_133 || version == ESM::VER_134)
+            return true;
+        // Fallout 3 has the header version of Skyrim LE, which has no record with a form version below 40.
+        constexpr unsigned int firstSkyrimFormVersion = 40;
+        return version == ESM::VER_094 && hasFormVersion() && formVersion() < firstSkyrimFormVersion;
+    }
+
     void Reader::buildLStringIndex()
     {
         if ((mHeader.mFlags & Rec_ESM) == 0 || (mHeader.mFlags & Rec_Localized) == 0)
