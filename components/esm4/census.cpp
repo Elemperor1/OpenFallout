@@ -12,6 +12,7 @@
 
 #include "loadinfo.hpp"
 #include "loadpack.hpp"
+#include "loadperk.hpp"
 #include "loadqust.hpp"
 #include "loadscpt.hpp"
 #include "loadterm.hpp"
@@ -128,6 +129,14 @@ namespace ESM4
     {
         for (const Terminal::MenuItem& item : record.mMenuItems)
             addScript("TERM", item.mScript);
+    }
+
+    /// Add the script of every entry of a loaded PERK record, and the script before the first entry, to the census.
+    void Census::addScripts(const Perk& record)
+    {
+        addScript("PERK", record.mScript);
+        for (const Perk::Entry& entry : record.mEntries)
+            addScript("PERK", entry.mScript);
     }
 
     void Census::collect(Reader& reader, const std::function<bool(Reader&)>& parse)

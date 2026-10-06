@@ -15,6 +15,7 @@ namespace ESM4
     class Reader;
     struct AIPackage;
     struct DialogInfo;
+    struct Perk;
     struct Quest;
     struct Script;
     struct Terminal;
@@ -80,6 +81,9 @@ namespace ESM4
         void addScripts(const AIPackage& record);
         /// Count the script of each loaded TERM menu item, retaining only sizes and counts.
         void addScripts(const Terminal& record);
+        /// Count the script of each loaded PERK entry and the one that comes before the first entry, retaining only
+        /// sizes and counts.
+        void addScripts(const Perk& record);
 
         void write(std::ostream& stream) const;
 

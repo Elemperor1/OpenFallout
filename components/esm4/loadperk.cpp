@@ -5,6 +5,20 @@
 
 namespace ESM4
 {
+    namespace
+    {
+#pragma pack(push, 1)
+        // DATA of an entry that sets a quest stage.
+        struct QuestStageData
+        {
+            ESM::FormId32 mQuest = 0;
+            std::uint8_t mStage = 0;
+            std::array<std::uint8_t, 3> mUnused{};
+        };
+#pragma pack(pop)
+        static_assert(sizeof(QuestStageData) == 8);
+    }
+
     void Perk::load(Reader& reader)
     {
         mId = reader.getFormIdFromHeader();
@@ -57,9 +71,34 @@ namespace ESM4
                         mData.mRanks = data[2];
                         mData.mPlayable = data.size() > 3 ? data[3] : 0;
                         mData.mHidden = data.size() > 4 ? data[4] : 0;
+                        break;
                     }
-                    else
-                        in.bytes(mEntries.back().mData, { 3, 4, 8 });
+                    Entry& entry = mEntries.back();
+                    switch (entry.mType)
+                    {
+                        case 0:
+                        {
+                            QuestStageData data;
+                            in.value(data, &QuestStageData::mQuest);
+                            entry.mQuest = ESM::FormId::fromUint32(data.mQuest);
+                            entry.mQuestStage = data.mStage;
+                            break;
+                        }
+                        case 1:
+                            in.formId(entry.mAbility);
+                            break;
+                        case 2:
+                        {
+                            std::array<std::uint8_t, 3> data;
+                            in.value(data);
+                            entry.mEntryPoint = data[0];
+                            entry.mFunction = data[1];
+                            entry.mTabCount = data[2];
+                            break;
+                        }
+                        default:
+                            in.bytes(entry.mData, { 3, 4, 8 });
+                    }
                     break;
                 }
                 case ESM::fourCC("PRKE"):
@@ -97,11 +136,32 @@ namespace ESM4
                 }
                 case ESM::fourCC("EPFD"):
                 {
-                    std::array<std::uint8_t, 4> data;
-                    in.value(data);
                     if (mEntries.empty())
                         in.fail("EPFD comes before PRKE");
-                    mEntries.back().mFunctionData = data;
+                    Entry& entry = mEntries.back();
+                    // EPFT comes before EPFD and says what it holds. A type that the format reference does not list
+                    // can hold anything.
+                    if (entry.mFunctionType == 3)
+                    {
+                        in.formId(entry.mLeveledItem);
+                        break;
+                    }
+                    switch (entry.mFunctionType)
+                    {
+                        case 1:
+                            in.expectSize(4);
+                            break;
+                        case 2:
+                        case 5:
+                            in.expectSize(8);
+                            break;
+                        case 4:
+                            in.expectSize(0);
+                            break;
+                        default:
+                            break;
+                    }
+                    in.bytes(entry.mFunctionData);
                     break;
                 }
                 case ESM::fourCC("EPF2"):

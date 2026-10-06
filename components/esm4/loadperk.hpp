@@ -42,11 +42,20 @@ namespace ESM4
             std::uint8_t mType = 0; // PRKE, 0 = quest stage, 1 = ability, 2 = entry point
             std::uint8_t mRank = 0;
             std::uint8_t mPriority = 0;
-            std::vector<std::uint8_t>
-                mData; // DATA, 8 bytes for a quest stage, 4 for an ability, 3 for an entry point; not decoded
+            // DATA depends on the type of the entry:
+            ESM::FormId mQuest; // a quest stage: a QUST
+            std::uint8_t mQuestStage = 0; // a quest stage
+            ESM::FormId mAbility; // an ability: a SPEL
+            std::uint8_t mEntryPoint = 0; // an entry point, which of the points of the format reference
+            std::uint8_t mFunction = 0; // an entry point
+            std::uint8_t mTabCount = 0; // an entry point, how many tabs of conditions
+            std::vector<std::uint8_t> mData; // DATA of an entry of another type, 3, 4 or 8 bytes; not decoded
             std::vector<ConditionGroup> mConditionGroups;
-            std::uint8_t mFunctionType = 0; // EPFT
-            std::array<std::uint8_t, 4> mFunctionData{}; // EPFD, not decoded
+            std::uint8_t mFunctionType = 0; // EPFT, which says what EPFD holds
+            ESM::FormId mLeveledItem; // EPFD when EPFT is 3: a LVLI
+            // EPFD of the other types: any bytes for 0, a float for 1, two floats for 2, nothing for 4, an actor value
+            // and a float for 5; not decoded
+            std::vector<std::uint8_t> mFunctionData;
             std::string mFunctionText; // EPF2
             std::array<std::uint8_t, 2> mButtonFlags{}; // EPF3
             ScriptDefinition mScript; // the sub-records of a script

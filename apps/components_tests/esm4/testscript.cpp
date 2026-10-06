@@ -2,6 +2,7 @@
 #include <components/esm4/common.hpp>
 #include <components/esm4/loadinfo.hpp>
 #include <components/esm4/loadpack.hpp>
+#include <components/esm4/loadperk.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadterm.hpp>
@@ -668,5 +669,32 @@ namespace
         EXPECT_EQ(census.getScripts().at("TERM").mBytecode, 2 * code.size());
         EXPECT_EQ(census.getScripts().at("PACK").mCount, 2u);
         EXPECT_EQ(census.getScripts().at("PACK").mBytecode, 2 * code.size());
+    }
+
+    /// Verify that the script before the first entry of a perk and the script of each entry are counted.
+    TEST(ESM4CensusTest, countsTheScriptsOfPerkEntries)
+    {
+        const std::string code("\x01\x02\x03", 3);
+        const std::string perk = scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKE", bytePattern(3, 2))
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKF", "")
+            + subRecord("PRKE", bytePattern(3, 2)) + subRecord("PRKF", "") + subRecord("PRKE", bytePattern(3, 2))
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKF", "");
+
+        const std::string plugin = header() + topGroup("PERK", record("PERK", 1, perk));
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "scripts.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, [&](ESM4::Reader& r) {
+            r.getRecordData();
+            ESM4::Perk value;
+            value.load(r);
+            census.addScripts(value);
+            return true;
+        });
+
+        EXPECT_EQ(census.getFatalError(), "");
+        ASSERT_EQ(census.getScripts().size(), 1u);
+        // The entry without a script is not counted.
+        EXPECT_EQ(census.getScripts().at("PERK").mCount, 3u);
+        EXPECT_EQ(census.getScripts().at("PERK").mBytecode, 3 * code.size());
     }
 }
