@@ -11,11 +11,31 @@
 #include <components/esm4/loadwrld.hpp>
 #include <components/misc/algorithm.hpp>
 
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 
 namespace OFWorld
 {
+    ESM::FormId resolveClimate(
+        const ESM4::World& world, const std::function<const ESM4::World*(ESM::FormId)>& findWorld)
+    {
+        // A chain that is longer than this is a loop in the data
+        constexpr std::size_t maxDepth = 16;
+        const ESM4::World* current = &world;
+        for (std::size_t depth = 0; depth < maxDepth; ++depth)
+        {
+            if (current->mParent.isZeroOrUnset() || !(current->mParentUseFlags & ESM4::World::UseFlag_Climate))
+                break;
+            const ESM4::World* parent = findWorld(current->mParent);
+            if (parent == nullptr)
+                break;
+            current = parent;
+        }
+        // A parent that has no climate either leaves the worldspace with its own
+        return !current->mClimate.isZeroOrUnset() ? current->mClimate : world.mClimate;
+    }
+
     ESM4::Lighting resolveLighting(
         const ESM4::Lighting& own, const ESM4::Lighting* lightingTemplate, std::uint32_t inheritFlags)
     {
@@ -105,7 +125,7 @@ namespace OFWorld
         , mGridPos(cell.mX, cell.mY)
         , mDisplayname(cell.mFullName)
         , mNameID(cell.mEditorId)
-        , mRegion() // an exterior cell gets the id of its climate below, the other cells have no weather
+        , mRegion() // an exterior cell gets the id of its climate below, an interior cell has no region
         , mId(cell.mId)
         , mParent(cell.mParent)
         , mWaterHeight(cell.mWaterHeight)
@@ -120,8 +140,13 @@ namespace OFWorld
             mWaterHeight = world->mWaterLevel;
 
             // The weather of an exterior cell is the one of its climate, where a cell of Morrowind has the weather of
-            // its region. The cell says which climate if it differs from the one of its worldspace.
-            const ESM::FormId climate = !cell.mClimate.isZeroOrUnset() ? cell.mClimate : world->mClimate;
+            // its region. The cell says which climate if it differs from the one of its worldspace, and a worldspace
+            // can use the one of its parent. An exterior cell with no climate has no region, as a cell of Morrowind
+            // without one: the weather manager leaves the weather as it is.
+            const auto& worlds = OFBase::Environment::get().getESMStore()->get<ESM4::World>();
+            const ESM::FormId climate = !cell.mClimate.isZeroOrUnset()
+                ? cell.mClimate
+                : resolveClimate(*world, [&](ESM::FormId id) { return worlds.search(ESM::RefId(id)); });
             if (!climate.isZeroOrUnset())
                 mRegion = ESM::RefId(climate);
         }
