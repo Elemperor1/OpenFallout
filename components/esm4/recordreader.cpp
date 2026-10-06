@@ -1,6 +1,7 @@
 #include "recordreader.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 
@@ -93,6 +94,23 @@ namespace ESM4
     void RecordReader::condition(TargetCondition& value)
     {
         this->value(value, &TargetCondition::reference);
+        adjustComparison(value);
+    }
+
+    void RecordReader::conditionOrOlder(TargetCondition& value)
+    {
+        if (size() == offsetof(TargetCondition, runOn))
+        {
+            value = {};
+            readExact(&value, offsetof(TargetCondition, runOn));
+            adjustComparison(value);
+        }
+        else
+            condition(value);
+    }
+
+    void RecordReader::adjustComparison(TargetCondition& value) const
+    {
         if ((value.condition & CTF_UseGlobal) != 0)
         {
             ESM::FormId32 global;

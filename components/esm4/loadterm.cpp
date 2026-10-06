@@ -29,6 +29,7 @@
 #include <stdexcept>
 
 #include "reader.hpp"
+#include "recordreader.hpp"
 // #include "writer.hpp"
 
 void ESM4::Terminal::load(ESM4::Reader& reader)
@@ -36,9 +37,17 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
 
+    // The terminals of Fallout 3 and New Vegas are read by size and by what they follow. Only the helpers are used,
+    // because the loader is shared with the later games, whose menu items are different.
+    RecordReader in(reader, "TERM");
+
     while (reader.getSubRecordHeader())
     {
         const ESM4::SubRecordHeader& subHdr = reader.subRecordHeader();
+        // The script of a menu item follows its ANAM and INAM
+        if (!mMenuItems.empty() && mMenuItems.back().mScript.loadSubRecord(reader))
+            continue;
+
         switch (subHdr.typeId)
         {
             case ESM::fourCC("EDID"):
@@ -66,16 +75,41 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
             case ESM::fourCC("MODL"):
                 reader.getZString(mModel);
                 break;
+            case ESM::fourCC("ITXT"):
+                reader.getLocalizedString(mMenuItems.emplace_back().mText);
+                break;
             case ESM::fourCC("RNAM"):
                 reader.getZString(mResultText);
+                if (!mMenuItems.empty())
+                    mMenuItems.back().mResultText = mResultText;
+                break;
+            case ESM::fourCC("ANAM"):
+                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(std::uint8_t))
+                    reader.get(mMenuItems.back().mFlags);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("INAM"):
+                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(mMenuItems.back().mDisplayNote);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("TNAM"):
+                if (!mMenuItems.empty() && subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(mMenuItems.back().mSubMenu);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("CTDA"):
+                if (subHdr.dataSize == sizeof(TargetCondition))
+                    in.condition((mMenuItems.empty() ? mConditions : mMenuItems.back().mConditions).emplace_back());
+                else
+                    reader.skipSubRecordData();
                 break;
             case ESM::fourCC("DNAM"): // difficulty
-            case ESM::fourCC("ANAM"): // flags
-            case ESM::fourCC("CTDA"):
             case ESM::fourCC("CIS1"):
             case ESM::fourCC("CIS2"):
-            case ESM::fourCC("INAM"):
-            case ESM::fourCC("ITXT"): // Menu Item
             case ESM::fourCC("MODT"): // Model data
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
@@ -87,7 +121,6 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
             case ESM::fourCC("SCTX"):
             case ESM::fourCC("SCVR"):
             case ESM::fourCC("SLSD"):
-            case ESM::fourCC("TNAM"):
             case ESM::fourCC("OBND"):
             case ESM::fourCC("VMAD"):
             case ESM::fourCC("KSIZ"):

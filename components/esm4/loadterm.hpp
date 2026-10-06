@@ -29,10 +29,13 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <components/esm/defs.hpp>
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
+
+#include "script.hpp"
 
 namespace ESM4
 {
@@ -41,6 +44,18 @@ namespace ESM4
 
     struct Terminal
     {
+        /// An entry of the menu of a terminal in Fallout 3 and New Vegas.
+        struct MenuItem
+        {
+            std::string mText; // ITXT
+            std::string mResultText; // RNAM, what the terminal shows when the item is chosen
+            std::uint8_t mFlags = 0; // ANAM
+            ESM::FormId mDisplayNote; // INAM, a NOTE
+            ESM::FormId mSubMenu; // TNAM, a TERM
+            ScriptDefinition mScript; // SCHR, SCDA, SCTX, SLSD, SCVR, SCRO and SCRV, run when the item is chosen
+            std::vector<TargetCondition> mConditions; // CTDA, when the item is shown
+        };
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags; // from the header, see enum type RecordFlag for details
 
@@ -49,7 +64,10 @@ namespace ESM4
         std::string mText;
 
         ESM::Path mModel;
-        std::string mResultText;
+        std::string mResultText; // RNAM, the last of the menu items
+
+        std::vector<MenuItem> mMenuItems;
+        std::vector<TargetCondition> mConditions; // CTDA before the first menu item
 
         ESM::FormId mScriptId;
         ESM::FormId mPasswordNote;

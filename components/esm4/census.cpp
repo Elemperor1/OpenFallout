@@ -11,8 +11,10 @@
 #include <components/esm/common.hpp>
 
 #include "loadinfo.hpp"
+#include "loadpack.hpp"
 #include "loadqust.hpp"
 #include "loadscpt.hpp"
+#include "loadterm.hpp"
 #include "reader.hpp"
 #include "readerutils.hpp"
 
@@ -111,6 +113,21 @@ namespace ESM4
         for (const QuestStage& stage : record.mStages)
             for (const QuestLogEntry& entry : stage.mLogEntries)
                 addScript("QUST", entry.mScript);
+    }
+
+    /// Add the scripts that a loaded PACK record runs when it begins, ends and changes to the census.
+    void Census::addScripts(const AIPackage& record)
+    {
+        addScript("PACK", record.mBegin.mScript);
+        addScript("PACK", record.mEnd.mScript);
+        addScript("PACK", record.mChange.mScript);
+    }
+
+    /// Add the script of every menu item of a loaded TERM record to the census.
+    void Census::addScripts(const Terminal& record)
+    {
+        for (const Terminal::MenuItem& item : record.mMenuItems)
+            addScript("TERM", item.mScript);
     }
 
     void Census::collect(Reader& reader, const std::function<bool(Reader&)>& parse)

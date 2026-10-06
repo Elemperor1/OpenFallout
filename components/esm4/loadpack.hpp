@@ -34,6 +34,8 @@
 #include <components/esm/defs.hpp>
 #include <components/esm/formid.hpp>
 
+#include "script.hpp"
+
 namespace ESM4
 {
     class Reader;
@@ -88,6 +90,15 @@ namespace ESM4
         };
 #pragma pack(pop)
 
+        /// What a package of Fallout 3 and New Vegas does when it begins, ends or is changed.
+        struct Event
+        {
+            bool mPresent = false; // the marker POBA, POEA or POCA, which has no data, was read
+            ESM::FormId mIdle; // INAM, an IDLE
+            ScriptDefinition mScript; // SCHR, SCDA, SCTX, SLSD, SCVR, SCRO and SCRV
+            ESM::FormId mTopic; // TNAM, a DIAL
+        };
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags; // from the header, see enum type RecordFlag for details
 
@@ -98,6 +109,11 @@ namespace ESM4
         PLDT mLocation;
         PTDT mTarget;
         std::vector<CTDA> mConditions;
+        std::vector<TargetCondition> mTargetConditions; // CTDA of 28 bytes, and of 20 bytes in Fallout 3
+
+        Event mBegin; // POBA
+        Event mEnd; // POEA
+        Event mChange; // POCA
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

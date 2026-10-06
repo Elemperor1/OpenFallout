@@ -26,10 +26,12 @@
 */
 #include "loadpack.hpp"
 
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 
 #include "reader.hpp"
+#include "recordreader.hpp"
 //#include "writer.hpp"
 
 void ESM4::AIPackage::load(ESM4::Reader& reader)
@@ -37,9 +39,18 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
 
+    // The packages of Fallout 3 and New Vegas are read by size and by what they follow. Only the helpers are used,
+    // because the loader is shared with the other games.
+    RecordReader in(reader, "PACK");
+    // The event that the sub-records after its marker belong to
+    Event* event = nullptr;
+
     while (reader.getSubRecordHeader())
     {
         const ESM4::SubRecordHeader& subHdr = reader.subRecordHeader();
+        if (event != nullptr && event->mScript.loadSubRecord(reader))
+            continue;
+
         switch (subHdr.typeId)
         {
             case ESM::fourCC("EDID"):
@@ -97,9 +108,14 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
             }
             case ESM::fourCC("CTDA"):
             {
+                if (subHdr.dataSize == sizeof(TargetCondition) || subHdr.dataSize == offsetof(TargetCondition, runOn))
+                {
+                    in.conditionOrOlder(mTargetConditions.emplace_back());
+                    break;
+                }
                 if (subHdr.dataSize != sizeof(CTDA))
                 {
-                    reader.skipSubRecordData(); // FIXME: FO3
+                    reader.skipSubRecordData();
                     break;
                 }
 
@@ -112,14 +128,36 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
 
                 break;
             }
+            case ESM::fourCC("POBA"):
+                mBegin.mPresent = true;
+                event = &mBegin;
+                reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("POEA"):
+                mEnd.mPresent = true;
+                event = &mEnd;
+                reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("POCA"):
+                mChange.mPresent = true;
+                event = &mChange;
+                reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("INAM"):
+                if (event != nullptr && subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(event->mIdle);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("TNAM"):
+                if (event != nullptr && subHdr.dataSize == sizeof(ESM::FormId32))
+                    in.formId(event->mTopic);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("CTDT"): // always 20 for TES4
-            case ESM::fourCC("TNAM"): // FO3
-            case ESM::fourCC("INAM"): // FO3
             case ESM::fourCC("CNAM"): // FO3
             case ESM::fourCC("SCHR"): // FO3
-            case ESM::fourCC("POBA"): // FO3
-            case ESM::fourCC("POCA"): // FO3
-            case ESM::fourCC("POEA"): // FO3
             case ESM::fourCC("SCTX"): // FO3
             case ESM::fourCC("SCDA"): // FO3
             case ESM::fourCC("SCRO"): // FO3

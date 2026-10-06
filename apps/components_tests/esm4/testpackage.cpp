@@ -1,0 +1,128 @@
+#include <components/esm4/loadpack.hpp>
+
+#include "syntheticplugin.hpp"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace
+{
+    using namespace testing;
+    using namespace ESM4Test;
+
+    std::string scriptHeader(std::uint32_t references, std::uint32_t compiledSize, std::uint32_t variables)
+    {
+        std::string data;
+        append<std::uint32_t>(data, 0);
+        append(data, references);
+        append(data, compiledSize);
+        append(data, variables);
+        append<std::uint16_t>(data, 0);
+        append<std::uint16_t>(data, 1);
+        return data;
+    }
+
+    std::string formIdData(std::uint32_t id)
+    {
+        std::string data;
+        append(data, id);
+        return data;
+    }
+
+    std::string basics()
+    {
+        return zString("EDID", "Text of EDID") + subRecord("PKDT", bytePattern(8, 1))
+            + subRecord("PLDT", bytePattern(12, 10)) + subRecord("PSDT", bytePattern(8, 20));
+    }
+
+    TEST(ESM4PackageTest, readsTheScriptsThatRunWhenAPackageBeginsEndsAndChanges)
+    {
+        const std::string data = basics() + subRecord("POBA", "") + subRecord("INAM", formIdData(0x00010001))
+            + subRecord("SCHR", scriptHeader(0, 0, 0)) + subRecord("TNAM", formIdData(0x00010002))
+            + subRecord("POEA", "") + subRecord("INAM", formIdData(0x00010003))
+            + subRecord("SCHR", scriptHeader(1, 3, 0)) + subRecord("SCDA", bytePattern(3, 60))
+            + subRecord("SCTX", "source") + subRecord("SCRO", formIdData(0x00010004))
+            + subRecord("TNAM", formIdData(0x00010005)) + subRecord("POCA", "")
+            + subRecord("INAM", formIdData(0x00010006)) + subRecord("SCHR", scriptHeader(0, 0, 0))
+            + subRecord("TNAM", formIdData(0x00010007));
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>("PACK", record("PACK", 1, data));
+
+        ASSERT_EQ(result.size(), 1u);
+        const ESM4::AIPackage& package = result[0];
+        EXPECT_EQ(package.mEditorId, "Text of EDID");
+
+        EXPECT_TRUE(package.mBegin.mPresent);
+        EXPECT_EQ(package.mBegin.mIdle, ESM::FormId::fromUint32(0x00010001));
+        EXPECT_EQ(package.mBegin.mTopic, ESM::FormId::fromUint32(0x00010002));
+        EXPECT_THAT(package.mBegin.mScript.compiledScript, IsEmpty());
+
+        EXPECT_TRUE(package.mEnd.mPresent);
+        EXPECT_EQ(package.mEnd.mIdle, ESM::FormId::fromUint32(0x00010003));
+        EXPECT_EQ(package.mEnd.mTopic, ESM::FormId::fromUint32(0x00010005));
+        EXPECT_THAT(package.mEnd.mScript.compiledScript, ElementsAre(60, 61, 62));
+        EXPECT_EQ(package.mEnd.mScript.scriptSource, "source");
+        ASSERT_EQ(package.mEnd.mScript.references.size(), 1u);
+        EXPECT_EQ(package.mEnd.mScript.references[0].formId, ESM::FormId::fromUint32(0x00010004));
+        EXPECT_TRUE(package.mEnd.mScript.isConsistent());
+
+        EXPECT_TRUE(package.mChange.mPresent);
+        EXPECT_EQ(package.mChange.mIdle, ESM::FormId::fromUint32(0x00010006));
+        EXPECT_EQ(package.mChange.mTopic, ESM::FormId::fromUint32(0x00010007));
+    }
+
+    TEST(ESM4PackageTest, marksOnlyTheEventsThatArePresent)
+    {
+        const std::string data = basics() + subRecord("POEA", "");
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>("PACK", record("PACK", 1, data));
+
+        ASSERT_EQ(result.size(), 1u);
+        EXPECT_FALSE(result[0].mBegin.mPresent);
+        EXPECT_TRUE(result[0].mEnd.mPresent);
+        EXPECT_FALSE(result[0].mChange.mPresent);
+    }
+
+    TEST(ESM4PackageTest, readsConditionsOfTwentyAndTwentyEightBytesAsTargetConditions)
+    {
+        const std::string longCondition = conditionData(0x40, 2.5f, 14, 0x00010001);
+        const std::string shortCondition = longCondition.substr(0, 20);
+        const std::string data = basics() + subRecord("CTDA", longCondition) + subRecord("CTDA", shortCondition)
+            + subRecord("CTDA", bytePattern(24, 5)) + subRecord("CTDA", "12345");
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>("PACK", record("PACK", 1, data));
+
+        ASSERT_EQ(result.size(), 1u);
+        ASSERT_EQ(result[0].mTargetConditions.size(), 2u);
+        EXPECT_EQ(result[0].mTargetConditions[0].functionIndex, 14u);
+        EXPECT_EQ(result[0].mTargetConditions[0].runOn, 1u);
+        EXPECT_EQ(result[0].mTargetConditions[0].reference, 0x00010001u);
+        EXPECT_EQ(result[0].mTargetConditions[1].functionIndex, 14u);
+        EXPECT_EQ(result[0].mTargetConditions[1].param2, 8u);
+        EXPECT_EQ(result[0].mTargetConditions[1].runOn, 0u);
+        EXPECT_EQ(result[0].mTargetConditions[1].reference, 0u);
+        EXPECT_EQ(result[0].mConditions.size(), 1u);
+    }
+
+    TEST(ESM4PackageTest, ignoresSubrecordsThatNoEventClaims)
+    {
+        // The loader is shared with games whose packages have no event markers.
+        const std::string data = basics() + subRecord("INAM", formIdData(1)) + subRecord("TNAM", formIdData(2))
+            + subRecord("SCHR", scriptHeader(0, 0, 0)) + subRecord("POBA", "") + subRecord("INAM", "123")
+            + subRecord("TNAM", "");
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>("PACK", record("PACK", 1, data));
+
+        ASSERT_EQ(result.size(), 1u);
+        EXPECT_TRUE(result[0].mBegin.mPresent);
+        EXPECT_EQ(result[0].mBegin.mIdle, ESM::FormId());
+        EXPECT_EQ(result[0].mBegin.mTopic, ESM::FormId());
+    }
+
+    TEST(ESM4PackageTest, rejectsAnUnknownSubrecord)
+    {
+        EXPECT_THROW(
+            loadRecords<ESM4::AIPackage>("PACK", record("PACK", 1, subRecord("ZZZZ", "1"))), std::runtime_error);
+    }
+}

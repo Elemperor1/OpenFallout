@@ -1,8 +1,10 @@
 #include <components/esm4/census.hpp>
 #include <components/esm4/common.hpp>
 #include <components/esm4/loadinfo.hpp>
+#include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/loadterm.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 
@@ -620,5 +622,51 @@ namespace
         census.write(out);
         EXPECT_THAT(out.str(), HasSubstr("Scripts held in line by records:"));
         EXPECT_THAT(out.str(), Not(HasSubstr("TestScript")));
+    }
+
+    /// Verify that the menu items of a terminal and the begin, end and change scripts of a package are counted.
+    TEST(ESM4CensusTest, countsTheScriptsOfTerminalMenuItemsAndPackageEvents)
+    {
+        const std::string code("\x01\x02\x03", 3);
+        const std::string menu = zString("ITXT", "One") + scriptHeader(0, 3, 0) + subRecord("SCDA", code)
+            + zString("ITXT", "Two") + scriptHeader(0, 0, 0) + zString("ITXT", "Three") + scriptHeader(0, 3, 0)
+            + subRecord("SCDA", code) + condition(14);
+        const std::string events = subRecord("POBA", "") + scriptHeader(0, 0, 0) + subRecord("POEA", "")
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("POCA", "") + scriptHeader(0, 3, 0)
+            + subRecord("SCDA", code);
+
+        const std::string plugin
+            = header() + topGroup("TERM", record("TERM", 1, menu)) + topGroup("PACK", record("PACK", 2, events));
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "scripts.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, [&](ESM4::Reader& r) {
+            r.getRecordData();
+            switch (r.hdr().record.typeId)
+            {
+                case ESM4::REC_TERM:
+                {
+                    ESM4::Terminal value;
+                    value.load(r);
+                    census.addScripts(value);
+                    return true;
+                }
+                case ESM4::REC_PACK:
+                {
+                    ESM4::AIPackage value;
+                    value.load(r);
+                    census.addScripts(value);
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        EXPECT_EQ(census.getFatalError(), "");
+        ASSERT_EQ(census.getScripts().size(), 2u);
+        // The second menu item and the begin event have empty scripts.
+        EXPECT_EQ(census.getScripts().at("TERM").mCount, 2u);
+        EXPECT_EQ(census.getScripts().at("TERM").mBytecode, 2 * code.size());
+        EXPECT_EQ(census.getScripts().at("PACK").mCount, 2u);
+        EXPECT_EQ(census.getScripts().at("PACK").mBytecode, 2 * code.size());
     }
 }

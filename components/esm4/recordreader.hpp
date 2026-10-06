@@ -110,6 +110,10 @@ namespace ESM4
         // function.
         void condition(TargetCondition& value);
 
+        // The same, and also the older form of 20 bytes, which has no run on and no reference. Those are left at zero,
+        // which is the subject and none.
+        void conditionOrOlder(TargetCondition& value);
+
         // Adjusts the form ID that a member of a packed struct holds, unless it is null. A reference cannot bind to
         // such a member.
         template <class T>
@@ -150,6 +154,7 @@ namespace ESM4
     private:
         void readExact(void* data, std::size_t count);
         void adjustReference(ESM::FormId32& id) const;
+        void adjustComparison(TargetCondition& value) const;
 
         Reader& mReader;
         std::string mName;

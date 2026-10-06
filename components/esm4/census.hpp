@@ -13,9 +13,11 @@
 namespace ESM4
 {
     class Reader;
+    struct AIPackage;
     struct DialogInfo;
     struct Quest;
     struct Script;
+    struct Terminal;
 
     enum class CensusOutcome
     {
@@ -74,6 +76,10 @@ namespace ESM4
         void addScripts(const DialogInfo& record);
         /// Count each loaded QUST stage log entry's script, retaining only sizes and counts.
         void addScripts(const Quest& record);
+        /// Count the loaded PACK begin, end and change scripts, retaining only sizes and counts.
+        void addScripts(const AIPackage& record);
+        /// Count the script of each loaded TERM menu item, retaining only sizes and counts.
+        void addScripts(const Terminal& record);
 
         void write(std::ostream& stream) const;
 
