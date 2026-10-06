@@ -60,16 +60,70 @@ jobs:
         echo "$RUNNER_TEMP/ccache-${CCACHE_VERSION}-darwin" >> "$GITHUB_PATH"
 
     - name: Prime ccache
+      id: compiler-cache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
         install: 'no'
         key: ${{ inputs.image }}-${{ inputs.build-type }}
         max-size: 1000M
 
+    - name: Fingerprint build environment
+      id: build-env
+      run: |
+        echo "key=$(python3 CI/build_cache.py key --compiler clang --mode '${{ inputs.image }}-${{ inputs.build-type }}' --dependency-file "$RUNNER_TEMP/openmw-manifest.txt")" >> "$GITHUB_OUTPUT"
+
+    - name: Restore incremental build
+      id: build-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          build/*
+          !build/*.dmg
+          !build/_CPack_Packages
+        key: build-macos-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
+        restore-keys: build-macos-v1-${{ steps.build-env.outputs.key }}-
+
+    - name: Restore unchanged source timestamps
+      run: python3 CI/build_cache.py restore
+
     - name: Configure
-      run: CI/before_script.macos.sh -C
+      run: CI/before_script.macos.sh -C -k
     - name: Build
-      run: CI/macos/build.sh
+      run: CI/macos/build.sh all
+
+    - name: Record source timestamps
+      run: python3 CI/build_cache.py snapshot
+
+    - name: Save incremental build
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          build/*
+          !build/*.dmg
+          !build/_CPack_Packages
+        key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Limit stored compiler cache
+      if: always() && steps.compiler-cache.outcome == 'success'
+      run: |
+        ccache --max-size=384M
+        ccache --cleanup
+
+    - name: Package disk image
+      run: |
+        for attempt in 1 2 3; do
+          if CI/macos/build.sh package > "$RUNNER_TEMP/package.log" 2>&1; then
+            cat "$RUNNER_TEMP/package.log"
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/package.log"
+          if ! grep -q 'hdiutil: create failed - Resource busy' "$RUNNER_TEMP/package.log" || [ "$attempt" -eq 3 ]; then
+            exit 1
+          fi
+          echo "Disk-image creation is busy; retrying in 10 seconds ($attempt/3)"
+          sleep 10
+        done
 
     - name: Store dmg
       uses: actions/upload-artifact@v6
