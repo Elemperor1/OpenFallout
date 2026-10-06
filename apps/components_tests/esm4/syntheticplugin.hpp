@@ -2,11 +2,16 @@
 #define OPENFALLOUT_APPS_COMPONENTS_TESTS_ESM4_SYNTHETICPLUGIN_H
 
 #include <components/esm4/common.hpp>
+#include <components/esm4/reader.hpp>
+#include <components/esm4/readerutils.hpp>
 
 #include <cstdint>
+#include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <zlib.h>
 
@@ -96,6 +101,27 @@ namespace ESM4Test
         append<std::int32_t>(hedr, 0);
         append<std::uint32_t>(hedr, 0x800);
         return record("TES4", 0, subRecord("HEDR", hedr));
+    }
+
+    /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
+    /// bytes of the file are dropped, so the record and group headers still promise them.
+    /// Loader and reader errors propagate to the caller.
+    template <class T>
+    std::vector<T> loadRecords(std::string_view group, const std::string& records, std::size_t cutBytes = 0)
+    {
+        std::string plugin = header() + topGroup(group, records);
+        plugin.resize(plugin.size() - cutBytes);
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        std::vector<T> result;
+        ESM4::ReaderUtils::readAll(
+            reader,
+            [&](ESM4::Reader& r) {
+                r.getRecordData();
+                result.emplace_back().load(r);
+                return true;
+            },
+            [](ESM4::Reader&) {});
+        return result;
     }
 }
 

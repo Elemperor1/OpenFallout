@@ -316,7 +316,8 @@ namespace EsmTool
                     readTypedRecord<ESM4::Eyes>(params, reader);
                     return true;
                 case ESM4::REC_FACT:
-                    break;
+                    readTypedRecord<ESM4::Faction>(params, reader);
+                    return true;
                 case ESM4::REC_FLOR:
                     readTypedRecord<ESM4::Flora>(params, reader);
                     return true;

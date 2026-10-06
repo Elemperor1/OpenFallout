@@ -24,27 +24,6 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
-    /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
-    /// bytes of the file are dropped, so the record and group headers still promise them.
-    /// Loader and reader errors propagate to the caller.
-    template <class T>
-    std::vector<T> loadRecords(std::string_view group, const std::string& records, std::size_t cutBytes = 0)
-    {
-        std::string plugin = header() + topGroup(group, records);
-        plugin.resize(plugin.size() - cutBytes);
-        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "script.esp", nullptr, nullptr);
-        std::vector<T> result;
-        ESM4::ReaderUtils::readAll(
-            reader,
-            [&](ESM4::Reader& r) {
-                r.getRecordData();
-                result.emplace_back().load(r);
-                return true;
-            },
-            [](ESM4::Reader&) {});
-        return result;
-    }
-
     /// Build an enabled SCHR subrecord with the supplied reference, bytecode and variable counts.
     std::string scriptHeader(
         std::uint32_t refCount, std::uint32_t compiledSize, std::uint32_t variableCount, std::uint16_t type = 0)
