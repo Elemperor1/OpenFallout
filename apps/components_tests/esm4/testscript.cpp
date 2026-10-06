@@ -24,27 +24,6 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
-    /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
-    /// bytes of the file are dropped, so the record and group headers still promise them.
-    /// Loader and reader errors propagate to the caller.
-    template <class T>
-    std::vector<T> loadRecords(std::string_view group, const std::string& records, std::size_t cutBytes = 0)
-    {
-        std::string plugin = header() + topGroup(group, records);
-        plugin.resize(plugin.size() - cutBytes);
-        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "script.esp", nullptr, nullptr);
-        std::vector<T> result;
-        ESM4::ReaderUtils::readAll(
-            reader,
-            [&](ESM4::Reader& r) {
-                r.getRecordData();
-                result.emplace_back().load(r);
-                return true;
-            },
-            [](ESM4::Reader&) {});
-        return result;
-    }
-
     /// Build an enabled SCHR subrecord with the supplied reference, bytecode and variable counts.
     std::string scriptHeader(
         std::uint32_t refCount, std::uint32_t compiledSize, std::uint32_t variableCount, std::uint16_t type = 0)
@@ -312,6 +291,18 @@ namespace
         const ESM4::ScriptDefinition& definition = scripts.front().mScript;
         EXPECT_EQ(std::string(definition.compiledScript.begin(), definition.compiledScript.end()), bytecode);
         EXPECT_TRUE(definition.hasConsistentSize());
+    }
+
+    /// Verify a compressed record whose last sub-record has 9 bytes or less is read in full. The size of a compressed
+    /// record is 4 bytes below the size of its data, which once hid such a sub-record from the reader.
+    TEST(ESM4ScriptTest, readsAShortLastSubrecordOfACompressedRecord)
+    {
+        const std::string data = zString("EDID", "Packed") + scriptHeader(0, 0, 0) + subRecord("SCTX", "ab");
+
+        const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", compressedRecord("SCPT", 1, data));
+
+        ASSERT_EQ(scripts.size(), 1u);
+        EXPECT_EQ(scripts.front().mScript.scriptSource, "ab");
     }
 
     /// Verify delegating script subrecords still rejects an unknown SCPT subrecord.
