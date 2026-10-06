@@ -319,6 +319,12 @@ namespace ESM4
         // Note: recordStart must come from getContext() called right after the record header was read
         void skipFailedRecord(const ReaderContext& recordStart);
 
+        // Go back to the first sub-record of the current record, to read it a second time. A compressed record is
+        // inflated again if getRecordData() has not been called for it.
+        // Note: recordStart must come from getContext() called right after the record header was read, and the
+        // record data must not have been given up since (by skipFailedRecord() or by reading the next header)
+        void rewindRecordData(const ReaderContext& recordStart);
+
         // Skip the remaining part of the group
         // Note: assumes the header was read correctly and group was pushed onto the stack
         void skipGroupData();

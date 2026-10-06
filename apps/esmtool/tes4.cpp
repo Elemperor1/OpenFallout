@@ -5,9 +5,11 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <set>
 
 #include <components/debug/writeflags.hpp>
 #include <components/esm/esmcommon.hpp>
+#include <components/esm/format.hpp>
 #include <components/esm/path.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
@@ -15,7 +17,10 @@
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
+#include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
+#include <components/files/conversion.hpp>
+#include <components/files/openfile.hpp>
 #include <components/toutf8/toutf8.hpp>
 
 namespace EsmTool
@@ -30,7 +35,7 @@ namespace EsmTool
 
             /// Derive quiet mode from the command and retain an optional, non-owning script census pointer.
             explicit Params(const Arguments& info, ESM4::Census* census = nullptr)
-                : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census")
+                : mQuite(info.quiet_given || info.mode == "clone" || info.mode == "census" || info.mode == "survey")
                 , mCensus(census)
             {
             }
@@ -644,5 +649,49 @@ namespace EsmTool
             std::cout << "\nERROR:\n\n  " << e.what() << std::endl;
             return -1;
         }
+    }
+    /// Survey every file named on the command line, as one list of sub-records, and print it to standard output.
+    /// Return 0 when every file was read to its end, or -1 if one could not be opened or read.
+    int surveyTes4(const Arguments& info)
+    {
+        ESM4::Survey survey(std::set<std::string>(info.types.begin(), info.types.end()), info.failed_given);
+        const Params params(info);
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
+        int result = 0;
+
+        for (const std::filesystem::path& path : info.inputFiles)
+        {
+            const std::string name = Files::pathToUnicodeString(path.filename());
+            try
+            {
+                auto stream = Files::openBinaryInputFileStream(path);
+                if (!stream->is_open())
+                {
+                    std::cout << "Failed to open file " << name << ": " << std::generic_category().message(errno)
+                              << '\n';
+                    result = -1;
+                    continue;
+                }
+                if (ESM::readFormat(*stream) != ESM::Format::Tes4)
+                {
+                    std::cout << "Survey mode only supports TES4-format files: " << name << '\n';
+                    result = -1;
+                    continue;
+                }
+                stream->seekg(0);
+
+                ESM4::Reader reader(std::move(stream), path, nullptr, &encoder, true);
+                survey.collect(reader, [&params](ESM4::Reader& r) { return readRecord(params, r); });
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "\nERROR in " << name << ":\n\n  " << e.what() << std::endl;
+                result = -1;
+            }
+        }
+
+        std::cout << "Surveyed " << info.inputFiles.size() << " files\n\n";
+        survey.write(std::cout);
+        return survey.getFatalErrors().empty() ? result : -1;
     }
 }

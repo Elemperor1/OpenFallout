@@ -590,6 +590,23 @@ namespace ESM4
         mCtx.recordRead = mCtx.recordHeader.record.dataSize; // for getSubRecordHeader()
     }
 
+    void Reader::rewindRecordData(const ReaderContext& recordStart)
+    {
+        mStream->clear();
+        if (mSavedStream)
+        {
+            // The data was inflated, and the inflated stream starts with the first sub-record.
+            mStream->seekg(0);
+        }
+        else
+        {
+            mStream->seekg(recordStart.filePos + static_cast<std::streamoff>(recordStart.recHeaderSize));
+            if ((mCtx.recordHeader.record.flags & Rec_Compressed) != 0)
+                getRecordData();
+        }
+        mCtx.recordRead = 0; // for getSubRecordHeader()
+    }
+
     bool Reader::getSubRecordHeader()
     {
         bool result = false;

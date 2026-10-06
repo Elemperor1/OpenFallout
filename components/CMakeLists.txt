@@ -293,6 +293,7 @@ add_component_dir (esm4
     readerutils
     reference
     script
+    survey
     typetraits
     vertex
 )
