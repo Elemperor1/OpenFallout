@@ -40,7 +40,8 @@ namespace ESM4
                     readString(reader, mEditorId);
                     break;
                 case ESM::fourCC("FULL"):
-                    reader.getLocalizedString(mFullName);
+                    // Fallout 3 and New Vegas plugins are never localized, and getLocalizedString hides a short read.
+                    readString(reader, mFullName);
                     break;
                 case ESM::fourCC("XNAM"):
                 {

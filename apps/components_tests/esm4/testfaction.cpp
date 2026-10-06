@@ -221,6 +221,7 @@ namespace
     {
         const std::string edid = zString("EDID", "Cut");
         const std::vector<std::pair<std::string, std::string>> cases = {
+            { "FULL", edid + zString("FULL", "Name") },
             { "XNAM", edid + relation(0x000a0001, 1) },
             { "XNAM", edid + relation(0x000a0001, 1, 2) },
             { "DATA", edid + flags(1, 1) },
