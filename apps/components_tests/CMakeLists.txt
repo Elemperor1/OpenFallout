@@ -69,12 +69,34 @@ file(GLOB UNITTEST_SRC_FILES
     toutf8/toutf8.cpp
 
     esm4/includes.cpp
+    esm4/testactorvalueinfo.cpp
+    esm4/testaddonnode.cpp
+    esm4/testcamerapath.cpp
+    esm4/testcamerashot.cpp
     esm4/testcensus.cpp
+    esm4/testclimate.cpp
+    esm4/testcombatstyle.cpp
+    esm4/testdebris.cpp
+    esm4/testeffectshader.cpp
+    esm4/testencounterzone.cpp
+    esm4/testexplosion.cpp
     esm4/testfaction.cpp
+    esm4/testimagespace.cpp
+    esm4/testimagespacemodifier.cpp
+    esm4/testimpactdata.cpp
+    esm4/testimpactdataset.cpp
+    esm4/testloadscreen.cpp
+    esm4/testloadscreentype.cpp
+    esm4/testmenuicon.cpp
     esm4/testnpc.cpp
+    esm4/testprojectile.cpp
+    esm4/testragdoll.cpp
     esm4/testrecordreader.cpp
     esm4/testscript.cpp
     esm4/testsurvey.cpp
+    esm4/testvoicetype.cpp
+    esm4/testwater.cpp
+    esm4/testweather.cpp
 
     fx/lexer.cpp
     fx/technique.cpp
