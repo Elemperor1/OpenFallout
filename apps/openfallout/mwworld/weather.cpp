@@ -11,6 +11,7 @@
 #include <components/esm3/loadregn.hpp>
 #include <components/esm3/weatherstate.hpp>
 #include <components/esm4/loadclmt.hpp>
+#include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadwthr.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -371,9 +372,17 @@ namespace OFWorld
     {
     }
 
-    RegionWeather::RegionWeather(const std::map<ESM::RefId, uint8_t>& chances)
+    RegionWeather::RegionWeather(
+        const std::map<ESM::RefId, uint8_t>& chances, const std::map<ESM::RefId, ESM::RefId>& globals)
         : mChances(chances)
+        , mGlobals(globals)
     {
+    }
+
+    void RegionWeather::load(const ESM::RegionWeatherState& state)
+    {
+        mWeather = state.mWeather;
+        mChances = state.mChances;
     }
 
     RegionWeather::operator ESM::RegionWeatherState() const
@@ -421,23 +430,49 @@ namespace OFWorld
 
     void RegionWeather::chooseNewWeather(const WeatherStore& store)
     {
-        // All probabilities must add to 100 (responsibility of the user).
-        // If chances A and B has values 30 and 70 then by generating 100 numbers 1..100, 30% will be lesser or equal 30
-        // and 70% will be greater than 30 (in theory).
-        auto& prng = OFBase::Environment::get().getWorld()->getPrng();
-        unsigned int chance = Misc::Rng::rollDice(100u, prng) + 1u; // 1..100
-        unsigned int sum = 0;
-        for (const Weather* weather : store)
+        // A weather of Fallout can need a global to be set. The global is the one of the record, nothing changes it
+        // yet.
+        const auto isAvailable = [this](const ESM::RefId& weather) {
+            const auto condition = mGlobals.find(weather);
+            if (condition == mGlobals.end())
+                return true;
+            const ESM4::GlobalVariable* global
+                = OFBase::Environment::get().getESMStore()->get<ESM4::GlobalVariable>().search(condition->second);
+            return global != nullptr && global->mValue != 0.f;
+        };
+
+        // All probabilities must add to 100 (responsibility of the user), those of the weathers that are left out
+        // for a global that is not set are shared among the others.
+        unsigned int total = 100;
+        if (!mGlobals.empty())
         {
-            sum += getChance(weather->mId);
-            if (chance <= sum)
+            total = 0;
+            for (const Weather* weather : store)
+                if (isAvailable(weather->mId))
+                    total += getChance(weather->mId);
+        }
+
+        if (total > 0)
+        {
+            // If chances A and B has values 30 and 70 then by generating 100 numbers 1..100, 30% will be lesser or
+            // equal 30 and 70% will be greater than 30 (in theory).
+            auto& prng = OFBase::Environment::get().getWorld()->getPrng();
+            unsigned int chance = Misc::Rng::rollDice(total, prng) + 1u; // 1..total
+            unsigned int sum = 0;
+            for (const Weather* weather : store)
             {
-                mWeather = weather->mId;
-                return;
+                if (!isAvailable(weather->mId))
+                    continue;
+                sum += getChance(weather->mId);
+                if (chance <= sum)
+                {
+                    mWeather = weather->mId;
+                    return;
+                }
             }
         }
 
-        // if we hit this path then the chances don't add to 100, choose a default weather instead
+        // if we hit this path then the chances don't add up, choose a default weather instead
         mWeather = ESM::Weather::indexToRefId(0);
     }
 
@@ -485,6 +520,18 @@ namespace OFWorld
                 weights.emplace_back(id, entry.mChance);
         }
         return normaliseChances(weights);
+    }
+
+    std::map<ESM::RefId, ESM::RefId> climateGlobals(const ESM4::Climate& climate, const WeatherStore& store)
+    {
+        std::map<ESM::RefId, ESM::RefId> globals;
+        for (const ESM4::Climate::WeatherEntry& entry : climate.mWeathers)
+        {
+            const ESM::RefId id(ESM::FormId::fromUint32(entry.mWeather));
+            if (entry.mGlobal != 0 && store.search(id) != nullptr)
+                globals[id] = ESM::RefId(ESM::FormId::fromUint32(entry.mGlobal));
+        }
+        return globals;
     }
 
     MoonModel::MoonModel(float fadeInStart, float fadeInFinish, float fadeOutStart, float fadeOutFinish,
@@ -1250,6 +1297,17 @@ namespace OFWorld
             mNextWeather = state.mNextWeather;
             mQueuedWeather = state.mQueuedWeather;
 
+            // A weather of Fallout that the content files of the game no longer have cannot be shown
+            if (mWeatherStore->search(mCurrentWeather) == nullptr)
+                mCurrentWeather = ESM::Weather::indexToRefId(0);
+            if (!mNextWeather.empty() && mWeatherStore->search(mNextWeather) == nullptr)
+            {
+                mNextWeather = {};
+                mTransitionFactor = 0.0f;
+            }
+            if (!mQueuedWeather.empty() && mWeatherStore->search(mQueuedWeather) == nullptr)
+                mQueuedWeather = {};
+
             mRegions.clear();
             importRegions();
 
@@ -1258,7 +1316,7 @@ namespace OFWorld
                 auto found = mRegions.find(it->first);
                 if (found != mRegions.end())
                 {
-                    found->second = RegionWeather(it->second);
+                    found->second.load(it->second);
                 }
             }
 
@@ -1292,7 +1350,8 @@ namespace OFWorld
         {
             std::map<ESM::RefId, uint8_t> chances = climateChances(climate, *mWeatherStore);
             if (!chances.empty())
-                mRegions.insert(std::make_pair(ESM::RefId(climate.mId), RegionWeather(chances)));
+                mRegions.insert(std::make_pair(
+                    ESM::RefId(climate.mId), RegionWeather(chances, climateGlobals(climate, *mWeatherStore))));
         }
     }
 

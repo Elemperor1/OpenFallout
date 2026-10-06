@@ -223,6 +223,8 @@ def check(text, scenario, pixel):
     if scenario.exterior and WEATHER_LINE not in weather_lines:
         problems.append(f"the log has no line '{WEATHER_LINE}', the weather of the cell is: "
                         f"{weather_lines or 'not logged'}")
+    if any(plugin.CONDITIONAL_WEATHER_NAME in line for line in weather_lines):
+        problems.append("the engine chose the weather that needs a global that is 0")
     if not scenario.exterior and weather_lines:
         problems.append(f"the engine chose a weather in an interior cell: {weather_lines}")
     if pixel is None:

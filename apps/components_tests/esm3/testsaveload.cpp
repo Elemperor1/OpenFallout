@@ -20,6 +20,7 @@
 #include <components/esm3/loadweap.hpp>
 #include <components/esm3/player.hpp>
 #include <components/esm3/quickkeys.hpp>
+#include <components/esm3/weatherstate.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -291,6 +292,60 @@ namespace ESM
             Region result;
             saveAndLoadRecord(record, CurrentSaveGameFormatVersion, result);
             EXPECT_EQ(result.mSoundList, record.mSoundList);
+        }
+
+        TEST_F(Esm3SaveLoadRecordTest, weatherStateShouldKeepWeathersOfMorrowind)
+        {
+            WeatherState record{};
+            record.mCurrentRegion = generateRandomRefId();
+            record.mTimePassed = 1.5f;
+            record.mWeatherUpdateTime = 3.f;
+            record.mTransitionFactor = 0.25f;
+            record.mCurrentWeather = Weather::indexToRefId(2);
+            record.mNextWeather = Weather::indexToRefId(4);
+            record.mRegions[generateRandomRefId()] = RegionWeatherState{ .mWeather = Weather::indexToRefId(3),
+                .mChances = { { Weather::indexToRefId(0), 40 }, { Weather::indexToRefId(3), 60 } } };
+            WeatherState result{};
+            saveAndLoadRecord(record, CurrentSaveGameFormatVersion, result);
+            EXPECT_EQ(result.mCurrentRegion, record.mCurrentRegion);
+            EXPECT_EQ(result.mCurrentWeather, record.mCurrentWeather);
+            EXPECT_EQ(result.mNextWeather, record.mNextWeather);
+            EXPECT_TRUE(result.mQueuedWeather.empty());
+            ASSERT_EQ(result.mRegions.size(), 1u);
+            const RegionWeatherState& region = result.mRegions.begin()->second;
+            EXPECT_EQ(region.mWeather, Weather::indexToRefId(3));
+            // The chance of every weather of Morrowind is saved, whether it is 0 or not
+            EXPECT_EQ(region.mChances.size(), static_cast<std::size_t>(Weather::Length));
+            EXPECT_EQ(region.mChances.at(Weather::indexToRefId(0)), 40);
+            EXPECT_EQ(region.mChances.at(Weather::indexToRefId(1)), 0);
+            EXPECT_EQ(region.mChances.at(Weather::indexToRefId(3)), 60);
+        }
+
+        TEST_F(Esm3SaveLoadRecordTest, weatherStateShouldKeepWeathersWithoutAnIndex)
+        {
+            // The weathers of Fallout are told apart by form ID, not by one of the ten indices of Morrowind
+            const RefId clear = RefId(FormId{ .mIndex = 0x800, .mContentFile = 1 });
+            const RefId dusty = RefId(FormId{ .mIndex = 0x801, .mContentFile = 1 });
+            WeatherState record{};
+            record.mCurrentRegion = RefId(FormId{ .mIndex = 0x900, .mContentFile = 1 });
+            record.mCurrentWeather = clear;
+            record.mNextWeather = dusty;
+            record.mQueuedWeather = Weather::indexToRefId(1);
+            record.mRegions[record.mCurrentRegion]
+                = RegionWeatherState{ .mWeather = dusty, .mChances = { { clear, 80 }, { dusty, 20 } } };
+            WeatherState result{};
+            saveAndLoadRecord(record, CurrentSaveGameFormatVersion, result);
+            EXPECT_EQ(result.mCurrentRegion, record.mCurrentRegion);
+            EXPECT_EQ(result.mCurrentWeather, clear);
+            EXPECT_EQ(result.mNextWeather, dusty);
+            EXPECT_EQ(result.mQueuedWeather, Weather::indexToRefId(1));
+            ASSERT_EQ(result.mRegions.size(), 1u);
+            const RegionWeatherState& region = result.mRegions.begin()->second;
+            EXPECT_EQ(region.mWeather, dusty);
+            EXPECT_EQ(region.mChances.at(clear), 80);
+            EXPECT_EQ(region.mChances.at(dusty), 20);
+            // and the ten of Morrowind with a chance of 0
+            EXPECT_EQ(region.mChances.size(), static_cast<std::size_t>(Weather::Length) + 2);
         }
 
         TEST_F(Esm3SaveLoadRecordTest, scriptSoundRefShouldSupportRefIdLongerThan32)

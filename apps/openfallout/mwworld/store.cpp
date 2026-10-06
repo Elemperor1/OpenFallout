@@ -1175,6 +1175,7 @@ template class OFWorld::TypedDynamicStore<ESM4::ArmorAddon>;
 template class OFWorld::TypedDynamicStore<ESM4::Book>;
 template class OFWorld::TypedDynamicStore<ESM4::Cell>;
 template class OFWorld::TypedDynamicStore<ESM4::Climate>;
+template class OFWorld::TypedDynamicStore<ESM4::GlobalVariable>;
 template class OFWorld::TypedDynamicStore<ESM4::Clothing>;
 template class OFWorld::TypedDynamicStore<ESM4::Container>;
 template class OFWorld::TypedDynamicStore<ESM4::Creature>;
