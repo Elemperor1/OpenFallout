@@ -284,8 +284,9 @@ namespace OFWorld
 
         operator ESM::RegionWeatherState() const;
 
-        /// Takes the weather and the chances of a saved state and keeps the rest
-        void load(const ESM::RegionWeatherState& state);
+        /// Takes the weather and the chances of a saved state and keeps the rest. A saved weather that the store does
+        /// not have (its content file was changed since) is dropped, a new one is chosen when it is needed.
+        void load(const ESM::RegionWeatherState& state, const WeatherStore& store);
 
         void setChances(const std::map<ESM::RefId, uint8_t>& chances, const WeatherStore& store);
         const std::map<ESM::RefId, uint8_t>& getChances() const { return mChances; }

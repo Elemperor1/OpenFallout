@@ -379,9 +379,9 @@ namespace OFWorld
     {
     }
 
-    void RegionWeather::load(const ESM::RegionWeatherState& state)
+    void RegionWeather::load(const ESM::RegionWeatherState& state, const WeatherStore& store)
     {
-        mWeather = state.mWeather;
+        mWeather = store.search(state.mWeather) != nullptr ? state.mWeather : ESM::RefId();
         mChances = state.mChances;
     }
 
@@ -1316,7 +1316,7 @@ namespace OFWorld
                 auto found = mRegions.find(it->first);
                 if (found != mRegions.end())
                 {
-                    found->second.load(it->second);
+                    found->second.load(it->second, *mWeatherStore);
                 }
             }
 

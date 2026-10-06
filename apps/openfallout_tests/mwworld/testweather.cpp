@@ -4,6 +4,7 @@
 
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm3/weatherstate.hpp>
 #include <components/esm4/loadclmt.hpp>
 #include <components/esm4/loadwthr.hpp>
 
@@ -928,6 +929,36 @@ namespace OFWorld
         {
             EXPECT_TRUE(normaliseChances({}).empty());
             EXPECT_TRUE(normaliseChances({ { formIdRefId(0x01000001), 0 } }).empty());
+        }
+
+        TEST(OFWorldWeatherTest, aRegionKeepsTheSavedWeatherTheStoreHas)
+        {
+            WeatherStore store;
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, makeRecord(4), 0.8f));
+            RegionWeather region(std::map<ESM::RefId, uint8_t>{});
+
+            region.load(ESM::RegionWeatherState{ .mWeather = formIdRefId(0x01000800),
+                            .mChances = { { formIdRefId(0x01000800), 100 } } },
+                store);
+
+            EXPECT_EQ(region.getChance(formIdRefId(0x01000800)), 100);
+            ESM::RegionWeatherState state = region;
+            EXPECT_EQ(state.mWeather, formIdRefId(0x01000800));
+        }
+
+        TEST(OFWorldWeatherTest, aRegionDropsASavedWeatherTheStoreDoesNotHave)
+        {
+            WeatherStore store;
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, makeRecord(4), 0.8f));
+            RegionWeather region(std::map<ESM::RefId, uint8_t>{});
+
+            region.load(ESM::RegionWeatherState{ .mWeather = formIdRefId(0x01000999),
+                            .mChances = { { formIdRefId(0x01000800), 100 } } },
+                store);
+
+            ESM::RegionWeatherState state = region;
+            EXPECT_TRUE(state.mWeather.empty());
+            EXPECT_EQ(state.mChances.at(formIdRefId(0x01000800)), 100);
         }
 
         TEST(OFWorldWeatherTest, theChancesOfAClimateLeaveOutTheWeathersTheStoreDoesNotHave)
