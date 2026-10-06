@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -67,6 +68,41 @@ namespace
     {
         EXPECT_EQ(
             loadFailure(subRecord("DATA", std::string(309, 'x'))), "ESM4::EFSH::load - DATA has an unexpected size");
+    }
+
+    TEST(ESM4EffectShaderTest, readsDataThatEndsAfterAnyMemberAndAdjustsTheDebris)
+    {
+        // The format reference lets DATA end after any member from the 224th byte on. The debris of the addon models
+        // is at 244 when DATA goes that far.
+        std::string longData = bytePattern(284, 1);
+        const std::uint32_t debris = 0x00000123;
+        longData.replace(244, 4, std::string(reinterpret_cast<const char*>(&debris), 4));
+        for (const std::size_t size : { 224u, 228u, 244u, 248u, 252u, 284u })
+        {
+            const std::vector<ESM4::EffectShader> result = loadRecords<ESM4::EffectShader>(
+                "EFSH", record("EFSH", 1, subRecord("DATA", longData.substr(0, size))), 0, nullptr, 3);
+            ASSERT_EQ(result.size(), 1u) << size;
+            ASSERT_EQ(result[0].mData.size(), size);
+            std::uint32_t id = 0;
+            if (size >= 248)
+            {
+                std::memcpy(&id, result[0].mData.data() + 244, sizeof(id));
+                EXPECT_EQ(id, 0x03000123u) << size;
+            }
+            else
+                EXPECT_EQ(std::string(result[0].mData.begin(), result[0].mData.end()), longData.substr(0, size));
+        }
+        EXPECT_EQ(
+            loadFailure(subRecord("DATA", std::string(223, 'x'))), "ESM4::EFSH::load - DATA has an unexpected size");
+    }
+
+    TEST(ESM4EffectShaderTest, rejectsDataThatEndsInsideAMember)
+    {
+        // Every member from the 224th byte on has four bytes.
+        for (const std::size_t size : { 225u, 226u, 227u, 245u, 307u })
+            EXPECT_EQ(loadFailure(subRecord("DATA", std::string(size, 'x'))),
+                "ESM4::EFSH::load - DATA has an unexpected size")
+                << size;
     }
 
     TEST(ESM4EffectShaderTest, rejectsAnUnknownSubrecord)

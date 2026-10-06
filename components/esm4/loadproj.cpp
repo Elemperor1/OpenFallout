@@ -50,19 +50,21 @@ namespace ESM4
                     in.bytes(stageModel().mTextures);
                     break;
                 case ESM::fourCC("DMDS"):
-                    in.bytes(stageModel().mAlternateTextures);
+                    in.alternateTextures(stageModel().mAlternateTextures);
                     break;
                 case ESM::fourCC("DSTF"):
                     in.expectSize(0);
                     break;
                 case ESM::fourCC("DATA"):
-                    in.bytes(mData, { 68, 84 });
+                    in.bytes(mData, { 68, 80, 84 });
+                    // The lights, the explosion, the sounds and the default weapon source.
+                    in.adjustFormIds(mData, { 16, 20, 36, 40, 56, 60, 64 });
                     break;
                 case ESM::fourCC("NAM1"):
                     in.string(mMuzzleFlashModel);
                     break;
                 case ESM::fourCC("NAM2"):
-                    in.bytes(mMuzzleFlashTextures, { 48, 72, 96 });
+                    in.bytes(mMuzzleFlashTextures);
                     break;
                 case ESM::fourCC("VNAM"):
                     in.value(mSoundLevel);
@@ -71,7 +73,7 @@ namespace ESM4
                     in.value(mBoundRadius);
                     break;
                 case ESM::fourCC("MODS"):
-                    in.bytes(mModelAlternateTextures);
+                    in.alternateTextures(mModelAlternateTextures);
                     break;
                 case ESM::fourCC("MODD"):
                     in.value(mModelFlags);

@@ -76,7 +76,10 @@ namespace ESM4
             }
             case ESM::fourCC("SCVR"): // assumed always pair with SLSD
                 checkSubRecord(reader);
-                if (!localVarData.empty())
+                // The reader cannot read a string of no bytes at all, which is a name that is empty.
+                if (!localVarData.empty() && subHdr.dataSize == 0)
+                    localVarData.back().variableName.clear();
+                else if (!localVarData.empty())
                     reader.getZString(localVarData.back().variableName);
                 else
                     reader.skipSubRecordData();
@@ -85,9 +88,12 @@ namespace ESM4
             {
                 checkSubRecord(reader, referenceSize);
                 ScriptReference reference;
-                if (!reader.getFormId(reference.formId))
-                    throw std::runtime_error(
-                        "ESM4::ScriptDefinition::loadSubRecord - sub-record is shorter than its size");
+                ESM::FormId32 id = 0;
+                readField(reader, id);
+                reference.formId = ESM::FormId::fromUint32(id);
+                // A null reference (zero) is valid, and stays null.
+                if (id != 0)
+                    reader.adjustFormId(reference.formId);
                 references.push_back(reference);
                 return true;
             }

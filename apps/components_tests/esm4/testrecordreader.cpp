@@ -47,6 +47,7 @@ namespace
         ESM4::TargetCondition mCondition{};
         std::vector<std::uint8_t> mSized;
         ESM4::RawSubRecord mRaw;
+        std::vector<ESM4::AlternateTexture> mTextures;
 
         void load(ESM4::Reader& reader)
         {
@@ -90,6 +91,9 @@ namespace
                         break;
                     case ESM::fourCC("RAWS"):
                         in.raw(mRaw);
+                        break;
+                    case ESM::fourCC("MODS"):
+                        in.alternateTextures(mTextures);
                         break;
                     default:
                         in.unknown();
@@ -250,6 +254,75 @@ namespace
         EXPECT_EQ(global, 0u);
     }
 
+    TEST(ESM4RecordReaderTest, readsAlternateTexturesAndAdjustsTheirTextures)
+    {
+        const std::vector<Sample> samples = loadRecords<Sample>("SMPL",
+            record("SMPL", 1,
+                subRecord("MODS", alternateTextureData({ { "Part", 0x00000123, 4 }, { "", 0, -1 } }))
+                    + subRecord("MODS", alternateTextureData({}))),
+            0, nullptr, 3);
+
+        ASSERT_EQ(samples.size(), 1u);
+        ASSERT_EQ(samples[0].mTextures.size(), 2u);
+        EXPECT_EQ(samples[0].mTextures[0].mName, "Part");
+        EXPECT_EQ(samples[0].mTextures[0].mTexture, (ESM::FormId{ 0x123, 3 }));
+        EXPECT_EQ(samples[0].mTextures[0].mIndex, 4);
+        // A texture that is null stays null.
+        EXPECT_EQ(samples[0].mTextures[1].mName, "");
+        EXPECT_EQ(samples[0].mTextures[1].mTexture.toUint32(), 0u);
+        EXPECT_EQ(samples[0].mTextures[1].mIndex, -1);
+    }
+
+    TEST(ESM4RecordReaderTest, rejectsAlternateTexturesWhoseSizesDoNotAddUp)
+    {
+        const std::string good = alternateTextureData({ { "Part", 0x00000123, 4 } });
+        EXPECT_EQ(loadFailure(subRecord("MODS", "")), "ESM4::SMPL::load - MODS has an unexpected size");
+        EXPECT_EQ(loadFailure(subRecord("MODS", good.substr(0, good.size() - 1))),
+            "ESM4::SMPL::load - MODS has an unexpected size");
+        EXPECT_EQ(loadFailure(subRecord("MODS", good + "x")), "ESM4::SMPL::load - MODS has an unexpected size");
+
+        // A count that the sub-record is too short for.
+        std::string tooMany = good;
+        tooMany[0] = 2;
+        EXPECT_EQ(loadFailure(subRecord("MODS", tooMany)), "ESM4::SMPL::load - MODS has an unexpected size");
+
+        // A name whose length runs past the sub-record.
+        std::string longName = good;
+        longName[4] = 100;
+        EXPECT_EQ(loadFailure(subRecord("MODS", longName)), "ESM4::SMPL::load - MODS has an unexpected size");
+    }
+
+    TEST(ESM4RecordReaderTest, readsConditionsWithoutTheRunOnAndTheReference)
+    {
+        const std::string full = conditionData(0x42, 2.5f, 14, 0x00000009); // run on target, so 0x02 is set
+        const std::string withoutReference = full.substr(0, 24);
+        const std::string withoutRunOn = full.substr(0, 20);
+        std::string global;
+        append<std::uint32_t>(global, ESM4::CTF_UseGlobal);
+        append<std::uint32_t>(global, 0x00000456);
+        for (const std::uint32_t value : { 14u, 7u, 8u })
+            append(global, value);
+
+        std::vector<Sample> samples;
+        for (const std::string& condition : { full, withoutReference, withoutRunOn, global })
+            samples.push_back(loadAsThirdPlugin(subRecord("CTDA", condition)));
+
+        EXPECT_EQ(samples[0].mCondition.runOn, 1u);
+        EXPECT_EQ(samples[0].mCondition.reference, 0x03000009u);
+        // The run on of the record is 1 (target) in conditionData, and the flag says the same.
+        EXPECT_EQ(samples[1].mCondition.runOn, 1u);
+        EXPECT_EQ(samples[1].mCondition.reference, 0u);
+        EXPECT_EQ(samples[1].mCondition.param2, 8u);
+        EXPECT_EQ(samples[2].mCondition.runOn, 1u); // from the flag
+        EXPECT_EQ(samples[2].mCondition.reference, 0u);
+        // Without the flag, a condition without a run on is about the subject.
+        EXPECT_EQ(samples[3].mCondition.runOn, 0u);
+        EXPECT_EQ(samples[3].mCondition.reference, 0u);
+        std::uint32_t id = 0;
+        std::memcpy(&id, &samples[3].mCondition.comparison, sizeof(id));
+        EXPECT_EQ(id, 0x03000456u);
+    }
+
     TEST(ESM4RecordReaderTest, rejectsAListWhoseSizeIsNotAWholeNumberOfItems)
     {
         EXPECT_EQ(
@@ -259,7 +332,7 @@ namespace
         EXPECT_EQ(
             loadFailure(subRecord("LINK", std::string(6, 'x'))), "ESM4::SMPL::load - LINK has an unexpected size");
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::SMPL::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::SMPL::load - CTDA has an unexpected size");
     }
 
     TEST(ESM4RecordReaderTest, rejectsASizeThatIsNotInTheListOfSizes)

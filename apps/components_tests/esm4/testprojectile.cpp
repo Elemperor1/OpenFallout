@@ -52,12 +52,19 @@ namespace
         return data;
     }
 
+    // DATA with a form ID at each of the offsets that hold one: two lights, the explosion, three sounds and the default
+    // weapon source.
+    std::string projectileData(std::uint32_t id, std::size_t size = 68)
+    {
+        return bytesWithFormIds(68, 19, { 16, 20, 36, 40, 56, 60, 64 }, id).substr(0, size);
+    }
+
     std::string everySubRecord()
     {
         return zString("EDID", "Text of EDID") + subRecord("OBND", dataBounds(2)) + zString("FULL", "Text of FULL")
             + zString("MODL", "Text of MODL") + subRecord("MODT", bytePattern(5, 15))
             + subRecord("DEST", dataDestruction(6)) + subRecord("DSTD", dataStages(7))
-            + subRecord("DSTD", dataStages(17)) + subRecord("DSTF", "") + subRecord("DATA", bytePattern(68, 19))
+            + subRecord("DSTD", dataStages(17)) + subRecord("DSTF", "") + subRecord("DATA", projectileData(0x00010001))
             + zString("NAM1", "Text of NAM1") + subRecord("NAM2", bytePattern(48, 21))
             + valueSubRecord<std::uint32_t>("VNAM", 100012);
     }
@@ -96,7 +103,7 @@ namespace
         EXPECT_EQ(result.mStages[1].mExplosion, 0x00010016u);
         EXPECT_EQ(result.mStages[1].mDebris, 0x00010017u);
         EXPECT_EQ(result.mStages[1].mDebrisCount, -100024);
-        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), bytePattern(68, 19));
+        EXPECT_EQ(std::string(result.mData.begin(), result.mData.end()), projectileData(0x00010001));
         EXPECT_EQ(result.mMuzzleFlashModel, "Text of NAM1");
         EXPECT_EQ(
             std::string(result.mMuzzleFlashTextures.begin(), result.mMuzzleFlashTextures.end()), bytePattern(48, 21));
@@ -136,6 +143,27 @@ namespace
         expectEverySubRecord(records[0]);
     }
 
+    TEST(ESM4ProjectileTest, adjustsTheFormIdsOfItsDataAndReadsTheLongerForms)
+    {
+        for (const std::size_t size : { 68u, 80u, 84u })
+        {
+            const std::string data
+                = bytesWithFormIds(84, 19, { 16, 20, 36, 40, 56, 60, 64 }, 0x00000123).substr(0, size);
+            const std::vector<ESM4::Projectile> result = loadRecords<ESM4::Projectile>("PROJ",
+                record("PROJ", 1, subRecord("DATA", data) + subRecord("NAM2", bytePattern(24 * 5, 1))), 0, nullptr, 3);
+            ASSERT_EQ(result.size(), 1u) << size;
+            EXPECT_EQ(result[0].mData.size(), size);
+            EXPECT_EQ(std::string(result[0].mData.begin(), result[0].mData.end()),
+                bytesWithFormIds(84, 19, { 16, 20, 36, 40, 56, 60, 64 }, 0x03000123).substr(0, size));
+            EXPECT_EQ(result[0].mMuzzleFlashTextures.size(), 24u * 5);
+        }
+        // Null form IDs stay null.
+        const std::vector<ESM4::Projectile> result = loadRecords<ESM4::Projectile>(
+            "PROJ", record("PROJ", 1, subRecord("DATA", projectileData(0))), 0, nullptr, 3);
+        ASSERT_EQ(result.size(), 1u);
+        EXPECT_EQ(std::string(result[0].mData.begin(), result[0].mData.end()), projectileData(0));
+    }
+
     TEST(ESM4ProjectileTest, rejectsASizeThatNoGameUses)
     {
         EXPECT_EQ(
@@ -154,8 +182,6 @@ namespace
             loadFailure(subRecord("DSTF", std::string(1, 'x'))), "ESM4::PROJ::load - DSTF has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("DATA", std::string(85, 'x'))), "ESM4::PROJ::load - DATA has an unexpected size");
-        EXPECT_EQ(
-            loadFailure(subRecord("NAM2", std::string(97, 'x'))), "ESM4::PROJ::load - NAM2 has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("VNAM", std::string(3, 'x'))), "ESM4::PROJ::load - VNAM has an unexpected size");
         EXPECT_EQ(

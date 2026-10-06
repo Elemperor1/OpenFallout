@@ -9,6 +9,7 @@
 - **42 record types have no loader.** Fallout 3 uses 28 of them (2,973 of 718,951 records in `Fallout3.esm`). New Vegas uses all 42 (5,496 of 465,016 records in `FalloutNV.esm`). New Vegas adds 14 unparsed types of its own (`AMEF`, `CCRD`, `CDCK`, `CHAL`, `CHIP`, `CMNY`, `CSNO`, `DEHY`, `HUNG`, `LSCT`, `RCCT`, `RCPE`, `REPU`, `SLPD`).
 - Whether a type has a loader is the same in both games for every type they share.
 - **Update 2026-10-06: `FACT` now has a loader** (PR #10) and none of its 2,528 records in the 20 plugins fails. The tables below were made before it and still show `FACT` as having no loader, so the counts in this list and in the tables are the first runs'. See "Faction records".
+- **Update 2026-10-06: every record type has a loader now, and no record fails** (PRs #11 and #12). The census on the head of PR #12 parses all records of all 20 plugins, with 0 in the No parser column and 0 in the Failed column, and the 17 failing `NPC_` records load. The tables above this one were made before that and still show the earlier counts. See "Loaders of M1 slices 3 to 5".
 - **Tale of Two Wastelands: 17 `NPC_` records fail to load, and no unparsed record type is new.** The four TTW plugins hold 1,279,509 records after their headers. Every failure is an `NPC_` record: three are unknown subrecords (`DLVT` twice, `LSNA` once) and the other 14 are loader errors for which the census withholds the message. Every `NPC_` record in the vanilla `Fallout3.esm` and `FalloutNV.esm` loads, so the failing records exist only in the TTW-patched files. The files came from a community installer and were not checked against reference hashes, so the failures may come from the installer instead of from TTW's data.
 - **Compiled scripts line up with their headers, except for the variable count.** The 16 plugins hold 16,180 `INFO`, 2,437 `QUST` and 6,035 `SCPT` scripts, with 3.1 MB of bytecode. In every script the compiled size in the header equals the bytecode read, and the reference count equals the references read in all but one source-only `INFO` script. The header's variable count does not equal the number of local variables read: it is above the highest declared index in 449 scripts. See "Scripts held by records".
 
@@ -416,6 +417,81 @@ What the 2,528 records show about the layout, which the loader was written from 
 - 242 records have ranks and the most in one record is 9. No rank title has zero bytes, none comes before its `RNAM`, and no `FACT` sub-record type outside the loader's list occurs.
 - **No `FACT` record is compressed**, and across all record types no compressed record (96,951 in the 11 plugins that have any) ends with a sub-record of 9 bytes or less. The reader took a compressed record to end 4 bytes before its data does, so it would not have seen such a last sub-record. The fix therefore changes no record in these 20 plugins, and matters only for plugins that are not in this census.
 - The Tale of Two Wastelands copies of `Fallout3.esm` and `FalloutNV.esm` have no `CNAM` at all, where the vanilla files have 35 and 34, although the `DATA` sizes in the TTW `FalloutNV.esm` equal the vanilla ones. This was not looked into.
+
+## Loaders of M1 slices 3 to 5
+
+Run on 2026-10-06 on the same Mac, from the branch of PRs #11 and #12, on the same 20 plugins, each from its own folder with a bare file name. All runs exited 0 with nothing on standard error, no run printed an `ERROR` line or "Reading stopped early", and no census printed a Failures section. The tables above this section were made before these loaders and still show the earlier counts.
+
+Six runs: `e84c2fc0` (PR #11, the first 22 types and the `NPC_` fix), `003492d1` (the head of PR #11, which decides by game whether a file gets the new loaders), `8fb3e4b4` (the first head of PR #12, which adds the last 19 types and the `TERM` and `PACK` scripts) and `3896a171` (PR #12 after review, with stricter loaders: model alternate textures decoded, perk entry data read by its type, terminal menu items split where their sub-records start over, and the scripts of perks counted) and `5523877c` (PR #12 after a second review, which compared the loaders with the xEdit definitions: conditions of 20, 24 and 28 bytes, sub-records that may be missing, counter effects, a 16-bit quest stage of a perk, the sizes of the structs that may end early, and the form IDs inside blocks kept as bytes) and `f5f45ebf` (the same after a third review, which gave `DATA` of `REPU` and `CHAL` their types). The first two outputs are identical in all 20 plugins, byte for byte, so the check that Fallout files are accepted rejected none. None of the 20 plugins is from another game, so this run cannot show that other games are turned away; the unit tests do that. The run on `3896a171` differs from the one on `8fb3e4b4` in one place only: a `PERK` row appears in the scripts table of 7 plugins (see below). Every cell of the by-type tables, and every other row of the scripts table, is the same in all 20 plugins, so the stricter loaders rejected no record that the earlier ones read.
+
+Result of the last two runs (`5523877c` and `f5f45ebf`, byte for byte the same as each other and as on `3896a171` in all 20 plugins, and the same as on `8fb3e4b4` except for the `PERK` row of the scripts table): in every plugin Parsed equals Records, and No parser and Failed are 0. All 20 runs exited 0 with nothing on standard error. "No parser before" is the count of the run on `003492d1`, which is the same as on `e84c2fc0`. Later commits make the size checks of `EFSH`, `IMGS`, `IMAD` and `WATR` accept only the sizes at which a member ends, which the format definitions allow, not every size in between, and decode the alternate textures of the models of a casino (`MODS`, `MO2S`, `MO3S` and `MO4S`), which were kept as bytes; the census was run on the last head again before the merge, and the comment on PR #12 has its numbers.
+
+| Plugin | Records | No parser before | No parser | Failed |
+|---|---:|---:|---:|---:|
+| `Fallout3.esm` | 718,951 | 1,022 | 0 | 0 |
+| `Anchorage.esm` | 40,569 | 34 | 0 | 0 |
+| `BrokenSteel.esm` | 41,304 | 68 | 0 | 0 |
+| `PointLookout.esm` | 61,982 | 75 | 0 | 0 |
+| `ThePitt.esm` | 32,839 | 48 | 0 | 0 |
+| `Zeta.esm` | 36,523 | 93 | 0 | 0 |
+| `FalloutNV.esm` | 465,016 | 2,630 | 0 | 0 |
+| `DeadMoney.esm` | 40,084 | 326 | 0 | 0 |
+| `HonestHearts.esm` | 36,201 | 174 | 0 | 0 |
+| `OldWorldBlues.esm` | 52,683 | 377 | 0 | 0 |
+| `LonesomeRoad.esm` | 34,988 | 248 | 0 | 0 |
+| `GunRunnersArsenal.esm` | 778 | 83 | 0 | 0 |
+| `ClassicPack.esm` | 19 | 3 | 0 | 0 |
+| `CaravanPack.esm` | 7 | 1 | 0 | 0 |
+| `MercenaryPack.esm` | 7 | 1 | 0 | 0 |
+| `TribalPack.esm` | 5 | 1 | 0 | 0 |
+| `TaleOfTwoWastelands.esm` | 83,154 | 1,120 | 0 | 0 |
+| `YUPTTW.esm` | 27,118 | 275 | 0 | 0 |
+| `Fallout3.esm` (TTW-patched) | 704,183 | 47 | 0 | 0 |
+| `FalloutNV.esm` (TTW-patched) | 465,054 | 2,636 | 0 | 0 |
+
+The 19 types of PR #12 have these record counts in the two base plugins (all parse, none fails). Fallout 3: `ENCH` 89, `MESG` 518, `MGEF` 163, `PERK` 87, `RADS` 5, `SPEL` 160. New Vegas: `AMEF` 54, `CCRD` 270, `CDCK` 13, `CHAL` 105, `CHIP` 5, `CMNY` 6, `CSNO` 5, `DEHY` 5, `ENCH` 145, `HUNG` 5, `MESG` 1,144, `MGEF` 289, `PERK` 176, `RADS` 5, `RCCT` 10, `RCPE` 105, `REPU` 13, `SLPD` 5, `SPEL` 270. For some types of PR #11: `WTHR` 27 in Fallout 3 and 63 in New Vegas, `IMAD` 112 and 215, `LSCR` 150 and 208, `PROJ` 52 and 95.
+
+### Scripts of `TERM` menu items and `PACK` events
+
+The census now counts these scripts in its "Scripts held in line by records" table, with the same checks as for the other holders. The `INFO`, `QUST` and `SCPT` rows are identical to the earlier runs.
+
+| Plugin | `TERM` scripts | `TERM` bytecode (bytes) | `TERM` bad reference counts | `PACK` scripts | `PACK` bytecode (bytes) |
+|---|---:|---:|---:|---:|---:|
+| `Fallout3.esm` | 371 | 14,579 | 0 | 510 | 13,751 |
+| `Anchorage.esm` | 31 | 1,714 | 1 | 73 | 1,498 |
+| `BrokenSteel.esm` | 61 | 3,222 | 0 | 83 | 1,909 |
+| `PointLookout.esm` | 20 | 711 | 0 | 24 | 480 |
+| `ThePitt.esm` | 27 | 2,154 | 0 | 96 | 1,484 |
+| `Zeta.esm` | 1 | 21 | 0 | 77 | 1,455 |
+| `FalloutNV.esm` | 208 | 11,293 | 0 | 480 | 12,526 |
+| `DeadMoney.esm` | 113 | 8,688 | 1 | 34 | 2,363 |
+| `HonestHearts.esm` | 3 | 61 | 0 | 52 | 1,270 |
+| `OldWorldBlues.esm` | 57 | 20,499 | 1 | 9 | 130 |
+| `LonesomeRoad.esm` | 26 | 1,339 | 0 | 21 | 669 |
+| **All 11** | **918** | **64,281** | **3** | **1,459** | **37,535** |
+| `TaleOfTwoWastelands.esm` | 148 | 8,138 | 0 | 325 | 9,951 |
+| `YUPTTW.esm` | 55 | 6,703 | 0 | 143 | 6,426 |
+| `Fallout3.esm` (TTW-patched) | 303 | 12,909 | 0 | 503 | 13,624 |
+| `FalloutNV.esm` (TTW-patched) | 208 | 11,293 | 0 | 480 | 12,526 |
+
+The add-on packs and `GunRunnersArsenal.esm` have no `TERM` or `PACK` script. The TTW rows are not added to the total, as before. In every `TERM` and `PACK` script the compiled size in the header equals the bytecode read, the variable-count check flags no script, and the reference count equals the references read except in three `TERM` scripts, one in each of `Anchorage.esm`, `DeadMoney.esm` and `OldWorldBlues.esm` (the TTW rows show none). That is a property of those scripts as shipped, since an independent recount of the scripts of `INFO`, `PACK`, `QUST`, `SCPT` and `TERM` straight from the plugin files, with a separate parser, equals this table in every cell of all 20 plugins. The `TERM` and `PACK` numbers are the same on `8fb3e4b4` and on `3896a171`, where a menu item ends and the next one starts by the order of the sub-records, not only at an `ITXT`: the three scripts with another reference count are therefore not menu items run together.
+
+### Scripts of `PERK` entries
+
+The run on `3896a171` is the first that counts the scripts of perks (the record's own, and the one of each entry). Only 23 scripts exist in the 20 plugins. Every one has the compiled size of its header, the reference count and the variable count that the header says (all bad-count columns are 0), and the independent recount equals the census in all five columns for every plugin, the new `PERK` row included.
+
+| Plugin | `PERK` scripts | `PERK` bytecode (bytes) |
+|---|---:|---:|
+| `Fallout3.esm` | 3 | 132 |
+| `FalloutNV.esm` | 5 | 354 |
+| `HonestHearts.esm` | 1 | 51 |
+| `OldWorldBlues.esm` | 1 | 39 |
+| **All 11** | **10** | **576** |
+| `TaleOfTwoWastelands.esm` | 4 | 396 |
+| `YUPTTW.esm` | 4 | 290 |
+| `FalloutNV.esm` (TTW-patched) | 5 | 354 |
+
+The other plugins, `Fallout3.esm` (TTW-patched) among them, have no `PERK` script. The TTW rows are not added to the total, as before.
 
 ## Notes
 

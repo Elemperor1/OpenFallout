@@ -1,6 +1,7 @@
 #include "recordreader.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <stdexcept>
 
@@ -90,9 +91,68 @@ namespace ESM4
         }
     }
 
+    void RecordReader::alternateTextures(std::vector<AlternateTexture>& values)
+    {
+        std::vector<std::uint8_t> data;
+        bytes(data);
+
+        std::size_t position = 0;
+        const auto read = [&](void* out, std::size_t count) {
+            if (data.size() - position < count)
+                badSize();
+            std::memcpy(out, data.data() + position, count);
+            position += count;
+        };
+
+        std::uint32_t count = 0;
+        read(&count, sizeof(count));
+        // Each entry has at least the length of its name, the texture and the index.
+        constexpr std::size_t minimumEntrySize = 3 * sizeof(std::uint32_t);
+        if (count > (data.size() - position) / minimumEntrySize)
+            badSize();
+        for (; count > 0; --count)
+        {
+            AlternateTexture& value = values.emplace_back();
+            std::uint32_t nameLength = 0;
+            read(&nameLength, sizeof(nameLength));
+            if (data.size() - position < nameLength)
+                badSize();
+            value.mName.assign(reinterpret_cast<const char*>(data.data()) + position, nameLength);
+            position += nameLength;
+            ESM::FormId32 texture = 0;
+            read(&texture, sizeof(texture));
+            adjustReference(texture);
+            value.mTexture = ESM::FormId::fromUint32(texture);
+            read(&value.mIndex, sizeof(value.mIndex));
+        }
+        if (position != data.size())
+            badSize();
+    }
+
     void RecordReader::condition(TargetCondition& value)
     {
-        this->value(value, &TargetCondition::reference);
+        // The run on and the reference are optional in the format reference.
+        constexpr std::size_t withoutRunOn = offsetof(TargetCondition, runOn);
+        constexpr std::size_t withoutReference = offsetof(TargetCondition, reference);
+        if (size() == withoutRunOn || size() == withoutReference)
+        {
+            value = {};
+            readExact(&value, size());
+        }
+        else
+            this->value(value, &TargetCondition::reference);
+        // The older way to say that a condition is about the target, which the run on replaced. The format reference's
+        // tool turns it into the run on, whatever the size, and so does this.
+        if ((value.condition & CTF_RunOnTarget) != 0)
+        {
+            value.condition &= ~static_cast<std::uint32_t>(CTF_RunOnTarget);
+            value.runOn = 1;
+        }
+        adjustComparison(value);
+    }
+
+    void RecordReader::adjustComparison(TargetCondition& value) const
+    {
         if ((value.condition & CTF_UseGlobal) != 0)
         {
             ESM::FormId32 global;
@@ -120,6 +180,29 @@ namespace ESM4
         data.resize(size());
         if (!data.empty() && !mReader.get(data.data(), data.size()))
             fail("sub-record is shorter than its size");
+    }
+
+    void RecordReader::bytesBetween(std::vector<std::uint8_t>& data, std::uint32_t minimum, std::uint32_t maximum,
+        std::uint32_t step, std::initializer_list<std::uint32_t> others)
+    {
+        const bool onBoundary = size() >= minimum && size() <= maximum && (size() - minimum) % step == 0;
+        if (!onBoundary && std::find(others.begin(), others.end(), size()) == others.end())
+            badSize();
+        bytes(data);
+    }
+
+    void RecordReader::adjustFormIds(
+        std::uint8_t* data, std::size_t size, std::initializer_list<std::size_t> offsets) const
+    {
+        for (const std::size_t offset : offsets)
+        {
+            if (size < sizeof(ESM::FormId32) || offset > size - sizeof(ESM::FormId32))
+                continue;
+            ESM::FormId32 id = 0;
+            std::memcpy(&id, data + offset, sizeof(id));
+            adjustReference(id);
+            std::memcpy(data + offset, &id, sizeof(id));
+        }
     }
 
     void RecordReader::bytes(std::vector<std::uint8_t>& data, std::initializer_list<std::uint32_t> sizes)

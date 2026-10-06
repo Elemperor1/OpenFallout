@@ -1,8 +1,11 @@
 #include <components/esm4/census.hpp>
 #include <components/esm4/common.hpp>
 #include <components/esm4/loadinfo.hpp>
+#include <components/esm4/loadpack.hpp>
+#include <components/esm4/loadperk.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/loadterm.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 
@@ -38,8 +41,8 @@ namespace
         return subRecord("SCHR", data);
     }
 
-    /// Build an SLSD local variable followed by the SCVR subrecord containing its name.
-    std::string localVariable(std::uint32_t index, std::string_view name)
+    /// Build an SLSD local variable.
+    std::string localVariableData(std::uint32_t index)
     {
         std::string data;
         append(data, index);
@@ -48,7 +51,13 @@ namespace
         append<std::uint32_t>(data, 0);
         append<std::uint32_t>(data, 1); // type
         append<std::uint32_t>(data, 0);
-        return subRecord("SLSD", data) + zString("SCVR", name);
+        return subRecord("SLSD", data);
+    }
+
+    /// Build an SLSD local variable followed by the SCVR subrecord containing its name.
+    std::string localVariable(std::uint32_t index, std::string_view name)
+    {
+        return localVariableData(index) + zString("SCVR", name);
     }
 
     /// Build a FO3/FONV CTDA condition comparing the given function on the subject to 1.
@@ -103,6 +112,36 @@ namespace
         EXPECT_EQ(definition.references[2].formId.mIndex, 0x0a0002u);
 
         EXPECT_TRUE(definition.isConsistent());
+    }
+
+    /// Verify a null script reference stays null, and the others are adjusted to the load order.
+    TEST(ESM4ScriptTest, keepsANullReferenceNullAndAdjustsTheOthers)
+    {
+        const std::string data = scriptHeader(2, 0, 0) + valueSubRecord<std::uint32_t>("SCRO", 0)
+            + valueSubRecord<std::uint32_t>("SCRO", 0x00000123);
+
+        const std::vector<ESM4::Script> scripts
+            = loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data), 0, nullptr, 3);
+
+        ASSERT_EQ(scripts.size(), 1u);
+        ASSERT_EQ(scripts[0].mScript.references.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.references[0].formId.toUint32(), 0u);
+        EXPECT_TRUE(scripts[0].mScript.references[0].formId.isZeroOrUnset());
+        EXPECT_EQ(scripts[0].mScript.references[1].formId, (ESM::FormId{ 0x123, 3 }));
+    }
+
+    /// Verify a local variable whose name sub-record has no bytes at all has an empty name.
+    TEST(ESM4ScriptTest, readsALocalVariableWithoutAName)
+    {
+        const std::string data
+            = scriptHeader(0, 0, 2) + localVariableData(1) + subRecord("SCVR", "") + localVariable(2, "iNext");
+
+        const std::vector<ESM4::Script> scripts = loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data));
+
+        ASSERT_EQ(scripts.size(), 1u);
+        ASSERT_EQ(scripts[0].mScript.localVarData.size(), 2u);
+        EXPECT_EQ(scripts[0].mScript.localVarData[0].variableName, "");
+        EXPECT_EQ(scripts[0].mScript.localVarData[1].variableName, "iNext");
     }
 
     /// Verify a source-only script loads with empty bytecode and references and consistent counts.
@@ -620,5 +659,78 @@ namespace
         census.write(out);
         EXPECT_THAT(out.str(), HasSubstr("Scripts held in line by records:"));
         EXPECT_THAT(out.str(), Not(HasSubstr("TestScript")));
+    }
+
+    /// Verify that the menu items of a terminal and the begin, end and change scripts of a package are counted.
+    TEST(ESM4CensusTest, countsTheScriptsOfTerminalMenuItemsAndPackageEvents)
+    {
+        const std::string code("\x01\x02\x03", 3);
+        const std::string menu = zString("ITXT", "One") + scriptHeader(0, 3, 0) + subRecord("SCDA", code)
+            + zString("ITXT", "Two") + scriptHeader(0, 0, 0) + zString("ITXT", "Three") + scriptHeader(0, 3, 0)
+            + subRecord("SCDA", code) + condition(14);
+        const std::string events = subRecord("POBA", "") + scriptHeader(0, 0, 0) + subRecord("POEA", "")
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("POCA", "") + scriptHeader(0, 3, 0)
+            + subRecord("SCDA", code);
+
+        const std::string plugin
+            = header() + topGroup("TERM", record("TERM", 1, menu)) + topGroup("PACK", record("PACK", 2, events));
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "scripts.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, [&](ESM4::Reader& r) {
+            r.getRecordData();
+            switch (r.hdr().record.typeId)
+            {
+                case ESM4::REC_TERM:
+                {
+                    ESM4::Terminal value;
+                    value.load(r);
+                    census.addScripts(value);
+                    return true;
+                }
+                case ESM4::REC_PACK:
+                {
+                    ESM4::AIPackage value;
+                    value.load(r);
+                    census.addScripts(value);
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        EXPECT_EQ(census.getFatalError(), "");
+        ASSERT_EQ(census.getScripts().size(), 2u);
+        // The second menu item and the begin event have empty scripts.
+        EXPECT_EQ(census.getScripts().at("TERM").mCount, 2u);
+        EXPECT_EQ(census.getScripts().at("TERM").mBytecode, 2 * code.size());
+        EXPECT_EQ(census.getScripts().at("PACK").mCount, 2u);
+        EXPECT_EQ(census.getScripts().at("PACK").mBytecode, 2 * code.size());
+    }
+
+    /// Verify that the script before the first entry of a perk and the script of each entry are counted.
+    TEST(ESM4CensusTest, countsTheScriptsOfPerkEntries)
+    {
+        const std::string code("\x01\x02\x03", 3);
+        const std::string perk = scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKE", bytePattern(3, 2))
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKF", "")
+            + subRecord("PRKE", bytePattern(3, 2)) + subRecord("PRKF", "") + subRecord("PRKE", bytePattern(3, 2))
+            + scriptHeader(0, 3, 0) + subRecord("SCDA", code) + subRecord("PRKF", "");
+
+        const std::string plugin = header() + topGroup("PERK", record("PERK", 1, perk));
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "scripts.esp", nullptr, nullptr);
+        ESM4::Census census;
+        census.collect(reader, [&](ESM4::Reader& r) {
+            r.getRecordData();
+            ESM4::Perk value;
+            value.load(r);
+            census.addScripts(value);
+            return true;
+        });
+
+        EXPECT_EQ(census.getFatalError(), "");
+        ASSERT_EQ(census.getScripts().size(), 1u);
+        // The entry without a script is not counted.
+        EXPECT_EQ(census.getScripts().at("PERK").mCount, 3u);
+        EXPECT_EQ(census.getScripts().at("PERK").mBytecode, 3 * code.size());
     }
 }

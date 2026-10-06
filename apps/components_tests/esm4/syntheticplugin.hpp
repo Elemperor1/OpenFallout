@@ -72,6 +72,40 @@ namespace ESM4Test
         return result;
     }
 
+    /// Bytes that are all different, with the form ID id at each of the offsets.
+    inline std::string bytesWithFormIds(
+        std::size_t size, std::uint8_t first, const std::vector<std::size_t>& offsets, std::uint32_t id)
+    {
+        std::string result = bytePattern(size, first);
+        for (const std::size_t offset : offsets)
+            result.replace(offset, sizeof(id), reinterpret_cast<const char*>(&id), sizeof(id));
+        return result;
+    }
+
+    /// One entry of the data of an alternate texture subrecord (MODS, DMDS and the like).
+    struct TextureEntry
+    {
+        std::string mName;
+        std::uint32_t mTexture;
+        std::int32_t mIndex;
+    };
+
+    /// The data of an alternate texture subrecord: a count, then for each entry the length of its name, the name, a
+    /// texture and an index.
+    inline std::string alternateTextureData(const std::vector<TextureEntry>& entries)
+    {
+        std::string data;
+        append<std::uint32_t>(data, static_cast<std::uint32_t>(entries.size()));
+        for (const TextureEntry& entry : entries)
+        {
+            append<std::uint32_t>(data, static_cast<std::uint32_t>(entry.mName.size()));
+            data.append(entry.mName);
+            append(data, entry.mTexture);
+            append(data, entry.mIndex);
+        }
+        return data;
+    }
+
     /// The data of a CTDA subrecord as Fallout 3 and New Vegas write it, 28 bytes.
     inline std::string conditionData(
         std::uint32_t type, float comparison, std::uint32_t function, std::uint32_t reference)
@@ -157,15 +191,17 @@ namespace ESM4Test
 
     /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
     /// bytes of the file are dropped, so the record and group headers still promise them. The engine and esmtool
-    /// read plugins with an encoder, which reads strings by another path than a reader without one.
+    /// read plugins with an encoder, which reads strings by another path than a reader without one. The plugin has no
+    /// masters and the load order index modIndex, which is what the form IDs of its records are adjusted to.
     /// Loader and reader errors propagate to the caller.
     template <class T>
     std::vector<T> loadRecords(std::string_view group, const std::string& records, std::size_t cutBytes = 0,
-        const ToUTF8::StatelessUtf8Encoder* encoder = nullptr)
+        const ToUTF8::StatelessUtf8Encoder* encoder = nullptr, std::uint32_t modIndex = 0)
     {
         std::string plugin = header() + topGroup(group, records);
         plugin.resize(plugin.size() - cutBytes);
         ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, encoder);
+        reader.setModIndex(modIndex);
         std::vector<T> result;
         ESM4::ReaderUtils::readAll(
             reader,

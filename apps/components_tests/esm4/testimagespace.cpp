@@ -65,6 +65,28 @@ namespace
             loadFailure(subRecord("DNAM", std::string(153, 'x'))), "ESM4::IMGS::load - DNAM has an unexpected size");
     }
 
+    TEST(ESM4ImageSpaceTest, readsDataThatEndsAfterAnyMember)
+    {
+        for (const std::size_t size : { 132u, 136u, 140u, 144u, 148u, 149u, 152u })
+        {
+            const std::vector<ESM4::ImageSpace> records
+                = loadRecords<ESM4::ImageSpace>("IMGS", record("IMGS", 1, subRecord("DNAM", bytePattern(size, 1))));
+            ASSERT_EQ(records.size(), 1u) << size;
+            EXPECT_EQ(records[0].mData.size(), size);
+        }
+        EXPECT_EQ(
+            loadFailure(subRecord("DNAM", std::string(131, 'x'))), "ESM4::IMGS::load - DNAM has an unexpected size");
+    }
+
+    TEST(ESM4ImageSpaceTest, rejectsDataThatEndsInsideAMember)
+    {
+        // The flags at the 149th byte are followed by three unused bytes, which are one member.
+        for (const std::size_t size : { 133u, 135u, 147u, 150u, 151u })
+            EXPECT_EQ(loadFailure(subRecord("DNAM", std::string(size, 'x'))),
+                "ESM4::IMGS::load - DNAM has an unexpected size")
+                << size;
+    }
+
     TEST(ESM4ImageSpaceTest, rejectsAnUnknownSubrecord)
     {
         EXPECT_EQ(

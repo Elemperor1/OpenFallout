@@ -34,7 +34,7 @@ namespace
     {
         EXPECT_EQ(result.mEditorId, "Text of EDID");
         ASSERT_EQ(result.mConditions.size(), 1u);
-        EXPECT_EQ(result.mConditions[0].condition, 0x42u);
+        EXPECT_EQ(result.mConditions[0].condition, 0x40u);
         EXPECT_EQ(result.mConditions[0].comparison, 2.5f);
         EXPECT_EQ(result.mConditions[0].functionIndex, 14u);
         EXPECT_EQ(result.mConditions[0].reference, 0x00010002u);
@@ -82,7 +82,7 @@ namespace
     TEST(ESM4CameraPathTest, rejectsASizeThatNoGameUses)
     {
         EXPECT_EQ(
-            loadFailure(subRecord("CTDA", std::string(24, 'x'))), "ESM4::CPTH::load - CTDA has an unexpected size");
+            loadFailure(subRecord("CTDA", std::string(21, 'x'))), "ESM4::CPTH::load - CTDA has an unexpected size");
         EXPECT_EQ(
             loadFailure(subRecord("CTDA", std::string(32, 'x'))), "ESM4::CPTH::load - CTDA has an unexpected size");
         EXPECT_EQ(
