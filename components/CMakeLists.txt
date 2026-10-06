@@ -204,6 +204,7 @@ add_component_dir (esm4
     common
     dialogue
     effect
+    effectlist
     grid
     grouptype
     inventory
@@ -213,6 +214,7 @@ add_component_dir (esm4
     loadaddn
     loadalch
     loadaloc
+    loadamef
     loadammo
     loadanio
     loadappa
@@ -223,21 +225,29 @@ add_component_dir (esm4
     loadbook
     loadbptd
     loadcams
+    loadccrd
+    loadcdck
     loadcell
+    loadchal
+    loadchip
     loadclas
     loadclfm
     loadclmt
     loadclot
+    loadcmny
     loadcont
     loadcpth
     loadcrea
+    loadcsno
     loadcsty
     loaddebr
+    loaddehy
     loaddial
     loaddobj
     loaddoor
     loadeczn
     loadefsh
+    loadench
     loadexpl
     loadeyes
     loadfact
@@ -250,6 +260,7 @@ add_component_dir (esm4
     loadgrup
     loadhair
     loadhdpt
+    loadhung
     loadidle
     loadidlm
     loadimad
@@ -270,6 +281,8 @@ add_component_dir (esm4
     loadlvli
     loadlvln
     loadmato
+    loadmesg
+    loadmgef
     loadmicn
     loadmisc
     loadmset
@@ -281,14 +294,19 @@ add_component_dir (esm4
     loadnpc
     loadotft
     loadpack
+    loadperk
     loadpgrd
     loadpgre
     loadproj
     loadpwat
     loadqust
     loadrace
+    loadrads
+    loadrcct
+    loadrcpe
     loadrefr
     loadregn
+    loadrepu
     loadrgdl
     loadroad
     loadsbsp
@@ -297,8 +315,10 @@ add_component_dir (esm4
     loadscrl
     loadsgst
     loadslgm
+    loadslpd
     loadsndr
     loadsoun
+    loadspel
     loadstat
     loadtact
     loadterm
