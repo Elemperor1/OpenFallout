@@ -459,6 +459,19 @@ namespace
         EXPECT_TRUE(other.mLogEntries[0].mScript.isConsistent());
     }
 
+    /// Verify a stage index above 32767 is kept as it is, not read as a negative number.
+    TEST(ESM4QuestTest, keepsStageIndicesAboveTheSignedRange)
+    {
+        const std::string data = zString("EDID", "Big") + valueSubRecord<std::uint16_t>("INDX", 40000)
+            + valueSubRecord<std::uint8_t>("QSDT", 0) + zString("CNAM", "Late stage");
+
+        const std::vector<ESM4::Quest> quests = loadRecords<ESM4::Quest>("QUST", record("QUST", 1, data));
+
+        ASSERT_EQ(quests.size(), 1u);
+        ASSERT_EQ(quests[0].mStages.size(), 1u);
+        EXPECT_EQ(quests[0].mStages[0].mIndex, 40000u);
+    }
+
     /// Verify scripts outside stage log entries are skipped without disrupting later quest records.
     TEST(ESM4QuestTest, skipsScriptDataThatHasNoLogEntryAndKeepsReading)
     {

@@ -69,7 +69,7 @@ namespace ESM4
 
     struct QuestStage
     {
-        std::int16_t mIndex = 0; // INDX
+        std::uint16_t mIndex = 0; // INDX
         std::vector<QuestLogEntry> mLogEntries;
     };
 
