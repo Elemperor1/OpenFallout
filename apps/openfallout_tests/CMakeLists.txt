@@ -12,6 +12,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwworld/testptr.cpp
     mwworld/testweather.cpp
     mwworld/testpositioncellgrid.cpp
+    mwworld/testplaceholderrecords.cpp
 
     mwdialogue/testkeywordsearch.cpp
 

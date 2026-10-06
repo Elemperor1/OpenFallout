@@ -269,3 +269,23 @@ set(BUILTIN_DATA_FILES
 foreach (f ${BUILTIN_DATA_FILES})
     copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs/${f}")
 endforeach (f)
+
+# A skeleton with no body for the actors of a game that supplies none, Fallout 3 and New Vegas among them. It is copied to
+# every path the engine looks for a base skeleton at, into resources/vfs-fallback. The engine adds that directory to the
+# virtual file system before every archive and data directory, so that the base skeleton of a game that has one, in an
+# archive or loose, shadows it. Regenerate the file with scripts/openfallout/placeholder_skeleton.py.
+set(PLACEHOLDER_SKELETON_PATHS
+    meshes/base_anim.nif
+    meshes/base_anim_female.nif
+    meshes/base_anim_female.1st.nif
+    meshes/base_animkna.nif
+    meshes/base_animkna.1st.nif
+    meshes/xbase_anim.nif
+    meshes/xbase_anim.1st.nif
+    meshes/xbase_anim_female.nif
+    meshes/xargonian_swimkna.nif
+)
+
+foreach (f ${PLACEHOLDER_SKELETON_PATHS})
+    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/meshes/placeholder_skeleton.nif" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs-fallback/${f}")
+endforeach (f)

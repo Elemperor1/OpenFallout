@@ -73,6 +73,18 @@ The unit tests never load the Lua scripts and l10n files under `files/data`, so 
 - As a control, one `require('openfallout.ui')` in a copy of the resources was changed back to `openmw.ui`. The script fails and prints `Can't start Menu[scripts/omw/settings/menu.lua]; Lua error: module not found: openmw.ui` and the three scripts that depend on it.
 - Limit: only scripts for the `MENU` context start, because the synthetic file has no cell to start a new game in. The `GLOBAL`, `PLAYER` and `NPC` scripts are listed in the log but not started. For them stage B relies on a static check that every `require` id in `files/data` and `files/data-mw` is either registered in C++ or a file in the virtual file system, and that every `l10n(...)` context and `#{Context:Key}` reference has a matching directory.
 
+### The Fallout start smoke test
+
+`fallout_start_smoke_test.py` is the matching check for starting a game. It writes a Fallout 3 format plugin with one interior cell, a floor and a pillar (`synthetic_fallout_plugin.py`; the mesh is an OpenSceneGraph text file, since no game data is used), then starts `openfallout --skip-menu --start OFTestCell` on it under a virtual display with Mesa software rendering. A Lua player script waits three seconds, walks north, casts a ray down and quits after twelve. The script fails unless the log shows the placeholder records, the cell loaded, an interior position on the floor (height 0 to 2) for the whole run, a ray that hits the floor at 0, a stop at the pillar, no Lua or start error, and `Quitting peacefully`. It also checks that `files/data/meshes/placeholder_skeleton.nif` is what `placeholder_skeleton.py` writes.
+
+    scripts/openfallout/fallout_start_smoke_test.py --build build
+
+It takes about 15 seconds. It is not part of the CI workflow, which runs unit tests only, because running a window needs a virtual display on the runner.
+
+To start a game in a cell of real data, give the editor id of an interior cell (exterior cells have not been tried):
+
+    openfallout --content Fallout3.esm --skip-menu --start <CellEditorId>
+
 ## Result after rename stage C
 
 Measured on 2026-10-04 on the same container, from an empty build directory, with the same options as stage B.

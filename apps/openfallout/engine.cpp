@@ -17,6 +17,7 @@
 
 #include <components/misc/rng.hpp>
 
+#include <components/vfs/filesystemarchive.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/registerarchives.hpp>
 
@@ -742,6 +743,12 @@ void OF::Engine::prepareEngine()
     createWindow();
 
     mVFS = std::make_unique<VFS::Manager>();
+
+    // Files that stand in for what a game does not supply are added first, below every archive and data directory,
+    // so that a game's own file of the same name shadows them.
+    const std::filesystem::path fallbackDir = mResDir / "vfs-fallback";
+    if (std::filesystem::is_directory(fallbackDir))
+        mVFS->addArchive(std::make_unique<VFS::FileSystemArchive>(fallbackDir));
 
     VFS::registerArchives(mVFS.get(), mFileCollections, mArchives, true, &mEncoder.get()->getStatelessEncoder());
 
