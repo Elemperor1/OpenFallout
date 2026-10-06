@@ -24,6 +24,7 @@ namespace ESM4
         std::string mFullName; // FULL
         std::string mDescription; // DESC
         std::string mIcon; // ICON
+        std::string mSmallIcon; // MICO, New Vegas only
         std::string mShortName; // ANAM
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of

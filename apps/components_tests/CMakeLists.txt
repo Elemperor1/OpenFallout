@@ -88,6 +88,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testloadscreen.cpp
     esm4/testloadscreentype.cpp
     esm4/testmenuicon.cpp
+    esm4/testmodeldata.cpp
     esm4/testnpc.cpp
     esm4/testprojectile.cpp
     esm4/testragdoll.cpp

@@ -11,6 +11,12 @@ namespace ESM4
         mFlags = reader.hdr().record.flags;
 
         RecordReader in(reader, "PROJ");
+        // The model of the stage that the last DSTD began
+        const auto stageModel = [&]() -> StageModel& {
+            if (mStageModels.empty())
+                in.fail(std::string(ESM::printName(in.type())) + " comes before DSTD");
+            return mStageModels.back();
+        };
         while (in.next())
         {
             switch (in.type())
@@ -35,6 +41,16 @@ namespace ESM4
                     break;
                 case ESM::fourCC("DSTD"):
                     in.value(mStages.emplace_back(), &DestructionStage::mExplosion, &DestructionStage::mDebris);
+                    mStageModels.emplace_back();
+                    break;
+                case ESM::fourCC("DMDL"):
+                    in.path(stageModel().mModel);
+                    break;
+                case ESM::fourCC("DMDT"):
+                    in.bytes(stageModel().mTextures);
+                    break;
+                case ESM::fourCC("DMDS"):
+                    in.bytes(stageModel().mAlternateTextures);
                     break;
                 case ESM::fourCC("DSTF"):
                     in.expectSize(0);
@@ -50,6 +66,15 @@ namespace ESM4
                     break;
                 case ESM::fourCC("VNAM"):
                     in.value(mSoundLevel);
+                    break;
+                case ESM::fourCC("MODB"):
+                    in.value(mBoundRadius);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
                     break;
                 default:
                     in.unknown();

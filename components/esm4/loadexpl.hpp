@@ -27,6 +27,9 @@ namespace ESM4
         std::string mFullName; // FULL
         ESM::Path mModel; // MODL, the model
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         ESM::FormId mObjectEffect; // EITM
         ESM::FormId mImageSpaceModifier; // MNAM
         ESM::FormId mPlacedImpactObject; // INAM

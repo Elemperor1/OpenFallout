@@ -30,6 +30,15 @@ namespace ESM4
                 case ESM::fourCC("MNAM"):
                     in.formId(mImageSpaceModifier);
                     break;
+                case ESM::fourCC("MODT"):
+                    in.bytes(mModelTextures);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
+                    break;
                 default:
                     in.unknown();
             }

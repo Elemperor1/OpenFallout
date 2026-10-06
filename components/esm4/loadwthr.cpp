@@ -72,6 +72,21 @@ namespace ESM4
                 case ESM::fourCC("SNAM"):
                     in.value(mSounds.emplace_back(), &WeatherSound::mSound);
                     break;
+                case ESM::fourCC("MODL"):
+                    in.path(mModel);
+                    break;
+                case ESM::fourCC("MODB"):
+                    in.value(mBoundRadius);
+                    break;
+                case ESM::fourCC("MODT"):
+                    in.bytes(mModelTextures);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
+                    break;
                 default:
                     in.unknown();
             }

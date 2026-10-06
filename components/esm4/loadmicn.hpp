@@ -21,6 +21,7 @@ namespace ESM4
 
         std::string mEditorId; // EDID
         std::string mIcon; // ICON
+        std::string mSmallIcon; // MICO, New Vegas only
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

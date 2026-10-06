@@ -35,6 +35,9 @@ namespace ESM4
         ObjectBounds mBounds; // OBND
         ESM::Path mModel; // MODL, the model
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         std::int32_t mNodeIndex = 0; // DATA, the index other records use to name the node
         ESM::FormId mSound; // SNAM
         ParticleData mParticleData; // DNAM

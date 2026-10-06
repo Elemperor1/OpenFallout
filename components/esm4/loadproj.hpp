@@ -42,6 +42,14 @@ namespace ESM4
         };
 #pragma pack(pop)
 
+        /// The model that a destruction stage shows.
+        struct StageModel
+        {
+            ESM::Path mModel; // DMDL
+            std::vector<std::uint8_t> mTextures; // DMDT, texture hashes, not decoded
+            std::vector<std::uint8_t> mAlternateTextures; // DMDS, not decoded
+        };
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
@@ -50,8 +58,12 @@ namespace ESM4
         std::string mFullName; // FULL
         ESM::Path mModel; // MODL, the model
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         Destruction mDestruction; // DEST
         std::vector<DestructionStage> mStages; // DSTD
+        std::vector<StageModel> mStageModels; // DMDL, DMDT and DMDS, one for each of mStages, empty when it has none
         std::vector<std::uint8_t> mData; // DATA, type, speed, range, lights, sounds; not decoded
         std::string mMuzzleFlashModel; // NAM1
         std::vector<std::uint8_t> mMuzzleFlashTextures; // NAM2, texture hashes, not decoded

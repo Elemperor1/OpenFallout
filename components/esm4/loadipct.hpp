@@ -23,6 +23,9 @@ namespace ESM4
         std::string mEditorId; // EDID
         ESM::Path mModel; // MODL, the model
         std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         std::array<std::uint8_t, 24>
             mData{}; // DATA, duration, orientation, angle threshold, placement radius, sound level, flags
         std::array<std::uint8_t, 36> mDecalData{}; // DODT

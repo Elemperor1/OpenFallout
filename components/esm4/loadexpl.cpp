@@ -42,6 +42,15 @@ namespace ESM4
                 case ESM::fourCC("DATA"):
                     in.value(mData);
                     break;
+                case ESM::fourCC("MODB"):
+                    in.value(mBoundRadius);
+                    break;
+                case ESM::fourCC("MODS"):
+                    in.bytes(mModelAlternateTextures);
+                    break;
+                case ESM::fourCC("MODD"):
+                    in.value(mModelFlags);
+                    break;
                 default:
                     in.unknown();
             }

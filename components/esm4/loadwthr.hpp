@@ -8,6 +8,7 @@
 
 #include <components/esm/defs.hpp>
 #include <components/esm/formid.hpp>
+#include <components/esm/path.hpp>
 
 namespace ESM4
 {
@@ -57,6 +58,11 @@ namespace ESM4
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
         std::string mEditorId; // EDID
+        ESM::Path mModel; // MODL, the model
+        float mBoundRadius = 0; // MODB
+        std::vector<std::uint8_t> mModelTextures; // MODT, texture hashes of the model, not decoded
+        std::vector<std::uint8_t> mModelAlternateTextures; // MODS, not decoded
+        std::uint8_t mModelFlags = 0; // MODD, FaceGen model flags
         std::array<ESM::FormId, 6> mImageSpaceModifiers; // \x00IAD and others, IMAD records for sunrise, day, sunset,
                                                          // night, high noon and midnight
         std::array<std::string, 4> mCloudTextures; // DNAM and others, the four layers of clouds
