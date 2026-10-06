@@ -5,8 +5,9 @@ without any game data.
 The plugin has the records of a plain room: a static that is a cube (used as a floor and as a pillar), the marker
 static that Fallout cells use for their entry point, an interior cell "OFTestCell" with the lighting of a Fallout 3
 cell, a lighting template that the cell takes its fog colour and far fog distance from, and three references that put
-them there. It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a
-cube, which the engine can load beside the NIF files of the games.
+them there. It also has a worldspace "OFTestWorld" with a flat exterior cell, a weather and the climate of the
+worldspace that says the weather is the one to have. It holds no Bethesda data. The mesh is an OpenSceneGraph text
+file, a cube, which the engine can load beside the NIF files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
@@ -28,8 +29,11 @@ EXTERIOR_CELL_ID = 0x808
 EXTERIOR_LAND_ID = 0x809
 EXTERIOR_PILLAR_ID = 0x80A
 EXTERIOR_MARKER_REF_ID = 0x80B
+WEATHER_ID = 0x80C
+CLIMATE_ID = 0x80D
 CELL_NAME = "OFTestCell"
 WORLD_NAME = "OFTestWorld"
+WEATHER_NAME = "OFTestWeather"
 # The size of an exterior cell of Fallout 3 and New Vegas, in game units. The exterior cell 0,0 covers x and y from 0 to
 # this. The cell has an entry marker at its centre, which is where the player starts; a cell without a marker is
 # entered at its centre too.
@@ -51,6 +55,23 @@ TEMPLATE_FOG = (120, 110, 100)
 TEMPLATE_FOG_FAR = 2500.0
 FOG_NEAR = 100.0
 INHERIT_FOG_COLOR_AND_FAR = 0x04 | 0x10
+
+# The weather: for each of the ten colour types of NAM0 (sky upper, fog, clouds lower, ambient, sunlight, sun, stars,
+# sky lower, horizon, clouds upper) the colours at sunrise, day, sunset and night. Only the types the engine uses are
+# distinct, the others are black. It has 4 times of day like the weathers of Fallout 3, those of New Vegas have 6.
+WEATHER_SKY = ((200, 120, 60), (30, 80, 200), (210, 90, 40), (0, 0, 40))
+WEATHER_FOG = ((190, 150, 110), (200, 190, 170), (180, 120, 90), (10, 10, 20))
+WEATHER_AMBIENT = ((90, 70, 60), (70, 80, 90), (80, 60, 60), (10, 10, 30))
+WEATHER_SUNLIGHT = ((255, 200, 150), (255, 240, 200), (255, 160, 100), (0, 0, 0))
+WEATHER_SUN = ((255, 255, 255), (255, 255, 255), (255, 120, 40), (0, 0, 0))
+# Where the fog starts and ends, in game units, by day and by night, then its power by day and by night.
+WEATHER_FOG_DAY = (300.0, 12000.0)
+WEATHER_FOG_NIGHT = (150.0, 6000.0)
+# The wind and the glare of the sun, as bytes (the engine makes a share of 1 of them)
+WEATHER_WIND = 51
+WEATHER_GLARE = 255
+# The chance that the climate gives the weather. It is the only one, so whatever it is the weather is the one chosen.
+WEATHER_CHANCE = 7
 
 
 def sub(code, data=b""):
@@ -93,6 +114,29 @@ def lighting(ambient, directional, fog, fog_near, fog_far):
     return data
 
 
+def weather():
+    """A WTHR record with 4 times of day in NAM0, fog distances, wind and glare."""
+    colours = bytearray()
+    for kind in (WEATHER_SKY, WEATHER_FOG, ((0, 0, 0),) * 4, WEATHER_AMBIENT, WEATHER_SUNLIGHT, WEATHER_SUN,
+                 ((0, 0, 0),) * 4, ((0, 0, 0),) * 4, ((0, 0, 0),) * 4, ((0, 0, 0),) * 4):
+        for colour in kind:
+            colours += bytes(colour) + b"\0"
+    assert len(colours) == 160
+    fog = struct.pack("<6f", *WEATHER_FOG_DAY, *WEATHER_FOG_NIGHT, 1.0, 1.0)
+    # wind speed, cloud speeds, transition delta, sun glare, sun damage, precipitation and thunder fade, thunder
+    # frequency, classification (0: none) and the colour of lightning
+    data = struct.pack("<15B", WEATHER_WIND, 0, 0, 4, WEATHER_GLARE, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255)
+    return record(b"WTHR", WEATHER_ID, [zstr(b"EDID", WEATHER_NAME), sub(b"NAM0", bytes(colours)), sub(b"FNAM", fog),
+                                        sub(b"DATA", data)])
+
+
+def climate():
+    """A CLMT record that lists the weather, with the times of sunrise and sunset."""
+    return record(b"CLMT", CLIMATE_ID, [zstr(b"EDID", "OFTestClimate"),
+                                        sub(b"WLST", struct.pack("<IiI", WEATHER_ID, WEATHER_CHANCE, 0)),
+                                        sub(b"TNAM", struct.pack("<6B", 36, 42, 108, 114, 0, 0))])
+
+
 def land():
     """A LAND record: a flat terrain at height 0 over the whole cell, 33 by 33 vertices with normals pointing up and no
     textures (the engine uses the default one of the game)."""
@@ -112,6 +156,7 @@ def worldspace():
     wrld = record(b"WRLD", WORLD_ID, [zstr(b"EDID", WORLD_NAME), zstr(b"FULL", "OpenFallout Test World"),
                                       sub(b"NAM0", struct.pack("<ff", -4096.0, -4096.0)),
                                       sub(b"NAM9", struct.pack("<ff", 8192.0, 8192.0)),
+                                      sub(b"CNAM", struct.pack("<I", CLIMATE_ID)),
                                       sub(b"DATA", b"\x00"), sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
     # DATA of an exterior cell is its flags (0: not an interior, no water), XCLC the grid and the flags of the land.
     cell = record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
@@ -130,7 +175,7 @@ def worldspace():
 
 
 def plugin():
-    hedr = struct.pack("<fiI", 0.94, 14, EXTERIOR_MARKER_REF_ID + 2)
+    hedr = struct.pack("<fiI", 0.94, 16, CLIMATE_ID + 1)
     header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"),
                                  zstr(b"SNAM", "synthetic test plugin")], flags=1)
     half = int(CUBE / 2)
@@ -156,6 +201,7 @@ def plugin():
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
     return (header + top_group(b"STAT", [cube, marker]) + top_group(b"LGTM", [template])
+            + top_group(b"WTHR", [weather()]) + top_group(b"CLMT", [climate()])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 

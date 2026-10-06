@@ -141,6 +141,81 @@ namespace
         expectEverySubRecord(records[0]);
     }
 
+    // NAM0 of a weather with a number of times of day: the colour of type T at time D is red 10 * T + D, green 100 +
+    // red and blue 150 + red, followed by an alpha byte that nothing reads
+    std::string coloursOf(std::size_t times)
+    {
+        std::string data;
+        for (std::size_t type = 0; type < ESM4::Weather::sColourTypeCount; ++type)
+            for (std::size_t time = 0; time < times; ++time)
+            {
+                const auto red = static_cast<std::uint8_t>(10 * type + time);
+                append<std::uint8_t>(data, red);
+                append<std::uint8_t>(data, static_cast<std::uint8_t>(100 + red));
+                append<std::uint8_t>(data, static_cast<std::uint8_t>(150 + red));
+                append<std::uint8_t>(data, 255);
+            }
+        return data;
+    }
+
+    ESM4::Weather loadWithColours(const std::string& colours)
+    {
+        return loadRecords<ESM4::Weather>("WTHR", record("WTHR", 1, zString("EDID", "x") + subRecord("NAM0", colours)))
+            .at(0);
+    }
+
+    TEST(ESM4WeatherTest, readsTheColoursOfAWeatherWithSixTimesOfDay)
+    {
+        const ESM4::Weather weather = loadWithColours(coloursOf(6));
+
+        EXPECT_EQ(weather.colourTimeCount(), 6u);
+        const auto skyUpperSunrise
+            = weather.colour(ESM4::Weather::ColourType::SkyUpper, ESM4::Weather::TimeOfDay::Sunrise);
+        ASSERT_TRUE(skyUpperSunrise.has_value());
+        EXPECT_EQ(skyUpperSunrise->mRed, 0);
+        EXPECT_EQ(skyUpperSunrise->mGreen, 100);
+        EXPECT_EQ(skyUpperSunrise->mBlue, 150);
+        const auto fogNight = weather.colour(ESM4::Weather::ColourType::Fog, ESM4::Weather::TimeOfDay::Night);
+        ASSERT_TRUE(fogNight.has_value());
+        EXPECT_EQ(fogNight->mRed, 13);
+        EXPECT_EQ(fogNight->mGreen, 113);
+        EXPECT_EQ(fogNight->mBlue, 163);
+        const auto horizonMidnight
+            = weather.colour(ESM4::Weather::ColourType::Horizon, ESM4::Weather::TimeOfDay::Midnight);
+        ASSERT_TRUE(horizonMidnight.has_value());
+        EXPECT_EQ(horizonMidnight->mRed, 85);
+        EXPECT_EQ(horizonMidnight->mGreen, 185);
+        EXPECT_EQ(horizonMidnight->mBlue, 235);
+    }
+
+    TEST(ESM4WeatherTest, readsTheColoursOfAWeatherWithFourTimesOfDay)
+    {
+        const ESM4::Weather weather = loadWithColours(coloursOf(4));
+
+        EXPECT_EQ(weather.colourTimeCount(), 4u);
+        const auto sunlightDay = weather.colour(ESM4::Weather::ColourType::Sunlight, ESM4::Weather::TimeOfDay::Day);
+        ASSERT_TRUE(sunlightDay.has_value());
+        EXPECT_EQ(sunlightDay->mRed, 41);
+        EXPECT_EQ(sunlightDay->mGreen, 141);
+        EXPECT_EQ(sunlightDay->mBlue, 191);
+        const auto cloudsUpperNight
+            = weather.colour(ESM4::Weather::ColourType::CloudsUpper, ESM4::Weather::TimeOfDay::Night);
+        ASSERT_TRUE(cloudsUpperNight.has_value());
+        EXPECT_EQ(cloudsUpperNight->mRed, 93);
+        EXPECT_FALSE(weather.colour(ESM4::Weather::ColourType::Fog, ESM4::Weather::TimeOfDay::HighNoon).has_value());
+        EXPECT_FALSE(weather.colour(ESM4::Weather::ColourType::Fog, ESM4::Weather::TimeOfDay::Midnight).has_value());
+    }
+
+    TEST(ESM4WeatherTest, hasNoColoursWithoutNam0)
+    {
+        const std::vector<ESM4::Weather> records
+            = loadRecords<ESM4::Weather>("WTHR", record("WTHR", 1, zString("EDID", "x")));
+
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].colourTimeCount(), 0u);
+        EXPECT_FALSE(records[0].colour(ESM4::Weather::ColourType::SkyUpper, ESM4::Weather::TimeOfDay::Day).has_value());
+    }
+
     TEST(ESM4WeatherTest, readsACompressedRecord)
     {
         const std::vector<ESM4::Weather> records

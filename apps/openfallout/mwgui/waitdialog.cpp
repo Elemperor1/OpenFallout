@@ -206,8 +206,9 @@ namespace OFGui
             const ESM::RefId& regionstr = player.getCell()->getCell()->getRegion();
             if (!regionstr.empty())
             {
-                const ESM::Region* region = world->getStore().get<ESM::Region>().find(regionstr);
-                if (!region->mSleepList.empty())
+                // Not a region of Morrowind for a cell of Fallout, its id is the one of a climate
+                const ESM::Region* region = world->getStore().get<ESM::Region>().search(regionstr);
+                if (region != nullptr && !region->mSleepList.empty())
                 {
                     // figure out if player will be woken while sleeping
                     int x = Misc::Rng::rollDice(hoursToWait, world->getPrng());

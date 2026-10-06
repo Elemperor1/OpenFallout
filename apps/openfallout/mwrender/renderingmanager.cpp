@@ -714,6 +714,11 @@ namespace OFRender
         mFog->configure(mViewDistance, fogDepth, underwaterFog, dlFactor, dlOffset, color);
     }
 
+    void RenderingManager::configureFog(float fogNear, float fogFar, const osg::Vec4f& color)
+    {
+        mFog->configureRange(mViewDistance, fogNear, fogFar, color);
+    }
+
     SkyManager* RenderingManager::getSkyManager()
     {
         return mSky.get();

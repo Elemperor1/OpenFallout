@@ -33,19 +33,7 @@ namespace OFRender
         // A Fallout cell says where its fog starts and ends, in game units, whatever the view distance is
         if (mood.hasFogRange())
         {
-            mLandFogStart = mood.mFogNear;
-            mLandFogEnd = mood.mFogFar;
-            if (Settings::fog().mUseDistantFog)
-            {
-                mUnderwaterFogStart = Settings::fog().mDistantUnderwaterFogStart;
-                mUnderwaterFogEnd = Settings::fog().mDistantUnderwaterFogEnd;
-            }
-            else
-            {
-                mUnderwaterFogStart = std::min(viewDistance, 7168.f) * (1 - mUnderwaterIndoorFog);
-                mUnderwaterFogEnd = std::min(viewDistance, 7168.f);
-            }
-            mFogColor = color;
+            configureRange(viewDistance, mood.mFogNear, mood.mFogFar, color);
             return;
         }
 
@@ -62,6 +50,23 @@ namespace OFRender
         }
         else
             configure(viewDistance, fogDensity, mUnderwaterIndoorFog, 1.0f, 0.0f, color);
+    }
+
+    void FogManager::configureRange(float viewDistance, float fogNear, float fogFar, const osg::Vec4f& color)
+    {
+        mLandFogStart = fogNear;
+        mLandFogEnd = fogFar;
+        if (Settings::fog().mUseDistantFog)
+        {
+            mUnderwaterFogStart = Settings::fog().mDistantUnderwaterFogStart;
+            mUnderwaterFogEnd = Settings::fog().mDistantUnderwaterFogEnd;
+        }
+        else
+        {
+            mUnderwaterFogStart = std::min(viewDistance, 7168.f) * (1 - mUnderwaterIndoorFog);
+            mUnderwaterFogEnd = std::min(viewDistance, 7168.f);
+        }
+        mFogColor = color;
     }
 
     void FogManager::configure(float viewDistance, float fogDepth, float underwaterFog, float dlFactor, float dlOffset,

@@ -8,10 +8,12 @@ together with the rest of the engine: the plugin and its mesh come from syntheti
 started twice with `--skip-menu`, once with `--start OFTestCell` (an interior cell) and once with
 `--start OFTestWorld:0,0` (the exterior cell 0,0 of a worldspace), under a virtual display (Xvfb with Mesa software
 rendering is enough), and a Lua player script walks north from the start for a few seconds, casts a ray down and
-quits. The checks are on the log: the cell is the one asked for, in the interior it is lit with its own ambient and sun colours and with the fog colour and far
-distance of its lighting template, the player stands on the floor the whole time, the camera is at eye height above the
-player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine quits by
-itself.
+quits. The checks are on the log: the cell is the one asked for, in the interior it is lit with its own ambient and
+sun colours and with the fog colour and far distance of its lighting template, in the exterior the weather is the one
+that the climate of the worldspace lists, the player stands on the floor the whole time, the camera is at eye height
+above the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine
+quits by itself. When ImageMagick's `import` is installed, one pixel of the screen is checked too: where nothing is
+drawn it has the colour of the fog of the cell or of the weather.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -37,25 +39,28 @@ import synthetic_fallout_plugin as plugin
 ROOT = Path(__file__).resolve().parents[2]
 
 # Where the walk ends, in the units of the game, relative to where it starts: the pillar is PILLAR_DISTANCE north of the
-# start and a cube wide, the player a box 40 wide, so it comes to a halt about 20 units short of the pillar's south face.
+# start and a cube wide, the player a box 40 wide, so it comes to a halt about 20 units short of the pillar's south
+# face.
 PILLAR_FACE = plugin.PILLAR_DISTANCE - plugin.CUBE / 2
 STOP_RANGE = (PILLAR_FACE - 60.0, PILLAR_FACE)
 
 
 class Scenario:
     """One start of the engine: the text after --start, how the engine names the cell in its log, whether the cell is an
-    exterior one, where in the world the player starts (the entry marker of the cell) and whether the cell has the
-    lighting that the plugin gives the interior cell."""
+    exterior one, where in the world the player starts (the entry marker of the cell), whether the cell has the
+    lighting that the plugin gives the interior cell and the colour of the screen where nothing is drawn, which is the
+    colour of the fog. The exterior cell has the weather of the climate of its worldspace instead of the lighting."""
 
-    def __init__(self, name, start, loaded, exterior, origin, lit):
+    def __init__(self, name, start, loaded, exterior, origin, lit, background):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
             name, start, loaded, exterior, origin, lit)
+        self.background = background
 
 
 SCENARIOS = [
-    Scenario("interior", plugin.CELL_NAME, plugin.CELL_NAME, False, (0.0, 0.0), True),
+    Scenario("interior", plugin.CELL_NAME, plugin.CELL_NAME, False, (0.0, 0.0), True, plugin.TEMPLATE_FOG),
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
-             (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False),
+             (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False, plugin.WEATHER_FOG[1]),
 ]
 
 WALK_SECONDS = 12
@@ -68,6 +73,20 @@ NEIGHBOURS = [(x, y) for x in (-1, 0, 1) for y in (-1, 0, 1) if (x, y) != (0, 0)
 LIGHTING_LINE = ("Cell lighting: ambient {}, directional {}, fog {}, fog range {:.6f} to {:.6f}".format(
     *(",".join(map(str, colour)) for colour in (plugin.AMBIENT, plugin.DIRECTIONAL, plugin.TEMPLATE_FOG)),
     plugin.FOG_NEAR, plugin.TEMPLATE_FOG_FAR))
+
+# What the engine logs about the weather it chose for the exterior cell, from the climate of the worldspace: the weather
+# record with its colours at day (and the sky at night) and the fog distances.
+WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, sunlight day {}, "
+                "fog range {:.6f} to {:.6f} day, {:.6f} to {:.6f} night".format(
+                    plugin.WEATHER_NAME, *(",".join(map(str, colour)) for colour in (
+                        plugin.WEATHER_SKY[1], plugin.WEATHER_SKY[3], plugin.WEATHER_FOG[1], plugin.WEATHER_AMBIENT[1],
+                        plugin.WEATHER_SUNLIGHT[1])), *plugin.WEATHER_FOG_DAY, *plugin.WEATHER_FOG_NIGHT))
+
+# Where on the screen to look for the colour of the fog: the top left of the window of the game, which is the sky when
+# the player looks north, and how far from the expected colour a channel may be (the game is at about nine in the
+# morning, when the weather is still a little on its way from the colours of sunrise to those of the day).
+BACKGROUND_PIXEL = (300, 100)
+BACKGROUND_TOLERANCE = 12
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
@@ -136,6 +155,23 @@ def start_xvfb():
     return process
 
 
+def wait_for_pixel(process, log, seconds):
+    """The colour of a pixel of the screen once the player has been there for 2 seconds, before it starts to walk, as
+    (red, green, blue), or None when it cannot be read (ImageMagick's `import` is not installed, or the engine quit
+    before)."""
+    importer = shutil.which("import")
+    deadline = time.monotonic() + seconds
+    while importer is not None and process.poll() is None and time.monotonic() < deadline:
+        if log.exists() and "OFTEST\tt=2.0 " in log.read_text(encoding="utf-8", errors="replace"):
+            x, y = BACKGROUND_PIXEL
+            shot = subprocess.run([importer, "-window", "root", "-crop", "1x1+%d+%d" % (x, y), "+repage", "txt:-"],
+                                  capture_output=True, text=True)
+            found = re.search(r"srgba?\((\d+),(\d+),(\d+)", shot.stdout)
+            return tuple(int(found.group(i)) for i in (1, 2, 3)) if found else None
+        time.sleep(0.25)
+    return None
+
+
 def run_engine(program, resources, data, home, runtime, seconds, start):
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
@@ -146,7 +182,9 @@ def run_engine(program, resources, data, home, runtime, seconds, start):
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     os.close(slave)
+    pixel = None
     try:
+        pixel = wait_for_pixel(process, home / ".config" / "openfallout" / "openfallout.log", seconds)
         process.wait(timeout=seconds)
     except subprocess.TimeoutExpired:
         print(f"the engine was still running after {seconds} seconds, stopping it")
@@ -157,10 +195,10 @@ def run_engine(program, resources, data, home, runtime, seconds, start):
             process.kill()
             process.wait()
     os.close(master)
-    return process.returncode
+    return process.returncode, pixel
 
 
-def check(text, scenario):
+def check(text, scenario, pixel):
     """The problems the log shows, as a list of sentences; empty when the run did what it should."""
     problems = []
     for line in text.splitlines():
@@ -181,6 +219,17 @@ def check(text, scenario):
     if scenario.lit and LIGHTING_LINE not in text:
         lines = [line.split("]", 1)[-1].strip() for line in text.splitlines() if "Cell lighting" in line]
         problems.append(f"the log has no line '{LIGHTING_LINE}', the lighting of the cell is: {lines or 'not logged'}")
+    weather_lines = [line.split("]", 1)[-1].strip() for line in text.splitlines() if "] Weather: " in line]
+    if scenario.exterior and WEATHER_LINE not in weather_lines:
+        problems.append(f"the log has no line '{WEATHER_LINE}', the weather of the cell is: "
+                        f"{weather_lines or 'not logged'}")
+    if not scenario.exterior and weather_lines:
+        problems.append(f"the engine chose a weather in an interior cell: {weather_lines}")
+    if pixel is None:
+        print("no screenshot, the colour of the fog on the screen is not checked (needs ImageMagick's import)")
+    elif any(abs(have - want) > BACKGROUND_TOLERANCE for have, want in zip(pixel, scenario.background)):
+        problems.append(f"the colour of the screen where nothing is drawn is {pixel}, the fog colour of the cell "
+                        f"is {scenario.background}")
     samples = [(float(m.group(1)), m.group(2), m.group(3), tuple(float(m.group(i)) for i in (4, 5, 6)),
                 tuple(float(m.group(i)) for i in (7, 8, 9))) for m in map(SAMPLE.search, text.splitlines()) if m]
     if len(samples) < WALK_SECONDS:
@@ -249,7 +298,7 @@ def main():
         runtime = work / scenario.name / "runtime"
         runtime.mkdir(mode=0o700)
         print(f"== {scenario.name}: --start {scenario.start}")
-        status = run_engine(program, build / "resources", data, home, runtime, args.seconds, scenario.start)
+        status, pixel = run_engine(program, build / "resources", data, home, runtime, args.seconds, scenario.start)
 
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
@@ -257,7 +306,7 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
-        found += check(text, scenario)
+        found += check(text, scenario, pixel)
         for line in (line for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())
         for problem in found:

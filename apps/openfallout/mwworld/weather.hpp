@@ -5,6 +5,8 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <osg/Vec4f>
@@ -22,6 +24,12 @@ namespace ESM
     struct RegionWeatherState;
     class ESMWriter;
     class ESMReader;
+}
+
+namespace ESM4
+{
+    struct Climate;
+    struct Weather;
 }
 
 namespace OFRender
@@ -142,6 +150,11 @@ namespace OFWorld
         Weather(const ESM::RefId id, const int scriptId, const std::string& name, float stormWindSpeed, float dlFactor,
             float dlOffset, std::string_view particleEffect);
 
+        /// A weather of Fallout 3 or New Vegas: the colours, the fog and the wind come from the record and everything
+        /// else (how fast it changes to another weather, the rain and thunder) from the settings of the clear weather
+        /// of Morrowind. The record must have colours, see ESM4::Weather::colourTimeCount.
+        Weather(const ESM::RefId id, const int scriptId, const ESM4::Weather& record, float stormWindSpeed);
+
         ESM::RefId mId;
         int mScriptId;
         std::string mName;
@@ -158,6 +171,15 @@ namespace OFWorld
 
         // Fog depth/density
         TimeOfDayInterpolator<float> mLandFogDepth;
+
+        // Does it come from a WTHR record of Fallout?
+        bool mFromRecord = false;
+
+        // Where the fog starts and ends, in game units. Only the weathers of Fallout say it (mHasFogRange), the others
+        // use mLandFogDepth, a share of the view distance.
+        bool mHasFogRange = false;
+        TimeOfDayInterpolator<float> mFogNear{ 0.f, 0.f, 0.f, 0.f };
+        TimeOfDayInterpolator<float> mFogFar{ 0.f, 0.f, 0.f, 0.f };
 
         // Color modulation for the sun itself during sunset
         osg::Vec4f mSunDiscSunsetColor;
@@ -255,6 +277,7 @@ namespace OFWorld
     public:
         explicit RegionWeather(const ESM::Region& region);
         explicit RegionWeather(const ESM::RegionWeatherState& state);
+        explicit RegionWeather(const std::map<ESM::RefId, uint8_t>& chances);
 
         operator ESM::RegionWeatherState() const;
 
@@ -272,6 +295,14 @@ namespace OFWorld
 
         void chooseNewWeather(const WeatherStore& store);
     };
+
+    /// Splits 100 among the weights, as the chances of the weathers of a region have to add up to 100. Weights that are
+    /// not above 0 are left out, so is everything when none is. The shares that rounding takes the most from get the
+    /// remainder.
+    std::map<ESM::RefId, uint8_t> normaliseChances(const std::vector<std::pair<ESM::RefId, int>>& weights);
+
+    /// The chances of the weathers of a Fallout climate, for the weathers that the store has.
+    std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store);
 
     /// A class that acts as a model for the moons.
     class MoonModel

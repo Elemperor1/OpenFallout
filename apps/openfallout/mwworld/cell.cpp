@@ -105,7 +105,7 @@ namespace OFWorld
         , mGridPos(cell.mX, cell.mY)
         , mDisplayname(cell.mFullName)
         , mNameID(cell.mEditorId)
-        , mRegion(ESM::RefId()) // Unimplemented for now
+        , mRegion() // an exterior cell gets the id of its climate below, the other cells have no weather
         , mId(cell.mId)
         , mParent(cell.mParent)
         , mWaterHeight(cell.mWaterHeight)
@@ -118,6 +118,12 @@ namespace OFWorld
                 throw std::runtime_error(
                     "Cell " + cell.mId.toDebugString() + " parent world " + mParent.toDebugString() + " is not found");
             mWaterHeight = world->mWaterLevel;
+
+            // The weather of an exterior cell is the one of its climate, where a cell of Morrowind has the weather of
+            // its region. The cell says which climate if it differs from the one of its worldspace.
+            const ESM::FormId climate = !cell.mClimate.isZeroOrUnset() ? cell.mClimate : world->mClimate;
+            if (!climate.isZeroOrUnset())
+                mRegion = ESM::RefId(climate);
         }
         mDescription = getCellDescription(cell, world);
     }

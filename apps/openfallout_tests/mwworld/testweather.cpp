@@ -2,6 +2,11 @@
 
 #include <cmath>
 
+#include <components/esm/formid.hpp>
+#include <components/esm/refid.hpp>
+#include <components/esm4/loadclmt.hpp>
+#include <components/esm4/loadwthr.hpp>
+
 #include "apps/openfallout/mwworld/timestamp.hpp"
 #include "apps/openfallout/mwworld/weather.hpp"
 
@@ -741,6 +746,207 @@ namespace OFWorld
             EXPECT_GT(afterState.mMoonAlpha, 0.0f);
             EXPECT_LE(beforeStatePostLoop.mMoonAlpha, 0.0f);
             EXPECT_GT(afterStatePostLoop.mMoonAlpha, 0.0f);
+        }
+
+        // WEATHERS AND CLIMATES OF FALLOUT
+
+        ESM::RefId formIdRefId(std::uint32_t formId)
+        {
+            return ESM::RefId(ESM::FormId::fromUint32(formId));
+        }
+
+        int sum(const std::map<ESM::RefId, uint8_t>& chances)
+        {
+            int result = 0;
+            for (const auto& [id, chance] : chances)
+                result += chance;
+            return result;
+        }
+
+        // Colours as NAM0 has them: for each of the ten types the colours of the times of day, each with an unused byte
+        void setColour(ESM4::Weather& record, std::size_t times, ESM4::Weather::ColourType type,
+            ESM4::Weather::TimeOfDay time, std::uint8_t red, std::uint8_t green, std::uint8_t blue)
+        {
+            const std::size_t offset = (static_cast<std::size_t>(type) * times + static_cast<std::size_t>(time)) * 4;
+            record.mColours[offset] = red;
+            record.mColours[offset + 1] = green;
+            record.mColours[offset + 2] = blue;
+        }
+
+        ESM4::Weather makeRecord(std::size_t times)
+        {
+            using Type = ESM4::Weather::ColourType;
+            using Time = ESM4::Weather::TimeOfDay;
+
+            ESM4::Weather record;
+            record.mId = ESM::FormId::fromUint32(0x01000800);
+            record.mEditorId = "TestWeather";
+            record.mColours.assign(ESM4::Weather::sColourTypeCount * times * 4, 0);
+            setColour(record, times, Type::SkyUpper, Time::Sunrise, 255, 128, 0);
+            setColour(record, times, Type::SkyUpper, Time::Day, 51, 102, 204);
+            setColour(record, times, Type::SkyUpper, Time::Sunset, 204, 51, 0);
+            setColour(record, times, Type::SkyUpper, Time::Night, 0, 0, 51);
+            setColour(record, times, Type::Fog, Time::Day, 10, 20, 30);
+            setColour(record, times, Type::Ambient, Time::Day, 40, 50, 60);
+            setColour(record, times, Type::Sunlight, Time::Day, 255, 255, 204);
+            setColour(record, times, Type::Sun, Time::Sunset, 255, 0, 0);
+            record.mFog.mDayNear = 100.f;
+            record.mFog.mDayFar = 9000.f;
+            record.mFog.mNightNear = 50.f;
+            record.mFog.mNightFar = 4000.f;
+            record.mData.mWindSpeed = 51;
+            record.mData.mSunGlare = 255;
+            return record;
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutTakesItsColoursFogAndWindFromTheRecord)
+        {
+            const ESM4::Weather record = makeRecord(4);
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+
+            EXPECT_EQ(weather.mScriptId, 10);
+            EXPECT_EQ(weather.mName, "TestWeather");
+            EXPECT_TRUE(weather.mFromRecord);
+
+            EXPECT_EQ(weather.mSkyColor.getSunriseValue(), osg::Vec4f(1.f, 128 / 255.f, 0.f, 1.f));
+            EXPECT_EQ(weather.mSkyColor.getDayValue(), osg::Vec4f(0.2f, 0.4f, 0.8f, 1.f));
+            EXPECT_EQ(weather.mSkyColor.getSunsetValue(), osg::Vec4f(0.8f, 0.2f, 0.f, 1.f));
+            EXPECT_EQ(weather.mSkyColor.getNightValue(), osg::Vec4f(0.f, 0.f, 0.2f, 1.f));
+            EXPECT_EQ(weather.mFogColor.getDayValue(), osg::Vec4f(10 / 255.f, 20 / 255.f, 30 / 255.f, 1.f));
+            EXPECT_EQ(weather.mAmbientColor.getDayValue(), osg::Vec4f(40 / 255.f, 50 / 255.f, 60 / 255.f, 1.f));
+            EXPECT_EQ(weather.mSunColor.getDayValue(), osg::Vec4f(1.f, 1.f, 0.8f, 1.f));
+            EXPECT_EQ(weather.mSunDiscSunsetColor, osg::Vec4f(1.f, 0.f, 0.f, 1.f));
+
+            EXPECT_TRUE(weather.mHasFogRange);
+            EXPECT_EQ(weather.mFogNear.getSunriseValue(), 100.f);
+            EXPECT_EQ(weather.mFogFar.getDayValue(), 9000.f);
+            EXPECT_EQ(weather.mFogNear.getSunsetValue(), 100.f);
+            EXPECT_EQ(weather.mFogNear.getNightValue(), 50.f);
+            EXPECT_EQ(weather.mFogFar.getNightValue(), 4000.f);
+
+            EXPECT_FLOAT_EQ(weather.mWindSpeed, 0.2f);
+            EXPECT_FLOAT_EQ(weather.mGlareView, 1.f);
+            EXPECT_FALSE(weather.mIsStorm);
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutWithSixTimesOfDayUsesTheFirstFour)
+        {
+            const ESM4::Weather record = makeRecord(6);
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+
+            EXPECT_EQ(weather.mSkyColor.getSunriseValue(), osg::Vec4f(1.f, 128 / 255.f, 0.f, 1.f));
+            EXPECT_EQ(weather.mSkyColor.getDayValue(), osg::Vec4f(0.2f, 0.4f, 0.8f, 1.f));
+            EXPECT_EQ(weather.mSkyColor.getNightValue(), osg::Vec4f(0.f, 0.f, 0.2f, 1.f));
+            EXPECT_EQ(weather.mSunColor.getDayValue(), osg::Vec4f(1.f, 1.f, 0.8f, 1.f));
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutWithoutFogDistancesHasNoFogRange)
+        {
+            ESM4::Weather record = makeRecord(4);
+            record.mFog = {};
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+
+            EXPECT_FALSE(weather.mHasFogRange);
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfFalloutWithAFogRangeForTheDayOnlyHasNoFogRange)
+        {
+            ESM4::Weather record = makeRecord(4);
+            record.mFog.mNightNear = 0.f;
+            record.mFog.mNightFar = 0.f;
+            const Weather weather(formIdRefId(0x01000800), 10, record, 0.8f);
+
+            EXPECT_FALSE(weather.mHasFogRange);
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherOfMorrowindIsNotFromARecord)
+        {
+            const Weather weather(ESM::RefId::stringRefId("Clear"), 0, "Clear", 0.8f, 1.f, 0.f, {});
+
+            EXPECT_FALSE(weather.mFromRecord);
+            EXPECT_FALSE(weather.mHasFogRange);
+        }
+
+        TEST(OFWorldWeatherTest, chancesThatAddUpTo100AreKept)
+        {
+            const ESM::RefId clear = formIdRefId(0x01000001);
+            const ESM::RefId cloudy = formIdRefId(0x01000002);
+
+            const std::map<ESM::RefId, uint8_t> chances = normaliseChances({ { clear, 70 }, { cloudy, 30 } });
+
+            EXPECT_EQ(chances.size(), 2u);
+            EXPECT_EQ(chances.at(clear), 70);
+            EXPECT_EQ(chances.at(cloudy), 30);
+        }
+
+        TEST(OFWorldWeatherTest, chancesAreScaledToAddUpTo100)
+        {
+            const ESM::RefId clear = formIdRefId(0x01000001);
+            const ESM::RefId cloudy = formIdRefId(0x01000002);
+
+            const std::map<ESM::RefId, uint8_t> chances = normaliseChances({ { clear, 6 }, { cloudy, 3 } });
+
+            EXPECT_EQ(chances.at(clear), 67);
+            EXPECT_EQ(chances.at(cloudy), 33);
+        }
+
+        TEST(OFWorldWeatherTest, chancesThatDoNotDivideEvenlyGetTheRemainderOneByOne)
+        {
+            const std::map<ESM::RefId, uint8_t> chances = normaliseChances(
+                { { formIdRefId(0x01000001), 1 }, { formIdRefId(0x01000002), 1 }, { formIdRefId(0x01000003), 1 } });
+
+            EXPECT_EQ(chances.size(), 3u);
+            EXPECT_EQ(sum(chances), 100);
+            for (const auto& [id, chance] : chances)
+                EXPECT_TRUE(chance == 33 || chance == 34) << static_cast<int>(chance);
+        }
+
+        TEST(OFWorldWeatherTest, aWeatherListedTwiceHasTheChancesAddedUp)
+        {
+            const ESM::RefId clear = formIdRefId(0x01000001);
+            const ESM::RefId cloudy = formIdRefId(0x01000002);
+
+            const std::map<ESM::RefId, uint8_t> chances
+                = normaliseChances({ { clear, 10 }, { cloudy, 20 }, { clear, 10 } });
+
+            EXPECT_EQ(chances.at(clear), 50);
+            EXPECT_EQ(chances.at(cloudy), 50);
+        }
+
+        TEST(OFWorldWeatherTest, aChanceOfZeroOrLessIsLeftOut)
+        {
+            const ESM::RefId clear = formIdRefId(0x01000001);
+
+            const std::map<ESM::RefId, uint8_t> chances
+                = normaliseChances({ { clear, 5 }, { formIdRefId(0x01000002), 0 }, { formIdRefId(0x01000003), -4 } });
+
+            EXPECT_EQ(chances.size(), 1u);
+            EXPECT_EQ(chances.at(clear), 100);
+        }
+
+        TEST(OFWorldWeatherTest, withoutAnyChanceThereAreNoChances)
+        {
+            EXPECT_TRUE(normaliseChances({}).empty());
+            EXPECT_TRUE(normaliseChances({ { formIdRefId(0x01000001), 0 } }).empty());
+        }
+
+        TEST(OFWorldWeatherTest, theChancesOfAClimateLeaveOutTheWeathersTheStoreDoesNotHave)
+        {
+            WeatherStore store;
+            ESM4::Weather record = makeRecord(4);
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, record, 0.8f));
+            store.insertStatic(Weather(formIdRefId(0x01000801), 1, record, 0.8f));
+
+            ESM4::Climate climate;
+            climate.mWeathers.push_back({ 0x01000800, 50, 0 });
+            climate.mWeathers.push_back({ 0x01000801, 25, 0 });
+            climate.mWeathers.push_back({ 0x01000802, 25, 0 }); // not in the store
+
+            const std::map<ESM::RefId, uint8_t> chances = climateChances(climate, store);
+
+            EXPECT_EQ(chances.size(), 2u);
+            EXPECT_EQ(chances.at(formIdRefId(0x01000800)), 67);
+            EXPECT_EQ(chances.at(formIdRefId(0x01000801)), 33);
         }
     }
 }
