@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace
@@ -23,12 +24,14 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
-    /// Load all records as T from a synthetic plugin containing one group, preserving file order.
+    /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
+    /// bytes of the file are dropped, so the record and group headers still promise them.
     /// Loader and reader errors propagate to the caller.
     template <class T>
-    std::vector<T> loadRecords(std::string_view group, const std::string& records)
+    std::vector<T> loadRecords(std::string_view group, const std::string& records, std::size_t cutBytes = 0)
     {
-        const std::string plugin = header() + topGroup(group, records);
+        std::string plugin = header() + topGroup(group, records);
+        plugin.resize(plugin.size() - cutBytes);
         ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "script.esp", nullptr, nullptr);
         std::vector<T> result;
         ESM4::ReaderUtils::readAll(
@@ -204,16 +207,21 @@ namespace
         EXPECT_EQ(scripts[1].mEditorId, "Next");
     }
 
-    /// Verify a truncated SCDA payload raises a loading error.
+    /// Verify a file that ends inside the SCDA payload raises a loading error.
     TEST(ESM4ScriptTest, rejectsBytecodeThatIsCutShort)
     {
-        // The sub-record header promises ten bytes and the file ends after four.
-        std::string cut = "SCDA";
-        append<std::uint16_t>(cut, 10);
-        cut.append("\x01\x02\x03\x04", 4);
-        const std::string data = zString("EDID", "Cut") + cut;
+        // The record and the sub-record promise ten bytes of bytecode and the file ends after four.
+        const std::string data = zString("EDID", "Cut") + subRecord("SCDA", "0123456789");
 
-        EXPECT_ANY_THROW(loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data)));
+        try
+        {
+            loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data), 6);
+            FAIL() << "the cut-short SCDA was accepted";
+        }
+        catch (const std::exception& e)
+        {
+            EXPECT_THAT(e.what(), HasSubstr("SCDA is shorter than its size"));
+        }
     }
 
     /// Verify an SCDA that promises more bytes than its record holds is rejected, not read from the next record.
@@ -257,6 +265,37 @@ namespace
                 {
                     EXPECT_THAT(e.what(), HasSubstr("unexpected size")) << type << " of " << payload.size() << " bytes";
                 }
+            }
+        }
+    }
+
+    /// Verify a file that ends inside a script header, local variable or reference is rejected, not read as zeros.
+    TEST(ESM4ScriptTest, rejectsFieldsThatTheFileEndsInside)
+    {
+        std::string local;
+        for (int i = 0; i < 6; ++i)
+            append<std::uint32_t>(local, 0x01010101);
+
+        const std::string before = zString("EDID", "Cut");
+        const std::string counted = scriptHeader(1, 2, 1) + subRecord("SCDA", "ab");
+        const std::vector<std::pair<std::string_view, std::string>> cases = {
+            { "SCHR", before + scriptHeader(0, 0, 0) },
+            { "SLSD", before + counted + subRecord("SLSD", local) },
+            { "SCRO", before + counted + valueSubRecord<std::uint32_t>("SCRO", 0x000a0001) },
+            { "SCRV", before + counted + valueSubRecord<std::uint32_t>("SCRV", 2) },
+        };
+
+        for (const auto& [type, data] : cases)
+        {
+            // Two bytes of the last field are missing, as in a file that was cut off.
+            try
+            {
+                loadRecords<ESM4::Script>("SCPT", record("SCPT", 1, data), 2);
+                ADD_FAILURE() << type << " cut by two bytes was accepted";
+            }
+            catch (const std::exception& e)
+            {
+                EXPECT_THAT(e.what(), HasSubstr("shorter than its size")) << type;
             }
         }
     }

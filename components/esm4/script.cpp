@@ -24,11 +24,20 @@ namespace ESM4
             if (size != 0 && reader.subRecordHeader().dataSize != size)
                 throw std::runtime_error("ESM4::ScriptDefinition::loadSubRecord - sub-record has an unexpected size");
         }
+
+        /// Read a fixed-size field, or throw std::runtime_error if the file ends inside it.
+        template <class T>
+        void readField(Reader& reader, T& value)
+        {
+            if (!reader.getExact(value))
+                throw std::runtime_error("ESM4::ScriptDefinition::loadSubRecord - sub-record is shorter than its size");
+        }
     }
 
     /// Consume a recognized script subrecord and return true; leave unknown subrecords unread.
     /// Skip SCHR headers of unexpected size. Throw std::runtime_error for a recognized subrecord that is declared
-    /// longer than its record, for SLSD, SCRO and SCRV data of another size, and for truncated SCDA data.
+    /// longer than its record, for SLSD, SCRO and SCRV data of another size, and for SCHR, SCDA, SLSD, SCRO and
+    /// SCRV data that the file ends inside.
     bool ScriptDefinition::loadSubRecord(Reader& reader)
     {
         const SubRecordHeader& subHdr = reader.subRecordHeader();
@@ -37,7 +46,7 @@ namespace ESM4
             case ESM::fourCC("SCHR"):
                 checkSubRecord(reader);
                 if (subHdr.dataSize == sizeof(ScriptHeader))
-                    reader.get(scriptHeader);
+                    readField(reader, scriptHeader);
                 else
                     reader.skipSubRecordData();
                 return true;
@@ -55,12 +64,12 @@ namespace ESM4
             {
                 checkSubRecord(reader, localVariableSize);
                 ScriptLocalVariableData localVar;
-                reader.get(localVar.index);
-                reader.get(localVar.unknown1);
-                reader.get(localVar.unknown2);
-                reader.get(localVar.unknown3);
-                reader.get(localVar.type);
-                reader.get(localVar.unknown4);
+                readField(reader, localVar.index);
+                readField(reader, localVar.unknown1);
+                readField(reader, localVar.unknown2);
+                readField(reader, localVar.unknown3);
+                readField(reader, localVar.type);
+                readField(reader, localVar.unknown4);
                 localVarData.push_back(std::move(localVar));
                 // WARN: assumes SCVR will follow immediately
                 return true;
@@ -76,7 +85,9 @@ namespace ESM4
             {
                 checkSubRecord(reader, referenceSize);
                 ScriptReference reference;
-                reader.getFormId(reference.formId);
+                if (!reader.getFormId(reference.formId))
+                    throw std::runtime_error(
+                        "ESM4::ScriptDefinition::loadSubRecord - sub-record is shorter than its size");
                 references.push_back(reference);
                 return true;
             }
@@ -85,7 +96,7 @@ namespace ESM4
                 checkSubRecord(reader, referenceSize);
                 ScriptReference reference;
                 reference.isVariable = true;
-                reader.get(reference.variableIndex);
+                readField(reader, reference.variableIndex);
                 references.push_back(reference);
                 return true;
             }
