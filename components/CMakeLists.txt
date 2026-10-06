@@ -291,6 +291,7 @@ add_component_dir (esm4
     magiceffectid
     reader
     readerutils
+    recordreader
     reference
     script
     survey

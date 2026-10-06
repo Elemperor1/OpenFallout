@@ -71,6 +71,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/includes.cpp
     esm4/testcensus.cpp
     esm4/testfaction.cpp
+    esm4/testrecordreader.cpp
     esm4/testscript.cpp
     esm4/testsurvey.cpp
 
