@@ -99,6 +99,7 @@
 #include "datetimemanager.hpp"
 #include "inventorystore.hpp"
 #include "manualref.hpp"
+#include "placeholderrecords.hpp"
 #include "player.hpp"
 #include "projectilemanager.hpp"
 #include "weather.hpp"
@@ -218,6 +219,12 @@ namespace OFWorld
 
         loadContentFiles(fileCollections, contentFiles, encoder, listener);
         loadGroundcoverFiles(fileCollections, groundcoverFiles, encoder, listener);
+
+        // A content list made only of Fallout plugins has no player, race, class, skills or settings in the record
+        // format of the engine. The Lua scripts that run when content is loaded rely on them.
+        if (lacksPlayerRecord(mStore))
+            insertPlaceholderRecords(mStore);
+
         OFBase::Environment::get().getLuaManager()->contentFilesLoaded();
 
         fillGlobalVariables();

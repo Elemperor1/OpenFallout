@@ -83,7 +83,7 @@ add_openfallout_dir (mwworld
     store esmstore fallback actionrepair actionsoulgem livecellref actiondoor
     contentloader esmloader actiontrap cellreflist cellref weather projectilemanager
     cellpreloader datetimemanager groundcoverstore magiceffects cell ptrregistry
-    positioncellgrid
+    positioncellgrid placeholderrecords
     )
 
 add_openfallout_dir (mwphysics

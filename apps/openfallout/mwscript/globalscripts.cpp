@@ -194,7 +194,10 @@ namespace OFScript
         // make list of global scripts to be added
         std::vector<ESM::RefId> scripts;
 
-        scripts.emplace_back(ESM::RefId::stringRefId("main"));
+        // Morrowind's game files have a script called main. Content that has none, a Fallout game for one, runs
+        // its quest scripts from the records that own them instead.
+        if (mStore.get<ESM::Script>().search(ESM::RefId::stringRefId("main")) != nullptr)
+            scripts.emplace_back(ESM::RefId::stringRefId("main"));
 
         for (OFWorld::Store<ESM::StartScript>::iterator iter = mStore.get<ESM::StartScript>().begin();
              iter != mStore.get<ESM::StartScript>().end(); ++iter)
