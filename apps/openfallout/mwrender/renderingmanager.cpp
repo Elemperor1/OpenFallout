@@ -602,6 +602,9 @@ namespace OFRender
         mPathgrid->addCell(store);
 
         mWater->changeCell(store);
+        // A cell of a Fallout worldspace has water only once its tile is added, so what the cell before it left in the
+        // sky and the post processing (water on, at its height) has to go
+        updateWaterEnabled();
 
         if (store->getCell()->isExterior())
         {
