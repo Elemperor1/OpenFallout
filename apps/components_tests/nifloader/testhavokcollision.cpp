@@ -684,6 +684,21 @@ namespace
         EXPECT_EQ(survey.count(filesSection, "not used, none of its bodies is solid"), 0);
     }
 
+    TEST_F(TestHavokCollision, a_survey_counts_a_file_that_has_no_scene_root)
+    {
+        Nif::NIFFile file(testNif);
+        file.mHash = "hash";
+        file.mVersion = Nif::NIFStream::generateVersion(20, 2, 0, 7);
+        file.mBethVersion = fallout3Version;
+        NifBullet::HavokSurvey survey;
+        NifBullet::BulletNifLoader loader(true);
+        loader.setHavokSurvey(&survey);
+
+        loader.load(file);
+
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "no scene root"), 1);
+    }
+
     TEST_F(TestHavokCollision, a_survey_of_files_of_other_games_counts_nothing)
     {
         NifBullet::HavokSurvey survey;

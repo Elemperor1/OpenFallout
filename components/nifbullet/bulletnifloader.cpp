@@ -188,6 +188,8 @@ namespace NifBullet
         if (roots.empty())
         {
             warn("Found no root nodes in NIF file " + mShape->mFileName.value());
+            if (nif.getBethVersion() == Nif::NIFFile::BethVersion::BETHVER_FO3)
+                survey("Files of Fallout 3 and New Vegas", "no scene root");
             return mShape;
         }
 
