@@ -9,17 +9,21 @@ them there. It also has a worldspace "OFTestWorld" with a flat exterior cell, a 
 worldspace that says the weather is the one to have (it lists a second weather too, which needs a global that is 0),
 and two more exterior cells that are flagged for water: one has water of its own and the other the largest float as
 its height, which the games write for a cell without water of its own. The worldspace names a kind of water (WATR),
-black and opaque, with no reflection.
+black and opaque, with no reflection. Both cells have a person (a race and a character with a skeleton) standing
+east of the end of the player's walk.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
-writes `OFTest.esm`, `meshes/openfallout/cube.osgt` and `textures/sky/oftestclouds.dds` into the folder.
+writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, `meshes/characters/_male/skeleton.nif` and
+`textures/sky/oftestclouds.dds` into the folder.
 """
 import argparse
 import struct
 from pathlib import Path
+
+import placeholder_skeleton
 
 CUBE_ID = 0x800
 CELL_ID = 0x801
@@ -42,8 +46,17 @@ WATER_LAND_ID = 0x811
 DRY_CELL_ID = 0x812
 DRY_LAND_ID = 0x813
 WATER_TYPE_ID = 0x814
-LAST_ID = WATER_TYPE_ID # the largest form ID of the plugin, which the next object ID of its header follows
+RACE_ID = 0x815
+NPC_ID = 0x816
+NPC_REF_ID = 0x817
+EXTERIOR_NPC_REF_ID = 0x818
+LAST_ID = EXTERIOR_NPC_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
+NPC_NAME = "OFTestPerson"
+RACE_NAME = "OFTestRace"
+# The skeleton of the character, as the record names it: Fallout characters have theirs in the NPC_ record, not in the
+# race. The file is the placeholder skeleton of the engine, which is the one with the bounding box.
+SKELETON = "characters\\_male\\skeleton.nif"
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
@@ -75,6 +88,11 @@ FLOAT_MAX = 3.4028234663852886e+38
 CUBE = 256.0
 FLOOR_SCALE = 16.0
 PILLAR_DISTANCE = 600.0
+# How far north of the start the person stands: a little short of the south face of the pillar, so that the player
+# who has walked into the pillar and strafes east meets them with the middle of their body.
+NPC_DEPTH = PILLAR_DISTANCE - CUBE / 2 - 30.0
+# and this many units east of the line of the walk, the player is a box 40 wide and the person a cylinder 40 wide
+NPC_DISTANCE = 300.0
 
 # The lighting of the cell, in the order of the XCLL sub-record. The cell inherits the fog colour and the far fog
 # distance of its lighting template (inherit flags 0x04 and 0x10), the rest is its own: what the engine should use is
@@ -221,6 +239,29 @@ def land(form_id=EXTERIOR_LAND_ID, height=0.0):
                                      sub(b"VHGT", heights)])
 
 
+def race():
+    """A race with the data that the loader needs of one and no body parts: the skeleton is in the NPC_ record."""
+    skills = struct.pack("<16B", *([0] * 16))
+    data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
+    return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data)])
+
+
+def person():
+    """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL)."""
+    # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
+    # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
+    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, 100, 0.0, 0, 0)
+    return record(b"NPC_", NPC_ID, [zstr(b"EDID", NPC_NAME), zstr(b"FULL", "OpenFallout Test Person"),
+                                    zstr(b"MODL", SKELETON), sub(b"ACBS", acbs),
+                                    sub(b"RNAM", struct.pack("<I", RACE_ID))])
+
+
+def achr(form_id, position):
+    """A placed character: the base record and where it stands."""
+    return record(b"ACHR", form_id, [sub(b"NAME", struct.pack("<I", NPC_ID)),
+                                     sub(b"DATA", struct.pack("<6f", *position, 0.0, 0.0, 0.0))])
+
+
 def worldspace():
     """The WRLD record of OFTestWorld followed by its children: the exterior cell 0,0 in an exterior block and sub-block
     (both labelled with the grid 0,0), with its references in the temporary children group of the cell."""
@@ -246,6 +287,7 @@ def worldspace():
         land(),
         refr(EXTERIOR_PILLAR_ID, CUBE_ID, (half, half + PILLAR_DISTANCE, CUBE / 2)),
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
+        achr(EXTERIOR_NPC_REF_ID, (half + NPC_DISTANCE, half + NPC_DEPTH, 0.0)),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
     water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
@@ -280,6 +322,7 @@ def plugin():
         refr(FLOOR_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
         refr(MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
+        achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -288,6 +331,7 @@ def plugin():
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
+            + top_group(b"RACE", [race()]) + top_group(b"NPC_", [person()])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 
@@ -329,6 +373,9 @@ def write(out):
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())
+    skeleton = out / "meshes" / Path(SKELETON.replace("\\", "/"))
+    skeleton.parent.mkdir(parents=True, exist_ok=True)
+    skeleton.write_bytes(placeholder_skeleton.skeleton())
     (out / "OFTest.esm").write_bytes(plugin())
     return out / "OFTest.esm"
 

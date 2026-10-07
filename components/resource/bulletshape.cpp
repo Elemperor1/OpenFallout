@@ -5,6 +5,7 @@
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCompoundShape.h>
+#include <BulletCollision/CollisionShapes/btCylinderShape.h>
 #include <BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h>
 #include <BulletCollision/CollisionShapes/btScaledBvhTriangleMeshShape.h>
 
@@ -50,6 +51,14 @@ namespace Resource
             {
                 const btBoxShape* boxshape = static_cast<const btBoxShape*>(shape);
                 return CollisionShapePtr(new btBoxShape(*boxshape));
+            }
+
+            if (shape->getShapeType() == CYLINDER_SHAPE_PROXYTYPE)
+            {
+                // Only the ones that stand on the z axis are made, by code, for the bodies of actors
+                const btCylinderShape* cylinder = static_cast<const btCylinderShape*>(shape);
+                if (cylinder->getUpAxis() == 2)
+                    return CollisionShapePtr(new btCylinderShapeZ(cylinder->getHalfExtentsWithoutMargin()));
             }
 
             if (shape->getShapeType() == TERRAIN_SHAPE_PROXYTYPE)

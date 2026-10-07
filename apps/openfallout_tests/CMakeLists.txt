@@ -18,6 +18,8 @@ file(GLOB UNITTEST_SRC_FILES
     mwworld/testcellwater.cpp
     mwworld/testworldspacestart.cpp
 
+    mwclass/testesm4npcbody.cpp
+
     mwdialogue/testkeywordsearch.cpp
 
     mwgui/tooltips.cpp
