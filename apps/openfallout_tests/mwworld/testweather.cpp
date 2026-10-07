@@ -1055,6 +1055,55 @@ namespace OFWorld
             EXPECT_EQ(fogFar, 8000.f);
         }
 
+        TEST(OFWorldWeatherTest, theShareOfAWeatherCountsOnlyTheEntriesWhoseGlobalIsSet)
+        {
+            const ESM::RefId global = formIdRefId(0x01000900);
+            const std::vector<WeatherCondition> entries{ { ESM::RefId(), 30 }, { global, 20 } };
+
+            EXPECT_DOUBLE_EQ(availableShare(entries, [](const ESM::RefId&) { return false; }), 0.6);
+            EXPECT_DOUBLE_EQ(availableShare(entries, [](const ESM::RefId&) { return true; }), 1.0);
+        }
+
+        TEST(OFWorldWeatherTest, theShareOfAWeatherChecksTheGlobalOfEachEntry)
+        {
+            const ESM::RefId first = formIdRefId(0x01000900);
+            const ESM::RefId second = formIdRefId(0x01000901);
+            const std::vector<WeatherCondition> entries{ { first, 10 }, { second, 30 } };
+
+            EXPECT_DOUBLE_EQ(availableShare(entries, [&](const ESM::RefId& id) { return id == first; }), 0.25);
+            EXPECT_DOUBLE_EQ(availableShare(entries, [&](const ESM::RefId& id) { return id == second; }), 0.75);
+            EXPECT_DOUBLE_EQ(availableShare(entries, [](const ESM::RefId&) { return false; }), 0.0);
+        }
+
+        TEST(OFWorldWeatherTest, theShareOfAWeatherWithoutEntriesIsTheWhole)
+        {
+            EXPECT_DOUBLE_EQ(availableShare({}, [](const ESM::RefId&) { return false; }), 1.0);
+        }
+
+        TEST(OFWorldWeatherTest, theConditionsOfAClimateKeepEachEntryOfAWeatherThatHasAGlobal)
+        {
+            WeatherStore store;
+            const ESM4::Weather record = makeRecord(4);
+            store.insertStatic(Weather(formIdRefId(0x01000800), 0, record, 0.8f));
+            store.insertStatic(Weather(formIdRefId(0x01000801), 1, record, 0.8f));
+
+            ESM4::Climate climate;
+            climate.mWeathers.push_back({ 0x01000800, 30, 0 });
+            climate.mWeathers.push_back({ 0x01000800, 20, 0x01000900 });
+            climate.mWeathers.push_back({ 0x01000801, 50, 0 }); // no global: no conditions
+            climate.mWeathers.push_back({ 0x01000802, 10, 0x01000901 }); // not in the store
+
+            const WeatherConditions conditions = climateConditions(climate, store);
+
+            ASSERT_EQ(conditions.size(), 1u);
+            const auto& entries = conditions.at(formIdRefId(0x01000800));
+            ASSERT_EQ(entries.size(), 2u);
+            EXPECT_TRUE(entries[0].mGlobal.empty());
+            EXPECT_EQ(entries[0].mWeight, 30);
+            EXPECT_EQ(entries[1].mGlobal, formIdRefId(0x01000900));
+            EXPECT_EQ(entries[1].mWeight, 20);
+        }
+
         TEST(OFWorldWeatherTest, theChancesOfAClimateLeaveOutTheWeathersTheStoreDoesNotHave)
         {
             WeatherStore store;

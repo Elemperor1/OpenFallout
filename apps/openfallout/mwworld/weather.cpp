@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <optional>
 
 namespace OFWorld
@@ -377,10 +378,9 @@ namespace OFWorld
     {
     }
 
-    RegionWeather::RegionWeather(
-        const std::map<ESM::RefId, uint8_t>& chances, const std::map<ESM::RefId, ESM::RefId>& globals)
+    RegionWeather::RegionWeather(const std::map<ESM::RefId, uint8_t>& chances, const WeatherConditions& conditions)
         : mChances(chances)
-        , mGlobals(globals)
+        , mConditions(conditions)
     {
     }
 
@@ -442,41 +442,68 @@ namespace OFWorld
         return mWeather;
     }
 
+    double availableShare(
+        const std::vector<WeatherCondition>& entries, const std::function<bool(const ESM::RefId&)>& isGlobalSet)
+    {
+        int64_t total = 0;
+        int64_t available = 0;
+        for (const WeatherCondition& entry : entries)
+        {
+            total += entry.mWeight;
+            if (entry.mGlobal.empty() || isGlobalSet(entry.mGlobal))
+                available += entry.mWeight;
+        }
+        return total > 0 ? static_cast<double>(available) / static_cast<double>(total) : 1.0;
+    }
+
     void RegionWeather::chooseNewWeather(const WeatherStore& store)
     {
-        // A weather of Fallout can need a global to be set. The global is the one of the record, nothing changes it
-        // yet.
-        const auto isAvailable = [this](const ESM::RefId& weather) {
-            const auto condition = mGlobals.find(weather);
-            if (condition == mGlobals.end())
-                return true;
-            const ESM4::GlobalVariable* global
-                = OFBase::Environment::get().getESMStore()->get<ESM4::GlobalVariable>().search(condition->second);
-            return global != nullptr && global->mValue != 0.f;
-        };
+        auto& prng = OFBase::Environment::get().getWorld()->getPrng();
 
-        // All probabilities must add to 100 (responsibility of the user), those of the weathers that are left out
-        // for a global that is not set are shared among the others.
-        unsigned int total = 100;
-        if (!mGlobals.empty())
+        if (!mConditions.empty())
         {
-            total = 0;
+            // An entry of the weather list of a Fallout climate can need a global to be set. The global is the one of
+            // the record, nothing changes it yet. The chance of a weather counts only for the part its entries that
+            // count make, and the weathers share what is left out.
+            const auto isGlobalSet = [](const ESM::RefId& id) {
+                const ESM4::GlobalVariable* global
+                    = OFBase::Environment::get().getESMStore()->get<ESM4::GlobalVariable>().search(id);
+                return global != nullptr && global->mValue != 0.f;
+            };
+            const auto availableChance = [&](const ESM::RefId& weather) {
+                const auto found = mConditions.find(weather);
+                const double share = found == mConditions.end() ? 1.0 : availableShare(found->second, isGlobalSet);
+                return getChance(weather) * share;
+            };
+
+            double total = 0.0;
             for (const Weather* weather : store)
-                if (isAvailable(weather->mId))
-                    total += getChance(weather->mId);
-        }
+                total += availableChance(weather->mId);
 
-        if (total > 0)
+            if (total > 0.0)
+            {
+                const double roll = Misc::Rng::rollProbability(prng) * total; // [0, total)
+                double sum = 0.0;
+                for (const Weather* weather : store)
+                {
+                    sum += availableChance(weather->mId);
+                    if (roll < sum)
+                    {
+                        mWeather = weather->mId;
+                        return;
+                    }
+                }
+            }
+        }
+        else
         {
+            // All probabilities must add to 100 (responsibility of the user).
             // If chances A and B has values 30 and 70 then by generating 100 numbers 1..100, 30% will be lesser or
             // equal 30 and 70% will be greater than 30 (in theory).
-            auto& prng = OFBase::Environment::get().getWorld()->getPrng();
-            unsigned int chance = Misc::Rng::rollDice(total, prng) + 1u; // 1..total
+            unsigned int chance = Misc::Rng::rollDice(100, prng) + 1u; // 1..100
             unsigned int sum = 0;
             for (const Weather* weather : store)
             {
-                if (!isAvailable(weather->mId))
-                    continue;
                 sum += getChance(weather->mId);
                 if (chance <= sum)
                 {
@@ -555,16 +582,27 @@ namespace OFWorld
         return normaliseChances(weights);
     }
 
-    std::map<ESM::RefId, ESM::RefId> climateGlobals(const ESM4::Climate& climate, const WeatherStore& store)
+    WeatherConditions climateConditions(const ESM4::Climate& climate, const WeatherStore& store)
     {
-        std::map<ESM::RefId, ESM::RefId> globals;
+        WeatherConditions conditions;
         for (const ESM4::Climate::WeatherEntry& entry : climate.mWeathers)
         {
             const ESM::RefId id(ESM::FormId::fromUint32(entry.mWeather));
-            if (entry.mGlobal != 0 && store.search(id) != nullptr)
-                globals[id] = ESM::RefId(ESM::FormId::fromUint32(entry.mGlobal));
+            if (entry.mChance <= 0 || store.search(id) == nullptr)
+                continue;
+            ESM::RefId global;
+            if (entry.mGlobal != 0)
+                global = ESM::RefId(ESM::FormId::fromUint32(entry.mGlobal));
+            conditions[id].push_back(WeatherCondition{ global, entry.mChance });
         }
-        return globals;
+        // Only the weathers with an entry that needs a global have conditions
+        for (auto it = conditions.begin(); it != conditions.end();)
+        {
+            const bool conditional = std::any_of(it->second.begin(), it->second.end(),
+                [](const WeatherCondition& entry) { return !entry.mGlobal.empty(); });
+            it = conditional ? std::next(it) : conditions.erase(it);
+        }
+        return conditions;
     }
 
     MoonModel::MoonModel(float fadeInStart, float fadeInFinish, float fadeOutStart, float fadeOutFinish,
@@ -1384,7 +1422,7 @@ namespace OFWorld
             std::map<ESM::RefId, uint8_t> chances = climateChances(climate, *mWeatherStore);
             if (!chances.empty())
                 mRegions.insert(std::make_pair(
-                    ESM::RefId(climate.mId), RegionWeather(chances, climateGlobals(climate, *mWeatherStore))));
+                    ESM::RefId(climate.mId), RegionWeather(chances, climateConditions(climate, *mWeatherStore))));
         }
     }
 

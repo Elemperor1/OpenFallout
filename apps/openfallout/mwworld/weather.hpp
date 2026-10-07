@@ -2,6 +2,7 @@
 #define GAME_MWWORLD_WEATHER_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <string_view>
@@ -271,16 +272,31 @@ namespace OFWorld
 
     class WeatherStore;
 
+    /// An entry of the weather list of a Fallout climate: its weight and the global that has to be set (not 0) for it
+    /// to count, empty when it has none.
+    struct WeatherCondition
+    {
+        ESM::RefId mGlobal;
+        int mWeight = 0;
+    };
+
+    /// The entries of the weather list of a climate for each weather that has an entry with a global.
+    using WeatherConditions = std::map<ESM::RefId, std::vector<WeatherCondition>>;
+
+    /// The share, from 0 to 1, of the chance of a weather that is left when the globals that its entries need are
+    /// checked with isGlobalSet: the weight of the entries that count over the weight of all of them.
+    double availableShare(
+        const std::vector<WeatherCondition>& entries, const std::function<bool(const ESM::RefId&)>& isGlobalSet);
+
     /// A class for storing a region's weather.
     class RegionWeather
     {
     public:
         explicit RegionWeather(const ESM::Region& region);
         explicit RegionWeather(const ESM::RegionWeatherState& state);
-        /// A region of Fallout: its chances and, for the weathers that need a global to be set, which one (weather to
-        /// global)
-        explicit RegionWeather(
-            const std::map<ESM::RefId, uint8_t>& chances, const std::map<ESM::RefId, ESM::RefId>& globals = {});
+        /// A region of Fallout: its chances and the conditions of the entries of its weather list that need a global
+        /// to be set
+        explicit RegionWeather(const std::map<ESM::RefId, uint8_t>& chances, const WeatherConditions& conditions = {});
 
         operator ESM::RegionWeatherState() const;
 
@@ -299,8 +315,9 @@ namespace OFWorld
     private:
         ESM::RefId mWeather;
         std::map<ESM::RefId, uint8_t> mChances;
-        // The global that has to be set (not 0) for a weather to be chosen, for the weathers that have one
-        std::map<ESM::RefId, ESM::RefId> mGlobals;
+        // For the weathers with an entry that needs a global to be set, the entries: only the part of the chance of the
+        // weather that the entries which count make is used
+        WeatherConditions mConditions;
 
         void chooseNewWeather(const WeatherStore& store);
     };
@@ -327,9 +344,9 @@ namespace OFWorld
     /// The chances of the weathers of a Fallout climate, for the weathers that the store has.
     std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store);
 
-    /// The weathers of a Fallout climate that need a global to be set, and which global, for the weathers that the
-    /// store has.
-    std::map<ESM::RefId, ESM::RefId> climateGlobals(const ESM4::Climate& climate, const WeatherStore& store);
+    /// The entries of the weather list of a Fallout climate for the weathers that have an entry that needs a global to
+    /// be set, for the weathers that the store has.
+    WeatherConditions climateConditions(const ESM4::Climate& climate, const WeatherStore& store);
 
     /// A class that acts as a model for the moons.
     class MoonModel
