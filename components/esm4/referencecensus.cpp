@@ -4,6 +4,7 @@
 #include <cctype>
 #include <exception>
 #include <iomanip>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <stdexcept>
@@ -33,12 +34,12 @@ namespace ESM4
             return std::string(message.substr(0, message.find('\n')));
         }
 
-        // The base object of the current reference, whose data has been read: the form ID of its NAME. Zero when
-        // the record has none, as a record that changes only a part of a reference may not. A sub-record that runs
-        // past the end of the record, or a file that ends inside the NAME, is an error.
-        ESM::FormId readBase(Reader& reader)
+        // The base object of the current reference, whose data has been read: the form ID of its NAME, which is empty
+        // when the record has none (a record that changes only a part of a reference may leave it out). A sub-record
+        // that runs past the end of the record, or a file that ends inside the NAME, is an error.
+        std::optional<ESM::FormId> readBase(Reader& reader)
         {
-            ESM::FormId base;
+            std::optional<ESM::FormId> base;
             while (true)
             {
                 const bool found = reader.getSubRecordHeader();
@@ -49,8 +50,10 @@ namespace ESM4
 
                 if (reader.subRecordHeader().typeId == ESM::fourCC("NAME") && reader.subRecordHeader().dataSize == 4)
                 {
-                    if (!reader.getFormId(base))
+                    ESM::FormId id;
+                    if (!reader.getFormId(id))
                         throw std::runtime_error("The file ends inside a base object");
+                    base = id;
                 }
                 else
                     reader.skipSubRecordData();
@@ -133,7 +136,7 @@ namespace ESM4
             try
             {
                 r.getRecordData();
-                const ESM::FormId base = readBase(r);
+                const std::optional<ESM::FormId> base = readBase(r);
 
                 if ((flags & Rec_Deleted) != 0)
                 {
@@ -145,8 +148,8 @@ namespace ESM4
                     Placed& placed = mPlaced[id];
                     placed.mType = type;
                     // A record that overrides a reference may leave out what it does not change.
-                    if (base.mIndex != 0 || placed.mBase.mIndex == 0)
-                        placed.mBase = base;
+                    if (base.has_value())
+                        placed.mBase = *base;
                     placed.mDisabled = (flags & Rec_Disabled) != 0;
                 }
             }

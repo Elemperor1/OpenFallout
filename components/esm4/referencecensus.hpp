@@ -36,7 +36,8 @@ namespace ESM4
         };
 
         // What a reference with no base object is counted under, and one whose base object no file read has a record
-        // for (a master that was not given).
+        // for (a record that the game defines itself, or one that is missing). Every master of a file has to be given
+        // before it, or reading the file fails.
         static constexpr const char* noBase = "none";
         static constexpr const char* unknownBase = "unknown";
 

@@ -167,6 +167,21 @@ namespace
         EXPECT_TRUE(census.getFatalErrors().empty());
     }
 
+    TEST(ESM4ReferenceCensusTest, anOverrideThatNamesNoBaseKeepsItAndOneThatNamesNullReplacesIt)
+    {
+        ESM4::ReferenceCensus census;
+        collect(census, basePlugin(), "base.esm", 0, {});
+        // 0x2001 has no NAME in the patch, 0x2002 has a NAME of zero.
+        const std::string patch = headerWithMaster("base.esm")
+            + topGroup(
+                "REFR", record("REFR", 0x00002001, zString("EDID", "Same")) + record("REFR", 0x00002002, name(0)));
+        collect(census, patch, "patch.esp", 1, { { "base.esm", 0 } });
+
+        const Counts counts = census.getCounts();
+        EXPECT_EQ(total(counts, "STAT", "REFR"), 2u);
+        EXPECT_EQ(total(counts, ESM4::ReferenceCensus::noBase, "REFR"), 2u);
+    }
+
     TEST(ESM4ReferenceCensusTest, findsABaseObjectThatIsWrittenAfterTheReferenceToIt)
     {
         const std::string plugin = header()
