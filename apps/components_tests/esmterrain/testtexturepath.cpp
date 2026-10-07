@@ -55,5 +55,14 @@ namespace ESMTerrain
             EXPECT_EQ(findTexturePath(vfs.get(), "missing.dds", true).value(), "textures/landscape/missing.dds");
             EXPECT_EQ(findTexturePath(nullptr, "missing.dds", false).value(), "textures/missing.dds");
         }
+
+        TEST(ESMTerrainTexturePath, a_path_that_has_the_landscape_directory_is_not_given_it_again)
+        {
+            const auto vfs = createTestVFS({ { VFS::Path::NormalizedView("textures/other.dds"), &file } });
+
+            // Not textures/landscape/landscape/, which no game has, in the path that the log says is missing
+            EXPECT_EQ(
+                findTexturePath(vfs.get(), "Landscape\\missing.dds", true).value(), "textures/landscape/missing.dds");
+        }
     }
 }

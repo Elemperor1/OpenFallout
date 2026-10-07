@@ -10,6 +10,7 @@ namespace ESMTerrain
     VFS::Path::Normalized findTexturePath(const VFS::Manager* vfs, std::string_view path, bool landscape)
     {
         constexpr std::string_view textures = "textures/";
+        constexpr std::string_view landscapeDirectory = "landscape/";
         constexpr std::string_view landscapeTextures = "textures/landscape/";
 
         const VFS::Path::Normalized file(path);
@@ -20,7 +21,8 @@ namespace ESMTerrain
         std::vector<VFS::Path::Normalized> candidates;
         if (relative.starts_with(textures))
             candidates.emplace_back(std::string(relative));
-        if (landscape)
+        // A path that has the landscape directory already is not given it again
+        if (landscape && !relative.starts_with(landscapeDirectory))
             candidates.emplace_back(std::string(landscapeTextures) + std::string(relative));
         candidates.emplace_back(std::string(textures) + std::string(relative));
 
