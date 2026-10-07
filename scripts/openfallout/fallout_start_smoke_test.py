@@ -13,7 +13,8 @@ sun colours and with the fog colour and far distance of its lighting template, i
 that the climate of the worldspace lists, the player stands on the floor the whole time, the camera is at eye height
 above the player, the player stops at the pillar that is in the way and, strafing east from there, at the person who
 stands in the way (a character with a skeleton in its record, which is solid as an actor is: a ray that looks for actors
-finds it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
+finds it) and whose body can be seen (rays at what is drawn find the suit it wears, its head, its hair and the hand that
+the suit does not cover, and none the parts of its race that the suit takes the place of), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
 pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
 and in the exterior, where the player looks up after three seconds, the sky overhead has the sky colour of the weather
 with the clouds of the weather over it, and a band of water in a cell north of the start shows where the horizon would
@@ -152,8 +153,29 @@ STRAFE_FROM = 8.0
 PERSON_RADIUS = 20.0
 PERSON_STOP = (plugin.NPC_DISTANCE - 40.0 - 30.0, plugin.NPC_DISTANCE - 40.0 + 5.0)
 
+# What the rays at the drawn body of the person must find, each from outside to the middle of the body at the height of the
+# ray (the person stands at NPC_DISTANCE east and NPC_DEPTH north of where the player starts): the name of the ray, where
+# it starts and ends relative to the person, and the coordinate of the face it hits. The parts are boxes (PERSON_PARTS),
+# so the faces are exact. The suit covers the upper body and the right hand and is narrower than the upper body of the race
+# and than the right hand is far out, so a ray from the east at the height of the hand hits the suit only when neither of
+# them is drawn.
+def person_face(name, axis, side):
+    (half, centre) = plugin.PERSON_PARTS[name]
+    return centre[axis] + side * half[axis]
+
+
+BODY_RAYS = {
+    "east": ((100, 0, 50), (-100, 0, 50), 0, person_face("suit", 0, +1)),
+    "west": ((-100, 0, 50), (100, 0, 50), 0, person_face("lefthand", 0, -1)),
+    "head": ((100, 0, 118), (-100, 0, 118), 0, person_face("head", 0, +1)),
+    "top": ((0, 0, 300), (0, 0, 0), 2, person_face("hair", 2, +1)),
+}
+
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
+
+BODY_RAY_LUA = "".join("                look('%s', { %s }, { %s })\n" % (name, ", ".join(map(str, start)), ", ".join(map(str, end)))
+                       for name, (start, end, _, _) in BODY_RAYS.items())
 
 # Waits for the player to settle, then walks north (the player faces north at the start) into the pillar, from the
 # eighth second strafes east into the person that stands there, and logs once a second. At 7.5 s, when it has stopped at
@@ -165,7 +187,10 @@ local util = require('openfallout.util')
 local core = require('openfallout.core')
 local I = require('openfallout.interfaces')
 local camera = require('openfallout.camera')
+local async = require('openfallout.async')
 
+local npcPos = nil
+local bodyRaysDone = false
 local elapsed = 0
 local nextLog = 0
 local rayDone = false
@@ -213,17 +238,28 @@ return {
                     { collisionType = nearby.COLLISION_TYPE.Actor, ignore = self.object })
                 log('ray person hit=', tostring(person.hit), person.hit and fmt(person.hitPos) or '',
                     person.hitObject and tostring(person.hitObject.recordId) or '')
+                npcPos = person.hitObject and person.hitObject.position
             end
+            -- rays at what is drawn of the person, from the outside to the middle of the body
+            if elapsed >= 9 and not bodyRaysDone and npcPos then
+                bodyRaysDone = true
+                local function look(name, from, to)
+                    nearby.asyncCastRenderingRay(async:callback(function(res)
+                        log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
+                    end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
+                end
+%s            end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (*WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, WALK_SECONDS)
+""" % (*WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, WALK_SECONDS)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
 SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+RENDER_RAY = re.compile(r"OFTEST\trender ray (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 WATER_SIDE_RAY_LINE = re.compile(r"OFTEST\tray water side hit=\t(\w+)")
 PERSON_RAY = re.compile(r"OFTEST\tray person hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\t(.*)")
 WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
@@ -406,6 +442,20 @@ def check(text, scenario, colours):
                 or int(form_id.group(1), 16) & 0xFFFFFF != plugin.NPC_ID):
             problems.append(f"the ray cast east at the actors did not find the person (form {plugin.NPC_ID:#x}) at "
                             f"x={want_x:.0f}: {person_rays[0].group(0)}")
+    # What is drawn of the person: the suit where it covers the body, the hand that it does not cover, the head, the hair.
+    # The ray goes along an axis, so the coordinate of that axis is the one of the face that it hits
+    person = (scenario.origin[0] + plugin.NPC_DISTANCE, scenario.origin[1] + plugin.NPC_DEPTH, 0.0)
+    found = {m.group(1): m for m in map(RENDER_RAY.search, text.splitlines()) if m}
+    for name, (_, _, axis, want) in BODY_RAYS.items():
+        ray = found.get(name)
+        if ray is None:
+            problems.append(f"the script did not log the ray at what is drawn of the person ('{name}')")
+        elif ray.group(2) != "true" or abs(float(ray.group(3 + axis)) - (person[axis] + want)) > 1.5:
+            problems.append(f"the ray '{name}' at what is drawn of the person should hit a face at {person[axis] + want:.1f}"
+                            f" on its axis: {ray.group(0)}")
+    for line in text.splitlines():
+        if re.search(r" [EW]\] .*(?:person_|Hair not found|Head part not found)", line):
+            problems.append(line)
     side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "

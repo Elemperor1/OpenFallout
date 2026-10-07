@@ -24,6 +24,7 @@ namespace OFRender
 
         void updateParts();
         void updatePartsTES4(const ESM4::Npc& traits);
+        void updatePartsFallout(const ESM4::Npc& traits);
         void updatePartsTES5(const ESM4::Npc& traits);
     };
 }

@@ -1,10 +1,14 @@
 #include "esm4npc.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <set>
 
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadclot.hpp>
+#include <components/esm4/loadhair.hpp>
+#include <components/esm4/loadhdpt.hpp>
 #include <components/esm4/loadlvli.hpp>
 #include <components/esm4/loadlvln.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -29,6 +33,73 @@ namespace OFClass
         const float scale
             = std::isfinite(raceHeight) && raceHeight > 0.f ? std::clamp(raceHeight, sSmallest, sLargest) : 1.f;
         return osg::Vec3f(20.f, 20.f, 64.f) * scale;
+    }
+
+    std::vector<const ESM4::HeadPart*> expandHeadParts(
+        const std::vector<ESM::FormId>& ids, const std::function<const ESM4::HeadPart*(ESM::FormId)>& find)
+    {
+        std::vector<const ESM4::HeadPart*> parts;
+        std::set<ESM::FormId> seen;
+        const auto add = [&](const auto& self, ESM::FormId id) -> void {
+            if (id.isZeroOrUnset() || !seen.insert(id).second)
+                return;
+            const ESM4::HeadPart* part = find(id);
+            if (part == nullptr)
+                return;
+            parts.push_back(part);
+            for (const ESM::FormId extra : part->mExtraParts)
+                self(self, extra);
+        };
+        for (const ESM::FormId id : ids)
+            add(add, id);
+        return parts;
+    }
+
+    std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
+        const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor)
+    {
+        // The part of the body that a piece covers are its biped flags. A piece is worn if no piece before it covers
+        // any of them, so that a character with two suits wears the first.
+        constexpr std::uint32_t sBipedSlots = 0x000FFFFF;
+        std::uint32_t covered = 0;
+        std::vector<std::string> worn;
+        for (const ESM4::Armor* piece : armor)
+        {
+            if (piece == nullptr)
+                continue;
+            const std::uint32_t slots = piece->mArmorFlags & sBipedSlots;
+            const ESM::Path& model = isFemale && !piece->mModelFemale.empty() ? piece->mModelFemale : piece->mModelMale;
+            if (slots == 0 || model.empty() || (slots & covered) != 0)
+                continue;
+            covered |= slots;
+            worn.push_back(model.getOriginal());
+        }
+
+        std::vector<std::string> models;
+        // The index of a part of the body in the race, and the biped slot that hides it: the upper body, left hand and
+        // right hand (the fourth is only the texture of the upper body)
+        constexpr std::array<std::uint32_t, 3> sBodySlots{ ESM4::Armor::FO3_UpperBody, ESM4::Armor::FO3_LeftHand,
+            ESM4::Armor::FO3_RightHand };
+        const std::vector<ESM4::Race::BodyPart>& body = isFemale ? race.mBodyPartsFemale : race.mBodyPartsMale;
+        for (std::size_t i = 0; i < body.size() && i < sBodySlots.size(); ++i)
+            if (!body[i].mesh.empty() && (covered & sBodySlots[i]) == 0)
+                models.push_back(body[i].mesh);
+
+        // Everything of the face goes with the head: it is not there under a piece that covers the head
+        if ((covered & ESM4::Armor::FO3_Head) == 0)
+        {
+            for (const ESM4::Race::BodyPart& part : isFemale ? race.mHeadPartsFemale : race.mHeadParts)
+                if (!part.mesh.empty())
+                    models.push_back(part.mesh);
+            for (const ESM4::HeadPart* part : headParts)
+                if (part != nullptr && !part->mModel.empty())
+                    models.push_back(part->mModel.getOriginal());
+        }
+        if (hair != nullptr && !hair->mModel.empty() && (covered & ESM4::Armor::FO3_Hair) == 0)
+            models.push_back(hair->mModel.getOriginal());
+
+        models.insert(models.end(), worn.begin(), worn.end());
+        return models;
     }
 
     template <class LevelledRecord, class TargetRecord>

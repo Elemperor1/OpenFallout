@@ -63,7 +63,9 @@ void ESM4::Npc::load(ESM4::Reader& reader)
 
     std::uint32_t esmVer = reader.esmVersion();
     mIsTES4 = (esmVer == ESM::VER_080 || esmVer == ESM::VER_100) && !reader.hasFormVersion();
-    mIsFONV = esmVer == ESM::VER_132 || esmVer == ESM::VER_133 || esmVer == ESM::VER_134;
+    // Fallout 3 too: it has the header version of Skyrim LE, but the records of its characters have the layout of those
+    // of New Vegas (the template flags of ACBS are in another place than in Skyrim)
+    mIsFONV = reader.isFalloutFile();
     // mIsTES5 = esmVer == ESM::VER_094 || esmVer == ESM::VER_170; // WARN: FO3 is also VER_094
 
     while (reader.getSubRecordHeader())
@@ -178,7 +180,7 @@ void ESM4::Npc::load(ESM4::Reader& reader)
             case ESM::fourCC("WNAM"):
             {
                 // FIXME: should be read into mWornArmor for FO4
-                if (reader.esmVersion() == ESM::VER_094 || reader.esmVersion() == ESM::VER_170)
+                if (!mIsFONV && (reader.esmVersion() == ESM::VER_094 || reader.esmVersion() == ESM::VER_170))
                     reader.getFormId(mWornArmor);
                 else
                     reader.get(mFootWeight);
