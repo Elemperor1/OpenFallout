@@ -18,8 +18,10 @@ namespace OFRender
         void configure(float viewDistance, const OFWorld::Cell& cell);
         void configure(float viewDistance, float fogDepth, float underwaterFog, float dlFactor, float dlOffset,
             const osg::Vec4f& color);
-        /// Fog that starts and ends at given distances in game units, whatever the view distance is
-        void configureRange(float viewDistance, float fogNear, float fogFar, const osg::Vec4f& color);
+        /// Fog that starts and ends at given distances in game units, whatever the view distance is. The underwater
+        /// fog is the share of the view distance that is not fogged under water, as for the fog of a density.
+        void configureRange(
+            float viewDistance, float fogNear, float fogFar, float underwaterFog, const osg::Vec4f& color);
 
         osg::Vec4f getFogColor(bool isUnderwater) const;
         float getFogStart(bool isUnderwater) const;

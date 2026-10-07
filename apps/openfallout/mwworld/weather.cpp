@@ -1158,7 +1158,7 @@ namespace OFWorld
         mRendering.getSkyManager()->setSecundaState(mSecunda.calculateState(time));
 
         if (mResult.mHasFogRange)
-            mRendering.configureFog(mResult.mFogNear, mResult.mFogFar, mResult.mFogColor);
+            mRendering.configureFog(mResult.mFogNear, mResult.mFogFar, underwaterFog, mResult.mFogColor);
         else
             mRendering.configureFog(mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor,
                 mResult.mDLFogOffset / 100.0f, mResult.mFogColor);
