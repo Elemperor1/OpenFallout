@@ -338,6 +338,7 @@ add_component_dir (esm4
     readerutils
     recordreader
     reference
+    referencecensus
     script
     survey
     typetraits

@@ -15,6 +15,9 @@ namespace EsmTool
 
     // Surveys every file named in info.inputFiles and prints one report.
     int surveyTes4(const Arguments& info);
+
+    // Counts the references placed by every file named in info.inputFiles, read in that order, and prints one report.
+    int referencesTes4(const Arguments& info);
 }
 
 #endif
