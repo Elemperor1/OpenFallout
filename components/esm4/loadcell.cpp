@@ -52,6 +52,7 @@ void ESM4::Cell::load(ESM4::Reader& reader)
     mFlags = reader.hdr().record.flags;
     mParent = reader.currWorld();
     mWaterHeight = sInvalidWaterLevel;
+    mExteriorWaterIsFlagged = reader.isFalloutFile();
     reader.clearCellGrid(); // clear until XCLC FIXME: somehow do this automatically?
 
     // Sometimes cell 0,0 does not have an XCLC sub record (e.g. ToddLand 000009BF)

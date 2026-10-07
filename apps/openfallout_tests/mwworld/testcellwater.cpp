@@ -93,6 +93,21 @@ namespace OFWorld
             EXPECT_FALSE(resolveCellWater(exterior(false, sLargestFloat), &world).mHasWater);
         }
 
+        TEST(OFWorldResolveCellWaterTest, anExteriorCellOfAGameThatDoesNotFlagItsWaterHasTheWaterOfItsWorldspace)
+        {
+            // Oblivion and Skyrim use the flag for interior cells only
+            const ESM4::World world = makeWorld(-2300.f);
+            ESM4::Cell cell = exterior(false, sLargestFloat);
+            cell.mExteriorWaterIsFlagged = false;
+            const CellWater water = resolveCellWater(cell, &world);
+            EXPECT_TRUE(water.mHasWater);
+            EXPECT_EQ(water.mHeight, -2300.f);
+
+            ESM4::Cell inside = interior(false, 120.f);
+            inside.mExteriorWaterIsFlagged = false;
+            EXPECT_FALSE(resolveCellWater(inside, &world).mHasWater);
+        }
+
         TEST(OFWorldResolveCellWaterTest, anExteriorCellWithoutAHeightInAWorldspaceWithoutOneHasNoWater)
         {
             const ESM4::World world = makeWorld(sLargestFloat);

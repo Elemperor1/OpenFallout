@@ -83,6 +83,9 @@ namespace ESM4
         ESM::FormId mClimate;
         ESM::FormId mWater;
         float mWaterHeight = sInvalidWaterLevel;
+        // Whether CELL_HasWater says if an exterior cell has water, which it does in Fallout 3 and New Vegas (in the
+        // other games the flag is for interior cells, and an exterior cell has the water of its worldspace)
+        bool mExteriorWaterIsFlagged = true;
 
         std::vector<ESM::FormId> mRegions;
         Lighting mLighting;

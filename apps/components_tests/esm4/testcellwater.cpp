@@ -61,11 +61,14 @@ namespace
         EXPECT_TRUE(cell.mCellFlags & ESM4::CELL_HasWater);
         EXPECT_EQ(cell.mWaterHeight, 2600.f);
         EXPECT_TRUE(cell.hasWaterHeight());
+        EXPECT_TRUE(cell.mExteriorWaterIsFlagged);
     }
 
     TEST(ESM4CellWaterTest, newVegasKeepsTheHeightOfWater)
     {
-        EXPECT_EQ(loadCell(1.34f, 15, -4200.f).mWaterHeight, -4200.f);
+        const ESM4::Cell cell = loadCell(1.34f, 15, -4200.f);
+        EXPECT_EQ(cell.mWaterHeight, -4200.f);
+        EXPECT_TRUE(cell.mExteriorWaterIsFlagged);
     }
 
     TEST(ESM4CellWaterTest, newVegasKeepsTheLargestFloatThatSaysThereIsNoHeight)
@@ -80,5 +83,11 @@ namespace
         // The water records of Skyrim are broken, and Skyrim LE has the header version of Fallout 3
         EXPECT_FALSE(loadCell(0.94f, 43, 2600.f).hasWaterHeight());
         EXPECT_FALSE(loadCell(1.7f, 44, 2600.f).hasWaterHeight());
+    }
+
+    TEST(ESM4CellWaterTest, theFlagForWaterIsForInteriorCellsOutsideFallout)
+    {
+        EXPECT_FALSE(loadCell(0.94f, 43, 2600.f).mExteriorWaterIsFlagged);
+        EXPECT_FALSE(loadCell(1.7f, 44, 2600.f).mExteriorWaterIsFlagged);
     }
 }

@@ -53,7 +53,9 @@ namespace OFWorld
         CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight };
         if (cell.isExterior() && world != nullptr && !cell.hasWaterHeight())
             result.mHeight = world->mWaterLevel;
-        result.mHasWater = (cell.mCellFlags & ESM4::CELL_HasWater) && ESM4::Cell::isWaterHeight(result.mHeight);
+        const bool flagged
+            = (cell.mCellFlags & ESM4::CELL_HasWater) || (cell.isExterior() && !cell.mExteriorWaterIsFlagged);
+        result.mHasWater = flagged && ESM4::Cell::isWaterHeight(result.mHeight);
         return result;
     }
 
