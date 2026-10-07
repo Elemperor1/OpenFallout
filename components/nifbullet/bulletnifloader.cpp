@@ -168,6 +168,7 @@ namespace NifBullet
         mCompoundShape.reset();
         mAvoidCompoundShape.reset();
         mHavokRoots.clear();
+        mHasCollisionFlag = false;
 
         mShape->mFileHash = nif.getHash();
 
@@ -202,6 +203,10 @@ namespace NifBullet
 
         for (const Nif::NiAVObject* node : roots)
             handleRoot(nif, *node, args);
+
+        // Once for the file, whatever its roots are
+        if (nif.getBethVersion() == Nif::NIFFile::BethVersion::BETHVER_FO3)
+            survey("Files of Fallout 3 and New Vegas", mHasCollisionFlag ? "collision flag set" : "no collision flag");
 
         if (!mHavokRoots.empty())
             applyHavokCollision();
@@ -257,14 +262,10 @@ namespace NifBullet
                 }
             }
 
-            const bool hasCollisionFlag = bsxFlags != nullptr && (bsxFlags->mData & 2) != 0;
-            if (nif.getBethVersion() == Nif::NIFFile::BethVersion::BETHVER_FO3)
-                survey(
-                    "Files of Fallout 3 and New Vegas", hasCollisionFlag ? "collision flag set" : "no collision flag");
-
             // Collision flag
-            if (!hasCollisionFlag)
+            if (!bsxFlags || !(bsxFlags->mData & 2))
                 return;
+            mHasCollisionFlag = true;
 
             // Editor marker flag
             if (bsxFlags->mData & 32)
@@ -469,14 +470,22 @@ namespace NifBullet
         std::string unsupported;
         // The same files as for rendered geometry (see load) are taken for animated as a whole
         const bool animated = pathFileNameStartsWithX(mShape->mFileName);
+        bool supported = true;
         for (const Nif::NiAVObject* root : mHavokRoots)
         {
+            // A survey goes on after a body that is not read, so that it counts the bodies that come after it too
             if (!collectHavokBodies(*root, nullptr, animated, *havok, foundBody, unsupported))
             {
-                logHavokNotUsed(mShape->mFileName.value(), "it has " + unsupported);
-                survey("Havok collision of the files", "not used, it has " + unsupported);
-                return;
+                supported = false;
+                if (mHavokSurvey == nullptr)
+                    break;
             }
+        }
+        if (!supported)
+        {
+            logHavokNotUsed(mShape->mFileName.value(), "it has " + unsupported);
+            survey("Havok collision of the files", "not used, it has " + unsupported);
+            return;
         }
 
         if (havok->getNumChildShapes() == 0)
@@ -529,6 +538,7 @@ namespace NifBullet
         if (node.mRecordType == Nif::RC_AvoidNode)
             return true;
 
+        bool supported = true;
         animated = animated || hasMovingController(node);
 
         if (!node.mCollision.empty())
@@ -583,36 +593,45 @@ namespace NifBullet
                 }
                 if (isSolidHavokFilter(body->mHavokFilter) && stopsWhatTouchesIt)
                 {
+                    // What is not read is not used, and a survey goes on to count the bodies that come after it
+                    std::string failure;
                     // The shape moves with the node, and where the node is when it does is not what this knows
                     if (animated)
                     {
-                        unsupported = "a body that moves";
-                        return false;
+                        failure = "a body that moves";
                     }
-
-                    // Only a bhkRigidBodyT has the transform (the translation and rotation of a bhkRigidBody are not
-                    // used). A Havok quaternion turns a vector as an OSG one, and a body is placed by it and then by
-                    // its translation, which is in Havok units
-                    osg::Matrixf bodyTransform;
-                    if (body->mRecordType == Nif::RC_bhkRigidBodyT)
+                    else
                     {
-                        const osg::Vec4f& translation = body->mInfo.mTranslation;
-                        bodyTransform = osg::Matrixf::rotate(body->mInfo.mRotation)
-                            * osg::Matrixf::translate(
-                                osg::Vec3f(translation.x(), translation.y(), translation.z()) * sHavokScale);
+                        // Only a bhkRigidBodyT has the transform (the translation and rotation of a bhkRigidBody are
+                        // not used). A Havok quaternion turns a vector as an OSG one, and a body is placed by it and
+                        // then by its translation, which is in Havok units
+                        osg::Matrixf bodyTransform;
+                        if (body->mRecordType == Nif::RC_bhkRigidBodyT)
+                        {
+                            const osg::Vec4f& translation = body->mInfo.mTranslation;
+                            bodyTransform = osg::Matrixf::rotate(body->mInfo.mRotation)
+                                * osg::Matrixf::translate(
+                                    osg::Vec3f(translation.x(), translation.y(), translation.z()) * sHavokScale);
+                        }
+
+                        std::vector<HavokPiece> pieces;
+                        failure = convertHavokShape(body->mShape.get(), bodyTransform, pieces);
+                        if (failure.empty())
+                        {
+                            const osg::Matrixf nodeTransform = getWorldTransform(node, parent);
+                            for (HavokPiece& piece : pieces)
+                                addChildShape(std::move(piece.mShape), piece.mTransform * nodeTransform, compound);
+                        }
                     }
 
-                    std::vector<HavokPiece> pieces;
-                    std::string record = convertHavokShape(body->mShape.get(), bodyTransform, pieces);
-                    if (!record.empty())
+                    if (!failure.empty())
                     {
-                        unsupported = record;
-                        return false;
+                        if (unsupported.empty())
+                            unsupported = std::move(failure);
+                        if (mHavokSurvey == nullptr)
+                            return false;
+                        supported = false;
                     }
-
-                    const osg::Matrixf nodeTransform = getWorldTransform(node, parent);
-                    for (HavokPiece& piece : pieces)
-                        addChildShape(std::move(piece.mShape), piece.mTransform * nodeTransform, compound);
                 }
             }
         }
@@ -624,14 +643,18 @@ namespace NifBullet
             {
                 if (!child.empty()
                     && !collectHavokBodies(child.get(), &currentParent, animated, compound, foundBody, unsupported))
-                    return false;
+                {
+                    if (mHavokSurvey == nullptr)
+                        return false;
+                    supported = false;
+                }
                 // The same children as the rendered geometry has: the first one of a switch
                 if (node.mRecordType == Nif::RC_NiSwitchNode || node.mRecordType == Nif::RC_NiFltAnimationNode)
                     break;
             }
         }
 
-        return true;
+        return supported;
     }
 
 } // namespace NifBullet

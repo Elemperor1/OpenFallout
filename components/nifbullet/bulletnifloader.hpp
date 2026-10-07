@@ -97,6 +97,8 @@ namespace NifBullet
         void survey(std::string_view section, std::string_view answer) const;
 
         bool mHavokCollision;
+        // Whether a root of the file that is loaded has the flag for collision (bit 1 of its BSXFlags)
+        bool mHasCollisionFlag = false;
         HavokSurvey* mHavokSurvey = nullptr;
         std::vector<const Nif::NiAVObject*> mHavokRoots;
 
