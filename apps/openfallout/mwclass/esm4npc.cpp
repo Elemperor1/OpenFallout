@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <set>
 
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadclot.hpp>
@@ -32,6 +33,26 @@ namespace OFClass
         const float scale
             = std::isfinite(raceHeight) && raceHeight > 0.f ? std::clamp(raceHeight, sSmallest, sLargest) : 1.f;
         return osg::Vec3f(20.f, 20.f, 64.f) * scale;
+    }
+
+    std::vector<const ESM4::HeadPart*> expandHeadParts(
+        const std::vector<ESM::FormId>& ids, const std::function<const ESM4::HeadPart*(ESM::FormId)>& find)
+    {
+        std::vector<const ESM4::HeadPart*> parts;
+        std::set<ESM::FormId> seen;
+        const auto add = [&](const auto& self, ESM::FormId id) -> void {
+            if (id.isZeroOrUnset() || !seen.insert(id).second)
+                return;
+            const ESM4::HeadPart* part = find(id);
+            if (part == nullptr)
+                return;
+            parts.push_back(part);
+            for (const ESM::FormId extra : part->mExtraParts)
+                self(self, extra);
+        };
+        for (const ESM::FormId id : ids)
+            add(add, id);
+        return parts;
     }
 
     std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,

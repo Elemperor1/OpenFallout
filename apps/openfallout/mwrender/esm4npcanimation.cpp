@@ -64,17 +64,13 @@ namespace OFRender
                 Log(Debug::Error) << "Hair not found: " << ESM::RefId(traits.mHair);
         }
 
-        std::vector<const ESM4::HeadPart*> headParts;
-        for (ESM::FormId partId : traits.mHeadParts)
-        {
-            if (partId.isZeroOrUnset())
-                continue;
-            const ESM4::HeadPart* part = store->get<ESM4::HeadPart>().search(partId);
-            if (part == nullptr)
-                Log(Debug::Error) << "Head part not found: " << ESM::RefId(partId);
-            else
-                headParts.push_back(part);
-        }
+        const std::vector<const ESM4::HeadPart*> headParts
+            = OFClass::expandHeadParts(traits.mHeadParts, [store](ESM::FormId partId) -> const ESM4::HeadPart* {
+                  const ESM4::HeadPart* part = store->get<ESM4::HeadPart>().search(partId);
+                  if (part == nullptr)
+                      Log(Debug::Error) << "Head part not found: " << ESM::RefId(partId);
+                  return part;
+              });
 
         // The body parts are skinned to the bones of the skeleton and need no placing, unlike those of Oblivion
         for (const std::string& model : OFClass::falloutNpcModels(

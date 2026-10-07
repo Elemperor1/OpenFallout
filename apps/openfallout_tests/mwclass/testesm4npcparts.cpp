@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -181,6 +183,79 @@ namespace OFClass
             const ESM4::Armor suit = armorOf(ESM4::Armor::FO3_UpperBody, "suit\\jumpsuit.nif");
             EXPECT_TRUE(falloutNpcModels(race, false, nullptr, {}, {}).empty());
             EXPECT_EQ(falloutNpcModels(race, true, nullptr, {}, { &suit }), (Models{ "suit\\jumpsuit.nif" }));
+        }
+
+        // The head parts of the test: the records by form ID, the way the store has them
+        struct HeadPartStore
+        {
+            std::map<ESM::FormId, ESM4::HeadPart> mParts;
+            std::vector<ESM::FormId> mAsked;
+
+            ESM4::HeadPart& add(std::uint32_t id, const char* model, std::vector<std::uint32_t> extra = {})
+            {
+                ESM4::HeadPart& part = mParts[ESM::FormId::fromUint32(id)];
+                part.mModel = model;
+                for (const std::uint32_t extraId : extra)
+                    part.mExtraParts.push_back(ESM::FormId::fromUint32(extraId));
+                return part;
+            }
+
+            std::function<const ESM4::HeadPart*(ESM::FormId)> finder()
+            {
+                return [this](ESM::FormId id) -> const ESM4::HeadPart* {
+                    mAsked.push_back(id);
+                    const auto found = mParts.find(id);
+                    return found == mParts.end() ? nullptr : &found->second;
+                };
+            }
+        };
+
+        std::vector<std::string> modelsOf(const std::vector<const ESM4::HeadPart*>& parts)
+        {
+            std::vector<std::string> models;
+            for (const ESM4::HeadPart* part : parts)
+                models.push_back(part->mModel.getOriginal());
+            return models;
+        }
+
+        TEST(OFClassNpcPartsTest, aHeadPartThatNamesOthersIsFollowedByThemInOrder)
+        {
+            HeadPartStore store;
+            store.add(0x801, "", { 0x802, 0x803 });
+            store.add(0x802, "beard\\left.nif");
+            store.add(0x803, "beard\\right.nif", { 0x804 });
+            store.add(0x804, "beard\\chin.nif");
+            store.add(0x805, "brow.nif");
+            const auto parts
+                = expandHeadParts({ ESM::FormId::fromUint32(0x801), ESM::FormId::fromUint32(0x805) }, store.finder());
+            EXPECT_EQ(
+                modelsOf(parts), (Models{ "", "beard\\left.nif", "beard\\right.nif", "beard\\chin.nif", "brow.nif" }));
+
+            // the parent has no model, but the parts it names are worn
+            const ESM4::Race race{};
+            EXPECT_EQ(falloutNpcModels(race, false, nullptr, parts, {}),
+                (Models{ "beard\\left.nif", "beard\\right.nif", "beard\\chin.nif", "brow.nif" }));
+        }
+
+        TEST(OFClassNpcPartsTest, headPartsThatNameEachOtherOrThemselvesAreListedOnce)
+        {
+            HeadPartStore store;
+            store.add(0x801, "a.nif", { 0x802, 0x801 });
+            store.add(0x802, "b.nif", { 0x801 });
+            const auto parts
+                = expandHeadParts({ ESM::FormId::fromUint32(0x801), ESM::FormId::fromUint32(0x802) }, store.finder());
+            EXPECT_EQ(modelsOf(parts), (Models{ "a.nif", "b.nif" }));
+        }
+
+        TEST(OFClassNpcPartsTest, aHeadPartThatIsNotThereOrIsNullLeavesOutItsOwnExtraPartsOnly)
+        {
+            HeadPartStore store;
+            store.add(0x802, "b.nif");
+            const auto parts = expandHeadParts(
+                { ESM::FormId::fromUint32(0x801), ESM::FormId(), ESM::FormId::fromUint32(0x802) }, store.finder());
+            EXPECT_EQ(modelsOf(parts), (Models{ "b.nif" }));
+            // the unset form ID is not looked up
+            EXPECT_EQ(store.mAsked.size(), 2u);
         }
     }
 }
