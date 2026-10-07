@@ -28,7 +28,7 @@ namespace ESM4
     class ReferenceCensus
     {
     public:
-        // The references of one record type (REFR, ACHR, ACRE, PGRE, PMIS or PBEA) that place one type of object.
+        // The references of one record type (REFR, ACHR, ACRE, PGRE, PHZD, PMIS or PBEA) that place one type of object.
         struct Count
         {
             std::size_t mTotal = 0;

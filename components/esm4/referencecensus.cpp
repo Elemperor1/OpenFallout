@@ -21,11 +21,12 @@ namespace ESM4
 {
     namespace
     {
-        // The records that place an object in a cell: a reference, a character, a creature, a grenade, a missile and
-        // a beam. The last two are written by Fallout only and have no record type of their own in common.hpp.
+        // The records that place an object in a cell: a reference, a character, a creature, a grenade, a hazard, a
+        // missile and a beam. The last two are written by Fallout only and have no record type of their own in
+        // common.hpp.
         bool isReference(std::uint32_t type)
         {
-            return type == REC_REFR || type == REC_ACHR || type == REC_ACRE || type == REC_PGRE
+            return type == REC_REFR || type == REC_ACHR || type == REC_ACRE || type == REC_PGRE || type == REC_PHZD
                 || type == ESM::fourCC("PMIS") || type == ESM::fourCC("PBEA");
         }
 
@@ -36,7 +37,8 @@ namespace ESM4
 
         // The base object of the current reference, whose data has been read: the form ID of its NAME, which is empty
         // when the record has none (a record that changes only a part of a reference may leave it out). A sub-record
-        // that runs past the end of the record, or a file that ends inside the NAME, is an error.
+        // that runs past the end of the record, a record that ends inside a sub-record header and a file that ends
+        // inside the NAME are errors.
         std::optional<ESM::FormId> readBase(Reader& reader)
         {
             std::optional<ESM::FormId> base;
@@ -46,7 +48,12 @@ namespace ESM4
                 if (!reader.subRecordFitsRecord())
                     throw std::runtime_error("A sub-record runs past the end of its record");
                 if (!found)
+                {
+                    // The same answer comes at the end of the record and when a few bytes of a header are left.
+                    if (reader.unreadRecordBytes() != 0)
+                        throw std::runtime_error("A record ends inside a sub-record header");
                     break;
+                }
 
                 if (reader.subRecordHeader().typeId == ESM::fourCC("NAME") && reader.subRecordHeader().dataSize == 4)
                 {

@@ -238,4 +238,36 @@ namespace
         EXPECT_EQ(counts.size(), 1u);
         EXPECT_TRUE(census.getFatalErrors().empty());
     }
+
+    TEST(ESM4ReferenceCensusTest, aReferenceThatEndsInsideASubRecordHeaderCannotBeRead)
+    {
+        // A base object and then 3 bytes, which are not the 6 of a header.
+        const std::string plugin = header()
+            + topGroup("STAT",
+                record("STAT", stat, "") + record("REFR", 0x2001, name(stat) + "abc")
+                    + record("REFR", 0x2002, name(stat)));
+        ESM4::ReferenceCensus census;
+        collect(census, plugin, "base.esm", 0, {});
+
+        const Counts counts = census.getCounts();
+        EXPECT_EQ(total(counts, "STAT", "REFR"), 1u);
+        EXPECT_EQ(counts.size(), 1u);
+        EXPECT_TRUE(census.getFatalErrors().empty());
+    }
+
+    TEST(ESM4ReferenceCensusTest, countsPlacedHazardsAndTheOtherRecordsThatPlaceAnObject)
+    {
+        const std::string plugin = header()
+            + topGroup("STAT",
+                record("STAT", stat, zString("MODL", "meshes\\Stone.nif")) + record("PHZD", 0x2001, name(stat))
+                    + record("PMIS", 0x2002, name(stat)) + record("PBEA", 0x2003, name(stat))
+                    + record("PGRE", 0x2004, name(stat)) + record("ACRE", 0x2005, name(stat)));
+        ESM4::ReferenceCensus census;
+        collect(census, plugin, "base.esm", 0, {});
+
+        const Counts counts = census.getCounts();
+        for (const char* reference : { "PHZD", "PMIS", "PBEA", "PGRE", "ACRE" })
+            EXPECT_EQ(total(counts, "STAT", reference), 1u) << reference;
+        EXPECT_EQ(counts.size(), 1u);
+    }
 }
