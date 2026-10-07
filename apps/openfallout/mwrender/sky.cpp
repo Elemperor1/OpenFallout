@@ -850,11 +850,11 @@ namespace OFRender
         {
             mNextClouds = weather.mNextCloudTexture;
 
+            // An empty path is the next weather having no clouds (or none that the game has): the texture of the
+            // earlier weather must not stay on the next layer, or the clouds would fade into themselves.
+            mNextCloudUpdater->setTexture(loadCloudTexture(mNextClouds));
             if (!mNextClouds.empty())
-            {
-                mNextCloudUpdater->setTexture(loadCloudTexture(mNextClouds));
                 mNextStormDirection = weather.mStormDirection;
-            }
         }
 
         if (mCloudBlendFactor != weather.mCloudBlendFactor)
