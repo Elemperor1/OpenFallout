@@ -6,8 +6,10 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include <osg/BoundingBox>
+#include <osg/Matrixf>
 #include <osg/Referenced>
 #include <osg/ref_ptr>
 
@@ -38,6 +40,15 @@ namespace NifBullet
     class BulletNifLoader
     {
     public:
+        /// @param havokCollision make the collision of Fallout 3 and New Vegas meshes from their Havok data (bodies in
+        /// boxes, convex hulls and packed triangle strips) instead of from the rendered geometry, where the file has
+        /// shapes of those kinds and the result fits the rendered geometry; the rendered geometry stays where it does
+        /// not.
+        explicit BulletNifLoader(bool havokCollision = false)
+            : mHavokCollision(havokCollision)
+        {
+        }
+
         void warn(const std::string& msg) { Log(Debug::Warning) << "NIFLoader: Warn: " << msg; }
 
         [[noreturn]] void fail(const std::string& msg)
@@ -64,6 +75,19 @@ namespace NifBullet
         void handleRoot(Nif::FileView nif, const Nif::NiAVObject& node, HandleNodeArgs args);
         void handleNode(const Nif::NiAVObject& node, const Nif::Parent* parent, HandleNodeArgs args);
         void handleGeometry(const Nif::NiGeometry& nifNode, const Nif::Parent* parent, HandleNodeArgs args);
+
+        /// Adds a shape to a compound shape, at a transform whose scale is the scale of the shape.
+        void addChildShape(
+            std::unique_ptr<btCollisionShape> childShape, osg::Matrixf transform, btCompoundShape& compound);
+
+        /// Replaces the collision made from rendered geometry with the one of the Havok bodies of the roots in
+        /// mHavokRoots, if that is possible and it fits.
+        void applyHavokCollision();
+        bool collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,
+            btCompoundShape& compound, bool& foundBody, std::string& unsupported);
+
+        bool mHavokCollision;
+        std::vector<const Nif::NiAVObject*> mHavokRoots;
 
         std::unique_ptr<btCompoundShape, Resource::DeleteCollisionShape> mCompoundShape;
         std::unique_ptr<btCompoundShape, Resource::DeleteCollisionShape> mAvoidCompoundShape;

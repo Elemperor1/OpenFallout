@@ -110,6 +110,7 @@ namespace OFPhysics
         , mParentNode(std::move(parentNode))
     {
         mResourceSystem->addResourceManager(mShapeManager.get());
+        mShapeManager->setHavokCollision(Settings::physics().mHavokCollision);
 
         mCollisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
         mDispatcher = std::make_unique<btCollisionDispatcher>(mCollisionConfiguration.get());

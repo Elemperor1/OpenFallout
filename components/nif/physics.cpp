@@ -129,7 +129,11 @@ namespace Nif
         if (nif->getBethVersion() < 83)
             nif->skip(4); // Unused
         nif->read(mTranslation);
-        nif->read(mRotation);
+        // The rotation of a rigid body is a Havok quaternion, which is stored as x, y, z, w (a NiQuaternion is w, x, y,
+        // z), so read as the other would turn the identity rotation into a half turn about the z axis.
+        std::array<float, 4> rotation;
+        nif->readArray(rotation);
+        mRotation = osg::Quat(rotation[0], rotation[1], rotation[2], rotation[3]);
         nif->read(mLinearVelocity);
         nif->read(mAngularVelocity);
         // A bit hacky, but this is the only instance where a 3x3 matrix has padding.

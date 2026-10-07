@@ -117,7 +117,7 @@ namespace Resource
 
         if (Misc::getFileExtension(name.value()) == "nif")
         {
-            NifBullet::BulletNifLoader loader;
+            NifBullet::BulletNifLoader loader(mHavokCollision);
             shape = loader.load(*mNifFileManager->get(name));
         }
         else

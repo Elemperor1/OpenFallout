@@ -27,6 +27,7 @@ namespace Nif::Testing
     {
         init(static_cast<NiObjectNET&>(value));
         value.mFlags = 0;
+        value.mCollision = NiCollisionObjectPtr(nullptr);
         init(value.mTransform);
     }
 

@@ -234,6 +234,7 @@ namespace NavMeshTool
             Resource::BgsmFileManager bgsmFileManager(&vfs, expiryDelay);
             Resource::SceneManager sceneManager(&vfs, &imageManager, &nifFileManager, &bgsmFileManager, expiryDelay);
             Resource::BulletShapeManager bulletShapeManager(&vfs, &sceneManager, &nifFileManager, expiryDelay);
+            bulletShapeManager.setHavokCollision(Settings::physics().mHavokCollision);
             DetourNavigator::RecastGlobalAllocator::init();
             DetourNavigator::Settings navigatorSettings
                 = DetourNavigator::makeSettingsFromSettingsManager(Debug::getRecastMaxLogLevel());

@@ -29,6 +29,10 @@ namespace Resource
             const VFS::Manager* vfs, SceneManager* sceneMgr, NifFileManager* nifFileManager, double expiryDelay);
         ~BulletShapeManager();
 
+        /// Whether the collision of Fallout 3 and New Vegas meshes is made from their Havok data
+        /// (see NifBullet::BulletNifLoader). Set before shapes are loaded: it is not what a cached shape was made with.
+        void setHavokCollision(bool value) { mHavokCollision = value; }
+
         /// @note May return a null pointer if the object has no shape.
         std::shared_ptr<const BulletShape> getShape(VFS::Path::NormalizedView name);
 
@@ -54,6 +58,7 @@ namespace Resource
         std::unique_ptr<MultiObjectCache<std::shared_ptr<BulletShapeInstance>>> mInstanceCache;
         SceneManager* mSceneManager;
         NifFileManager* mNifFileManager;
+        bool mHavokCollision = false;
     };
 
 }
