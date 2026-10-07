@@ -1,6 +1,7 @@
 #include "bulletnifloader.hpp"
 #include <memory>
 
+#include <atomic>
 #include <cassert>
 #include <sstream>
 #include <tuple>
@@ -15,6 +16,9 @@
 #include <components/nif/nifstream.hpp>
 #include <components/nif/node.hpp>
 #include <components/nif/parent.hpp>
+#include <components/nif/physics.hpp>
+
+#include "havokshape.hpp"
 
 namespace
 {
@@ -24,6 +28,71 @@ namespace
         const std::size_t slashpos = path.find_last_of("/\\");
         const std::size_t letterPos = slashpos == std::string::npos ? 0 : slashpos + 1;
         return letterPos < path.size() && (path[letterPos] == 'x' || path[letterPos] == 'X');
+    }
+
+    // Whether a controller of the node moves it
+    bool hasMovingController(const Nif::NiAVObject& node)
+    {
+        for (Nif::NiTimeControllerPtr ctrl = node.mController; !ctrl.empty(); ctrl = ctrl->mNext)
+        {
+            if (!ctrl->isActive())
+                continue;
+            switch (ctrl->mRecordType)
+            {
+                case Nif::RC_NiKeyframeController:
+                case Nif::RC_NiPathController:
+                case Nif::RC_NiRollController:
+                    return true;
+                default:
+                    continue;
+            }
+        }
+        return false;
+    }
+
+    osg::Matrixf getWorldTransform(const Nif::NiAVObject& node, const Nif::Parent* parent)
+    {
+        osg::Matrixf transform = node.mTransform.toMatrix();
+        for (; parent != nullptr; parent = parent->mParent)
+            transform *= parent->mNiNode.mTransform.toMatrix();
+        return transform;
+    }
+
+    // The Havok data is made to fit the model it belongs to, so it has about its size and place. A collision that does
+    // not (in the file, or because of what this loader does not know about it) is more likely wrong than right, and
+    // an invisible wall, or a wall that is not there, is what a person walking sees of it.
+    bool havokFitsRenderedShape(const btCompoundShape& havok, const btCompoundShape& rendered)
+    {
+        btVector3 havokMin, havokMax, renderedMin, renderedMax;
+        havok.getAabb(btTransform::getIdentity(), havokMin, havokMax);
+        rendered.getAabb(btTransform::getIdentity(), renderedMin, renderedMax);
+
+        const btVector3 havokExtents = havokMax - havokMin;
+        const btVector3 renderedExtents = renderedMax - renderedMin;
+        const btScalar havokSize = havokExtents[havokExtents.maxAxis()];
+        const btScalar renderedSize = renderedExtents[renderedExtents.maxAxis()];
+
+        if (havokSize > 4.f * renderedSize || havokSize < 0.25f * renderedSize)
+            return false;
+
+        const btVector3 havokCenter = (havokMin + havokMax) * 0.5f;
+        const btVector3 renderedCenter = (renderedMin + renderedMax) * 0.5f;
+        return (havokCenter - renderedCenter).length() <= 0.5f * renderedSize;
+    }
+
+    // The files that do not get their Havok collision say so, but only so many times: a run on real data would
+    // otherwise have a line for each of thousands of meshes
+    void logHavokNotUsed(const std::string& file, std::string_view reason)
+    {
+        static std::atomic_int count = 0;
+        constexpr int limit = 40;
+        const int n = count.fetch_add(1);
+        if (n < limit)
+            Log(Debug::Info) << "Havok collision of " << file << " is not used: " << reason;
+        else if (n == limit)
+            Log(Debug::Info) << "Havok collision: no more files that do not get it are logged at this level";
+        else
+            Log(Debug::Verbose) << "Havok collision of " << file << " is not used: " << reason;
     }
 
 }
@@ -37,6 +106,7 @@ namespace NifBullet
 
         mCompoundShape.reset();
         mAvoidCompoundShape.reset();
+        mHavokRoots.clear();
 
         mShape->mFileHash = nif.getHash();
 
@@ -71,6 +141,9 @@ namespace NifBullet
 
         for (const Nif::NiAVObject* node : roots)
             handleRoot(nif, *node, args);
+
+        if (!mHavokRoots.empty())
+            applyHavokCollision();
 
         if (mCompoundShape)
             mShape->mCollisionShape = std::move(mCompoundShape);
@@ -131,7 +204,10 @@ namespace NifBullet
             if (bsxFlags->mData & 32)
                 args.mHasMarkers = true;
 
-            // FIXME: hack, using rendered geometry instead of Bethesda Havok data
+            // The rendered geometry is the collision, unless the Havok data replaces it (applyHavokCollision), which
+            // is read for Fallout 3 and New Vegas only: other games have other layers, scales and shapes
+            if (mHavokCollision && nif.getBethVersion() == Nif::NIFFile::BethVersion::BETHVER_FO3)
+                mHavokRoots.push_back(&node);
             args.mGenerateCollision = true;
         }
         // Pre-Gamebryo meshes
@@ -188,23 +264,8 @@ namespace NifBullet
         if (node.mRecordType == Nif::RC_NiCollisionSwitch && !node.collisionActive())
             return;
 
-        for (Nif::NiTimeControllerPtr ctrl = node.mController; !ctrl.empty(); ctrl = ctrl->mNext)
-        {
-            if (args.mAnimated)
-                break;
-            if (!ctrl->isActive())
-                continue;
-            switch (ctrl->mRecordType)
-            {
-                case Nif::RC_NiKeyframeController:
-                case Nif::RC_NiPathController:
-                case Nif::RC_NiRollController:
-                    args.mAnimated = true;
-                    break;
-                default:
-                    continue;
-            }
-        }
+        if (!args.mAnimated && hasMovingController(node))
+            args.mAnimated = true;
 
         if (node.mRecordType == Nif::RC_RootCollisionNode)
         {
@@ -281,10 +342,28 @@ namespace NifBullet
         if (childShape == nullptr)
             return;
 
-        osg::Matrixf transform = niGeometry.mTransform.toMatrix();
-        for (const Nif::Parent* parent = nodeParent; parent != nullptr; parent = parent->mParent)
-            transform *= parent->mNiNode.mTransform.toMatrix();
+        const osg::Matrixf transform = getWorldTransform(niGeometry, nodeParent);
 
+        if (!args.mAvoid)
+        {
+            if (!mCompoundShape)
+                mCompoundShape.reset(new btCompoundShape);
+
+            if (args.mAnimated)
+                mShape->mAnimatedShapes.emplace(niGeometry.mRecordIndex, mCompoundShape->getNumChildShapes());
+            addChildShape(std::move(childShape), transform, *mCompoundShape);
+        }
+        else
+        {
+            if (!mAvoidCompoundShape)
+                mAvoidCompoundShape.reset(new btCompoundShape);
+            addChildShape(std::move(childShape), transform, *mAvoidCompoundShape);
+        }
+    }
+
+    void BulletNifLoader::addChildShape(
+        std::unique_ptr<btCollisionShape> childShape, osg::Matrixf transform, btCompoundShape& compound)
+    {
         if (childShape->getShapeType() == TRIANGLE_MESH_SHAPE_PROXYTYPE)
         {
             auto scaledShape = std::make_unique<Resource::ScaledTriangleMeshShape>(
@@ -306,23 +385,118 @@ namespace NifBullet
             for (int j = 0; j < 3; ++j)
                 trans.getBasis()[i][j] = transform(j, i);
 
-        if (!args.mAvoid)
-        {
-            if (!mCompoundShape)
-                mCompoundShape.reset(new btCompoundShape);
-
-            if (args.mAnimated)
-                mShape->mAnimatedShapes.emplace(niGeometry.mRecordIndex, mCompoundShape->getNumChildShapes());
-            mCompoundShape->addChildShape(trans, childShape.get());
-        }
-        else
-        {
-            if (!mAvoidCompoundShape)
-                mAvoidCompoundShape.reset(new btCompoundShape);
-            mAvoidCompoundShape->addChildShape(trans, childShape.get());
-        }
+        compound.addChildShape(trans, childShape.get());
 
         std::ignore = childShape.release();
+    }
+
+    void BulletNifLoader::applyHavokCollision()
+    {
+        std::unique_ptr<btCompoundShape, Resource::DeleteCollisionShape> havok(new btCompoundShape);
+        bool foundBody = false;
+        std::string unsupported;
+        // The same files as for rendered geometry (see load) are taken for animated as a whole
+        const bool animated = pathFileNameStartsWithX(mShape->mFileName);
+        for (const Nif::NiAVObject* root : mHavokRoots)
+        {
+            if (!collectHavokBodies(*root, nullptr, animated, *havok, foundBody, unsupported))
+            {
+                logHavokNotUsed(mShape->mFileName.value(), "it has " + unsupported);
+                return;
+            }
+        }
+
+        if (havok->getNumChildShapes() == 0)
+        {
+            // No body in the file is solid (or there is none): this is not what a Havok file looks like, and the
+            // rendered geometry is as good a guess as any
+            logHavokNotUsed(mShape->mFileName.value(),
+                foundBody ? "none of its bodies is solid" : "it has no body with a shape of a kind that is read");
+            return;
+        }
+
+        // A model that is only collision, a wall that is not drawn, has no geometry to compare with
+        if (mCompoundShape != nullptr && !havokFitsRenderedShape(*havok, *mCompoundShape))
+        {
+            logHavokNotUsed(mShape->mFileName.value(), "its size and place are not those of its rendered geometry");
+            return;
+        }
+
+        Log(Debug::Verbose) << "Havok collision of " << mShape->mFileName << ": " << havok->getNumChildShapes()
+                            << " shapes";
+        mCompoundShape = std::move(havok);
+        mShape->mAnimatedShapes.clear();
+    }
+
+    bool BulletNifLoader::collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,
+        btCompoundShape& compound, bool& foundBody, std::string& unsupported)
+    {
+        if (node.mRecordType == Nif::RC_NiCollisionSwitch && !node.collisionActive())
+            return true;
+
+        // What is for avoiding is not an obstacle
+        if (node.mRecordType == Nif::RC_AvoidNode)
+            return true;
+
+        animated = animated || hasMovingController(node);
+
+        if (!node.mCollision.empty())
+        {
+            const auto* object = dynamic_cast<const Nif::bhkCollisionObject*>(node.mCollision.getPtr());
+            const Nif::bhkRigidBody* body = nullptr;
+            if (object != nullptr && !object->mBody.empty())
+                body = dynamic_cast<const Nif::bhkRigidBody*>(object->mBody.getPtr());
+
+            // Phantoms are volumes that detect what is in them, and make no obstacle
+            if (body != nullptr && !body->mShape.empty())
+            {
+                foundBody = true;
+                if (isSolidHavokLayer(body->mHavokFilter.mLayer))
+                {
+                    // The shape moves with the node, and where the node is when it does is not what this knows
+                    if (animated)
+                    {
+                        unsupported = "a body that moves";
+                        return false;
+                    }
+
+                    // A Havok quaternion turns a vector as an OSG one, and a body is placed by it and then by its
+                    // translation, which is in Havok units
+                    const osg::Vec4f& translation = body->mInfo.mTranslation;
+                    const osg::Matrixf bodyTransform = osg::Matrixf::rotate(body->mInfo.mRotation)
+                        * osg::Matrixf::translate(
+                            osg::Vec3f(translation.x(), translation.y(), translation.z()) * sHavokScale);
+
+                    std::vector<HavokPiece> pieces;
+                    std::string record = convertHavokShape(body->mShape.get(), bodyTransform, pieces);
+                    if (!record.empty())
+                    {
+                        unsupported = record;
+                        return false;
+                    }
+
+                    const osg::Matrixf nodeTransform = getWorldTransform(node, parent);
+                    for (HavokPiece& piece : pieces)
+                        addChildShape(std::move(piece.mShape), piece.mTransform * nodeTransform, compound);
+                }
+            }
+        }
+
+        if (const Nif::NiNode* ninode = dynamic_cast<const Nif::NiNode*>(&node))
+        {
+            const Nif::Parent currentParent{ *ninode, parent };
+            for (const auto& child : ninode->mChildren)
+            {
+                if (!child.empty()
+                    && !collectHavokBodies(child.get(), &currentParent, animated, compound, foundBody, unsupported))
+                    return false;
+                // The same children as the rendered geometry has: the first one of a switch
+                if (node.mRecordType == Nif::RC_NiSwitchNode || node.mRecordType == Nif::RC_NiFltAnimationNode)
+                    break;
+            }
+        }
+
+        return true;
     }
 
 } // namespace NifBullet

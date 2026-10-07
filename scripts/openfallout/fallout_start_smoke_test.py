@@ -14,7 +14,9 @@ that the climate of the worldspace lists, the player stands on the floor the who
 above the player, the player stops at the pillar that is in the way and, strafing east from there, at the person who
 stands in the way (a character with a skeleton in its record, which is solid as an actor is: a ray that looks for actors
 finds it) and whose body can be seen (rays at what is drawn find the suit it wears, its head, its hair and the hand that
-the suit does not cover, and none the parts of its race that the suit takes the place of), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
+the suit does not cover, and none the parts of its race that the suit takes the place of) and, strafing west from
+there, at a wall that is not drawn (a mesh with only Havok collision: a ray at what is drawn goes through it, the player
+and a ray at the world stop at it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
 pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
 and in the exterior, where the player looks up after three seconds, the sky overhead has the sky colour of the weather
 with the clouds of the weather over it, and a band of water in a cell north of the start shows where the horizon would
@@ -111,7 +113,7 @@ SCENARIOS = [
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
 
-WALK_SECONDS = 12
+WALK_SECONDS = 17
 
 # The eight cells around the exterior cell 0,0 that the player starts in.
 NEIGHBOURS = [(x, y) for x in (-1, 0, 1) for y in (-1, 0, 1) if (x, y) != (0, 0)]
@@ -152,6 +154,12 @@ WATER_SIDE_RAY = (WATER_CENTRE[0], WATER_CENTRE[1], plugin.WATER_HEIGHT - 10, WA
 STRAFE_FROM = 8.0
 PERSON_RADIUS = 20.0
 PERSON_STOP = (plugin.NPC_DISTANCE - 40.0 - 30.0, plugin.NPC_DISTANCE - 40.0 + 5.0)
+
+# Where the walk west ends: the wall is WALL_DISTANCE west of the start and 2 * WALL_HALF_EXTENTS[0] wide and the player
+# a box 40 wide, so it comes to a halt about 20 short of the east face of the wall, WALL_DISTANCE - 20 west of the start
+WEST_FROM = 11.0
+WALL_FACE = plugin.WALL_DISTANCE - plugin.WALL_HALF_EXTENTS[0]
+WALL_STOP = (-WALL_FACE + 10.0, -WALL_FACE + 30.0)
 
 # What the rays at the drawn body of the person must find, each from outside to the middle of the body at the height of the
 # ray (the person stands at NPC_DISTANCE east and NPC_DEPTH north of where the player starts): the name of the ray, where
@@ -195,6 +203,7 @@ local elapsed = 0
 local nextLog = 0
 local rayDone = false
 local personRayDone = false
+local wallRayDone = false
 local function log(...) print('OFTEST', ...) end
 local function fmt(v) return string.format('%%.1f,%%.1f,%%.1f', v.x, v.y, v.z) end
 
@@ -205,7 +214,7 @@ return {
             if elapsed >= 3 then
                 I.Controls.overrideMovementControls(true)
                 self.controls.movement = elapsed < 8 and 1 or 0
-                self.controls.sideMovement = elapsed < 8 and 0 or 1
+                self.controls.sideMovement = elapsed < 8 and 0 or (elapsed < %d and 1 or -1)
                 self.controls.run = true
                 self.controls.yawChange = 0
                 -- looks up for a second, the pitch stops at straight up
@@ -249,11 +258,22 @@ return {
                     end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
                 end
 %s            end
+            -- at the wall that is not drawn: a ray at the world finds it, a ray at what is drawn goes through
+            if elapsed >= %d and not wallRayDone then
+                wallRayDone = true
+                local from = self.position + util.vector3(0, 0, 64)
+                local wall = nearby.castRay(from, from - util.vector3(300, 0, 0),
+                    { collisionType = nearby.COLLISION_TYPE.World, ignore = self.object })
+                log('ray wall hit=', tostring(wall.hit), wall.hit and fmt(wall.hitPos) or '')
+                nearby.asyncCastRenderingRay(async:callback(function(res)
+                    log('render ray wall hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
+                end), from, from - util.vector3(300, 0, 0))
+            end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (*WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, WALK_SECONDS)
+""" % (int(WEST_FROM), *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, int(WEST_FROM) + 4, WALK_SECONDS)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
@@ -262,6 +282,8 @@ RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+
 RENDER_RAY = re.compile(r"OFTEST\trender ray (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 WATER_SIDE_RAY_LINE = re.compile(r"OFTEST\tray water side hit=\t(\w+)")
 PERSON_RAY = re.compile(r"OFTEST\tray person hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\t(.*)")
+WALL_RAY = re.compile(r"OFTEST\tray wall hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
+WALL_RENDER_RAY = re.compile(r"OFTEST\trender ray wall hit=\t(\w+)")
 WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 
 
@@ -403,10 +425,16 @@ def check(text, scenario, colours):
                         f"{origin_y + STOP_RANGE[1]:.0f} (stopped by the pillar)")
     if abs(x - origin_x) > 5.0:
         problems.append(f"the player drifted sideways to x={x:.1f} before the strafe")
-    x, y, z = samples[-1][3]
+    x, y, z = [position for time_, _, _, position, _ in samples if time_ <= WEST_FROM][-1]
     if not origin_x + PERSON_STOP[0] <= x <= origin_x + PERSON_STOP[1]:
         problems.append(f"the player strafing east ended at x={x:.1f}, expected {origin_x + PERSON_STOP[0]:.0f} to "
                         f"{origin_x + PERSON_STOP[1]:.0f} (stopped by the person at {origin_x + plugin.NPC_DISTANCE:.0f})")
+    # and then west, across the start, into the wall that is not drawn
+    x, y, z = samples[-1][3]
+    if not origin_x + WALL_STOP[0] <= x <= origin_x + WALL_STOP[1]:
+        problems.append(f"the player strafing west ended at x={x:.1f}, expected {origin_x + WALL_STOP[0]:.0f} to "
+                        f"{origin_x + WALL_STOP[1]:.0f} (stopped by the wall, which has its Havok collision, at "
+                        f"{origin_x - plugin.WALL_DISTANCE:.0f})")
     # The first person camera follows a node of the skeleton, and with none it stays at the world origin: it has to be
     # above the player, at about the eye height of a human, from the second second on.
     for time_, _, _, (px, py, pz), (cx, cy, cz) in samples:
@@ -456,6 +484,20 @@ def check(text, scenario, colours):
     for line in text.splitlines():
         if re.search(r" [EW]\] .*(?:person_|Hair not found|Head part not found)", line):
             problems.append(line)
+    # The wall has nothing to draw, so a ray at what is drawn goes through it, and its Havok box is hit by a ray at the
+    # world: the face of its box that the player faces, WALL_FACE west of the start
+    wall_rays = [m for m in map(WALL_RAY.search, text.splitlines()) if m]
+    wall_render_rays = [m for m in map(WALL_RENDER_RAY.search, text.splitlines()) if m]
+    if not wall_rays or not wall_render_rays:
+        problems.append("the script did not log the rays cast at the wall that is not drawn")
+    else:
+        want_x = scenario.origin[0] - WALL_FACE
+        if wall_rays[0].group(1) != "true" or abs(float(wall_rays[0].group(2)) - want_x) > 2.0:
+            problems.append(f"the ray cast west at the world did not hit the Havok box of the wall at x={want_x:.0f}: "
+                            f"{wall_rays[0].group(0)}")
+        if wall_render_rays[0].group(1) != "false":
+            problems.append(f"the ray cast west at what is drawn hit something where only the wall is: "
+                            f"{wall_render_rays[0].group(0)}")
     side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "

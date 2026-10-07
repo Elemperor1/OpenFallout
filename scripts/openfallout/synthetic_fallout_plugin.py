@@ -12,19 +12,22 @@ its height, which the games write for a cell without water of its own. The world
 black and opaque, with no reflection. Both cells have a person (a race and a character with a skeleton) standing
 east of the end of the player's walk. The person has the parts of a body: the race names an upper body, two hands and a
 head (boxes of different sizes), the person a hair and a suit that covers the upper body and the right hand, so that the
-body of the race is there where the suit is not.
+body of the race is there where the suit is not. West of the start there is a wall that is not drawn: a mesh with a
+Havok box and nothing to draw (havok_wall.py).
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
 writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
-`meshes/characters/_male/skeleton.nif` and `textures/sky/oftestclouds.dds` into the folder.
+`meshes/openfallout/wall.nif`, `meshes/characters/_male/skeleton.nif` and `textures/sky/oftestclouds.dds` into the
+folder.
 """
 import argparse
 import struct
 from pathlib import Path
 
+import havok_wall
 import placeholder_skeleton
 
 CUBE_ID = 0x800
@@ -54,7 +57,10 @@ NPC_REF_ID = 0x817
 EXTERIOR_NPC_REF_ID = 0x818
 HAIR_ID = 0x819
 SUIT_ID = 0x81A
-LAST_ID = SUIT_ID # the largest form ID of the plugin, which the next object ID of its header follows
+WALL_ID = 0x81B
+WALL_REF_ID = 0x81C
+EXTERIOR_WALL_REF_ID = 0x81D
+LAST_ID = EXTERIOR_WALL_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -111,6 +117,12 @@ PERSON_PARTS = {
 }
 # The biped slots of Fallout 3 that the suit covers: the upper body (0x04) and the right hand (0x10)
 SUIT_SLOTS = 0x04 | 0x10
+
+# A wall that is not drawn, a mesh with only Havok collision (havok_wall.py): a box of these half extents, west of where
+# the player starts and across the way of a walk west at the depth of the person
+WALL_MESH = "openfallout\\wall.nif"
+WALL_HALF_EXTENTS = (20.0, 100.0, 100.0)
+WALL_DISTANCE = 150.0
 
 # The lighting of the cell, in the order of the XCLL sub-record. The cell inherits the fog colour and the far fog
 # distance of its lighting template (inherit flags 0x04 and 0x10), the rest is its own: what the engine should use is
@@ -338,6 +350,7 @@ def worldspace():
         refr(EXTERIOR_PILLAR_ID, CUBE_ID, (half, half + PILLAR_DISTANCE, CUBE / 2)),
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
         achr(EXTERIOR_NPC_REF_ID, (half + NPC_DISTANCE, half + NPC_DEPTH, 0.0)),
+        refr(EXTERIOR_WALL_REF_ID, WALL_ID, (half - WALL_DISTANCE, half + NPC_DEPTH, 0.0)),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
     water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
@@ -358,6 +371,7 @@ def plugin():
     cube = record(b"STAT", CUBE_ID, [zstr(b"EDID", "OFTestCube"),
                                      sub(b"OBND", struct.pack("<6h", -half, -half, -half, half, half, half)),
                                      zstr(b"MODL", "openfallout\\cube.osgt")])
+    wall = record(b"STAT", WALL_ID, [zstr(b"EDID", "OFTestWall"), zstr(b"MODL", WALL_MESH)])
     # The static that real cells use to say where to enter them, with no model.
     marker = record(b"STAT", MARKER_ID, [zstr(b"EDID", "COCMarkerHeading")])
     template = record(b"LGTM", TEMPLATE_ID, [
@@ -373,11 +387,12 @@ def plugin():
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
         refr(MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
+        refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
-    return (header + top_group(b"STAT", [cube, marker]) + top_group(b"LGTM", [template])
+    return (header + top_group(b"STAT", [cube, marker, wall]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
@@ -427,6 +442,8 @@ def write(out):
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),
                                                                            encoding="ascii")
+    (out / "meshes" / Path(WALL_MESH.replace("\\", "/"))).write_bytes(
+        havok_wall.wall(WALL_HALF_EXTENTS, (0.0, 0.0, WALL_HALF_EXTENTS[2])))
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())

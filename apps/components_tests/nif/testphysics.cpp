@@ -49,6 +49,78 @@ namespace Nif
             stream.write(reinterpret_cast<const char*>(&value), sizeof(value));
         }
 
+        struct NifBhkRigidBodyTest : Test
+        {
+            NifBhkRigidBodyTest() { Nif::Reader::setWriteNifDebugLog(true); }
+        };
+
+        void writeZeros(std::size_t count, std::ostream& stream)
+        {
+            for (std::size_t i = 0; i < count; ++i)
+                stream.put(0);
+        }
+
+        TEST_F(NifBhkRigidBodyTest, shouldReadTheRotationAsAHavokQuaternion)
+        {
+            NIFFile file(path);
+            const ToUTF8::StatelessUtf8Encoder* const encoder = nullptr;
+            Reader reader(file, encoder);
+
+            std::ostringstream stream;
+
+            writeString("Gamebryo File Format, Version 20.2.0.7\n", stream);
+            writeUInt32(NIFStream::generateVersion(20, 2, 0, 7), stream);
+            writeUInt8(1, stream); // little endian
+            writeUInt32(11, stream); // user version
+            writeUInt32(1, stream); // records
+            writeUInt32(34, stream); // Fallout 3
+            writeUInt8SizedString("author", stream);
+            writeUInt8SizedString("process_script", stream);
+            writeUInt8SizedString("export_script", stream);
+            writeUInt16(1, stream);
+            writeUInt32SizedString("bhkRigidBody", stream);
+            writeUInt16(0, stream); // the type of the record
+            writeUInt32(0, stream); // its size, which is not used
+            writeUInt32(0, stream); // no strings
+            writeUInt32(0, stream);
+            writeUInt32(0, stream); // no groups
+
+            // The body: the shape (none) and the Havok filter (the layer is the first byte), the info of a world
+            // object and of an entity, then the rigid body info with the transform that is read
+            writeUInt32(0xFFFFFFFF, stream);
+            writeUInt8(1, stream);
+            writeZeros(3, stream);
+            writeZeros(4 + 1 + 3 + 12, stream);
+            writeZeros(4, stream);
+            writeZeros(4 + 4 + 4 + 4 + 4, stream);
+            for (float value : { 1.f, 2.f, 3.f, 0.f }) // translation, in Havok units
+                writeFloat(value, stream);
+            for (float value : { 0.f, 0.f, 0.6f, 0.8f }) // rotation: x, y, z, w
+                writeFloat(value, stream);
+            writeZeros(16 * 2 + 48 + 16 + 4 * 3 + 4 + 4 + 4 * 3 + 4 + 12, stream);
+            writeUInt32(0, stream); // no constraints
+            writeUInt32(0, stream); // body flags
+            writeUInt32(0, stream); // no roots
+
+            const std::string buffer = stream.str();
+
+            std::unique_ptr<std::istringstream> input = std::make_unique<std::istringstream>(buffer);
+            input->exceptions(std::ios::failbit | std::ios_base::badbit);
+
+            reader.parse(std::move(input));
+
+            const Record* const record = reader.getRecord(0);
+            ASSERT_NE(record, nullptr);
+            const bhkRigidBody* const body = dynamic_cast<const bhkRigidBody*>(record);
+            ASSERT_NE(body, nullptr);
+            EXPECT_EQ(body->mHavokFilter.mLayer, 1);
+            EXPECT_EQ(body->mInfo.mTranslation, osg::Vec4f(1, 2, 3, 0));
+            EXPECT_EQ(body->mInfo.mRotation.x(), 0.f);
+            EXPECT_EQ(body->mInfo.mRotation.y(), 0.f);
+            EXPECT_EQ(body->mInfo.mRotation.z(), 0.6f);
+            EXPECT_EQ(body->mInfo.mRotation.w(), 0.8f);
+        }
+
         struct NifBhkRagdollTemplateTest : Test
         {
             NifBhkRagdollTemplateTest() { Nif::Reader::setWriteNifDebugLog(true); }

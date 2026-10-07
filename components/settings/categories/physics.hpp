@@ -19,6 +19,7 @@ namespace Settings
         using WithIndex::WithIndex;
 
         SettingValue<int> mAsyncNumThreads{ mIndex, "Physics", "async num threads", makeMaxSanitizerInt(0) };
+        SettingValue<bool> mHavokCollision{ mIndex, "Physics", "havok collision" };
         SettingValue<int> mLineofsightKeepInactiveCache{ mIndex, "Physics", "lineofsight keep inactive cache",
             makeMaxSanitizerInt(-1) };
     };
