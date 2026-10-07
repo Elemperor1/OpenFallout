@@ -2,9 +2,12 @@
 #define GAME_MWWORLD_WEATHER_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <osg/Vec4f>
@@ -22,6 +25,12 @@ namespace ESM
     struct RegionWeatherState;
     class ESMWriter;
     class ESMReader;
+}
+
+namespace ESM4
+{
+    struct Climate;
+    struct Weather;
 }
 
 namespace OFRender
@@ -142,6 +151,11 @@ namespace OFWorld
         Weather(const ESM::RefId id, const int scriptId, const std::string& name, float stormWindSpeed, float dlFactor,
             float dlOffset, std::string_view particleEffect);
 
+        /// A weather of Fallout 3 or New Vegas: the colours, the fog and the wind come from the record and everything
+        /// else (how fast it changes to another weather, the rain and thunder) from the settings of the clear weather
+        /// of Morrowind. The record must have colours, see ESM4::Weather::colourTimeCount.
+        Weather(const ESM::RefId id, const int scriptId, const ESM4::Weather& record, float stormWindSpeed);
+
         ESM::RefId mId;
         int mScriptId;
         std::string mName;
@@ -158,6 +172,15 @@ namespace OFWorld
 
         // Fog depth/density
         TimeOfDayInterpolator<float> mLandFogDepth;
+
+        // Does it come from a WTHR record of Fallout?
+        bool mFromRecord = false;
+
+        // Where the fog starts and ends, in game units. Only the weathers of Fallout say it (mHasFogRange), the others
+        // use mLandFogDepth, a share of the view distance.
+        bool mHasFogRange = false;
+        TimeOfDayInterpolator<float> mFogNear{ 0.f, 0.f, 0.f, 0.f };
+        TimeOfDayInterpolator<float> mFogFar{ 0.f, 0.f, 0.f, 0.f };
 
         // Color modulation for the sun itself during sunset
         osg::Vec4f mSunDiscSunsetColor;
@@ -249,14 +272,37 @@ namespace OFWorld
 
     class WeatherStore;
 
+    /// An entry of the weather list of a Fallout climate: its weight and the global that has to be set (not 0) for it
+    /// to count, empty when it has none.
+    struct WeatherCondition
+    {
+        ESM::RefId mGlobal;
+        int mWeight = 0;
+    };
+
+    /// The entries of the weather list of a climate for each weather that has an entry with a global.
+    using WeatherConditions = std::map<ESM::RefId, std::vector<WeatherCondition>>;
+
+    /// The share, from 0 to 1, of the chance of a weather that is left when the globals that its entries need are
+    /// checked with isGlobalSet: the weight of the entries that count over the weight of all of them.
+    double availableShare(
+        const std::vector<WeatherCondition>& entries, const std::function<bool(const ESM::RefId&)>& isGlobalSet);
+
     /// A class for storing a region's weather.
     class RegionWeather
     {
     public:
         explicit RegionWeather(const ESM::Region& region);
         explicit RegionWeather(const ESM::RegionWeatherState& state);
+        /// A region of Fallout: its chances and the conditions of the entries of its weather list that need a global
+        /// to be set
+        explicit RegionWeather(const std::map<ESM::RefId, uint8_t>& chances, const WeatherConditions& conditions = {});
 
         operator ESM::RegionWeatherState() const;
+
+        /// Takes the weather and the chances of a saved state and keeps the rest. A saved weather that the store does
+        /// not have (its content file was changed since) is dropped, a new one is chosen when it is needed.
+        void load(const ESM::RegionWeatherState& state, const WeatherStore& store);
 
         void setChances(const std::map<ESM::RefId, uint8_t>& chances, const WeatherStore& store);
         const std::map<ESM::RefId, uint8_t>& getChances() const { return mChances; }
@@ -269,9 +315,38 @@ namespace OFWorld
     private:
         ESM::RefId mWeather;
         std::map<ESM::RefId, uint8_t> mChances;
+        // For the weathers with an entry that needs a global to be set, the entries: only the part of the chance of the
+        // weather that the entries which count make is used
+        WeatherConditions mConditions;
 
         void chooseNewWeather(const WeatherStore& store);
     };
+
+    /// Splits 100 among the weights, as the chances of the weathers of a region have to add up to 100. Weights that are
+    /// not above 0 are left out, so is everything when none is. The shares that rounding takes the most from get the
+    /// remainder.
+    std::map<ESM::RefId, uint8_t> normaliseChances(const std::vector<std::pair<ESM::RefId, int>>& weights);
+
+    /// The distances of the distant land fog (the settings of the distant fog), which the fog of a weather without a
+    /// range is made from when the engine uses distant fog.
+    struct DistantFog
+    {
+        float mLandFogStart;
+        float mLandFogEnd;
+    };
+
+    /// Where the fog of a weather result starts and ends in game units: the range the weather says, or the one the
+    /// renderer makes of its fog density when it has none (a share of the view distance, or with distant fog the
+    /// distant land fog of the result; no fog before the end of the view for a density of 0).
+    std::pair<float, float> fogRange(
+        const OFRender::WeatherResult& result, float viewDistance, const DistantFog* distantFog);
+
+    /// The chances of the weathers of a Fallout climate, for the weathers that the store has.
+    std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store);
+
+    /// The entries of the weather list of a Fallout climate for the weathers that have an entry that needs a global to
+    /// be set, for the weathers that the store has.
+    WeatherConditions climateConditions(const ESM4::Climate& climate, const WeatherStore& store);
 
     /// A class that acts as a model for the moons.
     class MoonModel

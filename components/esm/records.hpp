@@ -51,12 +51,14 @@
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadclmt.hpp>
 #include <components/esm4/loadclot.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadflor.hpp>
 #include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadhair.hpp>
 #include <components/esm4/loadhdpt.hpp>
 #include <components/esm4/loadimod.hpp>
@@ -83,6 +85,7 @@
 #include <components/esm4/loadtxst.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
+#include <components/esm4/loadwthr.hpp>
 
 // Special records which are not loaded from ESM
 #include <components/esm/attr.hpp>

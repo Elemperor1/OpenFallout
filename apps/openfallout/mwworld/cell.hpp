@@ -2,6 +2,7 @@
 #define OPENW_MWORLD_CELL
 
 #include <cstdint>
+#include <functional>
 
 #include <osg/Vec2i>
 
@@ -18,6 +19,7 @@ namespace ESM4
 {
     struct Cell;
     struct Lighting;
+    struct World;
 }
 
 namespace OFWorld
@@ -43,6 +45,17 @@ namespace OFWorld
     /// colour to bit 8 fog power, as in the LNAM sub-record of the cell) take from its lighting template.
     ESM4::Lighting resolveLighting(
         const ESM4::Lighting& own, const ESM4::Lighting* lightingTemplate, std::uint32_t inheritFlags);
+
+    /// The climate of a Fallout worldspace: its own, or the one of its parent worldspace (and so on up the chain) when
+    /// the worldspace says that it uses the climate of its parent. Zero when there is none.
+    ESM::FormId resolveClimate(
+        const ESM4::World& world, const std::function<const ESM4::World*(ESM::FormId)>& findWorld);
+
+    /// The climate that gives the weather of a Fallout cell, zero when it has none. Only a cell that shows the sky has
+    /// one: an exterior cell, or an interior cell with the "show sky" flag (QuasiExt). It is the climate the cell names
+    /// itself; an exterior cell that names none has the one of its worldspace (a null worldspace has none).
+    ESM::FormId resolveCellClimate(const ESM4::Cell& cell, const ESM4::World* world,
+        const std::function<const ESM4::World*(ESM::FormId)>& findWorld);
 
     class Cell : public ESM::CellVariant
     {

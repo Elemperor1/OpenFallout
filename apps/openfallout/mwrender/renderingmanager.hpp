@@ -149,6 +149,8 @@ namespace OFRender
         void configureFog(const OFWorld::Cell& cell);
         void configureFog(
             float fogDepth, float underwaterFog, float dlFactor, float dlOffset, const osg::Vec4f& colour);
+        /// The fog of a weather of Fallout: where it starts and ends in game units
+        void configureFog(float fogNear, float fogFar, float underwaterFog, const osg::Vec4f& colour);
 
         void addCell(const OFWorld::CellStore* store);
         void removeCell(const OFWorld::CellStore* store);

@@ -47,6 +47,12 @@ namespace OFRender
 
         float mFogDepth;
 
+        // Where the fog starts and ends in game units, when the weather says it (a weather of Fallout) and not as a
+        // share of the view distance (mFogDepth)
+        bool mHasFogRange = false;
+        float mFogNear = 0.f;
+        float mFogFar = 0.f;
+
         float mDLFogFactor;
         float mDLFogOffset;
 

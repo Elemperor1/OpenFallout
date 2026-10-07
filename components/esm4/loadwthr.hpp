@@ -2,7 +2,9 @@
 #define OPENFALLOUT_COMPONENTS_ESM4_LOADWTHR_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -56,6 +58,43 @@ namespace ESM4
         };
 #pragma pack(pop)
 
+        /// What a colour of NAM0 colours: the sky overhead and near the horizon, the fog, the light of the sun, and so
+        /// on.
+        enum class ColourType : std::size_t
+        {
+            SkyUpper,
+            Fog,
+            CloudsLower,
+            Ambient,
+            Sunlight,
+            Sun,
+            Stars,
+            SkyLower,
+            Horizon,
+            CloudsUpper,
+        };
+
+        /// The times of day that NAM0 gives a colour for. A weather of Fallout 3 has the first four and one of New
+        /// Vegas has all six.
+        enum class TimeOfDay : std::size_t
+        {
+            Sunrise,
+            Day,
+            Sunset,
+            Night,
+            HighNoon,
+            Midnight,
+        };
+
+        struct Colour
+        {
+            std::uint8_t mRed = 0;
+            std::uint8_t mGreen = 0;
+            std::uint8_t mBlue = 0;
+        };
+
+        static constexpr std::size_t sColourTypeCount = 10;
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
@@ -76,6 +115,13 @@ namespace ESM4
         std::array<std::uint8_t, 304> mInam{}; // INAM, not known
         Data mData; // DATA
         std::vector<WeatherSound> mSounds; // SNAM
+
+        /// How many times of day NAM0 gives colours for: 4 or 6, and 0 when the record has no NAM0.
+        std::size_t colourTimeCount() const { return mColours.size() / (sColourTypeCount * 4); }
+
+        /// The colour of a type at a time of day, or nothing when the record has none for that time. The alpha byte of
+        /// NAM0 is not read, no game uses it.
+        std::optional<Colour> colour(ColourType type, TimeOfDay time) const;
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

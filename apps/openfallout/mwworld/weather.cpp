@@ -1,5 +1,6 @@
 #include "weather.hpp"
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm/stringrefid.hpp>
 #include <components/settings/values.hpp>
 
@@ -9,6 +10,9 @@
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm3/loadregn.hpp>
 #include <components/esm3/weatherstate.hpp>
+#include <components/esm4/loadclmt.hpp>
+#include <components/esm4/loadglob.hpp>
+#include <components/esm4/loadwthr.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/soundmanager.hpp"
@@ -27,6 +31,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <optional>
 
 namespace OFWorld
 {
@@ -41,6 +47,45 @@ namespace OFWorld
         osg::Vec4f lerp(const osg::Vec4f& x, const osg::Vec4f& y, float factor)
         {
             return x * (1 - factor) + y * factor;
+        }
+
+        // A colour of a Fallout weather at a time of day, with the byte that NAM0 has for each channel as a share of 1
+        osg::Vec4f toColour(const std::optional<ESM4::Weather::Colour>& colour)
+        {
+            if (!colour.has_value())
+                return osg::Vec4f(0.f, 0.f, 0.f, 1.f);
+            return osg::Vec4f(colour->mRed / 255.f, colour->mGreen / 255.f, colour->mBlue / 255.f, 1.f);
+        }
+
+        TimeOfDayInterpolator<osg::Vec4f> readColours(const ESM4::Weather& record, ESM4::Weather::ColourType type)
+        {
+            using Time = ESM4::Weather::TimeOfDay;
+            return TimeOfDayInterpolator<osg::Vec4f>(toColour(record.colour(type, Time::Sunrise)),
+                toColour(record.colour(type, Time::Day)), toColour(record.colour(type, Time::Sunset)),
+                toColour(record.colour(type, Time::Night)));
+        }
+
+        std::string rgb(const osg::Vec4f& colour)
+        {
+            const auto channel = [](float value) { return std::to_string(std::lround(value * 255.f)); };
+            return channel(colour.r()) + "," + channel(colour.g()) + "," + channel(colour.b());
+        }
+
+        // What a weather of Fallout makes of its record, to check it against the game by eye
+        void logWeather(const Weather& weather)
+        {
+            if (!weather.mFromRecord)
+                return;
+            Log(Debug::Info) << "Weather: " << weather.mName << ", sky day " << rgb(weather.mSkyColor.getDayValue())
+                             << " night " << rgb(weather.mSkyColor.getNightValue()) << ", fog day "
+                             << rgb(weather.mFogColor.getDayValue()) << ", ambient day "
+                             << rgb(weather.mAmbientColor.getDayValue()) << ", sunlight day "
+                             << rgb(weather.mSunColor.getDayValue())
+                             << (weather.mHasFogRange ? ", fog range " + std::to_string(weather.mFogNear.getDayValue())
+                                            + " to " + std::to_string(weather.mFogFar.getDayValue()) + " day, "
+                                            + std::to_string(weather.mFogNear.getNightValue()) + " to "
+                                            + std::to_string(weather.mFogFar.getNightValue()) + " night"
+                                                      : ", no fog range");
         }
 
         osg::Vec3f calculateStormDirection(const std::string& particleEffect)
@@ -216,6 +261,43 @@ namespace OFWorld
             mAmbientLoopSoundID = ESM::RefId();
     }
 
+    Weather::Weather(ESM::RefId id, int scriptId, const ESM4::Weather& record, float stormWindSpeed)
+        // Nothing of the rest is in the record that anything uses yet
+        : Weather(id, scriptId, "Clear", stormWindSpeed, 1.0f, 0.0f, {})
+    {
+        using Type = ESM4::Weather::ColourType;
+        using Time = ESM4::Weather::TimeOfDay;
+
+        mFromRecord = true;
+        mName = record.mEditorId;
+        if (!record.mCloudTextures[0].empty())
+            mCloudTexture = record.mCloudTextures[0];
+
+        mSkyColor = readColours(record, Type::SkyUpper);
+        mFogColor = readColours(record, Type::Fog);
+        mAmbientColor = readColours(record, Type::Ambient);
+        mSunColor = readColours(record, Type::Sunlight);
+        mSunDiscSunsetColor = toColour(record.colour(Type::Sun, Time::Sunset));
+
+        // The fog of the day lasts from sunrise to sunset. A record that gives a range for the day only has no fog
+        // for the night to go by, so it has none.
+        mHasFogRange = record.mFog.mDayFar > record.mFog.mDayNear && record.mFog.mNightFar > record.mFog.mNightNear;
+        mFogNear = TimeOfDayInterpolator<float>(
+            record.mFog.mDayNear, record.mFog.mDayNear, record.mFog.mDayNear, record.mFog.mNightNear);
+        mFogFar = TimeOfDayInterpolator<float>(
+            record.mFog.mDayFar, record.mFog.mDayFar, record.mFog.mDayFar, record.mFog.mNightFar);
+
+        // The transition delta is in 255 steps up to 0.25 per second (the scale is the one of the definitions of xEdit
+        // for the newer games, not checked on Fallout data). 0 keeps the one of the weather this is made from.
+        if (record.mData.mTransDelta > 0)
+            mTransitionDelta = record.mData.mTransDelta / 255.f * 0.25f;
+
+        mWindSpeed = record.mData.mWindSpeed / 255.f;
+        mGlareView = record.mData.mSunGlare / 255.f;
+        // The storms of Morrowind move the characters and clouds, nothing of that is in the record
+        mIsStorm = false;
+    }
+
     float Weather::transitionDelta() const
     {
         // Transition Delta describes how quickly transitioning to the weather in question will take, in Hz. Note that
@@ -296,6 +378,27 @@ namespace OFWorld
     {
     }
 
+    RegionWeather::RegionWeather(const std::map<ESM::RefId, uint8_t>& chances, const WeatherConditions& conditions)
+        : mChances(chances)
+        , mConditions(conditions)
+    {
+    }
+
+    void RegionWeather::load(const ESM::RegionWeatherState& state, const WeatherStore& store)
+    {
+        mWeather = store.search(state.mWeather) != nullptr ? state.mWeather : ESM::RefId();
+        mChances = state.mChances;
+
+        // The weathers the content no longer has are left out of the chances, and the others share their chance. A
+        // map that has none of them is kept as it is.
+        std::vector<std::pair<ESM::RefId, int>> weights;
+        for (const auto& [id, chance] : mChances)
+            if (store.search(id) != nullptr)
+                weights.emplace_back(id, chance);
+        if (weights.size() != mChances.size())
+            mChances = normaliseChances(weights);
+    }
+
     RegionWeather::operator ESM::RegionWeatherState() const
     {
         ESM::RegionWeatherState state = { mWeather, mChances };
@@ -339,26 +442,167 @@ namespace OFWorld
         return mWeather;
     }
 
+    double availableShare(
+        const std::vector<WeatherCondition>& entries, const std::function<bool(const ESM::RefId&)>& isGlobalSet)
+    {
+        int64_t total = 0;
+        int64_t available = 0;
+        for (const WeatherCondition& entry : entries)
+        {
+            total += entry.mWeight;
+            if (entry.mGlobal.empty() || isGlobalSet(entry.mGlobal))
+                available += entry.mWeight;
+        }
+        return total > 0 ? static_cast<double>(available) / static_cast<double>(total) : 1.0;
+    }
+
     void RegionWeather::chooseNewWeather(const WeatherStore& store)
     {
-        // All probabilities must add to 100 (responsibility of the user).
-        // If chances A and B has values 30 and 70 then by generating 100 numbers 1..100, 30% will be lesser or equal 30
-        // and 70% will be greater than 30 (in theory).
         auto& prng = OFBase::Environment::get().getWorld()->getPrng();
-        unsigned int chance = Misc::Rng::rollDice(100u, prng) + 1u; // 1..100
-        unsigned int sum = 0;
-        for (const Weather* weather : store)
+
+        if (!mConditions.empty())
         {
-            sum += getChance(weather->mId);
-            if (chance <= sum)
+            // An entry of the weather list of a Fallout climate can need a global to be set. The global is the one of
+            // the record, nothing changes it yet. The chance of a weather counts only for the part its entries that
+            // count make, and the weathers share what is left out.
+            const auto isGlobalSet = [](const ESM::RefId& id) {
+                const ESM4::GlobalVariable* global
+                    = OFBase::Environment::get().getESMStore()->get<ESM4::GlobalVariable>().search(id);
+                return global != nullptr && global->mValue != 0.f;
+            };
+            const auto availableChance = [&](const ESM::RefId& weather) {
+                const auto found = mConditions.find(weather);
+                const double share = found == mConditions.end() ? 1.0 : availableShare(found->second, isGlobalSet);
+                return getChance(weather) * share;
+            };
+
+            double total = 0.0;
+            for (const Weather* weather : store)
+                total += availableChance(weather->mId);
+
+            if (total > 0.0)
             {
-                mWeather = weather->mId;
-                return;
+                const double roll = Misc::Rng::rollProbability(prng) * total; // [0, total)
+                double sum = 0.0;
+                for (const Weather* weather : store)
+                {
+                    sum += availableChance(weather->mId);
+                    if (roll < sum)
+                    {
+                        mWeather = weather->mId;
+                        return;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // All probabilities must add to 100 (responsibility of the user).
+            // If chances A and B has values 30 and 70 then by generating 100 numbers 1..100, 30% will be lesser or
+            // equal 30 and 70% will be greater than 30 (in theory).
+            unsigned int chance = Misc::Rng::rollDice(100, prng) + 1u; // 1..100
+            unsigned int sum = 0;
+            for (const Weather* weather : store)
+            {
+                sum += getChance(weather->mId);
+                if (chance <= sum)
+                {
+                    mWeather = weather->mId;
+                    return;
+                }
             }
         }
 
-        // if we hit this path then the chances don't add to 100, choose a default weather instead
+        // if we hit this path then the chances don't add up, choose a default weather instead
         mWeather = ESM::Weather::indexToRefId(0);
+    }
+
+    std::map<ESM::RefId, uint8_t> normaliseChances(const std::vector<std::pair<ESM::RefId, int>>& weights)
+    {
+        std::map<ESM::RefId, int64_t> summed;
+        int64_t total = 0;
+        for (const auto& [id, weight] : weights)
+        {
+            if (weight <= 0)
+                continue;
+            summed[id] += weight;
+            total += weight;
+        }
+
+        std::map<ESM::RefId, uint8_t> chances;
+        std::vector<std::pair<int64_t, ESM::RefId>> remainders;
+        int assigned = 0;
+        for (const auto& [id, weight] : summed)
+        {
+            const int64_t scaled = weight * 100;
+            const auto whole = static_cast<uint8_t>(scaled / total);
+            chances[id] = whole;
+            assigned += whole;
+            remainders.emplace_back(scaled % total, id);
+        }
+
+        // Less than one unit for each weather is left, the ones that rounding took the most from get it
+        std::stable_sort(remainders.begin(), remainders.end(),
+            [](const auto& left, const auto& right) { return left.first > right.first; });
+        for (std::size_t i = 0; assigned < 100 && i < remainders.size(); ++i, ++assigned)
+            ++chances[remainders[i].second];
+
+        return chances;
+    }
+
+    std::pair<float, float> fogRange(
+        const OFRender::WeatherResult& result, float viewDistance, const DistantFog* distantFog)
+    {
+        if (result.mHasFogRange)
+            return { result.mFogNear, result.mFogFar };
+
+        // The same as FogManager::configure makes of the density
+        if (distantFog != nullptr)
+        {
+            const float factor = result.mDLFogFactor;
+            const float offset = result.mDLFogOffset / 100.f;
+            return { factor * (distantFog->mLandFogStart - offset * distantFog->mLandFogEnd),
+                factor * (1.f - offset) * distantFog->mLandFogEnd };
+        }
+        if (result.mFogDepth <= 0.f)
+            return { viewDistance, viewDistance };
+        return { viewDistance * (1.f - result.mFogDepth), viewDistance };
+    }
+
+    std::map<ESM::RefId, uint8_t> climateChances(const ESM4::Climate& climate, const WeatherStore& store)
+    {
+        std::vector<std::pair<ESM::RefId, int>> weights;
+        for (const ESM4::Climate::WeatherEntry& entry : climate.mWeathers)
+        {
+            const ESM::RefId id(ESM::FormId::fromUint32(entry.mWeather));
+            // A weather that is not there, or has no colours, cannot be chosen
+            if (store.search(id) != nullptr)
+                weights.emplace_back(id, entry.mChance);
+        }
+        return normaliseChances(weights);
+    }
+
+    WeatherConditions climateConditions(const ESM4::Climate& climate, const WeatherStore& store)
+    {
+        WeatherConditions conditions;
+        for (const ESM4::Climate::WeatherEntry& entry : climate.mWeathers)
+        {
+            const ESM::RefId id(ESM::FormId::fromUint32(entry.mWeather));
+            if (entry.mChance <= 0 || store.search(id) == nullptr)
+                continue;
+            ESM::RefId global;
+            if (entry.mGlobal != 0)
+                global = ESM::RefId(ESM::FormId::fromUint32(entry.mGlobal));
+            conditions[id].push_back(WeatherCondition{ global, entry.mChance });
+        }
+        // Only the weathers with an entry that needs a global have conditions
+        for (auto it = conditions.begin(); it != conditions.end();)
+        {
+            const bool conditional = std::any_of(it->second.begin(), it->second.end(),
+                [](const WeatherCondition& entry) { return !entry.mGlobal.empty(); });
+            it = conditional ? std::next(it) : conditions.erase(it);
+        }
+        return conditions;
     }
 
     MoonModel::MoonModel(float fadeInStart, float fadeInFinish, float fadeOutStart, float fadeOutFinish,
@@ -625,6 +869,16 @@ namespace OFWorld
         addWeather("Blight", 0.2f, 60.0f, Settings::models().mWeatherblightcloud.get()); // 7
         addWeather("Snow", 0.5f, 40.0f, Settings::models().mWeathersnow.get()); // 8
         addWeather("Blizzard", 0.16f, 70.0f, Settings::models().mWeatherblizzard.get()); // 9
+
+        // The weathers of Fallout 3 and New Vegas come after those of Morrowind, a record that has no colours is not
+        // one that can be shown
+        for (const ESM4::Weather& record : store.get<ESM4::Weather>())
+        {
+            if (record.colourTimeCount() == 0)
+                continue;
+            const int index = static_cast<int>(getSize());
+            insertStatic(Weather(ESM::RefId(record.mId), index, record, fStromWindSpeed));
+        }
     }
 
     const Weather* WeatherStore::search(ESM::RefId id) const
@@ -739,11 +993,7 @@ namespace OFWorld
 
         mWeatherStore->reset(mStore);
 
-        Store<ESM::Region>::iterator it = store.get<ESM::Region>().begin();
-        for (; it != store.get<ESM::Region>().end(); ++it)
-        {
-            mRegions.insert(std::make_pair(it->mId, RegionWeather(*it)));
-        }
+        importRegions();
 
         forceWeather(ESM::Weather::indexToRefId(0));
     }
@@ -835,12 +1085,18 @@ namespace OFWorld
         if (!paused || mFastForward)
         {
             // Add new transitions when either the player's current external region changes.
+            const bool hadRegion = !mCurrentRegion.empty();
             if (updateWeatherTime() || updateWeatherRegion(player.getCell()->getCell()->getRegion()))
             {
                 auto it = mRegions.find(mCurrentRegion);
                 if (it != mRegions.end())
                 {
-                    addWeatherTransition(it->second.getWeather(*mWeatherStore));
+                    // With no region before there is no weather to change from, a game that starts outdoors without
+                    // being teleported there has the weather of its region at once
+                    if (hadRegion)
+                        addWeatherTransition(it->second.getWeather(*mWeatherStore));
+                    else
+                        forceWeather(it->second.getWeather(*mWeatherStore));
                 }
             }
 
@@ -939,8 +1195,11 @@ namespace OFWorld
         mRendering.getSkyManager()->setMasserState(mMasser.calculateState(time));
         mRendering.getSkyManager()->setSecundaState(mSecunda.calculateState(time));
 
-        mRendering.configureFog(
-            mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor, mResult.mDLFogOffset / 100.0f, mResult.mFogColor);
+        if (mResult.mHasFogRange)
+            mRendering.configureFog(mResult.mFogNear, mResult.mFogFar, underwaterFog, mResult.mFogColor);
+        else
+            mRendering.configureFog(mResult.mFogDepth, underwaterFog, mResult.mDLFogFactor,
+                mResult.mDLFogOffset / 100.0f, mResult.mFogColor);
         mRendering.setAmbientColour(mResult.mAmbientColor);
         mRendering.setSunColour(mResult.mSunColor, mResult.mSunColor, mResult.mGlareView * glareFade);
 
@@ -1109,6 +1368,17 @@ namespace OFWorld
             mNextWeather = state.mNextWeather;
             mQueuedWeather = state.mQueuedWeather;
 
+            // A weather of Fallout that the content files of the game no longer have cannot be shown
+            if (mWeatherStore->search(mCurrentWeather) == nullptr)
+                mCurrentWeather = ESM::Weather::indexToRefId(0);
+            if (!mNextWeather.empty() && mWeatherStore->search(mNextWeather) == nullptr)
+            {
+                mNextWeather = {};
+                mTransitionFactor = 0.0f;
+            }
+            if (!mQueuedWeather.empty() && mWeatherStore->search(mQueuedWeather) == nullptr)
+                mQueuedWeather = {};
+
             mRegions.clear();
             importRegions();
 
@@ -1117,7 +1387,7 @@ namespace OFWorld
                 auto found = mRegions.find(it->first);
                 if (found != mRegions.end())
                 {
-                    found->second = RegionWeather(it->second);
+                    found->second.load(it->second, *mWeatherStore);
                 }
             }
 
@@ -1144,6 +1414,15 @@ namespace OFWorld
         for (const ESM::Region& region : mStore.get<ESM::Region>())
         {
             mRegions.insert(std::make_pair(region.mId, RegionWeather(region)));
+        }
+
+        // A cell of Fallout has the weather of its climate where one of Morrowind has the one of its region
+        for (const ESM4::Climate& climate : mStore.get<ESM4::Climate>())
+        {
+            std::map<ESM::RefId, uint8_t> chances = climateChances(climate, *mWeatherStore);
+            if (!chances.empty())
+                mRegions.insert(std::make_pair(
+                    ESM::RefId(climate.mId), RegionWeather(chances, climateConditions(climate, *mWeatherStore))));
         }
     }
 
@@ -1244,6 +1523,8 @@ namespace OFWorld
         mCurrentWeather = weatherID;
         mNextWeather = {};
         mQueuedWeather = {};
+        if (const Weather* weather = mWeatherStore->search(weatherID))
+            logWeather(*weather);
     }
 
     inline bool WeatherManager::inTransition() const
@@ -1262,6 +1543,8 @@ namespace OFWorld
         {
             mNextWeather = weatherID;
             mTransitionFactor = 1.0f;
+            if (const Weather* weather = mWeatherStore->search(weatherID))
+                logWeather(*weather);
         }
         else if (inTransition() && (weatherID != mNextWeather))
         {
@@ -1327,6 +1610,12 @@ namespace OFWorld
                 > mTimeSettings.mNightStart + mTimeSettings.mStarsPostSunsetStart - mTimeSettings.mStarsFadingDuration);
 
         mResult.mFogDepth = current.mLandFogDepth.getValue(gameHour, mTimeSettings, "Fog");
+        mResult.mHasFogRange = current.mHasFogRange;
+        if (current.mHasFogRange)
+        {
+            mResult.mFogNear = current.mFogNear.getValue(gameHour, mTimeSettings, "Fog");
+            mResult.mFogFar = current.mFogFar.getValue(gameHour, mTimeSettings, "Fog");
+        }
         mResult.mFogColor = current.mFogColor.getValue(gameHour, mTimeSettings, "Fog");
         mResult.mAmbientColor = current.mAmbientColor.getValue(gameHour, mTimeSettings, "Ambient");
         mResult.mSunColor = current.mSunColor.getValue(gameHour, mTimeSettings, "Sun");
@@ -1400,6 +1689,20 @@ namespace OFWorld
         mResult.mAmbientColor = lerp(current.mAmbientColor, other.mAmbientColor, factor);
         mResult.mSunDiscColor = lerp(current.mSunDiscColor, other.mSunDiscColor, factor);
         mResult.mFogDepth = lerp(current.mFogDepth, other.mFogDepth, factor);
+        // With a weather that says where its fog starts and one that does not, the one that does not has the range that
+        // the renderer makes of its density, so that the fog goes from one to the other without a jump
+        mResult.mHasFogRange = current.mHasFogRange || other.mHasFogRange;
+        if (mResult.mHasFogRange)
+        {
+            const float viewDistance = mRendering.getViewDistance();
+            const DistantFog distantFog{ Settings::fog().mDistantLandFogStart.get(),
+                Settings::fog().mDistantLandFogEnd.get() };
+            const DistantFog* distant = Settings::fog().mUseDistantFog.get() ? &distantFog : nullptr;
+            const auto [currentNear, currentFar] = fogRange(current, viewDistance, distant);
+            const auto [otherNear, otherFar] = fogRange(other, viewDistance, distant);
+            mResult.mFogNear = lerp(currentNear, otherNear, factor);
+            mResult.mFogFar = lerp(currentFar, otherFar, factor);
+        }
         mResult.mDLFogFactor = lerp(current.mDLFogFactor, other.mDLFogFactor, factor);
         mResult.mDLFogOffset = lerp(current.mDLFogOffset, other.mDLFogOffset, factor);
 

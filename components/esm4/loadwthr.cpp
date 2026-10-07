@@ -5,6 +5,16 @@
 
 namespace ESM4
 {
+    std::optional<Weather::Colour> Weather::colour(ColourType type, TimeOfDay time) const
+    {
+        const std::size_t times = colourTimeCount();
+        if (static_cast<std::size_t>(time) >= times)
+            return std::nullopt;
+        // For each type in turn, the colours of its times of day, each of them red, green, blue and an unused byte
+        const std::size_t offset = (static_cast<std::size_t>(type) * times + static_cast<std::size_t>(time)) * 4;
+        return Colour{ mColours[offset], mColours[offset + 1], mColours[offset + 2] };
+    }
+
     void Weather::load(Reader& reader)
     {
         mId = reader.getFormIdFromHeader();
