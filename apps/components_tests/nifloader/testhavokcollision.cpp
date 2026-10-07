@@ -7,13 +7,16 @@
 #include <components/nif/physics.hpp>
 #include <components/nifbullet/bulletnifloader.hpp>
 #include <components/nifbullet/havokshape.hpp>
+#include <components/nifbullet/havoksurvey.hpp>
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btCompoundShape.h>
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <numbers>
+#include <sstream>
 #include <vector>
 
 namespace
@@ -80,10 +83,12 @@ namespace
             mRoot.mExtraList.push_back(Nif::ExtraPtr(&mBsxFlags));
 
             mBox.mRecordType = Nif::RC_bhkBoxShape;
+            mBox.mRecordName = "bhkBoxShape";
             mBox.mExtents = osg::Vec3f(1, 2, 3);
 
             // The transform of a body is used by a bhkRigidBodyT only
             mBody.mRecordType = Nif::RC_bhkRigidBodyT;
+            mBody.mRecordName = "bhkRigidBodyT";
             mBody.mShape = Nif::bhkShapePtr(&mBox);
             mBody.mHavokFilter.mLayer = staticLayer;
             mBody.mHavokFilter.mFlags = 0;
@@ -92,6 +97,7 @@ namespace
             mBody.mInfo.mRotation = osg::Quat();
 
             mObject.mRecordType = Nif::RC_bhkCollisionObject;
+            mObject.mRecordName = "bhkCollisionObject";
             mObject.mFlags = 1;
             mObject.mBody = Nif::bhkWorldObjectPtr(&mBody);
             mRoot.mCollision = Nif::NiCollisionObjectPtr(&mObject);
@@ -110,8 +116,9 @@ namespace
             mRoot.mChildren = Nif::NiAVObjectList{ Nif::NiAVObjectPtr(&mTriShape) };
         }
 
-        std::shared_ptr<Resource::BulletShape> load(
-            bool havokCollision = true, std::uint32_t bethVersion = fallout3Version, bool animatedFile = false)
+        std::shared_ptr<Resource::BulletShape> load(bool havokCollision = true,
+            std::uint32_t bethVersion = fallout3Version, bool animatedFile = false,
+            NifBullet::HavokSurvey* survey = nullptr)
         {
             Nif::NIFFile file(animatedFile ? xtestNif : testNif);
             file.mRoots.push_back(&mRoot);
@@ -120,6 +127,7 @@ namespace
             file.mBethVersion = bethVersion;
 
             NifBullet::BulletNifLoader loader(havokCollision);
+            loader.setHavokSurvey(survey);
             return loader.load(file);
         }
 
@@ -583,6 +591,248 @@ namespace
         const auto result = load();
 
         EXPECT_EQ(result->mCollisionShape, nullptr);
+    }
+
+    constexpr std::string_view filesSection = "Havok collision of the files";
+
+    TEST_F(TestHavokCollision, a_survey_counts_a_file_that_gets_its_havok_collision)
+    {
+        NifBullet::HavokSurvey survey;
+
+        load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "collision flag set"), 1);
+        EXPECT_EQ(survey.count(filesSection, "used, without geometry that is drawn"), 1);
+        EXPECT_EQ(survey.count("Collision objects", "bhkCollisionObject, flags 01 (active)"), 1);
+        EXPECT_EQ(survey.count("Bodies of the active collision objects", "bhkRigidBodyT"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by layer", "01 (solid)"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by response", "simple contact"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkBoxShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies that stop what walks", "yes"), 1);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_measures_the_havok_shape_against_the_rendered_geometry)
+    {
+        addRenderedGeometry();
+        // The box is 14 by 28 by 42 (42 is its longest side) around (50, 50, 0), the triangle 100 by 100
+        mBody.mInfo.mTranslation = osg::Vec4f(50.f / NifBullet::sHavokScale, 50.f / NifBullet::sHavokScale, 0, 0);
+        NifBullet::HavokSurvey survey;
+
+        load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(
+            survey.count("Size of the Havok shape over the size of the geometry that is drawn", "2: 0.25 to 0.5"), 1);
+        EXPECT_EQ(survey.count("Distance of the centres, in sizes of the geometry that is drawn", "1: up to 0.1"), 1);
+        EXPECT_EQ(survey.count(filesSection, "used, with geometry that is drawn"), 1);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_a_file_that_does_not_fit_with_its_size)
+    {
+        addRenderedGeometry();
+        mBody.mInfo.mTranslation = osg::Vec4f(-100, 0, 0, 0);
+        NifBullet::HavokSurvey survey;
+
+        load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(survey.count(filesSection, "not used, its size and place are not those of the geometry"), 1);
+        EXPECT_EQ(survey.count("Distance of the centres, in sizes of the geometry that is drawn", "4: over 0.5"), 1);
+        EXPECT_EQ(survey.count(filesSection, "used, with geometry that is drawn"), 0);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_the_kind_of_shape_that_is_not_read)
+    {
+        Nif::bhkSphereShape sphere;
+        sphere.mRecordType = Nif::RC_bhkSphereShape;
+        sphere.mRecordName = "bhkSphereShape";
+        sphere.mRadius = 1.f;
+        mBody.mShape = Nif::bhkShapePtr(&sphere);
+        NifBullet::HavokSurvey survey;
+
+        load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(survey.count(filesSection, "not used, it has bhkSphereShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkSphereShape"), 1);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_a_layer_that_is_not_solid_and_a_file_without_the_collision_flag)
+    {
+        mBody.mHavokFilter.mLayer = triggerLayer;
+        NifBullet::HavokSurvey survey;
+        load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(survey.count("Rigid bodies by layer", "12 (not solid)"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies that stop what walks", "no"), 1);
+        EXPECT_EQ(survey.count(filesSection, "not used, none of its bodies is solid"), 1);
+
+        mBsxFlags.mData = 0;
+        load(true, fallout3Version, false, &survey);
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "no collision flag"), 1);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_tells_a_solid_body_that_has_no_pieces_from_one_that_is_not_solid)
+    {
+        Nif::bhkListShape list;
+        list.mRecordType = Nif::RC_bhkListShape;
+        mBody.mShape = Nif::bhkShapePtr(&list);
+        NifBullet::HavokSurvey survey;
+
+        const auto result = load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(result->mCollisionShape, nullptr);
+        EXPECT_EQ(
+            survey.count(filesSection, "not used, its solid bodies have no pieces (an empty or degenerate shape)"), 1);
+        EXPECT_EQ(survey.count(filesSection, "not used, none of its bodies is solid"), 0);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_a_file_that_has_no_scene_root)
+    {
+        Nif::NIFFile file(testNif);
+        file.mHash = "hash";
+        file.mVersion = Nif::NIFStream::generateVersion(20, 2, 0, 7);
+        file.mBethVersion = fallout3Version;
+        NifBullet::HavokSurvey survey;
+        NifBullet::BulletNifLoader loader(true);
+        loader.setHavokSurvey(&survey);
+
+        loader.load(file);
+
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "no scene root"), 1);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_of_files_of_other_games_counts_nothing)
+    {
+        NifBullet::HavokSurvey survey;
+
+        load(true, skyrimVersion, false, &survey);
+
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "collision flag set"), 0);
+        EXPECT_EQ(survey.count(filesSection, "used, without geometry that is drawn"), 0);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_goes_on_after_a_body_that_is_not_read)
+    {
+        Nif::bhkSphereShape sphere;
+        sphere.mRecordType = Nif::RC_bhkSphereShape;
+        sphere.mRecordName = "bhkSphereShape";
+        sphere.mRadius = 1.f;
+        mBody.mShape = Nif::bhkShapePtr(&sphere);
+        // A second body in a child node, with the box
+        Nif::bhkRigidBody second = mBody;
+        second.mShape = Nif::bhkShapePtr(&mBox);
+        Nif::bhkCollisionObject object;
+        object.mRecordType = Nif::RC_bhkCollisionObject;
+        object.mRecordName = "bhkCollisionObject";
+        object.mFlags = 1;
+        object.mBody = Nif::bhkWorldObjectPtr(&second);
+        Nif::NiNode child;
+        init(child);
+        child.mParents.push_back(&mRoot);
+        child.mCollision = Nif::NiCollisionObjectPtr(&object);
+        mRoot.mChildren = Nif::NiAVObjectList{ Nif::NiAVObjectPtr(&child) };
+        NifBullet::HavokSurvey survey;
+
+        const auto result = load(true, fallout3Version, false, &survey);
+
+        // The collision is not made from a file that has a body that is not read ...
+        EXPECT_EQ(result->mCollisionShape, nullptr);
+        EXPECT_EQ(survey.count("Havok collision of the files", "not used, it has bhkSphereShape"), 1);
+        // ... and the survey has both bodies
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkSphereShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkBoxShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies that stop what walks", "yes"), 2);
+        EXPECT_EQ(load()->mCollisionShape, nullptr);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_the_bodies_after_one_that_moves)
+    {
+        Nif::bhkRigidBody second = mBody;
+        Nif::bhkCollisionObject object;
+        object.mRecordType = Nif::RC_bhkCollisionObject;
+        object.mRecordName = "bhkCollisionObject";
+        object.mFlags = 1;
+        object.mBody = Nif::bhkWorldObjectPtr(&second);
+        Nif::NiNode child;
+        init(child);
+        child.mParents.push_back(&mRoot);
+        child.mCollision = Nif::NiCollisionObjectPtr(&object);
+        mRoot.mChildren = Nif::NiAVObjectList{ Nif::NiAVObjectPtr(&child) };
+        NifBullet::HavokSurvey survey;
+
+        // The file is animated as a whole (its name starts with x)
+        const auto result = load(true, fallout3Version, true, &survey);
+
+        EXPECT_EQ(result->mCollisionShape, nullptr);
+        EXPECT_EQ(survey.count("Havok collision of the files", "not used, it has a body that moves"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkBoxShape"), 2);
+    }
+
+    TEST_F(TestHavokCollision, a_survey_counts_a_file_with_several_roots_once)
+    {
+        Nif::NiNode secondRoot;
+        init(secondRoot);
+        Nif::NiIntegerExtraData noCollision;
+        noCollision.mRecordType = Nif::RC_BSXFlags;
+        noCollision.mData = 0;
+        secondRoot.mExtraList.push_back(Nif::ExtraPtr(&noCollision));
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&mRoot);
+        file.mRoots.push_back(&secondRoot);
+        file.mHash = "hash";
+        file.mVersion = Nif::NIFStream::generateVersion(20, 2, 0, 7);
+        file.mBethVersion = fallout3Version;
+        NifBullet::HavokSurvey survey;
+        NifBullet::BulletNifLoader loader(true);
+        loader.setHavokSurvey(&survey);
+
+        loader.load(file);
+
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "collision flag set"), 1);
+        EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "no collision flag"), 0);
+    }
+
+    TEST(TestHavokSurvey, the_answers_are_counted_with_a_few_files_for_each)
+    {
+        NifBullet::HavokSurvey survey(2);
+        survey.add("Layers", "01", "a.nif");
+        survey.add("Layers", "01", "a.nif");
+        survey.add("Layers", "01", "b.nif");
+        survey.add("Layers", "01", "c.nif");
+        survey.add("Layers", "12", "d.nif");
+        survey.add("Shapes", "box", "a.nif");
+
+        EXPECT_EQ(survey.count("Layers", "01"), 4);
+        EXPECT_EQ(survey.count("Layers", "12"), 1);
+        EXPECT_EQ(survey.count("Layers", "02"), 0);
+        EXPECT_EQ(survey.count("Nothing", "01"), 0);
+
+        std::ostringstream out;
+        survey.print(out);
+        const std::string text = out.str();
+        // Sections in the order they came, the answers sorted, two examples of the four, none repeated in a row
+        EXPECT_LT(text.find("Layers (5)"), text.find("Shapes (1)"));
+        EXPECT_NE(text.find("e.g. a.nif, b.nif\n"), std::string::npos) << text;
+        EXPECT_EQ(text.find("c.nif"), std::string::npos) << text;
+        EXPECT_NE(text.find("80.0%  01"), std::string::npos) << text;
+        EXPECT_LT(text.find("01"), text.find("12"));
+    }
+
+    TEST(TestHavokSurvey, sizes_are_sorted_into_answers)
+    {
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(0.1f), "1: under 0.25");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(0.4f), "2: 0.25 to 0.5");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(0.7f), "3: 0.5 to 0.8");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(1.f), "4: 0.8 to 1.25");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(1.5f), "5: 1.25 to 2");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(3.f), "6: 2 to 4");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(7.f), "7: over 4");
+        EXPECT_EQ(NifBullet::havokSizeRatioAnswer(std::numeric_limits<float>::infinity()), "7: over 4");
+        EXPECT_EQ(NifBullet::havokOffsetAnswer(0.f), "1: up to 0.1");
+        EXPECT_EQ(NifBullet::havokOffsetAnswer(0.2f), "2: 0.1 to 0.25");
+        EXPECT_EQ(NifBullet::havokOffsetAnswer(0.4f), "3: 0.25 to 0.5");
+        EXPECT_EQ(NifBullet::havokOffsetAnswer(std::numeric_limits<float>::infinity()), "4: over 0.5");
+        EXPECT_EQ(NifBullet::havokNumberAnswer(7), "07");
+        EXPECT_EQ(NifBullet::havokNumberAnswer(43), "43");
+        EXPECT_EQ(NifBullet::havokNumberAnswer(200), "200");
     }
 
     TEST(TestHavokLayers, the_layers_that_make_a_world_solid_are_solid)

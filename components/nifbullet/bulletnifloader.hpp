@@ -6,6 +6,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <osg/BoundingBox>
@@ -33,6 +34,7 @@ namespace Nif
 
 namespace NifBullet
 {
+    class HavokSurvey;
 
     /**
      *Load bulletShape from NIF files.
@@ -56,6 +58,12 @@ namespace NifBullet
             Log(Debug::Error) << "NIFLoader: Fail: " << msg;
             abort();
         }
+
+        /// Counts what is in the Havok data of the files that are loaded and what is made of it (which files get their
+        /// Havok collision and why the others do not, what the bodies are, how the size of the shapes compares with
+        /// the one of the geometry that is drawn). Null, the default, counts nothing. The survey must outlive the
+        /// loads.
+        void setHavokSurvey(HavokSurvey* survey) { mHavokSurvey = survey; }
 
         std::shared_ptr<Resource::BulletShape> load(Nif::FileView file);
 
@@ -83,10 +91,23 @@ namespace NifBullet
         /// Replaces the collision made from rendered geometry with the one of the Havok bodies of the roots in
         /// mHavokRoots, if that is possible and it fits.
         void applyHavokCollision();
+        // What the bodies of a file are: none with a shape, some that stop nothing, or at least one that stops what
+        // walks
+        enum class HavokBodies
+        {
+            None,
+            NotSolid,
+            Solid
+        };
         bool collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,
-            btCompoundShape& compound, bool& foundBody, std::string& unsupported);
+            btCompoundShape& compound, HavokBodies& bodies, std::string& unsupported);
+
+        void survey(std::string_view section, std::string_view answer) const;
 
         bool mHavokCollision;
+        // Whether a root of the file that is loaded has the flag for collision (bit 1 of its BSXFlags)
+        bool mHasCollisionFlag = false;
+        HavokSurvey* mHavokSurvey = nullptr;
         std::vector<const Nif::NiAVObject*> mHavokRoots;
 
         std::unique_ptr<btCompoundShape, Resource::DeleteCollisionShape> mCompoundShape;
