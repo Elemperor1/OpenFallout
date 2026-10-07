@@ -8,9 +8,12 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <osg/Math>
+#include <osg/Matrixf>
+#include <osg/Uniform>
 
 #include <components/testing/util.hpp>
 #include <components/vfs/manager.hpp>
@@ -270,7 +273,7 @@ namespace
     }
 
     // The layout of the cloud mesh of Morrowind, which the sky manager gives the alpha of its vertices by their index:
-    // a vertex at the top, then four rings of 16, the last two with the alpha 0.25 and 0.
+    // a vertex at the middle, then four rings of 16, the last two with the alpha 0.25 and 0.
     TEST(OpenFalloutRenderSkyFallbackClouds, hasTheVerticesOfTheCloudMeshOfMorrowind)
     {
         const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
@@ -279,14 +282,39 @@ namespace
         ASSERT_EQ(vertices->size(), 65u);
         EXPECT_NEAR((*vertices)[0].x(), 0.f, 1e-3f);
         EXPECT_NEAR((*vertices)[0].y(), 0.f, 1e-3f);
-        EXPECT_NEAR((*vertices)[0].z(), 1000.f, 1e-3f);
-        for (const osg::Vec3f& vertex : *vertices)
-            EXPECT_NEAR(vertex.length(), 1000.f, 0.01f);
-        // every ring is lower than the one before
+        // every ring is farther from the middle than the one before
         for (std::size_t i = 1; i + 16 < vertices->size(); ++i)
-            EXPECT_GT((*vertices)[i].z(), (*vertices)[i + 16].z()) << i;
-        for (std::size_t i = 1; i < vertices->size(); ++i)
-            EXPECT_GE((*vertices)[i].z(), 0.f) << i;
+        {
+            const osg::Vec2f near((*vertices)[i].x(), (*vertices)[i].y());
+            const osg::Vec2f far((*vertices)[i + 16].x(), (*vertices)[i + 16].y());
+            EXPECT_LT(near.length(), far.length()) << i;
+        }
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackClouds, isOneFlatDiscWithItsFarthestRingAtTheRadius)
+    {
+        const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(clouds->getVertexArray());
+        ASSERT_NE(vertices, nullptr);
+        ASSERT_EQ(vertices->size(), 65u);
+        const float height = (*vertices)[0].z();
+        EXPECT_NEAR(height, 1000.f * std::sin(osg::DegreesToRadians(5.f)), 1e-2f);
+        for (const osg::Vec3f& vertex : *vertices)
+            EXPECT_NEAR(vertex.z(), height, 1e-3f);
+        // the rings are on the lines of sight at 70, 45, 25 and 5 degrees above the horizon
+        const std::array<float, 4> degrees = { 70.f, 45.f, 25.f, 5.f };
+        for (std::size_t ring = 0; ring < degrees.size(); ++ring)
+        {
+            for (std::size_t i = 0; i < 16; ++i)
+            {
+                const osg::Vec3f& vertex = (*vertices)[1 + ring * 16 + i];
+                const float distance = std::hypot(vertex.x(), vertex.y());
+                EXPECT_NEAR(osg::RadiansToDegrees(std::atan2(vertex.z(), distance)), degrees[ring], 1e-2f)
+                    << ring << "," << i;
+            }
+        }
+        const osg::Vec3f& farthest = (*vertices)[1 + 3 * 16];
+        EXPECT_NEAR(farthest.length(), 1000.f, 1e-2f);
     }
 
     TEST(OpenFalloutRenderSkyFallbackClouds, hasTheAlphaOfTheCloudMeshOfMorrowindAtEveryIndex)
@@ -306,7 +334,10 @@ namespace
         }
     }
 
-    TEST(OpenFalloutRenderSkyFallbackClouds, mapsAPlaneSeenFromAboveOntoTheDome)
+    // A texture that is laid on the disc without being stretched in a direction: the coordinates are the same multiple
+    // of the position at every vertex, so a cloud has the same shape on the disc wherever it is. (They were the ones of
+    // the plane under a dome once, and the clouds near the horizon were up to 11 times taller than wide.)
+    TEST(OpenFalloutRenderSkyFallbackClouds, laysTheTextureOnTheDiscWithoutStretchingIt)
     {
         const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
         const auto* vertices = dynamic_cast<const osg::Vec3Array*>(clouds->getVertexArray());
@@ -315,13 +346,14 @@ namespace
         ASSERT_EQ(coordinates->size(), vertices->size());
         EXPECT_NEAR((*coordinates)[0].x(), 0.5f, 1e-4f);
         EXPECT_NEAR((*coordinates)[0].y(), 0.5f, 1e-4f);
-        // opposite points of a ring are opposite around the middle, and a vertex that is higher is nearer to it
-        EXPECT_NEAR((*coordinates)[1].x() + (*coordinates)[9].x(), 1.f, 1e-3f);
-        EXPECT_NEAR((*coordinates)[1].y() + (*coordinates)[9].y(), 1.f, 1e-3f);
-        const auto distance = [&](std::size_t i) { return ((*coordinates)[i] - osg::Vec2f(0.5f, 0.5f)).length(); };
-        EXPECT_LT(distance(1), distance(17));
-        EXPECT_LT(distance(17), distance(33));
-        EXPECT_LT(distance(33), distance(49));
+        // straight above, the texture repeats one and a half times in a radian of the sky
+        const float height = (*vertices)[0].z();
+        const float scale = 1.5f / height;
+        for (std::size_t i = 1; i < vertices->size(); ++i)
+        {
+            EXPECT_NEAR((*coordinates)[i].x() - 0.5f, (*vertices)[i].x() * scale, 1e-3f) << i;
+            EXPECT_NEAR((*coordinates)[i].y() - 0.5f, (*vertices)[i].y() * scale, 1e-3f) << i;
+        }
     }
 
     TEST(OpenFalloutRenderSkyFallbackClouds, hasOnlyTrianglesOfItsVertices)
@@ -337,6 +369,110 @@ namespace
             used[index] = true;
         }
         EXPECT_EQ(std::count(used.begin(), used.end(), false), 0);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonBand, isARingOnTheSkyFromTheHorizonToAboutTwentyTwoDegrees)
+    {
+        const osg::ref_ptr<osg::Geometry> band = createHorizonBand(1000.f);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(band->getVertexArray());
+        ASSERT_NE(vertices, nullptr);
+        ASSERT_FALSE(vertices->empty());
+        float lowest = 90.f;
+        float highest = 0.f;
+        for (const osg::Vec3f& vertex : *vertices)
+        {
+            EXPECT_NEAR(vertex.length(), 1000.f, 0.01f);
+            const float degrees = osg::RadiansToDegrees(std::asin(vertex.z() / 1000.f));
+            lowest = std::min(lowest, degrees);
+            highest = std::max(highest, degrees);
+        }
+        EXPECT_NEAR(lowest, 0.f, 0.01f);
+        EXPECT_NEAR(highest, 22.f, 0.01f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonBand, putsTheFirstBandOfTheStripFourTimesAroundTheSky)
+    {
+        const osg::ref_ptr<osg::Geometry> band = createHorizonBand(1000.f);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(band->getVertexArray());
+        const auto* coordinates = dynamic_cast<const osg::Vec2Array*>(band->getTexCoordArray(0));
+        ASSERT_NE(coordinates, nullptr);
+        ASSERT_EQ(coordinates->size(), vertices->size());
+        float widest = 0.f;
+        for (std::size_t i = 0; i < vertices->size(); ++i)
+        {
+            EXPECT_GE((*coordinates)[i].x(), 0.f) << i;
+            EXPECT_LE((*coordinates)[i].x(), 4.f + 1e-4f) << i;
+            // the top of the band is the top of the image and the horizon the middle of it (the strip has two bands)
+            const float degrees = osg::RadiansToDegrees(std::asin((*vertices)[i].z() / 1000.f));
+            EXPECT_NEAR((*coordinates)[i].y(), 0.5f * (1.f - degrees / 22.f), 1e-3f) << i;
+            widest = std::max(widest, (*coordinates)[i].x());
+        }
+        EXPECT_NEAR(widest, 4.f, 1e-4f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonBand, hasOnlyTrianglesOfItsVerticesAndAnOpaqueAlpha)
+    {
+        const osg::ref_ptr<osg::Geometry> band = createHorizonBand(1000.f);
+        const std::size_t count = band->getVertexArray()->getNumElements();
+        const auto* triangles = dynamic_cast<const osg::DrawElementsUShort*>(band->getPrimitiveSet(0));
+        const auto* colours = dynamic_cast<const osg::Vec4Array*>(band->getColorArray());
+        ASSERT_NE(triangles, nullptr);
+        ASSERT_NE(colours, nullptr);
+        EXPECT_EQ(triangles->size() % 3, 0u);
+        std::vector<bool> used(count, false);
+        for (const unsigned short index : *triangles)
+        {
+            ASSERT_LT(index, count);
+            used[index] = true;
+        }
+        EXPECT_EQ(std::count(used.begin(), used.end(), false), 0);
+        for (const osg::Vec4f& colour : *colours)
+            EXPECT_EQ(colour.a(), 1.f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonBand, doesNotDriftWithTheClouds)
+    {
+        // The layer of clouds moves its texture along one axis, which is up and down the band: the band sets the
+        // matrix of its own, which is the identity
+        const osg::ref_ptr<osg::Geometry> band = createHorizonBand(1000.f);
+        ASSERT_NE(band->getStateSet(), nullptr);
+        const osg::Uniform* matrix = band->getStateSet()->getUniform("texMat0");
+        ASSERT_NE(matrix, nullptr);
+        osg::Matrixf value;
+        value(3, 0) = 1.f;
+        ASSERT_TRUE(matrix->get(value));
+        EXPECT_EQ(value, osg::Matrixf());
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonTexture, isAFileThatIsNamedAHorizonStrip)
+    {
+        EXPECT_TRUE(isHorizonCloudTexture("sky\\WastelandCloudHorizon01.dds"));
+        EXPECT_TRUE(isHorizonCloudTexture("textures/sky/wastelandcloudhorizon02.dds"));
+        EXPECT_TRUE(isHorizonCloudTexture("HORIZON.dds"));
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackHorizonTexture, isNotAFileOfAnotherNameInADirectoryOfThatName)
+    {
+        EXPECT_FALSE(isHorizonCloudTexture({}));
+        EXPECT_FALSE(isHorizonCloudTexture("sky\\NVCloudlight.dds"));
+        EXPECT_FALSE(isHorizonCloudTexture("sky\\WastelandCloudCloudyUpper01.dds"));
+        EXPECT_FALSE(isHorizonCloudTexture("sky\\horizon\\clouds.dds"));
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackCloudLayer, showsTheDiscUntilThereIsAHorizonStrip)
+    {
+        const osg::ref_ptr<osg::Group> layer = createCloudLayer(1000.f);
+        ASSERT_EQ(layer->getNumChildren(), 2u);
+        const auto shown
+            = [&] { return std::pair(layer->getChild(0)->getNodeMask() != 0, layer->getChild(1)->getNodeMask() != 0); };
+        EXPECT_EQ(shown(), std::pair(true, false));
+        selectCloudShape(*layer, "sky\\WastelandCloudHorizon01.dds");
+        EXPECT_EQ(shown(), std::pair(false, true));
+        selectCloudShape(*layer, "sky\\WastelandCloudCloudyUpper01.dds");
+        EXPECT_EQ(shown(), std::pair(true, false));
+        selectCloudShape(*layer, "sky\\WastelandCloudHorizon01.dds");
+        selectCloudShape(*layer, {});
+        EXPECT_EQ(shown(), std::pair(true, false));
     }
 
     TEST(OpenFalloutRenderSkyFallbackStars, hasAQuadForEachStar)

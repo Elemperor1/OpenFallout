@@ -217,7 +217,7 @@ namespace
     public:
         SkyRTT(osg::Vec2f size, osg::Group* earlyRenderBinRoot)
             : RTTNode(static_cast<int>(size.x()), static_cast<int>(size.y()), 0, false, 1, StereoAwareness::Aware,
-                OFRender::shouldAddMSAAIntermediateTarget())
+                  OFRender::shouldAddMSAAIntermediateTarget())
             , mEarlyRenderBinRoot(earlyRenderBinRoot)
         {
             setDepthBufferInternalFormat(GL_DEPTH24_STENCIL8);
@@ -388,9 +388,11 @@ namespace OFRender
         mEarlyRenderBinRoot->addChild(mCloudNode);
 
         mCloudMesh = new osg::PositionAttitudeTransform;
+        if (!mHasClouds)
+            mCloudLayer = createCloudLayer(0.97f * skyRadius);
         osg::ref_ptr<osg::Node> cloudMeshChild = mHasClouds
             ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mCloudMesh)
-            : osg::ref_ptr<osg::Node>(createCloudDome(0.97f * skyRadius));
+            : osg::ref_ptr<osg::Node>(mCloudLayer);
         mCloudUpdater = new CloudUpdater();
         mCloudUpdater->setTexture(loadCloudTexture({}));
         mCloudUpdater->setOpacity(1.f);
@@ -398,9 +400,11 @@ namespace OFRender
         mCloudMesh->addChild(cloudMeshChild);
 
         mNextCloudMesh = new osg::PositionAttitudeTransform;
+        if (!mHasClouds)
+            mNextCloudLayer = createCloudLayer(0.97f * skyRadius);
         osg::ref_ptr<osg::Node> nextCloudMeshChild = mHasClouds
             ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mNextCloudMesh)
-            : osg::ref_ptr<osg::Node>(createCloudDome(0.97f * skyRadius));
+            : osg::ref_ptr<osg::Node>(mNextCloudLayer);
         mNextCloudUpdater = new CloudUpdater();
         mNextCloudUpdater->setTexture(loadCloudTexture({}));
         mNextCloudUpdater->setOpacity(0.f);
@@ -847,6 +851,8 @@ namespace OFRender
         {
             mClouds = weather.mCloudTexture;
             mCloudUpdater->setTexture(loadCloudTexture(mClouds));
+            if (mCloudLayer)
+                selectCloudShape(*mCloudLayer, mClouds);
         }
 
         if (mStormDirection != weather.mStormDirection)
@@ -862,6 +868,8 @@ namespace OFRender
             // An empty path is the next weather having no clouds (or none that the game has): the texture of the
             // earlier weather must not stay on the next layer, or the clouds would fade into themselves.
             mNextCloudUpdater->setTexture(loadCloudTexture(mNextClouds));
+            if (mNextCloudLayer)
+                selectCloudShape(*mNextCloudLayer, mNextClouds);
             if (!mNextClouds.empty())
                 mNextStormDirection = weather.mStormDirection;
         }
