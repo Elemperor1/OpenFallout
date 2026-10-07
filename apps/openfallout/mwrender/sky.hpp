@@ -155,6 +155,9 @@ namespace OFRender
 
         bool mCreated;
 
+        // Which of the files of the sky of Morrowind the game has, see create().
+        bool mHasClouds = true;
+
         bool mIsStorm;
 
         bool mTimescaleClouds;

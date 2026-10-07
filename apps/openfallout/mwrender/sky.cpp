@@ -9,6 +9,7 @@
 #include <osgParticle/Operator>
 #include <osgParticle/ParticleSystemUpdater>
 
+#include <components/debug/debuglog.hpp>
 #include <components/settings/values.hpp>
 
 #include <components/sceneutil/controller.hpp>
@@ -35,6 +36,7 @@
 #include "../mwbase/world.hpp"
 
 #include "renderbin.hpp"
+#include "skyfallback.hpp"
 #include "skyutil.hpp"
 #include "util.hpp"
 #include "vismask.hpp"
@@ -297,9 +299,42 @@ namespace OFRender
     {
         assert(!mCreated);
 
-        mAtmosphereDay = mSceneManager->getInstance(Settings::models().mSkyatmosphere.get(), mEarlyRenderBinRoot);
-        ModVertexAlphaVisitor modAtmosphere(ModVertexAlphaVisitor::Atmosphere);
-        mAtmosphereDay->accept(modAtmosphere);
+        // The sky of Morrowind is a few meshes and textures. A game that has none of them gets a dome, a sun and no
+        // clouds, stars or moons, made in code, instead of the marker for a mesh that is missing and a magenta square
+        // for each texture.
+        const VFS::Manager& vfs = *mSceneManager->getVFS();
+        const bool hasAtmosphere = vfs.exists(Settings::models().mSkyatmosphere.get());
+        const bool hasStars
+            = vfs.exists(Settings::models().mSkynight02.get()) || vfs.exists(Settings::models().mSkynight01.get());
+        mHasClouds = vfs.exists(Settings::models().mSkyclouds.get());
+        const bool hasMasser = Moon::hasFiles(vfs, Moon::Type_Masser);
+        const bool hasSecunda = Moon::hasFiles(vfs, Moon::Type_Secunda);
+        std::string missing;
+        for (const auto& [present, name] :
+            { std::pair{ hasAtmosphere, "dome" }, std::pair{ hasStars, "stars" }, std::pair{ mHasClouds, "clouds" },
+                std::pair{ hasMasser, "masser" }, std::pair{ hasSecunda, "secunda" } })
+        {
+            if (!present)
+                missing += (missing.empty() ? "" : ", ") + std::string(name);
+        }
+        if (!missing.empty())
+            Log(Debug::Info) << "The game has no files for the sky of Morrowind (" << missing
+                             << "), the sky is made in code where it can be";
+
+        if (hasAtmosphere)
+        {
+            mAtmosphereDay = mSceneManager->getInstance(Settings::models().mSkyatmosphere.get(), mEarlyRenderBinRoot);
+            ModVertexAlphaVisitor modAtmosphere(ModVertexAlphaVisitor::Atmosphere);
+            mAtmosphereDay->accept(modAtmosphere);
+        }
+        else
+        {
+            // It is drawn without depth, so only the far plane, which it has to be inside of, limits how far it is.
+            // A script can change the view distance later and the dome does not follow it, like the sun and the moons
+            // (a thousand units away) do not.
+            mAtmosphereDay = createAtmosphereDome(generatedSkyRadius(Settings::camera().mViewingDistance));
+            mEarlyRenderBinRoot->addChild(mAtmosphereDay);
+        }
 
         mAtmosphereUpdater = new AtmosphereUpdater;
         mAtmosphereDay->addUpdateCallback(mAtmosphereUpdater);
@@ -309,10 +344,15 @@ namespace OFRender
         mEarlyRenderBinRoot->addChild(mAtmosphereNightNode);
 
         osg::ref_ptr<osg::Node> atmosphereNight;
-        if (mSceneManager->getVFS()->exists(Settings::models().mSkynight02.get()))
+        if (vfs.exists(Settings::models().mSkynight02.get()))
             atmosphereNight = mSceneManager->getInstance(Settings::models().mSkynight02.get(), mAtmosphereNightNode);
-        else
+        else if (hasStars)
             atmosphereNight = mSceneManager->getInstance(Settings::models().mSkynight01.get(), mAtmosphereNightNode);
+        else
+        {
+            atmosphereNight = new osg::Group;
+            mAtmosphereNightNode->addChild(atmosphereNight);
+        }
 
         ModVertexAlphaVisitor modStars(ModVertexAlphaVisitor::Stars);
         atmosphereNight->accept(modStars);
@@ -321,25 +361,29 @@ namespace OFRender
 
         mSun = std::make_unique<Sun>(mEarlyRenderBinRoot, *mSceneManager);
         mSun->setSunglare(mSunglareEnabled);
-        mMasser = std::make_unique<Moon>(
-            mEarlyRenderBinRoot, *mSceneManager, Fallback::Map::getFloat("Moons_Masser_Size") / 125, Moon::Type_Masser);
-        mSecunda = std::make_unique<Moon>(mEarlyRenderBinRoot, *mSceneManager,
-            Fallback::Map::getFloat("Moons_Secunda_Size") / 125, Moon::Type_Secunda);
+        if (hasMasser)
+            mMasser = std::make_unique<Moon>(mEarlyRenderBinRoot, *mSceneManager,
+                Fallback::Map::getFloat("Moons_Masser_Size") / 125, Moon::Type_Masser);
+        if (hasSecunda)
+            mSecunda = std::make_unique<Moon>(mEarlyRenderBinRoot, *mSceneManager,
+                Fallback::Map::getFloat("Moons_Secunda_Size") / 125, Moon::Type_Secunda);
 
         mCloudNode = new osg::Group;
         mEarlyRenderBinRoot->addChild(mCloudNode);
 
         mCloudMesh = new osg::PositionAttitudeTransform;
-        osg::ref_ptr<osg::Node> cloudMeshChild
-            = mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mCloudMesh);
+        osg::ref_ptr<osg::Node> cloudMeshChild = mHasClouds
+            ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mCloudMesh)
+            : osg::ref_ptr<osg::Node>(new osg::Group);
         mCloudUpdater = new CloudUpdater();
         mCloudUpdater->setOpacity(1.f);
         cloudMeshChild->addUpdateCallback(mCloudUpdater);
         mCloudMesh->addChild(cloudMeshChild);
 
         mNextCloudMesh = new osg::PositionAttitudeTransform;
-        osg::ref_ptr<osg::Node> nextCloudMeshChild
-            = mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mNextCloudMesh);
+        osg::ref_ptr<osg::Node> nextCloudMeshChild = mHasClouds
+            ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mNextCloudMesh)
+            : osg::ref_ptr<osg::Node>(new osg::Group);
         mNextCloudUpdater = new CloudUpdater();
         mNextCloudUpdater->setOpacity(0.f);
         nextCloudMeshChild->addUpdateCallback(mNextCloudUpdater);
@@ -486,14 +530,14 @@ namespace OFRender
     {
         if (!mCreated)
             return 0;
-        return mMasser->getPhaseInt();
+        return mMasser ? mMasser->getPhaseInt() : 0;
     }
 
     int SkyManager::getSecundaPhase() const
     {
         if (!mCreated)
             return 0;
-        return mSecunda->getPhaseInt();
+        return mSecunda ? mSecunda->getPhaseInt() : 0;
     }
 
     bool SkyManager::isEnabled()
@@ -597,7 +641,7 @@ namespace OFRender
 
     void SkyManager::setMoonColour(bool red)
     {
-        if (!mCreated)
+        if (!mCreated || !mSecunda)
             return;
         mSecunda->setColor(red ? mMoonScriptColor : osg::Vec4f(1, 1, 1, 1));
     }
@@ -748,7 +792,7 @@ namespace OFRender
             }
         }
 
-        if (mClouds != weather.mCloudTexture)
+        if (mHasClouds && mClouds != weather.mCloudTexture)
         {
             mClouds = weather.mCloudTexture;
 
@@ -769,7 +813,7 @@ namespace OFRender
         if (mNextStormDirection != weather.mNextStormDirection)
             mNextStormDirection = weather.mNextStormDirection;
 
-        if (mNextClouds != weather.mNextCloudTexture)
+        if (mHasClouds && mNextClouds != weather.mNextCloudTexture)
         {
             mNextClouds = weather.mNextCloudTexture;
 
@@ -813,8 +857,10 @@ namespace OFRender
             mSkyColour = weather.mSkyColor;
 
             mAtmosphereUpdater->setEmissionColor(mSkyColour);
-            mMasser->setAtmosphereColor(mSkyColour);
-            mSecunda->setAtmosphereColor(mSkyColour);
+            if (mMasser)
+                mMasser->setAtmosphereColor(mSkyColour);
+            if (mSecunda)
+                mSecunda->setAtmosphereColor(mSkyColour);
         }
 
         if (mFogColour != weather.mFogColor)
@@ -824,8 +870,10 @@ namespace OFRender
 
         mCloudSpeed = weather.mCloudSpeed;
 
-        mMasser->adjustTransparency(weather.mGlareView);
-        mSecunda->adjustTransparency(weather.mGlareView);
+        if (mMasser)
+            mMasser->adjustTransparency(weather.mGlareView);
+        if (mSecunda)
+            mSecunda->adjustTransparency(weather.mGlareView);
 
         mSun->setColor(weather.mSunDiscColor);
         mSun->adjustTransparency(weather.mGlareView * weather.mSunDiscColor.a());
@@ -890,7 +938,7 @@ namespace OFRender
 
     void SkyManager::setMasserState(const MoonState& state)
     {
-        if (!mCreated)
+        if (!mCreated || !mMasser)
             return;
 
         mMasser->setState(state);
@@ -898,7 +946,7 @@ namespace OFRender
 
     void SkyManager::setSecundaState(const MoonState& state)
     {
-        if (!mCreated)
+        if (!mCreated || !mSecunda)
             return;
 
         mSecunda->setState(state);
@@ -917,42 +965,54 @@ namespace OFRender
     void SkyManager::listAssetsToPreload(
         std::vector<VFS::Path::Normalized>& models, std::vector<VFS::Path::Normalized>& textures)
     {
-        models.push_back(Settings::models().mSkyatmosphere);
-        if (mSceneManager->getVFS()->exists(Settings::models().mSkynight02.get()))
-            models.push_back(Settings::models().mSkynight02);
-        models.push_back(Settings::models().mSkynight01);
-        models.push_back(Settings::models().mSkyclouds);
+        // Only what the game has: a file that is not there is not preloaded, and the sky does not use it.
+        const VFS::Manager& vfs = *mSceneManager->getVFS();
+        const auto addModel = [&](const VFS::Path::Normalized& model) {
+            if (vfs.exists(model))
+                models.push_back(model);
+        };
+        const auto addTexture = [&](std::string_view name) {
+            VFS::Path::Normalized texture(name);
+            if (vfs.exists(texture))
+                textures.push_back(std::move(texture));
+        };
 
-        models.push_back(Settings::models().mWeatherashcloud);
-        models.push_back(Settings::models().mWeatherblightcloud);
-        models.push_back(Settings::models().mWeathersnow);
-        models.push_back(Settings::models().mWeatherblizzard);
+        addModel(Settings::models().mSkyatmosphere);
+        if (vfs.exists(Settings::models().mSkynight02.get()))
+            addModel(Settings::models().mSkynight02);
+        addModel(Settings::models().mSkynight01);
+        addModel(Settings::models().mSkyclouds);
 
-        textures.emplace_back("textures/tx_mooncircle_full_s.dds");
-        textures.emplace_back("textures/tx_mooncircle_full_m.dds");
+        addModel(Settings::models().mWeatherashcloud);
+        addModel(Settings::models().mWeatherblightcloud);
+        addModel(Settings::models().mWeathersnow);
+        addModel(Settings::models().mWeatherblizzard);
 
-        textures.emplace_back("textures/tx_masser_new.dds");
-        textures.emplace_back("textures/tx_masser_one_wax.dds");
-        textures.emplace_back("textures/tx_masser_half_wax.dds");
-        textures.emplace_back("textures/tx_masser_three_wax.dds");
-        textures.emplace_back("textures/tx_masser_one_wan.dds");
-        textures.emplace_back("textures/tx_masser_half_wan.dds");
-        textures.emplace_back("textures/tx_masser_three_wan.dds");
-        textures.emplace_back("textures/tx_masser_full.dds");
+        addTexture("textures/tx_mooncircle_full_s.dds");
+        addTexture("textures/tx_mooncircle_full_m.dds");
 
-        textures.emplace_back("textures/tx_secunda_new.dds");
-        textures.emplace_back("textures/tx_secunda_one_wax.dds");
-        textures.emplace_back("textures/tx_secunda_half_wax.dds");
-        textures.emplace_back("textures/tx_secunda_three_wax.dds");
-        textures.emplace_back("textures/tx_secunda_one_wan.dds");
-        textures.emplace_back("textures/tx_secunda_half_wan.dds");
-        textures.emplace_back("textures/tx_secunda_three_wan.dds");
-        textures.emplace_back("textures/tx_secunda_full.dds");
+        addTexture("textures/tx_masser_new.dds");
+        addTexture("textures/tx_masser_one_wax.dds");
+        addTexture("textures/tx_masser_half_wax.dds");
+        addTexture("textures/tx_masser_three_wax.dds");
+        addTexture("textures/tx_masser_one_wan.dds");
+        addTexture("textures/tx_masser_half_wan.dds");
+        addTexture("textures/tx_masser_three_wan.dds");
+        addTexture("textures/tx_masser_full.dds");
 
-        textures.emplace_back("textures/tx_sun_05.dds");
-        textures.emplace_back("textures/tx_sun_flash_grey_05.dds");
+        addTexture("textures/tx_secunda_new.dds");
+        addTexture("textures/tx_secunda_one_wax.dds");
+        addTexture("textures/tx_secunda_half_wax.dds");
+        addTexture("textures/tx_secunda_three_wax.dds");
+        addTexture("textures/tx_secunda_one_wan.dds");
+        addTexture("textures/tx_secunda_half_wan.dds");
+        addTexture("textures/tx_secunda_three_wan.dds");
+        addTexture("textures/tx_secunda_full.dds");
 
-        textures.emplace_back("textures/tx_raindrop_01.dds");
+        addTexture("textures/tx_sun_05.dds");
+        addTexture("textures/tx_sun_flash_grey_05.dds");
+
+        addTexture("textures/tx_raindrop_01.dds");
     }
 
     void SkyManager::setWaterEnabled(bool enabled)

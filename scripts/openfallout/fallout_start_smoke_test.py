@@ -12,8 +12,10 @@ quits. The checks are on the log: the cell is the one asked for, in the interior
 sun colours and with the fog colour and far distance of its lighting template, in the exterior the weather is the one
 that the climate of the worldspace lists, the player stands on the floor the whole time, the camera is at eye height
 above the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine
-quits by itself. When ImageMagick's `import` is installed, one pixel of the screen is checked too: where nothing is
-drawn it has the colour of the fog of the cell or of the weather.
+quits by itself. When ImageMagick's `import` is installed, pixels of the screen are checked too: where nothing is drawn
+it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after two
+seconds, the sky overhead has the sky colour of the weather. The game has no files of the sky of Morrowind here, and the
+log must not mention a texture or a mesh of the sky as missing.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -48,19 +50,41 @@ STOP_RANGE = (PILLAR_FACE - 60.0, PILLAR_FACE)
 class Scenario:
     """One start of the engine: the text after --start, how the engine names the cell in its log, whether the cell is an
     exterior one, where in the world the player starts (the entry marker of the cell), whether the cell has the
-    lighting that the plugin gives the interior cell and the colour of the screen where nothing is drawn, which is the
-    colour of the fog. The exterior cell has the weather of the climate of its worldspace instead of the lighting."""
+    lighting that the plugin gives the interior cell and the pixels of the screen to check. The exterior cell has the
+    weather of the climate of its worldspace instead of the lighting.
 
-    def __init__(self, name, start, loaded, exterior, origin, lit, background):
+    Each pixel is (what it shows, when it is read, where on the screen, the colour it should have): the colour of the
+    screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather."""
+
+    def __init__(self, name, start, loaded, exterior, origin, lit, pixels):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
             name, start, loaded, exterior, origin, lit)
-        self.background = background
+        self.pixels = pixels
 
+
+# Where on the screen to look: the top left of the window of the game in the interior cell, which is the fog colour when
+# the player looks north; in the exterior, the horizon on the left of the middle of the window at the start (the sky
+# has no colour of its own there, it is the fog colour) and, after the player has looked up, the sky a little to the
+# left of the middle (the middle is the cross hair). How far from the expected colour a channel may be: the game is at
+# about nine in the morning, when the weather is still a little on its way from the colours of sunrise to those of the
+# day.
+FOG_PIXEL_INTERIOR = (300, 100)
+FOG_PIXEL_EXTERIOR = (300, 360)
+SKY_PIXEL = (500, 360)
+PIXEL_TOLERANCE = 12
+
+# The seconds after which the walk script has logged its position, the first when the player stands and looks at the
+# horizon, the second when it has looked up.
+HORIZON_TIME = 2.0
+ZENITH_TIME = 5.0
 
 SCENARIOS = [
-    Scenario("interior", plugin.CELL_NAME, plugin.CELL_NAME, False, (0.0, 0.0), True, plugin.TEMPLATE_FOG),
+    Scenario("interior", plugin.CELL_NAME, plugin.CELL_NAME, False, (0.0, 0.0), True,
+             [("fog", HORIZON_TIME, FOG_PIXEL_INTERIOR, plugin.TEMPLATE_FOG)]),
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
-             (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False, plugin.WEATHER_FOG[1]),
+             (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
+             [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
+              ("sky", ZENITH_TIME, SKY_PIXEL, plugin.WEATHER_SKY[1])]),
 ]
 
 WALK_SECONDS = 12
@@ -81,12 +105,6 @@ WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, s
                     plugin.WEATHER_NAME, *(",".join(map(str, colour)) for colour in (
                         plugin.WEATHER_SKY[1], plugin.WEATHER_SKY[3], plugin.WEATHER_FOG[1], plugin.WEATHER_AMBIENT[1],
                         plugin.WEATHER_SUNLIGHT[1])), *plugin.WEATHER_FOG_DAY, *plugin.WEATHER_FOG_NIGHT))
-
-# Where on the screen to look for the colour of the fog: the top left of the window of the game, which is the sky when
-# the player looks north, and how far from the expected colour a channel may be (the game is at about nine in the
-# morning, when the weather is still a little on its way from the colours of sunrise to those of the day).
-BACKGROUND_PIXEL = (300, 100)
-BACKGROUND_TOLERANCE = 12
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
@@ -115,6 +133,8 @@ return {
                 self.controls.movement = 1
                 self.controls.run = true
                 self.controls.yawChange = 0
+                -- looks up for a second, the pitch stops at straight up
+                self.controls.pitchChange = elapsed < 4 and -2 * dt or 0
             end
             if elapsed >= nextLog then
                 nextLog = nextLog + 1
@@ -155,24 +175,29 @@ def start_xvfb():
     return process
 
 
-def wait_for_pixel(process, log, seconds):
-    """The colour of a pixel of the screen once the player has been there for 2 seconds, before it starts to walk, as
-    (red, green, blue), or None when it cannot be read (ImageMagick's `import` is not installed, or the engine quit
-    before)."""
+def wait_for_pixels(process, log, seconds, pixels):
+    """The colours of the pixels of the screen, as {what it shows: (red, green, blue)}, each read once the walk script
+    has logged its first position after the time of the pixel. A colour is None when it cannot be read (ImageMagick's
+    `import` is not installed, or the engine quit before)."""
     importer = shutil.which("import")
+    colours = {name: None for name, _, _, _ in pixels}
+    pending = list(pixels)
     deadline = time.monotonic() + seconds
-    while importer is not None and process.poll() is None and time.monotonic() < deadline:
-        if log.exists() and "OFTEST\tt=2.0 " in log.read_text(encoding="utf-8", errors="replace"):
-            x, y = BACKGROUND_PIXEL
-            shot = subprocess.run([importer, "-window", "root", "-crop", "1x1+%d+%d" % (x, y), "+repage", "txt:-"],
-                                  capture_output=True, text=True)
-            found = re.search(r"srgba?\((\d+),(\d+),(\d+)", shot.stdout)
-            return tuple(int(found.group(i)) for i in (1, 2, 3)) if found else None
-        time.sleep(0.25)
-    return None
+    while importer is not None and pending and process.poll() is None and time.monotonic() < deadline:
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        for pixel in list(pending):
+            name, when, (x, y), _ = pixel
+            if re.search(rf"OFTEST\tt={int(when)}\.\d ", text):
+                shot = subprocess.run([importer, "-window", "root", "-crop", "1x1+%d+%d" % (x, y), "+repage", "txt:-"],
+                                      capture_output=True, text=True)
+                found = re.search(r"srgba?\((\d+),(\d+),(\d+)", shot.stdout)
+                colours[name] = tuple(int(found.group(i)) for i in (1, 2, 3)) if found else None
+                pending.remove(pixel)
+        time.sleep(0.1)
+    return colours
 
 
-def run_engine(program, resources, data, home, runtime, seconds, start):
+def run_engine(program, resources, data, home, runtime, seconds, start, pixels):
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
@@ -182,9 +207,9 @@ def run_engine(program, resources, data, home, runtime, seconds, start):
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     os.close(slave)
-    pixel = None
+    colours = {}
     try:
-        pixel = wait_for_pixel(process, home / ".config" / "openfallout" / "openfallout.log", seconds)
+        colours = wait_for_pixels(process, home / ".config" / "openfallout" / "openfallout.log", seconds, pixels)
         process.wait(timeout=seconds)
     except subprocess.TimeoutExpired:
         print(f"the engine was still running after {seconds} seconds, stopping it")
@@ -195,10 +220,10 @@ def run_engine(program, resources, data, home, runtime, seconds, start):
             process.kill()
             process.wait()
     os.close(master)
-    return process.returncode, pixel
+    return process.returncode, colours
 
 
-def check(text, scenario, pixel):
+def check(text, scenario, colours):
     """The problems the log shows, as a list of sentences; empty when the run did what it should."""
     problems = []
     for line in text.splitlines():
@@ -227,11 +252,18 @@ def check(text, scenario, pixel):
         problems.append("the engine chose the weather that needs a global that is 0")
     if not scenario.exterior and weather_lines:
         problems.append(f"the engine chose a weather in an interior cell: {weather_lines}")
-    if pixel is None:
-        print("no screenshot, the colour of the fog on the screen is not checked (needs ImageMagick's import)")
-    elif any(abs(have - want) > BACKGROUND_TOLERANCE for have, want in zip(pixel, scenario.background)):
-        problems.append(f"the colour of the screen where nothing is drawn is {pixel}, the fog colour of the cell "
-                        f"is {scenario.background}")
+    for name, _, position, want in scenario.pixels:
+        have = colours.get(name)
+        print(f"pixel {position} shows the {name}: {have}, expected {want}")
+        if have is None:
+            print(f"no screenshot, the colour of the {name} on the screen is not checked (needs ImageMagick's import)")
+        elif any(abs(h - w) > PIXEL_TOLERANCE for h, w in zip(have, want)):
+            problems.append(f"the pixel at {position} that should show the {name} is {have}, the {name} colour of the "
+                            f"cell is {want}")
+    missing = re.findall(r"Failed to (?:load|open) (?:image|'[^']*sky[^']*')[^\n]*(?:tx_sun|tx_moon|tx_masser|tx_secunda"
+                         r"|tx_sky|sky_[a-z_0-9]*\.nif)[^\n]*", text)
+    if missing:
+        problems.append(f"the log reports files of the sky of Morrowind as missing: {missing[:3]}")
     samples = [(float(m.group(1)), m.group(2), m.group(3), tuple(float(m.group(i)) for i in (4, 5, 6)),
                 tuple(float(m.group(i)) for i in (7, 8, 9))) for m in map(SAMPLE.search, text.splitlines()) if m]
     if len(samples) < WALK_SECONDS:
@@ -300,7 +332,8 @@ def main():
         runtime = work / scenario.name / "runtime"
         runtime.mkdir(mode=0o700)
         print(f"== {scenario.name}: --start {scenario.start}")
-        status, pixel = run_engine(program, build / "resources", data, home, runtime, args.seconds, scenario.start)
+        status, colours = run_engine(program, build / "resources", data, home, runtime, args.seconds, scenario.start,
+                                     scenario.pixels)
 
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
@@ -308,7 +341,7 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
-        found += check(text, scenario, pixel)
+        found += check(text, scenario, colours)
         for line in (line for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())
         for problem in found:

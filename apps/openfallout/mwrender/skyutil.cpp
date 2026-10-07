@@ -1,7 +1,9 @@
 #include "skyutil.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <string>
 
 #include <osg/AlphaFunc>
 #include <osg/BlendFunc>
@@ -23,6 +25,7 @@
 
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/scenemanager.hpp>
+#include <components/vfs/manager.hpp>
 
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/texmat.hpp>
@@ -35,6 +38,7 @@
 #include "../mwbase/environment.hpp"
 
 #include "renderbin.hpp"
+#include "skyfallback.hpp"
 #include "vismask.hpp"
 
 namespace
@@ -631,7 +635,10 @@ namespace OFRender
 
         constexpr VFS::Path::NormalizedView image("textures/tx_sun_05.dds");
 
-        osg::ref_ptr<osg::Texture2D> sunTex = new osg::Texture2D(imageManager.getImage(image));
+        // A game without the sun of Morrowind has a disc made in code, not the image for a missing file.
+        osg::ref_ptr<osg::Texture2D> sunTex
+            = new osg::Texture2D(sceneManager.getVFS()->exists(image) ? imageManager.getImage(image)
+                                                                      : osg::ref_ptr<osg::Image>(createSunImage()));
         sunTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         sunTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 
@@ -658,7 +665,7 @@ namespace OFRender
         mOcclusionQueryVisiblePixels = createOcclusionQueryNode(queryNode, true);
         mOcclusionQueryTotalPixels = createOcclusionQueryNode(queryNode, false);
 
-        createSunFlash(imageManager);
+        createSunFlash(sceneManager);
         createSunGlare();
     }
 
@@ -760,10 +767,12 @@ namespace OFRender
         return oqn;
     }
 
-    void Sun::createSunFlash(Resource::ImageManager& imageManager)
+    void Sun::createSunFlash(Resource::SceneManager& sceneManager)
     {
         constexpr VFS::Path::NormalizedView image("textures/tx_sun_flash_grey_05.dds");
-        osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(imageManager.getImage(image));
+        osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(sceneManager.getVFS()->exists(image)
+                ? sceneManager.getImageManager()->getImage(image)
+                : osg::ref_ptr<osg::Image>(createSunFlashImage()));
         tex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         tex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 
@@ -846,6 +855,64 @@ namespace OFRender
         }
     }
 
+    namespace
+    {
+        constexpr std::array<MoonState::Phase, 8> sMoonPhases
+            = { MoonState::Phase::Full, MoonState::Phase::WaningGibbous, MoonState::Phase::ThirdQuarter,
+                  MoonState::Phase::WaningCrescent, MoonState::Phase::New, MoonState::Phase::WaxingCrescent,
+                  MoonState::Phase::FirstQuarter, MoonState::Phase::WaxingGibbous };
+
+        std::string moonPhaseTexture(Moon::Type type, MoonState::Phase phase)
+        {
+            std::string textureName = "textures/tx_";
+
+            if (type == Moon::Type_Secunda)
+                textureName += "secunda_";
+            else
+                textureName += "masser_";
+
+            switch (phase)
+            {
+                case MoonState::Phase::New:
+                    textureName += "new";
+                    break;
+                case MoonState::Phase::WaxingCrescent:
+                    textureName += "one_wax";
+                    break;
+                case MoonState::Phase::FirstQuarter:
+                    textureName += "half_wax";
+                    break;
+                case MoonState::Phase::WaxingGibbous:
+                    textureName += "three_wax";
+                    break;
+                case MoonState::Phase::WaningCrescent:
+                    textureName += "one_wan";
+                    break;
+                case MoonState::Phase::ThirdQuarter:
+                    textureName += "half_wan";
+                    break;
+                case MoonState::Phase::WaningGibbous:
+                    textureName += "three_wan";
+                    break;
+                case MoonState::Phase::Full:
+                    textureName += "full";
+                    break;
+                default:
+                    break;
+            }
+
+            textureName += ".dds";
+            return textureName;
+        }
+
+        VFS::Path::NormalizedView moonCircleTexture(Moon::Type type)
+        {
+            constexpr VFS::Path::NormalizedView secunda("textures/tx_mooncircle_full_s.dds");
+            constexpr VFS::Path::NormalizedView masser("textures/tx_mooncircle_full_m.dds");
+            return type == Moon::Type_Secunda ? secunda : masser;
+        }
+    }
+
     Moon::Moon(osg::Group* parentNode, Resource::SceneManager& sceneManager, float scaleFactor, Type type)
         : CelestialBody(parentNode, scaleFactor, 2)
         , mType(type)
@@ -861,6 +928,14 @@ namespace OFRender
     Moon::~Moon()
     {
         mGeom->removeUpdateCallback(mUpdater);
+    }
+
+    bool Moon::hasFiles(const VFS::Manager& vfs, Type type)
+    {
+        if (!vfs.exists(moonCircleTexture(type)))
+            return false;
+        return std::ranges::all_of(sMoonPhases,
+            [&](MoonState::Phase phase) { return vfs.exists(VFS::Path::Normalized(moonPhaseTexture(type, phase))); });
     }
 
     void Moon::adjustTransparency(const float ratio)
@@ -911,57 +986,8 @@ namespace OFRender
 
         mPhase = phase;
 
-        std::string textureName = "textures/tx_";
-
-        if (mType == Moon::Type_Secunda)
-            textureName += "secunda_";
-        else
-            textureName += "masser_";
-
-        switch (mPhase)
-        {
-            case MoonState::Phase::New:
-                textureName += "new";
-                break;
-            case MoonState::Phase::WaxingCrescent:
-                textureName += "one_wax";
-                break;
-            case MoonState::Phase::FirstQuarter:
-                textureName += "half_wax";
-                break;
-            case MoonState::Phase::WaxingGibbous:
-                textureName += "three_wax";
-                break;
-            case MoonState::Phase::WaningCrescent:
-                textureName += "one_wan";
-                break;
-            case MoonState::Phase::ThirdQuarter:
-                textureName += "half_wan";
-                break;
-            case MoonState::Phase::WaningGibbous:
-                textureName += "three_wan";
-                break;
-            case MoonState::Phase::Full:
-                textureName += "full";
-                break;
-            default:
-                break;
-        }
-
-        textureName += ".dds";
-
-        const VFS::Path::Normalized texturePath(std::move(textureName));
-
-        if (mType == Moon::Type_Secunda)
-        {
-            constexpr VFS::Path::NormalizedView secunda("textures/tx_mooncircle_full_s.dds");
-            mUpdater->setTextures(texturePath, secunda);
-        }
-        else
-        {
-            constexpr VFS::Path::NormalizedView masser("textures/tx_mooncircle_full_m.dds");
-            mUpdater->setTextures(texturePath, masser);
-        }
+        const VFS::Path::Normalized texturePath(moonPhaseTexture(mType, mPhase));
+        mUpdater->setTextures(texturePath, moonCircleTexture(mType));
     }
 
     int RainCounter::numParticlesToCreate(double dt) const
