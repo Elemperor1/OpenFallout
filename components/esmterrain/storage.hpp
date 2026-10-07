@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <mutex>
+#include <set>
 
 #include <components/terrain/defs.hpp>
 #include <components/terrain/storage.hpp>
@@ -162,6 +163,8 @@ namespace ESMTerrain
 
         std::map<VFS::Path::Normalized, Terrain::LayerInfo, std::less<>> mLayerInfoMap;
         std::mutex mLayerInfoMutex;
+        // The textures that the log said are not in the data files, so that it says it once, under mLayerInfoMutex
+        std::set<VFS::Path::Normalized, std::less<>> mMissingTextures;
 
         std::string mNormalMapPattern;
         std::string mNormalHeightMapPattern;
@@ -171,6 +174,7 @@ namespace ESMTerrain
         bool mAutoUseSpecularMaps;
 
         Terrain::LayerInfo getLayerInfo(VFS::Path::NormalizedView texture);
+        VFS::Path::Normalized findLandTexture(std::string_view path, bool landscape, std::string_view source);
         Terrain::LayerInfo getTextureSetLayerInfo(const ESM4::TextureSet& txst);
         Terrain::LayerInfo getLandTextureLayerInfo(ESM::FormId id);
 

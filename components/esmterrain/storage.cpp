@@ -20,6 +20,7 @@
 #include <components/vfs/pathutil.hpp>
 
 #include "gridsampling.hpp"
+#include "texturepath.hpp"
 
 namespace ESMTerrain
 {
@@ -714,19 +715,36 @@ namespace ESMTerrain
         return info;
     }
 
+    VFS::Path::Normalized Storage::findLandTexture(std::string_view path, bool landscape, std::string_view source)
+    {
+        VFS::Path::Normalized result = findTexturePath(mVFS, path, landscape);
+        if (mVFS != nullptr && !mVFS->exists(result))
+        {
+            const std::lock_guard<std::mutex> lock(mLayerInfoMutex);
+            if (mMissingTextures.insert(result).second)
+                Log(Debug::Warning) << "Landscape texture " << result << " of " << source
+                                    << " is not in the data files";
+        }
+        return result;
+    }
+
     Terrain::LayerInfo Storage::getLandTextureLayerInfo(ESM::FormId id)
     {
         if (const ESM4::LandTexture* ltex = getEsm4LandTexture(id))
         {
-            if (!ltex->mTextureFile.empty())
+            // The texture set of Fallout 3 and the games after it comes first: the records of Fallout have the filename
+            // of an icon too, which is not where the texture is
+            if (!ltex->mTexture.isZeroOrUnset())
             {
-                constexpr VFS::Path::NormalizedView landscape("textures/landscape");
-                return getLayerInfo(VFS::Path::join(landscape, ltex->mTextureFile)); // TES4
+                const ESM4::TextureSet* txst = getEsm4TextureSet(ltex->mTexture);
+                if (txst != nullptr && !txst->mDiffuse.empty())
+                    return getTextureSetLayerInfo(*txst);
+                Log(Debug::Warning) << "TextureSet " << ltex->mTexture.toString() << " of landscape texture "
+                                    << ltex->mEditorId << (txst == nullptr ? " not found" : " has no diffuse map");
             }
-            if (const ESM4::TextureSet* txst = getEsm4TextureSet(ltex->mTexture))
-                return getTextureSetLayerInfo(*txst); // TES5
-            else
-                Log(Debug::Warning) << "TextureSet not found: " << ltex->mTexture.toString();
+            if (!ltex->mTextureFile.empty())
+                return getLayerInfo(
+                    findLandTexture(ltex->mTextureFile, true, "landscape texture " + ltex->mEditorId)); // TES4
         }
         else
             Log(Debug::Warning) << "LandTexture not found: " << id.toString();
@@ -737,14 +755,11 @@ namespace ESMTerrain
     {
         Terrain::LayerInfo info;
 
-        assert(!txst.mDiffuse.empty() && "getlayerInfo: empty diffuse map");
-
-        constexpr VFS::Path::NormalizedView textures("textures");
-
-        info.mDiffuseMap = VFS::Path::join(textures, txst.mDiffuse);
+        const std::string source = "texture set " + txst.mEditorId;
+        info.mDiffuseMap = findLandTexture(txst.mDiffuse, false, source);
 
         if (!txst.mNormalMap.empty())
-            info.mNormalMap = VFS::Path::join(textures, txst.mNormalMap);
+            info.mNormalMap = findLandTexture(txst.mNormalMap, false, source);
 
         // FIXME: this flag indicates height info in alpha channel of normal map
         //        but the normal map alpha channel has specular info instead

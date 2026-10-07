@@ -63,9 +63,12 @@ class Scenario:
 
     Each pixel is (what it shows, when it is read, where on the screen, the colour it should have): the colour of the
     screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather. A
-    fifth item, "darker", changes what is checked: each channel of the pixel must be at least WATER_DIFFERENCE below the
+    fifth item changes what is checked. "darker": each channel of the pixel must be at least WATER_DIFFERENCE below the
     one of the colour given (the water is black and opaque, so it shows only the fog in front of it, and that is
-    darker than the colour of the fog that the horizon has)."""
+    darker than the colour of the fog that the horizon has). "tinted": the pixel must have the hue of the colour given:
+    its strongest channel is the same as that of the colour, and the others are less than half of it (the ground has a
+    texture of one colour, and what the lighting and the fog do to it is not known to the test; the colour that the
+    engine gives a texture that it can not find is magenta)."""
 
     def __init__(self, name, start, loaded, exterior, origin, lit, pixels):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
@@ -89,6 +92,9 @@ PIXEL_TOLERANCE = 12
 # the fog each channel of the pixel must be for that water to be there.
 WATER_PIXEL = (900, 380)
 WATER_DIFFERENCE = 40
+# A pixel of the ground a little before the player, below the pillar at the bottom of the window. The texture of the
+# ground is red; the default texture of the game is not in the data files of the test.
+GROUND_PIXEL = (640, 600)
 
 # The colour of the sky overhead with the clouds of the weather over it. Their texture is white with one alpha, and they
 # are drawn over the sky in the colour of the fog of the weather with a little added (0.13 of the range of a colour).
@@ -109,6 +115,7 @@ SCENARIOS = [
              (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
              [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
               ("water", HORIZON_TIME, WATER_PIXEL, plugin.WEATHER_FOG[1], "darker"),
+              ("ground", HORIZON_TIME, GROUND_PIXEL, plugin.GROUND_COLOUR, "tinted"),
               ("sky and clouds", ZENITH_TIME, SKY_PIXEL,
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
@@ -317,7 +324,9 @@ def wait_for_pixels(process, log, seconds, pixels):
                 shot = subprocess.run([importer, "-window", "root", "-crop", "1x1+%d+%d" % (x, y), "+repage", "txt:-"],
                                       capture_output=True, text=True)
                 found = re.search(r"srgba?\((\d+),(\d+),(\d+)", shot.stdout)
-                colours[name] = tuple(int(found.group(i)) for i in (1, 2, 3)) if found else None
+                grey = re.search(r"gray\((\d+)\)", shot.stdout)
+                colours[name] = (tuple(int(found.group(i)) for i in (1, 2, 3)) if found
+                                 else (int(grey.group(1)),) * 3 if grey else None)
                 pending.remove(pixel)
         time.sleep(0.1)
     return colours
@@ -379,6 +388,10 @@ def check(text, scenario, colours):
     if scenario.exterior and WEATHER_LINE not in weather_lines:
         problems.append(f"the log has no line '{WEATHER_LINE}', the weather of the cell is: "
                         f"{weather_lines or 'not logged'}")
+    # the texture of the ground is where its texture set says, not where the icon of its record says
+    for line in text.splitlines():
+        if re.search(r"Landscape texture .* is not in the data files", line):
+            problems.append(line)
     if any(plugin.CONDITIONAL_WEATHER_NAME in line for line in weather_lines):
         problems.append("the engine chose the weather that needs a global that is 0")
     if not scenario.exterior and weather_lines:
@@ -390,9 +403,16 @@ def check(text, scenario, colours):
         problems.append(f"the engine made water in an interior cell: {water_lines}")
     for name, _, position, want, *mode in scenario.pixels:
         have = colours.get(name)
-        print(f"pixel {position} shows the {name}: {have}, expected {'below ' if mode else ''}{want}")
+        print(f"pixel {position} shows the {name}: {have}, expected {mode[0] + ' ' if mode else ''}{want}")
         if have is None:
             print(f"no screenshot, the colour of the {name} on the screen is not checked (needs ImageMagick's import)")
+        elif mode == ["tinted"]:
+            strongest = have.index(max(have))
+            if (strongest != want.index(max(want))
+                    or any(2 * channel > have[strongest] for i, channel in enumerate(have) if i != strongest)):
+                problems.append(f"the pixel at {position} that should show the {name} is {have}, which should have "
+                                f"the hue of {want} (its strongest channel the same and the "
+                                f"others less than half of it)")
         elif mode:
             if any(h > w - WATER_DIFFERENCE for h, w in zip(have, want)):
                 problems.append(f"the pixel at {position} that should show the {name} is {have}, which should be at "
