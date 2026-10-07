@@ -40,6 +40,7 @@ WATER_CELL_ID = 0x810
 WATER_LAND_ID = 0x811
 DRY_CELL_ID = 0x812
 DRY_LAND_ID = 0x813
+LAST_ID = DRY_LAND_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
@@ -235,7 +236,7 @@ def worldspace():
 
 
 def plugin():
-    hedr = struct.pack("<fiI", 0.94, 18, GLOBAL_ID + 1)
+    hedr = struct.pack("<fiI", 0.94, 18, LAST_ID + 1)
     header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"),
                                  zstr(b"SNAM", "synthetic test plugin")], flags=1)
     half = int(CUBE / 2)
