@@ -9,7 +9,7 @@ them there. It also has a worldspace "OFTestWorld" with a flat exterior cell, a 
 worldspace that says the weather is the one to have (it lists a second weather too, which needs a global that is 0),
 and two more exterior cells that are flagged for water: one has water of its own and the other the largest float as
 its height, which the games write for a cell without water of its own. The worldspace names a kind of water (WATR),
-black and opaque, with no reflection. Both cells have a person (a race and a character with a skeleton) standing
+green and opaque, with no reflection. Both cells have a person (a race and a character with a skeleton) standing
 east of the end of the player's walk. The person has the parts of a body: the race names an upper body, two hands and a
 head (boxes of different sizes), the person a hair and a suit that covers the upper body and the right hand, so that the
 body of the race is there where the suit is not. West of the start there is a wall that is not drawn: a mesh with a
@@ -85,13 +85,14 @@ WATER_CELL = (0, 1)
 DRY_CELL = (1, 0)
 WATER_TERRAIN = -40.0
 WATER_HEIGHT = -20.0
-# The kind of water of the worldspace (its NAM2), which the cells take as they name none: black and wholly opaque, with
-# no reflection, so that the water shows nothing but the fog in front of it, which is far from what the water of
-# Morrowind (white, half transparent) shows over the terrain. The colours are red, green and blue of 0 to 255, the
-# opacity is a percentage.
+# The kind of water of the worldspace (its NAM2), which the cells take as they name none: green and wholly opaque, with
+# no reflection, so that the water shows its green (with the fog in front of it), which is far from what the water of
+# Morrowind (white, half transparent) shows over the terrain, and which is not what a texture of one colour that the
+# engine can not find (magenta, so no green at all) would make of it. The colours are red, green and blue of 0 to 255,
+# the opacity is a percentage.
 WATER_TYPE_NAME = "OFTestWater"
-WATER_SHALLOW = (0, 0, 0)
-WATER_DEEP = (0, 0, 0)
+WATER_SHALLOW = (0, 160, 0)
+WATER_DEEP = (0, 160, 0)
 WATER_OPACITY = 100
 WATER_REFLECTIVITY = 0.0
 FLOAT_MAX = 3.4028234663852886e+38

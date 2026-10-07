@@ -136,6 +136,8 @@ file(GLOB UNITTEST_SRC_FILES
     esm3/testinfoorder.cpp
     esm3/testcstringids.cpp
 
+    myguiplatform/testmyguitexture.cpp
+
     nifosg/testnifloader.cpp
 
     esmterrain/testgridsampling.cpp

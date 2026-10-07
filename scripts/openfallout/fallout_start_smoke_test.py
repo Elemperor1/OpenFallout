@@ -20,7 +20,8 @@ and a ray at the world stop at it), nothing logs an error from Lua, and the engi
 pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
 and in the exterior, where the player looks up after three seconds, the sky overhead has the sky colour of the weather
 with the clouds of the weather over it, and a band of water in a cell north of the start shows where the horizon would
-be (it is black, as the kind of water of the worldspace says, so darker than the fog). The water of the cell that has a
+be (it is green, as the kind of water of the worldspace says, so greener than the fog and not tinted by the
+colour of a texture that the engine can not find). The water of the cell that has a
 height of its own is logged once, with its kind of water, and the cell that holds the largest float as its height has
 none. The game has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as
 missing.
@@ -63,9 +64,10 @@ class Scenario:
 
     Each pixel is (what it shows, when it is read, where on the screen, the colour it should have): the colour of the
     screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather. A
-    fifth item changes what is checked. "darker": each channel of the pixel must be at least WATER_DIFFERENCE below the
-    one of the colour given (the water is black and opaque, so it shows only the fog in front of it, and that is
-    darker than the colour of the fog that the horizon has). "tinted": the pixel must have the hue of the colour given:
+    fifth item changes what is checked. "greener": the green channel of the pixel must be at least WATER_GREEN more than
+    the red one and than the blue one (the water is green and opaque, and the fog that the horizon has is not green;
+    the colour that the engine gives a texture that it can not find is magenta, which has no green at all, so water
+    that took such a texture would not pass). "tinted": the pixel must have the hue of the colour given:
     its strongest channel is the same as that of the colour and at least TINT_MINIMUM (so a black pixel does not
     pass), and the others are less than half of it (the ground has a texture of one colour, and what the lighting and
     the fog do to it is not known to the test; the colour that the engine gives a texture that it can not find is
@@ -89,10 +91,10 @@ SKY_PIXEL = (500, 360)
 PIXEL_TOLERANCE = 12
 # A pixel of the band of water of the cell north of the start, on the right of the pillar, a little below the horizon. It
 # is the colour of the fog where there is no water, and about (191,119,164) with the water of Morrowind (white, half
-# transparent, over the terrain). The kind of water of the worldspace is black and opaque: how far below the colour of
-# the fog each channel of the pixel must be for that water to be there.
+# transparent, over the terrain). The kind of water of the worldspace is green and opaque: how much greener than red
+# and blue the pixel must be for that water to be there.
 WATER_PIXEL = (900, 380)
-WATER_DIFFERENCE = 40
+WATER_GREEN = 25
 # A pixel of the ground a little before the player, below the pillar at the bottom of the window. The texture of the
 # ground is red; the default texture of the game is not in the data files of the test.
 GROUND_PIXEL = (640, 600)
@@ -117,7 +119,7 @@ SCENARIOS = [
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
              (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
              [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
-              ("water", HORIZON_TIME, WATER_PIXEL, plugin.WEATHER_FOG[1], "darker"),
+              ("water", HORIZON_TIME, WATER_PIXEL, plugin.WATER_SHALLOW, "greener"),
               ("ground", HORIZON_TIME, GROUND_PIXEL, plugin.GROUND_COLOUR, "tinted"),
               ("sky and clouds", ZENITH_TIME, SKY_PIXEL,
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
@@ -416,13 +418,17 @@ def check(text, scenario, colours):
                 problems.append(f"the pixel at {position} that should show the {name} is {have}, which should have "
                                 f"the hue of {want} (its strongest channel the same and at least {TINT_MINIMUM}, "
                                 f"the others less than half of it)")
-        elif mode:
-            if any(h > w - WATER_DIFFERENCE for h, w in zip(have, want)):
-                problems.append(f"the pixel at {position} that should show the {name} is {have}, which should be at "
-                                f"least {WATER_DIFFERENCE} below {want} in each channel")
+        elif mode == ["greener"]:
+            if have[1] < have[0] + WATER_GREEN or have[1] < have[2] + WATER_GREEN:
+                problems.append(f"the pixel at {position} that should show the {name} is {have}, which should have a "
+                                f"green channel at least {WATER_GREEN} above the red and the blue one ({want})")
         elif any(abs(h - w) > PIXEL_TOLERANCE for h, w in zip(have, want)):
             problems.append(f"the pixel at {position} that should show the {name} is {have}, the {name} colour of the "
                             f"cell is {want}")
+    water_missing = re.findall(r"Failed to open image: Resource 'textures/water/[^']*' not found", text)
+    if water_missing:
+        problems.append(f"the log reports textures of the water of Morrowind as missing: {water_missing[:3]} (the "
+                        "engine should not look for frames that the game has not got)")
     missing = re.findall(r"Failed to (?:load|open) (?:image|'[^']*sky[^']*')[^\n]*(?:tx_sun|tx_moon|tx_masser|tx_secunda"
                          r"|tx_sky|sky_[a-z_0-9]*\.nif)[^\n]*", text)
     if missing:
