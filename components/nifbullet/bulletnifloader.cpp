@@ -461,7 +461,7 @@ namespace NifBullet
                 // A body that only reports what touches it, or does nothing when it is touched, stops nothing
                 const bool stopsWhatTouchesIt = body->mInfo.mResponseType != Nif::HkResponseType::Response_Reporting
                     && body->mInfo.mResponseType != Nif::HkResponseType::Response_None;
-                if (isSolidHavokLayer(body->mHavokFilter.mLayer) && stopsWhatTouchesIt)
+                if (isSolidHavokFilter(body->mHavokFilter) && stopsWhatTouchesIt)
                 {
                     // The shape moves with the node, and where the node is when it does is not what this knows
                     if (animated)

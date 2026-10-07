@@ -13,6 +13,7 @@ class btCollisionShape;
 namespace Nif
 {
     struct bhkShape;
+    struct HavokFilter;
 }
 
 namespace NifBullet
@@ -25,6 +26,10 @@ namespace NifBullet
     /// are triggers, zones, the volumes that picking and line of sight use, the boxes that are for avoiding and
     /// collision boxes, and the like; a layer that is not known counts as solid.
     bool isSolidHavokLayer(std::uint8_t layer);
+
+    /// Whether what walks is stopped by what has this filter: its layer is solid and it has not the flag for no
+    /// collision (bit 6 of the flags of the filter).
+    bool isSolidHavokFilter(const Nif::HavokFilter& filter);
 
     /// One convex or concave piece of a Havok shape, in game units, with the transform from its own space to the one
     /// of the body (a rotation and a translation, no scale).

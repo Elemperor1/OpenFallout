@@ -86,6 +86,7 @@ namespace
             mBody.mRecordType = Nif::RC_bhkRigidBodyT;
             mBody.mShape = Nif::bhkShapePtr(&mBox);
             mBody.mHavokFilter.mLayer = staticLayer;
+            mBody.mHavokFilter.mFlags = 0;
             mBody.mInfo.mResponseType = Nif::HkResponseType::Response_SimpleContact;
             mBody.mInfo.mTranslation = osg::Vec4f();
             mBody.mInfo.mRotation = osg::Quat();
@@ -337,6 +338,78 @@ namespace
         expectNear(triangles[2], btVector3(0, 7, 0));
     }
 
+    TEST_F(TestHavokCollision, a_subshape_of_packed_strips_that_stops_nothing_is_left_out)
+    {
+        Nif::hkPackedNiTriStripsData data;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0), osg::Vec3f(0, 0, 5),
+            osg::Vec3f(1, 0, 5), osg::Vec3f(0, 1, 5), osg::Vec3f(0, 0, 9), osg::Vec3f(1, 0, 9), osg::Vec3f(0, 1, 9) };
+        data.mTriangles.push_back(Nif::TriangleData{ { 0, 1, 2 }, 0, osg::Vec3f() });
+        data.mTriangles.push_back(Nif::TriangleData{ { 3, 4, 5 }, 0, osg::Vec3f() });
+        data.mTriangles.push_back(Nif::TriangleData{ { 6, 7, 8 }, 0, osg::Vec3f() });
+        // One subshape in a layer that is not solid, one that has the flag for no collision, and a solid one
+        Nif::hkSubPartData trigger{};
+        trigger.mNumVertices = 3;
+        trigger.mHavokFilter.mLayer = triggerLayer;
+        trigger.mHavokFilter.mFlags = 0;
+        Nif::hkSubPartData noCollision{};
+        noCollision.mNumVertices = 3;
+        noCollision.mHavokFilter.mLayer = staticLayer;
+        noCollision.mHavokFilter.mFlags = 0x40;
+        Nif::hkSubPartData solid{};
+        solid.mNumVertices = 3;
+        solid.mHavokFilter.mLayer = staticLayer;
+        data.mSubshapes = { solid, trigger, noCollision };
+        Nif::bhkPackedNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkPackedNiTriStripsShape;
+        strips.mScale = osg::Vec4f(1, 1, 1, 0);
+        strips.mData = Nif::hkPackedNiTriStripsDataPtr(&data);
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        // Only the first triangle, that of the solid subshape
+        const std::vector<btVector3> triangles = getTriangles(*shape.getChildShape(0));
+        ASSERT_EQ(triangles.size(), 3);
+        expectNear(triangles[2], btVector3(0, 7, 0));
+    }
+
+    TEST_F(TestHavokCollision, subshapes_that_do_not_add_up_to_the_vertices_are_not_read)
+    {
+        Nif::hkPackedNiTriStripsData data;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0) };
+        data.mTriangles.push_back(Nif::TriangleData{ { 0, 1, 2 }, 0, osg::Vec3f() });
+        Nif::hkSubPartData trigger{};
+        trigger.mNumVertices = 2;
+        trigger.mHavokFilter.mLayer = triggerLayer;
+        trigger.mHavokFilter.mFlags = 0;
+        data.mSubshapes = { trigger };
+        Nif::bhkPackedNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkPackedNiTriStripsShape;
+        strips.mScale = osg::Vec4f(1, 1, 1, 0);
+        strips.mData = Nif::hkPackedNiTriStripsDataPtr(&data);
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        EXPECT_EQ(getTriangles(*compound(*result).getChildShape(0)).size(), 3);
+    }
+
+    TEST_F(TestHavokCollision, a_body_with_the_flag_for_no_collision_makes_no_obstacle)
+    {
+        addRenderedGeometry();
+        mBody.mHavokFilter.mFlags = 0x40;
+
+        const auto result = load();
+
+        // Nothing in the file stops what touches it: what the rendered geometry is stays
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        EXPECT_EQ(compound(*result).getChildShape(0)->getShapeType(), SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE);
+    }
+
     TEST_F(TestHavokCollision, the_vertices_of_a_convex_shape_make_its_hull)
     {
         Nif::bhkConvexVerticesShape convex;
@@ -440,6 +513,7 @@ namespace
         Nif::bhkRigidBody trigger;
         trigger.mRecordType = Nif::RC_bhkRigidBody;
         trigger.mHavokFilter.mLayer = triggerLayer;
+        trigger.mHavokFilter.mFlags = 0;
         trigger.mInfo.mResponseType = Nif::HkResponseType::Response_SimpleContact;
         trigger.mInfo.mRotation = osg::Quat();
         trigger.mShape = Nif::bhkShapePtr(&mBox);

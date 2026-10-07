@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <numeric>
 #include <tuple>
 
 #include <BulletCollision/CollisionShapes/btBoxShape.h>
@@ -55,6 +56,9 @@ namespace NifBullet
             Layer_DroppingPick = 42,
             Layer_Null = 43,
         };
+
+        // The flag of a filter that turns the collision of a body or of a part of it off
+        constexpr std::uint8_t sNoCollisionFlag = 0x40;
 
         btVector3 toBullet(const osg::Vec4f& value, float scale)
         {
@@ -116,11 +120,32 @@ namespace NifBullet
                 vertices.emplace_back(vertex.x() * scale.x() * sHavokScale, vertex.y() * scale.y() * sHavokScale,
                     vertex.z() * scale.z() * sHavokScale);
 
+            // The subshapes take the vertices one after the other and have filters of their own: what is in a layer
+            // that is not solid, or has the flag for no collision, stops nothing, though the body does. Subshapes that
+            // do not add up to the vertices are not read.
+            std::vector<bool> solidVertices(vertices.size(), true);
+            const std::size_t verticesInSubshapes
+                = std::accumulate(data.mSubshapes.begin(), data.mSubshapes.end(), std::size_t(0),
+                    [](std::size_t sum, const Nif::hkSubPartData& part) { return sum + part.mNumVertices; });
+            if (!data.mSubshapes.empty() && verticesInSubshapes == vertices.size())
+            {
+                std::size_t first = 0;
+                for (const Nif::hkSubPartData& part : data.mSubshapes)
+                {
+                    std::fill_n(
+                        solidVertices.begin() + first, part.mNumVertices, isSolidHavokFilter(part.mHavokFilter));
+                    first += part.mNumVertices;
+                }
+            }
+
             auto mesh = std::make_unique<btTriangleMesh>();
             for (const Nif::TriangleData& triangle : data.mTriangles)
             {
                 const auto& indices = triangle.mTriangle;
                 if (std::ranges::any_of(indices, [&](std::uint16_t index) { return index >= vertices.size(); }))
+                    continue;
+                // A triangle is in the subshape that its first vertex is in
+                if (!solidVertices[indices[0]])
                     continue;
                 mesh->addTriangle(vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]);
             }
@@ -233,6 +258,11 @@ namespace NifBullet
             default:
                 return true;
         }
+    }
+
+    bool isSolidHavokFilter(const Nif::HavokFilter& filter)
+    {
+        return (filter.mFlags & sNoCollisionFlag) == 0 && isSolidHavokLayer(filter.mLayer);
     }
 
     std::string convertHavokShape(
