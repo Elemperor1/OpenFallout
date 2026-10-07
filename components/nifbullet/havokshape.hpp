@@ -23,8 +23,9 @@ namespace NifBullet
     constexpr float sHavokScale = 7.f;
 
     /// Whether what walks is stopped by a body in this layer of Fallout 3 and New Vegas. The layers that are not solid
-    /// are triggers, zones, the volumes that picking and line of sight use, the boxes that are for avoiding and
-    /// collision boxes, and the like; a layer that is not known counts as solid.
+    /// are triggers, zones, the volumes that picking and line of sight use, the boxes that are for avoiding, and the
+    /// like; the collision box (layer 32) is solid, since it is the layer of barriers that are only collision, and a
+    /// layer that is not known counts as solid.
     bool isSolidHavokLayer(std::uint8_t layer);
 
     /// Whether what walks is stopped by what has this filter: its layer is solid and it has not the flag for no

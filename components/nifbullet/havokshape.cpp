@@ -43,7 +43,6 @@ namespace NifBullet
             Layer_DeadBiped = 29,
             Layer_CharController = 30,
             Layer_AvoidBox = 31,
-            Layer_CollisionBox = 32,
             Layer_CameraSphere = 33,
             Layer_DoorDetection = 34,
             Layer_CameraPick = 35,
@@ -242,7 +241,6 @@ namespace NifBullet
             case Layer_DeadBiped:
             case Layer_CharController:
             case Layer_AvoidBox:
-            case Layer_CollisionBox:
             case Layer_CameraSphere:
             case Layer_DoorDetection:
             case Layer_CameraPick:

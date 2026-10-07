@@ -573,8 +573,9 @@ namespace
 
     TEST(TestHavokLayers, the_layers_that_make_a_world_solid_are_solid)
     {
-        // Static, animated static, transparent, clutter, trees, props, terrain, ground and invisible walls
-        for (std::uint8_t layer : { 1, 2, 3, 4, 9, 10, 13, 17, 27 })
+        // Static, animated static, transparent, clutter, trees, props, terrain, ground, invisible walls and collision
+        // boxes
+        for (std::uint8_t layer : { 1, 2, 3, 4, 9, 10, 13, 17, 27, 32 })
             EXPECT_TRUE(NifBullet::isSolidHavokLayer(layer)) << static_cast<int>(layer);
         // Weapons, projectiles, biped, water, triggers, non collidable, portals, zones, picking, line of sight and the
         // null layer
