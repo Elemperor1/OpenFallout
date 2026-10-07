@@ -70,9 +70,10 @@ namespace ESM4
             return base;
         }
 
-        // The extension of the first model that the current record names, in lower case, or empty when it names none.
-        // Reading stops at the model, the rest of the record is left unread.
-        std::string readModelExtension(Reader& reader)
+        // The extension of the first model that the current record names, in lower case, which is empty when the model
+        // has none, and nothing when the record names no model. Reading stops at the model, the rest of the record is
+        // left unread.
+        std::optional<std::string> readModelExtension(Reader& reader)
         {
             constexpr std::size_t longest = 8;
             while (true)
@@ -81,7 +82,7 @@ namespace ESM4
                 if (!reader.subRecordFitsRecord())
                     throw std::runtime_error("A sub-record runs past the end of its record");
                 if (!found)
-                    return {};
+                    return std::nullopt;
 
                 if (reader.subRecordHeader().typeId != ESM::fourCC("MODL"))
                 {
@@ -94,7 +95,7 @@ namespace ESM4
                     throw std::runtime_error("The file ends inside a model");
                 const std::size_t dot = path.rfind('.');
                 if (dot == std::string::npos || path.find_first_of("/\\", dot) != std::string::npos)
-                    return {};
+                    return std::string();
                 std::string extension = path.substr(dot + 1, longest);
                 std::transform(extension.begin(), extension.end(), extension.begin(),
                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -130,9 +131,10 @@ namespace ESM4
                 try
                 {
                     r.getRecordData();
-                    // A record that overrides another may leave the model out, it keeps the one it had.
-                    if (const std::string extension = readModelExtension(r); !extension.empty())
-                        record.mModel = modelKind(extension);
+                    // A record that overrides another may leave the model out, it keeps the one it had. One that names
+                    // a model with no extension (or none at all) has no model of a kind.
+                    if (const std::optional<std::string> extension = readModelExtension(r); extension.has_value())
+                        record.mModel = modelKind(*extension);
                 }
                 catch (const std::exception&)
                 {

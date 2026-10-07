@@ -150,6 +150,22 @@ namespace
         EXPECT_THAT(models.at("NPC_"), UnorderedElementsAre(Pair("nif", 1u)));
     }
 
+    TEST(ESM4ReferenceCensusTest, anOverridingRecordWhoseModelHasNoExtensionHasNoModel)
+    {
+        // The patch gives the static a model that names no kind of file, and the character an empty one
+        ESM4::ReferenceCensus census;
+        collect(census, basePlugin(), "base.esm", 0, {});
+        const std::string patch = headerWithMaster("base.esm")
+            + topGroup("STAT",
+                record("STAT", 0x00001001, zString("MODL", "meshes\\stone"))
+                    + record("NPC_", 0x00001002, zString("MODL", "")));
+        collect(census, patch, "patch.esp", 1, { { "base.esm", 0 } });
+
+        const auto models = census.getModels();
+        EXPECT_THAT(models.at("STAT"), UnorderedElementsAre(Pair("none", 3u)));
+        EXPECT_THAT(models.at("NPC_"), UnorderedElementsAre(Pair("none", 1u)));
+    }
+
     TEST(ESM4ReferenceCensusTest, aReferenceThatALaterFileOverridesOrDeletesCountsAsThatFileHasIt)
     {
         ESM4::ReferenceCensus census;
