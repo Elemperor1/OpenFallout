@@ -42,6 +42,10 @@ namespace OFPhysics
         btTransform getTransform() const;
         /// Return solid flag. Not used by the object itself, true by default.
         bool isSolid() const;
+
+        /// The body of a person (see PhysicsSystem::addActorBody) as opposed to a part of the world: it moves, so the
+        /// navigator does not take it for an obstacle.
+        bool isActorBody() const { return mActorBody; }
         void setSolid(bool solid);
         bool isAnimated() const;
         /// @brief update object shape
@@ -55,6 +59,7 @@ namespace OFPhysics
         std::shared_ptr<Resource::BulletShapeInstance> mShapeInstance;
         std::map<int, osg::NodePath> mRecordIndexToNodePath;
         bool mSolid;
+        const bool mActorBody;
         btVector3 mScale;
         osg::Vec3f mPosition;
         osg::Quat mRotation;

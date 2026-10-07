@@ -16,6 +16,11 @@
 
 namespace OFClass
 {
+    /// The half extents of the body that a person is solid as, in game units: a human is 40 units wide and 128 tall
+    /// (the box of the placeholder skeleton of the player), and a race that is raceHeight times as tall is that much
+    /// taller and wider. A height that is not a positive number (a record without data has none) counts as 1.
+    osg::Vec3f npcBodyHalfExtents(float raceHeight);
+
     class ESM4Npc final : public OFWorld::RegisteredClass<ESM4Npc>
     {
     public:
@@ -43,10 +48,7 @@ namespace OFClass
         }
 
         void insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
-            OFPhysics::PhysicsSystem& physics) const override
-        {
-            // ESM4Impl::insertObjectPhysics(ptr, getModel(ptr), rotation, physics);
-        }
+            OFPhysics::PhysicsSystem& physics) const override;
 
         bool hasToolTip(const OFWorld::ConstPtr& ptr) const override { return true; }
         OFGui::ToolTipInfo getToolTipInfo(const OFWorld::ConstPtr& ptr, int count) const override

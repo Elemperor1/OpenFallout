@@ -13,7 +13,9 @@
 #include <BulletCollision/CollisionDispatch/btCollisionWorld.h>
 #include <BulletCollision/CollisionDispatch/btDefaultCollisionConfiguration.h>
 #include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
+#include <BulletCollision/CollisionShapes/btCompoundShape.h>
 #include <BulletCollision/CollisionShapes/btConeShape.h>
+#include <BulletCollision/CollisionShapes/btCylinderShape.h>
 #include <BulletCollision/CollisionShapes/btSphereShape.h>
 #include <BulletCollision/CollisionShapes/btStaticPlaneShape.h>
 #include <BulletCollision/CollisionShapes/btTriangleMesh.h>
@@ -441,6 +443,26 @@ namespace OFPhysics
 
         if (obj->isAnimated())
             mAnimatedObjects.emplace(obj.get(), false);
+    }
+
+    void PhysicsSystem::addActorBody(const OFWorld::Ptr& ptr, const osg::Vec3f& halfExtents, osg::Quat rotation)
+    {
+        if (ptr.mRef->mData.mPhysicsPostponed || getObject(ptr) != nullptr)
+            return;
+
+        // The cylinder is a child of a compound shape so that it can stand on the position of the object
+        auto shape = std::make_shared<Resource::BulletShape>();
+        auto compound = std::make_unique<btCompoundShape>();
+        btTransform standing;
+        standing.setIdentity();
+        standing.setOrigin(btVector3(0, 0, halfExtents.z()));
+        compound->addChildShape(standing, new btCylinderShapeZ(Misc::Convert::toBullet(halfExtents)));
+        shape->mCollisionShape.reset(compound.release());
+        shape->mCollisionBox = { halfExtents, osg::Vec3f(0, 0, halfExtents.z()) };
+
+        auto obj = std::make_shared<Object>(
+            ptr, Resource::makeInstance(std::move(shape)), rotation, CollisionType_Actor, mTaskScheduler.get());
+        mObjects.emplace(ptr.mRef, obj);
     }
 
     void PhysicsSystem::remove(const OFWorld::Ptr& ptr)

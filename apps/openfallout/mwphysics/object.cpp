@@ -20,6 +20,7 @@ namespace OFPhysics
         : PtrHolder(ptr, osg::Vec3f())
         , mShapeInstance(std::move(shapeInstance))
         , mSolid(true)
+        , mActorBody(collisionType == CollisionType_Actor)
         , mScale(ptr.getCellRef().getScale(), ptr.getCellRef().getScale(), ptr.getCellRef().getScale())
         , mPosition(ptr.getRefData().getPosition().asVec3())
         , mRotation(rotation)

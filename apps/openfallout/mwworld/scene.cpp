@@ -224,7 +224,8 @@ namespace
                         object->getShapeInstance(), objectTransform, connectionStart, connectionEnd),
                     transform, navigatorUpdateGuard);
             }
-            else if (object->getShapeInstance()->mVisualCollisionType == Resource::VisualCollisionType::None)
+            else if (object->getShapeInstance()->mVisualCollisionType == Resource::VisualCollisionType::None
+                && !object->isActorBody())
             {
                 navigator.addObject(DetourNavigator::ObjectId(object),
                     DetourNavigator::ObjectShapes(object->getShapeInstance(), objectTransform), object->getTransform(),

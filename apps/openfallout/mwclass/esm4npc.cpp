@@ -1,5 +1,8 @@
 #include "esm4npc.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadclot.hpp>
 #include <components/esm4/loadlvli.hpp>
@@ -10,6 +13,7 @@
 
 #include <components/misc/resourcehelpers.hpp>
 
+#include "../mwphysics/physicssystem.hpp"
 #include "../mwworld/customdata.hpp"
 #include "../mwworld/esmstore.hpp"
 
@@ -17,6 +21,16 @@
 
 namespace OFClass
 {
+    osg::Vec3f npcBodyHalfExtents(float raceHeight)
+    {
+        // A race that is a quarter as tall, or four times, is the limit of what the data has meant
+        constexpr float sSmallest = 0.25f;
+        constexpr float sLargest = 4.f;
+        const float scale
+            = std::isfinite(raceHeight) && raceHeight > 0.f ? std::clamp(raceHeight, sSmallest, sLargest) : 1.f;
+        return osg::Vec3f(20.f, 20.f, 64.f) * scale;
+    }
+
     template <class LevelledRecord, class TargetRecord>
     static std::vector<const TargetRecord*> withBaseTemplates(
         const TargetRecord* rec, int level = OFClass::ESM4Impl::sDefaultLevel)
@@ -62,6 +76,8 @@ namespace OFClass
     public:
         const ESM4::Npc* mTraits;
         const ESM4::Npc* mBaseData;
+        // The record that has the skeleton of a Fallout character (the race of a Fallout character has none), if any
+        const ESM4::Npc* mSkeletonRecord = nullptr;
         const ESM4::Race* mRace;
         bool mIsFemale;
 
@@ -98,6 +114,16 @@ namespace OFClass
                                 << ESM::RefId(base->mId) << ")";
 
         data->mBaseData = chooseTemplate(npcRecs, ESM4::Npc::Template_UseBaseData);
+
+        // The one that the template flags leave the model with, else the first of the records that has one. Fallout
+        // names a marker as the model of a character that is not in the world.
+        const auto hasSkeleton = [](const ESM4::Npc* rec) {
+            return !rec->mModel.empty() && !ESM4Impl::isMarkerModel(rec->mModel.getNormalized().value());
+        };
+        if (const ESM4::Npc* rec = chooseTemplate(npcRecs, ESM4::Npc::Template_UseModel); rec && hasSkeleton(rec))
+            data->mSkeletonRecord = rec;
+        else if (const auto found = std::find_if(npcRecs.begin(), npcRecs.end(), hasSkeleton); found != npcRecs.end())
+            data->mSkeletonRecord = *found;
 
         if (data->mBaseData == nullptr)
             Log(Debug::Warning) << "Base data is not found for ESM4 NPC base record: \"" << base->mEditorId << "\" ("
@@ -182,7 +208,21 @@ namespace OFClass
             return {};
         if (data.mTraits->mIsTES4)
             return data.mTraits->mModel.getNormalized();
-        return data.mIsFemale ? data.mRace->mModelFemale.getNormalized() : data.mRace->mModelMale.getNormalized();
+        const ESM::Path& raceModel = data.mIsFemale ? data.mRace->mModelFemale : data.mRace->mModelMale;
+        if (!raceModel.empty())
+            return raceModel.getNormalized();
+        // Fallout: the skeleton is in the record of the character
+        if (data.mSkeletonRecord != nullptr)
+            return data.mSkeletonRecord->mModel.getNormalized();
+        return {};
+    }
+
+    void ESM4Npc::insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
+        OFPhysics::PhysicsSystem& physics) const
+    {
+        const ESM4::Race* race = getRace(ptr);
+        const float raceHeight = race == nullptr ? 1.f : (isFemale(ptr) ? race->mHeightFemale : race->mHeightMale);
+        physics.addActorBody(ptr, npcBodyHalfExtents(raceHeight), rotation);
     }
 
     std::string_view ESM4Npc::getName(const OFWorld::ConstPtr& ptr) const

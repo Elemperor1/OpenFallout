@@ -11,13 +11,16 @@ rendering is enough), and a Lua player script walks north from the start for a f
 quits. The checks are on the log: the cell is the one asked for, in the interior it is lit with its own ambient and
 sun colours and with the fog colour and far distance of its lighting template, in the exterior the weather is the one
 that the climate of the worldspace lists, the player stands on the floor the whole time, the camera is at eye height
-above the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine
-quits by itself. When ImageMagick's `import` is installed, pixels of the screen are checked too: where nothing is drawn
-it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after three
-seconds, the sky overhead has the sky colour of the weather with the clouds of the weather over it, and a band of
-water in a cell north of the start shows where the horizon would be (it is black, as the kind of water of the worldspace
-says, so darker than the fog). The water of the cell that has a height of its own is logged once, with its kind of
-water, and the cell that holds the largest float as its height has none. The game has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
+above the player, the player stops at the pillar that is in the way and, strafing east from there, at the person who
+stands in the way (a character with a skeleton in its record, which is solid as an actor is: a ray that looks for actors
+finds it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
+pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
+and in the exterior, where the player looks up after three seconds, the sky overhead has the sky colour of the weather
+with the clouds of the weather over it, and a band of water in a cell north of the start shows where the horizon would
+be (it is black, as the kind of water of the worldspace says, so darker than the fog). The water of the cell that has a
+height of its own is logged once, with its kind of water, and the cell that holds the largest float as its height has
+none. The game has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as
+missing.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -142,10 +145,19 @@ WATER_CENTRE = ((plugin.WATER_CELL[0] + 0.5) * 4096, (plugin.WATER_CELL[1] + 0.5
 WATER_SIDE_RAY = (WATER_CENTRE[0], WATER_CENTRE[1], plugin.WATER_HEIGHT - 10, WATER_CENTRE[0] + 4096,
                   WATER_CENTRE[1], plugin.WATER_HEIGHT - 10)
 
+# Where the strafe starts (the second of the walk script), the radius of the person's body, and where the player ends
+# strafing east, relative to where it starts: the person is NPC_DISTANCE away and the player a box 40 wide, so it comes
+# to a halt about 20 + 20 short of the middle of them
+STRAFE_FROM = 8.0
+PERSON_RADIUS = 20.0
+PERSON_STOP = (plugin.NPC_DISTANCE - 40.0 - 30.0, plugin.NPC_DISTANCE - 40.0 + 5.0)
+
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
 
-# Waits for the player to settle, then walks north (the player faces north at the start) and logs once a second.
+# Waits for the player to settle, then walks north (the player faces north at the start) into the pillar, from the
+# eighth second strafes east into the person that stands there, and logs once a second. At 7.5 s, when it has stopped at
+# the pillar, a ray goes east at the height of the middle of its body and looks for an actor.
 WALK_SCRIPT = """\
 local self = require('openfallout.self')
 local nearby = require('openfallout.nearby')
@@ -157,6 +169,7 @@ local camera = require('openfallout.camera')
 local elapsed = 0
 local nextLog = 0
 local rayDone = false
+local personRayDone = false
 local function log(...) print('OFTEST', ...) end
 local function fmt(v) return string.format('%%.1f,%%.1f,%%.1f', v.x, v.y, v.z) end
 
@@ -166,7 +179,8 @@ return {
             elapsed = elapsed + dt
             if elapsed >= 3 then
                 I.Controls.overrideMovementControls(true)
-                self.controls.movement = 1
+                self.controls.movement = elapsed < 8 and 1 or 0
+                self.controls.sideMovement = elapsed < 8 and 0 or 1
                 self.controls.run = true
                 self.controls.yawChange = 0
                 -- looks up for a second, the pitch stops at straight up
@@ -192,6 +206,14 @@ return {
                     { collisionType = nearby.COLLISION_TYPE.Water })
                 log('ray water side hit=', tostring(side.hit), side.hit and fmt(side.hitPos) or '')
             end
+            if elapsed >= 7.5 and not personRayDone then
+                personRayDone = true
+                local from = self.position + util.vector3(0, 0, 64)
+                local person = nearby.castRay(from, from + util.vector3(600, 0, 0),
+                    { collisionType = nearby.COLLISION_TYPE.Actor, ignore = self.object })
+                log('ray person hit=', tostring(person.hit), person.hit and fmt(person.hitPos) or '',
+                    person.hitObject and tostring(person.hitObject.recordId) or '')
+            end
             if elapsed >= %d then core.quit() end
         end,
     },
@@ -203,6 +225,7 @@ VECTOR = ",".join([NUMBER] * 3)
 SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
 WATER_SIDE_RAY_LINE = re.compile(r"OFTEST\tray water side hit=\t(\w+)")
+PERSON_RAY = re.compile(r"OFTEST\tray person hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\t(.*)")
 WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 
 
@@ -274,6 +297,10 @@ def check(text, scenario, colours):
     for line in text.splitlines():
         if re.search(r"Can't start|Failed to start|Lua error|Fatal error|Failed to load Lua", line, re.I):
             problems.append(line)
+    # a person's body is no obstacle for the navigator (which can not read a cylinder), and its record has its data
+    for line in text.splitlines():
+        if re.search(r"Unsupported shape type|Traits are not found|Base data is not found|NPC traits not found", line):
+            problems.append(line)
     if "using placeholder records" not in text:
         problems.append("the engine did not make placeholder records, so the content had a player record")
     if f"Loading cell {scenario.loaded}" not in text:
@@ -332,13 +359,18 @@ def check(text, scenario, colours):
         if not 0.0 <= z <= 2.0:
             problems.append(f"at {time_:.0f} s the player is {z:.1f} units high, not standing on the floor at 0")
             break
-    x, y, z = samples[-1][3]
+    # the walk north ends at the pillar, and from the eighth second the player strafes east into the person
+    x, y, z = [position for time_, _, _, position, _ in samples if time_ < STRAFE_FROM][-1]
     origin_x, origin_y = scenario.origin
     if not origin_y + STOP_RANGE[0] <= y <= origin_y + STOP_RANGE[1]:
         problems.append(f"the player ended at y={y:.1f}, expected {origin_y + STOP_RANGE[0]:.0f} to "
                         f"{origin_y + STOP_RANGE[1]:.0f} (stopped by the pillar)")
     if abs(x - origin_x) > 5.0:
-        problems.append(f"the player drifted sideways to x={x:.1f}")
+        problems.append(f"the player drifted sideways to x={x:.1f} before the strafe")
+    x, y, z = samples[-1][3]
+    if not origin_x + PERSON_STOP[0] <= x <= origin_x + PERSON_STOP[1]:
+        problems.append(f"the player strafing east ended at x={x:.1f}, expected {origin_x + PERSON_STOP[0]:.0f} to "
+                        f"{origin_x + PERSON_STOP[1]:.0f} (stopped by the person at {origin_x + plugin.NPC_DISTANCE:.0f})")
     # The first person camera follows a node of the skeleton, and with none it stays at the world origin: it has to be
     # above the player, at about the eye height of a human, from the second second on.
     for time_, _, _, (px, py, pz), (cx, cy, cz) in samples:
@@ -361,6 +393,19 @@ def check(text, scenario, colours):
                         f"{plugin.WATER_HEIGHT:g}: {water_rays[0].group(0)}")
     elif not scenario.exterior and water_rays[0].group(1) != "false":
         problems.append(f"the ray cast at the water hit something in an interior cell: {water_rays[0].group(0)}")
+    # The person is a body to collide with, as an actor does: the ray at the actors finds it, at the near edge
+    person_rays = [m for m in map(PERSON_RAY.search, text.splitlines()) if m]
+    if not person_rays:
+        problems.append("the script did not log the ray cast at the person")
+    else:
+        hit, hit_x, hit_object = person_rays[0].group(1), person_rays[0].group(2), person_rays[0].group(5)
+        want_x = scenario.origin[0] + plugin.NPC_DISTANCE - PERSON_RADIUS
+        # (a ray at a cylinder ends a few units off, the tests of Bullet for convex shapes are not exact)
+        form_id = re.search(r"0x([0-9a-f]+)", hit_object, re.I)
+        if (hit != "true" or abs(float(hit_x) - want_x) > 5.0 or not form_id
+                or int(form_id.group(1), 16) & 0xFFFFFF != plugin.NPC_ID):
+            problems.append(f"the ray cast east at the actors did not find the person (form {plugin.NPC_ID:#x}) at "
+                            f"x={want_x:.0f}: {person_rays[0].group(0)}")
     side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
