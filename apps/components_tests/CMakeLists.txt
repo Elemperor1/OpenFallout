@@ -78,6 +78,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testcaravandeck.cpp
     esm4/testcaravanmoney.cpp
     esm4/testcasino.cpp
+    esm4/testcellwater.cpp
     esm4/testcensus.cpp
     esm4/testchallenge.cpp
     esm4/testclimate.cpp

@@ -69,7 +69,7 @@ namespace OFRender
         const double waterHeight = mWater->getHeight();
         const osg::Vec3d cameraPosition = osg::Vec3d() * inverseView;
 
-        mCameraUnderwater = cameraPosition.z() < waterHeight;
+        mCameraUnderwater = mWater->isUnderwater(cameraPosition);
 
         for (osgUtil::RenderLeaf* leaf : _renderLeafList)
         {

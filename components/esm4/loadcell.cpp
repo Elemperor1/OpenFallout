@@ -52,6 +52,7 @@ void ESM4::Cell::load(ESM4::Reader& reader)
     mFlags = reader.hdr().record.flags;
     mParent = reader.currWorld();
     mWaterHeight = sInvalidWaterLevel;
+    mExteriorWaterIsFlagged = reader.isFalloutFile();
     reader.clearCellGrid(); // clear until XCLC FIXME: somehow do this automatically?
 
     // Sometimes cell 0,0 does not have an XCLC sub record (e.g. ToddLand 000009BF)
@@ -242,8 +243,9 @@ void ESM4::Cell::load(ESM4::Reader& reader)
                 throw std::runtime_error("ESM4::CELL::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
         }
     }
-    if (isSkyrim) // Skyrim seems to have broken water level records. But the subrecord exists so it
-                  // shouldn't be skipped.
+    // Skyrim seems to have broken water level records. But the subrecord exists so it shouldn't be skipped. Fallout 3
+    // has the header version of Skyrim LE too, but not its broken records: it keeps its heights.
+    if (isSkyrim && !reader.isFalloutFile())
     {
         mWaterHeight = sInvalidWaterLevel;
     }

@@ -1,5 +1,7 @@
 #include "water.hpp"
 
+#include <cmath>
+#include <limits>
 #include <sstream>
 
 #include <osg/ClipNode>
@@ -32,6 +34,7 @@
 
 #include <components/shader/shadermanager.hpp>
 
+#include <components/esm/util.hpp>
 #include <components/esm3/loadcell.hpp>
 
 #include <components/fallback/fallback.hpp>
@@ -361,6 +364,8 @@ namespace OFRender
         , mTop(0)
         , mInterior(false)
         , mShowWorld(true)
+        , mTileMode(false)
+        , mViewLevel(std::numeric_limits<float>::lowest())
         , mCullCallback(nullptr)
         , mShaderWaterStateSetUpdater(nullptr)
     {
@@ -378,11 +383,26 @@ namespace OFRender
         mWaterNode->addCullCallback(new FudgeCallback);
 
         // simple water fallback for the local map
-        osg::ref_ptr<osg::Geometry> geom2(osg::clone(mWaterGeom.get(), osg::CopyOp::DEEP_COPY_NODES));
-        createSimpleWaterStateSet(geom2, Fallback::Map::getFloat("Water_Map_Alpha"));
-        geom2->setNodeMask(Mask_SimpleWater);
-        geom2->setName("Simple Water Geometry");
-        mWaterNode->addChild(geom2);
+        mSimpleWaterGeom = osg::clone(mWaterGeom.get(), osg::CopyOp::DEEP_COPY_NODES);
+        createSimpleWaterStateSet(mSimpleWaterGeom, Fallback::Map::getFloat("Water_Map_Alpha"));
+        mSimpleWaterGeom->setNodeMask(Mask_SimpleWater);
+        mSimpleWaterGeom->setName("Simple Water Geometry");
+        mWaterNode->addChild(mSimpleWaterGeom);
+
+        // The square of a cell of a worldspace of Fallout, which all the tiles share
+        mTileGeom = SceneUtil::createWaterGeometry(static_cast<float>(Constants::ESM4CellSizeInUnits), 1, 1);
+        mTileGeom->setDrawCallback(new DepthClampCallback);
+        mTileGeom->setNodeMask(Mask_Water);
+        mTileGeom->setDataVariance(osg::Object::STATIC);
+        mTileGeom->setName("Water Tile Geometry");
+        // simple water fallback for the local map, as for the plane of the world
+        mTileSimpleGeom = osg::clone(mTileGeom.get(), osg::CopyOp::DEEP_COPY_NODES);
+        createSimpleWaterStateSet(mTileSimpleGeom, Fallback::Map::getFloat("Water_Map_Alpha"));
+        mTileSimpleGeom->setNodeMask(Mask_SimpleWater);
+        mTileSimpleGeom->setName("Water Tile Simple Geometry");
+        mTileGroup = new osg::Group;
+        mTileGroup->setName("Water Tiles");
+        mWaterNode->addChild(mTileGroup);
 
         mSceneRoot->addChild(mWaterNode);
 
@@ -435,6 +455,8 @@ namespace OFRender
         mWaterNode->setStateSet(nullptr);
         mWaterGeom->setStateSet(nullptr);
         mWaterGeom->setUpdateCallback(nullptr);
+        mTileGeom->setStateSet(nullptr);
+        mTileGeom->setUpdateCallback(nullptr);
 
         if (Settings::water().mShader)
         {
@@ -456,9 +478,13 @@ namespace OFRender
             createShaderWaterStateSet(mWaterNode);
         }
         else
+        {
             createSimpleWaterStateSet(mWaterGeom, Fallback::Map::getFloat("Water_World_Alpha"));
+            createSimpleWaterStateSet(mTileGeom, Fallback::Map::getFloat("Water_World_Alpha"));
+        }
 
         mResourceSystem->getSceneManager()->setUpNormalsRTForStateSet(mWaterGeom->getOrCreateStateSet(), true);
+        mResourceSystem->getSceneManager()->setUpNormalsRTForStateSet(mTileGeom->getOrCreateStateSet(), true);
 
         updateVisible();
     }
@@ -470,7 +496,7 @@ namespace OFRender
 
     osg::Drawable* Water::getDrawable() const
     {
-        return mWaterGeom;
+        return mTileMode ? mTileGeom.get() : mWaterGeom.get();
     }
 
     void Water::createSimpleWaterStateSet(osg::Node* node, float alpha)
@@ -662,7 +688,14 @@ namespace OFRender
     {
         bool isInterior = !store->getCell()->isExterior();
         bool wasInterior = mInterior;
-        if (!isInterior)
+        const bool tileMode = !isInterior && ESM::isEsm4Ext(store->getCell()->getWorldSpace());
+        if (tileMode)
+        {
+            // The tiles are where their cells are
+            mWaterNode->setPosition(osg::Vec3f());
+            mInterior = false;
+        }
+        else if (!isInterior)
         {
             mWaterNode->setPosition(
                 getSceneNodeCoordinates(store->getCell()->getGridX(), store->getCell()->getGridY()));
@@ -675,6 +708,94 @@ namespace OFRender
         }
         if (mInterior != wasInterior && mReflection)
             mReflection->setInterior(mInterior);
+
+        if (tileMode != mTileMode)
+        {
+            mTileMode = tileMode;
+            if (tileMode)
+                setCullCallback(nullptr);
+            updateVisible();
+        }
+    }
+
+    std::optional<float> Water::getTileHeightAt(float x, float y) const
+    {
+        const float size = static_cast<float>(Constants::ESM4CellSizeInUnits);
+        const auto found
+            = mTiles.find({ static_cast<int>(std::floor(x / size)), static_cast<int>(std::floor(y / size)) });
+        if (found == mTiles.end())
+            return std::nullopt;
+        return found->second.mHeight;
+    }
+
+    void Water::addTile(int gridX, int gridY, float height)
+    {
+        removeTile(gridX, gridY);
+
+        const float size = static_cast<float>(Constants::ESM4CellSizeInUnits);
+        const osg::Vec3f centre((gridX + 0.5f) * size, (gridY + 0.5f) * size, height);
+
+        osg::ref_ptr<osg::PositionAttitudeTransform> node(new osg::PositionAttitudeTransform);
+        node->setName("Water Tile");
+        node->setPosition(centre);
+        node->addChild(mTileGeom);
+        node->addChild(mTileSimpleGeom);
+        node->addCullCallback(new FudgeCallback);
+        // The shader finds the place of a point of the water from the position of the node of its tile
+        node->getOrCreateStateSet()->addUniform(new osg::Uniform("nodePosition", centre));
+        mTileGroup->addChild(node);
+
+        mTiles[{ gridX, gridY }] = Tile{ node, height };
+        updateVisible();
+    }
+
+    bool Water::removeTile(int gridX, int gridY)
+    {
+        const auto found = mTiles.find({ gridX, gridY });
+        if (found == mTiles.end())
+            return false;
+        mTileGroup->removeChild(found->second.mNode);
+        mTiles.erase(found);
+        updateVisible();
+        return true;
+    }
+
+    void Water::setViewPoint(const osg::Vec3f& position)
+    {
+        if (!mTileMode)
+            return;
+
+        const std::optional<float> inside = getTileHeightAt(position.x(), position.y());
+        mViewLevel = inside.value_or(std::numeric_limits<float>::lowest());
+
+        // The reflection is of one height: the one of the water the camera is over, or else of the nearest water
+        float level = mTop;
+        if (inside)
+            level = *inside;
+        else if (!mTiles.empty())
+        {
+            const float size = static_cast<float>(Constants::ESM4CellSizeInUnits);
+            float nearest = std::numeric_limits<float>::max();
+            for (const auto& [cell, tile] : mTiles)
+            {
+                const float dx = (cell.first + 0.5f) * size - position.x();
+                const float dy = (cell.second + 0.5f) * size - position.y();
+                const float distance = dx * dx + dy * dy;
+                if (distance < nearest)
+                {
+                    nearest = distance;
+                    level = tile.mHeight;
+                }
+            }
+        }
+
+        if (level != mTop)
+        {
+            mTop = level;
+            mSimulation->setWaterHeight(level);
+            if (mReflection)
+                mReflection->setWaterLevel(level);
+        }
     }
 
     void Water::setHeight(const float height)
@@ -712,8 +833,12 @@ namespace OFRender
 
     void Water::updateVisible()
     {
-        bool visible = mEnabled && mToggled;
+        bool visible = hasWater() && mToggled;
         mWaterNode->setNodeMask(visible ? ~0u : 0u);
+        // The plane of the whole world is for the water that has one height, the tiles for the water of Fallout
+        mWaterGeom->setNodeMask(mTileMode ? 0u : Mask_Water);
+        mSimpleWaterGeom->setNodeMask(mTileMode ? 0u : Mask_SimpleWater);
+        mTileGroup->setNodeMask(mTileMode ? ~0u : 0u);
         if (mReflection)
             mReflection->setNodeMask(visible ? Mask_RenderToTexture : 0u);
         if (mRipples)
@@ -729,6 +854,11 @@ namespace OFRender
 
     bool Water::isUnderwater(const osg::Vec3f& pos) const
     {
+        if (mTileMode)
+        {
+            const std::optional<float> height = getTileHeightAt(pos.x(), pos.y());
+            return height && pos.z() < *height && mToggled;
+        }
         return pos.z() < mTop && mToggled && mEnabled;
     }
 

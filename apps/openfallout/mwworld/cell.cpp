@@ -48,6 +48,17 @@ namespace OFWorld
         return ESM::FormId();
     }
 
+    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world)
+    {
+        CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight };
+        if (cell.isExterior() && world != nullptr && !cell.hasWaterHeight())
+            result.mHeight = world->mWaterLevel;
+        const bool flagged
+            = (cell.mCellFlags & ESM4::CELL_HasWater) || (cell.isExterior() && !cell.mExteriorWaterIsFlagged);
+        result.mHasWater = flagged && ESM4::Cell::isWaterHeight(result.mHeight);
+        return result;
+    }
+
     ESM4::Lighting resolveLighting(
         const ESM4::Lighting& own, const ESM4::Lighting* lightingTemplate, std::uint32_t inheritFlags)
     {
@@ -132,7 +143,7 @@ namespace OFWorld
         : ESM::CellVariant(cell)
         , mIsExterior(!(cell.mCellFlags & ESM4::CELL_Interior))
         , mIsQuasiExterior(cell.mCellFlags & ESM4::CELL_QuasiExt)
-        , mHasWater(cell.mCellFlags & ESM4::CELL_HasWater)
+        , mHasWater(false)
         , mNoSleep(false) // No such notion in ESM4
         , mGridPos(cell.mX, cell.mY)
         , mDisplayname(cell.mFullName)
@@ -145,13 +156,13 @@ namespace OFWorld
     {
         const auto& worlds = OFBase::Environment::get().getESMStore()->get<ESM4::World>();
         const ESM4::World* world = worlds.search(mParent);
-        if (isExterior())
-        {
-            if (world == nullptr)
-                throw std::runtime_error(
-                    "Cell " + cell.mId.toDebugString() + " parent world " + mParent.toDebugString() + " is not found");
-            mWaterHeight = world->mWaterLevel;
-        }
+        if (isExterior() && world == nullptr)
+            throw std::runtime_error(
+                "Cell " + cell.mId.toDebugString() + " parent world " + mParent.toDebugString() + " is not found");
+
+        const CellWater water = resolveCellWater(cell, world);
+        mHasWater = water.mHasWater;
+        mWaterHeight = water.mHeight;
 
         // The weather of a cell is the one of its climate, where a cell of Morrowind has the weather of its region. A
         // cell with no climate has no region, as a cell of Morrowind without one: the weather manager leaves the
