@@ -27,6 +27,8 @@ namespace
     // Havok data changes, so that tiles of the navigation mesh made from the old shapes are not used.
     constexpr std::string_view sHavokHashSuffix = "havok1";
 
+    constexpr std::uint16_t sCollisionObjectActive = 0x1;
+
     bool pathFileNameStartsWithX(const std::string& path)
     {
         const std::size_t slashpos = path.find_last_of("/\\");
@@ -451,7 +453,8 @@ namespace NifBullet
         {
             const auto* object = dynamic_cast<const Nif::bhkCollisionObject*>(node.mCollision.getPtr());
             const Nif::bhkRigidBody* body = nullptr;
-            if (object != nullptr && !object->mBody.empty())
+            // A collision object that is not active (bit 0 of its flags) has its collision turned off
+            if (object != nullptr && (object->mFlags & sCollisionObjectActive) != 0 && !object->mBody.empty())
                 body = dynamic_cast<const Nif::bhkRigidBody*>(object->mBody.getPtr());
 
             // Phantoms are volumes that detect what is in them, and make no obstacle

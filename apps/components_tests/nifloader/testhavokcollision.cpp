@@ -92,6 +92,7 @@ namespace
             mBody.mInfo.mRotation = osg::Quat();
 
             mObject.mRecordType = Nif::RC_bhkCollisionObject;
+            mObject.mFlags = 1;
             mObject.mBody = Nif::bhkWorldObjectPtr(&mBody);
             mRoot.mCollision = Nif::NiCollisionObjectPtr(&mObject);
 
@@ -398,6 +399,18 @@ namespace
         EXPECT_EQ(getTriangles(*compound(*result).getChildShape(0)).size(), 3);
     }
 
+    TEST_F(TestHavokCollision, a_collision_object_that_is_not_active_makes_no_obstacle)
+    {
+        addRenderedGeometry();
+        mObject.mFlags = 0;
+
+        const auto result = load();
+
+        // Nothing in the file is active: what the rendered geometry is stays
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        EXPECT_EQ(compound(*result).getChildShape(0)->getShapeType(), SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE);
+    }
+
     TEST_F(TestHavokCollision, a_body_with_the_flag_for_no_collision_makes_no_obstacle)
     {
         addRenderedGeometry();
@@ -519,6 +532,7 @@ namespace
         trigger.mShape = Nif::bhkShapePtr(&mBox);
         Nif::bhkCollisionObject object;
         object.mRecordType = Nif::RC_bhkCollisionObject;
+        object.mFlags = 1;
         object.mBody = Nif::bhkWorldObjectPtr(&trigger);
         Nif::NiNode child;
         init(child);
