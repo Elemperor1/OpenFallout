@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <map>
 
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadwrld.hpp>
@@ -38,6 +40,26 @@ namespace OFWorld
         {
             ESM4::World world;
             world.mWaterLevel = waterLevel;
+            return world;
+        }
+
+        // The worldspaces of a plugin by their form ids, as the lookup of a store gives them
+        std::function<const ESM4::World*(ESM::FormId)> lookup(const std::map<ESM::FormId, ESM4::World>& worlds)
+        {
+            return [&worlds](ESM::FormId id) -> const ESM4::World* {
+                const auto it = worlds.find(id);
+                return it != worlds.end() ? &it->second : nullptr;
+            };
+        }
+
+        ESM4::World makeChild(
+            ESM::FormId id, ESM::FormId parent, std::uint16_t useFlags, float waterLevel, ESM::FormId water)
+        {
+            ESM4::World world = makeWorld(waterLevel);
+            world.mId = id;
+            world.mParent = parent;
+            world.mParentUseFlags = useFlags;
+            world.mWater = water;
             return world;
         }
 
@@ -176,6 +198,125 @@ namespace OFWorld
 
             cell.mWater = ESM::FormId::fromUint32(0x001009CA);
             EXPECT_EQ(resolveCellWater(cell, nullptr).mType, cell.mWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aWorldspaceThatUsesTheWaterOfItsParentHasThePartsOfItsParent)
+        {
+            const ESM::FormId parentId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            const ESM::FormId parentWater = ESM::FormId::fromUint32(0x00030009);
+            const ESM::FormId childWater = ESM::FormId::fromUint32(0x001009CA);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[parentId] = makeChild(parentId, ESM::FormId(), 0, -2300.f, parentWater);
+            worlds[childId] = makeChild(childId, parentId, ESM4::World::UseFlag_Water, 500.f, childWater);
+
+            const ESM4::Cell cell = exterior(true, sLargestFloat);
+            const CellWater water = resolveCellWater(cell, &worlds[childId], lookup(worlds));
+            EXPECT_TRUE(water.mHasWater);
+            EXPECT_EQ(water.mHeight, -2300.f);
+            EXPECT_EQ(water.mType, parentWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aCellOfTheWorldspaceThatNamesItsOwnWaterKeepsIt)
+        {
+            const ESM::FormId parentId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[parentId] = makeChild(parentId, ESM::FormId(), 0, -2300.f, ESM::FormId::fromUint32(0x00030009));
+            worlds[childId]
+                = makeChild(childId, parentId, ESM4::World::UseFlag_Water, 500.f, ESM::FormId::fromUint32(0x001009CA));
+
+            ESM4::Cell cell = exterior(true, 2600.f);
+            cell.mWater = ESM::FormId::fromUint32(0x0010FFFF);
+            const CellWater water = resolveCellWater(cell, &worlds[childId], lookup(worlds));
+            EXPECT_EQ(water.mHeight, 2600.f);
+            EXPECT_EQ(water.mType, cell.mWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aWorldspaceThatDoesNotUseTheWaterOfItsParentHasItsOwn)
+        {
+            const ESM::FormId parentId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            const ESM::FormId childWater = ESM::FormId::fromUint32(0x001009CA);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[parentId] = makeChild(parentId, ESM::FormId(), 0, -2300.f, ESM::FormId::fromUint32(0x00030009));
+            // the flag of the climate is not the one of the water
+            worlds[childId] = makeChild(childId, parentId, ESM4::World::UseFlag_Climate, 500.f, childWater);
+
+            const CellWater water = resolveCellWater(exterior(true, sLargestFloat), &worlds[childId], lookup(worlds));
+            EXPECT_EQ(water.mHeight, 500.f);
+            EXPECT_EQ(water.mType, childWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, theWaterOfAWorldspaceComesFromTheTopOfTheChainOfParents)
+        {
+            const ESM::FormId topId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId middleId = ESM::FormId::fromUint32(0x00000200);
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000300);
+            const ESM::FormId topWater = ESM::FormId::fromUint32(0x00030009);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[topId] = makeChild(topId, ESM::FormId(), 0, -2300.f, topWater);
+            worlds[middleId]
+                = makeChild(middleId, topId, ESM4::World::UseFlag_Water, 100.f, ESM::FormId::fromUint32(0x001009CA));
+            worlds[childId]
+                = makeChild(childId, middleId, ESM4::World::UseFlag_Water, 500.f, ESM::FormId::fromUint32(0x001009CB));
+
+            const CellWater water = resolveCellWater(exterior(true, sLargestFloat), &worlds[childId], lookup(worlds));
+            EXPECT_EQ(water.mHeight, -2300.f);
+            EXPECT_EQ(water.mType, topWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aWorldspaceWhoseParentIsNotFoundHasItsOwnWater)
+        {
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            const ESM::FormId childWater = ESM::FormId::fromUint32(0x001009CA);
+            const std::map<ESM::FormId, ESM4::World> worlds;
+            const ESM4::World child = makeChild(
+                childId, ESM::FormId::fromUint32(0x00000100), ESM4::World::UseFlag_Water, 500.f, childWater);
+
+            const CellWater water = resolveCellWater(exterior(true, sLargestFloat), &child, lookup(worlds));
+            EXPECT_TRUE(water.mHasWater);
+            EXPECT_EQ(water.mHeight, 500.f);
+            EXPECT_EQ(water.mType, childWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aWorldspaceWithoutALookupHasItsOwnWater)
+        {
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            const ESM4::World child = makeChild(childId, ESM::FormId::fromUint32(0x00000100),
+                ESM4::World::UseFlag_Water, 500.f, ESM::FormId::fromUint32(0x001009CA));
+
+            const CellWater water = resolveCellWater(exterior(true, sLargestFloat), &child);
+            EXPECT_EQ(water.mHeight, 500.f);
+            EXPECT_EQ(water.mType, child.mWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, aLoopOfParentsEndsTheWalkWithoutHangingTheGame)
+        {
+            const ESM::FormId firstId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId secondId = ESM::FormId::fromUint32(0x00000200);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[firstId] = makeChild(
+                firstId, secondId, ESM4::World::UseFlag_Water, -2300.f, ESM::FormId::fromUint32(0x00030009));
+            worlds[secondId]
+                = makeChild(secondId, firstId, ESM4::World::UseFlag_Water, 500.f, ESM::FormId::fromUint32(0x001009CA));
+
+            const CellWater water = resolveCellWater(exterior(true, sLargestFloat), &worlds[firstId], lookup(worlds));
+            EXPECT_TRUE(water.mHasWater);
+            EXPECT_EQ(water.mHeight, 500.f);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, anInteriorCellDoesNotTakeTheWaterOfTheParentsOfAWorldspace)
+        {
+            const ESM::FormId parentId = ESM::FormId::fromUint32(0x00000100);
+            const ESM::FormId childId = ESM::FormId::fromUint32(0x00000200);
+            std::map<ESM::FormId, ESM4::World> worlds;
+            worlds[parentId] = makeChild(parentId, ESM::FormId(), 0, -2300.f, ESM::FormId::fromUint32(0x00030009));
+            worlds[childId] = makeChild(childId, parentId, ESM4::World::UseFlag_Water, 500.f, ESM::FormId());
+
+            const CellWater water = resolveCellWater(interior(true, 120.f), &worlds[childId], lookup(worlds));
+            EXPECT_EQ(water.mHeight, 120.f);
+            EXPECT_TRUE(water.mType.isZeroOrUnset());
         }
     }
 }

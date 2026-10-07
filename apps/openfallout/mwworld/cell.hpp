@@ -71,8 +71,11 @@ namespace OFWorld
     /// The water of a Fallout cell: it has water when its flags say so and it has a height of water, its own or, for an
     /// exterior cell, the default one of its worldspace (the cells of a worldspace have the largest float as their own
     /// height when they have none). The heights of the cells inside that the game files fill with the largest float or
-    /// the smallest integer are no heights, so such a cell has no water.
-    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world);
+    /// the smallest integer are no heights, so such a cell has no water. The water of a worldspace is the one of its
+    /// parent (and so on up the chain) when its flags say that it uses the water data of its parent, which is looked
+    /// up with findWorld; without it a parent is never found.
+    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world,
+        const std::function<const ESM4::World*(ESM::FormId)>& findWorld = {});
 
     class Cell : public ESM::CellVariant
     {
