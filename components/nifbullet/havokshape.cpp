@@ -53,6 +53,7 @@ namespace NifBullet
             Layer_CustomPick2 = 40,
             Layer_SpellExplosion = 41,
             Layer_DroppingPick = 42,
+            Layer_Null = 43,
         };
 
         btVector3 toBullet(const osg::Vec4f& value, float scale)
@@ -227,6 +228,7 @@ namespace NifBullet
             case Layer_CustomPick2:
             case Layer_SpellExplosion:
             case Layer_DroppingPick:
+            case Layer_Null:
                 return false;
             default:
                 return true;

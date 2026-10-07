@@ -85,6 +85,7 @@ namespace
             mBody.mRecordType = Nif::RC_bhkRigidBody;
             mBody.mShape = Nif::bhkShapePtr(&mBox);
             mBody.mHavokFilter.mLayer = staticLayer;
+            mBody.mInfo.mResponseType = Nif::HkResponseType::Response_SimpleContact;
             mBody.mInfo.mTranslation = osg::Vec4f();
             mBody.mInfo.mRotation = osg::Quat();
 
@@ -386,11 +387,41 @@ namespace
         EXPECT_EQ(compound(*result).getChildShape(0)->getShapeType(), SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE);
     }
 
+    TEST_F(TestHavokCollision, a_body_that_only_reports_or_does_nothing_makes_no_obstacle)
+    {
+        addRenderedGeometry();
+
+        for (const Nif::HkResponseType response :
+            { Nif::HkResponseType::Response_Reporting, Nif::HkResponseType::Response_None })
+        {
+            mBody.mInfo.mResponseType = response;
+
+            const auto result = load();
+
+            // Nothing in the file stops what touches it: what the rendered geometry is stays
+            ASSERT_NE(result->mCollisionShape, nullptr);
+            EXPECT_EQ(compound(*result).getChildShape(0)->getShapeType(), SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE)
+                << static_cast<int>(response);
+        }
+    }
+
+    TEST_F(TestHavokCollision, a_body_with_no_response_set_is_solid)
+    {
+        // The response type of a body is unset (invalid) in some files, and what that body is is by its layer
+        mBody.mInfo.mResponseType = Nif::HkResponseType::Response_Invalid;
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        EXPECT_EQ(compound(*result).getChildShape(0)->getShapeType(), BOX_SHAPE_PROXYTYPE);
+    }
+
     TEST_F(TestHavokCollision, a_solid_body_leaves_out_a_body_that_is_not_solid_of_the_same_file)
     {
         Nif::bhkRigidBody trigger;
         trigger.mRecordType = Nif::RC_bhkRigidBody;
         trigger.mHavokFilter.mLayer = triggerLayer;
+        trigger.mInfo.mResponseType = Nif::HkResponseType::Response_SimpleContact;
         trigger.mInfo.mRotation = osg::Quat();
         trigger.mShape = Nif::bhkShapePtr(&mBox);
         Nif::bhkCollisionObject object;
@@ -452,8 +483,9 @@ namespace
         // Static, animated static, transparent, clutter, trees, props, terrain, ground and invisible walls
         for (std::uint8_t layer : { 1, 2, 3, 4, 9, 10, 13, 17, 27 })
             EXPECT_TRUE(NifBullet::isSolidHavokLayer(layer)) << static_cast<int>(layer);
-        // Weapons, projectiles, biped, water, triggers, non collidable, portals, zones, picking and line of sight
-        for (std::uint8_t layer : { 5, 6, 8, 11, 12, 15, 18, 21, 22, 23, 35, 36, 37, 38 })
+        // Weapons, projectiles, biped, water, triggers, non collidable, portals, zones, picking, line of sight and the
+        // null layer
+        for (std::uint8_t layer : { 5, 6, 8, 11, 12, 15, 18, 21, 22, 23, 35, 36, 37, 38, 43 })
             EXPECT_FALSE(NifBullet::isSolidHavokLayer(layer)) << static_cast<int>(layer);
         // A layer that is not known is solid
         EXPECT_TRUE(NifBullet::isSolidHavokLayer(200));
