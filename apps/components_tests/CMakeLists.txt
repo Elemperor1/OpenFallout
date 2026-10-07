@@ -138,6 +138,7 @@ file(GLOB UNITTEST_SRC_FILES
     nifosg/testnifloader.cpp
 
     esmterrain/testgridsampling.cpp
+    esmterrain/testtexturepath.cpp
 
     resource/testmultiobjectcache.cpp
     resource/testobjectcache.cpp

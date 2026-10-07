@@ -20,8 +20,8 @@ files of the games.
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
 writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
-`meshes/openfallout/wall.nif`, `meshes/characters/_male/skeleton.nif` and `textures/sky/oftestclouds.dds` into the
-folder.
+`meshes/openfallout/wall.nif`, `meshes/characters/_male/skeleton.nif`, `textures/sky/oftestclouds.dds` and
+`textures/landscape/oftestground.dds` into the folder.
 """
 import argparse
 import struct
@@ -60,7 +60,9 @@ SUIT_ID = 0x81A
 WALL_ID = 0x81B
 WALL_REF_ID = 0x81C
 EXTERIOR_WALL_REF_ID = 0x81D
-LAST_ID = EXTERIOR_WALL_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
+TEXTURE_SET_ID = 0x81E
+LAND_TEXTURE_ID = 0x81F
+LAST_ID = LAND_TEXTURE_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -149,6 +151,12 @@ WEATHER_SUN = ((255, 255, 255), (255, 255, 255), (255, 120, 40), (0, 0, 0))
 # or how far they have drifted.
 CLOUD_TEXTURE = "sky\\OFTestClouds.dds"
 CLOUD_ALPHA = 128
+# The texture of the ground of the exterior cell: a landscape texture record names a texture set (as the records of
+# Fallout 3 and New Vegas do) and has an icon filename that is not where the texture is, the texture set names the file
+# relative to the textures directory, and the file is one colour.
+GROUND_TEXTURE = "landscape\\OFTestGround.dds"
+GROUND_ICON = "landscape\\OFTestIcon.dds"
+GROUND_COLOUR = (200, 40, 40)
 # Where the fog starts and ends, in game units, by day and by night, then its power by day and by night.
 WEATHER_FOG_DAY = (300.0, 12000.0)
 WEATHER_FOG_NIGHT = (150.0, 6000.0)
@@ -222,7 +230,19 @@ def weather(form_id=WEATHER_ID, name=WEATHER_NAME):
 
 def cloud_texture(size=4):
     """The image of the clouds, a DDS file of uncompressed 32 bit pixels, white with CLOUD_ALPHA as alpha."""
-    pixels = bytes((255, 255, 255, CLOUD_ALPHA)) * (size * size)
+    return dds_texture((255, 255, 255, CLOUD_ALPHA), size)
+
+
+def ground_texture(size=4):
+    """The image of the ground, a DDS file of one colour (opaque)."""
+    return dds_texture((*GROUND_COLOUR, 255), size)
+
+
+def dds_texture(colour, size):
+    """A DDS file of uncompressed 32 bit pixels of one colour (red, green, blue, alpha), whose bytes are in the order of
+    the masks below, blue first."""
+    red, green, blue, alpha = colour
+    pixels = bytes((blue, green, red, alpha)) * (size * size)
     # magic, header size, flags (caps, height, width, pitch, pixel format), height, width, pitch, depth, mip maps, 11
     # reserved, then the pixel format: size, flags (alpha and rgb), four character code, bits, the masks of red, green,
     # blue and alpha, then the caps (texture) and 4 more words
@@ -257,16 +277,32 @@ def climate():
                                         sub(b"TNAM", struct.pack("<6B", 36, 42, 108, 114, 0, 0))])
 
 
-def land(form_id=EXTERIOR_LAND_ID, height=0.0):
-    """A LAND record: a flat terrain at the height over the whole cell, 33 by 33 vertices with normals pointing up and no
-    textures (the engine uses the default one of the game)."""
+def land(form_id=EXTERIOR_LAND_ID, height=0.0, textured=False):
+    """A LAND record: a flat terrain at the height over the whole cell, 33 by 33 vertices with normals pointing up, and
+    with the base texture of GROUND_TEXTURE on each quadrant when `textured` (otherwise none, and the engine uses the
+    default one of the game)."""
     flags = 0x1 | 0x2  # has normals and heights
     normals = bytes((0, 0, 127)) * (33 * 33)
     # The height of the first vertex in steps of 8 units, then for each vertex the difference to the one before it (a
     # signed byte, in steps of 8 units), then 3 bytes of padding.
     heights = struct.pack("<f", height / 8) + bytes(33 * 33) + bytes(3)
+    base_textures = [sub(b"BTXT", struct.pack("<IBBH", LAND_TEXTURE_ID, quadrant, 0, 0)) for quadrant in range(4)]
     return record(b"LAND", form_id, [sub(b"DATA", struct.pack("<I", flags)), sub(b"VNML", normals),
-                                     sub(b"VHGT", heights)])
+                                     sub(b"VHGT", heights)] + (base_textures if textured else []))
+
+
+def land_texture():
+    """A LTEX record as Fallout has them: the filename of an icon (which is not the texture), the texture set that has
+    the texture, the havok data and the specular exponent."""
+    return record(b"LTEX", LAND_TEXTURE_ID, [zstr(b"EDID", "OFTestGround"), zstr(b"ICON", GROUND_ICON),
+                                             sub(b"TNAM", struct.pack("<I", TEXTURE_SET_ID)),
+                                             sub(b"HNAM", bytes((2, 30, 30))), sub(b"SNAM", bytes((30,)))])
+
+
+def texture_set():
+    """A TXST record with the diffuse texture of the ground, which a landscape texture names."""
+    return record(b"TXST", TEXTURE_SET_ID, [zstr(b"EDID", "OFTestGroundSet"), zstr(b"TX00", GROUND_TEXTURE),
+                                            sub(b"DNAM", struct.pack("<H", 0))])
 
 
 def part_path(name):
@@ -346,7 +382,7 @@ def worldspace():
                                              sub(b"XCLW", struct.pack("<f", FLOAT_MAX))])
     half = EXTERIOR_CELL_SIZE / 2
     refs = group(struct.pack("<I", EXTERIOR_CELL_ID), 9, [
-        land(),
+        land(textured=True),
         refr(EXTERIOR_PILLAR_ID, CUBE_ID, (half, half + PILLAR_DISTANCE, CUBE / 2)),
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
         achr(EXTERIOR_NPC_REF_ID, (half + NPC_DISTANCE, half + NPC_DEPTH, 0.0)),
@@ -396,6 +432,7 @@ def plugin():
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
+            + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"NPC_", [person()])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
@@ -447,6 +484,9 @@ def write(out):
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())
+    ground = out / "textures" / Path(GROUND_TEXTURE.replace("\\", "/")).parent / "oftestground.dds"
+    ground.parent.mkdir(parents=True, exist_ok=True)
+    ground.write_bytes(ground_texture())
     skeleton = out / "meshes" / Path(SKELETON.replace("\\", "/"))
     skeleton.parent.mkdir(parents=True, exist_ok=True)
     skeleton.write_bytes(placeholder_skeleton.skeleton())
