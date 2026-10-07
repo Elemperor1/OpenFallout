@@ -322,7 +322,7 @@ namespace ESM4
         {
             stream << "\nThe base objects that no record was found for, most references first (form ID: references)\n";
             for (const auto& [id, number] : unknown)
-                stream << id.toString("0x") << ": " << number << '\n';
+                stream << id.toString() << ": " << number << '\n';
         }
 
         stream << '\n' << mDeleted << " references of earlier files are deleted by later ones\n";
