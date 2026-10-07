@@ -881,9 +881,14 @@ namespace OFRender
         mPostProcessor->getStateUpdater()->setWaterHeight(height);
     }
 
-    void RenderingManager::addWaterTile(int gridX, int gridY, float height)
+    void RenderingManager::setWaterLook(const WaterLook& look)
     {
-        mWater->addTile(gridX, gridY, height);
+        mWater->setLook(look);
+    }
+
+    void RenderingManager::addWaterTile(int gridX, int gridY, float height, const WaterLook& look)
+    {
+        mWater->addTile(gridX, gridY, height, look);
         updateWaterEnabled();
     }
 

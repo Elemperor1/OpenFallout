@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,26 @@ namespace ESM4
         };
 #pragma pack(pop)
 
+        struct Colour
+        {
+            std::uint8_t mRed = 0;
+            std::uint8_t mGreen = 0;
+            std::uint8_t mBlue = 0;
+        };
+
+        /// How a water looks, from the first 52 bytes of its settings: the colour of shallow water and of deep water,
+        /// the colour of what it reflects, and how much it reflects. The alpha byte of a colour is not read, no game
+        /// uses it.
+        struct Appearance
+        {
+            Colour mShallow;
+            Colour mDeep;
+            Colour mReflection;
+            float mSunPower = 0.f;
+            float mReflectivity = 0.f; // 0.6 for the clean water of New Vegas
+            float mFresnel = 0.f;
+        };
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
@@ -39,6 +60,11 @@ namespace ESM4
         std::vector<std::uint8_t> mData; // DATA, the damage in the shorter form, all settings in the longer
         std::vector<std::uint8_t> mVisualData; // DNAM
         RelatedWaters mRelatedWaters; // GNAM, unused by the game
+
+        /// The appearance given by the settings of the water: the DNAM sub-record, or the DATA sub-record of a water
+        /// that has all its settings in it (8 of the water types of New Vegas have no DNAM). Nothing when the record
+        /// has neither or when one of the numbers is not finite.
+        std::optional<Appearance> appearance() const;
 
         /// Throws on unknown sub-records, on sizes that no known version of the record has, and on bytes of
         /// the record that no sub-record accounts for.

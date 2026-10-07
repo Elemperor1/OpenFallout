@@ -4,6 +4,8 @@
 #include <chrono>
 #include <limits>
 #include <optional>
+#include <sstream>
+#include <string>
 
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 
@@ -37,6 +39,7 @@
 #include "../mwrender/landmanager.hpp"
 #include "../mwrender/postprocessor.hpp"
 #include "../mwrender/renderingmanager.hpp"
+#include "../mwrender/waterlook.hpp"
 
 #include "../mwphysics/actor.hpp"
 #include "../mwphysics/heightfield.hpp"
@@ -96,6 +99,30 @@ namespace
     {
         if (ptr.getRefData().getBaseNode())
             rendering.rotateObject(ptr, rotation);
+    }
+
+    struct CellWaterLook
+    {
+        OFRender::WaterLook mLook;
+        std::string mDescription; // for the log
+    };
+
+    /// How the water of a cell looks from the kind of water it has, the standard look for water without a kind of
+    /// water or with one that is not found or has no settings
+    CellWaterLook findWaterLook(const OFWorld::ESMStore& store, ESM::FormId type)
+    {
+        if (type.isZeroOrUnset())
+            return { OFRender::WaterLook::standard(), "no water type" };
+        const ESM4::Water* water = store.get<ESM4::Water>().search(ESM::RefId(type));
+        if (water == nullptr)
+            return { OFRender::WaterLook::standard(), "water type " + ESM::RefId(type).toDebugString() + " not found" };
+        const std::optional<OFRender::WaterLook> look = OFRender::makeWaterLook(*water);
+        if (!look)
+            return { OFRender::WaterLook::standard(), "water type " + water->mEditorId + " without settings" };
+        std::ostringstream description;
+        description << "water type " << water->mEditorId << " (opacity " << static_cast<int>(water->mOpacity)
+                    << "%, reflectivity " << look->mReflectivity << ")";
+        return { *look, description.str() };
     }
 
     VFS::Path::Normalized getModel(const OFWorld::Ptr& ptr)
@@ -518,8 +545,10 @@ namespace OFWorld
                 // Where the terrain is above the water there is nothing to see
                 if (!lowestTerrain || waterLevel >= *lowestTerrain)
                 {
-                    Log(Debug::Info) << "Water of cell " << cellVariant.getDescription() << " at height " << waterLevel;
-                    mRendering.addWaterTile(cellX, cellY, waterLevel);
+                    const CellWaterLook look = findWaterLook(mWorld.getStore(), cellVariant.getWaterType());
+                    Log(Debug::Info) << "Water of cell " << cellVariant.getDescription() << " at height " << waterLevel
+                                     << ", " << look.mDescription;
+                    mRendering.addWaterTile(cellX, cellY, waterLevel, look.mLook);
                     mPhysics->addWaterTile(cellX, cellY, waterLevel, static_cast<float>(ESM::getCellSize(worldspace)));
                 }
                 if (mPhysics->getHeightField(cellX, cellY))
@@ -533,6 +562,7 @@ namespace OFWorld
             mRendering.setWaterEnabled(waterEnabled);
             if (waterEnabled)
             {
+                mRendering.setWaterLook(findWaterLook(mWorld.getStore(), cellVariant.getWaterType()).mLook);
                 mPhysics->enableWater(waterLevel);
                 mRendering.setWaterHeight(waterLevel);
 

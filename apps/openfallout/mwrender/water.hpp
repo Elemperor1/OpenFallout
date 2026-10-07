@@ -14,6 +14,8 @@
 #include <components/settings/settings.hpp>
 #include <components/vfs/pathutil.hpp>
 
+#include "waterlook.hpp"
+
 namespace osg
 {
     class Group;
@@ -82,7 +84,9 @@ namespace OFRender
         struct Tile
         {
             osg::ref_ptr<osg::PositionAttitudeTransform> mNode;
+            osg::ref_ptr<osg::Group> mSurface; // the node of the geometry of the surface, under the node of the tile
             float mHeight;
+            WaterLook mLook;
         };
         std::map<std::pair<int, int>, Tile> mTiles;
         osg::ref_ptr<osg::Group> mTileGroup;
@@ -91,6 +95,7 @@ namespace OFRender
         osg::ref_ptr<osg::Geometry> mSimpleWaterGeom;
         bool mTileMode;
         float mViewLevel;
+        WaterLook mLook = WaterLook::standard();
 
         std::optional<float> getTileHeightAt(float x, float y) const;
 
@@ -105,6 +110,12 @@ namespace OFRender
         void createShaderWaterStateSet(osg::Node* node);
 
         void updateWaterMaterial();
+
+        /// Give the look to the water of a tile or to the one plane: as the uniforms of the shader of the water, and
+        /// without the shader as the colour and alpha of the material of its surface, which has the look of the water
+        /// of Morrowind when the look is the standard one.
+        void applyTileLook(Tile& tile);
+        void applyPlaneLook();
 
     public:
         Water(osg::Group* parent, osg::Group* sceneRoot, Resource::ResourceSystem* resourceSystem,
@@ -131,7 +142,7 @@ namespace OFRender
         bool isTiled() const { return mTileMode; }
 
         /// The water of a cell of a worldspace of Fallout, replacing the water the cell had.
-        void addTile(int gridX, int gridY, float height);
+        void addTile(int gridX, int gridY, float height, const WaterLook& look);
         /// Returns whether the cell had a tile.
         bool removeTile(int gridX, int gridY);
 
@@ -154,6 +165,10 @@ namespace OFRender
 
         void changeCell(const OFWorld::CellStore* store);
         void setHeight(const float height);
+        /// The look of the water that is one plane (the water of an interior cell or of the worldspace of Morrowind),
+        /// which a tile gets as it is made.
+        void setLook(const WaterLook& look);
+        const WaterLook& getLook() const { return mLook; }
         void setRainIntensity(const float rainIntensity);
 
         void update(float dt, bool paused);

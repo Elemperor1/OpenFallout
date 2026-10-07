@@ -100,6 +100,7 @@ namespace OFRender
     class Pathgrid;
     class Camera;
     class Water;
+    struct WaterLook;
     class TerrainStorage;
     class LandManager;
     class NavMesh;
@@ -169,8 +170,12 @@ namespace OFRender
         void setWaterEnabled(bool enabled);
         void setWaterHeight(float level);
 
-        /// The water of an exterior cell of a worldspace of Fallout, at its own height. The tile goes with the cell.
-        void addWaterTile(int gridX, int gridY, float height);
+        /// How the water that is one plane looks, until the next call: the water of an interior cell, or of Morrowind.
+        void setWaterLook(const WaterLook& look);
+
+        /// The water of an exterior cell of a worldspace of Fallout, at its own height and with its own look. The tile
+        /// goes with the cell.
+        void addWaterTile(int gridX, int gridY, float height, const WaterLook& look);
 
         /// Take a screenshot of w*h onto the given image, not including the GUI.
         void screenshot(osg::Image* image, int w, int h);

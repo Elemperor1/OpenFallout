@@ -50,9 +50,11 @@ namespace OFWorld
 
     CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world)
     {
-        CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight };
+        CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight, .mType = cell.mWater };
         if (cell.isExterior() && world != nullptr && !cell.hasWaterHeight())
             result.mHeight = world->mWaterLevel;
+        if (result.mType.isZeroOrUnset() && cell.isExterior() && world != nullptr)
+            result.mType = world->mWater;
         const bool flagged
             = (cell.mCellFlags & ESM4::CELL_HasWater) || (cell.isExterior() && !cell.mExteriorWaterIsFlagged);
         result.mHasWater = flagged && ESM4::Cell::isWaterHeight(result.mHeight);
@@ -163,6 +165,7 @@ namespace OFWorld
         const CellWater water = resolveCellWater(cell, world);
         mHasWater = water.mHasWater;
         mWaterHeight = water.mHeight;
+        mWaterType = water.mType;
 
         // The weather of a cell is the one of its climate, where a cell of Morrowind has the weather of its region. A
         // cell with no climate has no region, as a cell of Morrowind without one: the weather manager leaves the

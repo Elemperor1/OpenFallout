@@ -144,5 +144,38 @@ namespace OFWorld
         {
             EXPECT_FALSE(resolveCellWater(interior(false, 120.f), nullptr).mHasWater);
         }
+
+        TEST(OFWorldResolveCellWaterTest, anExteriorCellTakesTheKindOfWaterOfItsWorldspaceUnlessItNamesOne)
+        {
+            ESM4::World world = makeWorld(-2300.f);
+            world.mWater = ESM::FormId::fromUint32(0x00030009);
+
+            ESM4::Cell cell = exterior(true, 2600.f);
+            EXPECT_EQ(resolveCellWater(cell, &world).mType, world.mWater);
+
+            cell.mWater = ESM::FormId::fromUint32(0x001009CA);
+            EXPECT_EQ(resolveCellWater(cell, &world).mType, cell.mWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, anInteriorCellHasNoKindOfWaterUnlessItNamesOne)
+        {
+            ESM4::World world = makeWorld(-2300.f);
+            world.mWater = ESM::FormId::fromUint32(0x00030009);
+
+            ESM4::Cell cell = interior(true, 120.f);
+            EXPECT_TRUE(resolveCellWater(cell, &world).mType.isZeroOrUnset());
+
+            cell.mWater = ESM::FormId::fromUint32(0x001009CA);
+            EXPECT_EQ(resolveCellWater(cell, &world).mType, cell.mWater);
+        }
+
+        TEST(OFWorldResolveCellWaterTest, anExteriorCellWithoutAWorldspaceHasNoKindOfWaterUnlessItNamesOne)
+        {
+            ESM4::Cell cell = exterior(true, 2600.f);
+            EXPECT_TRUE(resolveCellWater(cell, nullptr).mType.isZeroOrUnset());
+
+            cell.mWater = ESM::FormId::fromUint32(0x001009CA);
+            EXPECT_EQ(resolveCellWater(cell, nullptr).mType, cell.mWater);
+        }
     }
 }
