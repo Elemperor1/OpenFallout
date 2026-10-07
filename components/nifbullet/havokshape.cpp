@@ -141,8 +141,9 @@ namespace NifBullet
             return makeConvexHullShape(points);
         }
 
-        // The triangle strips of the data of a bhkNiTriStripsShape, in game units, in one mesh. A data that has a
-        // filter that stops nothing is left out.
+        // The triangle strips of the data of a bhkNiTriStripsShape in one mesh. The vertices of an NiTriStripsData are
+        // in game units already (only the packed data of a bhkPackedNiTriStripsShape is in Havok units), so only the
+        // scale of the shape is applied. A data that has a filter that stops nothing is left out.
         std::unique_ptr<btCollisionShape> makeStripsShape(const Nif::bhkNiTriStripsShape& shape)
         {
             osg::Vec3f scale(1.f, 1.f, 1.f);
@@ -162,8 +163,7 @@ namespace NifBullet
                 std::vector<btVector3> vertices;
                 vertices.reserve(data.mVertices.size());
                 for (const osg::Vec3f& vertex : data.mVertices)
-                    vertices.emplace_back(vertex.x() * scale.x() * sHavokScale, vertex.y() * scale.y() * sHavokScale,
-                        vertex.z() * scale.z() * sHavokScale);
+                    vertices.emplace_back(vertex.x() * scale.x(), vertex.y() * scale.y(), vertex.z() * scale.z());
 
                 for (const std::vector<std::uint16_t>& strip : data.mStrips)
                 {

@@ -561,12 +561,12 @@ namespace
         expectNear(shape.getChildTransform(0).getBasis() * btVector3(1, 0, 0), btVector3(0, 1, 0));
     }
 
-    TEST_F(TestHavokCollision, triangle_strips_are_made_in_game_units_and_a_data_that_stops_nothing_is_left_out)
+    TEST_F(TestHavokCollision, triangle_strips_are_taken_as_they_are_and_a_data_that_stops_nothing_is_left_out)
     {
         // Two triangles of a strip of four vertices, and a strip of another data that is in a layer that is no obstacle
         Nif::NiTriStripsData wall;
         wall.mRecordType = Nif::RC_NiTriStripsData;
-        wall.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0), osg::Vec3f(1, 1, 0) };
+        wall.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(10, 0, 0), osg::Vec3f(0, 10, 0), osg::Vec3f(10, 10, 0) };
         wall.mStrips = { { 0, 1, 2, 3 } };
         Nif::NiTriStripsData trigger;
         trigger.mRecordType = Nif::RC_NiTriStripsData;
@@ -588,7 +588,29 @@ namespace
         ASSERT_EQ(triangles.size(), 6);
         const auto [min, max] = getBounds(triangles);
         expectNear(min, btVector3(0, 0, 0));
-        expectNear(max, btVector3(7, 7, 0));
+        expectNear(max, btVector3(10, 10, 0));
+    }
+
+    TEST_F(TestHavokCollision, triangle_strips_have_the_scale_of_their_shape)
+    {
+        Nif::NiTriStripsData data;
+        data.mRecordType = Nif::RC_NiTriStripsData;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0) };
+        data.mStrips = { { 0, 1, 2 } };
+        Nif::bhkNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkNiTriStripsShape;
+        strips.mScale = osg::Vec4f(2, 3, 1, 0);
+        strips.mData = { Nif::RecordPtrT<Nif::NiTriStripsData>(&data) };
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        const auto [min, max] = getBounds(getTriangles(*shape.getChildShape(0)));
+        expectNear(min, btVector3(0, 0, 0));
+        expectNear(max, btVector3(2, 3, 0));
     }
 
     TEST_F(TestHavokCollision, triangle_strips_leave_out_a_triangle_that_has_a_vertex_twice_or_not_at_all)
