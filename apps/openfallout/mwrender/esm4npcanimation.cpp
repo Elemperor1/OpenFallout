@@ -36,16 +36,9 @@ namespace OFRender
         if (traits->mIsTES4)
             updatePartsTES4(*traits);
         else if (traits->mIsFONV)
-        {
-            // Not implemented yet
-        }
+            updatePartsFallout(*traits);
         else
-        {
-            // There is no easy way to distinguish TES5 and FO3.
-            // In case of FO3 the function shouldn't crash the game and will
-            // only lead to the NPC not being rendered.
             updatePartsTES5(*traits);
-        }
     }
 
     void ESM4NpcAnimation::insertPart(std::string_view model)
@@ -54,6 +47,39 @@ namespace OFRender
             return;
         mResourceSystem->getSceneManager()->getInstance(
             Misc::ResourceHelpers::correctMeshPath(VFS::Path::Normalized(model)), mObjectRoot.get());
+    }
+
+    void ESM4NpcAnimation::updatePartsFallout(const ESM4::Npc& traits)
+    {
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        const ESM4::Race* race = OFClass::ESM4Npc::getRace(mPtr);
+        if (race == nullptr)
+            return;
+
+        const ESM4::Hair* hair = nullptr;
+        if (!traits.mHair.isZeroOrUnset())
+        {
+            hair = store->get<ESM4::Hair>().search(traits.mHair);
+            if (hair == nullptr)
+                Log(Debug::Error) << "Hair not found: " << ESM::RefId(traits.mHair);
+        }
+
+        std::vector<const ESM4::HeadPart*> headParts;
+        for (ESM::FormId partId : traits.mHeadParts)
+        {
+            if (partId.isZeroOrUnset())
+                continue;
+            const ESM4::HeadPart* part = store->get<ESM4::HeadPart>().search(partId);
+            if (part == nullptr)
+                Log(Debug::Error) << "Head part not found: " << ESM::RefId(partId);
+            else
+                headParts.push_back(part);
+        }
+
+        // The body parts are skinned to the bones of the skeleton and need no placing, unlike those of Oblivion
+        for (const std::string& model : OFClass::falloutNpcModels(
+                 *race, OFClass::ESM4Npc::isFemale(mPtr), hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr)))
+            insertPart(model);
     }
 
     template <class Record>

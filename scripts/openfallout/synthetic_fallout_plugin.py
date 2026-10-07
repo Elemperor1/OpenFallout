@@ -10,14 +10,16 @@ worldspace that says the weather is the one to have (it lists a second weather t
 and two more exterior cells that are flagged for water: one has water of its own and the other the largest float as
 its height, which the games write for a cell without water of its own. The worldspace names a kind of water (WATR),
 black and opaque, with no reflection. Both cells have a person (a race and a character with a skeleton) standing
-east of the end of the player's walk.
+east of the end of the player's walk. The person has the parts of a body: the race names an upper body, two hands and a
+head (boxes of different sizes), the person a hair and a suit that covers the upper body and the right hand, so that the
+body of the race is there where the suit is not.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
-writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, `meshes/characters/_male/skeleton.nif` and
-`textures/sky/oftestclouds.dds` into the folder.
+writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
+`meshes/characters/_male/skeleton.nif` and `textures/sky/oftestclouds.dds` into the folder.
 """
 import argparse
 import struct
@@ -50,7 +52,9 @@ RACE_ID = 0x815
 NPC_ID = 0x816
 NPC_REF_ID = 0x817
 EXTERIOR_NPC_REF_ID = 0x818
-LAST_ID = EXTERIOR_NPC_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
+HAIR_ID = 0x819
+SUIT_ID = 0x81A
+LAST_ID = SUIT_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -93,6 +97,20 @@ PILLAR_DISTANCE = 600.0
 NPC_DEPTH = PILLAR_DISTANCE - CUBE / 2 - 30.0
 # and this many units east of the line of the walk, the player is a box 40 wide and the person a cylinder 40 wide
 NPC_DISTANCE = 300.0
+# The body of the person: boxes of half extents and centre (x east, y north, z up, from the feet) that are the models of
+# the parts. The race has an upper body wider than the suit (so that the suit is seen where both are drawn), a hand on
+# each side outside of the cylinder, and a head; the person has a hair on top of it and wears a suit that covers the
+# upper body and the right hand (the right hand is the one on the east side, the way the person faces).
+PERSON_PARTS = {
+    "upperbody": ((18.0, 10.0, 30.0), (0.0, 0.0, 60.0)),
+    "lefthand": ((3.0, 3.0, 3.0), (-26.0, 0.0, 50.0)),
+    "righthand": ((3.0, 3.0, 3.0), (26.0, 0.0, 50.0)),
+    "head": ((8.0, 8.0, 8.0), (0.0, 0.0, 118.0)),
+    "hair": ((9.0, 9.0, 3.0), (0.0, 0.0, 130.0)),
+    "suit": ((12.0, 8.0, 30.0), (0.0, 0.0, 60.0)),
+}
+# The biped slots of Fallout 3 that the suit covers: the upper body (0x04) and the right hand (0x10)
+SUIT_SLOTS = 0x04 | 0x10
 
 # The lighting of the cell, in the order of the XCLL sub-record. The cell inherits the fog colour and the far fog
 # distance of its lighting template (inherit flags 0x04 and 0x10), the rest is its own: what the engine should use is
@@ -239,11 +257,41 @@ def land(form_id=EXTERIOR_LAND_ID, height=0.0):
                                      sub(b"VHGT", heights)])
 
 
+def part_path(name):
+    """The path of the mesh of a part of the person, as a record names it (under meshes)."""
+    return "openfallout\\person_%s.osgt" % name
+
+
+def part(index, name):
+    """The INDX and MODL of a part of the body or head of a race."""
+    return [sub(b"INDX", struct.pack("<I", index)), zstr(b"MODL", part_path(name))]
+
+
 def race():
-    """A race with the data that the loader needs of one and no body parts: the skeleton is in the NPC_ record."""
+    """A race with the data that the loader needs of one and the parts of a body that Fallout 3 gives it: the head (part
+    0 of the 8 of the head data) and the upper body and the two hands (parts 0 to 2 of the 4 of the body data), for men.
+    The skeleton is in the NPC_ record."""
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
-    return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data)])
+    return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
+                                     sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), sub(b"FNAM"),
+                                     sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
+                                     *part(2, "righthand"), sub(b"FNAM")])
+
+
+def hair():
+    """A HAIR record with a model."""
+    return record(b"HAIR", HAIR_ID, [zstr(b"EDID", "OFTestHair"), zstr(b"FULL", "OpenFallout Test Hair"),
+                                     zstr(b"MODL", part_path("hair")), zstr(b"ICON", "openfallout\\hair.dds"),
+                                     sub(b"DATA", b"\x00")])
+
+
+def suit():
+    """An ARMO record of Fallout 3: the model of a man in MODL, the biped slots and the general flags in BMDT, then the
+    value, health and weight."""
+    return record(b"ARMO", SUIT_ID, [zstr(b"EDID", "OFTestSuit"), zstr(b"FULL", "OpenFallout Test Suit"),
+                                     zstr(b"MODL", part_path("suit")), sub(b"BMDT", struct.pack("<II", SUIT_SLOTS, 0)),
+                                     sub(b"DATA", struct.pack("<IIf", 1, 1, 1.0))])
 
 
 def person():
@@ -253,7 +301,9 @@ def person():
     acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, 100, 0.0, 0, 0)
     return record(b"NPC_", NPC_ID, [zstr(b"EDID", NPC_NAME), zstr(b"FULL", "OpenFallout Test Person"),
                                     zstr(b"MODL", SKELETON), sub(b"ACBS", acbs),
-                                    sub(b"RNAM", struct.pack("<I", RACE_ID))])
+                                    sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)),
+                                    sub(b"RNAM", struct.pack("<I", RACE_ID)),
+                                    sub(b"HNAM", struct.pack("<I", HAIR_ID))])
 
 
 def achr(form_id, position):
@@ -331,14 +381,18 @@ def plugin():
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
-            + top_group(b"RACE", [race()]) + top_group(b"NPC_", [person()])
+            + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
+            + top_group(b"NPC_", [person()])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 
-def cube_mesh():
-    """An OpenSceneGraph text file with one cube of edge CUBE, centred on its origin."""
-    x = y = z = CUBE / 2
+def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):
+    """An OpenSceneGraph text file with one box of the half extents around the centre; with the defaults, a cube of edge
+    CUBE centred on its origin."""
+    x, y, z = half_extents
+    cx, cy, cz = center
     corners = [(-x, -y, -z), (x, -y, -z), (x, y, -z), (-x, y, -z), (-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)]
+    corners = [(a + cx, b + cy, c + cz) for a, b, c in corners]
     # Corner indices of each face, counter-clockwise seen from outside, with the normal of that face.
     faces = [((0, 3, 2, 1), (0, 0, -1)), ((4, 5, 6, 7), (0, 0, 1)), ((0, 1, 5, 4), (0, -1, 0)),
              ((2, 3, 7, 6), (0, 1, 0)), ((1, 2, 6, 5), (1, 0, 0)), ((3, 0, 4, 7), (-1, 0, 0))]
@@ -369,7 +423,10 @@ def write(out):
     out = Path(out)
     mesh = out / "meshes" / "openfallout" / "cube.osgt"
     mesh.parent.mkdir(parents=True, exist_ok=True)
-    mesh.write_text(cube_mesh(), encoding="ascii")
+    mesh.write_text(box_mesh(), encoding="ascii")
+    for name, (half_extents, center) in PERSON_PARTS.items():
+        (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),
+                                                                           encoding="ascii")
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())
