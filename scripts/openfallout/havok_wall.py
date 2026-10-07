@@ -62,7 +62,7 @@ def root_node(extra, collision):
 
 
 def rigid_body(shape, translation, layer=STATIC_LAYER):
-    """A body that does not move, its translation in Havok units."""
+    """A body that does not move, its translation in Havok units (a bhkRigidBodyT, the one whose transform is used)."""
     data = struct.pack("<i", shape)
     data += struct.pack("<BBH", layer, 0, 0)  # layer, flags, group
     data += struct.pack("<I", 0) + struct.pack("<B", 1) + bytes(3) + struct.pack("<III", 0, 0, 0)  # world object
@@ -96,7 +96,7 @@ def wall(half_extents, centre):
         ("NiNode", root_node(1, 2)),
         ("BSXFlags", struct.pack("<iI", 1, 2)),
         ("bhkCollisionObject", struct.pack("<iHi", 0, 1, 3)),
-        ("bhkRigidBody", rigid_body(4, [c * scale for c in centre])),
+        ("bhkRigidBodyT", rigid_body(4, [c * scale for c in centre])),
         ("bhkBoxShape", box_shape([h * scale for h in half_extents])),
     ]
     return nif(blocks, ["OFTestWall", "BSX"], [0])

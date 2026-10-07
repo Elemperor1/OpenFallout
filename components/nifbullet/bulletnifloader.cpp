@@ -470,12 +470,17 @@ namespace NifBullet
                         return false;
                     }
 
-                    // A Havok quaternion turns a vector as an OSG one, and a body is placed by it and then by its
-                    // translation, which is in Havok units
-                    const osg::Vec4f& translation = body->mInfo.mTranslation;
-                    const osg::Matrixf bodyTransform = osg::Matrixf::rotate(body->mInfo.mRotation)
-                        * osg::Matrixf::translate(
-                            osg::Vec3f(translation.x(), translation.y(), translation.z()) * sHavokScale);
+                    // Only a bhkRigidBodyT has the transform (the translation and rotation of a bhkRigidBody are not
+                    // used). A Havok quaternion turns a vector as an OSG one, and a body is placed by it and then by
+                    // its translation, which is in Havok units
+                    osg::Matrixf bodyTransform;
+                    if (body->mRecordType == Nif::RC_bhkRigidBodyT)
+                    {
+                        const osg::Vec4f& translation = body->mInfo.mTranslation;
+                        bodyTransform = osg::Matrixf::rotate(body->mInfo.mRotation)
+                            * osg::Matrixf::translate(
+                                osg::Vec3f(translation.x(), translation.y(), translation.z()) * sHavokScale);
+                    }
 
                     std::vector<HavokPiece> pieces;
                     std::string record = convertHavokShape(body->mShape.get(), bodyTransform, pieces);

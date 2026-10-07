@@ -82,7 +82,8 @@ namespace
             mBox.mRecordType = Nif::RC_bhkBoxShape;
             mBox.mExtents = osg::Vec3f(1, 2, 3);
 
-            mBody.mRecordType = Nif::RC_bhkRigidBody;
+            // The transform of a body is used by a bhkRigidBodyT only
+            mBody.mRecordType = Nif::RC_bhkRigidBodyT;
             mBody.mShape = Nif::bhkShapePtr(&mBox);
             mBody.mHavokFilter.mLayer = staticLayer;
             mBody.mInfo.mResponseType = Nif::HkResponseType::Response_SimpleContact;
@@ -141,6 +142,24 @@ namespace
             static_cast<const btBoxShape*>(shape.getChildShape(0))->getHalfExtentsWithMargin(), btVector3(7, 14, 21));
         expectNear(shape.getChildTransform(0).getOrigin(), btVector3(7, 14, 21));
         EXPECT_TRUE(result->mAnimatedShapes.empty());
+    }
+
+    TEST_F(TestHavokCollision, the_transform_of_a_body_that_is_not_a_bhkrigidbodyt_is_not_used)
+    {
+        mBody.mRecordType = Nif::RC_bhkRigidBody;
+        mBody.mInfo.mTranslation = osg::Vec4f(1, 2, 3, 0);
+        mBody.mInfo.mRotation = osg::Quat(osg::PI_2, osg::Vec3f(0, 0, 1));
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        expectNear(shape.getChildTransform(0).getOrigin(), btVector3(0, 0, 0));
+        // The box is not turned: its half extents (1, 2, 3) times 7 stay along x, y and z
+        expectNear(
+            static_cast<const btBoxShape*>(shape.getChildShape(0))->getHalfExtentsWithMargin(), btVector3(7, 14, 21));
+        EXPECT_TRUE(shape.getChildTransform(0).getBasis() == btMatrix3x3::getIdentity());
     }
 
     TEST_F(TestHavokCollision, a_model_that_is_only_collision_has_collision)
