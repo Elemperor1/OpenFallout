@@ -1,10 +1,12 @@
 #include "referencecensus.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <iomanip>
 #include <ostream>
 #include <set>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 
@@ -32,19 +34,72 @@ namespace ESM4
         }
 
         // The base object of the current reference, whose data has been read: the form ID of its NAME. Zero when
-        // the record has none, as a record that changes only a part of a reference may not.
+        // the record has none, as a record that changes only a part of a reference may not. A sub-record that runs
+        // past the end of the record, or a file that ends inside the NAME, is an error.
         ESM::FormId readBase(Reader& reader)
         {
             ESM::FormId base;
-            while (reader.getSubRecordHeader())
+            while (true)
             {
+                const bool found = reader.getSubRecordHeader();
+                if (!reader.subRecordFitsRecord())
+                    throw std::runtime_error("A sub-record runs past the end of its record");
+                if (!found)
+                    break;
+
                 if (reader.subRecordHeader().typeId == ESM::fourCC("NAME") && reader.subRecordHeader().dataSize == 4)
-                    reader.getFormId(base);
+                {
+                    if (!reader.getFormId(base))
+                        throw std::runtime_error("The file ends inside a base object");
+                }
                 else
                     reader.skipSubRecordData();
             }
             return base;
         }
+
+        // The extension of the first model that the current record names, in lower case, or empty when it names none.
+        // Reading stops at the model, the rest of the record is left unread.
+        std::string readModelExtension(Reader& reader)
+        {
+            constexpr std::size_t longest = 8;
+            while (true)
+            {
+                const bool found = reader.getSubRecordHeader();
+                if (!reader.subRecordFitsRecord())
+                    throw std::runtime_error("A sub-record runs past the end of its record");
+                if (!found)
+                    return {};
+
+                if (reader.subRecordHeader().typeId != ESM::fourCC("MODL"))
+                {
+                    reader.skipSubRecordData();
+                    continue;
+                }
+
+                std::string path;
+                if (!reader.getZString(path))
+                    throw std::runtime_error("The file ends inside a model");
+                const std::size_t dot = path.rfind('.');
+                if (dot == std::string::npos || path.find_first_of("/\\", dot) != std::string::npos)
+                    return {};
+                std::string extension = path.substr(dot + 1, longest);
+                std::transform(extension.begin(), extension.end(), extension.begin(),
+                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                return extension;
+            }
+        }
+    }
+
+    std::size_t ReferenceCensus::modelKind(const std::string& extension)
+    {
+        if (extension.empty())
+            return 0;
+        const auto it = std::find(mModelKinds.begin(), mModelKinds.end(), extension);
+        if (it != mModelKinds.end())
+            return static_cast<std::size_t>(it - mModelKinds.begin());
+        mModelKinds.push_back(extension);
+        return mModelKinds.size() - 1;
     }
 
     void ReferenceCensus::collect(Reader& reader)
@@ -53,14 +108,28 @@ namespace ESM4
             const std::uint32_t type = r.hdr().record.typeId;
             const ESM::FormId id = r.getFormIdFromHeader();
 
-            if (!isReference(type))
-            {
-                mRecordTypes[id] = type;
-                return false; // nothing has been read, the record data is skipped
-            }
-
             const ReaderContext recordStart = r.getContext();
             const std::uint32_t flags = r.hdr().record.flags;
+
+            if (!isReference(type))
+            {
+                Record& record = mRecords[id];
+                record.mType = type;
+                try
+                {
+                    r.getRecordData();
+                    // A record that overrides another may leave the model out, it keeps the one it had.
+                    if (const std::string extension = readModelExtension(r); !extension.empty())
+                        record.mModel = modelKind(extension);
+                }
+                catch (const std::exception&)
+                {
+                    // The record cannot be read, so it has no model that is known. Its type counts.
+                }
+                r.skipFailedRecord(recordStart);
+                return true;
+            }
+
             try
             {
                 r.getRecordData();
@@ -109,8 +178,8 @@ namespace ESM4
             std::string base = noBase;
             if (placed.mBase.mIndex != 0)
             {
-                const auto it = mRecordTypes.find(placed.mBase);
-                base = it != mRecordTypes.end() ? ESM::printName(it->second) : unknownBase;
+                const auto it = mRecords.find(placed.mBase);
+                base = it != mRecords.end() ? ESM::printName(it->second.mType) : unknownBase;
             }
 
             Count& count = result[base][ESM::printName(placed.mType)];
@@ -118,6 +187,34 @@ namespace ESM4
             if (placed.mDisabled)
                 ++count.mDisabled;
         }
+        return result;
+    }
+
+    std::map<std::string, std::map<std::string, std::size_t>> ReferenceCensus::getModels() const
+    {
+        std::map<std::string, std::map<std::string, std::size_t>> result;
+        for (const auto& [id, placed] : mPlaced)
+        {
+            const auto it = placed.mBase.mIndex != 0 ? mRecords.find(placed.mBase) : mRecords.end();
+            if (it == mRecords.end())
+                continue;
+            ++result[ESM::printName(it->second.mType)][mModelKinds[it->second.mModel]];
+        }
+        return result;
+    }
+
+    std::vector<std::pair<ESM::FormId, std::size_t>> ReferenceCensus::getUnknownBases(std::size_t limit) const
+    {
+        std::map<ESM::FormId, std::size_t> counts;
+        for (const auto& [id, placed] : mPlaced)
+            if (placed.mBase.mIndex != 0 && !mRecords.contains(placed.mBase))
+                ++counts[placed.mBase];
+
+        std::vector<std::pair<ESM::FormId, std::size_t>> result(counts.begin(), counts.end());
+        std::stable_sort(result.begin(), result.end(),
+            [](const auto& left, const auto& right) { return left.second > right.second; });
+        if (result.size() > limit)
+            result.resize(limit);
         return result;
     }
 
@@ -190,6 +287,40 @@ namespace ESM4
                 total.mDisabled += count.mDisabled;
             }
         writeRow("All", &columnTotals, all);
+
+        // The kinds of model, for each type of base object that has references with a model of a kind.
+        const auto models = getModels();
+        std::set<std::string> kinds;
+        for (const auto& [base, perKind] : models)
+            for (const auto& [kind, number] : perKind)
+                kinds.insert(kind);
+        stream << "\nPlaced references by the file extension of the model of their base object (" << noModel
+               << " is no model)\n";
+        stream << std::left << std::setw(typeWidth) << "Base" << std::right;
+        for (const std::string& kind : kinds)
+            stream << std::setw(countWidth) << kind;
+        stream << '\n';
+        for (const Row& row : rows)
+        {
+            const auto it = models.find(row.mBase);
+            if (it == models.end())
+                continue;
+            stream << std::left << std::setw(typeWidth) << row.mBase << std::right;
+            for (const std::string& kind : kinds)
+            {
+                const auto number = it->second.find(kind);
+                stream << std::setw(countWidth) << (number == it->second.end() ? 0 : number->second);
+            }
+            stream << '\n';
+        }
+
+        constexpr std::size_t unknownShown = 10;
+        if (const auto unknown = getUnknownBases(unknownShown); !unknown.empty())
+        {
+            stream << "\nThe base objects that no record was found for, most references first (form ID: references)\n";
+            for (const auto& [id, number] : unknown)
+                stream << id.toString("0x") << ": " << number << '\n';
+        }
 
         stream << '\n' << mDeleted << " references of earlier files are deleted by later ones\n";
         for (const std::string& error : mFatalErrors)

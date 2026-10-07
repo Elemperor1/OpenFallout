@@ -21,6 +21,7 @@ namespace
     constexpr std::uint32_t stat = 0x1001;
     constexpr std::uint32_t npc = 0x1002;
     constexpr std::uint32_t note = 0x1003;
+    constexpr std::uint32_t tree = 0x1004;
 
     // The header of a plugin that has one master.
     std::string headerWithMaster(const std::string& master)
@@ -40,14 +41,17 @@ namespace
 
     std::string basePlugin()
     {
-        // A static, a character and a note, and the references that place them.
-        const std::string records = record("STAT", stat, zString("EDID", "Stone"))
-            + record("NPC_", npc, zString("EDID", "Guard")) + record("NOTE", note, zString("EDID", "Letter"))
-            + record("REFR", 0x2001, name(stat)) + record("REFR", 0x2002, name(stat), ESM4::Rec_Disabled)
-            + record("ACHR", 0x2003, name(npc)) + record("REFR", 0x2004, name(note))
-            + record("REFR", 0x2005, name(0x1009)) // no record has this form ID
+        // A static, a character, a note and a tree, and the references that place them. The note has no model, the
+        // tree has one that is not a nif.
+        const std::string records
+            = record("STAT", stat, zString("EDID", "Stone") + zString("MODL", "meshes\\Stone.NIF"))
+            + record("NPC_", npc, zString("EDID", "Guard") + zString("MODL", "meshes\\skeleton.nif"))
+            + record("NOTE", note, zString("EDID", "Letter"))
+            + record("TREE", tree, zString("MODL", "trees\\shrub.spt")) + record("REFR", 0x2001, name(stat))
+            + record("REFR", 0x2002, name(stat), ESM4::Rec_Disabled) + record("ACHR", 0x2003, name(npc))
+            + record("REFR", 0x2004, name(note)) + record("REFR", 0x2005, name(0x1009)) // no record has this form ID
             + record("REFR", 0x2006, zString("EDID", "NoBase")) + record("REFR", 0x2007, name(stat), ESM4::Rec_Deleted)
-            + compressedRecord("REFR", 0x2008, name(stat));
+            + compressedRecord("REFR", 0x2008, name(stat)) + record("REFR", 0x2009, name(tree));
         return header() + topGroup("STAT", records);
     }
 
@@ -93,8 +97,57 @@ namespace
         EXPECT_EQ(total(counts, "NOTE", "REFR"), 1u);
         EXPECT_EQ(total(counts, ESM4::ReferenceCensus::unknownBase, "REFR"), 1u);
         EXPECT_EQ(total(counts, ESM4::ReferenceCensus::noBase, "REFR"), 1u);
-        EXPECT_EQ(counts.size(), 5u);
+        EXPECT_EQ(total(counts, "TREE", "REFR"), 1u);
+        EXPECT_EQ(counts.size(), 6u);
         EXPECT_TRUE(census.getFatalErrors().empty());
+    }
+
+    TEST(ESM4ReferenceCensusTest, countsReferencesByTheFileExtensionOfTheModelOfTheirBaseObject)
+    {
+        ESM4::ReferenceCensus census;
+        collect(census, basePlugin(), "base.esm", 0, {});
+
+        // The extension is in lower case. A reference with no base object, or one that no record has, has no model to
+        // count.
+        EXPECT_THAT(census.getModels(),
+            UnorderedElementsAre(Pair("STAT", UnorderedElementsAre(Pair("nif", 3u))),
+                Pair("NPC_", UnorderedElementsAre(Pair("nif", 1u))),
+                Pair("NOTE", UnorderedElementsAre(Pair(ESM4::ReferenceCensus::noModel, 1u))),
+                Pair("TREE", UnorderedElementsAre(Pair("spt", 1u)))));
+    }
+
+    TEST(ESM4ReferenceCensusTest, listsTheBaseObjectsThatNoRecordWasFoundForCommonestFirst)
+    {
+        const std::string plugin = header()
+            + topGroup("REFR",
+                record("REFR", 0x2001, name(0x1009)) + record("REFR", 0x2002, name(0x100a))
+                    + record("REFR", 0x2003, name(0x100a)) + record("REFR", 0x2004, name(stat))
+                    + record("STAT", stat, ""));
+        ESM4::ReferenceCensus census;
+        collect(census, plugin, "base.esm", 0, {});
+
+        const auto unknown = census.getUnknownBases(10);
+        ASSERT_EQ(unknown.size(), 2u);
+        EXPECT_EQ(unknown[0].first.mIndex, 0x100au);
+        EXPECT_EQ(unknown[0].second, 2u);
+        EXPECT_EQ(unknown[1].first.mIndex, 0x1009u);
+        EXPECT_EQ(census.getUnknownBases(1).size(), 1u);
+    }
+
+    TEST(ESM4ReferenceCensusTest, aModelOfAnOverridingRecordReplacesTheOneItHad)
+    {
+        // The patch gives the static of the base plugin a model that is not a nif, and a second record leaves the
+        // model out.
+        ESM4::ReferenceCensus census;
+        collect(census, basePlugin(), "base.esm", 0, {});
+        const std::string patch = headerWithMaster("base.esm")
+            + topGroup("STAT",
+                record("STAT", 0x00001001, zString("MODL", "meshes\\stone.kf")) + record("NPC_", 0x00001002, ""));
+        collect(census, patch, "patch.esp", 1, { { "base.esm", 0 } });
+
+        const auto models = census.getModels();
+        EXPECT_THAT(models.at("STAT"), UnorderedElementsAre(Pair("kf", 3u)));
+        EXPECT_THAT(models.at("NPC_"), UnorderedElementsAre(Pair("nif", 1u)));
     }
 
     TEST(ESM4ReferenceCensusTest, aReferenceThatALaterFileOverridesOrDeletesCountsAsThatFileHasIt)
@@ -147,6 +200,8 @@ namespace
         EXPECT_THAT(text, HasSubstr("Base"));
         EXPECT_THAT(text, MatchesRegex("(.|\n)*STAT +0 +3 +3 +1\n(.|\n)*"));
         EXPECT_THAT(text, MatchesRegex("(.|\n)*NPC_ +1 +0 +1 +0\n(.|\n)*"));
+        EXPECT_THAT(text, MatchesRegex("(.|\n)*TREE +0 +0 +1\n(.|\n)*"));
+        EXPECT_THAT(text, HasSubstr("0x1009: 1\n"));
         EXPECT_THAT(text, HasSubstr("0 references of earlier files are deleted by later ones"));
     }
 
@@ -162,7 +217,10 @@ namespace
         ESM4::ReferenceCensus census;
         collect(census, plugin, "base.esm", 0, {});
 
-        EXPECT_EQ(total(census.getCounts(), "STAT", "REFR"), 1u);
+        // The reference that cannot be read is left out, it is not counted as one with no base object.
+        const Counts counts = census.getCounts();
+        EXPECT_EQ(total(counts, "STAT", "REFR"), 1u);
+        EXPECT_EQ(counts.size(), 1u);
         EXPECT_TRUE(census.getFatalErrors().empty());
     }
 }
