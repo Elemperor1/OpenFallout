@@ -9,11 +9,14 @@
 #include <vector>
 
 #include <components/bgsm/file.hpp>
+#include <components/debug/debuglog.hpp>
 #include <components/files/configurationmanager.hpp>
 #include <components/files/constrainedfilestream.hpp>
 #include <components/files/conversion.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/nif/niffile.hpp>
+#include <components/nifbullet/bulletnifloader.hpp>
+#include <components/nifbullet/havoksurvey.hpp>
 #include <components/vfs/archive.hpp>
 #include <components/vfs/bsaarchive.hpp>
 #include <components/vfs/filesystemarchive.hpp>
@@ -119,8 +122,8 @@ std::unique_ptr<VFS::Archive> makeArchive(const std::filesystem::path& path)
     return nullptr;
 }
 
-bool readFile(
-    const std::filesystem::path& source, const std::filesystem::path& path, const VFS::Manager* vfs, bool quiet)
+bool readFile(const std::filesystem::path& source, const std::filesystem::path& path, const VFS::Manager* vfs,
+    bool quiet, NifBullet::HavokSurvey* havokSurvey)
 {
     const auto [fileType, fileClass] = classifyFile(path);
     if (fileClass != FileClass::NIF && fileClass != FileClass::Material)
@@ -147,6 +150,13 @@ bool readFile(
                     reader.parse(vfs->get(VFS::Path::Normalized(pathStr)));
                 else
                     reader.parse(Files::openConstrainedFileStream(fullPath));
+
+                if (havokSurvey != nullptr && fileType == FileType::NIF)
+                {
+                    NifBullet::BulletNifLoader loader(true);
+                    loader.setHavokSurvey(havokSurvey);
+                    loader.load(Nif::FileView(file));
+                }
                 break;
             }
             case FileClass::Material:
@@ -170,7 +180,8 @@ bool readFile(
 
 /// Check all the nif files in a given VFS::Archive
 /// \note Can not read a bsa file inside of a bsa file.
-void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::path& archivePath, bool quiet)
+void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::path& archivePath, bool quiet,
+    NifBullet::HavokSurvey* havokSurvey)
 {
     if (archive == nullptr)
         return;
@@ -184,7 +195,7 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
 
     for (const auto& name : vfs.getRecursiveDirectoryIterator())
     {
-        readFile(archivePath, name.value(), &vfs, quiet);
+        readFile(archivePath, name.value(), &vfs, quiet, havokSurvey);
     }
 
     if (!archivePath.empty() && !isBSA(archivePath))
@@ -198,7 +209,7 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
             {
                 try
                 {
-                    readVFS(VFS::makeBsaArchive(file.second, nullptr), file.second, quiet);
+                    readVFS(VFS::makeBsaArchive(file.second, nullptr), file.second, quiet, havokSurvey);
                 }
                 catch (const std::exception& e)
                 {
@@ -211,7 +222,7 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
 }
 
 bool parseOptions(int argc, char** argv, Files::PathContainer& files, Files::PathContainer& archives,
-    bool& writeDebugLog, bool& quiet)
+    bool& writeDebugLog, bool& quiet, bool& havokSurvey, std::size_t& havokExamples)
 {
     bpo::options_description desc(
         R"(Ensure that OpenMW can use the provided NIF, KF, BTO/BTR, RDT, PSA, BGEM/BGSM and BSA/BA2 files
@@ -225,6 +236,11 @@ Allowed options)");
     addOption("help,h", "print help message.");
     addOption("write-debug-log,v", "write debug log for unsupported nif files");
     addOption("quiet,q", "do not log read archives/files");
+    addOption("havok-survey",
+        "also load the collision of the Fallout 3 and New Vegas files from their Havok data, and print at the end what "
+        "the Havok data of the files is and which files get it (counts and file names only)");
+    addOption("havok-examples", bpo::value<std::size_t>()->default_value(3),
+        "with --havok-survey: how many file names to print for each count");
     addOption("archives", bpo::value<Files::MaybeQuotedPathContainer>(), "path to archive files to provide files");
     addOption("input-file", bpo::value<Files::MaybeQuotedPathContainer>(), "input file");
 
@@ -245,6 +261,8 @@ Allowed options)");
         }
         writeDebugLog = variables.count("write-debug-log") > 0;
         quiet = variables.count("quiet") > 0;
+        havokSurvey = variables.count("havok-survey") > 0;
+        havokExamples = variables["havok-examples"].as<std::size_t>();
         if (variables.count("input-file"))
         {
             files = asPathContainer(variables["input-file"].as<Files::MaybeQuotedPathContainer>());
@@ -269,8 +287,16 @@ int main(int argc, char** argv)
     Files::PathContainer files, sources;
     bool writeDebugLog = false;
     bool quiet = false;
-    if (!parseOptions(argc, argv, files, sources, writeDebugLog, quiet))
+    bool havokSurveyRequested = false;
+    std::size_t havokExamples = 0;
+    if (!parseOptions(argc, argv, files, sources, writeDebugLog, quiet, havokSurveyRequested, havokExamples))
         return 1;
+
+    NifBullet::HavokSurvey survey(havokExamples);
+    NifBullet::HavokSurvey* havokSurvey = havokSurveyRequested ? &survey : nullptr;
+    // The survey tells what the loader says about each file, in counts
+    if (havokSurvey != nullptr)
+        Log::sMinDebugLevel = Debug::Warning;
 
     Nif::Reader::setWriteNifDebugLog(writeDebugLog);
 
@@ -305,12 +331,12 @@ int main(int argc, char** argv)
         const std::string pathStr = Files::pathToUnicodeString(path);
         try
         {
-            const bool isFile = readFile({}, path, vfs.get(), quiet);
+            const bool isFile = readFile({}, path, vfs.get(), quiet, havokSurvey);
             if (!isFile)
             {
                 if (auto archive = makeArchive(path))
                 {
-                    readVFS(std::move(archive), path, quiet);
+                    readVFS(std::move(archive), path, quiet, havokSurvey);
                 }
                 else
                 {
@@ -324,5 +350,8 @@ int main(int argc, char** argv)
             std::cerr << "Failed to read '" << pathStr << "':  " << e.what() << std::endl;
         }
     }
+
+    if (havokSurvey != nullptr)
+        survey.print(std::cout);
     return 0;
 }
