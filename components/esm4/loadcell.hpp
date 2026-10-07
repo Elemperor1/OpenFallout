@@ -27,6 +27,7 @@
 #ifndef ESM4_CELL_H
 #define ESM4_CELL_H
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -114,11 +115,16 @@ namespace ESM4
             return ESM::ExteriorCellLocation(mX, mY, isExterior() ? mParent : mId);
         }
         static float sInvalidWaterLevel;
+        static constexpr float sNoWaterMagnitude = 2147483648.f; // 2^31, the smallest integer as a float is -2^31
 
         /// Whether a number is a height of water. The cells of Fallout that have no height of their own hold the
         /// largest float (cells of a worldspace, which have the default height of the worldspace) or the smallest
         /// 32 bit integer as a float (cells inside), and a cell without the sub-record holds sInvalidWaterLevel.
-        static bool isWaterHeight(float height) { return height > sInvalidWaterLevel && height < -sInvalidWaterLevel; }
+        /// Any other finite number below the range of a 32 bit integer is a height.
+        static bool isWaterHeight(float height)
+        {
+            return height != sInvalidWaterLevel && std::abs(height) < sNoWaterMagnitude;
+        }
 
         bool hasWaterHeight() const { return isWaterHeight(mWaterHeight); }
     };

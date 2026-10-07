@@ -48,6 +48,14 @@ namespace OFWorld
             EXPECT_TRUE(ESM4::Cell::isWaterHeight(0.f));
         }
 
+        TEST(ESM4CellWaterHeightTest, aHeightBeyondTheSentinelOfAnUnsetCellIsAHeight)
+        {
+            // only the values the files use for no height are left out, not the range around them
+            EXPECT_TRUE(ESM4::Cell::isWaterHeight(250000.f));
+            EXPECT_TRUE(ESM4::Cell::isWaterHeight(-250000.f));
+            EXPECT_TRUE(ESM4::Cell::isWaterHeight(2.0e9f));
+        }
+
         TEST(ESM4CellWaterHeightTest, theValuesOfACellWithoutWaterAreNoHeights)
         {
             EXPECT_FALSE(ESM4::Cell::isWaterHeight(sLargestFloat));
