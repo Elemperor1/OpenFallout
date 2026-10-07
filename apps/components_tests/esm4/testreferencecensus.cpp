@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <string>
 
@@ -245,9 +246,10 @@ namespace
         const std::string text = stream.str();
 
         EXPECT_THAT(text, HasSubstr("Base"));
-        EXPECT_THAT(text, MatchesRegex("(.|\n)*STAT +0 +3 +3 +1\n(.|\n)*"));
-        EXPECT_THAT(text, MatchesRegex("(.|\n)*NPC_ +1 +0 +1 +0\n(.|\n)*"));
-        EXPECT_THAT(text, MatchesRegex("(.|\n)*TREE +0 +0 +1\n(.|\n)*"));
+        // (a row of the table, a line of its own; the regular expressions of gtest are not the ones of std on Windows)
+        EXPECT_TRUE(std::regex_search(text, std::regex("\nSTAT +0 +3 +3 +1\n"))) << text;
+        EXPECT_TRUE(std::regex_search(text, std::regex("\nNPC_ +1 +0 +1 +0\n"))) << text;
+        EXPECT_TRUE(std::regex_search(text, std::regex("\nTREE +0 +0 +1\n"))) << text;
         EXPECT_THAT(text, HasSubstr("0x1009: 1\n"));
         EXPECT_THAT(text, HasSubstr("0 references of earlier files are deleted by later ones"));
     }
