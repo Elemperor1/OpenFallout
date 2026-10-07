@@ -6,7 +6,9 @@ The plugin has the records of a plain room: a static that is a cube (used as a f
 static that Fallout cells use for their entry point, an interior cell "OFTestCell" with the lighting of a Fallout 3
 cell, a lighting template that the cell takes its fog colour and far fog distance from, and three references that put
 them there. It also has a worldspace "OFTestWorld" with a flat exterior cell, a weather and the climate of the
-worldspace that says the weather is the one to have (it lists a second weather too, which needs a global that is 0).
+worldspace that says the weather is the one to have (it lists a second weather too, which needs a global that is 0),
+and two more exterior cells that are flagged for water: one has water of its own and the other the largest float as
+its height, which the games write for a cell without water of its own.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
@@ -34,6 +36,10 @@ WEATHER_ID = 0x80C
 CLIMATE_ID = 0x80D
 CONDITIONAL_WEATHER_ID = 0x80E
 GLOBAL_ID = 0x80F
+WATER_CELL_ID = 0x810
+WATER_LAND_ID = 0x811
+DRY_CELL_ID = 0x812
+DRY_LAND_ID = 0x813
 CELL_NAME = "OFTestCell"
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
@@ -42,6 +48,16 @@ CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
 # this. The cell has an entry marker at its centre, which is where the player starts; a cell without a marker is
 # entered at its centre too.
 EXTERIOR_CELL_SIZE = 4096.0
+# The exterior cell north of the start (grid 0,1) is a shallow basin: its flat terrain is at WATER_TERRAIN, below the
+# terrain of the start cell, and it has water at WATER_HEIGHT, a little above its terrain and below the eyes of the
+# player, who sees it from above as a band just below the horizon when they look north. The cell east of it (grid 1,0)
+# is flagged for water as nearly all the cells of New Vegas are, but holds the largest float as its height, so it has
+# the default height of the worldspace, far below its terrain: no water to see.
+WATER_CELL = (0, 1)
+DRY_CELL = (1, 0)
+WATER_TERRAIN = -40.0
+WATER_HEIGHT = -20.0
+FLOAT_MAX = 3.4028234663852886e+38
 # Edge of the cube in game units. The floor is the cube scaled up so that its top face is at height 0, where the
 # player starts, and the pillar is the cube as it is, standing on the floor PILLAR_DISTANCE units north of the start.
 CUBE = 256.0
@@ -170,16 +186,16 @@ def climate():
                                         sub(b"TNAM", struct.pack("<6B", 36, 42, 108, 114, 0, 0))])
 
 
-def land():
-    """A LAND record: a flat terrain at height 0 over the whole cell, 33 by 33 vertices with normals pointing up and no
+def land(form_id=EXTERIOR_LAND_ID, height=0.0):
+    """A LAND record: a flat terrain at the height over the whole cell, 33 by 33 vertices with normals pointing up and no
     textures (the engine uses the default one of the game)."""
     flags = 0x1 | 0x2  # has normals and heights
     normals = bytes((0, 0, 127)) * (33 * 33)
-    # The height of the first vertex, then for each vertex the difference to the one before it (a signed byte, in steps
-    # of 8 units), then 3 bytes of padding.
-    heights = struct.pack("<f", 0.0) + bytes(33 * 33) + bytes(3)
-    return record(b"LAND", EXTERIOR_LAND_ID, [sub(b"DATA", struct.pack("<I", flags)), sub(b"VNML", normals),
-                                              sub(b"VHGT", heights)])
+    # The height of the first vertex in steps of 8 units, then for each vertex the difference to the one before it (a
+    # signed byte, in steps of 8 units), then 3 bytes of padding.
+    heights = struct.pack("<f", height / 8) + bytes(33 * 33) + bytes(3)
+    return record(b"LAND", form_id, [sub(b"DATA", struct.pack("<I", flags)), sub(b"VNML", normals),
+                                     sub(b"VHGT", heights)])
 
 
 def worldspace():
@@ -194,6 +210,13 @@ def worldspace():
     # DATA of an exterior cell is its flags (0: not an interior, no water), XCLC the grid and the flags of the land.
     cell = record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
                                               sub(b"XCLC", struct.pack("<iiI", 0, 0, 0))])
+    # Two more cells with flat terrain and water flagged: one with a height of its own, one with the largest float.
+    water_cell = record(b"CELL", WATER_CELL_ID, [zstr(b"EDID", WORLD_NAME + "WaterCell"), sub(b"DATA", b"\x02"),
+                                                 sub(b"XCLC", struct.pack("<iiI", *WATER_CELL, 0)),
+                                                 sub(b"XCLW", struct.pack("<f", WATER_HEIGHT))])
+    dry_cell = record(b"CELL", DRY_CELL_ID, [zstr(b"EDID", WORLD_NAME + "DryCell"), sub(b"DATA", b"\x02"),
+                                             sub(b"XCLC", struct.pack("<iiI", *DRY_CELL, 0)),
+                                             sub(b"XCLW", struct.pack("<f", FLOAT_MAX))])
     half = EXTERIOR_CELL_SIZE / 2
     refs = group(struct.pack("<I", EXTERIOR_CELL_ID), 9, [
         land(),
@@ -201,8 +224,12 @@ def worldspace():
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
+    water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
+        group(struct.pack("<I", WATER_CELL_ID), 9, [land(WATER_LAND_ID, WATER_TERRAIN)])])
+    dry_children = group(struct.pack("<I", DRY_CELL_ID), 6, [
+        group(struct.pack("<I", DRY_CELL_ID), 9, [land(DRY_LAND_ID)])])
     grid = struct.pack("<hh", 0, 0)
-    sub_block = group(grid, 5, [cell, children])
+    sub_block = group(grid, 5, [cell, children, water_cell, water_children, dry_cell, dry_children])
     block = group(grid, 4, [sub_block])
     return [wrld, group(struct.pack("<I", WORLD_ID), 1, [block])]
 

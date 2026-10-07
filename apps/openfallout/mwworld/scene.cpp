@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <limits>
+#include <optional>
 
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 
@@ -440,6 +441,8 @@ namespace OFWorld
         ESM::RefId worldspace = cellVariant.getWorldSpace();
         ESM::ExteriorCellLocation cellIndex(cellX, cellY, worldspace);
 
+        // The height of the lowest point of the terrain of an exterior cell that has terrain
+        std::optional<float> lowestTerrain;
         if (cellVariant.isExterior())
         {
             std::shared_ptr<const ESMTerrain::LandObject> land = mRendering.getLandManager()->getLand(cellIndex);
@@ -449,6 +452,7 @@ namespace OFWorld
 
             if (data)
             {
+                lowestTerrain = data->getMinHeight();
                 mPhysics->addHeightField(data->getHeights().data(), cellX, cellY, worldsize, verts,
                     data->getMinHeight(), data->getMaxHeight(), std::move(land));
             }
@@ -501,28 +505,49 @@ namespace OFWorld
         mRendering.addCell(&cell);
 
         OFBase::Environment::get().getWindowManager()->addCell(&cell);
-        bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
         float waterLevel = cell.getWaterLevel();
-        mRendering.setWaterEnabled(waterEnabled);
-        if (waterEnabled)
+        if (cellVariant.isExterior() && ESM::isEsm4Ext(worldspace))
         {
-            mPhysics->enableWater(waterLevel);
-            mRendering.setWaterHeight(waterLevel);
-
-            if (cellVariant.isExterior())
+            // Each cell of a worldspace of Fallout has water of its own, at its own height or at none: the water is a
+            // square of the cell, and there is no one plane of water to collide with.
+            mPhysics->disableWater();
+            if (cellVariant.hasWater())
             {
+                // Where the terrain is above the water there is nothing to see
+                if (!lowestTerrain || waterLevel >= *lowestTerrain)
+                {
+                    Log(Debug::Info) << "Water of cell " << cellVariant.getDescription() << " at height " << waterLevel;
+                    mRendering.addWaterTile(cellX, cellY, waterLevel);
+                }
                 if (mPhysics->getHeightField(cellX, cellY))
                     mNavigator.addWater(
-                        osg::Vec2i(cellX, cellY), ESM::Land::REAL_SIZE, waterLevel, navigatorUpdateGuard);
-            }
-            else
-            {
-                mNavigator.addWater(
-                    osg::Vec2i(cellX, cellY), std::numeric_limits<int>::max(), waterLevel, navigatorUpdateGuard);
+                        osg::Vec2i(cellX, cellY), ESM::getCellSize(worldspace), waterLevel, navigatorUpdateGuard);
             }
         }
         else
-            mPhysics->disableWater();
+        {
+            bool waterEnabled = cellVariant.hasWater() || cell.isExterior();
+            mRendering.setWaterEnabled(waterEnabled);
+            if (waterEnabled)
+            {
+                mPhysics->enableWater(waterLevel);
+                mRendering.setWaterHeight(waterLevel);
+
+                if (cellVariant.isExterior())
+                {
+                    if (mPhysics->getHeightField(cellX, cellY))
+                        mNavigator.addWater(
+                            osg::Vec2i(cellX, cellY), ESM::Land::REAL_SIZE, waterLevel, navigatorUpdateGuard);
+                }
+                else
+                {
+                    mNavigator.addWater(
+                        osg::Vec2i(cellX, cellY), std::numeric_limits<int>::max(), waterLevel, navigatorUpdateGuard);
+                }
+            }
+            else
+                mPhysics->disableWater();
+        }
 
         if (!cell.isExterior() && !cellVariant.isQuasiExterior())
         {

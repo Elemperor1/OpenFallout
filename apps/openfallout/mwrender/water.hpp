@@ -1,7 +1,10 @@
 #ifndef OPENFALLOUT_MWRENDER_WATER_H
 #define OPENFALLOUT_MWRENDER_WATER_H
 
+#include <map>
 #include <memory>
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include <osg/Vec3d>
@@ -73,6 +76,23 @@ namespace OFRender
         bool mInterior;
         bool mShowWorld;
 
+        /// The water of a worldspace of Fallout: a square for each cell, at the height of water of the cell, instead of
+        /// one plane of the whole world at one height. Then mTop is the height of the water at or nearest to the view
+        /// point, which is what the reflection and the order of drawing use.
+        struct Tile
+        {
+            osg::ref_ptr<osg::PositionAttitudeTransform> mNode;
+            float mHeight;
+        };
+        std::map<std::pair<int, int>, Tile> mTiles;
+        osg::ref_ptr<osg::Group> mTileGroup;
+        osg::ref_ptr<osg::Geometry> mTileGeom;
+        osg::ref_ptr<osg::Geometry> mSimpleWaterGeom;
+        bool mTileMode;
+        float mViewLevel;
+
+        std::optional<float> getTileHeightAt(float x, float y) const;
+
         osg::Callback* mCullCallback;
         osg::ref_ptr<osg::Callback> mShaderWaterStateSetUpdater;
 
@@ -98,9 +118,28 @@ namespace OFRender
 
         bool toggle();
 
-        bool isVisible() const { return mEnabled && mToggled; }
+        bool isVisible() const { return hasWater() && mToggled; }
+
+        /// Whether there is water to draw: the water of the cell the player is in, or the water of any cell loaded
+        /// when the water has a height for each cell.
+        bool hasWater() const { return mTileMode ? !mTiles.empty() : mEnabled; }
 
         bool isUnderwater(const osg::Vec3f& pos) const;
+
+        /// Whether the water has a height for each cell (the worldspaces of Fallout).
+        bool isTiled() const { return mTileMode; }
+
+        /// The water of a cell of a worldspace of Fallout, replacing the water the cell had.
+        void addTile(int gridX, int gridY, float height);
+        /// Returns whether the cell had a tile.
+        bool removeTile(int gridX, int gridY);
+
+        /// Tell the water where the camera is. With the water in tiles the height used for the reflection follows it.
+        void setViewPoint(const osg::Vec3f& position);
+
+        /// The height of the water of the cell around the view point, the lowest float when it has none. Only with the
+        /// water in tiles.
+        float getViewLevel() const { return mViewLevel; }
 
         /// adds an emitter, position will be tracked automatically using its scene node
         void addEmitter(const OFWorld::Ptr& ptr, float scale = 1.f, float force = 1.f);

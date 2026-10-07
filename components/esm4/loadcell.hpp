@@ -114,6 +114,13 @@ namespace ESM4
             return ESM::ExteriorCellLocation(mX, mY, isExterior() ? mParent : mId);
         }
         static float sInvalidWaterLevel;
+
+        /// Whether a number is a height of water. The cells of Fallout that have no height of their own hold the
+        /// largest float (cells of a worldspace, which have the default height of the worldspace) or the smallest
+        /// 32 bit integer as a float (cells inside), and a cell without the sub-record holds sInvalidWaterLevel.
+        static bool isWaterHeight(float height) { return height > sInvalidWaterLevel && height < -sInvalidWaterLevel; }
+
+        bool hasWaterHeight() const { return isWaterHeight(mWaterHeight); }
     };
 }
 

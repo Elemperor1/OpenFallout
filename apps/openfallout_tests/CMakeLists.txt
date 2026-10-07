@@ -15,6 +15,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwworld/testplaceholderrecords.cpp
     mwworld/testcelllighting.cpp
     mwworld/testcellclimate.cpp
+    mwworld/testcellwater.cpp
     mwworld/testworldspacestart.cpp
 
     mwdialogue/testkeywordsearch.cpp

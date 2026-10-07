@@ -57,6 +57,20 @@ namespace OFWorld
     ESM::FormId resolveCellClimate(const ESM4::Cell& cell, const ESM4::World* world,
         const std::function<const ESM4::World*(ESM::FormId)>& findWorld);
 
+    /// The water of a Fallout cell.
+    struct CellWater
+    {
+        bool mHasWater;
+        /// The height of the water, the height in the cell or in its worldspace even when there is no water.
+        float mHeight;
+    };
+
+    /// The water of a Fallout cell: it has water when its flags say so and it has a height of water, its own or, for an
+    /// exterior cell, the default one of its worldspace (the cells of a worldspace have the largest float as their own
+    /// height when they have none). The heights of the cells inside that the game files fill with the largest float or
+    /// the smallest integer are no heights, so such a cell has no water.
+    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world);
+
     class Cell : public ESM::CellVariant
     {
     public:

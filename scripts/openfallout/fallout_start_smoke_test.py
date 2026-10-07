@@ -14,8 +14,10 @@ that the climate of the worldspace lists, the player stands on the floor the who
 above the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine
 quits by itself. When ImageMagick's `import` is installed, pixels of the screen are checked too: where nothing is drawn
 it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after three
-seconds, the sky overhead has the sky colour of the weather with the clouds of the weather over it. The game has no
-files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
+seconds, the sky overhead has the sky colour of the weather with the clouds of the weather over it, and a band of
+water in a cell north of the start shows where the horizon would be (it is not the fog colour). The water of the cell
+that has a height of its own is logged once and the cell that holds the largest float as its height has none. The game
+has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -54,7 +56,9 @@ class Scenario:
     weather of the climate of its worldspace instead of the lighting.
 
     Each pixel is (what it shows, when it is read, where on the screen, the colour it should have): the colour of the
-    screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather."""
+    screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather. A
+    fifth item, True, turns it round: the colour must not be the one given (the pixel that shows the water is not the
+    fog colour that the same pixel has without water)."""
 
     def __init__(self, name, start, loaded, exterior, origin, lit, pixels):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
@@ -72,6 +76,11 @@ FOG_PIXEL_INTERIOR = (300, 100)
 FOG_PIXEL_EXTERIOR = (300, 360)
 SKY_PIXEL = (500, 360)
 PIXEL_TOLERANCE = 12
+# A pixel of the band of water of the cell north of the start, on the right of the pillar, a little below the horizon. It
+# is the colour of the fog where there is no water, and about (192,119,165) with it. How far from the fog colour a
+# channel must be for the water to be there.
+WATER_PIXEL = (900, 380)
+WATER_DIFFERENCE = 40
 
 # The colour of the sky overhead with the clouds of the weather over it. Their texture is white with one alpha, and they
 # are drawn over the sky in the colour of the fog of the weather with a little added (0.13 of the range of a colour).
@@ -91,6 +100,7 @@ SCENARIOS = [
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
              (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
              [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
+              ("water", HORIZON_TIME, WATER_PIXEL, plugin.WEATHER_FOG[1], True),
               ("sky and clouds", ZENITH_TIME, SKY_PIXEL,
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
@@ -115,6 +125,11 @@ WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, s
                         plugin.WEATHER_SKY[1], plugin.WEATHER_SKY[3], plugin.WEATHER_FOG[1], plugin.WEATHER_AMBIENT[1],
                         plugin.WEATHER_SUNLIGHT[1])), plugin.CLOUD_TEXTURE, *plugin.WEATHER_FOG_DAY,
                     *plugin.WEATHER_FOG_NIGHT))
+
+# What the engine logs about the water of an exterior cell: only the cell that has a height of its own has water to see
+# (the other cell that is flagged for water has the default height of the worldspace, below its terrain).
+WATER_LINE = "Water of cell {}WaterCell ({}, {}) at height {:g}".format(plugin.WORLD_NAME, *plugin.WATER_CELL,
+                                                                        plugin.WATER_HEIGHT)
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
@@ -190,13 +205,13 @@ def wait_for_pixels(process, log, seconds, pixels):
     has logged its first position after the time of the pixel. A colour is None when it cannot be read (ImageMagick's
     `import` is not installed, or the engine quit before)."""
     importer = shutil.which("import")
-    colours = {name: None for name, _, _, _ in pixels}
+    colours = {pixel[0]: None for pixel in pixels}
     pending = list(pixels)
     deadline = time.monotonic() + seconds
     while importer is not None and pending and process.poll() is None and time.monotonic() < deadline:
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         for pixel in list(pending):
-            name, when, (x, y), _ = pixel
+            name, when, (x, y) = pixel[:3]
             if re.search(rf"OFTEST\tt={int(when)}\.\d ", text):
                 shot = subprocess.run([importer, "-window", "root", "-crop", "1x1+%d+%d" % (x, y), "+repage", "txt:-"],
                                       capture_output=True, text=True)
@@ -246,7 +261,8 @@ def check(text, scenario, colours):
     if scenario.exterior:
         # The worldspace has one cell record, so the engine makes the cells around it. Each must be loaded once, under
         # its own coordinates: two made cells that shared an id would load one of them twice and the other never.
-        loaded = re.findall(rf"Loading cell {plugin.WORLD_NAME} \((-?\d+), (-?\d+)\)", text)
+        # (the cell with water and the one flagged for it have records of their own, and the names of those in the log)
+        loaded = re.findall(rf"Loading cell {plugin.WORLD_NAME}\w* \((-?\d+), (-?\d+)\)", text)
         for dx, dy in NEIGHBOURS:
             if loaded.count((str(dx), str(dy))) != 1:
                 problems.append(f"the cell {plugin.WORLD_NAME} ({dx}, {dy}) next to the start was loaded "
@@ -262,11 +278,20 @@ def check(text, scenario, colours):
         problems.append("the engine chose the weather that needs a global that is 0")
     if not scenario.exterior and weather_lines:
         problems.append(f"the engine chose a weather in an interior cell: {weather_lines}")
-    for name, _, position, want in scenario.pixels:
+    water_lines = [line.split("]", 1)[-1].strip() for line in text.splitlines() if "] Water of cell " in line]
+    if scenario.exterior and water_lines != [WATER_LINE]:
+        problems.append(f"the log has the lines {water_lines or 'none'} about water, expected only '{WATER_LINE}'")
+    if not scenario.exterior and water_lines:
+        problems.append(f"the engine made water in an interior cell: {water_lines}")
+    for name, _, position, want, *unlike in scenario.pixels:
         have = colours.get(name)
-        print(f"pixel {position} shows the {name}: {have}, expected {want}")
+        print(f"pixel {position} shows the {name}: {have}, expected {'not ' if unlike else ''}{want}")
         if have is None:
             print(f"no screenshot, the colour of the {name} on the screen is not checked (needs ImageMagick's import)")
+        elif unlike:
+            if all(abs(h - w) <= WATER_DIFFERENCE for h, w in zip(have, want)):
+                problems.append(f"the pixel at {position} that should show the {name} is {have}, which is the colour "
+                                f"{want} that it has without {name}")
         elif any(abs(h - w) > PIXEL_TOLERANCE for h, w in zip(have, want)):
             problems.append(f"the pixel at {position} that should show the {name} is {have}, the {name} colour of the "
                             f"cell is {want}")

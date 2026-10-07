@@ -15,6 +15,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <optional>
 #include <span>
 #include <unordered_map>
 
@@ -168,6 +169,9 @@ namespace OFRender
         void setWaterEnabled(bool enabled);
         void setWaterHeight(float level);
 
+        /// The water of an exterior cell of a worldspace of Fallout, at its own height. The tile goes with the cell.
+        void addWaterTile(int gridX, int gridY, float height);
+
         /// Take a screenshot of w*h onto the given image, not including the GUI.
         void screenshot(osg::Image* image, int w, int h);
 
@@ -290,6 +294,9 @@ namespace OFRender
         osg::Vec2f getProjectionOffset() const { return mProjectionOffset; }
 
     private:
+        void updateWaterEnabled();
+        void applyWaterHeight(float height);
+
         void updateTextureFiltering();
         void updateAmbient();
         struct WorldspaceChunkMgr
@@ -331,6 +338,9 @@ namespace OFRender
         std::unique_ptr<Pathgrid> mPathgrid;
         std::unique_ptr<Objects> mObjects;
         std::unique_ptr<Water> mWater;
+        /// The height of water the sky, the fog and the post processing were last given from the camera, when the water
+        /// has a height for each cell.
+        std::optional<float> mTiledWaterLevel;
         std::unordered_map<ESM::RefId, WorldspaceChunkMgr> mWorldspaceChunks;
         Terrain::World* mTerrain;
         std::unique_ptr<TerrainStorage> mTerrainStorage;

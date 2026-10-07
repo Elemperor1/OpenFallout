@@ -622,6 +622,10 @@ namespace OFRender
         }
 
         mWater->removeCell(store);
+
+        if (store->getCell()->isExterior()
+            && mWater->removeTile(store->getCell()->getGridX(), store->getCell()->getGridY()))
+            updateWaterEnabled();
     }
 
     void RenderingManager::enableTerrain(bool enable, ESM::RefId worldspace)
@@ -764,6 +768,14 @@ namespace OFRender
         float fogUnderwaterEnd = mFog->getFogEnd(true);
         osg::Vec4f fogUnderwaterColor = mFog->getFogColor(true);
 
+        // With one height of water for each cell, what depends on the height of the water follows the camera
+        mWater->setViewPoint(mCamera->getPosition());
+        if (mWater->isTiled() && mTiledWaterLevel != mWater->getViewLevel())
+        {
+            mTiledWaterLevel = mWater->getViewLevel();
+            applyWaterHeight(*mTiledWaterLevel);
+        }
+
         bool isUnderwater = mWater->isUnderwater(mCamera->getPosition());
 
         mStateUpdater->setFogColor(fogColor);
@@ -839,20 +851,37 @@ namespace OFRender
     void RenderingManager::setWaterEnabled(bool enabled)
     {
         mWater->setEnabled(enabled);
-        mSky->setWaterEnabled(enabled);
+        updateWaterEnabled();
+    }
+
+    void RenderingManager::updateWaterEnabled()
+    {
+        mSky->setWaterEnabled(mWater->hasWater());
         mStateUpdater->setWaterEnabled(mWater->isVisible());
 
-        mPostProcessor->getStateUpdater()->setIsWaterEnabled(enabled);
+        mPostProcessor->getStateUpdater()->setIsWaterEnabled(mWater->hasWater());
     }
 
     void RenderingManager::setWaterHeight(float height)
     {
+        mTiledWaterLevel.reset();
         mWater->setCullCallback(mTerrain->getHeightCullCallback(height, Mask_Water));
         mWater->setHeight(height);
+        applyWaterHeight(height);
+    }
+
+    void RenderingManager::applyWaterHeight(float height)
+    {
         mSky->setWaterHeight(height);
         mStateUpdater->setWaterHeight(height);
 
         mPostProcessor->getStateUpdater()->setWaterHeight(height);
+    }
+
+    void RenderingManager::addWaterTile(int gridX, int gridY, float height)
+    {
+        mWater->addTile(gridX, gridY, height);
+        updateWaterEnabled();
     }
 
     void RenderingManager::screenshot(osg::Image* image, int w, int h)
