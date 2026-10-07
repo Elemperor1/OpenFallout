@@ -138,7 +138,9 @@ namespace ESM4
                 }
                 catch (const std::exception&)
                 {
-                    // The record cannot be read, so it has no model that is known. Its type counts.
+                    // The record cannot be read, so it has no model that is known, not even the one an earlier file
+                    // gave it. Its type counts.
+                    record.mModel = 0;
                 }
                 r.skipFailedRecord(recordStart);
                 return true;
