@@ -41,9 +41,10 @@ namespace NifBullet
     };
 
     /// Adds the pieces that make up a Havok shape. `transform` is the one of the shape in the space of the body.
-    /// The shapes that are read are boxes, convex hulls and packed triangle strips, inside of the MOPP trees and lists
-    /// that hold them. Returns an empty string, or the name of the first record of a kind that is not read (then the
-    /// pieces made so far mean nothing).
+    /// The shapes that are read are boxes, spheres and capsules (as convex hulls), convex hulls, packed triangle strips
+    /// and triangle strips, inside of the MOPP trees, lists, convex lists and transform shapes that hold them. Returns
+    /// an empty string, or the name of the first record of a kind that is not read (then the pieces made so far mean
+    /// nothing).
     std::string convertHavokShape(
         const Nif::bhkShape& shape, const osg::Matrixf& transform, std::vector<HavokPiece>& pieces);
 }
