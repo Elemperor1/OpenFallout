@@ -11,6 +11,12 @@ namespace OFRender
     /// not in the data of other games. The sky manager builds these stand-ins in code when the game does not supply
     /// the file, so that its own file of the same name is used whenever there is one.
 
+    /// The radius of the generated sky for a viewing distance: the distance at which the dome of the sky is meant to
+    /// be, brought in to nine tenths of the far plane of the camera if that is nearer, because anything beyond the far
+    /// plane is cut off and the sky would be gone. The sky is only seen from the inside, so a nearer dome looks the
+    /// same.
+    float generatedSkyRadius(float viewDistance);
+
     /// How much of the colour of the sky a point of the dome shows, and how much of the fog colour (which is the clear
     /// colour of the screen) shows through, at an angle above the horizon in radians: 0 at the horizon, 1 straight up.
     float atmosphereAlpha(float elevation);

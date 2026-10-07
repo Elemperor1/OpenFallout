@@ -43,10 +43,6 @@
 
 namespace
 {
-    // How far from the camera the dome that stands in for the atmosphere mesh is. It is drawn without depth, so only
-    // the view distance, which it has to be inside of, limits it.
-    constexpr float sGeneratedDomeRadius = 1500.f;
-
     class WrapAroundOperator : public osgParticle::Operator
     {
     public:
@@ -311,10 +307,12 @@ namespace OFRender
         const bool hasStars
             = vfs.exists(Settings::models().mSkynight02.get()) || vfs.exists(Settings::models().mSkynight01.get());
         mHasClouds = vfs.exists(Settings::models().mSkyclouds.get());
-        mHasMoons = vfs.exists(VFS::Path::NormalizedView("textures/tx_mooncircle_full_m.dds"));
+        const bool hasMasser = Moon::hasFiles(vfs, Moon::Type_Masser);
+        const bool hasSecunda = Moon::hasFiles(vfs, Moon::Type_Secunda);
         std::string missing;
-        for (const auto& [present, name] : { std::pair{ hasAtmosphere, "dome" }, std::pair{ hasStars, "stars" },
-                 std::pair{ mHasClouds, "clouds" }, std::pair{ mHasMoons, "moons" } })
+        for (const auto& [present, name] :
+            { std::pair{ hasAtmosphere, "dome" }, std::pair{ hasStars, "stars" }, std::pair{ mHasClouds, "clouds" },
+                std::pair{ hasMasser, "masser" }, std::pair{ hasSecunda, "secunda" } })
         {
             if (!present)
                 missing += (missing.empty() ? "" : ", ") + std::string(name);
@@ -331,7 +329,10 @@ namespace OFRender
         }
         else
         {
-            mAtmosphereDay = createAtmosphereDome(sGeneratedDomeRadius);
+            // It is drawn without depth, so only the far plane, which it has to be inside of, limits how far it is.
+            // A script can change the view distance later and the dome does not follow it, like the sun and the moons
+            // (a thousand units away) do not.
+            mAtmosphereDay = createAtmosphereDome(generatedSkyRadius(Settings::camera().mViewingDistance));
             mEarlyRenderBinRoot->addChild(mAtmosphereDay);
         }
 
@@ -360,13 +361,12 @@ namespace OFRender
 
         mSun = std::make_unique<Sun>(mEarlyRenderBinRoot, *mSceneManager);
         mSun->setSunglare(mSunglareEnabled);
-        if (mHasMoons)
-        {
+        if (hasMasser)
             mMasser = std::make_unique<Moon>(mEarlyRenderBinRoot, *mSceneManager,
                 Fallback::Map::getFloat("Moons_Masser_Size") / 125, Moon::Type_Masser);
+        if (hasSecunda)
             mSecunda = std::make_unique<Moon>(mEarlyRenderBinRoot, *mSceneManager,
                 Fallback::Map::getFloat("Moons_Secunda_Size") / 125, Moon::Type_Secunda);
-        }
 
         mCloudNode = new osg::Group;
         mEarlyRenderBinRoot->addChild(mCloudNode);

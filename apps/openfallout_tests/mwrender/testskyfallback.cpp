@@ -1,10 +1,19 @@
 #include <apps/openfallout/mwrender/skyfallback.hpp>
+#include <apps/openfallout/mwrender/skyutil.hpp>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <osg/Math>
+
+#include <components/testing/util.hpp>
+#include <components/vfs/manager.hpp>
 
 namespace
 {
@@ -34,6 +43,21 @@ namespace
     {
         EXPECT_FLOAT_EQ(atmosphereAlpha(-1.f), 0.f);
         EXPECT_FLOAT_EQ(atmosphereAlpha(3.f), 1.f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackRadius, isTheFullRadiusWhenTheViewDistanceIsFarEnough)
+    {
+        EXPECT_FLOAT_EQ(generatedSkyRadius(7168.f), 1500.f);
+        EXPECT_FLOAT_EQ(generatedSkyRadius(81920.f), 1500.f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackRadius, staysInsideTheFarPlaneOfAShortViewDistance)
+    {
+        for (const float viewDistance : { 10.f, 500.f, 1000.f, 1600.f })
+        {
+            EXPECT_LT(generatedSkyRadius(viewDistance), viewDistance) << viewDistance;
+            EXPECT_GT(generatedSkyRadius(viewDistance), 0.5f * viewDistance) << viewDistance;
+        }
     }
 
     TEST(OpenFalloutRenderSkyFallbackDome, hasAllItsVerticesOnASphereOfTheRadiusAboveTheHorizon)
@@ -177,5 +201,71 @@ namespace
             EXPECT_GE(alphaAt(*image, x, 64), alphaAt(*image, x + 1, 64)) << x;
         EXPECT_EQ(alphaAt(*image, 127, 64), 0);
         EXPECT_EQ(alphaAt(*image, 0, 0), 0);
+    }
+
+    class OpenFalloutRenderMoonFiles : public Test
+    {
+    protected:
+        static constexpr std::array<const char*, 8> sPhases
+            = { "new", "one_wax", "half_wax", "three_wax", "one_wan", "half_wan", "three_wan", "full" };
+
+        /// The files of a moon, without the ones in the list, in a game.
+        std::unique_ptr<VFS::Manager> makeVfs(const std::vector<std::string>& moons, const std::string& without = {})
+        {
+            VFS::FileMap files;
+            for (const std::string& moon : moons)
+            {
+                std::vector<std::string> names = { "textures/tx_mooncircle_full_" + moon.substr(0, 1) + ".dds" };
+                for (const char* phase : sPhases)
+                    names.push_back(
+                        "textures/tx_" + std::string(moon == "m" ? "masser" : "secunda") + "_" + phase + ".dds");
+                for (const std::string& name : names)
+                {
+                    if (name != without)
+                        mNames.push_back(name);
+                }
+            }
+            for (const std::string& name : mNames)
+                files.emplace(VFS::Path::Normalized(name), &mFile);
+            return TestingOpenMW::createTestVFS(std::move(files));
+        }
+
+        TestingOpenMW::VFSTestFile mFile{ "" };
+        std::vector<std::string> mNames;
+    };
+
+    TEST_F(OpenFalloutRenderMoonFiles, isFalseWhenTheGameHasNoMoonFiles)
+    {
+        const auto vfs = makeVfs({});
+        EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Masser));
+        EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
+    }
+
+    TEST_F(OpenFalloutRenderMoonFiles, isTrueForTheMoonsThatTheGameHasFilesFor)
+    {
+        const auto vfs = makeVfs({ "m", "s" });
+        EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Masser));
+        EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
+    }
+
+    TEST_F(OpenFalloutRenderMoonFiles, judgesEachMoonOnItsOwnFiles)
+    {
+        const auto vfs = makeVfs({ "m" });
+        EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Masser));
+        EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
+    }
+
+    TEST_F(OpenFalloutRenderMoonFiles, isFalseWhenAPhaseIsMissing)
+    {
+        const auto vfs = makeVfs({ "m", "s" }, "textures/tx_secunda_three_wan.dds");
+        EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Masser));
+        EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
+    }
+
+    TEST_F(OpenFalloutRenderMoonFiles, isFalseWhenTheCircleIsMissing)
+    {
+        const auto vfs = makeVfs({ "m", "s" }, "textures/tx_mooncircle_full_m.dds");
+        EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Masser));
+        EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
     }
 }

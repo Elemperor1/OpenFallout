@@ -17,6 +17,9 @@ namespace OFRender
 
         constexpr int sSegments = 32;
 
+        // Where the generated sky is when the far plane of the camera is further away than that
+        constexpr float sFullRadius = 1500.f;
+
         float smoothstep(float low, float high, float value)
         {
             const float t = std::clamp((value - low) / (high - low), 0.f, 1.f);
@@ -47,6 +50,11 @@ namespace OFRender
             }
             return image;
         }
+    }
+
+    float generatedSkyRadius(float viewDistance)
+    {
+        return std::min(sFullRadius, 0.9f * viewDistance);
     }
 
     float atmosphereAlpha(float elevation)

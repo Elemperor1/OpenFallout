@@ -20,6 +20,11 @@ namespace Resource
     class SceneManager;
 }
 
+namespace VFS
+{
+    class Manager;
+}
+
 namespace OFRender
 {
     struct MoonUpdater;
@@ -310,6 +315,11 @@ namespace OFRender
         Moon(osg::Group* parentNode, Resource::SceneManager& sceneManager, float scaleFactor, Type type);
 
         ~Moon();
+
+        /// Whether the game has all the textures of the moon: the circle that hides the stars behind it and the
+        /// picture of each phase. A moon that is missing any of them must not be made, it would show a magenta square
+        /// in the phase that is missing.
+        static bool hasFiles(const VFS::Manager& vfs, Type type);
 
         void adjustTransparency(const float ratio) override;
         void setState(const MoonState state);
