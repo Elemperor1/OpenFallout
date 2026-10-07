@@ -669,6 +669,21 @@ namespace
         EXPECT_EQ(survey.count("Files of Fallout 3 and New Vegas", "no collision flag"), 1);
     }
 
+    TEST_F(TestHavokCollision, a_survey_tells_a_solid_body_that_has_no_pieces_from_one_that_is_not_solid)
+    {
+        Nif::bhkListShape list;
+        list.mRecordType = Nif::RC_bhkListShape;
+        mBody.mShape = Nif::bhkShapePtr(&list);
+        NifBullet::HavokSurvey survey;
+
+        const auto result = load(true, fallout3Version, false, &survey);
+
+        EXPECT_EQ(result->mCollisionShape, nullptr);
+        EXPECT_EQ(
+            survey.count(filesSection, "not used, its solid bodies have no pieces (an empty or degenerate shape)"), 1);
+        EXPECT_EQ(survey.count(filesSection, "not used, none of its bodies is solid"), 0);
+    }
+
     TEST_F(TestHavokCollision, a_survey_of_files_of_other_games_counts_nothing)
     {
         NifBullet::HavokSurvey survey;

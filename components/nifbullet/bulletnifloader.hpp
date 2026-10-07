@@ -91,8 +91,16 @@ namespace NifBullet
         /// Replaces the collision made from rendered geometry with the one of the Havok bodies of the roots in
         /// mHavokRoots, if that is possible and it fits.
         void applyHavokCollision();
+        // What the bodies of a file are: none with a shape, some that stop nothing, or at least one that stops what
+        // walks
+        enum class HavokBodies
+        {
+            None,
+            NotSolid,
+            Solid
+        };
         bool collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,
-            btCompoundShape& compound, bool& foundBody, std::string& unsupported);
+            btCompoundShape& compound, HavokBodies& bodies, std::string& unsupported);
 
         void survey(std::string_view section, std::string_view answer) const;
 

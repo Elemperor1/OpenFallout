@@ -1,6 +1,7 @@
 #include "bulletnifloader.hpp"
 #include <memory>
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <limits>
@@ -466,7 +467,7 @@ namespace NifBullet
     void BulletNifLoader::applyHavokCollision()
     {
         std::unique_ptr<btCompoundShape, Resource::DeleteCollisionShape> havok(new btCompoundShape);
-        bool foundBody = false;
+        HavokBodies bodies = HavokBodies::None;
         std::string unsupported;
         // The same files as for rendered geometry (see load) are taken for animated as a whole
         const bool animated = pathFileNameStartsWithX(mShape->mFileName);
@@ -474,7 +475,7 @@ namespace NifBullet
         for (const Nif::NiAVObject* root : mHavokRoots)
         {
             // A survey goes on after a body that is not read, so that it counts the bodies that come after it too
-            if (!collectHavokBodies(*root, nullptr, animated, *havok, foundBody, unsupported))
+            if (!collectHavokBodies(*root, nullptr, animated, *havok, bodies, unsupported))
             {
                 supported = false;
                 if (mHavokSurvey == nullptr)
@@ -490,10 +491,13 @@ namespace NifBullet
 
         if (havok->getNumChildShapes() == 0)
         {
-            // No body in the file is solid (or there is none): this is not what a Havok file looks like, and the
-            // rendered geometry is as good a guess as any
-            const std::string reason
-                = foundBody ? "none of its bodies is solid" : "it has no body with a shape of a kind that is read";
+            // No body in the file is solid (or there is none, or what is solid has no pieces): this is not what a
+            // Havok file looks like, and the rendered geometry is as good a guess as any
+            std::string reason = "it has no body with a shape of a kind that is read";
+            if (bodies == HavokBodies::NotSolid)
+                reason = "none of its bodies is solid";
+            else if (bodies == HavokBodies::Solid)
+                reason = "its solid bodies have no pieces (an empty or degenerate shape)";
             logHavokNotUsed(mShape->mFileName.value(), reason);
             survey("Havok collision of the files", "not used, " + reason);
             return;
@@ -529,7 +533,7 @@ namespace NifBullet
     }
 
     bool BulletNifLoader::collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,
-        btCompoundShape& compound, bool& foundBody, std::string& unsupported)
+        btCompoundShape& compound, HavokBodies& bodies, std::string& unsupported)
     {
         if (node.mRecordType == Nif::RC_NiCollisionSwitch && !node.collisionActive())
             return true;
@@ -572,7 +576,7 @@ namespace NifBullet
                 survey("Rigid bodies", "without a shape");
             if (body != nullptr && !body->mShape.empty())
             {
-                foundBody = true;
+                bodies = std::max(bodies, HavokBodies::NotSolid);
                 // A body that only reports what touches it, or does nothing when it is touched, stops nothing
                 const bool stopsWhatTouchesIt = body->mInfo.mResponseType != Nif::HkResponseType::Response_Reporting
                     && body->mInfo.mResponseType != Nif::HkResponseType::Response_None;
@@ -593,6 +597,7 @@ namespace NifBullet
                 }
                 if (isSolidHavokFilter(body->mHavokFilter) && stopsWhatTouchesIt)
                 {
+                    bodies = HavokBodies::Solid;
                     // What is not read is not used, and a survey goes on to count the bodies that come after it
                     std::string failure;
                     // The shape moves with the node, and where the node is when it does is not what this knows
@@ -642,7 +647,7 @@ namespace NifBullet
             for (const auto& child : ninode->mChildren)
             {
                 if (!child.empty()
-                    && !collectHavokBodies(child.get(), &currentParent, animated, compound, foundBody, unsupported))
+                    && !collectHavokBodies(child.get(), &currentParent, animated, compound, bodies, unsupported))
                 {
                     if (mHavokSurvey == nullptr)
                         return false;
