@@ -37,8 +37,8 @@ namespace ESM4
 
         // The base object of the current reference, whose data has been read: the form ID of its NAME, which is empty
         // when the record has none (a record that changes only a part of a reference may leave it out). A sub-record
-        // that runs past the end of the record, a record that ends inside a sub-record header and a file that ends
-        // inside the NAME are errors.
+        // that runs past the end of the record, a record that ends inside a sub-record header, a NAME that is not 4
+        // bytes and a file that ends inside the NAME are errors.
         std::optional<ESM::FormId> readBase(Reader& reader)
         {
             std::optional<ESM::FormId> base;
@@ -55,8 +55,10 @@ namespace ESM4
                     break;
                 }
 
-                if (reader.subRecordHeader().typeId == ESM::fourCC("NAME") && reader.subRecordHeader().dataSize == 4)
+                if (reader.subRecordHeader().typeId == ESM::fourCC("NAME"))
                 {
+                    if (reader.subRecordHeader().dataSize != sizeof(std::uint32_t))
+                        throw std::runtime_error("A base object is not a form ID");
                     ESM::FormId id;
                     if (!reader.getFormId(id))
                         throw std::runtime_error("The file ends inside a base object");

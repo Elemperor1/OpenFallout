@@ -9,6 +9,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/resource/imagemanager.hpp>
+#include <components/vfs/manager.hpp>
 
 namespace MyGUIPlatform
 {
@@ -111,8 +112,11 @@ namespace MyGUIPlatform
         if (!mImageManager)
             throw std::runtime_error("No imagemanager set");
 
-        osg::ref_ptr<osg::Image> image(mImageManager->getImage(VFS::Path::Normalized(fname)));
-        if (image == mImageManager->getWarningImage())
+        const VFS::Path::Normalized path(fname);
+        osg::ref_ptr<osg::Image> image(mImageManager->getImage(path));
+        // A texture that no data file has is blank, as the textures of Morrowind's interface are in the data of other
+        // games. One that is there and cannot be read keeps the warning image, whose reason is in the log.
+        if (image == mImageManager->getWarningImage() && !mImageManager->getVFS()->exists(path))
             image = createBlankImage();
         mTexture = new osg::Texture2D(image);
         mTexture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);

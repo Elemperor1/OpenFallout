@@ -1,5 +1,6 @@
 #include <components/myguiplatform/myguitexture.hpp>
 #include <components/resource/imagemanager.hpp>
+#include <components/testing/util.hpp>
 #include <components/vfs/manager.hpp>
 
 #include <gtest/gtest.h>
@@ -31,5 +32,22 @@ namespace
         for (int y = 0; y < loaded->getImage()->t(); ++y)
             for (int x = 0; x < loaded->getImage()->s(); ++x)
                 EXPECT_FLOAT_EQ(loaded->getImage()->getColor(x, y).a(), 0.f) << x << ' ' << y;
+    }
+
+    TEST(MyGUIPlatformTextureFileTest, aTextureThatIsThereAndCannotBeReadKeepsTheWarningImage)
+    {
+        // The reason is in the log and the interface stays diagnosable, only a file that is not there is blank
+        TestingOpenMW::VFSTestFile file("this is not an image");
+        VFS::FileMap files;
+        files.emplace(VFS::Path::Normalized("textures/broken.dds"), &file);
+        const auto vfs = TestingOpenMW::createTestVFS(std::move(files));
+        Resource::ImageManager imageManager(vfs.get(), 0.0);
+
+        MyGUIPlatform::OSGTexture texture("textures/broken.dds", &imageManager);
+        texture.loadFromFile("textures/broken.dds");
+
+        const osg::Texture2D* const loaded = texture.getTexture();
+        ASSERT_NE(loaded, nullptr);
+        EXPECT_EQ(loaded->getImage(), imageManager.getWarningImage());
     }
 }

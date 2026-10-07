@@ -255,6 +255,28 @@ namespace
         EXPECT_TRUE(census.getFatalErrors().empty());
     }
 
+    TEST(ESM4ReferenceCensusTest, aReferenceWhoseBaseObjectIsNotAFormIdCannotBeRead)
+    {
+        // A NAME of 2 bytes and one of 8, which fit the record but are not a form ID
+        std::string short_("NAME");
+        append<std::uint16_t>(short_, 2);
+        short_ += "ab";
+        std::string long_("NAME");
+        append<std::uint16_t>(long_, 8);
+        long_ += "abcdefgh";
+        const std::string plugin = header()
+            + topGroup("STAT",
+                record("STAT", stat, "") + record("REFR", 0x2001, short_) + record("REFR", 0x2002, long_)
+                    + record("REFR", 0x2003, name(stat)));
+        ESM4::ReferenceCensus census;
+        collect(census, plugin, "base.esm", 0, {});
+
+        const Counts counts = census.getCounts();
+        EXPECT_EQ(total(counts, "STAT", "REFR"), 1u);
+        EXPECT_EQ(counts.size(), 1u);
+        EXPECT_TRUE(census.getFatalErrors().empty());
+    }
+
     TEST(ESM4ReferenceCensusTest, countsPlacedHazardsAndTheOtherRecordsThatPlaceAnObject)
     {
         const std::string plugin = header()
