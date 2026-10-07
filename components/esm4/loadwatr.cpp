@@ -3,8 +3,56 @@
 #include "reader.hpp"
 #include "recordreader.hpp"
 
+#include <cmath>
+#include <cstring>
+
 namespace ESM4
 {
+    namespace
+    {
+        // Where the members of the settings are, in bytes: 16 bytes that are not known, then the sun power, the
+        // reflectivity, the fresnel amount, 4 unused bytes, the near and far distance of the fog above the water, and
+        // the colours (red, green, blue and an unused byte each).
+        constexpr std::size_t sSunPower = 16;
+        constexpr std::size_t sReflectivity = 20;
+        constexpr std::size_t sFresnel = 24;
+        constexpr std::size_t sShallowColour = 40;
+        constexpr std::size_t sDeepColour = 44;
+        constexpr std::size_t sReflectionColour = 48;
+        constexpr std::size_t sAppearanceSize = 52;
+
+        float readFloat(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+        {
+            float value;
+            std::memcpy(&value, bytes.data() + offset, sizeof(value));
+            return value;
+        }
+
+        Water::Colour readColour(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+        {
+            return { bytes[offset], bytes[offset + 1], bytes[offset + 2] };
+        }
+    }
+
+    std::optional<Water::Appearance> Water::appearance() const
+    {
+        // The settings of a record that has a DNAM are in it, the others have them before the damage in DATA
+        const std::vector<std::uint8_t>& bytes = mVisualData.empty() ? mData : mVisualData;
+        if (bytes.size() < sAppearanceSize)
+            return std::nullopt;
+
+        Appearance result;
+        result.mShallow = readColour(bytes, sShallowColour);
+        result.mDeep = readColour(bytes, sDeepColour);
+        result.mReflection = readColour(bytes, sReflectionColour);
+        result.mSunPower = readFloat(bytes, sSunPower);
+        result.mReflectivity = readFloat(bytes, sReflectivity);
+        result.mFresnel = readFloat(bytes, sFresnel);
+        if (!std::isfinite(result.mSunPower) || !std::isfinite(result.mReflectivity) || !std::isfinite(result.mFresnel))
+            return std::nullopt;
+        return result;
+    }
+
     void Water::load(Reader& reader)
     {
         mId = reader.getFormIdFromHeader();

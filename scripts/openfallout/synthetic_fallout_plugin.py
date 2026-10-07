@@ -8,7 +8,8 @@ cell, a lighting template that the cell takes its fog colour and far fog distanc
 them there. It also has a worldspace "OFTestWorld" with a flat exterior cell, a weather and the climate of the
 worldspace that says the weather is the one to have (it lists a second weather too, which needs a global that is 0),
 and two more exterior cells that are flagged for water: one has water of its own and the other the largest float as
-its height, which the games write for a cell without water of its own.
+its height, which the games write for a cell without water of its own. The worldspace names a kind of water (WATR),
+black and opaque, with no reflection.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
@@ -40,7 +41,8 @@ WATER_CELL_ID = 0x810
 WATER_LAND_ID = 0x811
 DRY_CELL_ID = 0x812
 DRY_LAND_ID = 0x813
-LAST_ID = DRY_LAND_ID # the largest form ID of the plugin, which the next object ID of its header follows
+WATER_TYPE_ID = 0x814
+LAST_ID = WATER_TYPE_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
@@ -58,6 +60,15 @@ WATER_CELL = (0, 1)
 DRY_CELL = (1, 0)
 WATER_TERRAIN = -40.0
 WATER_HEIGHT = -20.0
+# The kind of water of the worldspace (its NAM2), which the cells take as they name none: black and wholly opaque, with
+# no reflection, so that the water shows nothing but the fog in front of it, which is far from what the water of
+# Morrowind (white, half transparent) shows over the terrain. The colours are red, green and blue of 0 to 255, the
+# opacity is a percentage.
+WATER_TYPE_NAME = "OFTestWater"
+WATER_SHALLOW = (0, 0, 0)
+WATER_DEEP = (0, 0, 0)
+WATER_OPACITY = 100
+WATER_REFLECTIVITY = 0.0
 FLOAT_MAX = 3.4028234663852886e+38
 # Edge of the cube in game units. The floor is the cube scaled up so that its top face is at height 0, where the
 # player starts, and the pillar is the cube as it is, standing on the floor PILLAR_DISTANCE units north of the start.
@@ -172,6 +183,17 @@ def cloud_texture(size=4):
     return header + pixel_format + struct.pack("<5I", 0x1000, 0, 0, 0, 0) + pixels
 
 
+def water_type():
+    """A WATR record with its settings in a DNAM of 196 bytes: the sun power, the reflectivity and the fresnel amount
+    after 16 bytes, then the colours (red, green, blue and an unused byte) of shallow water, deep water and the
+    reflection, the rest are zeros."""
+    visual = (bytes(16) + struct.pack("<fff", 826.0, WATER_REFLECTIVITY, 0.75) + bytes(4) + struct.pack("<ff", 0.0, 0.0)
+              + bytes(WATER_SHALLOW) + b"\xff" + bytes(WATER_DEEP) + b"\xff" + bytes((10, 10, 10)) + b"\xff")
+    visual += bytes(196 - len(visual))
+    return record(b"WATR", WATER_TYPE_ID, [zstr(b"EDID", WATER_TYPE_NAME), sub(b"ANAM", bytes((WATER_OPACITY,))),
+                                           sub(b"FNAM", b"\x02"), sub(b"DATA", bytes(2)), sub(b"DNAM", visual)])
+
+
 def global_variable():
     """A GLOB record, a float that is 0."""
     return record(b"GLOB", GLOBAL_ID, [zstr(b"EDID", "OFTestWeatherGlobal"), sub(b"FNAM", b"f"),
@@ -207,7 +229,8 @@ def worldspace():
                                       sub(b"NAM0", struct.pack("<ff", -4096.0, -4096.0)),
                                       sub(b"NAM9", struct.pack("<ff", 8192.0, 8192.0)),
                                       sub(b"CNAM", struct.pack("<I", CLIMATE_ID)),
-                                      sub(b"DATA", b"\x00"), sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
+                                      sub(b"NAM2", struct.pack("<I", WATER_TYPE_ID)), sub(b"DATA", b"\x00"),
+                                      sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
     # DATA of an exterior cell is its flags (0: not an interior, no water), XCLC the grid and the flags of the land.
     cell = record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
                                               sub(b"XCLC", struct.pack("<iiI", 0, 0, 0))])
@@ -264,7 +287,7 @@ def plugin():
     return (header + top_group(b"STAT", [cube, marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
-            + top_group(b"CLMT", [climate()])
+            + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 

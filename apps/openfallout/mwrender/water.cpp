@@ -486,6 +486,11 @@ namespace OFRender
         mResourceSystem->getSceneManager()->setUpNormalsRTForStateSet(mWaterGeom->getOrCreateStateSet(), true);
         mResourceSystem->getSceneManager()->setUpNormalsRTForStateSet(mTileGeom->getOrCreateStateSet(), true);
 
+        // The way a look is given depends on whether the water has its shader
+        applyPlaneLook();
+        for (auto& [cell, tile] : mTiles)
+            applyTileLook(tile);
+
         updateVisible();
     }
 
@@ -524,21 +529,56 @@ namespace OFRender
             textures.push_back(tex);
         }
 
-        if (textures.empty())
-            return;
+        if (!textures.empty())
+        {
+            float fps = Fallback::Map::getFloat("Water_SurfaceFPS");
 
-        float fps = Fallback::Map::getFloat("Water_SurfaceFPS");
+            osg::ref_ptr<NifOsg::FlipController> controller(new NifOsg::FlipController(0, 1.f / fps, textures));
+            controller->setSource(std::make_shared<SceneUtil::FrameTimeSource>());
+            node->setUpdateCallback(controller);
 
-        osg::ref_ptr<NifOsg::FlipController> controller(new NifOsg::FlipController(0, 1.f / fps, textures));
-        controller->setSource(std::make_shared<SceneUtil::FrameTimeSource>());
-        node->setUpdateCallback(controller);
+            stateset->setTextureAttribute(0, textures[0], osg::StateAttribute::ON);
+        }
 
-        stateset->setTextureAttribute(0, textures[0], osg::StateAttribute::ON);
-
-        // use a shader to render the simple water, ensuring that fog is applied per pixel as required.
+        // use a shader to render the simple water, ensuring that fog is applied per pixel as required, and that the
+        // colour of its material is used when it has no texture (the water of Fallout).
         // this could be removed if a more detailed water mesh, using some sort of paging solution, is implemented.
         Resource::SceneManager* sceneManager = mResourceSystem->getSceneManager();
         sceneManager->recreateShaders(node);
+    }
+
+    namespace
+    {
+        // The uniforms of the shader of the water that say how the water looks
+        void addLookUniforms(osg::StateSet* stateset, const WaterLook& look)
+        {
+            stateset->addUniform(new osg::Uniform("waterShallowColour", look.mShallowColour));
+            stateset->addUniform(new osg::Uniform("waterDeepColour", look.mDeepColour));
+            stateset->addUniform(new osg::Uniform("waterLook", osg::Vec2f(look.mOpacity, look.mReflectivity)));
+        }
+
+        // The material of the water that is drawn without the shader: white at the alpha of the water of Morrowind
+        // for the standard look (what SceneUtil::createSimpleWaterStateSet makes), else the colour and the opacity
+        // of the look. The ambient colour has the colour as well, or the water would be lit with white by the light
+        // of the cell.
+        osg::ref_ptr<SceneUtil::Material> makeSimpleMaterial(const WaterLook& look)
+        {
+            osg::ref_ptr<SceneUtil::Material> material(new SceneUtil::Material);
+            material->setEmission(osg::Vec4f(0.f, 0.f, 0.f, 1.f));
+            if (look == WaterLook::standard())
+            {
+                material->setDiffuse(osg::Vec4f(1.f, 1.f, 1.f, Fallback::Map::getFloat("Water_World_Alpha")));
+                material->setAmbient(osg::Vec4f(1.f, 1.f, 1.f, 1.f));
+            }
+            else
+            {
+                const osg::Vec3f colour = look.simpleColour();
+                material->setDiffuse(osg::Vec4f(colour, look.mOpacity));
+                material->setAmbient(osg::Vec4f(colour, 1.f));
+            }
+            material->setVertexColorMode(SceneUtil::VertexColorModes::None);
+            return material;
+        }
     }
 
     class ShaderWaterStateSetUpdater : public SceneUtil::StateSetUpdater
@@ -581,6 +621,7 @@ namespace OFRender
                 stateset->addUniform(new osg::Uniform("rippleMap", 4));
             }
             stateset->addUniform(new osg::Uniform("nodePosition", osg::Vec3f(mWater->getPosition())));
+            addLookUniforms(stateset, mWater->getLook());
         }
 
         void apply(osg::StateSet* stateset, osg::NodeVisitor* nv) override
@@ -599,6 +640,11 @@ namespace OFRender
                 stateset->setTextureAttribute(4, mRipples->getColorTexture(), osg::StateAttribute::ON);
             }
             stateset->getUniform("nodePosition")->set(osg::Vec3f(mWater->getPosition()));
+            // The water of one plane has one look, which is changed with the cell. Tiles have their own.
+            const WaterLook& look = mWater->getLook();
+            stateset->getUniform("waterShallowColour")->set(look.mShallowColour);
+            stateset->getUniform("waterDeepColour")->set(look.mDeepColour);
+            stateset->getUniform("waterLook")->set(osg::Vec2f(look.mOpacity, look.mReflectivity));
         }
 
     private:
@@ -728,7 +774,36 @@ namespace OFRender
         return found->second.mHeight;
     }
 
-    void Water::addTile(int gridX, int gridY, float height)
+    void Water::applyTileLook(Tile& tile)
+    {
+        addLookUniforms(tile.mNode->getOrCreateStateSet(), tile.mLook);
+
+        // Without the shader the surface has the material of the tile instead of the shared one, which the material of
+        // the node of the surface overrides
+        if (mReflection || tile.mLook == WaterLook::standard())
+            tile.mSurface->setStateSet(nullptr);
+        else
+            makeSimpleMaterial(tile.mLook)
+                ->setStateSet(
+                    tile.mSurface->getOrCreateStateSet(), osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+    }
+
+    void Water::applyPlaneLook()
+    {
+        if (mReflection || mWaterGeom->getStateSet() == nullptr)
+            return;
+        makeSimpleMaterial(mLook)->setStateSet(mWaterGeom->getStateSet());
+    }
+
+    void Water::setLook(const WaterLook& look)
+    {
+        if (look == mLook)
+            return;
+        mLook = look;
+        applyPlaneLook();
+    }
+
+    void Water::addTile(int gridX, int gridY, float height, const WaterLook& look)
     {
         removeTile(gridX, gridY);
 
@@ -738,14 +813,18 @@ namespace OFRender
         osg::ref_ptr<osg::PositionAttitudeTransform> node(new osg::PositionAttitudeTransform);
         node->setName("Water Tile");
         node->setPosition(centre);
-        node->addChild(mTileGeom);
+        osg::ref_ptr<osg::Group> surface(new osg::Group);
+        surface->setName("Water Tile Surface");
+        surface->addChild(mTileGeom);
+        node->addChild(surface);
         node->addChild(mTileSimpleGeom);
         node->addCullCallback(new FudgeCallback);
         // The shader finds the place of a point of the water from the position of the node of its tile
         node->getOrCreateStateSet()->addUniform(new osg::Uniform("nodePosition", centre));
         mTileGroup->addChild(node);
 
-        mTiles[{ gridX, gridY }] = Tile{ node, height };
+        Tile& tile = mTiles[{ gridX, gridY }] = Tile{ node, surface, height, look };
+        applyTileLook(tile);
         updateVisible();
     }
 

@@ -27,6 +27,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     mwrender/testfogmanager.cpp
     mwrender/testskyfallback.cpp
+    mwrender/testwaterlook.cpp
 
     mwscript/testscripts.cpp
 

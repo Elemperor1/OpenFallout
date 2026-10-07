@@ -17,21 +17,34 @@
 
 namespace OFWorld
 {
+    namespace
+    {
+        // The worldspace that gives a worldspace what the use flag stands for: itself, or its parent (and so on up the
+        // chain) while the flags say that it uses the data of its parent. A parent that is not found ends the walk, and
+        // so does a loop in the data, so a long chain or a bad one does not hang the game.
+        const ESM4::World& findInheritedWorld(const ESM4::World& world, std::uint16_t useFlag,
+            const std::function<const ESM4::World*(ESM::FormId)>& findWorld)
+        {
+            // The worldspaces on the way up
+            std::set<ESM::FormId> visited{ world.mId };
+            const ESM4::World* current = &world;
+            while (findWorld && !current->mParent.isZeroOrUnset() && (current->mParentUseFlags & useFlag))
+            {
+                const ESM4::World* parent = findWorld(current->mParent);
+                if (parent == nullptr || !visited.insert(parent->mId).second)
+                    break;
+                current = parent;
+            }
+            return *current;
+        }
+    }
+
     ESM::FormId resolveClimate(
         const ESM4::World& world, const std::function<const ESM4::World*(ESM::FormId)>& findWorld)
     {
-        // The worldspaces on the way up, so that a loop in the data ends the walk and a long chain does not
-        std::set<ESM::FormId> visited{ world.mId };
-        const ESM4::World* current = &world;
-        while (!current->mParent.isZeroOrUnset() && (current->mParentUseFlags & ESM4::World::UseFlag_Climate))
-        {
-            const ESM4::World* parent = findWorld(current->mParent);
-            if (parent == nullptr || !visited.insert(parent->mId).second)
-                break;
-            current = parent;
-        }
+        const ESM4::World& current = findInheritedWorld(world, ESM4::World::UseFlag_Climate, findWorld);
         // A parent that has no climate either leaves the worldspace with its own
-        return !current->mClimate.isZeroOrUnset() ? current->mClimate : world.mClimate;
+        return !current.mClimate.isZeroOrUnset() ? current.mClimate : world.mClimate;
     }
 
     ESM::FormId resolveCellClimate(const ESM4::Cell& cell, const ESM4::World* world,
@@ -48,11 +61,19 @@ namespace OFWorld
         return ESM::FormId();
     }
 
-    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world)
+    CellWater resolveCellWater(const ESM4::Cell& cell, const ESM4::World* world,
+        const std::function<const ESM4::World*(ESM::FormId)>& findWorld)
     {
-        CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight };
-        if (cell.isExterior() && world != nullptr && !cell.hasWaterHeight())
-            result.mHeight = world->mWaterLevel;
+        CellWater result{ .mHasWater = false, .mHeight = cell.mWaterHeight, .mType = cell.mWater };
+        if (cell.isExterior() && world != nullptr)
+        {
+            // The worldspace has the water of its parent when its flags say so
+            const ESM4::World& source = findInheritedWorld(*world, ESM4::World::UseFlag_Water, findWorld);
+            if (!cell.hasWaterHeight())
+                result.mHeight = source.mWaterLevel;
+            if (result.mType.isZeroOrUnset())
+                result.mType = !source.mWater.isZeroOrUnset() ? source.mWater : world->mWater;
+        }
         const bool flagged
             = (cell.mCellFlags & ESM4::CELL_HasWater) || (cell.isExterior() && !cell.mExteriorWaterIsFlagged);
         result.mHasWater = flagged && ESM4::Cell::isWaterHeight(result.mHeight);
@@ -160,9 +181,11 @@ namespace OFWorld
             throw std::runtime_error(
                 "Cell " + cell.mId.toDebugString() + " parent world " + mParent.toDebugString() + " is not found");
 
-        const CellWater water = resolveCellWater(cell, world);
+        const CellWater water
+            = resolveCellWater(cell, world, [&](ESM::FormId id) { return worlds.search(ESM::RefId(id)); });
         mHasWater = water.mHasWater;
         mWaterHeight = water.mHeight;
+        mWaterType = water.mType;
 
         // The weather of a cell is the one of its climate, where a cell of Morrowind has the weather of its region. A
         // cell with no climate has no region, as a cell of Morrowind without one: the weather manager leaves the

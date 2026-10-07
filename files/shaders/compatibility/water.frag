@@ -65,6 +65,12 @@ varying float linearDepth;
 
 uniform sampler2D normalMap;
 
+// The look of the water: the colours of shallow and deep water, and x: how much of the ground is hidden by the colour
+// of the water, y: how much of the reflection is taken where the water reflects
+uniform vec3 waterShallowColour;
+uniform vec3 waterDeepColour;
+uniform vec2 waterLook;
+
 uniform float osg_SimulationTime;
 
 uniform float near;
@@ -178,7 +184,7 @@ void main(void)
     // reflection
     vec3 reflection = sampleReflectionMap(screenCoords + reflectionCoordsOffset).rgb * fogScale + fogOffset;
 
-    vec3 waterColor = WATER_COLOR * sunFade;
+    vec3 waterColor = waterDeepColour * sunFade;
 
     vec4 sunSpec = sun.specular;
     // alpha component is sun visibility; we want to start fading lighting effects when visibility is low
@@ -215,7 +221,12 @@ void main(void)
         if (!hasOpaqueGeometry(refractionCoords))
             refraction = deepWaterColor;
         else
+        {
+            // the colour of the water over the ground, shallow near the surface and deep farther down
+            vec3 shownColor = mix(waterShallowColour, waterDeepColour, clamp(realWaterDepth / VISIBILITY, 0.0, 1.0));
+            refraction = mix(refraction, shownColor * sunFade * fogScale + fogOffset, waterLook.x);
             refraction = mix(refraction, deepWaterColor, clamp(realWaterDepth / VISIBILITY - 1.0, 0.0, 1.0));
+        }
     }
 
 #if @sunlightScattering
@@ -230,7 +241,9 @@ void main(void)
     refraction = mix(refraction, scatterColour * fogScale + fogOffset, lightScatter);
 #endif
 
-    gl_FragData[0].rgb = mix(refraction, reflection, fresnel);
+    // the reflectivity of the water is for the surface seen from above, from underneath it reflects as it always did
+    float reflectivity = (cameraPos.z >= 0.0) ? waterLook.y : 1.0;
+    gl_FragData[0].rgb = mix(refraction, reflection, fresnel * reflectivity);
     gl_FragData[0].a = 1.0;
     // no alpha here, so make sure raindrop ripple specularity gets properly subdued
     rainSpecular *= waterTransparency;

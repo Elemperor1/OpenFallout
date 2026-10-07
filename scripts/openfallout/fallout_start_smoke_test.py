@@ -15,9 +15,9 @@ above the player, the player stops at the pillar that is in the way, nothing log
 quits by itself. When ImageMagick's `import` is installed, pixels of the screen are checked too: where nothing is drawn
 it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after three
 seconds, the sky overhead has the sky colour of the weather with the clouds of the weather over it, and a band of
-water in a cell north of the start shows where the horizon would be (it is not the fog colour). The water of the cell
-that has a height of its own is logged once and the cell that holds the largest float as its height has none. The game
-has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
+water in a cell north of the start shows where the horizon would be (it is black, as the kind of water of the worldspace
+says, so darker than the fog). The water of the cell that has a height of its own is logged once, with its kind of
+water, and the cell that holds the largest float as its height has none. The game has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -57,8 +57,9 @@ class Scenario:
 
     Each pixel is (what it shows, when it is read, where on the screen, the colour it should have): the colour of the
     screen where nothing is drawn is the colour of the fog, and the sky overhead has the sky colour of the weather. A
-    fifth item, True, turns it round: the colour must not be the one given (the pixel that shows the water is not the
-    fog colour that the same pixel has without water)."""
+    fifth item, "darker", changes what is checked: each channel of the pixel must be at least WATER_DIFFERENCE below the
+    one of the colour given (the water is black and opaque, so it shows only the fog in front of it, and that is
+    darker than the colour of the fog that the horizon has)."""
 
     def __init__(self, name, start, loaded, exterior, origin, lit, pixels):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
@@ -77,8 +78,9 @@ FOG_PIXEL_EXTERIOR = (300, 360)
 SKY_PIXEL = (500, 360)
 PIXEL_TOLERANCE = 12
 # A pixel of the band of water of the cell north of the start, on the right of the pillar, a little below the horizon. It
-# is the colour of the fog where there is no water, and about (192,119,165) with it. How far from the fog colour a
-# channel must be for the water to be there.
+# is the colour of the fog where there is no water, and about (191,119,164) with the water of Morrowind (white, half
+# transparent, over the terrain). The kind of water of the worldspace is black and opaque: how far below the colour of
+# the fog each channel of the pixel must be for that water to be there.
 WATER_PIXEL = (900, 380)
 WATER_DIFFERENCE = 40
 
@@ -100,7 +102,7 @@ SCENARIOS = [
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
              (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
              [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
-              ("water", HORIZON_TIME, WATER_PIXEL, plugin.WEATHER_FOG[1], True),
+              ("water", HORIZON_TIME, WATER_PIXEL, plugin.WEATHER_FOG[1], "darker"),
               ("sky and clouds", ZENITH_TIME, SKY_PIXEL,
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
@@ -127,9 +129,11 @@ WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, s
                     *plugin.WEATHER_FOG_NIGHT))
 
 # What the engine logs about the water of an exterior cell: only the cell that has a height of its own has water to see
-# (the other cell that is flagged for water has the default height of the worldspace, below its terrain).
-WATER_LINE = "Water of cell {}WaterCell ({}, {}) at height {:g}".format(plugin.WORLD_NAME, *plugin.WATER_CELL,
-                                                                        plugin.WATER_HEIGHT)
+# (the other cell that is flagged for water has the default height of the worldspace, below its terrain), and it has
+# the kind of water of its worldspace.
+WATER_LINE = "Water of cell {}WaterCell ({}, {}) at height {:g}, water type {} (opacity {}%, reflectivity {:g})".format(
+    plugin.WORLD_NAME, *plugin.WATER_CELL, plugin.WATER_HEIGHT, plugin.WATER_TYPE_NAME, plugin.WATER_OPACITY,
+    plugin.WATER_REFLECTIVITY)
 
 # The middle of the cell with water, where the script casts a ray down at the water (a cell is 4096 units wide)
 WATER_CENTRE = ((plugin.WATER_CELL[0] + 0.5) * 4096, (plugin.WATER_CELL[1] + 0.5) * 4096)
@@ -299,15 +303,15 @@ def check(text, scenario, colours):
         problems.append(f"the log has the lines {water_lines or 'none'} about water, expected only '{WATER_LINE}'")
     if not scenario.exterior and water_lines:
         problems.append(f"the engine made water in an interior cell: {water_lines}")
-    for name, _, position, want, *unlike in scenario.pixels:
+    for name, _, position, want, *mode in scenario.pixels:
         have = colours.get(name)
-        print(f"pixel {position} shows the {name}: {have}, expected {'not ' if unlike else ''}{want}")
+        print(f"pixel {position} shows the {name}: {have}, expected {'below ' if mode else ''}{want}")
         if have is None:
             print(f"no screenshot, the colour of the {name} on the screen is not checked (needs ImageMagick's import)")
-        elif unlike:
-            if all(abs(h - w) <= WATER_DIFFERENCE for h, w in zip(have, want)):
-                problems.append(f"the pixel at {position} that should show the {name} is {have}, which is the colour "
-                                f"{want} that it has without {name}")
+        elif mode:
+            if any(h > w - WATER_DIFFERENCE for h, w in zip(have, want)):
+                problems.append(f"the pixel at {position} that should show the {name} is {have}, which should be at "
+                                f"least {WATER_DIFFERENCE} below {want} in each channel")
         elif any(abs(h - w) > PIXEL_TOLERANCE for h, w in zip(have, want)):
             problems.append(f"the pixel at {position} that should show the {name} is {have}, the {name} colour of the "
                             f"cell is {want}")
