@@ -66,9 +66,10 @@ class Scenario:
     fifth item changes what is checked. "darker": each channel of the pixel must be at least WATER_DIFFERENCE below the
     one of the colour given (the water is black and opaque, so it shows only the fog in front of it, and that is
     darker than the colour of the fog that the horizon has). "tinted": the pixel must have the hue of the colour given:
-    its strongest channel is the same as that of the colour, and the others are less than half of it (the ground has a
-    texture of one colour, and what the lighting and the fog do to it is not known to the test; the colour that the
-    engine gives a texture that it can not find is magenta)."""
+    its strongest channel is the same as that of the colour and at least TINT_MINIMUM (so a black pixel does not
+    pass), and the others are less than half of it (the ground has a texture of one colour, and what the lighting and
+    the fog do to it is not known to the test; the colour that the engine gives a texture that it can not find is
+    magenta)."""
 
     def __init__(self, name, start, loaded, exterior, origin, lit, pixels):
         self.name, self.start, self.loaded, self.exterior, self.origin, self.lit = (
@@ -95,6 +96,8 @@ WATER_DIFFERENCE = 40
 # A pixel of the ground a little before the player, below the pillar at the bottom of the window. The texture of the
 # ground is red; the default texture of the game is not in the data files of the test.
 GROUND_PIXEL = (640, 600)
+# The least that the strongest channel of a tinted pixel has, which a black pixel (nothing drawn there) does not
+TINT_MINIMUM = 40
 
 # The colour of the sky overhead with the clouds of the weather over it. Their texture is white with one alpha, and they
 # are drawn over the sky in the colour of the fog of the weather with a little added (0.13 of the range of a colour).
@@ -408,11 +411,11 @@ def check(text, scenario, colours):
             print(f"no screenshot, the colour of the {name} on the screen is not checked (needs ImageMagick's import)")
         elif mode == ["tinted"]:
             strongest = have.index(max(have))
-            if (strongest != want.index(max(want))
+            if (strongest != want.index(max(want)) or have[strongest] < TINT_MINIMUM
                     or any(2 * channel > have[strongest] for i, channel in enumerate(have) if i != strongest)):
                 problems.append(f"the pixel at {position} that should show the {name} is {have}, which should have "
-                                f"the hue of {want} (its strongest channel the same and the "
-                                f"others less than half of it)")
+                                f"the hue of {want} (its strongest channel the same and at least {TINT_MINIMUM}, "
+                                f"the others less than half of it)")
         elif mode:
             if any(h > w - WATER_DIFFERENCE for h, w in zip(have, want)):
                 problems.append(f"the pixel at {position} that should show the {name} is {have}, which should be at "
