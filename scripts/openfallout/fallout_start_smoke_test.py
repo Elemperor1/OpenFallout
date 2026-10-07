@@ -13,9 +13,9 @@ sun colours and with the fog colour and far distance of its lighting template, i
 that the climate of the worldspace lists, the player stands on the floor the whole time, the camera is at eye height
 above the player, the player stops at the pillar that is in the way, nothing logs an error from Lua, and the engine
 quits by itself. When ImageMagick's `import` is installed, pixels of the screen are checked too: where nothing is drawn
-it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after two
-seconds, the sky overhead has the sky colour of the weather. The game has no files of the sky of Morrowind here, and the
-log must not mention a texture or a mesh of the sky as missing.
+it has the colour of the fog of the cell or of the weather, and in the exterior, where the player looks up after three
+seconds, the sky overhead has the sky colour of the weather with the clouds of the weather over it. The game has no
+files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as missing.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -64,14 +64,21 @@ class Scenario:
 
 # Where on the screen to look: the top left of the window of the game in the interior cell, which is the fog colour when
 # the player looks north; in the exterior, the horizon on the left of the middle of the window at the start (the sky
-# has no colour of its own there, it is the fog colour) and, after the player has looked up, the sky a little to the
-# left of the middle (the middle is the cross hair). How far from the expected colour a channel may be: the game is at
+# has no colour of its own there, it is the fog colour) and, after the player has looked up, the sky and its clouds a
+# little to the left of the middle (the middle is the cross hair). How far from the expected colour a channel may be: the game is at
 # about nine in the morning, when the weather is still a little on its way from the colours of sunrise to those of the
 # day.
 FOG_PIXEL_INTERIOR = (300, 100)
 FOG_PIXEL_EXTERIOR = (300, 360)
 SKY_PIXEL = (500, 360)
 PIXEL_TOLERANCE = 12
+
+# The colour of the sky overhead with the clouds of the weather over it. Their texture is white with one alpha, and they
+# are drawn over the sky in the colour of the fog of the weather with a little added (0.13 of the range of a colour).
+def clouded_sky(sky, fog, alpha):
+    cloud = [min(255.0, f + 0.13 * 255) for f in fog]
+    return tuple(round(c * alpha / 255 + s * (1 - alpha / 255)) for c, s in zip(cloud, sky))
+
 
 # The seconds after which the walk script has logged its position, the first when the player stands and looks at the
 # horizon, the second when it has looked up.
@@ -84,7 +91,8 @@ SCENARIOS = [
     Scenario("exterior", f"{plugin.WORLD_NAME}:0,0", f"{plugin.WORLD_NAME}Cell (0, 0)", True,
              (plugin.EXTERIOR_CELL_SIZE / 2, plugin.EXTERIOR_CELL_SIZE / 2), False,
              [("fog", HORIZON_TIME, FOG_PIXEL_EXTERIOR, plugin.WEATHER_FOG[1]),
-              ("sky", ZENITH_TIME, SKY_PIXEL, plugin.WEATHER_SKY[1])]),
+              ("sky and clouds", ZENITH_TIME, SKY_PIXEL,
+               clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
 
 WALK_SECONDS = 12

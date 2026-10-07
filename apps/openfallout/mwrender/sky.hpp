@@ -15,6 +15,7 @@
 
 namespace osg
 {
+    class Texture2D;
     class Group;
     class Node;
     class PositionAttitudeTransform;
@@ -108,6 +109,8 @@ namespace OFRender
     private:
         void create();
         ///< no need to call this, automatically done on first enable()
+
+        osg::ref_ptr<osg::Texture2D> loadCloudTexture(const std::string& path) const;
 
         void createRain();
         void destroyRain();

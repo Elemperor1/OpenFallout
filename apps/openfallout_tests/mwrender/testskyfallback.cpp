@@ -268,4 +268,163 @@ namespace
         EXPECT_FALSE(Moon::hasFiles(*vfs, Moon::Type_Masser));
         EXPECT_TRUE(Moon::hasFiles(*vfs, Moon::Type_Secunda));
     }
+
+    // The layout of the cloud mesh of Morrowind, which the sky manager gives the alpha of its vertices by their index:
+    // a vertex at the top, then four rings of 16, the last two with the alpha 0.25 and 0.
+    TEST(OpenFalloutRenderSkyFallbackClouds, hasTheVerticesOfTheCloudMeshOfMorrowind)
+    {
+        const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(clouds->getVertexArray());
+        ASSERT_NE(vertices, nullptr);
+        ASSERT_EQ(vertices->size(), 65u);
+        EXPECT_NEAR((*vertices)[0].x(), 0.f, 1e-3f);
+        EXPECT_NEAR((*vertices)[0].y(), 0.f, 1e-3f);
+        EXPECT_NEAR((*vertices)[0].z(), 1000.f, 1e-3f);
+        for (const osg::Vec3f& vertex : *vertices)
+            EXPECT_NEAR(vertex.length(), 1000.f, 0.01f);
+        // every ring is lower than the one before
+        for (std::size_t i = 1; i + 16 < vertices->size(); ++i)
+            EXPECT_GT((*vertices)[i].z(), (*vertices)[i + 16].z()) << i;
+        for (std::size_t i = 1; i < vertices->size(); ++i)
+            EXPECT_GE((*vertices)[i].z(), 0.f) << i;
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackClouds, hasTheAlphaOfTheCloudMeshOfMorrowindAtEveryIndex)
+    {
+        const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
+        const auto* colours = dynamic_cast<const osg::Vec4Array*>(clouds->getColorArray());
+        ASSERT_NE(colours, nullptr);
+        ASSERT_EQ(colours->size(), 65u);
+        for (std::size_t i = 0; i < colours->size(); ++i)
+        {
+            float expected = 1.f;
+            if (i >= 49)
+                expected = 0.f;
+            else if (i >= 33)
+                expected = 0.25098f;
+            EXPECT_FLOAT_EQ((*colours)[i].a(), expected) << i;
+        }
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackClouds, mapsAPlaneSeenFromAboveOntoTheDome)
+    {
+        const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(clouds->getVertexArray());
+        const auto* coordinates = dynamic_cast<const osg::Vec2Array*>(clouds->getTexCoordArray(0));
+        ASSERT_NE(coordinates, nullptr);
+        ASSERT_EQ(coordinates->size(), vertices->size());
+        EXPECT_NEAR((*coordinates)[0].x(), 0.5f, 1e-4f);
+        EXPECT_NEAR((*coordinates)[0].y(), 0.5f, 1e-4f);
+        // opposite points of a ring are opposite around the middle, and a vertex that is higher is nearer to it
+        EXPECT_NEAR((*coordinates)[1].x() + (*coordinates)[9].x(), 1.f, 1e-3f);
+        EXPECT_NEAR((*coordinates)[1].y() + (*coordinates)[9].y(), 1.f, 1e-3f);
+        const auto distance = [&](std::size_t i) { return ((*coordinates)[i] - osg::Vec2f(0.5f, 0.5f)).length(); };
+        EXPECT_LT(distance(1), distance(17));
+        EXPECT_LT(distance(17), distance(33));
+        EXPECT_LT(distance(33), distance(49));
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackClouds, hasOnlyTrianglesOfItsVertices)
+    {
+        const osg::ref_ptr<osg::Geometry> clouds = createCloudDome(1000.f);
+        const auto* triangles = dynamic_cast<const osg::DrawElementsUShort*>(clouds->getPrimitiveSet(0));
+        ASSERT_NE(triangles, nullptr);
+        EXPECT_EQ(triangles->size() % 3, 0u);
+        std::vector<bool> used(65, false);
+        for (const unsigned short index : *triangles)
+        {
+            ASSERT_LT(index, 65);
+            used[index] = true;
+        }
+        EXPECT_EQ(std::count(used.begin(), used.end(), false), 0);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackStars, hasAQuadForEachStar)
+    {
+        const osg::ref_ptr<osg::Geometry> stars = createStarField(1000.f, 50);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(stars->getVertexArray());
+        const auto* coordinates = dynamic_cast<const osg::Vec2Array*>(stars->getTexCoordArray(0));
+        const auto* colours = dynamic_cast<const osg::Vec4Array*>(stars->getColorArray());
+        const auto* triangles = dynamic_cast<const osg::DrawElementsUShort*>(stars->getPrimitiveSet(0));
+        ASSERT_NE(vertices, nullptr);
+        ASSERT_NE(coordinates, nullptr);
+        ASSERT_NE(colours, nullptr);
+        ASSERT_NE(triangles, nullptr);
+        EXPECT_EQ(vertices->size(), 200u);
+        EXPECT_EQ(coordinates->size(), 200u);
+        EXPECT_EQ(colours->size(), 200u);
+        EXPECT_EQ(triangles->size(), 300u);
+        for (const unsigned short index : *triangles)
+            ASSERT_LT(index, 200);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackStars, hasEveryStarFacingTheOriginAtTheRadiusAndAboveTheHorizon)
+    {
+        const osg::ref_ptr<osg::Geometry> stars = createStarField(1000.f, 100);
+        const auto* vertices = dynamic_cast<const osg::Vec3Array*>(stars->getVertexArray());
+        ASSERT_NE(vertices, nullptr);
+        for (std::size_t star = 0; star < vertices->size() / 4; ++star)
+        {
+            const osg::Vec3f centre = ((*vertices)[star * 4] + (*vertices)[star * 4 + 1] + (*vertices)[star * 4 + 2]
+                                          + (*vertices)[star * 4 + 3])
+                / 4.f;
+            EXPECT_NEAR(centre.length(), 1000.f, 0.5f) << star;
+            EXPECT_GE(centre.z(), -0.11f * 1000.f) << star;
+            // the corners are in the plane that faces the origin
+            for (std::size_t corner = 0; corner < 4; ++corner)
+            {
+                const osg::Vec3f offset = (*vertices)[star * 4 + corner] - centre;
+                EXPECT_NEAR(offset * centre, 0.f, 0.5f) << star;
+                EXPECT_GT(offset.length(), 0.f);
+                EXPECT_LT(offset.length(), 10.f);
+            }
+        }
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackStars, hasBrightnessesBetweenAThirdAndOneAndNoColour)
+    {
+        const osg::ref_ptr<osg::Geometry> stars = createStarField(1000.f, 100);
+        const auto* colours = dynamic_cast<const osg::Vec4Array*>(stars->getColorArray());
+        float lowest = 1.f;
+        float highest = 0.f;
+        for (const osg::Vec4f& colour : *colours)
+        {
+            EXPECT_EQ(colour.r(), 0.f);
+            lowest = std::min(lowest, colour.a());
+            highest = std::max(highest, colour.a());
+        }
+        EXPECT_GE(lowest, 0.34f);
+        EXPECT_LE(highest, 1.f);
+        EXPECT_GT(highest - lowest, 0.2f);
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackStars, isTheSameSkyEveryTime)
+    {
+        const osg::ref_ptr<osg::Geometry> first = createStarField(1000.f, 100);
+        const osg::ref_ptr<osg::Geometry> second = createStarField(1000.f, 100);
+        const auto* one = dynamic_cast<const osg::Vec3Array*>(first->getVertexArray());
+        const auto* other = dynamic_cast<const osg::Vec3Array*>(second->getVertexArray());
+        ASSERT_EQ(one->size(), other->size());
+        for (std::size_t i = 0; i < one->size(); ++i)
+            EXPECT_EQ((*one)[i], (*other)[i]) << i;
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackStarImage, isADotThatFadesToTheEdge)
+    {
+        const osg::ref_ptr<osg::Image> image = createStarImage(16);
+        EXPECT_EQ(image->s(), 16);
+        EXPECT_GE(alphaAt(*image, 8, 8), 200);
+        EXPECT_EQ(alphaAt(*image, 0, 0), 0);
+        EXPECT_EQ(alphaAt(*image, 15, 8), 0);
+        for (int x = 8; x < 15; ++x)
+            EXPECT_GE(alphaAt(*image, x, 8), alphaAt(*image, x + 1, 8)) << x;
+    }
+
+    TEST(OpenFalloutRenderSkyFallbackTransparentImage, isOnePixelThatShowsNothing)
+    {
+        const osg::ref_ptr<osg::Image> image = createTransparentImage();
+        EXPECT_EQ(image->s(), 1);
+        EXPECT_EQ(image->t(), 1);
+        EXPECT_EQ(alphaAt(*image, 0, 0), 0);
+    }
 }

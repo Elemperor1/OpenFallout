@@ -2,6 +2,7 @@
 
 #include <osg/Depth>
 #include <osg/PositionAttitudeTransform>
+#include <osg/Texture2D>
 
 #include <osgParticle/BoxPlacer>
 #include <osgParticle/ModularEmitter>
@@ -17,6 +18,7 @@
 #include <components/sceneutil/material.hpp>
 #include <components/sceneutil/rtt.hpp>
 #include <components/sceneutil/shadow.hpp>
+#include <components/sceneutil/texturetype.hpp>
 #include <components/sceneutil/visitor.hpp>
 
 #include <components/resource/imagemanager.hpp>
@@ -43,6 +45,9 @@
 
 namespace
 {
+    // How many stars the sky made in code has
+    constexpr int sGeneratedStarCount = 700;
+
     class WrapAroundOperator : public osgParticle::Operator
     {
     public:
@@ -309,6 +314,10 @@ namespace OFRender
         mHasClouds = vfs.exists(Settings::models().mSkyclouds.get());
         const bool hasMasser = Moon::hasFiles(vfs, Moon::Type_Masser);
         const bool hasSecunda = Moon::hasFiles(vfs, Moon::Type_Secunda);
+        // How far the sky made in code is: inside the far plane of the camera, which cuts off anything beyond it. A
+        // script can change the view distance later and the sky does not follow it, like the sun and the moons (a
+        // thousand units away) do not. It is drawn without depth, so only the far plane limits how far it is.
+        const float skyRadius = generatedSkyRadius(Settings::camera().mViewingDistance);
         std::string missing;
         for (const auto& [present, name] :
             { std::pair{ hasAtmosphere, "dome" }, std::pair{ hasStars, "stars" }, std::pair{ mHasClouds, "clouds" },
@@ -319,7 +328,7 @@ namespace OFRender
         }
         if (!missing.empty())
             Log(Debug::Info) << "The game has no files for the sky of Morrowind (" << missing
-                             << "), the sky is made in code where it can be";
+                             << "), the sky is made in code where it can be (not the moons)";
 
         if (hasAtmosphere)
         {
@@ -329,10 +338,7 @@ namespace OFRender
         }
         else
         {
-            // It is drawn without depth, so only the far plane, which it has to be inside of, limits how far it is.
-            // A script can change the view distance later and the dome does not follow it, like the sun and the moons
-            // (a thousand units away) do not.
-            mAtmosphereDay = createAtmosphereDome(generatedSkyRadius(Settings::camera().mViewingDistance));
+            mAtmosphereDay = createAtmosphereDome(skyRadius);
             mEarlyRenderBinRoot->addChild(mAtmosphereDay);
         }
 
@@ -350,12 +356,22 @@ namespace OFRender
             atmosphereNight = mSceneManager->getInstance(Settings::models().mSkynight01.get(), mAtmosphereNightNode);
         else
         {
-            atmosphereNight = new osg::Group;
+            osg::ref_ptr<osg::Geometry> stars = createStarField(0.93f * skyRadius, sGeneratedStarCount);
+            osg::StateSet* stateset = stars->getOrCreateStateSet();
+            osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D(createStarImage());
+            texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+            texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+            stateset->setTextureAttribute(0, texture);
+            stateset->setTextureAttribute(0, new SceneUtil::TextureType("diffuseMap"), osg::StateAttribute::ON);
+            atmosphereNight = stars;
             mAtmosphereNightNode->addChild(atmosphereNight);
         }
 
-        ModVertexAlphaVisitor modStars(ModVertexAlphaVisitor::Stars);
-        atmosphereNight->accept(modStars);
+        if (hasStars)
+        {
+            ModVertexAlphaVisitor modStars(ModVertexAlphaVisitor::Stars);
+            atmosphereNight->accept(modStars);
+        }
         mAtmosphereNightUpdater = new AtmosphereNightUpdater(mSceneManager->getImageManager());
         atmosphereNight->addUpdateCallback(mAtmosphereNightUpdater);
 
@@ -374,8 +390,9 @@ namespace OFRender
         mCloudMesh = new osg::PositionAttitudeTransform;
         osg::ref_ptr<osg::Node> cloudMeshChild = mHasClouds
             ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mCloudMesh)
-            : osg::ref_ptr<osg::Node>(new osg::Group);
+            : osg::ref_ptr<osg::Node>(createCloudDome(0.97f * skyRadius));
         mCloudUpdater = new CloudUpdater();
+        mCloudUpdater->setTexture(loadCloudTexture({}));
         mCloudUpdater->setOpacity(1.f);
         cloudMeshChild->addUpdateCallback(mCloudUpdater);
         mCloudMesh->addChild(cloudMeshChild);
@@ -383,8 +400,9 @@ namespace OFRender
         mNextCloudMesh = new osg::PositionAttitudeTransform;
         osg::ref_ptr<osg::Node> nextCloudMeshChild = mHasClouds
             ? mSceneManager->getInstance(Settings::models().mSkyclouds.get(), mNextCloudMesh)
-            : osg::ref_ptr<osg::Node>(new osg::Group);
+            : osg::ref_ptr<osg::Node>(createCloudDome(0.97f * skyRadius));
         mNextCloudUpdater = new CloudUpdater();
+        mNextCloudUpdater->setTexture(loadCloudTexture({}));
         mNextCloudUpdater->setOpacity(0.f);
         nextCloudMeshChild->addUpdateCallback(mNextCloudUpdater);
         mNextCloudMesh->setNodeMask(0);
@@ -393,9 +411,12 @@ namespace OFRender
         mCloudNode->addChild(mCloudMesh);
         mCloudNode->addChild(mNextCloudMesh);
 
-        ModVertexAlphaVisitor modClouds(ModVertexAlphaVisitor::Clouds);
-        mCloudMesh->accept(modClouds);
-        mNextCloudMesh->accept(modClouds);
+        if (mHasClouds)
+        {
+            ModVertexAlphaVisitor modClouds(ModVertexAlphaVisitor::Clouds);
+            mCloudMesh->accept(modClouds);
+            mNextCloudMesh->accept(modClouds);
+        }
 
         Shader::ShaderManager::DefineMap defines = {};
         Stereo::shaderStereoDefines(defines);
@@ -412,6 +433,34 @@ namespace OFRender
         mMoonScriptColor = Fallback::Map::getColour("Moons_Script_Color");
 
         mCreated = true;
+    }
+
+    osg::ref_ptr<osg::Texture2D> SkyManager::loadCloudTexture(const std::string& path) const
+    {
+        // A texture that the game does not have or cannot read, or a weather with no clouds, makes no clouds, not the
+        // image for a missing file
+        osg::ref_ptr<osg::Image> image;
+        if (!path.empty())
+        {
+            const VFS::Path::Normalized texture
+                = Misc::ResourceHelpers::correctTexturePath(VFS::Path::toNormalized(path), *mSceneManager->getVFS());
+            if (mSceneManager->getVFS()->exists(texture))
+            {
+                Resource::ImageManager& imageManager = *mSceneManager->getImageManager();
+                image = imageManager.getImage(texture);
+                // A file that cannot be read is the image for a missing file (the reason is in the log), which would
+                // cover the sky with magenta
+                if (image.get() == imageManager.getWarningImage())
+                    image = nullptr;
+            }
+        }
+        if (!image)
+            image = createTransparentImage();
+
+        osg::ref_ptr<osg::Texture2D> cloudTex = new osg::Texture2D(image);
+        cloudTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
+        cloudTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
+        return cloudTex;
     }
 
     void SkyManager::createRain()
@@ -792,19 +841,10 @@ namespace OFRender
             }
         }
 
-        if (mHasClouds && mClouds != weather.mCloudTexture)
+        if (mClouds != weather.mCloudTexture)
         {
             mClouds = weather.mCloudTexture;
-
-            const VFS::Path::Normalized texture
-                = Misc::ResourceHelpers::correctTexturePath(VFS::Path::toNormalized(mClouds), *mSceneManager->getVFS());
-
-            osg::ref_ptr<osg::Texture2D> cloudTex
-                = new osg::Texture2D(mSceneManager->getImageManager()->getImage(texture));
-            cloudTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-            cloudTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-
-            mCloudUpdater->setTexture(std::move(cloudTex));
+            mCloudUpdater->setTexture(loadCloudTexture(mClouds));
         }
 
         if (mStormDirection != weather.mStormDirection)
@@ -813,23 +853,15 @@ namespace OFRender
         if (mNextStormDirection != weather.mNextStormDirection)
             mNextStormDirection = weather.mNextStormDirection;
 
-        if (mHasClouds && mNextClouds != weather.mNextCloudTexture)
+        if (mNextClouds != weather.mNextCloudTexture)
         {
             mNextClouds = weather.mNextCloudTexture;
 
+            // An empty path is the next weather having no clouds (or none that the game has): the texture of the
+            // earlier weather must not stay on the next layer, or the clouds would fade into themselves.
+            mNextCloudUpdater->setTexture(loadCloudTexture(mNextClouds));
             if (!mNextClouds.empty())
-            {
-                const VFS::Path::Normalized texture = Misc::ResourceHelpers::correctTexturePath(
-                    VFS::Path::toNormalized(mNextClouds), *mSceneManager->getVFS());
-
-                osg::ref_ptr<osg::Texture2D> cloudTex
-                    = new osg::Texture2D(mSceneManager->getImageManager()->getImage(texture));
-                cloudTex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
-                cloudTex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
-
-                mNextCloudUpdater->setTexture(std::move(cloudTex));
                 mNextStormDirection = weather.mStormDirection;
-            }
         }
 
         if (mCloudBlendFactor != weather.mCloudBlendFactor)

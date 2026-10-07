@@ -26,9 +26,27 @@ namespace OFRender
     /// only the alpha of each vertex counts.
     osg::ref_ptr<osg::Geometry> createAtmosphereDome(float radius);
 
+    /// The dome that the clouds are drawn on, radius around the origin, with a vertex for the top and four rings of 16
+    /// below it, from the top down to the horizon: the layout of the cloud mesh of Morrowind, so that what the sky
+    /// manager does to that mesh works on this one. The alpha of the vertices (0 at the horizon, a quarter in the
+    /// ring above, 1 in the rest) fades the clouds out there, and the texture coordinates map a texture that repeats
+    /// as if it were a plane seen from above.
+    osg::ref_ptr<osg::Geometry> createCloudDome(float radius);
+
+    /// Stars as small squares of the given number around the origin at the radius, at random places above and a little
+    /// below the horizon, each facing the origin. The same stars every time. A star has a brightness for the alpha of
+    /// its vertices, and the texture coordinates map the image of createStarImage onto it.
+    osg::ref_ptr<osg::Geometry> createStarField(float radius, int count);
+
     /// The disc of the sun, white with an alpha that is 1 in the disc and falls off in a glow around it, on a square
     /// image. The colour of the weather multiplies it.
     osg::ref_ptr<osg::Image> createSunImage(int size = 128);
+
+    /// The picture of a star: a white dot that fades out to the edge of a square image.
+    osg::ref_ptr<osg::Image> createStarImage(int size = 16);
+
+    /// A single pixel that shows nothing, for a texture that is missing and must not show.
+    osg::ref_ptr<osg::Image> createTransparentImage();
 
     /// The glow that the sun makes when the camera looks at it, white, a soft fall off from the centre to the edge of a
     /// square image.
