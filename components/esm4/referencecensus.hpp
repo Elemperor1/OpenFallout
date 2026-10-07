@@ -24,7 +24,8 @@ namespace ESM4
     // The files must be read in load order, each with its mod index and the indices of its masters set on the reader
     // (Reader::setModIndex and Reader::updateModIndices), so that a form ID means the same record in every file. A
     // reference that a later file places again (an override) counts once, as the later file has it, and one that a
-    // later file deletes does not count.
+    // later file deletes does not count. A reference that cannot be read does not count either, not even by the
+    // definition of an earlier file when it is the later file that cannot be read.
     class ReferenceCensus
     {
     public:

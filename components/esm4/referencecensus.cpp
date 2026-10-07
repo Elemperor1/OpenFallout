@@ -164,7 +164,9 @@ namespace ESM4
             }
             catch (const std::exception&)
             {
-                // The record cannot be read. It is left out; the file goes on with the next one.
+                // The record cannot be read. It is left out, an earlier definition of the reference that it would
+                // have replaced with it; the file goes on with the next record.
+                mPlaced.erase(id);
             }
             // Whatever was read of the record, the stream is somewhere inside it now.
             r.skipFailedRecord(recordStart);

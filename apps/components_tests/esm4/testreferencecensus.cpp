@@ -255,6 +255,23 @@ namespace
         EXPECT_TRUE(census.getFatalErrors().empty());
     }
 
+    TEST(ESM4ReferenceCensusTest, anOverrideThatCannotBeReadLeavesTheReferenceOut)
+    {
+        // The patch overrides the reference 0x2001 of the base plugin, whose NAME promises 4 bytes and has 2
+        std::string overrunning("NAME");
+        append<std::uint16_t>(overrunning, 4);
+        overrunning += "ab";
+        const std::string patch
+            = headerWithMaster("base.esm") + topGroup("REFR", record("REFR", 0x00002001, overrunning));
+        ESM4::ReferenceCensus census;
+        collect(census, basePlugin(), "base.esm", 0, {});
+        ASSERT_EQ(total(census.getCounts(), "STAT", "REFR"), 3u);
+        collect(census, patch, "patch.esp", 1, { { "base.esm", 0 } });
+
+        EXPECT_EQ(total(census.getCounts(), "STAT", "REFR"), 2u);
+        EXPECT_TRUE(census.getFatalErrors().empty());
+    }
+
     TEST(ESM4ReferenceCensusTest, aReferenceWhoseBaseObjectIsNotAFormIdCannotBeRead)
     {
         // A NAME of 2 bytes and one of 8, which fit the record but are not a form ID
