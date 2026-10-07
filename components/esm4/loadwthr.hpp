@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <components/esm/defs.hpp>
@@ -118,6 +119,11 @@ namespace ESM4
 
         /// How many times of day NAM0 gives colours for: 4 or 6, and 0 when the record has no NAM0.
         std::size_t colourTimeCount() const { return mColours.size() / (sColourTypeCount * 4); }
+
+        /// The texture of the first of the four layers of clouds that has clouds, or an empty name when none has. A
+        /// layer with no clouds has no name or is the texture sky\alpha.dds, which the games make blank:
+        /// NVWastelandClear has it in three layers and its clouds in the fourth.
+        std::string_view cloudTexture() const;
 
         /// The colour of a type at a time of day, or nothing when the record has none for that time. The alpha byte of
         /// NAM0 is not read, no game uses it.

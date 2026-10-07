@@ -273,4 +273,33 @@ namespace
             "ESM4::WTHR::load - record has unread bytes after its last sub-record");
     }
 
+    TEST(ESM4WeatherTest, takesTheCloudsOfTheFirstLayerThatHasThem)
+    {
+        // NVWastelandClear has the blank texture in three layers and its clouds in the fourth
+        ESM4::Weather weather;
+        weather.mCloudTextures = { "Sky\\Alpha.dds", "", "sky/alpha.dds", "sky\\NVCloudlight.dds" };
+        EXPECT_EQ(weather.cloudTexture(), "sky\\NVCloudlight.dds");
+
+        weather.mCloudTextures[1] = "sky\\wastelandcloudcloudyupper01.dds";
+        EXPECT_EQ(weather.cloudTexture(), "sky\\wastelandcloudcloudyupper01.dds");
+
+        weather.mCloudTextures[0] = "Sky\\UrbanCloudOvercastUpper01.dds";
+        EXPECT_EQ(weather.cloudTexture(), "Sky\\UrbanCloudOvercastUpper01.dds");
+    }
+
+    TEST(ESM4WeatherTest, hasNoCloudsWhenEveryLayerIsBlank)
+    {
+        ESM4::Weather weather;
+        EXPECT_TRUE(weather.cloudTexture().empty());
+
+        weather.mCloudTextures = { "sky\\alpha.dds", "ALPHA.DDS", "", "Sky/Alpha.dds" };
+        EXPECT_TRUE(weather.cloudTexture().empty());
+    }
+
+    TEST(ESM4WeatherTest, doesNotTakeATextureForTheBlankOneByItsEnding)
+    {
+        ESM4::Weather weather;
+        weather.mCloudTextures = { "sky\\notalpha.dds", "", "", "" };
+        EXPECT_EQ(weather.cloudTexture(), "sky\\notalpha.dds");
+    }
 }

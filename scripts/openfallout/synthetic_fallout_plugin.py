@@ -137,8 +137,11 @@ def weather(form_id=WEATHER_ID, name=WEATHER_NAME):
     # wind speed, cloud speeds, transition delta, sun glare, sun damage, precipitation and thunder fade, thunder
     # frequency, classification (0: none) and the colour of lightning
     data = struct.pack("<15B", WEATHER_WIND, 0, 0, 4, WEATHER_GLARE, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255)
-    return record(b"WTHR", form_id, [zstr(b"EDID", name), zstr(b"DNAM", CLOUD_TEXTURE),
-                                     sub(b"NAM0", bytes(colours)), sub(b"FNAM", fog), sub(b"DATA", data)])
+    # Like NVWastelandClear, three layers of clouds are the blank texture and the clouds are in the fourth
+    return record(b"WTHR", form_id, [zstr(b"EDID", name), zstr(b"DNAM", "Sky\\Alpha.dds"),
+                                     zstr(b"CNAM", "sky\\alpha.dds"), zstr(b"ANAM", "sky/alpha.dds"),
+                                     zstr(b"BNAM", CLOUD_TEXTURE), sub(b"NAM0", bytes(colours)),
+                                     sub(b"FNAM", fog), sub(b"DATA", data)])
 
 
 def cloud_texture(size=4):

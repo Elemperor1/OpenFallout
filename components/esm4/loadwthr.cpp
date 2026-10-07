@@ -1,10 +1,31 @@
 #include "loadwthr.hpp"
 
+#include <components/misc/strings/algorithm.hpp>
+
 #include "reader.hpp"
 #include "recordreader.hpp"
 
 namespace ESM4
 {
+    namespace
+    {
+        bool hasClouds(std::string_view texture)
+        {
+            // The names have either kind of slash and any case ("sky\\alpha.dds", "Sky\\Alpha.dds", "sky/Alpha.dds")
+            const std::size_t slash = texture.find_last_of("\\/");
+            const std::string_view file = slash == std::string_view::npos ? texture : texture.substr(slash + 1);
+            return !file.empty() && !Misc::StringUtils::ciEqual(file, "alpha.dds");
+        }
+    }
+
+    std::string_view Weather::cloudTexture() const
+    {
+        for (const std::string& texture : mCloudTextures)
+            if (hasClouds(texture))
+                return texture;
+        return {};
+    }
+
     std::optional<Weather::Colour> Weather::colour(ColourType type, TimeOfDay time) const
     {
         const std::size_t times = colourTimeCount();
