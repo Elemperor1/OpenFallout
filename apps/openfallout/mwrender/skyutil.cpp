@@ -23,6 +23,7 @@
 
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/scenemanager.hpp>
+#include <components/vfs/manager.hpp>
 
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/texmat.hpp>
@@ -35,6 +36,7 @@
 #include "../mwbase/environment.hpp"
 
 #include "renderbin.hpp"
+#include "skyfallback.hpp"
 #include "vismask.hpp"
 
 namespace
@@ -631,7 +633,10 @@ namespace OFRender
 
         constexpr VFS::Path::NormalizedView image("textures/tx_sun_05.dds");
 
-        osg::ref_ptr<osg::Texture2D> sunTex = new osg::Texture2D(imageManager.getImage(image));
+        // A game without the sun of Morrowind has a disc made in code, not the image for a missing file.
+        osg::ref_ptr<osg::Texture2D> sunTex
+            = new osg::Texture2D(sceneManager.getVFS()->exists(image) ? imageManager.getImage(image)
+                                                                      : osg::ref_ptr<osg::Image>(createSunImage()));
         sunTex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         sunTex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 
@@ -658,7 +663,7 @@ namespace OFRender
         mOcclusionQueryVisiblePixels = createOcclusionQueryNode(queryNode, true);
         mOcclusionQueryTotalPixels = createOcclusionQueryNode(queryNode, false);
 
-        createSunFlash(imageManager);
+        createSunFlash(sceneManager);
         createSunGlare();
     }
 
@@ -760,10 +765,12 @@ namespace OFRender
         return oqn;
     }
 
-    void Sun::createSunFlash(Resource::ImageManager& imageManager)
+    void Sun::createSunFlash(Resource::SceneManager& sceneManager)
     {
         constexpr VFS::Path::NormalizedView image("textures/tx_sun_flash_grey_05.dds");
-        osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(imageManager.getImage(image));
+        osg::ref_ptr<osg::Texture2D> tex = new osg::Texture2D(sceneManager.getVFS()->exists(image)
+                ? sceneManager.getImageManager()->getImage(image)
+                : osg::ref_ptr<osg::Image>(createSunFlashImage()));
         tex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         tex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
 

@@ -283,7 +283,7 @@ namespace OFRender
         /// pixels.
         osg::ref_ptr<osg::OcclusionQueryNode> createOcclusionQueryNode(osg::Group* parent, bool queryVisible);
 
-        void createSunFlash(Resource::ImageManager& imageManager);
+        void createSunFlash(Resource::SceneManager& sceneManager);
         void destroySunFlash();
 
         void createSunGlare();

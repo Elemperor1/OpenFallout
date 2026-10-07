@@ -24,6 +24,8 @@ file(GLOB UNITTEST_SRC_FILES
 
     mwlua/testobjectcache.cpp
 
+    mwrender/testskyfallback.cpp
+
     mwscript/testscripts.cpp
 
     mwsound/testheadcache.cpp
