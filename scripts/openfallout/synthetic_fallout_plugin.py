@@ -12,7 +12,7 @@ files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
-writes `OFTest.esm` and `meshes/openfallout/cube.osgt` into the folder.
+writes `OFTest.esm`, `meshes/openfallout/cube.osgt` and `textures/sky/oftestclouds.dds` into the folder.
 """
 import argparse
 import struct
@@ -68,6 +68,11 @@ WEATHER_FOG = ((190, 150, 110), (200, 190, 170), (180, 120, 90), (10, 10, 20))
 WEATHER_AMBIENT = ((90, 70, 60), (70, 80, 90), (80, 60, 60), (10, 10, 30))
 WEATHER_SUNLIGHT = ((255, 200, 150), (255, 240, 200), (255, 160, 100), (0, 0, 0))
 WEATHER_SUN = ((255, 255, 255), (255, 255, 255), (255, 120, 40), (0, 0, 0))
+# The texture of the clouds, as the record names it (a path under textures, the way the games write it), and the image:
+# white pixels of one alpha, so that the colour of the clouds on the screen does not depend on where it is looked at
+# or how far they have drifted.
+CLOUD_TEXTURE = "sky\\OFTestClouds.dds"
+CLOUD_ALPHA = 128
 # Where the fog starts and ends, in game units, by day and by night, then its power by day and by night.
 WEATHER_FOG_DAY = (300.0, 12000.0)
 WEATHER_FOG_NIGHT = (150.0, 6000.0)
@@ -132,8 +137,19 @@ def weather(form_id=WEATHER_ID, name=WEATHER_NAME):
     # wind speed, cloud speeds, transition delta, sun glare, sun damage, precipitation and thunder fade, thunder
     # frequency, classification (0: none) and the colour of lightning
     data = struct.pack("<15B", WEATHER_WIND, 0, 0, 4, WEATHER_GLARE, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255)
-    return record(b"WTHR", form_id, [zstr(b"EDID", name), sub(b"NAM0", bytes(colours)), sub(b"FNAM", fog),
-                                     sub(b"DATA", data)])
+    return record(b"WTHR", form_id, [zstr(b"EDID", name), zstr(b"DNAM", CLOUD_TEXTURE),
+                                     sub(b"NAM0", bytes(colours)), sub(b"FNAM", fog), sub(b"DATA", data)])
+
+
+def cloud_texture(size=4):
+    """The image of the clouds, a DDS file of uncompressed 32 bit pixels, white with CLOUD_ALPHA as alpha."""
+    pixels = bytes((255, 255, 255, CLOUD_ALPHA)) * (size * size)
+    # magic, header size, flags (caps, height, width, pitch, pixel format), height, width, pitch, depth, mip maps, 11
+    # reserved, then the pixel format: size, flags (alpha and rgb), four character code, bits, the masks of red, green,
+    # blue and alpha, then the caps (texture) and 4 more words
+    header = struct.pack("<4sIIIIIII11I", b"DDS ", 124, 0x100F, size, size, size * 4, 0, 0, *(0,) * 11)
+    pixel_format = struct.pack("<IIIIIIII", 32, 0x41, 0, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+    return header + pixel_format + struct.pack("<5I", 0x1000, 0, 0, 0, 0) + pixels
 
 
 def global_variable():
@@ -256,6 +272,9 @@ def write(out):
     mesh = out / "meshes" / "openfallout" / "cube.osgt"
     mesh.parent.mkdir(parents=True, exist_ok=True)
     mesh.write_text(cube_mesh(), encoding="ascii")
+    texture = out / "textures" / "sky" / "oftestclouds.dds"
+    texture.parent.mkdir(parents=True, exist_ok=True)
+    texture.write_bytes(cloud_texture())
     (out / "OFTest.esm").write_bytes(plugin())
     return out / "OFTest.esm"
 

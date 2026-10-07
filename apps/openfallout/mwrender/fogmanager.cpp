@@ -1,6 +1,7 @@
 #include "fogmanager.hpp"
 
 #include <algorithm>
+#include <tuple>
 
 #include <components/esm/esmbridge.hpp>
 #include <components/esm3/loadcell.hpp>
@@ -13,6 +14,14 @@
 
 namespace OFRender
 {
+    std::pair<float, float> fitFogRange(float fogNear, float fogFar, float viewDistance)
+    {
+        if (fogFar <= viewDistance || fogFar <= 0.f || viewDistance <= 0.f)
+            return { fogNear, fogFar };
+        const float scale = viewDistance / fogFar;
+        return { fogNear * scale, viewDistance };
+    }
+
     FogManager::FogManager()
         : mLandFogStart(0.f)
         , mLandFogEnd(std::numeric_limits<float>::max())
@@ -55,8 +64,7 @@ namespace OFRender
     void FogManager::configureRange(
         float viewDistance, float fogNear, float fogFar, float underwaterFog, const osg::Vec4f& color)
     {
-        mLandFogStart = fogNear;
-        mLandFogEnd = fogFar;
+        std::tie(mLandFogStart, mLandFogEnd) = fitFogRange(fogNear, fogFar, viewDistance);
         if (Settings::fog().mUseDistantFog)
         {
             mUnderwaterFogStart = Settings::fog().mDistantUnderwaterFogStart;
