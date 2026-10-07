@@ -437,15 +437,22 @@ namespace OFRender
 
     osg::ref_ptr<osg::Texture2D> SkyManager::loadCloudTexture(const std::string& path) const
     {
-        // A texture that the game does not have, or a weather with no clouds, makes no clouds, not the image for a
-        // missing file
+        // A texture that the game does not have or cannot read, or a weather with no clouds, makes no clouds, not the
+        // image for a missing file
         osg::ref_ptr<osg::Image> image;
         if (!path.empty())
         {
             const VFS::Path::Normalized texture
                 = Misc::ResourceHelpers::correctTexturePath(VFS::Path::toNormalized(path), *mSceneManager->getVFS());
             if (mSceneManager->getVFS()->exists(texture))
-                image = mSceneManager->getImageManager()->getImage(texture);
+            {
+                Resource::ImageManager& imageManager = *mSceneManager->getImageManager();
+                image = imageManager.getImage(texture);
+                // A file that cannot be read is the image for a missing file (the reason is in the log), which would
+                // cover the sky with magenta
+                if (image.get() == imageManager.getWarningImage())
+                    image = nullptr;
+            }
         }
         if (!image)
             image = createTransparentImage();
