@@ -47,6 +47,7 @@ class btDefaultCollisionConfiguration;
 class btCollisionDispatcher;
 class btCollisionObject;
 class btCollisionShape;
+class btTriangleMesh;
 class btVector3;
 
 namespace ESMTerrain
@@ -166,8 +167,8 @@ namespace OFPhysics
         void setWaterHeight(float height);
         void disableWater();
 
-        /// The water of a cell of a worldspace of Fallout: a square slab of the size of the cell, which has the
-        /// surface of the water for its top. There is no one plane for the water of such a world.
+        /// The water of a cell of a worldspace of Fallout: a square of the size of the cell at the height of the
+        /// surface. There is no one plane for the water of such a world.
         void addWaterTile(int gridX, int gridY, float height, float size);
         void removeWaterTile(int gridX, int gridY);
 
@@ -340,8 +341,10 @@ namespace OFPhysics
 
         struct WaterTile
         {
-            std::unique_ptr<btCollisionObject> mObject;
+            // The order is the one in which they are destroyed: the object, then the shape, then the mesh of the shape
+            std::unique_ptr<btTriangleMesh> mMesh;
             std::unique_ptr<btCollisionShape> mShape;
+            std::unique_ptr<btCollisionObject> mObject;
         };
         std::map<std::pair<int, int>, WaterTile> mWaterTiles;
 

@@ -134,6 +134,10 @@ WATER_LINE = "Water of cell {}WaterCell ({}, {}) at height {:g}".format(plugin.W
 # The middle of the cell with water, where the script casts a ray down at the water (a cell is 4096 units wide)
 WATER_CENTRE = ((plugin.WATER_CELL[0] + 0.5) * 4096, (plugin.WATER_CELL[1] + 0.5) * 4096)
 
+# From the middle of the cell with water, 10 units under its surface, to the east across the edge of the cell
+WATER_SIDE_RAY = (WATER_CENTRE[0], WATER_CENTRE[1], plugin.WATER_HEIGHT - 10, WATER_CENTRE[0] + 4096,
+                  WATER_CENTRE[1], plugin.WATER_HEIGHT - 10)
+
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
 
@@ -179,17 +183,22 @@ return {
                 local water = nearby.castRay(util.vector3(%.1f, %.1f, 500), util.vector3(%.1f, %.1f, -500),
                     { collisionType = nearby.COLLISION_TYPE.Water })
                 log('ray water hit=', tostring(water.hit), water.hit and fmt(water.hitPos) or '')
+                -- just under the surface and along it, across the edge of the cell: only the surface is there to hit
+                local side = nearby.castRay(util.vector3(%.1f, %.1f, %.1f), util.vector3(%.1f, %.1f, %.1f),
+                    { collisionType = nearby.COLLISION_TYPE.Water })
+                log('ray water side hit=', tostring(side.hit), side.hit and fmt(side.hitPos) or '')
             end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (*WATER_CENTRE, *WATER_CENTRE, WALK_SECONDS)
+""" % (*WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, WALK_SECONDS)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
 SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+WATER_SIDE_RAY_LINE = re.compile(r"OFTEST\tray water side hit=\t(\w+)")
 WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 
 
@@ -348,6 +357,10 @@ def check(text, scenario, colours):
                         f"{plugin.WATER_HEIGHT:g}: {water_rays[0].group(0)}")
     elif not scenario.exterior and water_rays[0].group(1) != "false":
         problems.append(f"the ray cast at the water hit something in an interior cell: {water_rays[0].group(0)}")
+    side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
+    if not side_rays or side_rays[0].group(1) != "false":
+        problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
+                        "the water should have no sides")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

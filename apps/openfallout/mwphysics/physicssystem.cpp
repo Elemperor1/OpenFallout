@@ -12,10 +12,11 @@
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 #include <BulletCollision/CollisionDispatch/btCollisionWorld.h>
 #include <BulletCollision/CollisionDispatch/btDefaultCollisionConfiguration.h>
-#include <BulletCollision/CollisionShapes/btBoxShape.h>
+#include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
 #include <BulletCollision/CollisionShapes/btConeShape.h>
 #include <BulletCollision/CollisionShapes/btSphereShape.h>
 #include <BulletCollision/CollisionShapes/btStaticPlaneShape.h>
+#include <BulletCollision/CollisionShapes/btTriangleMesh.h>
 
 #include <LinearMath/btQuickprof.h>
 #include <LinearMath/btVector3.h>
@@ -854,15 +855,18 @@ namespace OFPhysics
     {
         removeWaterTile(gridX, gridY);
 
-        // As deep as to stop what falls onto the surface or flies into it in one step
-        constexpr float halfThickness = 64.f;
-
+        // Only the surface, as the plane of water of the other worlds is for what hits it: a slab would be a wall at
+        // the edge of the cell that a projectile under the surface runs into
+        const float half = size / 2;
         WaterTile tile;
-        tile.mShape = std::make_unique<btBoxShape>(btVector3(size / 2, size / 2, halfThickness));
+        tile.mMesh = std::make_unique<btTriangleMesh>();
+        tile.mMesh->addTriangle(btVector3(-half, -half, 0), btVector3(half, -half, 0), btVector3(half, half, 0));
+        tile.mMesh->addTriangle(btVector3(-half, -half, 0), btVector3(half, half, 0), btVector3(-half, half, 0));
+        tile.mShape = std::make_unique<btBvhTriangleMeshShape>(tile.mMesh.get(), false);
         tile.mObject = std::make_unique<btCollisionObject>();
         tile.mObject->setCollisionShape(tile.mShape.get());
-        tile.mObject->setWorldTransform(btTransform(btQuaternion::getIdentity(),
-            btVector3((gridX + 0.5f) * size, (gridY + 0.5f) * size, height - halfThickness)));
+        tile.mObject->setWorldTransform(
+            btTransform(btQuaternion::getIdentity(), btVector3((gridX + 0.5f) * size, (gridY + 0.5f) * size, height)));
         mTaskScheduler->addCollisionObject(
             tile.mObject.get(), CollisionType_Water, CollisionType_Actor | CollisionType_Projectile);
         mWaterTiles.emplace(std::pair(gridX, gridY), std::move(tile));
