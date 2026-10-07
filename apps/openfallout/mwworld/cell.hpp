@@ -51,6 +51,12 @@ namespace OFWorld
     ESM::FormId resolveClimate(
         const ESM4::World& world, const std::function<const ESM4::World*(ESM::FormId)>& findWorld);
 
+    /// The climate that gives the weather of a Fallout cell, zero when it has none. Only a cell that shows the sky has
+    /// one: an exterior cell, or an interior cell with the "show sky" flag (QuasiExt). It is the climate the cell names
+    /// itself; an exterior cell that names none has the one of its worldspace (a null worldspace has none).
+    ESM::FormId resolveCellClimate(const ESM4::Cell& cell, const ESM4::World* world,
+        const std::function<const ESM4::World*(ESM::FormId)>& findWorld);
+
     class Cell : public ESM::CellVariant
     {
     public:

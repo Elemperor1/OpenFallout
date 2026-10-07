@@ -2,6 +2,7 @@
 
 #include <map>
 
+#include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadwrld.hpp>
 
 #include "apps/openfallout/mwworld/cell.hpp"
@@ -111,6 +112,53 @@ namespace OFWorld
             worlds.add(makeWorld(0x11, 0x101, 0x10, ESM4::World::UseFlag_Climate));
             const ESM::FormId climate = worlds.climateOf(0x10);
             EXPECT_TRUE(climate == formId(0x100) || climate == formId(0x101));
+        }
+
+        ESM4::Cell makeCell(std::uint32_t flags, std::uint32_t climate)
+        {
+            ESM4::Cell cell;
+            cell.mCellFlags = flags;
+            cell.mClimate = formId(climate);
+            return cell;
+        }
+
+        const std::function<const ESM4::World*(ESM::FormId)> sNoWorlds = [](ESM::FormId) { return nullptr; };
+
+        TEST(OFWorldResolveCellClimateTest, anExteriorCellHasTheClimateItNames)
+        {
+            const ESM4::World world = makeWorld(0x10, 0x100, 0, 0);
+            EXPECT_EQ(resolveCellClimate(makeCell(0, 0x200), &world, sNoWorlds), formId(0x200));
+        }
+
+        TEST(OFWorldResolveCellClimateTest, anExteriorCellThatNamesNoneHasTheClimateOfItsWorldspace)
+        {
+            const ESM4::World world = makeWorld(0x10, 0x100, 0, 0);
+            EXPECT_EQ(resolveCellClimate(makeCell(0, 0), &world, sNoWorlds), formId(0x100));
+        }
+
+        TEST(OFWorldResolveCellClimateTest, anExteriorCellWithoutAWorldspaceAndWithoutAClimateHasNone)
+        {
+            EXPECT_TRUE(resolveCellClimate(makeCell(0, 0), nullptr, sNoWorlds).isZeroOrUnset());
+        }
+
+        TEST(OFWorldResolveCellClimateTest, anInteriorCellHasNoClimate)
+        {
+            const ESM4::World world = makeWorld(0x10, 0x100, 0, 0);
+            EXPECT_TRUE(resolveCellClimate(makeCell(ESM4::CELL_Interior, 0x200), &world, sNoWorlds).isZeroOrUnset());
+        }
+
+        TEST(OFWorldResolveCellClimateTest, anInteriorCellThatShowsTheSkyHasTheClimateItNames)
+        {
+            const ESM4::World world = makeWorld(0x10, 0x100, 0, 0);
+            EXPECT_EQ(resolveCellClimate(makeCell(ESM4::CELL_Interior | ESM4::CELL_QuasiExt, 0x200), &world, sNoWorlds),
+                formId(0x200));
+        }
+
+        TEST(OFWorldResolveCellClimateTest, anInteriorCellThatShowsTheSkyAndNamesNoneHasNone)
+        {
+            const ESM4::World world = makeWorld(0x10, 0x100, 0, 0);
+            EXPECT_TRUE(resolveCellClimate(makeCell(ESM4::CELL_Interior | ESM4::CELL_QuasiExt, 0), &world, sNoWorlds)
+                            .isZeroOrUnset());
         }
     }
 }
