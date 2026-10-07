@@ -17,6 +17,7 @@
 #include <limits>
 #include <numbers>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 namespace
@@ -53,11 +54,23 @@ namespace
         return result;
     }
 
-    void expectNear(const btVector3& actual, const btVector3& expected)
+    std::pair<btVector3, btVector3> getBounds(const std::vector<btVector3>& points)
     {
-        EXPECT_NEAR(actual.x(), expected.x(), 1e-3);
-        EXPECT_NEAR(actual.y(), expected.y(), 1e-3);
-        EXPECT_NEAR(actual.z(), expected.z(), 1e-3);
+        btVector3 min(1e9f, 1e9f, 1e9f);
+        btVector3 max(-1e9f, -1e9f, -1e9f);
+        for (const btVector3& point : points)
+        {
+            min.setMin(point);
+            max.setMax(point);
+        }
+        return { min, max };
+    }
+
+    void expectNear(const btVector3& actual, const btVector3& expected, double tolerance = 1e-3)
+    {
+        EXPECT_NEAR(actual.x(), expected.x(), tolerance);
+        EXPECT_NEAR(actual.y(), expected.y(), tolerance);
+        EXPECT_NEAR(actual.z(), expected.z(), tolerance);
     }
 
     struct TestHavokCollision : Test
@@ -460,13 +473,172 @@ namespace
         expectNear(max, btVector3(7, 7, 7));
     }
 
+    TEST_F(TestHavokCollision, a_sphere_is_a_hull_with_its_radius_in_game_units)
+    {
+        Nif::bhkSphereShape sphere;
+        sphere.mRecordType = Nif::RC_bhkSphereShape;
+        sphere.mRadius = 2.f;
+        mBody.mShape = Nif::bhkShapePtr(&sphere);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        const auto [min, max] = getBounds(getTriangles(*shape.getChildShape(0)));
+        expectNear(min, btVector3(-14, -14, -14));
+        expectNear(max, btVector3(14, 14, 14));
+    }
+
+    TEST_F(TestHavokCollision, a_sphere_with_no_radius_makes_no_obstacle)
+    {
+        Nif::bhkSphereShape sphere;
+        sphere.mRecordType = Nif::RC_bhkSphereShape;
+        sphere.mRadius = 0.f;
+        mBody.mShape = Nif::bhkShapePtr(&sphere);
+
+        EXPECT_EQ(load()->mCollisionShape, nullptr);
+    }
+
+    TEST_F(TestHavokCollision, a_capsule_is_a_hull_of_the_two_ends)
+    {
+        Nif::bhkCapsuleShape capsule;
+        capsule.mRecordType = Nif::RC_bhkCapsuleShape;
+        capsule.mPoint1 = osg::Vec3f(0, 0, 0);
+        capsule.mPoint2 = osg::Vec3f(0, 0, 2);
+        capsule.mRadius = 1.f;
+        capsule.mRadius1 = 1.f;
+        capsule.mRadius2 = 0.5f;
+        mBody.mShape = Nif::bhkShapePtr(&capsule);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        // The ends are 14 apart in z; one has a radius of 7 and the other of 3.5. The hull computer rounds the points
+        // to a grid, so the bounds are near and not exact.
+        const auto [min, max] = getBounds(getTriangles(*shape.getChildShape(0)));
+        expectNear(min, btVector3(-7, -7, -7), 0.01);
+        expectNear(max, btVector3(7, 7, 14 + 3.5), 0.01);
+    }
+
+    TEST_F(TestHavokCollision, a_convex_list_has_all_its_shapes)
+    {
+        Nif::bhkBoxShape second;
+        second.mRecordType = Nif::RC_bhkBoxShape;
+        second.mExtents = osg::Vec3f(2, 2, 2);
+        Nif::bhkConvexListShape list;
+        list.mRecordType = Nif::RC_bhkConvexListShape;
+        list.mSubShapes = { Nif::bhkShapePtr(&mBox), Nif::bhkShapePtr(&second) };
+        mBody.mShape = Nif::bhkShapePtr(&list);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        EXPECT_EQ(compound(*result).getNumChildShapes(), 2);
+    }
+
+    TEST_F(TestHavokCollision, a_transform_shape_places_its_shape_by_its_matrix_in_havok_units)
+    {
+        // Turned a quarter about z, then moved one Havok unit along x (the translation is in the last row)
+        Nif::bhkConvexTransformShape transformShape;
+        transformShape.mRecordType = Nif::RC_bhkConvexTransformShape;
+        transformShape.mShape = Nif::bhkShapePtr(&mBox);
+        transformShape.mTransform = osg::Matrixf::rotate(std::numbers::pi_v<float> / 2, osg::Vec3f(0, 0, 1))
+            * osg::Matrixf::translate(1, 0, 0);
+        mBody.mShape = Nif::bhkShapePtr(&transformShape);
+        mBody.mInfo.mTranslation = osg::Vec4f(0, 2, 0, 0);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        ASSERT_EQ(shape.getChildShape(0)->getShapeType(), BOX_SHAPE_PROXYTYPE);
+        // The matrix of the shape first, then the body: (1, 0, 0) and (0, 2, 0) Havok units
+        expectNear(shape.getChildTransform(0).getOrigin(), btVector3(7, 14, 0));
+        expectNear(shape.getChildTransform(0).getBasis() * btVector3(1, 0, 0), btVector3(0, 1, 0));
+    }
+
+    TEST_F(TestHavokCollision, triangle_strips_are_taken_as_they_are_and_a_data_that_stops_nothing_is_left_out)
+    {
+        // Two triangles of a strip of four vertices, and a strip of another data that is in a layer that is no obstacle
+        Nif::NiTriStripsData wall;
+        wall.mRecordType = Nif::RC_NiTriStripsData;
+        wall.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(10, 0, 0), osg::Vec3f(0, 10, 0), osg::Vec3f(10, 10, 0) };
+        wall.mStrips = { { 0, 1, 2, 3 } };
+        Nif::NiTriStripsData trigger;
+        trigger.mRecordType = Nif::RC_NiTriStripsData;
+        trigger.mVertices = { osg::Vec3f(0, 0, 5), osg::Vec3f(1, 0, 5), osg::Vec3f(0, 1, 5) };
+        trigger.mStrips = { { 0, 1, 2 } };
+        Nif::bhkNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkNiTriStripsShape;
+        strips.mData
+            = { Nif::RecordPtrT<Nif::NiTriStripsData>(&wall), Nif::RecordPtrT<Nif::NiTriStripsData>(&trigger) };
+        strips.mHavokFilters = { Nif::HavokFilter{ staticLayer, 0, 0 }, Nif::HavokFilter{ triggerLayer, 0, 0 } };
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        const std::vector<btVector3> triangles = getTriangles(*shape.getChildShape(0));
+        ASSERT_EQ(triangles.size(), 6);
+        const auto [min, max] = getBounds(triangles);
+        expectNear(min, btVector3(0, 0, 0));
+        expectNear(max, btVector3(10, 10, 0));
+    }
+
+    TEST_F(TestHavokCollision, triangle_strips_have_the_scale_of_their_shape)
+    {
+        Nif::NiTriStripsData data;
+        data.mRecordType = Nif::RC_NiTriStripsData;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0) };
+        data.mStrips = { { 0, 1, 2 } };
+        Nif::bhkNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkNiTriStripsShape;
+        strips.mScale = osg::Vec4f(2, 3, 1, 0);
+        strips.mData = { Nif::RecordPtrT<Nif::NiTriStripsData>(&data) };
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        const btCompoundShape& shape = compound(*result);
+        ASSERT_EQ(shape.getNumChildShapes(), 1);
+        const auto [min, max] = getBounds(getTriangles(*shape.getChildShape(0)));
+        expectNear(min, btVector3(0, 0, 0));
+        expectNear(max, btVector3(2, 3, 0));
+    }
+
+    TEST_F(TestHavokCollision, triangle_strips_leave_out_a_triangle_that_has_a_vertex_twice_or_not_at_all)
+    {
+        Nif::NiTriStripsData data;
+        data.mRecordType = Nif::RC_NiTriStripsData;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0) };
+        // 0, 1, 2 is a triangle; 1, 2, 2 is none; 2, 2, 9 is none; 2, 9, 0 has a vertex that is not there
+        data.mStrips = { { 0, 1, 2, 2, 9, 0 } };
+        Nif::bhkNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkNiTriStripsShape;
+        strips.mData = { Nif::RecordPtrT<Nif::NiTriStripsData>(&data) };
+        mBody.mShape = Nif::bhkShapePtr(&strips);
+
+        const auto result = load();
+
+        ASSERT_NE(result->mCollisionShape, nullptr);
+        ASSERT_EQ(compound(*result).getNumChildShapes(), 1);
+        EXPECT_EQ(getTriangles(*compound(*result).getChildShape(0)).size(), 3);
+    }
+
     TEST_F(TestHavokCollision, a_shape_that_is_not_read_leaves_the_rendered_geometry)
     {
         addRenderedGeometry();
-        Nif::bhkSphereShape sphere;
-        sphere.mRecordType = Nif::RC_bhkSphereShape;
-        sphere.mRadius = 1.f;
-        mBody.mShape = Nif::bhkShapePtr(&sphere);
+        Nif::bhkCylinderShape cylinder;
+        cylinder.mRecordType = Nif::RC_bhkCylinderShape;
+        cylinder.mRadius = 1.f;
+        mBody.mShape = Nif::bhkShapePtr(&cylinder);
 
         const auto result = load();
 
@@ -476,11 +648,11 @@ namespace
 
     TEST_F(TestHavokCollision, a_list_that_has_a_shape_that_is_not_read_is_not_used_at_all)
     {
-        Nif::bhkSphereShape sphere;
-        sphere.mRecordType = Nif::RC_bhkSphereShape;
+        Nif::bhkCylinderShape cylinder;
+        cylinder.mRecordType = Nif::RC_bhkCylinderShape;
         Nif::bhkListShape list;
         list.mRecordType = Nif::RC_bhkListShape;
-        list.mSubshapes = { Nif::bhkShapePtr(&mBox), Nif::bhkShapePtr(&sphere) };
+        list.mSubshapes = { Nif::bhkShapePtr(&mBox), Nif::bhkShapePtr(&cylinder) };
         mBody.mShape = Nif::bhkShapePtr(&list);
 
         const auto result = load();
@@ -641,17 +813,17 @@ namespace
 
     TEST_F(TestHavokCollision, a_survey_counts_the_kind_of_shape_that_is_not_read)
     {
-        Nif::bhkSphereShape sphere;
-        sphere.mRecordType = Nif::RC_bhkSphereShape;
-        sphere.mRecordName = "bhkSphereShape";
-        sphere.mRadius = 1.f;
-        mBody.mShape = Nif::bhkShapePtr(&sphere);
+        Nif::bhkCylinderShape cylinder;
+        cylinder.mRecordType = Nif::RC_bhkCylinderShape;
+        cylinder.mRecordName = "bhkCylinderShape";
+        cylinder.mRadius = 1.f;
+        mBody.mShape = Nif::bhkShapePtr(&cylinder);
         NifBullet::HavokSurvey survey;
 
         load(true, fallout3Version, false, &survey);
 
-        EXPECT_EQ(survey.count(filesSection, "not used, it has bhkSphereShape"), 1);
-        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkSphereShape"), 1);
+        EXPECT_EQ(survey.count(filesSection, "not used, it has bhkCylinderShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkCylinderShape"), 1);
     }
 
     TEST_F(TestHavokCollision, a_survey_counts_a_layer_that_is_not_solid_and_a_file_without_the_collision_flag)
@@ -711,11 +883,11 @@ namespace
 
     TEST_F(TestHavokCollision, a_survey_goes_on_after_a_body_that_is_not_read)
     {
-        Nif::bhkSphereShape sphere;
-        sphere.mRecordType = Nif::RC_bhkSphereShape;
-        sphere.mRecordName = "bhkSphereShape";
-        sphere.mRadius = 1.f;
-        mBody.mShape = Nif::bhkShapePtr(&sphere);
+        Nif::bhkCylinderShape cylinder;
+        cylinder.mRecordType = Nif::RC_bhkCylinderShape;
+        cylinder.mRecordName = "bhkCylinderShape";
+        cylinder.mRadius = 1.f;
+        mBody.mShape = Nif::bhkShapePtr(&cylinder);
         // A second body in a child node, with the box
         Nif::bhkRigidBody second = mBody;
         second.mShape = Nif::bhkShapePtr(&mBox);
@@ -735,9 +907,9 @@ namespace
 
         // The collision is not made from a file that has a body that is not read ...
         EXPECT_EQ(result->mCollisionShape, nullptr);
-        EXPECT_EQ(survey.count("Havok collision of the files", "not used, it has bhkSphereShape"), 1);
+        EXPECT_EQ(survey.count("Havok collision of the files", "not used, it has bhkCylinderShape"), 1);
         // ... and the survey has both bodies
-        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkSphereShape"), 1);
+        EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkCylinderShape"), 1);
         EXPECT_EQ(survey.count("Rigid bodies by shape", "bhkBoxShape"), 1);
         EXPECT_EQ(survey.count("Rigid bodies that stop what walks", "yes"), 2);
         EXPECT_EQ(load()->mCollisionShape, nullptr);

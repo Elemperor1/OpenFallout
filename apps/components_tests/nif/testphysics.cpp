@@ -121,6 +121,57 @@ namespace Nif
             EXPECT_EQ(body->mInfo.mRotation.w(), 0.8f);
         }
 
+        TEST_F(NifBhkRigidBodyTest, shouldReadTheMatrixOfATransformShapeWithItsTranslationInTheLastRow)
+        {
+            NIFFile file(path);
+            const ToUTF8::StatelessUtf8Encoder* const encoder = nullptr;
+            Reader reader(file, encoder);
+
+            std::ostringstream stream;
+
+            writeString("Gamebryo File Format, Version 20.2.0.7\n", stream);
+            writeUInt32(NIFStream::generateVersion(20, 2, 0, 7), stream);
+            writeUInt8(1, stream); // little endian
+            writeUInt32(11, stream); // user version
+            writeUInt32(1, stream); // records
+            writeUInt32(34, stream); // Fallout 3
+            writeUInt8SizedString("author", stream);
+            writeUInt8SizedString("process_script", stream);
+            writeUInt8SizedString("export_script", stream);
+            writeUInt16(1, stream);
+            writeUInt32SizedString("bhkTransformShape", stream);
+            writeUInt16(0, stream); // the type of the record
+            writeUInt32(0, stream); // its size, which is not used
+            writeUInt32(0, stream); // no strings
+            writeUInt32(0, stream);
+            writeUInt32(0, stream); // no groups
+
+            // The shape (none), the material, the radius and unused bytes, then the 16 floats of the transform as
+            // Havok stores them: the three columns of the rotation, then the translation (in Havok units)
+            writeUInt32(0xFFFFFFFF, stream);
+            writeUInt32(0, stream);
+            writeFloat(0.f, stream);
+            writeZeros(8, stream);
+            for (float value : { 0.f, 1.f, 0.f, 0.f, -1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 3.f, 4.f, 5.f, 1.f })
+                writeFloat(value, stream);
+            writeUInt32(0, stream); // no roots
+
+            const std::string buffer = stream.str();
+
+            std::unique_ptr<std::istringstream> input = std::make_unique<std::istringstream>(buffer);
+            input->exceptions(std::ios::failbit | std::ios_base::badbit);
+
+            reader.parse(std::move(input));
+
+            const Record* const record = reader.getRecord(0);
+            ASSERT_NE(record, nullptr);
+            const bhkConvexTransformShape* const shape = dynamic_cast<const bhkConvexTransformShape*>(record);
+            ASSERT_NE(shape, nullptr);
+            EXPECT_EQ(shape->mTransform.getTrans(), osg::Vec3f(3, 4, 5));
+            // A quarter turn about z, then the translation: the x axis ends up along y
+            EXPECT_EQ(osg::Vec3f(1, 0, 0) * shape->mTransform, osg::Vec3f(3, 5, 5));
+        }
+
         struct NifBhkRagdollTemplateTest : Test
         {
             NifBhkRagdollTemplateTest() { Nif::Reader::setWriteNifDebugLog(true); }

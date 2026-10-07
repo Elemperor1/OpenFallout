@@ -10,6 +10,7 @@
 #include <LinearMath/btConvexHullComputer.h>
 
 #include <components/misc/convert.hpp>
+#include <components/nif/data.hpp>
 #include <components/nif/physics.hpp>
 #include <components/resource/bulletshape.hpp>
 
@@ -101,6 +102,97 @@ namespace NifBullet
             return shape;
         }
 
+        // Points on a sphere, as the corners, the middles of the edges and the middles of the faces of a cube (26
+        // directions), which a hull makes into a sphere that is near enough for something that is only to be walked
+        // into. A radius that is not above 0 adds nothing.
+        void addSpherePoints(std::vector<btVector3>& points, const btVector3& centre, float radius)
+        {
+            if (!(radius > 0.f))
+                return;
+            for (int x = -1; x <= 1; ++x)
+                for (int y = -1; y <= 1; ++y)
+                    for (int z = -1; z <= 1; ++z)
+                        if (x != 0 || y != 0 || z != 0)
+                            points.push_back(centre + btVector3(x, y, z).normalized() * radius);
+        }
+
+        std::unique_ptr<btCollisionShape> makeCapsuleShape(const Nif::bhkCapsuleShape& capsule)
+        {
+            // The radius of each end is its own; the one of the convex shape is the same in the files that I know of
+            const float radius1 = capsule.mRadius1 > 0.f ? capsule.mRadius1 : capsule.mRadius;
+            const float radius2 = capsule.mRadius2 > 0.f ? capsule.mRadius2 : capsule.mRadius;
+
+            std::vector<btVector3> points;
+            points.reserve(52);
+            addSpherePoints(points,
+                btVector3(capsule.mPoint1.x(), capsule.mPoint1.y(), capsule.mPoint1.z()) * sHavokScale,
+                radius1 * sHavokScale);
+            addSpherePoints(points,
+                btVector3(capsule.mPoint2.x(), capsule.mPoint2.y(), capsule.mPoint2.z()) * sHavokScale,
+                radius2 * sHavokScale);
+            return makeConvexHullShape(points);
+        }
+
+        std::unique_ptr<btCollisionShape> makeSphereShape(const Nif::bhkConvexShape& sphere)
+        {
+            std::vector<btVector3> points;
+            points.reserve(26);
+            addSpherePoints(points, btVector3(0, 0, 0), sphere.mRadius * sHavokScale);
+            return makeConvexHullShape(points);
+        }
+
+        // The triangle strips of the data of a bhkNiTriStripsShape in one mesh. The vertices of an NiTriStripsData are
+        // in game units already (only the packed data of a bhkPackedNiTriStripsShape is in Havok units), so only the
+        // scale of the shape is applied. A data that has a filter that stops nothing is left out.
+        std::unique_ptr<btCollisionShape> makeStripsShape(const Nif::bhkNiTriStripsShape& shape)
+        {
+            osg::Vec3f scale(1.f, 1.f, 1.f);
+            if (shape.mScale.x() > 0.f && shape.mScale.y() > 0.f && shape.mScale.z() > 0.f)
+                scale = osg::Vec3f(shape.mScale.x(), shape.mScale.y(), shape.mScale.z());
+
+            // The filters are for the data one by one; if they are not, all of the data is taken
+            const bool hasFilters = shape.mHavokFilters.size() == shape.mData.size();
+
+            auto mesh = std::make_unique<btTriangleMesh>();
+            for (std::size_t i = 0; i < shape.mData.size(); ++i)
+            {
+                if (shape.mData[i].empty() || (hasFilters && !isSolidHavokFilter(shape.mHavokFilters[i])))
+                    continue;
+
+                const Nif::NiTriStripsData& data = shape.mData[i].get();
+                std::vector<btVector3> vertices;
+                vertices.reserve(data.mVertices.size());
+                for (const osg::Vec3f& vertex : data.mVertices)
+                    vertices.emplace_back(vertex.x() * scale.x(), vertex.y() * scale.y(), vertex.z() * scale.z());
+
+                for (const std::vector<std::uint16_t>& strip : data.mStrips)
+                {
+                    // Each vertex after the second makes a triangle with the two before it, turned over every other
+                    // time. Triangles that have a vertex twice, or a vertex that is not there, are left out.
+                    for (std::size_t j = 2; j < strip.size(); ++j)
+                    {
+                        const std::uint16_t a = strip[j - 2];
+                        const std::uint16_t b = strip[j - 1];
+                        const std::uint16_t c = strip[j];
+                        if (a == b || b == c || a == c || a >= vertices.size() || b >= vertices.size()
+                            || c >= vertices.size())
+                            continue;
+                        if (j % 2 == 0)
+                            mesh->addTriangle(vertices[a], vertices[b], vertices[c]);
+                        else
+                            mesh->addTriangle(vertices[a], vertices[c], vertices[b]);
+                    }
+                }
+            }
+
+            if (mesh->getNumTriangles() == 0)
+                return nullptr;
+
+            auto result = std::make_unique<Resource::TriangleMeshShape>(mesh.get(), true);
+            std::ignore = mesh.release();
+            return result;
+        }
+
         std::unique_ptr<btCollisionShape> makePackedStripsShape(const Nif::bhkPackedNiTriStripsShape& shape)
         {
             if (shape.mData.empty())
@@ -158,6 +250,24 @@ namespace NifBullet
         }
 
         std::string convert(
+            const Nif::bhkShape& shape, const osg::Matrixf& transform, std::vector<HavokPiece>& pieces, int depth);
+
+        // All the shapes of a list; the first one that is not read ends it
+        std::string convertAll(
+            const Nif::bhkShapeList& shapes, const osg::Matrixf& transform, std::vector<HavokPiece>& pieces, int depth)
+        {
+            for (const auto& child : shapes)
+            {
+                if (child.empty())
+                    continue;
+                std::string unsupported = convert(child.get(), transform, pieces, depth + 1);
+                if (!unsupported.empty())
+                    return unsupported;
+            }
+            return {};
+        }
+
+        std::string convert(
             const Nif::bhkShape& shape, const osg::Matrixf& transform, std::vector<HavokPiece>& pieces, int depth)
         {
             if (depth > sMaxShapeDepth)
@@ -173,17 +283,22 @@ namespace NifBullet
                     return convert(mopp.mShape.get(), transform, pieces, depth + 1);
                 }
                 case Nif::RC_bhkListShape:
+                    return convertAll(
+                        static_cast<const Nif::bhkListShape&>(shape).mSubshapes, transform, pieces, depth);
+                case Nif::RC_bhkConvexListShape:
+                    // A list of convex shapes of one kind and material; its radius only rounds them
+                    return convertAll(
+                        static_cast<const Nif::bhkConvexListShape&>(shape).mSubShapes, transform, pieces, depth);
+                case Nif::RC_bhkConvexTransformShape:
                 {
-                    const auto& list = static_cast<const Nif::bhkListShape&>(shape);
-                    for (const auto& child : list.mSubshapes)
-                    {
-                        if (child.empty())
-                            continue;
-                        std::string unsupported = convert(child.get(), transform, pieces, depth + 1);
-                        if (!unsupported.empty())
-                            return unsupported;
-                    }
-                    return {};
+                    // bhkTransformShape is the same record under another name. The matrix is read as OSG has it (the
+                    // translation in its last row) and the translation is in Havok units like the rest.
+                    const auto& transformShape = static_cast<const Nif::bhkConvexTransformShape&>(shape);
+                    if (transformShape.mShape.empty())
+                        return {};
+                    osg::Matrixf local = transformShape.mTransform;
+                    local.setTrans(local.getTrans() * sHavokScale);
+                    return convert(transformShape.mShape.get(), local * transform, pieces, depth + 1);
                 }
                 case Nif::RC_bhkBoxShape:
                 {
@@ -209,6 +324,24 @@ namespace NifBullet
                 {
                     if (auto strips = makePackedStripsShape(static_cast<const Nif::bhkPackedNiTriStripsShape&>(shape)))
                         pieces.push_back({ std::move(strips), transform });
+                    return {};
+                }
+                case Nif::RC_bhkNiTriStripsShape:
+                {
+                    if (auto strips = makeStripsShape(static_cast<const Nif::bhkNiTriStripsShape&>(shape)))
+                        pieces.push_back({ std::move(strips), transform });
+                    return {};
+                }
+                case Nif::RC_bhkCapsuleShape:
+                {
+                    if (auto capsule = makeCapsuleShape(static_cast<const Nif::bhkCapsuleShape&>(shape)))
+                        pieces.push_back({ std::move(capsule), transform });
+                    return {};
+                }
+                case Nif::RC_bhkSphereShape:
+                {
+                    if (auto sphere = makeSphereShape(static_cast<const Nif::bhkConvexShape&>(shape)))
+                        pieces.push_back({ std::move(sphere), transform });
                     return {};
                 }
                 default:
