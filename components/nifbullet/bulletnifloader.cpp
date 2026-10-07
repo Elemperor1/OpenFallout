@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cassert>
 #include <sstream>
+#include <string_view>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -22,6 +23,9 @@
 
 namespace
 {
+    // Added to the hash of the file of a shape that is made from its Havok data. Change it when what is made from the
+    // Havok data changes, so that tiles of the navigation mesh made from the old shapes are not used.
+    constexpr std::string_view sHavokHashSuffix = "havok1";
 
     bool pathFileNameStartsWithX(const std::string& path)
     {
@@ -426,6 +430,9 @@ namespace NifBullet
                             << " shapes";
         mCompoundShape = std::move(havok);
         mShape->mAnimatedShapes.clear();
+        // The hash names the shape in the navigation mesh database, which keeps tiles that were made for another shape
+        // of the same file (the rendered geometry, from before or with the setting off) apart from these.
+        mShape->mFileHash += sHavokHashSuffix;
     }
 
     bool BulletNifLoader::collectHavokBodies(const Nif::NiAVObject& node, const Nif::Parent* parent, bool animated,

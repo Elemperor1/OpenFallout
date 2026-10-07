@@ -178,6 +178,28 @@ namespace
         EXPECT_EQ(shape.getChildShape(0)->getShapeType(), BOX_SHAPE_PROXYTYPE);
     }
 
+    TEST_F(TestHavokCollision, a_shape_made_from_havok_data_has_a_hash_of_its_own)
+    {
+        addRenderedGeometry();
+        mBody.mInfo.mTranslation = osg::Vec4f(50.f / NifBullet::sHavokScale, 50.f / NifBullet::sHavokScale, 0, 0);
+
+        // The navigation mesh database names a shape by its file and hash, so the same file read with another kind of
+        // collision must have another hash
+        const std::string rendered = load(false)->mFileHash;
+        const std::string havok = load(true)->mFileHash;
+
+        EXPECT_EQ(rendered, "hash");
+        EXPECT_NE(havok, rendered);
+    }
+
+    TEST_F(TestHavokCollision, a_shape_that_falls_back_to_the_rendered_geometry_keeps_the_hash_of_its_file)
+    {
+        addRenderedGeometry();
+        mBody.mInfo.mTranslation = osg::Vec4f(-100, 0, 0, 0);
+
+        EXPECT_EQ(load(true)->mFileHash, "hash");
+    }
+
     TEST_F(TestHavokCollision, a_body_that_is_not_where_the_rendered_geometry_is_is_not_used)
     {
         addRenderedGeometry();
