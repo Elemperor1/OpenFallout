@@ -87,6 +87,7 @@ namespace OFRender
         std::map<std::pair<int, int>, Tile> mTiles;
         osg::ref_ptr<osg::Group> mTileGroup;
         osg::ref_ptr<osg::Geometry> mTileGeom;
+        osg::ref_ptr<osg::Geometry> mTileSimpleGeom;
         osg::ref_ptr<osg::Geometry> mSimpleWaterGeom;
         bool mTileMode;
         float mViewLevel;

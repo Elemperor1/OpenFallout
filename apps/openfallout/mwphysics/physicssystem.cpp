@@ -12,6 +12,7 @@
 #include <BulletCollision/CollisionDispatch/btCollisionObject.h>
 #include <BulletCollision/CollisionDispatch/btCollisionWorld.h>
 #include <BulletCollision/CollisionDispatch/btDefaultCollisionConfiguration.h>
+#include <BulletCollision/CollisionShapes/btBoxShape.h>
 #include <BulletCollision/CollisionShapes/btConeShape.h>
 #include <BulletCollision/CollisionShapes/btSphereShape.h>
 #include <BulletCollision/CollisionShapes/btStaticPlaneShape.h>
@@ -140,6 +141,8 @@ namespace OFPhysics
 
         if (mWaterCollisionObject)
             mTaskScheduler->removeCollisionObject(mWaterCollisionObject.get());
+        for (const auto& [position, tile] : mWaterTiles)
+            mTaskScheduler->removeCollisionObject(tile.mObject.get());
 
         mTaskScheduler->releaseSharedStates();
         mHeightFields.clear();
@@ -845,6 +848,33 @@ namespace OFPhysics
         mWaterCollisionObject->setCollisionShape(mWaterCollisionShape.get());
         mTaskScheduler->addCollisionObject(
             mWaterCollisionObject.get(), CollisionType_Water, CollisionType_Actor | CollisionType_Projectile);
+    }
+
+    void PhysicsSystem::addWaterTile(int gridX, int gridY, float height, float size)
+    {
+        removeWaterTile(gridX, gridY);
+
+        // As deep as to stop what falls onto the surface or flies into it in one step
+        constexpr float halfThickness = 64.f;
+
+        WaterTile tile;
+        tile.mShape = std::make_unique<btBoxShape>(btVector3(size / 2, size / 2, halfThickness));
+        tile.mObject = std::make_unique<btCollisionObject>();
+        tile.mObject->setCollisionShape(tile.mShape.get());
+        tile.mObject->setWorldTransform(btTransform(btQuaternion::getIdentity(),
+            btVector3((gridX + 0.5f) * size, (gridY + 0.5f) * size, height - halfThickness)));
+        mTaskScheduler->addCollisionObject(
+            tile.mObject.get(), CollisionType_Water, CollisionType_Actor | CollisionType_Projectile);
+        mWaterTiles.emplace(std::pair(gridX, gridY), std::move(tile));
+    }
+
+    void PhysicsSystem::removeWaterTile(int gridX, int gridY)
+    {
+        const auto found = mWaterTiles.find({ gridX, gridY });
+        if (found == mWaterTiles.end())
+            return;
+        mTaskScheduler->removeCollisionObject(found->second.mObject.get());
+        mWaterTiles.erase(found);
     }
 
     bool PhysicsSystem::isAreaOccupiedByOtherActor(

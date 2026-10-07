@@ -131,6 +131,9 @@ WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, s
 WATER_LINE = "Water of cell {}WaterCell ({}, {}) at height {:g}".format(plugin.WORLD_NAME, *plugin.WATER_CELL,
                                                                         plugin.WATER_HEIGHT)
 
+# The middle of the cell with water, where the script casts a ray down at the water (a cell is 4096 units wide)
+WATER_CENTRE = ((plugin.WATER_CELL[0] + 0.5) * 4096, (plugin.WATER_CELL[1] + 0.5) * 4096)
+
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
 
@@ -173,17 +176,21 @@ return {
                 local down = nearby.castRay(from, from - util.vector3(0, 0, 1000),
                     { collisionType = nearby.COLLISION_TYPE.World + nearby.COLLISION_TYPE.HeightMap })
                 log('ray down hit=', tostring(down.hit), down.hit and fmt(down.hitPos) or '')
+                local water = nearby.castRay(util.vector3(%.1f, %.1f, 500), util.vector3(%.1f, %.1f, -500),
+                    { collisionType = nearby.COLLISION_TYPE.Water })
+                log('ray water hit=', tostring(water.hit), water.hit and fmt(water.hitPos) or '')
             end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % WALK_SECONDS
+""" % (*WATER_CENTRE, *WATER_CENTRE, WALK_SECONDS)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
 SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 
 
 def start_xvfb():
@@ -331,6 +338,16 @@ def check(text, scenario, colours):
     rays = [m for m in rays if m]
     if not rays or rays[0].group(1) != "true" or abs(float(rays[0].group(4))) > 1.0:
         problems.append("the ray cast down from the player did not hit the ground at height 0")
+    # The water of a cell of Fallout is a body to collide with (to stand on with water walking, to be hit by a bullet)
+    water_rays = [m for m in map(WATER_RAY.search, text.splitlines()) if m]
+    if not water_rays:
+        problems.append("the script did not log the ray cast at the water")
+    elif scenario.exterior and (water_rays[0].group(1) != "true"
+                                or abs(float(water_rays[0].group(4)) - plugin.WATER_HEIGHT) > 1.0):
+        problems.append(f"the ray cast down at the water of the cell {plugin.WATER_CELL} did not hit it at height "
+                        f"{plugin.WATER_HEIGHT:g}: {water_rays[0].group(0)}")
+    elif not scenario.exterior and water_rays[0].group(1) != "false":
+        problems.append(f"the ray cast at the water hit something in an interior cell: {water_rays[0].group(0)}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

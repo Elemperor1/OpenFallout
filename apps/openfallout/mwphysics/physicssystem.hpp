@@ -166,6 +166,11 @@ namespace OFPhysics
         void setWaterHeight(float height);
         void disableWater();
 
+        /// The water of a cell of a worldspace of Fallout: a square slab of the size of the cell, which has the
+        /// surface of the water for its top. There is no one plane for the water of such a world.
+        void addWaterTile(int gridX, int gridY, float height, float size);
+        void removeWaterTile(int gridX, int gridY);
+
         void addObject(const OFWorld::Ptr& ptr, VFS::Path::NormalizedView mesh, osg::Quat rotation,
             int collisionType = CollisionType_World);
         void addActor(const OFWorld::Ptr& ptr, VFS::Path::NormalizedView mesh);
@@ -332,6 +337,13 @@ namespace OFPhysics
 
         std::unique_ptr<btCollisionObject> mWaterCollisionObject;
         std::unique_ptr<btCollisionShape> mWaterCollisionShape;
+
+        struct WaterTile
+        {
+            std::unique_ptr<btCollisionObject> mObject;
+            std::unique_ptr<btCollisionShape> mShape;
+        };
+        std::map<std::pair<int, int>, WaterTile> mWaterTiles;
 
         std::unique_ptr<OFRender::DebugDrawer> mDebugDrawer;
 

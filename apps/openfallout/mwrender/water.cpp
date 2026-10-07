@@ -395,6 +395,11 @@ namespace OFRender
         mTileGeom->setNodeMask(Mask_Water);
         mTileGeom->setDataVariance(osg::Object::STATIC);
         mTileGeom->setName("Water Tile Geometry");
+        // simple water fallback for the local map, as for the plane of the world
+        mTileSimpleGeom = osg::clone(mTileGeom.get(), osg::CopyOp::DEEP_COPY_NODES);
+        createSimpleWaterStateSet(mTileSimpleGeom, Fallback::Map::getFloat("Water_Map_Alpha"));
+        mTileSimpleGeom->setNodeMask(Mask_SimpleWater);
+        mTileSimpleGeom->setName("Water Tile Simple Geometry");
         mTileGroup = new osg::Group;
         mTileGroup->setName("Water Tiles");
         mWaterNode->addChild(mTileGroup);
@@ -734,6 +739,7 @@ namespace OFRender
         node->setName("Water Tile");
         node->setPosition(centre);
         node->addChild(mTileGeom);
+        node->addChild(mTileSimpleGeom);
         node->addCullCallback(new FudgeCallback);
         // The shader finds the place of a point of the water from the position of the node of its tile
         node->getOrCreateStateSet()->addUniform(new osg::Uniform("nodePosition", centre));

@@ -401,6 +401,8 @@ namespace OFWorld
 
         if (cell->getCell()->hasWater())
             mNavigator.removeWater(osg::Vec2i(cellX, cellY), navigatorUpdateGuard);
+        if (cell->getCell()->isExterior())
+            mPhysics->removeWaterTile(cellX, cellY);
 
         ESM::visit(ESM::VisitOverload{
                        [&](const ESM::Cell& c) {
@@ -509,7 +511,7 @@ namespace OFWorld
         if (cellVariant.isExterior() && ESM::isEsm4Ext(worldspace))
         {
             // Each cell of a worldspace of Fallout has water of its own, at its own height or at none: the water is a
-            // square of the cell, and there is no one plane of water to collide with.
+            // square of the cell, to see and to collide with, and there is no one plane of it.
             mPhysics->disableWater();
             if (cellVariant.hasWater())
             {
@@ -518,6 +520,7 @@ namespace OFWorld
                 {
                     Log(Debug::Info) << "Water of cell " << cellVariant.getDescription() << " at height " << waterLevel;
                     mRendering.addWaterTile(cellX, cellY, waterLevel);
+                    mPhysics->addWaterTile(cellX, cellY, waterLevel, static_cast<float>(ESM::getCellSize(worldspace)));
                 }
                 if (mPhysics->getHeightField(cellX, cellY))
                     mNavigator.addWater(
