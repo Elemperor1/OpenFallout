@@ -1,15 +1,32 @@
 #include "myguitexture.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
+#include <osg/Image>
 #include <osg/StateSet>
 #include <osg/Texture2D>
 
 #include <components/debug/debuglog.hpp>
 #include <components/resource/imagemanager.hpp>
+#include <components/vfs/manager.hpp>
 
 namespace MyGUIPlatform
 {
+    namespace
+    {
+        // What the interface shows in place of a texture that no data file has: nothing. The games of Fallout do not
+        // have the textures of the interface of Morrowind, and the magenta image that the scene shows for a missing
+        // texture would cover the screen with squares. The log still says which texture is missing.
+        osg::ref_ptr<osg::Image> createBlankImage()
+        {
+            constexpr int size = 8;
+            osg::ref_ptr<osg::Image> image = new osg::Image;
+            image->allocateImage(size, size, 1, GL_RGBA, GL_UNSIGNED_BYTE);
+            std::fill_n(image->data(), image->getTotalSizeInBytes(), static_cast<unsigned char>(0));
+            return image;
+        }
+    }
 
     OSGTexture::OSGTexture(const std::string& name, Resource::ImageManager* imageManager)
         : mName(name)
@@ -95,7 +112,12 @@ namespace MyGUIPlatform
         if (!mImageManager)
             throw std::runtime_error("No imagemanager set");
 
-        osg::ref_ptr<osg::Image> image(mImageManager->getImage(VFS::Path::Normalized(fname)));
+        const VFS::Path::Normalized path(fname);
+        osg::ref_ptr<osg::Image> image(mImageManager->getImage(path));
+        // A texture that no data file has is blank, as the textures of Morrowind's interface are in the data of other
+        // games. One that is there and cannot be read keeps the warning image, whose reason is in the log.
+        if (image == mImageManager->getWarningImage() && !mImageManager->getVFS()->exists(path))
+            image = createBlankImage();
         mTexture = new osg::Texture2D(image);
         mTexture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         mTexture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);

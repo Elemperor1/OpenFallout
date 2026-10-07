@@ -135,6 +135,9 @@ namespace OFRender
         osg::ref_ptr<CloudUpdater> mNextCloudUpdater;
         osg::ref_ptr<osg::PositionAttitudeTransform> mCloudMesh;
         osg::ref_ptr<osg::PositionAttitudeTransform> mNextCloudMesh;
+        // The shapes of the generated clouds (createCloudLayer), null when the game has the mesh of Morrowind
+        osg::ref_ptr<osg::Group> mCloudLayer;
+        osg::ref_ptr<osg::Group> mNextCloudLayer;
 
         osg::ref_ptr<osg::Node> mAtmosphereDay;
 

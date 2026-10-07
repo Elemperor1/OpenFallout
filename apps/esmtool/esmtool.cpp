@@ -60,6 +60,10 @@ Allowed modes:
          sizes, in which order) the records of one or more TES4-format files
          hold, optionally only for some record types (--type) or only for the
          records a loader rejects (--failed). Prints no record contents.
+  references Counts the references that one or more TES4-format files place
+         (REFR, ACHR, ACRE and the like) by the record type of the object they
+         place. Give the files in load order, masters first. Prints no record
+         contents.
 
 Allowed options)");
         auto addOption = desc.add_options();
@@ -145,7 +149,7 @@ Allowed options)");
 
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
-                || info.mode == "survey"))
+                || info.mode == "survey" || info.mode == "references"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -167,8 +171,9 @@ Allowed options)");
               }*/
 
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
-        // Only a survey takes any number of files, the other modes take an input file and an output file.
-        if (info.mode != "survey" && inputFiles.size() > 2)
+        // Only a survey or a count of references takes any number of files, the other modes take an input file and an
+        // output file.
+        if (info.mode != "survey" && info.mode != "references" && inputFiles.size() > 2)
         {
             std::cout << "\nERROR: more than two files specified\n\n";
             std::cout << desc << finalText << std::endl;
@@ -221,6 +226,8 @@ int main(int argc, char** argv)
             return load(info, nullptr);
         else if (info.mode == "survey")
             return surveyTes4(info);
+        else if (info.mode == "references")
+            return referencesTes4(info);
         else if (info.mode == "clone")
             return clone(info);
         else if (info.mode == "comp")

@@ -1,7 +1,10 @@
 #ifndef OPENFALLOUT_MWRENDER_SKYFALLBACK_H
 #define OPENFALLOUT_MWRENDER_SKYFALLBACK_H
 
+#include <string_view>
+
 #include <osg/Geometry>
+#include <osg/Group>
 #include <osg/Image>
 #include <osg/ref_ptr>
 
@@ -26,12 +29,31 @@ namespace OFRender
     /// only the alpha of each vertex counts.
     osg::ref_ptr<osg::Geometry> createAtmosphereDome(float radius);
 
-    /// The dome that the clouds are drawn on, radius around the origin, with a vertex for the top and four rings of 16
-    /// below it, from the top down to the horizon: the layout of the cloud mesh of Morrowind, so that what the sky
-    /// manager does to that mesh works on this one. The alpha of the vertices (0 at the horizon, a quarter in the
-    /// ring above, 1 in the rest) fades the clouds out there, and the texture coordinates map a texture that repeats
-    /// as if it were a plane seen from above.
+    /// The disc that the clouds are drawn on, over the viewer, with a vertex for the middle and four rings of 16 around
+    /// it, the farthest one at the radius from the origin: the layout of the cloud mesh of Morrowind, so that what the
+    /// sky manager does to that mesh works on this one. The rings are where the lines of sight at 70, 45, 25 and 5
+    /// degrees above the horizon meet the disc. The alpha of the vertices (0 in the farthest ring, a quarter in the
+    /// one before, 1 in the rest) fades the clouds out towards the horizon, and the texture coordinates lay a texture
+    /// that repeats on the disc as it is, so that it is seen in perspective, the clouds closer together the nearer the
+    /// horizon.
     osg::ref_ptr<osg::Geometry> createCloudDome(float radius);
+
+    /// The band that a strip of cloud for the horizon is drawn on: a ring of the radius around the origin from the
+    /// horizon up to about 22 degrees, with the first half of the texture (a strip in the games is two bands stacked
+    /// in one image, each four times as wide as it is tall) repeated four times round the sky. It does not drift.
+    osg::ref_ptr<osg::Geometry> createHorizonBand(float radius);
+
+    /// Whether the texture of the clouds of a weather is a strip for the horizon (the games call such a file
+    /// *Horizon*) and not a layer of clouds over the whole sky.
+    bool isHorizonCloudTexture(std::string_view path);
+
+    /// The group of the two shapes that the clouds of a generated sky are drawn on, the disc of createCloudDome as the
+    /// first child and the band of createHorizonBand as the second, with only the disc shown.
+    osg::ref_ptr<osg::Group> createCloudLayer(float radius);
+
+    /// Shows the shape that the texture needs in a layer of createCloudLayer, which is the band for a strip for the
+    /// horizon and the disc for any other texture, or none.
+    void selectCloudShape(osg::Group& layer, std::string_view texture);
 
     /// Stars as small squares of the given number around the origin at the radius, at random places above and a little
     /// below the horizon, each facing the origin. The same stars every time. A star has a brightness for the alpha of

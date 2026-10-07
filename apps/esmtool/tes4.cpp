@@ -5,6 +5,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <set>
 
 #include <components/debug/writeflags.hpp>
@@ -17,10 +18,12 @@
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
+#include <components/esm4/referencecensus.hpp>
 #include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
 #include <components/files/conversion.hpp>
 #include <components/files/openfile.hpp>
+#include <components/misc/strings/lower.hpp>
 #include <components/toutf8/toutf8.hpp>
 
 namespace EsmTool
@@ -817,5 +820,56 @@ namespace EsmTool
         std::cout << "Surveyed " << info.inputFiles.size() << " files\n\n";
         survey.write(std::cout);
         return survey.getFatalErrors().empty() ? result : -1;
+    }
+
+    /// Count the references that every file named on the command line places, read in the order given, and print the
+    /// counts to standard output. Return 0 when every file was read to its end, or -1 if one could not be opened or
+    /// read.
+    int referencesTes4(const Arguments& info)
+    {
+        ESM4::ReferenceCensus census;
+        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
+        std::map<std::string, int> nameToIndex;
+        int result = 0;
+
+        std::uint32_t index = 0;
+        for (const std::filesystem::path& path : info.inputFiles)
+        {
+            const std::string name = Files::pathToUnicodeString(path.filename());
+            const std::uint32_t modIndex = index++;
+            try
+            {
+                auto stream = Files::openBinaryInputFileStream(path);
+                if (!stream->is_open())
+                {
+                    std::cout << "Failed to open file " << name << ": " << std::generic_category().message(errno)
+                              << '\n';
+                    result = -1;
+                    continue;
+                }
+                if (ESM::readFormat(*stream) != ESM::Format::Tes4)
+                {
+                    std::cout << "References mode only supports TES4-format files: " << name << '\n';
+                    result = -1;
+                    continue;
+                }
+                stream->seekg(0);
+
+                ESM4::Reader reader(std::move(stream), path, nullptr, &encoder, true);
+                reader.setModIndex(modIndex);
+                reader.updateModIndices(nameToIndex);
+                nameToIndex[Misc::StringUtils::lowerCase(name)] = static_cast<int>(modIndex);
+                census.collect(reader);
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "\nERROR in " << name << ":\n\n  " << e.what() << std::endl;
+                result = -1;
+            }
+        }
+
+        std::cout << "Counted the references of " << info.inputFiles.size() << " files\n\n";
+        census.write(std::cout);
+        return census.getFatalErrors().empty() ? result : -1;
     }
 }

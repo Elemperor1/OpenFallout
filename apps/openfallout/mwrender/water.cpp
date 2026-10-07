@@ -48,6 +48,7 @@
 #include "ripplesimulation.hpp"
 #include "util.hpp"
 #include "vismask.hpp"
+#include "waterframes.hpp"
 
 namespace OFRender
 {
@@ -515,13 +516,10 @@ namespace OFRender
 
         // Add animated textures
         std::vector<osg::ref_ptr<osg::Texture2D>> textures;
-        const int frameCount = std::clamp(Fallback::Map::getInt("Water_SurfaceFrameCount"), 0, 320);
-        std::string_view texture = Fallback::Map::getString("Water_SurfaceTexture");
-        for (int i = 0; i < frameCount; ++i)
+        for (const VFS::Path::Normalized& path :
+            findWaterFrames(*mResourceSystem->getVFS(), Fallback::Map::getString("Water_SurfaceTexture"),
+                std::clamp(Fallback::Map::getInt("Water_SurfaceFrameCount"), 0, 320)))
         {
-            std::ostringstream texname;
-            texname << "textures/water/" << texture << std::setw(2) << std::setfill('0') << i << ".dds";
-            const VFS::Path::Normalized path(texname.str());
             osg::ref_ptr<osg::Texture2D> tex(new osg::Texture2D(mResourceSystem->getImageManager()->getImage(path)));
             tex->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
             tex->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
@@ -714,14 +712,10 @@ namespace OFRender
 
     void Water::listAssetsToPreload(std::vector<VFS::Path::Normalized>& textures)
     {
-        const int frameCount = std::clamp(Fallback::Map::getInt("Water_SurfaceFrameCount"), 0, 320);
-        std::string_view texture = Fallback::Map::getString("Water_SurfaceTexture");
-        for (int i = 0; i < frameCount; ++i)
-        {
-            std::ostringstream texname;
-            texname << "textures/water/" << texture << std::setw(2) << std::setfill('0') << i << ".dds";
-            textures.emplace_back(texname.str());
-        }
+        for (VFS::Path::Normalized& path :
+            findWaterFrames(*mResourceSystem->getVFS(), Fallback::Map::getString("Water_SurfaceTexture"),
+                std::clamp(Fallback::Map::getInt("Water_SurfaceFrameCount"), 0, 320)))
+            textures.push_back(std::move(path));
     }
 
     void Water::setEnabled(bool enabled)

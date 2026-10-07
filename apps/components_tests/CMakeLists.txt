@@ -116,6 +116,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testrecipe.cpp
     esm4/testrecipecategory.cpp
     esm4/testrecordreader.cpp
+    esm4/testreferencecensus.cpp
     esm4/testreputation.cpp
     esm4/testscript.cpp
     esm4/testsleepdeprivationstage.cpp
@@ -134,6 +135,8 @@ file(GLOB UNITTEST_SRC_FILES
     esm3/testesmwriter.cpp
     esm3/testinfoorder.cpp
     esm3/testcstringids.cpp
+
+    myguiplatform/testmyguitexture.cpp
 
     nifosg/testnifloader.cpp
 

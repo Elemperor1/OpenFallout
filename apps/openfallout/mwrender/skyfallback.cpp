@@ -9,6 +9,9 @@
 #include <osg/Math>
 #include <osg/Vec3f>
 
+#include <components/misc/strings/algorithm.hpp>
+#include <components/sceneutil/texmat.hpp>
+
 namespace OFRender
 {
     namespace
@@ -131,33 +134,35 @@ namespace OFRender
         // The angle above the horizon of each ring, from the top, and the alpha it has in the mesh of Morrowind
         constexpr std::array<float, rings> elevations = { 70.f, 45.f, 25.f, 5.f };
         constexpr std::array<float, rings> alphas = { 1.f, 1.f, 0.25098f, 0.f };
-        // How many times the texture repeats from one side of the dome to the other
-        constexpr float repeats = 3.f;
+        // How many times the texture repeats along the distance of one radian, seen from the middle, straight above
+        constexpr float repeatsPerRadian = 1.5f;
+
+        // Like the mesh of Morrowind, the clouds are one flat disc over the viewer, not a dome: the rings are where
+        // the lines of sight at those angles meet the disc, and the farthest one is at the radius. The texture lies on
+        // the disc without distortion, so the view of it is in perspective, the clouds are squeezed together towards
+        // the horizon. (On a dome whose texture coordinates were the ones of the plane under it, a cloud near the
+        // horizon was drawn up to 11 times taller than wide, as streaks.)
+        const float height = radius * std::sin(osg::DegreesToRadians(elevations[rings - 1]));
 
         osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
         osg::ref_ptr<osg::Vec2Array> coordinates = new osg::Vec2Array;
         osg::ref_ptr<osg::Vec4Array> colours = new osg::Vec4Array;
 
-        const auto add = [&](const osg::Vec3f& direction, float alpha) {
-            vertices->push_back(direction * radius);
-            // Seen from above, a point of the dome is at its distance from the top in the plane, so that the clouds
-            // thin out towards the horizon like a layer of them would.
+        const auto add = [&](float distance, float angle, float alpha) {
+            const float x = distance * std::cos(angle);
+            const float y = distance * std::sin(angle);
+            vertices->push_back(osg::Vec3f(x, y, height));
             coordinates->push_back(
-                osg::Vec2f(0.5f + direction.x() * repeats / 2.f, 0.5f + direction.y() * repeats / 2.f));
+                osg::Vec2f(0.5f + x / height * repeatsPerRadian, 0.5f + y / height * repeatsPerRadian));
             colours->push_back(osg::Vec4f(0.f, 0.f, 0.f, alpha));
         };
 
-        add(osg::Vec3f(0.f, 0.f, 1.f), 1.f);
+        add(0.f, 0.f, 1.f);
         for (int ring = 0; ring < rings; ++ring)
         {
-            const float elevation = osg::DegreesToRadians(elevations[ring]);
+            const float distance = height / std::tan(osg::DegreesToRadians(elevations[ring]));
             for (int i = 0; i < segments; ++i)
-            {
-                const float angle = 2.f * osg::PIf * i / segments;
-                add(osg::Vec3f(std::cos(elevation) * std::cos(angle), std::cos(elevation) * std::sin(angle),
-                        std::sin(elevation)),
-                    alphas[ring]);
-            }
+                add(distance, 2.f * osg::PIf * i / segments, alphas[ring]);
         }
 
         osg::ref_ptr<osg::DrawElementsUShort> triangles = new osg::DrawElementsUShort(osg::PrimitiveSet::TRIANGLES);
@@ -192,6 +197,91 @@ namespace OFRender
         geometry->addPrimitiveSet(triangles);
         geometry->getOrCreateStateSet()->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
         return geometry;
+    }
+
+    osg::ref_ptr<osg::Geometry> createHorizonBand(float radius)
+    {
+        constexpr int segments = 48;
+        constexpr int rows = 4;
+        // The strip of the games is two bands in an image four times as wide as one band is tall. Round the sky it
+        // repeats four times, which puts it at a height of 22 degrees.
+        constexpr float topElevation = 22.f;
+        constexpr float repeatsAround = 4.f;
+
+        osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+        osg::ref_ptr<osg::Vec2Array> coordinates = new osg::Vec2Array;
+        osg::ref_ptr<osg::Vec4Array> colours = new osg::Vec4Array;
+        for (int row = 0; row <= rows; ++row)
+        {
+            const float fraction = static_cast<float>(row) / rows;
+            const float elevation = osg::DegreesToRadians(topElevation * fraction);
+            for (int i = 0; i <= segments; ++i)
+            {
+                const float turn = static_cast<float>(i) / segments;
+                const float angle = 2.f * osg::PIf * turn;
+                vertices->push_back(osg::Vec3f(std::cos(elevation) * std::cos(angle),
+                                        std::cos(elevation) * std::sin(angle), std::sin(elevation))
+                    * radius);
+                // The first band of the image has its top at the top of the band and its bottom at the horizon.
+                coordinates->push_back(osg::Vec2f(turn * repeatsAround, 0.5f * (1.f - fraction)));
+                colours->push_back(osg::Vec4f(0.f, 0.f, 0.f, 1.f));
+            }
+        }
+
+        osg::ref_ptr<osg::DrawElementsUShort> triangles = new osg::DrawElementsUShort(osg::PrimitiveSet::TRIANGLES);
+        for (int row = 0; row < rows; ++row)
+        {
+            for (int i = 0; i < segments; ++i)
+            {
+                const int low = row * (segments + 1) + i;
+                const int high = low + segments + 1;
+                triangles->push_back(low);
+                triangles->push_back(low + 1);
+                triangles->push_back(high);
+                triangles->push_back(low + 1);
+                triangles->push_back(high + 1);
+                triangles->push_back(high);
+            }
+        }
+
+        osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+        geometry->setName("Sky Horizon Clouds");
+        geometry->setVertexArray(vertices);
+        geometry->setTexCoordArray(0, coordinates, osg::Array::BIND_PER_VERTEX);
+        geometry->setColorArray(colours, osg::Array::BIND_PER_VERTEX);
+        geometry->addPrimitiveSet(triangles);
+        osg::StateSet* stateset = geometry->getOrCreateStateSet();
+        stateset->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
+        // The clouds of the layer drift along the texture, which is up the band here: this one stays where it is
+        SceneUtil::setupTexMatForStateSet(*stateset, 0, osg::Matrixf{});
+        return geometry;
+    }
+
+    bool isHorizonCloudTexture(std::string_view path)
+    {
+        const std::size_t slash = path.find_last_of("/\\");
+        const std::string_view file = slash == std::string_view::npos ? path : path.substr(slash + 1);
+        constexpr std::string_view word = "horizon";
+        for (std::size_t i = 0; i + word.size() <= file.size(); ++i)
+            if (Misc::StringUtils::ciEqual(file.substr(i, word.size()), word))
+                return true;
+        return false;
+    }
+
+    osg::ref_ptr<osg::Group> createCloudLayer(float radius)
+    {
+        osg::ref_ptr<osg::Group> layer = new osg::Group;
+        layer->addChild(createCloudDome(radius));
+        layer->addChild(createHorizonBand(radius));
+        selectCloudShape(*layer, {});
+        return layer;
+    }
+
+    void selectCloudShape(osg::Group& layer, std::string_view texture)
+    {
+        const bool horizon = isHorizonCloudTexture(texture);
+        layer.getChild(0)->setNodeMask(horizon ? 0u : ~0u);
+        layer.getChild(1)->setNodeMask(horizon ? ~0u : 0u);
     }
 
     osg::ref_ptr<osg::Geometry> createStarField(float radius, int count)

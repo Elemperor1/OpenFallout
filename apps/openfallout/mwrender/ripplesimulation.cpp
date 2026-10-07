@@ -20,6 +20,7 @@
 #include <components/sceneutil/material.hpp>
 
 #include "vismask.hpp"
+#include "waterframes.hpp"
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
@@ -28,26 +29,24 @@
 
 namespace
 {
-    void createWaterRippleStateSet(Resource::ResourceSystem* resourceSystem, osg::Node* node)
+    // Gives the ripples the frames of their texture. Returns false when the game has none (the games of Fallout do not
+    // have the textures of Morrowind's water), which would be drawn as magenta squares.
+    bool createWaterRippleStateSet(Resource::ResourceSystem* resourceSystem, osg::Node* node)
     {
-        int rippleFrameCount = Fallback::Map::getInt("Water_RippleFrameCount");
-        if (rippleFrameCount <= 0)
-            return;
-
-        std::string_view tex = Fallback::Map::getString("Water_RippleTexture");
+        const int rippleFrameCount = Fallback::Map::getInt("Water_RippleFrameCount");
 
         std::vector<osg::ref_ptr<osg::Texture2D>> textures;
-        for (int i = 0; i < rippleFrameCount; ++i)
+        for (const VFS::Path::Normalized& path : OFRender::findWaterFrames(
+                 *resourceSystem->getVFS(), Fallback::Map::getString("Water_RippleTexture"), rippleFrameCount))
         {
-            std::ostringstream texname;
-            texname << "textures/water/" << tex << std::setw(2) << std::setfill('0') << i << ".dds";
-            const VFS::Path::Normalized path(texname.str());
             osg::ref_ptr<osg::Texture2D> tex2(new osg::Texture2D(resourceSystem->getImageManager()->getImage(path)));
             tex2->setWrap(osg::Texture::WRAP_S, osg::Texture::REPEAT);
             tex2->setWrap(osg::Texture::WRAP_T, osg::Texture::REPEAT);
             resourceSystem->getSceneManager()->applyFilterSettings(tex2);
             textures.push_back(tex2);
         }
+        if (textures.empty())
+            return false;
 
         osg::ref_ptr<NifOsg::FlipController> controller(
             new NifOsg::FlipController(0, 0.3f / rippleFrameCount, textures));
@@ -78,6 +77,7 @@ namespace
         stateset->setAttributeAndModes(mat, osg::StateAttribute::ON);
 
         node->setStateSet(stateset);
+        return true;
     }
 
     int findOldestParticleAlive(const osgParticle::ParticleSystem* partsys)
@@ -129,7 +129,9 @@ namespace OFRender
         mParticleNode->addChild(mParticleSystem);
         mParticleNode->setNodeMask(Mask_Water);
 
-        createWaterRippleStateSet(resourceSystem, mParticleNode);
+        // Without a texture the ripples are not drawn, nothing of them would show but squares
+        if (!createWaterRippleStateSet(resourceSystem, mParticleNode))
+            mParticleNode->setNodeMask(0);
 
         resourceSystem->getSceneManager()->recreateShaders(mParticleNode);
 
