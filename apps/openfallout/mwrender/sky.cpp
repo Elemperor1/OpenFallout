@@ -453,6 +453,8 @@ namespace OFRender
                 if (image.get() == imageManager.getWarningImage())
                     image = nullptr;
             }
+            else
+                Log(Debug::Warning) << "The cloud texture " << texture << " of the weather is not in the game files";
         }
         if (!image)
             image = createTransparentImage();

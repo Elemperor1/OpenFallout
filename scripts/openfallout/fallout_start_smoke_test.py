@@ -107,12 +107,14 @@ LIGHTING_LINE = ("Cell lighting: ambient {}, directional {}, fog {}, fog range {
     plugin.FOG_NEAR, plugin.TEMPLATE_FOG_FAR))
 
 # What the engine logs about the weather it chose for the exterior cell, from the climate of the worldspace: the weather
-# record with its colours at day (and the sky at night) and the fog distances.
-WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, sunlight day {}, "
+# record with its colours at day (and the sky at night), the texture of its clouds (the fourth layer, the other three are
+# blank) and the fog distances.
+WEATHER_LINE = ("Weather: {}, sky day {} night {}, fog day {}, ambient day {}, sunlight day {}, clouds {}, "
                 "fog range {:.6f} to {:.6f} day, {:.6f} to {:.6f} night".format(
                     plugin.WEATHER_NAME, *(",".join(map(str, colour)) for colour in (
                         plugin.WEATHER_SKY[1], plugin.WEATHER_SKY[3], plugin.WEATHER_FOG[1], plugin.WEATHER_AMBIENT[1],
-                        plugin.WEATHER_SUNLIGHT[1])), *plugin.WEATHER_FOG_DAY, *plugin.WEATHER_FOG_NIGHT))
+                        plugin.WEATHER_SUNLIGHT[1])), plugin.CLOUD_TEXTURE, *plugin.WEATHER_FOG_DAY,
+                    *plugin.WEATHER_FOG_NIGHT))
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)

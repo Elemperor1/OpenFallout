@@ -80,7 +80,8 @@ namespace OFWorld
                              << " night " << rgb(weather.mSkyColor.getNightValue()) << ", fog day "
                              << rgb(weather.mFogColor.getDayValue()) << ", ambient day "
                              << rgb(weather.mAmbientColor.getDayValue()) << ", sunlight day "
-                             << rgb(weather.mSunColor.getDayValue())
+                             << rgb(weather.mSunColor.getDayValue()) << ", clouds "
+                             << (weather.mCloudTexture.empty() ? std::string("none") : weather.mCloudTexture)
                              << (weather.mHasFogRange ? ", fog range " + std::to_string(weather.mFogNear.getDayValue())
                                             + " to " + std::to_string(weather.mFogFar.getDayValue()) + " day, "
                                             + std::to_string(weather.mFogNear.getNightValue()) + " to "
@@ -270,8 +271,8 @@ namespace OFWorld
 
         mFromRecord = true;
         mName = record.mEditorId;
-        if (!record.mCloudTextures[0].empty())
-            mCloudTexture = record.mCloudTextures[0];
+        // No clouds is an empty name, not the texture of Morrowind's clear weather that this was made from
+        mCloudTexture = std::string(record.cloudTexture());
 
         mSkyColor = readColours(record, Type::SkyUpper);
         mFogColor = readColours(record, Type::Fog);
