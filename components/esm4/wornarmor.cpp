@@ -11,8 +11,10 @@ namespace ESM4
         // A list of lists that goes deeper than this, or a chain of templates that is longer, is a cycle or a mistake
         constexpr std::size_t maxListDepth = 8;
         constexpr std::size_t maxTemplateDepth = 16;
-        // A list that calculates for each item in its count is rolled once per item, up to this many times
-        constexpr int maxRollsPerEntry = 16;
+        // A list that calculates for each item in its count is rolled once per item. The counts of the real records are
+        // a few at most; this many rolls stop a corrupt count of billions from holding the game up, and a list with
+        // dozens of entries has given every one of them long before.
+        constexpr int maxRollsPerEntry = 4096;
 
         // splitmix64, which gives the same numbers on every platform
         class Random

@@ -345,6 +345,34 @@ namespace
         EXPECT_THAT(wornAcrossSeeds(source, npc, 5), UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001, 0x1002 }));
     }
 
+    TEST(ESM4WornArmorTest, rollsAListOnceForEachItemOfALargeCount)
+    {
+        // a hundred items of a list of a hundred pieces: with fewer rolls than that some piece would be missed
+        TestSource source;
+        std::vector<std::pair<int, std::uint32_t>> entries;
+        for (std::uint32_t piece = 0; piece < 100; ++piece)
+        {
+            source.addArmor(0x1001 + piece, upperBody);
+            entries.push_back({ 1, 0x1001 + piece });
+        }
+        ESM4::LevelledItem list{};
+        list.mId = id(0x2000);
+        list.mHasLvlItemFlags = true;
+        list.mLvlItemFlags = 0x02;
+        for (const auto& [level, item] : entries)
+            list.mLvlObject.push_back({ static_cast<std::int16_t>(level), 0, item, 1, 0 });
+        source.mLevelledItems[id(0x2000)] = list;
+        ESM4::Npc& npc = source.addNpc(0x3001, { 0x2000 });
+        npc.mInventory.back().count = 2000;
+
+        // (a character wears the first piece that covers a slot, but the armour it was given is all of them)
+        EXPECT_EQ(ESM4::wornArmor(source, npc, playerLevel, 1).size(), 100u);
+
+        // a count of billions is cut short
+        npc.mInventory.back().count = 4000000000u;
+        EXPECT_EQ(ESM4::wornArmor(source, npc, playerLevel, 1).size(), 100u);
+    }
+
     TEST(ESM4WornArmorTest, followsListsInLists)
     {
         TestSource source;
