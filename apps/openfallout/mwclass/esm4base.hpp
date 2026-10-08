@@ -28,6 +28,10 @@ namespace OFClass
             OFPhysics::PhysicsSystem& physics);
         OFGui::ToolTipInfo getToolTipInfo(std::string_view name, int count);
 
+        /// What chooses among the entries of the levelled lists that a placed actor depends on: the same actor gets the
+        /// same choices each time, and two actors of one base record do not necessarily get the same.
+        std::uint32_t actorSeed(const OFWorld::ConstPtr& ptr, ESM::FormId baseId);
+
         // We don't handle ESM4 player stats yet, so for resolving levelled object we use an arbitrary number.
         constexpr int sDefaultLevel = 5;
 

@@ -41,7 +41,8 @@ namespace
         EXPECT_EQ(ESM4::chooseLevelledEntries(entries, {}, 2, random, chosen), ESM4::LevelledOutcome::EmptyByLevel);
         ESM4::LevelledRules always;
         always.mChanceNone = 100;
-        EXPECT_EQ(ESM4::chooseLevelledEntries(entries, always, 9, random, chosen), ESM4::LevelledOutcome::EmptyByChance);
+        EXPECT_EQ(
+            ESM4::chooseLevelledEntries(entries, always, 9, random, chosen), ESM4::LevelledOutcome::EmptyByChance);
         EXPECT_TRUE(chosen.empty());
     }
 

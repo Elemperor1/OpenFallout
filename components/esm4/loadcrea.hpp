@@ -37,6 +37,7 @@
 
 #include "actor.hpp"
 #include "inventory.hpp"
+#include "objectbounds.hpp"
 
 namespace ESM4
 {
@@ -134,6 +135,8 @@ namespace ESM4
         std::string mBloodDecal;
 
         float mBoundRadius;
+        ObjectBounds mBounds; // OBND of Fallout 3 and New Vegas, the box of the creature in game units
+        bool mHasBounds = false;
         std::vector<std::string> mNif; // NIF filenames, get directory from mModel
         std::vector<std::string> mKf;
 

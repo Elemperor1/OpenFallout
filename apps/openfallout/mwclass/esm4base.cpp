@@ -32,6 +32,13 @@ namespace OFClass
         physics.addObject(ptr, VFS::Path::toNormalized(model), rotation, OFPhysics::CollisionType_World);
     }
 
+    std::uint32_t ESM4Impl::actorSeed(const OFWorld::ConstPtr& ptr, ESM::FormId baseId)
+    {
+        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
+        return (refNum.mIndex * 2654435761u + static_cast<std::uint32_t>(refNum.mContentFile))
+            ^ (baseId.mIndex * 40503u);
+    }
+
     OFGui::ToolTipInfo ESM4Impl::getToolTipInfo(std::string_view name, int count)
     {
         OFGui::ToolTipInfo info;

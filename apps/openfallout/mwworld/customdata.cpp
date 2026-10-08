@@ -90,4 +90,18 @@ namespace OFWorld
         error << "bad cast " << typeid(this).name() << " to ESM4NpcCustomData";
         throw std::logic_error(error.str());
     }
+
+    OFClass::ESM4CreatureCustomData& CustomData::asESM4CreatureCustomData()
+    {
+        std::stringstream error;
+        error << "bad cast " << typeid(this).name() << " to ESM4CreatureCustomData";
+        throw std::logic_error(error.str());
+    }
+
+    const OFClass::ESM4CreatureCustomData& CustomData::asESM4CreatureCustomData() const
+    {
+        std::stringstream error;
+        error << "bad cast " << typeid(this).name() << " to ESM4CreatureCustomData";
+        throw std::logic_error(error.str());
+    }
 }

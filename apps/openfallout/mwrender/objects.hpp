@@ -55,6 +55,8 @@ namespace OFRender
         void insertModel(const OFWorld::Ptr& ptr, const std::string& model, bool allowLight = true);
 
         void insertNPC(const OFWorld::Ptr& ptr);
+        /// A creature of Fallout 3 or New Vegas, with its body models and animations
+        void insertESM4Creature(const OFWorld::Ptr& ptr);
         void insertCreature(const OFWorld::Ptr& ptr, const std::string& model, bool weaponsShields);
 
         Animation* getAnimation(const OFWorld::Ptr& ptr);

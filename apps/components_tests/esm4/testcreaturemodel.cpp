@@ -292,7 +292,8 @@ namespace
 
         std::set<std::string> skeletons;
         for (std::uint32_t seed = 1; seed <= 64; ++seed)
-            skeletons.insert(ESM4::creatureModel(source, source.mCreatures.at(id(0x2001)), playerLevel, seed).mSkeleton);
+            skeletons.insert(
+                ESM4::creatureModel(source, source.mCreatures.at(id(0x2001)), playerLevel, seed).mSkeleton);
         EXPECT_THAT(skeletons, UnorderedElementsAre("creatures/b/skeleton.nif", "creatures/c/skeleton.nif"));
     }
 }

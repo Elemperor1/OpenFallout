@@ -58,6 +58,13 @@ namespace ESM4
     CreatureModel creatureModel(
         const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed);
 
+    // The same for a chain of templates that is known already
+    CreatureModel creatureModel(const std::vector<const Creature*>& chain);
+
+    // The first record of the chain that does not take the thing the flag names (one of Creature::TemplateFlags) from
+    // the next record, so that it is the record that has the thing. Null if every record of the chain takes it.
+    const Creature* creatureTemplateOwner(const std::vector<const Creature*>& chain, std::uint16_t flag);
+
     // The file `name` in the folder of `skeleton`, unless the name has a folder of its own:
     // "creatures\\gecko\\skeleton.nif" and "gecko.nif" make "creatures/gecko/gecko.nif". Slashes are forward in the
     // result.

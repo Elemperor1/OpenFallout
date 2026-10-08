@@ -158,9 +158,7 @@ namespace OFClass
     // characters of one base record are not necessarily dressed alike.
     static std::uint32_t equipmentSeed(const OFWorld::ConstPtr& ptr, const ESM4::Npc& base)
     {
-        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
-        return (refNum.mIndex * 2654435761u + static_cast<std::uint32_t>(refNum.mContentFile))
-            ^ (base.mId.mIndex * 40503u);
+        return ESM4Impl::actorSeed(ptr, base.mId);
     }
 
     class ESM4NpcCustomData : public OFWorld::TypedCustomData<ESM4NpcCustomData>

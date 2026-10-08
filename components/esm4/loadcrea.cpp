@@ -33,7 +33,7 @@
 #include <components/debug/debuglog.hpp>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
 
 bool ESM4::Creature::takesFromTemplate(std::uint16_t flag) const
 {
@@ -124,6 +124,15 @@ void ESM4::Creature::load(ESM4::Reader& reader)
             case ESM::fourCC("WNAM"):
                 reader.get(mFootWeight);
                 break;
+            case ESM::fourCC("OBND"): // FO3
+                if (subHdr.dataSize == sizeof(ObjectBounds))
+                {
+                    reader.get(mBounds);
+                    mHasBounds = true;
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("MODB"):
                 reader.get(mBoundRadius);
                 break;
@@ -166,7 +175,6 @@ void ESM4::Creature::load(ESM4::Reader& reader)
             case ESM::fourCC("MODT"):
             case ESM::fourCC("RNAM"):
             case ESM::fourCC("CSDT"):
-            case ESM::fourCC("OBND"): // FO3
             case ESM::fourCC("EAMT"): // FO3
             case ESM::fourCC("VTCK"): // FO3
             case ESM::fourCC("NAM4"): // FO3

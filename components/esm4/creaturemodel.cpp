@@ -55,21 +55,24 @@ namespace ESM4
         return chain;
     }
 
+    const Creature* creatureTemplateOwner(const std::vector<const Creature*>& chain, std::uint16_t flag)
+    {
+        for (const Creature* record : chain)
+            if (!record->takesFromTemplate(flag))
+                return record;
+        return nullptr;
+    }
+
     CreatureModel creatureModel(
         const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed)
     {
-        const std::vector<const Creature*> chain = creatureTemplateChain(source, creature, playerLevel, seed);
+        return creatureModel(creatureTemplateChain(source, creature, playerLevel, seed));
+    }
 
+    CreatureModel creatureModel(const std::vector<const Creature*>& chain)
+    {
         // The record that the flags leave the model with, else the first that has a skeleton
-        const Creature* owner = nullptr;
-        for (const Creature* record : chain)
-        {
-            if (!record->takesFromTemplate(Creature::Template_UseModel))
-            {
-                owner = record;
-                break;
-            }
-        }
+        const Creature* owner = creatureTemplateOwner(chain, Creature::Template_UseModel);
         if (owner == nullptr || !hasSkeleton(*owner))
         {
             const auto found

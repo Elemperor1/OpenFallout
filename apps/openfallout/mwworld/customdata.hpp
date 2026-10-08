@@ -6,6 +6,7 @@
 namespace OFClass
 {
     class CreatureCustomData;
+    class ESM4CreatureCustomData;
     class ESM4NpcCustomData;
     class NpcCustomData;
     class ContainerCustomData;
@@ -42,6 +43,9 @@ namespace OFWorld
 
         virtual OFClass::ESM4NpcCustomData& asESM4NpcCustomData();
         virtual const OFClass::ESM4NpcCustomData& asESM4NpcCustomData() const;
+
+        virtual OFClass::ESM4CreatureCustomData& asESM4CreatureCustomData();
+        virtual const OFClass::ESM4CreatureCustomData& asESM4CreatureCustomData() const;
     };
 
     template <class T>
