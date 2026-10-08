@@ -18,7 +18,7 @@ set(OPENFALLOUT_HEADERS
 source_group(apps/openfallout FILES main.cpp androidmain.cpp ${OPENFALLOUT_SOURCES} ${OPENFALLOUT_HEADERS} ${OPENFALLOUT_RESOURCES})
 
 add_openfallout_dir (mwrender
-    actors objects renderingmanager animation rotatecontroller sky skyutil skyfallback npcanimation esm4npcanimation falloutanimation falloutface vismask
+    actors objects renderingmanager animation rotatecontroller sky skyutil skyfallback npcanimation esm4npcanimation esm4creatureanimation falloutactoranimation falloutanimation falloutface vismask
     creatureanimation effectmanager util renderinginterface pathgrid rendermode weaponanimation screenshotmanager
     bulletdebugdraw globalmap characterpreview camera localmap water waterframes waterlook terrainstorage ripplesimulation
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
@@ -95,7 +95,7 @@ add_openfallout_dir (mwphysics
 add_openfallout_dir (mwclass
     classes activator creature npc weapon armor potion apparatus book clothing container door
     ingredient creaturelevlist itemlevlist light lockpick misc probe repair static actor bodypart
-    esm4base esm4npc light4
+    esm4base esm4creature esm4npc light4
     )
 
 add_openfallout_dir (mwmechanics

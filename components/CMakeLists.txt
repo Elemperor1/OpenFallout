@@ -348,6 +348,8 @@ add_component_dir (esm4
     survey
     typetraits
     vertex
+    creaturemodel
+    levelled
     wornarmor
     wornarmorcensus
 )

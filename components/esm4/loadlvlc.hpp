@@ -49,10 +49,10 @@ namespace ESM4
 
         ESM::FormId mScriptId;
         ESM::FormId mTemplate;
-        std::int8_t mChanceNone;
+        std::int8_t mChanceNone = 0;
 
-        bool mHasLvlCreaFlags;
-        std::uint8_t mLvlCreaFlags;
+        bool mHasLvlCreaFlags = false;
+        std::uint8_t mLvlCreaFlags = 0;
 
         std::vector<LVLO> mLvlObject;
 

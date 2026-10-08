@@ -59,7 +59,7 @@ namespace ESM4
 
     // The records that a character gets traits, inventory and the rest from, the character itself first and then its
     // template, the template of that, and so on. A levelled list of characters in the place of a template gives one of
-    // its characters, by the level of the record that names it. The seed is what chooses the character.
+    // its characters, by the level of the player. The seed is what chooses the character.
     std::vector<const Npc*> templateChain(const WornArmorSource& source, const Npc& npc, int playerLevel,
         std::uint32_t seed, WornArmorTrace* trace = nullptr);
 

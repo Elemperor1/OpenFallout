@@ -19,7 +19,11 @@ skinned to the left foot and the folder of the skeleton has an animation file th
 box finds where the animation put it: the file moves the foot with the control points of a B-spline, as most bones of
 the files of the games are driven, or with two keys under `--key-animation`; `--no-animation` leaves the file out, which
 must leave the foot where the skeleton has it)
-and, strafing west from
+and, from there, three creatures in view east of the person (one with a skeleton, body models and an idle animation of its own, one that takes its model from a levelled
+list of creatures that is its template, and a levelled list of creatures placed as it is, which the cell must turn into the creature that
+the list gives): a ray at what is drawn finds the body of each, and the box skinned to the foot of each where the
+animation put it, a ray at the actors finds the solid body that the box of the record makes, and the one that the list
+gives has the record of its entry; and, strafing west from
 there, at a wall that is not drawn (a mesh with only Havok collision: a ray at what is drawn goes through it, the player
 and a ray at the world stop at it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
 pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
@@ -233,6 +237,20 @@ MOVING_FOOT_FACES = {
 }
 MOVING_FOOT_TOLERANCE = 25.0
 
+# The creatures stand at CREATURE_POSITIONS from where the player starts. A ray from above finds the top of the body model
+# (a box, the first of the NIFZ list), a ray from the west at the height of the foot the box that is skinned to the foot
+# (moved by the animation like the one of the person), and a ray at the actors the solid body made of the box of the
+# record, a cylinder as wide as the smaller side of the box: from the east at half the height of the box it is hit
+# CREATURE_RADIUS short of the middle. The record of what it hits: the creature itself, the one that takes its model from
+# a template, and for the list the creature that the list gives.
+CREATURE_TOP = plugin.CREATURE_BODY_BOX[1][2] + plugin.CREATURE_BODY_BOX[0][2]
+_BOUNDS = plugin.CREATURE_BOUNDS
+CREATURE_RADIUS = min(_BOUNDS[3] - _BOUNDS[0], _BOUNDS[4] - _BOUNDS[1]) / 2.0
+CREATURE_BODY_HEIGHT = (_BOUNDS[2] + _BOUNDS[5]) / 2.0
+CREATURE_RECORDS = {"beast": plugin.CREATURE_ID, "user": plugin.CREATURE_USER_ID, "list": plugin.CREATURE_ID}
+CREATURE_ROW = ", ".join("{ '%s', %g, %g }" % (name, x, y) for name, (x, y) in plugin.CREATURE_POSITIONS.items())
+CREATURE_RAYS_FROM = 9.0
+
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
 
@@ -255,6 +273,10 @@ local I = require('openfallout.interfaces')
 local camera = require('openfallout.camera')
 local async = require('openfallout.async')
 
+local startPos = nil
+local creatureRaysDone = false
+local creatureFootRaysDone = false
+local creatures = { %s }
 local npcPos = nil
 local npcObject = nil
 local personMoving = false
@@ -275,6 +297,13 @@ local function look(name, from, to)
     end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
 end
 
+-- a ray at what is drawn, from and to points relative to where the player started
+local function lookAt(name, from, to)
+    nearby.asyncCastRenderingRay(async:callback(function(res)
+        log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
+    end), startPos + util.vector3(table.unpack(from)), startPos + util.vector3(table.unpack(to)))
+end
+
 -- a ray at the foot of the person where it is now (it is moved), which logs where it is when the ray has found its foot
 local function lookFoot(name)
     local pos = npcObject.position
@@ -288,6 +317,7 @@ return {
     engineHandlers = {
         onUpdate = function(dt)
             elapsed = elapsed + dt
+            if startPos == nil then startPos = self.position end
             if elapsed >= 3 then
                 I.Controls.overrideMovementControls(true)
                 self.controls.movement = elapsed < 8 and 1 or 0
@@ -360,14 +390,34 @@ return {
                     lookFoot(ray[1])
                 end
             end
+            -- the creatures, which are far from where the player walks: rays from above and at the actors, and, when the
+            -- player faces them, rays at the box that is skinned to the foot, which the animation has moved
+            if elapsed >= %.1f and not creatureRaysDone then
+                creatureRaysDone = true
+                for _, c in ipairs(creatures) do
+                    lookAt('creaturetop_' .. c[1], { c[2], c[3], 300 }, { c[2], c[3], 0 })
+                    local from = startPos + util.vector3(c[2] + 300, c[3], %g)
+                    local hit = nearby.castRay(from, from - util.vector3(600, 0, 0),
+                        { collisionType = nearby.COLLISION_TYPE.Actor, ignore = self.object })
+                    log('ray creature ' .. c[1] .. ' hit=', tostring(hit.hit), hit.hit and fmt(hit.hitPos) or '',
+                        hit.hitObject and tostring(hit.hitObject.recordId) or '')
+                end
+            end
+            if elapsed >= %.1f and not creatureFootRaysDone then
+                creatureFootRaysDone = true
+                for _, c in ipairs(creatures) do
+                    lookAt('creaturefoot_' .. c[1], { c[2] - 300, c[3], %g }, { c[2], c[3], %g })
+                end
+            end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (", ".join(map(str, FOOT_RAY[0])), ", ".join(map(str, FOOT_RAY[1])), int(WEST_FROM), TURN_FROM, TURN_FROM, TURN_FROM,
+""" % (CREATURE_ROW, ", ".join(map(str, FOOT_RAY[0])), ", ".join(map(str, FOOT_RAY[1])), int(WEST_FROM), TURN_FROM, TURN_FROM, TURN_FROM,
        TURN_FROM, TURN_FROM, *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, int(WEST_FROM) + 4,
        FOOT_RAY_FROM, FOOT_RAY_LUA, PERSON_MOVE_FROM, PERSON_MOVE_FROM + WALK_RAY_AFTER,
-       PERSON_MOVE_FROM + RUN_RAY_AFTER, PERSON_MOVE_FROM + STAND_RAY_AFTER, WALK_SECONDS)
+       PERSON_MOVE_FROM + RUN_RAY_AFTER, PERSON_MOVE_FROM + STAND_RAY_AFTER, CREATURE_RAYS_FROM,
+       CREATURE_BODY_HEIGHT, FOOT_RAY_FROM, FOOT_HEIGHT, FOOT_HEIGHT, WALK_SECONDS)
 
 # Moves the person that the player script names, east, in steps of a frame: teleporting it to where it would be at the
 # speed of walking and then of running (the speeds of the animation files, which the engine compares the speed of the
@@ -412,6 +462,7 @@ SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR
 RAY = re.compile(r"OFTEST\tray down hit=\t(\w+)\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
 RENDER_RAY = re.compile(r"OFTEST\trender ray (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 WATER_SIDE_RAY_LINE = re.compile(r"OFTEST\tray water side hit=\t(\w+)")
+CREATURE_ACTOR_RAY = re.compile(r"OFTEST\tray creature (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\t(.*)")
 PERSON_RAY = re.compile(r"OFTEST\tray person hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\t(.*)")
 WALL_RAY = re.compile(r"OFTEST\tray wall hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 WALL_RENDER_RAY = re.compile(r"OFTEST\trender ray wall hit=\t(\w+)")
@@ -636,6 +687,7 @@ def check(text, scenario, colours, animated=True):
     for line in text.splitlines():
         if re.search(r" [EW]\] .*(?:person_|Hair not found|Head part not found)", line):
             problems.append(line)
+    problems += check_creatures(text, scenario, found, animated)
     # The person is moved east, at the speed of walking, then running, and then stands: the engine takes the speed from
     # how fast it changes its place, and plays the animation of each, which put the foot in a place of their own. The
     # control run (--no-animation) has no animation files, so the foot stays where the skeleton has it.
@@ -677,6 +729,45 @@ def check(text, scenario, colours, animated=True):
                         "the water should have no sides")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_creatures(text, scenario, found, animated):
+    """The problems with the creatures: the body model of each is drawn, its foot is where the animation put it, it is
+    a solid body, and the one placed as a levelled list has the record of the entry of the list."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r" [EW]\] .*(?:body model of the creature|oftestbeast|OFTestBeast)", line):
+            problems.append(line)
+    actor_rays = {m.group(1): m for m in map(CREATURE_ACTOR_RAY.search, text.splitlines()) if m}
+    for name, (x, y) in plugin.CREATURE_POSITIONS.items():
+        creature_x, creature_y = scenario.origin[0] + x, scenario.origin[1] + y
+        top = found.get(f"creaturetop_{name}")
+        if top is None:
+            problems.append(f"the script did not log the ray from above at what is drawn of the creature '{name}'")
+        elif top.group(2) != "true" or abs(float(top.group(5)) - CREATURE_TOP) > 1.5:
+            problems.append(f"the ray from above at the creature '{name}' should hit the top of its body at "
+                            f"{CREATURE_TOP:.1f}: {top.group(0)}")
+        elif abs(float(top.group(3)) - creature_x) > 1.5 or abs(float(top.group(4)) - creature_y) > 1.5:
+            problems.append(f"the ray from above at the creature '{name}' hit it somewhere else than where it stands "
+                            f"({creature_x:.0f},{creature_y:.0f}): {top.group(0)}")
+        foot = found.get(f"creaturefoot_{name}")
+        want = creature_x + (FOOT_PLAYED_FACE if animated else FOOT_REST_FACE)
+        if foot is None:
+            problems.append(f"the script did not log the ray at the foot of the creature '{name}'")
+        elif foot.group(2) != "true" or abs(float(foot.group(3)) - want) > 1.5:
+            problems.append(f"the ray at the foot of the creature '{name}' should hit the box that is skinned to it at "
+                            f"x={want:.1f}: {foot.group(0)}")
+        actor = actor_rays.get(name)
+        if actor is None:
+            problems.append(f"the script did not log the ray at the actors for the creature '{name}'")
+            continue
+        form_id = re.search(r"0x([0-9a-f]+)", actor.group(6), re.I)
+        if (actor.group(2) != "true" or abs(float(actor.group(3)) - (creature_x + CREATURE_RADIUS)) > 5.0
+                or not form_id or int(form_id.group(1), 16) & 0xFFFFFF != CREATURE_RECORDS[name]):
+            problems.append(f"the ray at the actors from the east at the creature '{name}' should hit its body at "
+                            f"x={creature_x + CREATURE_RADIUS:.0f} and find the record {CREATURE_RECORDS[name]:#x}: "
+                            f"{actor.group(0)}")
     return problems
 
 

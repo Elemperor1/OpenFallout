@@ -42,6 +42,7 @@
 #include <components/esm3/objectstate.hpp>
 #include <components/esm3/readerscache.hpp>
 
+#include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadacti.hpp>
 #include <components/esm4/loadalch.hpp>
@@ -58,6 +59,8 @@
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadligh.hpp>
+#include <components/esm4/loadlvlc.hpp>
+#include <components/esm4/loadlvln.hpp>
 #include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadmstt.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -794,6 +797,53 @@ namespace OFWorld
         }
     }
 
+    namespace
+    {
+        // The level of the player that the levelled lists of a placed actor are resolved for: there is no player with a
+        // level yet, so it is the one that the classes of the actors assume as well
+        constexpr int sPlacedActorLevel = 5;
+
+        /// The creature or character that a levelled list (LVLC, LVLN) in the place of the base of an actor gives, by
+        /// the dice of the reference so that the same actor stands there each time. Zero when the list gives nothing.
+        ESM::FormId resolvePlacedActor(
+            const OFWorld::ESMStore& store, ESM::RecNameInts listType, const ESM4::ActorCharacter& ref)
+        {
+            ESM4::LevelledRandom random(
+                ref.mId.mIndex * 2654435761ull + static_cast<std::uint64_t>(ref.mId.mContentFile));
+            if (listType == ESM::REC_LVLC4)
+            {
+                const ESM4::Creature* creature = ESM4::resolveLevelledRecord<ESM4::Creature>(
+                    [&store](ESM::FormId id) { return store.get<ESM4::Creature>().search(id); },
+                    [&store](ESM::FormId id) { return store.get<ESM4::LevelledCreature>().search(id); }, ref.mBaseObj,
+                    sPlacedActorLevel, random);
+                return creature == nullptr ? ESM::FormId() : creature->mId;
+            }
+            const ESM4::Npc* npc = ESM4::resolveLevelledRecord<ESM4::Npc>(
+                [&store](ESM::FormId id) { return store.get<ESM4::Npc>().search(id); },
+                [&store](ESM::FormId id) { return store.get<ESM4::LevelledNpc>().search(id); }, ref.mBaseObj,
+                sPlacedActorLevel, random);
+            return npc == nullptr ? ESM::FormId() : npc->mId;
+        }
+
+        /// The base record that a placed actor stands for: its own, or the creature or character that the levelled list
+        /// in its place gives. False when a list gives nothing, so that no actor stands there. The type is the one of
+        /// the record in `base`. The same choice is made each time, so the ids a cell lists are those of the actors it
+        /// loads.
+        bool placedActorBase(
+            const OFWorld::ESMStore& store, const ESM4::ActorCharacter& ref, ESM::FormId& base, ESM::RecNameInts& type)
+        {
+            base = ref.mBaseObj;
+            type = static_cast<ESM::RecNameInts>(store.find(base));
+            if (type != ESM::REC_LVLC4 && type != ESM::REC_LVLN4)
+                return true;
+            base = resolvePlacedActor(store, type, ref);
+            if (base.isZeroOrUnset())
+                return false;
+            type = static_cast<ESM::RecNameInts>(store.find(base));
+            return true;
+        }
+    }
+
     template <typename ReferenceInvocable>
     static void visitCell4References(
         const ESM4::Cell& cell, const ESMStore& esmStore, ESM::ReadersCache& readers, ReferenceInvocable&& invocable)
@@ -815,8 +865,14 @@ namespace OFWorld
     void CellStore::listRefs(const ESM4::Cell& cell)
     {
         visitCell4References(cell, mStore, mReaders, [&](const ESM4::Reference& ref) { mIds.push_back(ref.mBaseObj); });
-        visitCell4ActorReferences(
-            cell, mStore, mReaders, [&](const ESM4::ActorCharacter& ref) { mIds.push_back(ref.mBaseObj); });
+        // A levelled list in the place of the base of an actor is listed as the actor it gives, which is the id of the
+        // reference when it is loaded
+        visitCell4ActorReferences(cell, mStore, mReaders, [&](const ESM4::ActorCharacter& ref) {
+            ESM::FormId base;
+            ESM::RecNameInts type;
+            if (placedActorBase(mStore, ref, base, type))
+                mIds.push_back(base);
+        });
     }
 
     void CellStore::listRefs()
@@ -934,10 +990,23 @@ namespace OFWorld
         });
     }
 
-    void CellStore::loadRef(const ESM4::ActorCharacter& ref)
+    void CellStore::loadRef(const ESM4::ActorCharacter& placed)
     {
         const OFWorld::ESMStore& store = mStore;
-        ESM::RecNameInts foundType = static_cast<ESM::RecNameInts>(store.find(ref.mBaseObj));
+
+        // A creature or character may be placed as a levelled list, which stands for one of its entries
+        ESM::FormId base;
+        ESM::RecNameInts foundType;
+        if (!placedActorBase(store, placed, base, foundType))
+            return;
+        ESM4::ActorCharacter resolved;
+        const bool isList = base != placed.mBaseObj;
+        if (isList)
+        {
+            resolved = placed;
+            resolved.mBaseObj = base;
+        }
+        const ESM4::ActorCharacter& ref = isList ? resolved : placed;
 
         Misc::tupleForEach(this->mCellStoreImp->mRefLists, [&ref, &store, foundType](auto& x) {
             recNameSwitcher(x, foundType, [&ref, &store](auto& storeIn) { storeIn.load(ref, store); });

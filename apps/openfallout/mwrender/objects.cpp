@@ -13,6 +13,7 @@
 
 #include "animation.hpp"
 #include "creatureanimation.hpp"
+#include "esm4creatureanimation.hpp"
 #include "esm4npcanimation.hpp"
 #include "npcanimation.hpp"
 #include "vismask.hpp"
@@ -136,6 +137,16 @@ namespace OFRender
                 ptr.getClass().getInventoryStore(ptr).setContListener(anim.get());
             }
         }
+    }
+
+    void Objects::insertESM4Creature(const OFWorld::Ptr& ptr)
+    {
+        insertBegin(ptr);
+        ptr.getRefData().getBaseNode()->setNodeMask(Mask_Actor);
+
+        osg::ref_ptr<ESM4CreatureAnimation> anim(
+            new ESM4CreatureAnimation(ptr, osg::ref_ptr<osg::Group>(ptr.getRefData().getBaseNode()), mResourceSystem));
+        mObjects.emplace(ptr.mRef, anim);
     }
 
     bool Objects::removeObject(const OFWorld::Ptr& ptr)

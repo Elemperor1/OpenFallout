@@ -65,7 +65,16 @@ WALL_REF_ID = 0x81C
 EXTERIOR_WALL_REF_ID = 0x81D
 TEXTURE_SET_ID = 0x81E
 LAND_TEXTURE_ID = 0x81F
-LAST_ID = LAND_TEXTURE_ID # the largest form ID of the plugin, which the next object ID of its header follows
+CREATURE_ID = 0x820
+CREATURE_USER_ID = 0x821
+CREATURE_LIST_ID = 0x822
+CREATURE_REF_ID = 0x823
+CREATURE_USER_REF_ID = 0x824
+CREATURE_LIST_REF_ID = 0x825
+EXTERIOR_CREATURE_REF_ID = 0x826
+EXTERIOR_CREATURE_USER_REF_ID = 0x827
+EXTERIOR_CREATURE_LIST_REF_ID = 0x828
+LAST_ID = EXTERIOR_CREATURE_LIST_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -97,6 +106,24 @@ LOCOMOTION_SECONDS = 0.2
 # Where the foot is when the skeleton is at rest: the bones hang from each other (BONES in placeholder_skeleton.py), the
 # pelvis 64 units up, the thigh 8 to the left and 4 down from it, and the calf and the foot 26 down each.
 FOOT_REST = (-8.0, 0.0, 8.0)
+# Three creatures stand east of the person, in view when the player faces east at the end of the walk west: a creature
+# with a skeleton, body models (NIFZ) and an idle animation of its own (in the folder `creatures/oftestbeast`, with the
+# same body as the person has: a box above the ground and the small box skinned to the left foot), one that takes its model
+# and its name from a template that is a levelled list of creatures (which has the first one at level 1), and a levelled
+# list of creatures placed as it is, the way the games place the creatures that appear by chance. The creatures stand
+# at CREATURE_POSITIONS, east and north of where the player starts. The body of the first is a box of CREATURE_BOUNDS
+# in its record.
+CREATURE_NAME = "OFTestBeast"
+CREATURE_FOLDER = "creatures\\oftestbeast\\"
+CREATURE_SKELETON = CREATURE_FOLDER + "skeleton.nif"
+CREATURE_IDLE = CREATURE_FOLDER + "mtidle.kf"
+CREATURE_BODY = "body.osgt"  # bare names, as NIFZ lists them: the files are in the folder of the skeleton
+CREATURE_FOOT = "foot.nif"
+CREATURE_BODY_BOX = ((30.0, 15.0, 15.0), (0.0, 0.0, 60.0))
+CREATURE_BOUNDS = (-30, -15, 0, 30, 15, 80)
+CREATURE_POSITIONS = {"beast": (450.0, 140.0), "user": (450.0, 540.0), "list": (800.0, 340.0)}
+# The flags of ACBS that take the model and the name from the template
+CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
@@ -410,6 +437,47 @@ def head_morphs():
     return data
 
 
+def creature_folder_file(name):
+    """The path of a file in the folder of the creature, as a record names it (under meshes)."""
+    return CREATURE_FOLDER + name
+
+
+def creature(form_id, name, subs, level=1, template_flags=0):
+    """A CREA record of Fallout 3 with the ACBS that the loader reads (24 bytes, template flags last)."""
+    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, level, 1, 1, 100, 0.0, 0, template_flags)
+    return record(b"CREA", form_id, [zstr(b"EDID", name), sub(b"ACBS", acbs), *subs])
+
+
+def creatures():
+    """The creature with a model of its own, the one that takes the model from a levelled list, and the list."""
+    beast = creature(CREATURE_ID, CREATURE_NAME, [
+        zstr(b"FULL", "OpenFallout Test Beast"), zstr(b"MODL", CREATURE_SKELETON),
+        sub(b"NIFZ", CREATURE_BODY.encode("ascii") + b"\0" + CREATURE_FOOT.encode("ascii") + b"\0"),
+        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS))])
+    # the record of one that takes its model, and with it its name, from the template and keeps nothing of its own
+    user = creature(CREATURE_USER_ID, CREATURE_NAME + "User", [
+        zstr(b"FULL", "Not Shown"), sub(b"TPLT", struct.pack("<I", CREATURE_LIST_ID))],
+        template_flags=CREATURE_TEMPLATE_FLAGS)
+    # LVLD (the chance of nothing), LVLF (the flags) and one LVLO (level 1, the creature, a count of 1)
+    levelled = record(b"LVLC", CREATURE_LIST_ID, [
+        zstr(b"EDID", CREATURE_NAME + "List"), sub(b"LVLD", b"\x00"), sub(b"LVLF", b"\x00"),
+        sub(b"LVLO", struct.pack("<hHIhH", 1, 0, CREATURE_ID, 1, 0))])
+    return beast, user, levelled
+
+
+def acre(form_id, base, position):
+    """A placed creature: the base record (a creature or a levelled list) and where it stands."""
+    return record(b"ACRE", form_id, [sub(b"NAME", struct.pack("<I", base)),
+                                     sub(b"DATA", struct.pack("<6f", *position, 0.0, 0.0, 0.0))])
+
+
+def placed_creatures(origin, ids):
+    """The three placed creatures of a cell, whose origin is where the player starts in it."""
+    bases = {"beast": CREATURE_ID, "user": CREATURE_USER_ID, "list": CREATURE_LIST_ID}
+    return [acre(ids[name], bases[name], (origin[0] + x, origin[1] + y, 0.0))
+            for name, (x, y) in CREATURE_POSITIONS.items()]
+
+
 def achr(form_id, position):
     """A placed character: the base record and where it stands."""
     return record(b"ACHR", form_id, [sub(b"NAME", struct.pack("<I", NPC_ID)),
@@ -443,6 +511,8 @@ def worldspace():
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
         achr(EXTERIOR_NPC_REF_ID, (half + NPC_DISTANCE, half + NPC_DEPTH, 0.0)),
         refr(EXTERIOR_WALL_REF_ID, WALL_ID, (half - WALL_DISTANCE, half + NPC_DEPTH, 0.0)),
+        *placed_creatures((half, half), {"beast": EXTERIOR_CREATURE_REF_ID, "user": EXTERIOR_CREATURE_USER_REF_ID,
+                                         "list": EXTERIOR_CREATURE_LIST_REF_ID}),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
     water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
@@ -480,6 +550,8 @@ def plugin():
         refr(MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
+        *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
+                                      "list": CREATURE_LIST_REF_ID}),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -490,7 +562,8 @@ def plugin():
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
-            + top_group(b"NPC_", [person()])
+            + top_group(b"NPC_", [person()]) + top_group(b"CREA", list(creatures()[:2]))
+            + top_group(b"LVLC", [creatures()[2]])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
 
@@ -552,7 +625,14 @@ def write(out, animation=True, spline=True):
     skeleton.write_bytes(placeholder_skeleton.skeleton())
     (out / "meshes" / Path(FOOT_PART.replace("\\", "/"))).write_bytes(
         skinned_box.skinned_box(FOOT_BONE, FOOT_REST, FOOT_REST, FOOT_MARKER))
+    creature_folder = out / "meshes" / Path(CREATURE_FOLDER.replace("\\", "/"))
+    creature_folder.mkdir(parents=True, exist_ok=True)
+    (creature_folder / "skeleton.nif").write_bytes(placeholder_skeleton.skeleton())
+    (creature_folder / CREATURE_BODY).write_text(box_mesh(*CREATURE_BODY_BOX), encoding="ascii")
+    (creature_folder / CREATURE_FOOT).write_bytes(skinned_box.skinned_box(FOOT_BONE, FOOT_REST, FOOT_REST, FOOT_MARKER))
     if animation:
+        (creature_folder / "mtidle.kf").write_bytes(
+            idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE, spline=spline))
         (out / "meshes" / Path(IDLE_ANIMATION.replace("\\", "/"))).write_bytes(
             idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE, spline=spline))
         for path, name, move, velocity in ((WALK_ANIMATION, "MTForward", WALK_MOVE, WALK_VELOCITY),

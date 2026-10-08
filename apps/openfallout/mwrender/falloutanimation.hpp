@@ -29,7 +29,11 @@ namespace OFRender
     /// of the skeleton of a character (lower case, as the virtual file system lists them, files of folders below that
     /// one included). They are in the folder `locomotion` below that of the skeleton or in one below it: a folder named
     /// for the sex of the character comes first, then `locomotion` itself, then any other, except those named for
-    /// children and for the hurt, which hold the movements of those. Empty for a file that is not there.
+    /// children and for the hurt, which hold the movements of those. Some creatures name the movements otherwise:
+    /// when the usual file is not there, the walk is `mtfoward` (a misspelling in the files of the deathclaw),
+    /// `forwardwalk`, `forward` or `h2hforward`, the run `fastforward` or `h2hfastforward`, and when none of those is
+    /// there, the first file whose name has "forward" in it (and "fast" in it for the run, and not "fast", "run" or
+    /// "sprint" for the walk). Empty for a file that is not there.
     FalloutLocomotion chooseFalloutLocomotion(
         std::string_view folder, const std::vector<std::string>& files, bool female);
 
