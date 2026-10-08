@@ -40,8 +40,9 @@ namespace ESM4
     std::size_t applyFaceMorphs(const FaceMorphs& morphs, const std::vector<float>& symmetric,
         const std::vector<float>& asymmetric, float* positions, std::size_t vertexCount, std::size_t first = 0);
 
-    // The .egm file that goes with a model ("meshes/characters/head/headhuman.nif" has
-    // "meshes/characters/head/headhuman.egm"), empty if the model is not a .nif file
+    // The .egm file that goes with a model: the same file name with the extension .egm
+    // ("meshes/characters/head/headhuman.nif" has "meshes/characters/head/headhuman.egm"). Empty if the file name has
+    // no extension.
     std::string faceMorphPath(std::string_view modelPath);
 
     // The textures that the editor wrote for single characters, under textures/characters/facemods/<plugin>/ (the skin

@@ -138,10 +138,10 @@ namespace
     TEST(ESM4FaceGenTest, namesTheMorphFileOfAModel)
     {
         EXPECT_EQ(ESM4::faceMorphPath("meshes/characters/head/headhuman.nif"), "meshes/characters/head/headhuman.egm");
-        EXPECT_EQ(ESM4::faceMorphPath("Meshes\\Characters\\Hair\\Hair01.NIF").size(),
-            std::string("Meshes\\Characters\\Hair\\Hair01.egm").size());
         EXPECT_EQ(ESM4::faceMorphPath("Meshes\\Characters\\Hair\\Hair01.NIF"), "Meshes\\Characters\\Hair\\Hair01.egm");
-        EXPECT_EQ(ESM4::faceMorphPath("meshes/a.kf"), "");
+        EXPECT_EQ(ESM4::faceMorphPath("meshes/a.b/hair"), "");
+        EXPECT_EQ(ESM4::faceMorphPath("meshes/head"), "");
+        EXPECT_EQ(ESM4::faceMorphPath("meshes/.nif"), "");
         EXPECT_EQ(ESM4::faceMorphPath(".nif"), "");
         EXPECT_EQ(ESM4::faceMorphPath(""), "");
     }

@@ -220,7 +220,7 @@ FOOT_PLAYED_FACE = FOOT_REST_FACE + plugin.FOOT_MOVE
 BODY_RAYS = {
     "east": ((100, 0, 50), (-100, 0, 50), 0, person_face("suit", 0, +1)),
     "west": ((-100, 0, 50), (100, 0, 50), 0, person_face("lefthand", 0, -1)),
-    "head": ((100, 0, 118), (-100, 0, 118), 0, person_face("head", 0, +1)),
+    "head": ((100, 0, 118), (-100, 0, 118), 0, person_face("head", 0, +1) + plugin.FACE_SHIFT),
     "top": ((0, 0, 300), (0, 0, 0), 2, person_face("hair", 2, +1)),
 }
 FOOT_RAY = ((-300, 0, FOOT_HEIGHT), (0, 0, FOOT_HEIGHT), 0, FOOT_PLAYED_FACE)

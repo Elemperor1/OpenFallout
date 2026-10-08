@@ -130,11 +130,12 @@ namespace ESM4
 
     std::string faceMorphPath(std::string_view modelPath)
     {
-        constexpr std::string_view extension = ".nif";
-        if (modelPath.size() <= extension.size()
-            || !Misc::StringUtils::ciEqual(modelPath.substr(modelPath.size() - extension.size()), extension))
+        // The extension is the part of the file name after its last dot
+        const std::size_t separator = modelPath.find_last_of("/\\");
+        const std::size_t dot = modelPath.find_last_of('.');
+        if (dot == std::string_view::npos || dot == 0 || (separator != std::string_view::npos && dot < separator + 2))
             return {};
-        std::string result(modelPath.substr(0, modelPath.size() - extension.size()));
+        std::string result(modelPath.substr(0, dot));
         result += ".egm";
         return result;
     }

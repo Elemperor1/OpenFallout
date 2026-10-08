@@ -1,6 +1,7 @@
 #include "esm4npcanimation.hpp"
 
 #include <algorithm>
+#include <filesystem>
 
 #include <osg/Vec2f>
 
@@ -14,20 +15,26 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/resourcehelpers.hpp>
+#include <components/misc/strings/algorithm.hpp>
+#include <components/misc/strings/lower.hpp>
+#include <components/resource/imagemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/nodecallback.hpp>
 #include <components/sceneutil/skeleton.hpp>
 #include <components/vfs/manager.hpp>
+#include <components/vfs/pathutil.hpp>
 #include <components/vfs/recursivedirectoryiterator.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/world.hpp"
 #include "../mwclass/esm4npc.hpp"
 #include "../mwmechanics/character.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/refdata.hpp"
 
 #include "blendmask.hpp"
+#include "falloutface.hpp"
 
 namespace OFRender
 {
@@ -217,10 +224,10 @@ namespace OFRender
             updatePartsTES5(*traits);
     }
 
-    void ESM4NpcAnimation::insertPart(std::string_view model)
+    osg::ref_ptr<osg::Node> ESM4NpcAnimation::insertPart(std::string_view model)
     {
         if (model.empty())
-            return;
+            return nullptr;
         osg::ref_ptr<osg::Node> part = mResourceSystem->getSceneManager()->getInstance(
             Misc::ResourceHelpers::correctMeshPath(VFS::Path::Normalized(model)), mObjectRoot.get());
 
@@ -238,7 +245,44 @@ namespace OFRender
             for (unsigned int i = 0; i < skeleton->getNumChildren(); ++i)
                 group->addChild(skeleton->getChild(i));
             mObjectRoot->replaceChild(skeleton, group);
+            part = group;
         }
+        return part;
+    }
+
+    void ESM4NpcAnimation::shapeFalloutPart(
+        osg::Node& part, std::string_view model, const ESM4::Npc& traits, bool isHead, bool isBody)
+    {
+        // The shape: the morphs of the file beside the model, moved by the coefficients of the character
+        if (!traits.mSymShapeModeCoefficients.empty() || !traits.mAsymShapeModeCoefficients.empty())
+        {
+            const std::shared_ptr<const ESM4::FaceMorphs> morphs = getFaceMorphs(*mResourceSystem->getVFS(), model);
+            if (morphs != nullptr
+                && morphFaceMeshes(part, *morphs, traits.mSymShapeModeCoefficients, traits.mAsymShapeModeCoefficients)
+                    == 0)
+                Log(Debug::Verbose) << "FaceGen: the meshes of " << model << " do not have the " << morphs->mVertexCount
+                                    << " vertices of its morph file";
+        }
+
+        // The skin: a texture that the editor wrote for the character, of the plugin that made the character
+        if (!isHead && !isBody)
+            return;
+        const std::vector<std::string>& contentFiles = OFBase::Environment::get().getWorld()->getContentFiles();
+        std::string plugin;
+        if (traits.mId.mContentFile >= 0 && static_cast<std::size_t>(traits.mId.mContentFile) < contentFiles.size())
+            plugin = Misc::StringUtils::lowerCase(
+                std::filesystem::path(contentFiles[traits.mId.mContentFile]).stem().string());
+        const ESM4::FaceTextureIndex& textures = getFaceTextures(*mResourceSystem->getVFS());
+        const ESM4::FaceTextureIndex::Kind kind = isHead ? ESM4::FaceTextureIndex::Kind::Face
+            : OFClass::ESM4Npc::isFemale(mPtr)           ? ESM4::FaceTextureIndex::Kind::BodyFemale
+                                                         : ESM4::FaceTextureIndex::Kind::BodyMale;
+        const std::string* path = textures.find(kind, plugin, traits.mId.mIndex);
+        if (path == nullptr)
+            return;
+        const osg::ref_ptr<osg::Image> image
+            = mResourceSystem->getImageManager()->getImage(VFS::Path::Normalized(*path));
+        if (replaceDiffuseMap(part, image) == 0)
+            Log(Debug::Verbose) << "FaceGen: " << model << " has no diffuse map to give " << *path;
     }
 
     void ESM4NpcAnimation::updatePartsFallout(const ESM4::Npc& traits)
@@ -265,9 +309,18 @@ namespace OFRender
               });
 
         // The body parts are skinned to the bones of the skeleton and need no placing, unlike those of Oblivion
-        for (const std::string& model : OFClass::falloutNpcModels(
-                 *race, OFClass::ESM4Npc::isFemale(mPtr), hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr)))
-            insertPart(model);
+        const bool isFemale = OFClass::ESM4Npc::isFemale(mPtr);
+        const std::string headModel = OFClass::falloutHeadModel(*race, isFemale);
+        const std::string bodyModel = OFClass::falloutBodyModel(*race, isFemale);
+        for (const std::string& model :
+            OFClass::falloutNpcModels(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr)))
+        {
+            const osg::ref_ptr<osg::Node> part = insertPart(model);
+            if (part != nullptr)
+                shapeFalloutPart(*part, model, traits,
+                    !headModel.empty() && Misc::StringUtils::ciEqual(model, headModel),
+                    !bodyModel.empty() && Misc::StringUtils::ciEqual(model, bodyModel));
+        }
     }
 
     template <class Record>

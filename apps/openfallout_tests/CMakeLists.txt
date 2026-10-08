@@ -29,6 +29,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwlua/testobjectcache.cpp
 
     mwrender/testfalloutanimation.cpp
+    mwrender/testfalloutface.cpp
     mwrender/testfogmanager.cpp
     mwrender/testskyfallback.cpp
     mwrender/testwaterlook.cpp

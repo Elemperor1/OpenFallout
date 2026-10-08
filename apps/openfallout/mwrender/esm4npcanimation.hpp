@@ -39,7 +39,14 @@ namespace OFRender
         void updateGait(float duration);
         void setGait(FalloutGait gait);
 
-        void insertPart(std::string_view model);
+        /// Adds a model to the character and returns the node that it is, null when there is no model
+        osg::ref_ptr<osg::Node> insertPart(std::string_view model);
+
+        /// Gives a part of a Fallout character the face that its record asks for: the shape of the morph file beside
+        /// the model (the coefficients FGGS and FGGA), and the texture of the face or of the body that the editor wrote
+        /// for the character, if there is one
+        void shapeFalloutPart(
+            osg::Node& part, std::string_view model, const ESM4::Npc& traits, bool isHead, bool isBody);
 
         // Works for FO3/FONV/TES5
         void insertHeadParts(const std::vector<ESM::FormId>& partIds, std::set<uint32_t>& usedHeadPartTypes);
