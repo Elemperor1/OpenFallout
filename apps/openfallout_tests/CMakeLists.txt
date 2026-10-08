@@ -28,6 +28,8 @@ file(GLOB UNITTEST_SRC_FILES
 
     mwlua/testobjectcache.cpp
 
+    mwmechanics/testfalloutpackages.cpp
+
     mwrender/testfalloutanimation.cpp
     mwrender/testfalloutface.cpp
     mwrender/testfogmanager.cpp
