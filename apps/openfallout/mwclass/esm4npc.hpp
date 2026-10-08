@@ -49,6 +49,14 @@ namespace OFClass
     std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
         const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor);
 
+    /// The model of the head of the race for the sex (the first part of the head, as opposed to the ears, mouth, teeth,
+    /// tongue and eyes), as the race names it; empty when it names none. The face texture of a character belongs to it.
+    std::string falloutHeadModel(const ESM4::Race& race, bool isFemale);
+
+    /// The model of the upper body of the race for the sex, as the race names it; empty when it names none. The body
+    /// texture of a character belongs to it.
+    std::string falloutBodyModel(const ESM4::Race& race, bool isFemale);
+
     class ESM4Npc final : public OFWorld::RegisteredClass<ESM4Npc>
     {
     public:

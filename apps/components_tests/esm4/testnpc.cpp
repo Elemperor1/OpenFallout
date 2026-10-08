@@ -73,6 +73,40 @@ namespace
         return subRecord("ACBS", data);
     }
 
+    TEST(ESM4NpcTest, knowsTheContentFileItWasReadFromApartFromTheOneThatMadeIt)
+    {
+        // the plugin with the load order index 5 changes a character of its master, which has the index 2
+        std::string hedr;
+        append<float>(hedr, 0.8f);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+        const std::string plugin
+            = record("TES4", 0,
+                  subRecord("HEDR", hedr) + zString("MAST", "base.esm") + valueSubRecord<std::uint64_t>("DATA", 0))
+            + topGroup("NPC_",
+                record("NPC_", 0x801, zString("EDID", "Npc")) + record("NPC_", 0x01000802, zString("EDID", "Own")));
+
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "patch.esp", nullptr, nullptr);
+        reader.setModIndex(5);
+        reader.updateModIndices({ { "base.esm", 2 } });
+        std::vector<ESM4::Npc> npcs;
+        ESM4::ReaderUtils::readAll(
+            reader,
+            [&](ESM4::Reader& r) {
+                r.getRecordData();
+                npcs.emplace_back().load(r);
+                return true;
+            },
+            [](ESM4::Reader&) {});
+
+        ASSERT_EQ(npcs.size(), 2u);
+        EXPECT_EQ(npcs[0].mId.mContentFile, 2);
+        EXPECT_EQ(npcs[0].mSourceFile, 5);
+        // a character of the plugin itself has the plugin as both
+        EXPECT_EQ(npcs[1].mId.mContentFile, 5);
+        EXPECT_EQ(npcs[1].mSourceFile, 5);
+    }
+
     TEST(ESM4NpcTest, takesACharacterOfFallout3ForOneOfFalloutAndReadsItsTemplateFlagsWhereFalloutHasThem)
     {
         const std::string data = zString("EDID", "Npc") + falloutBaseConfig(ESM4::Npc::Template_UseModel)

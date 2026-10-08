@@ -146,6 +146,19 @@ PERSON_PARTS = {
     "hair": ((9.0, 9.0, 3.0), (0.0, 0.0, 130.0)),
     "suit": ((12.0, 8.0, 30.0), (0.0, 0.0, 60.0)),
 }
+# The face of the person: the head box has a FaceGen file beside it (person_head.egm) with 50 symmetric and 30 asymmetric
+# morphs that move nothing but the first, which moves each vertex FACE_SHIFT units east when the coefficient is 1. The
+# coefficient is the sum of the race's FGGS (for men) and the person's: RACE_FACE and PERSON_FACE, which only add up to 1
+# when the engine puts the face of the race and the numbers of the person together. The head is where the shift puts it
+# only when the engine morphs it.
+FACE_SHIFT = 20.0
+RACE_FACE = 0.75
+PERSON_FACE = 0.25
+HEAD_VERTICES = 24  # four for each face of the box (box_mesh)
+# The file has more vertices than the head, as the head files of the games do (1449 for a head of 1211): the head is
+# the first of them
+HEAD_FILE_EXTRA_VERTICES = 10
+
 # The biped slots of Fallout 3 that the suit covers: the upper body (0x04) and the right hand (0x10)
 SUIT_SLOTS = 0x04 | 0x10
 
@@ -352,7 +365,7 @@ def race():
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
     return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
-                                     sub(b"FNAM"),
+                                     sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
                                      *part(2, "righthand"), sub(b"FNAM")])
 
@@ -381,7 +394,20 @@ def person():
                                     zstr(b"MODL", SKELETON), sub(b"ACBS", acbs),
                                     sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)),
                                     sub(b"RNAM", struct.pack("<I", RACE_ID)),
-                                    sub(b"HNAM", struct.pack("<I", HAIR_ID))])
+                                    sub(b"HNAM", struct.pack("<I", HAIR_ID)),
+                                    sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))])
+
+
+def head_morphs():
+    """The FaceGen morph file of the head: a header of 64 bytes (FREGM002, the numbers of vertices and of morphs, a number,
+    40 bytes that are not used), then each morph with its scale and three deltas for each vertex. The scale of the first
+    symmetric morph is 0.5, so its deltas are twice the shift."""
+    vertices = HEAD_VERTICES + HEAD_FILE_EXTRA_VERTICES
+    data = b"FREGM002" + struct.pack("<4I", vertices, 50, 30, 0) + bytes(40)
+    for index in range(80):
+        move = int(round(FACE_SHIFT * 2)) if index == 0 else 0
+        data += struct.pack("<f", 0.5) + struct.pack("<3h", move, 0, 0) * vertices
+    return data
 
 
 def achr(form_id, position):
@@ -512,6 +538,7 @@ def write(out, animation=True, spline=True):
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),
                                                                            encoding="ascii")
+    (out / "meshes" / Path(part_path("head").replace("\\", "/")).with_suffix(".egm")).write_bytes(head_morphs())
     (out / "meshes" / Path(WALL_MESH.replace("\\", "/"))).write_bytes(
         havok_wall.wall(WALL_HALF_EXTENTS, (0.0, 0.0, WALL_HALF_EXTENTS[2])))
     texture = out / "textures" / "sky" / "oftestclouds.dds"

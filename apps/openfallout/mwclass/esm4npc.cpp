@@ -91,6 +91,18 @@ namespace OFClass
         return models;
     }
 
+    std::string falloutHeadModel(const ESM4::Race& race, bool isFemale)
+    {
+        const std::vector<ESM4::Race::BodyPart>& parts = isFemale ? race.mHeadPartsFemale : race.mHeadParts;
+        return parts.empty() ? std::string() : parts.front().mesh;
+    }
+
+    std::string falloutBodyModel(const ESM4::Race& race, bool isFemale)
+    {
+        const std::vector<ESM4::Race::BodyPart>& parts = isFemale ? race.mBodyPartsFemale : race.mBodyPartsMale;
+        return parts.empty() ? std::string() : parts.front().mesh;
+    }
+
     template <class LevelledRecord, class TargetRecord>
     static std::vector<const TargetRecord*> withBaseTemplates(
         const TargetRecord* rec, int level = OFClass::ESM4Impl::sDefaultLevel)
