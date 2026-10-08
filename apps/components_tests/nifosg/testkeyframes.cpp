@@ -1,13 +1,17 @@
 #include "../nif/sequence.hpp"
 
 #include <components/nifosg/nifloader.hpp>
+#include <components/sceneutil/controller.hpp>
 #include <components/sceneutil/keyframe.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <osg/Quat>
 #include <osg/Vec3f>
 
+#include <limits>
+#include <memory>
 #include <set>
 #include <string>
 
@@ -17,6 +21,31 @@ namespace
     using namespace Nif::Testing;
 
     constexpr VFS::Path::NormalizedView idleKf("meshes/characters/_male/mtidle.kf");
+
+    class ConstantSource : public SceneUtil::ControllerSource
+    {
+    public:
+        float getValue(osg::NodeVisitor* nv) override { return 0.f; }
+    };
+
+    class IdentityFunction : public SceneUtil::ControllerFunction
+    {
+    public:
+        float calculate(float input) const override { return input; }
+        float getMaximum() const override { return 1.f; }
+    };
+
+    // The transform that the controller of a node gives at the first moment
+    SceneUtil::KeyframeController::KfTransform transformAtStart(const SceneUtil::KeyframeController& controller)
+    {
+        auto& ctrl = const_cast<SceneUtil::KeyframeController&>(controller);
+        ctrl.setSource(std::make_shared<ConstantSource>());
+        ctrl.setFunction(std::make_shared<IdentityFunction>());
+        osg::NodeVisitor visitor;
+        return ctrl.getCurrentTransformation(&visitor);
+    }
+
+    constexpr float notSet = std::numeric_limits<float>::lowest();
 
     std::set<std::string> textKeys(const SceneUtil::TextKeyMap& map)
     {
@@ -131,5 +160,47 @@ namespace
         EXPECT_THAT(textKeys(holder.mTextKeys),
             UnorderedElementsAre("0.000000 mtidle: start", "0.000000 mtidle: loop start", "2.000000 mtidle: stop",
                 "2.000000 mtidle: loop stop"));
+    }
+
+    // A channel that an interpolator has no keys for holds one value, which is the pose of the bone
+    TEST(NifOsgLoadKfControllerSequence, appliesTheValuesOfAnInterpolatorThatHasNoKeys)
+    {
+        Nif::NIFFile file(idleKf);
+        const Nif::NiQuatTransform pose{ osg::Vec3f(1, 2, 3), osg::Quat(0.5, osg::Vec3f(0, 0, 1)), 2.f };
+        addSequence(
+            file, "Idle", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Constant, { { "Bip01 Head", {}, pose } });
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        const auto transform = transformAtStart(*holder.mKeyframeControllers.at("Bip01 Head"));
+        ASSERT_TRUE(transform.mTranslation.has_value());
+        ASSERT_TRUE(transform.mRotation.has_value());
+        ASSERT_TRUE(transform.mScale.has_value());
+        EXPECT_EQ(*transform.mTranslation, osg::Vec3f(1, 2, 3));
+        EXPECT_EQ(*transform.mRotation, osg::Quat(0.5, osg::Vec3f(0, 0, 1)));
+        EXPECT_EQ(*transform.mScale, 2.f);
+    }
+
+    // The files mark a channel that has nothing set with the smallest float
+    TEST(NifOsgLoadKfControllerSequence, leavesAChannelAloneThatTheFileMarksAsNotSet)
+    {
+        Nif::NIFFile file(idleKf);
+        const Nif::NiQuatTransform pose{ osg::Vec3f(notSet, notSet, notSet), osg::Quat(notSet, 0, 0, 0), notSet };
+        addSequence(file, "Idle", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Constant,
+            { { "Bip01 Head", {}, pose }, { "Bip01 Neck", { { 0.f, osg::Vec3f(4, 0, 0) } }, pose } });
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        const auto head = transformAtStart(*holder.mKeyframeControllers.at("Bip01 Head"));
+        EXPECT_FALSE(head.mTranslation.has_value());
+        EXPECT_FALSE(head.mRotation.has_value());
+        EXPECT_FALSE(head.mScale.has_value());
+        // the keys of the channel still count
+        const auto neck = transformAtStart(*holder.mKeyframeControllers.at("Bip01 Neck"));
+        ASSERT_TRUE(neck.mTranslation.has_value());
+        EXPECT_EQ(*neck.mTranslation, osg::Vec3f(4, 0, 0));
+        EXPECT_FALSE(neck.mRotation.has_value());
     }
 }

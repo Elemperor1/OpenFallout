@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_NIFOSG_CONTROLLER_H
 #define COMPONENTS_NIFOSG_CONTROLLER_H
 
+#include <optional>
 #include <set>
 #include <type_traits>
 
@@ -265,6 +266,12 @@ namespace NifOsg
 
         Vec3Interpolator mTranslations;
         FloatInterpolator mScales;
+
+        // What an interpolator holds for a channel that it has no keys for. The value is applied as it is, unless the
+        // file marks it as not set (the smallest float)
+        std::optional<osg::Vec3f> mDefaultTranslation;
+        std::optional<osg::Quat> mDefaultRotation;
+        std::optional<float> mDefaultScale;
 
         Nif::NiKeyframeData::AxisOrder mAxisOrder{ Nif::NiKeyframeData::AxisOrder::Order_XYZ };
 

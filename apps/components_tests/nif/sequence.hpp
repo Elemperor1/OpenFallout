@@ -2,6 +2,7 @@
 #define OPENFALLOUT_TEST_SUITE_NIF_SEQUENCE_H
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,6 +21,8 @@ namespace Nif::Testing
     {
         std::string mNode;
         std::vector<std::pair<float, osg::Vec3f>> mKeys;
+        /// What the interpolator holds for a channel that has no keys (the identity when not given)
+        std::optional<NiQuatTransform> mDefault = std::nullopt;
     };
 
     template <class Record>
@@ -71,7 +74,7 @@ namespace Nif::Testing
 
             auto& interpolator
                 = addRecord<NiTransformInterpolator>(file, "NiTransformInterpolator", RC_NiTransformInterpolator);
-            interpolator.mDefaultValue = NiQuatTransform::getIdentity();
+            interpolator.mDefaultValue = track.mDefault.value_or(NiQuatTransform::getIdentity());
             interpolator.mData = NiKeyframeDataPtr(&data);
 
             ControlledBlock block;

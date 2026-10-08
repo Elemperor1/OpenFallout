@@ -87,6 +87,9 @@ namespace NifOsg
         , mZRotations(copy.mZRotations)
         , mTranslations(copy.mTranslations)
         , mScales(copy.mScales)
+        , mDefaultTranslation(copy.mDefaultTranslation)
+        , mDefaultRotation(copy.mDefaultRotation)
+        , mDefaultScale(copy.mDefaultScale)
         , mAxisOrder(copy.mAxisOrder)
     {
     }
@@ -117,9 +120,27 @@ namespace NifOsg
         setInterpolator(*interp);
     }
 
+    namespace
+    {
+        // The files mark a value that is not set with the smallest float
+        bool isSet(float value)
+        {
+            return value > -3.0e38f;
+        }
+    }
+
     void KeyframeController::setInterpolator(const Nif::NiTransformInterpolator& interp)
     {
         const Nif::NiQuatTransform& defaultTransform = interp.mDefaultValue;
+        const osg::Vec3f& translation = defaultTransform.mTranslation;
+        if (isSet(translation.x()) && isSet(translation.y()) && isSet(translation.z()))
+            mDefaultTranslation = translation;
+        const osg::Quat& rotation = defaultTransform.mRotation;
+        if (isSet(rotation.w()) && isSet(rotation.x()) && isSet(rotation.y()) && isSet(rotation.z()))
+            mDefaultRotation = rotation;
+        if (isSet(defaultTransform.mScale))
+            mDefaultScale = defaultTransform.mScale;
+
         if (!interp.mData.empty())
         {
             mRotations = QuaternionInterpolator(interp.mData->mRotations, defaultTransform.mRotation);
@@ -217,12 +238,18 @@ namespace NifOsg
                 out.mRotation = mRotations.interpKey(time);
             else if (!mXRotations.empty() || !mYRotations.empty() || !mZRotations.empty())
                 out.mRotation = getXYZRotation(time);
+            else if (mDefaultRotation)
+                out.mRotation = *mDefaultRotation;
 
             if (!mTranslations.empty())
                 out.mTranslation = mTranslations.interpKey(time);
+            else if (mDefaultTranslation)
+                out.mTranslation = *mDefaultTranslation;
 
             if (!mScales.empty())
                 out.mScale = mScales.interpKey(time);
+            else if (mDefaultScale)
+                out.mScale = *mDefaultScale;
         }
 
         return out;
