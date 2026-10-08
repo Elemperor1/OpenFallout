@@ -1,6 +1,7 @@
 #include "falloutanimation.hpp"
 
 #include <algorithm>
+#include <initializer_list>
 
 #include <components/misc/strings/lower.hpp>
 
@@ -82,44 +83,76 @@ namespace OFRender
     {
         const std::string base = std::string(folder) + std::string(sLocomotionFolder);
 
-        const auto choose = [&](std::string_view wanted) {
-            std::string best;
-            int bestRank = 3;
-            for (const std::string& path : files)
-            {
-                if (!path.starts_with(base) || !path.ends_with(sExtension))
-                    continue;
-                // What is left is "name.kf" or "folder/name.kf"
-                std::string_view rest = std::string_view(path).substr(base.size());
-                rest.remove_suffix(sExtension.size());
-                std::string_view subfolder;
-                const std::size_t slash = rest.find('/');
-                if (slash != std::string_view::npos)
-                {
-                    subfolder = rest.substr(0, slash);
-                    rest.remove_prefix(slash + 1);
-                }
-                if (rest != wanted || rest.find('/') != std::string_view::npos)
-                    continue;
-
-                int rank = 2;
-                if (subfolder.empty())
-                    rank = 1;
-                else if (subfolder == (female ? "female" : "male"))
-                    rank = 0;
-                else if (subfolder == "child" || subfolder == "hurt")
-                    continue;
-
-                if (rank < bestRank || (rank == bestRank && path < best))
-                {
-                    best = path;
-                    bestRank = rank;
-                }
-            }
-            return best;
+        // The files below the locomotion folder that can be taken, with the name they have and how well their folder
+        // fits: the folder of the sex of the character, then locomotion itself, then any other
+        struct Candidate
+        {
+            const std::string* mPath;
+            std::string_view mName;
+            int mRank;
         };
+        std::vector<Candidate> candidates;
+        for (const std::string& path : files)
+        {
+            if (!path.starts_with(base) || !path.ends_with(sExtension))
+                continue;
+            // What is left is "name.kf" or "folder/name.kf"
+            std::string_view rest = std::string_view(path).substr(base.size());
+            rest.remove_suffix(sExtension.size());
+            std::string_view subfolder;
+            const std::size_t slash = rest.find('/');
+            if (slash != std::string_view::npos)
+            {
+                subfolder = rest.substr(0, slash);
+                rest.remove_prefix(slash + 1);
+            }
+            if (rest.empty() || rest.find('/') != std::string_view::npos)
+                continue;
 
-        return { choose("mtforward"), choose("mtfastforward") };
+            int rank = 2;
+            if (subfolder.empty())
+                rank = 1;
+            else if (subfolder == (female ? "female" : "male"))
+                rank = 0;
+            else if (subfolder == "child" || subfolder == "hurt")
+                continue;
+            candidates.push_back({ &path, rest, rank });
+        }
+
+        const auto better = [](const Candidate& a, const Candidate& b) {
+            return a.mRank != b.mRank ? a.mRank < b.mRank : *a.mPath < *b.mPath;
+        };
+        const auto choose = [&](std::initializer_list<std::string_view> preferred, auto&& fits) -> std::string {
+            // The first name of the list that a file has, else the first file by folder and path whose name fits
+            for (const std::string_view wanted : preferred)
+            {
+                const Candidate* best = nullptr;
+                for (const Candidate& candidate : candidates)
+                    if (candidate.mName == wanted && (best == nullptr || better(candidate, *best)))
+                        best = &candidate;
+                if (best != nullptr)
+                    return *best->mPath;
+            }
+            const Candidate* best = nullptr;
+            for (const Candidate& candidate : candidates)
+                if (fits(candidate.mName) && (best == nullptr || better(candidate, *best)))
+                    best = &candidate;
+            return best == nullptr ? std::string() : *best->mPath;
+        };
+        const auto has
+            = [](std::string_view name, std::string_view part) { return name.find(part) != std::string_view::npos; };
+        const auto goesForward = [&has](std::string_view name) { return has(name, "forward") || has(name, "foward"); };
+
+        // The characters have mtforward and mtfastforward. The creatures of the games after them do not all: one has a
+        // misspelled file, others name the movements forward, forwardwalk and fastforward, the dog h2hforward. Of those
+        // a name that fits is taken when none of the usual ones is there.
+        const std::string walk
+            = choose({ "mtforward", "mtfoward", "forwardwalk", "forward", "h2hforward" }, [&](std::string_view name) {
+                  return goesForward(name) && !has(name, "fast") && !has(name, "run") && !has(name, "sprint");
+              });
+        const std::string run = choose({ "mtfastforward", "fastforward", "h2hfastforward" },
+            [&](std::string_view name) { return goesForward(name) && has(name, "fast"); });
+        return { walk, run };
     }
 
     FalloutGait chooseFalloutGait(float speed, FalloutGait current, const FalloutGaits& gaits)

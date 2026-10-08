@@ -120,7 +120,7 @@ namespace ESM4
 
         AIData mAIData;
         std::vector<ESM::FormId> mAIPackages;
-        ActorBaseConfig mBaseConfig;
+        ActorBaseConfig mBaseConfig{};
         ActorFaction mFaction;
         Data mData;
         ESM::FormId mCombatStyle;
@@ -141,6 +141,27 @@ namespace ESM4
 
         ESM::FormId mBaseTemplate; // FO3/FONV
         std::vector<ESM::FormId> mBodyParts; // FO3/FONV
+
+        bool mIsFONV = false; // the record is one of Fallout 3 or New Vegas (Reader::isFalloutFile())
+
+        // The bits of the template flags of ACBS (the same as those of NPC_)
+        enum TemplateFlags
+        {
+            Template_UseTraits = 0x0001,
+            Template_UseStats = 0x0002,
+            Template_UseFactions = 0x0004,
+            Template_UseSpellList = 0x0008,
+            Template_UseAIData = 0x0010,
+            Template_UseAIPackage = 0x0020,
+            Template_UseModel = 0x0040, // the model, the body models and the animations
+            Template_UseBaseData = 0x0080,
+            Template_UseInventory = 0x0100,
+            Template_UseScript = 0x0200,
+        };
+
+        /// Whether the record takes the thing that the flag names (one of TemplateFlags) from its template. Only
+        /// the records of Fallout 3 and New Vegas have a template.
+        bool takesFromTemplate(std::uint16_t flag) const;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

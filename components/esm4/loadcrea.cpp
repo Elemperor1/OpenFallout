@@ -35,10 +35,16 @@
 #include "reader.hpp"
 //#include "writer.hpp"
 
+bool ESM4::Creature::takesFromTemplate(std::uint16_t flag) const
+{
+    return mIsFONV && (mBaseConfig.fo3.templateFlags & flag) != 0;
+}
+
 void ESM4::Creature::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
+    mIsFONV = reader.isFalloutFile();
 
     while (reader.getSubRecordHeader())
     {

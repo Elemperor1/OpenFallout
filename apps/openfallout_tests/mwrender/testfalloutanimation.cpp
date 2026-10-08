@@ -108,10 +108,69 @@ namespace
     {
         const std::vector<std::string> files = { "meshes/characters/_female/locomotion/mtforward.kf",
             "meshes/characters/_male/mtforward.kf", "meshes/characters/_male/locomotion/mtforward.nif",
-            "meshes/characters/_male/locomotion/a/b/mtforward.kf", "meshes/characters/_male/locomotion/mtforwardx.kf" };
+            "meshes/characters/_male/locomotion/a/b/mtforward.kf", "meshes/characters/_male/locomotion/mtbackward.kf" };
         const FalloutLocomotion locomotion = chooseFalloutLocomotion(mFolder, files, false);
         EXPECT_EQ(locomotion.mWalk, "");
         EXPECT_EQ(locomotion.mRun, "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutLocomotion, takesTheUsualFilesBeforeTheOtherNamesOfACreature)
+    {
+        const std::string folder = "meshes/creatures/dog/";
+        const std::vector<std::string> files = { "meshes/creatures/dog/locomotion/forward.kf",
+            "meshes/creatures/dog/locomotion/h2hforward.kf", "meshes/creatures/dog/locomotion/mtforward.kf",
+            "meshes/creatures/dog/locomotion/fastforward.kf", "meshes/creatures/dog/locomotion/mtfastforward.kf" };
+        const FalloutLocomotion locomotion = chooseFalloutLocomotion(folder, files, false);
+        EXPECT_EQ(locomotion.mWalk, "meshes/creatures/dog/locomotion/mtforward.kf");
+        EXPECT_EQ(locomotion.mRun, "meshes/creatures/dog/locomotion/mtfastforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutLocomotion, knowsTheNamesCreaturesHaveForTheirMovements)
+    {
+        const std::string folder = "meshes/creatures/dog/";
+        // the dog
+        FalloutLocomotion locomotion = chooseFalloutLocomotion(folder,
+            { "meshes/creatures/dog/locomotion/h2hforward.kf", "meshes/creatures/dog/locomotion/h2hfastforward.kf",
+                "meshes/creatures/dog/locomotion/mtbackward.kf" },
+            false);
+        EXPECT_EQ(locomotion.mWalk, "meshes/creatures/dog/locomotion/h2hforward.kf");
+        EXPECT_EQ(locomotion.mRun, "meshes/creatures/dog/locomotion/h2hfastforward.kf");
+
+        // a creature of the downloadable content
+        locomotion = chooseFalloutLocomotion(folder,
+            { "meshes/creatures/dog/locomotion/forwardwalk.kf", "meshes/creatures/dog/locomotion/fastforward.kf",
+                "meshes/creatures/dog/locomotion/forward.kf", "meshes/creatures/dog/locomotion/backward.kf" },
+            false);
+        EXPECT_EQ(locomotion.mWalk, "meshes/creatures/dog/locomotion/forwardwalk.kf");
+        EXPECT_EQ(locomotion.mRun, "meshes/creatures/dog/locomotion/fastforward.kf");
+
+        // the misspelling in the files of the deathclaw
+        locomotion = chooseFalloutLocomotion(folder,
+            { "meshes/creatures/dog/locomotion/mtfoward.kf", "meshes/creatures/dog/locomotion/mtfastforward.kf" },
+            false);
+        EXPECT_EQ(locomotion.mWalk, "meshes/creatures/dog/locomotion/mtfoward.kf");
+        EXPECT_EQ(locomotion.mRun, "meshes/creatures/dog/locomotion/mtfastforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutLocomotion, takesAnyFileThatGoesForwardWhenNoKnownNameIsThere)
+    {
+        const std::string folder = "meshes/creatures/x/";
+        const FalloutLocomotion locomotion = chooseFalloutLocomotion(folder,
+            { "meshes/creatures/x/locomotion/mtbackward.kf", "meshes/creatures/x/locomotion/1hmfastforward.kf",
+                "meshes/creatures/x/locomotion/1hmforward.kf", "meshes/creatures/x/locomotion/mtturnleft.kf" },
+            false);
+        EXPECT_EQ(locomotion.mWalk, "meshes/creatures/x/locomotion/1hmforward.kf");
+        EXPECT_EQ(locomotion.mRun, "meshes/creatures/x/locomotion/1hmfastforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutLocomotion, doesNotWalkWithARunOrRunWithAWalk)
+    {
+        const std::string folder = "meshes/creatures/x/";
+        const FalloutLocomotion locomotion
+            = chooseFalloutLocomotion(folder, { "meshes/creatures/x/locomotion/runforward.kf" }, false);
+        EXPECT_EQ(locomotion.mWalk, "");
+        EXPECT_EQ(locomotion.mRun, "");
+        EXPECT_EQ(chooseFalloutLocomotion(folder, { "meshes/creatures/x/locomotion/xforward.kf" }, false).mRun, "");
     }
 
     TEST_F(OpenFalloutRenderChooseFalloutLocomotion, hasNothingWithNoFiles)
