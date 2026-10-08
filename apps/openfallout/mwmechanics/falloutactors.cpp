@@ -624,7 +624,10 @@ namespace OFMechanics
                         if (mind.mWait > 0.f)
                             break;
                         mind.mDestination = falloutRoamPoint(mind.mGoal, mind.mRandom);
-                        mind.mDestination.z() = mind.position().z();
+                        // On its own floor the point is at the height of the character, as the ground is not at the
+                        // height of the place; the place of another floor keeps its height, so that the path goes there
+                        if (onSameFloor(mind.position(), mind.mDestination))
+                            mind.mDestination.z() = mind.position().z();
                     }
                     switch (walkTo(frame, mind, mind.mDestination, duration))
                     {
