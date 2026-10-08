@@ -217,7 +217,12 @@ namespace OFMechanics
 
     bool FalloutActors::handles(const OFWorld::Ptr& ptr)
     {
-        return ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId;
+        // Only the records of Fallout 3 and New Vegas: the packages and the sizes of the others are laid out differently
+        if (ptr.getType() == ESM4::Npc::sRecordId)
+            return ptr.get<ESM4::Npc>()->mBase->mIsFONV;
+        if (ptr.getType() == ESM4::Creature::sRecordId)
+            return ptr.get<ESM4::Creature>()->mBase->mIsFONV;
+        return false;
     }
 
     void FalloutActors::add(const OFWorld::Ptr& ptr)
