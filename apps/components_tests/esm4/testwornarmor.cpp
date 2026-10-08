@@ -373,6 +373,27 @@ namespace
         EXPECT_EQ(ESM4::wornArmor(source, npc, playerLevel, 1).size(), 100u);
     }
 
+    TEST(ESM4WornArmorTest, boundsTheRollsOfListsInListsThatCountForEachItem)
+    {
+        // Four lists, each with a count of 30000 for the list in it, all calculating for each item: the product of
+        // the counts is not a number of rolls that can be made, and the character is dressed all the same
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        for (std::uint32_t level = 0; level < 4; ++level)
+        {
+            ESM4::LevelledItem list{};
+            list.mId = id(0x2000 + level);
+            list.mHasLvlItemFlags = true;
+            list.mLvlItemFlags = 0x02;
+            list.mLvlObject.push_back({ 1, 0, level == 3 ? 0x1001u : 0x2001u + level, 30000, 0 });
+            source.mLevelledItems[id(0x2000 + level)] = list;
+        }
+        ESM4::Npc& npc = source.addNpc(0x3001, { 0x2000 });
+        npc.mInventory.back().count = 4000000000u;
+
+        EXPECT_EQ(ESM4::wornArmor(source, npc, playerLevel, 1).size(), 1u);
+    }
+
     TEST(ESM4WornArmorTest, followsListsInLists)
     {
         TestSource source;

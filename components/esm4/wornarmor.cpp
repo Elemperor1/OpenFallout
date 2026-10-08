@@ -11,10 +11,11 @@ namespace ESM4
         // A list of lists that goes deeper than this, or a chain of templates that is longer, is a cycle or a mistake
         constexpr std::size_t maxListDepth = 8;
         constexpr std::size_t maxTemplateDepth = 16;
-        // A list that calculates for each item in its count is rolled once per item. The counts of the real records are
-        // a few at most; this many rolls stop a corrupt count of billions from holding the game up, and a list with
-        // dozens of entries has given every one of them long before.
-        constexpr int maxRollsPerEntry = 4096;
+        // A list that calculates for each item in its count is rolled once per item, and a list can hold lists that do
+        // the same. The counts of the real records are a few at most; this many rolls in all, for one character, stop
+        // a corrupt count of billions (or lists nested in lists with counts of thousands) from holding the game up,
+        // and a list with dozens of entries has given every one of them long before.
+        constexpr std::uint32_t maxRollsPerCharacter = 16384;
 
         // splitmix64, which gives the same numbers on every platform
         class Random
@@ -177,15 +178,16 @@ namespace ESM4
                     return;
                 }
 
-                const int rolls = list->calcEachItemInCount()
-                    ? static_cast<int>(std::clamp<std::uint32_t>(count, 1, maxRollsPerEntry))
-                    : 1;
-                for (int roll = 0; roll < rolls; ++roll)
+                const std::uint32_t rolls = list->calcEachItemInCount() ? std::max<std::uint32_t>(count, 1) : 1;
+                for (std::uint32_t roll = 0; roll < rolls && mRollsLeft > 0; ++roll)
                     rollOnce(*list, depth);
             }
 
             void rollOnce(const LevelledItem& list, std::size_t depth)
             {
+                if (mRollsLeft == 0)
+                    return;
+                --mRollsLeft;
                 LevelledRules rules;
                 rules.mChanceNone = list.chanceNone();
                 rules.mAllLevels = list.calcAllLvlLessThanPlayer();
@@ -224,6 +226,7 @@ namespace ESM4
             int mLevel;
             Random& mRandom;
             WornArmorTrace* mTrace;
+            std::uint32_t mRollsLeft = maxRollsPerCharacter;
             std::vector<const Armor*> mArmor;
         };
     }
