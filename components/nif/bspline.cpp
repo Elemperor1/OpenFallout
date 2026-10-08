@@ -10,8 +10,10 @@ namespace Nif
 {
     namespace
     {
-        // The handle of a channel that has no control points
+        // The handle of a channel that has no control points: the files write 0xFFFF, and the all-ones word is the same
+        // thing in a 32 bit field
         constexpr uint32_t invalidHandle = 0xFFFF;
+        constexpr uint32_t invalidWideHandle = 0xFFFFFFFF;
 
         // The compact control points are shorts, scaled to the range of the channel
         constexpr float compactScale = 1.f / 32767.f;
@@ -106,7 +108,8 @@ namespace Nif
         // many channels, and every control point has the components of the channel
         const auto load = [&](uint32_t handle, std::size_t components, float offset, float halfRange) {
             const std::size_t count = numPoints * components;
-            if (handle == invalidHandle || count == 0 || handle > available || count > available - handle)
+            if (handle == invalidHandle || handle == invalidWideHandle || count == 0 || handle > available
+                || count > available - handle)
                 return BSplineCurve();
 
             std::vector<float> points(count);
