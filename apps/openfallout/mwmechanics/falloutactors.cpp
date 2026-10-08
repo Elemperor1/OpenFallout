@@ -514,7 +514,22 @@ namespace OFMechanics
                 break;
             }
             if (chosen == mind.mPackage)
+            {
+                // A place that the package names by a reference goes with it when something moves the reference
+                if (chosen != nullptr && chosen->mLocation.type == ESM4::Location_NearReference)
+                {
+                    mind.mHasFacing = hasFacing;
+                    mind.mFacing = facing;
+                    if ((goal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
+                    {
+                        mind.mGoal.mCenter = goal.mCenter;
+                        mind.mAtGoal = false;
+                        mind.mPathRetry = 0.f;
+                        stopWalking(mind);
+                    }
+                }
                 return;
+            }
 
             mind.mPackage = chosen;
             mind.mGoal = chosen != nullptr ? goal : FalloutGoal();
