@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <mutex>
+#include <set>
 
 #include <osg/Vec2f>
 
@@ -260,8 +262,15 @@ namespace OFRender
             if (morphs != nullptr
                 && morphFaceMeshes(part, *morphs, traits.mSymShapeModeCoefficients, traits.mAsymShapeModeCoefficients)
                     == 0)
-                Log(Debug::Verbose) << "FaceGen: the meshes of " << model << " do not have the " << morphs->mVertexCount
-                                    << " vertices of its morph file";
+            {
+                // Said once for each model, whatever number of characters wear it
+                static std::mutex sReportedMutex;
+                static std::set<std::string> sReported;
+                const std::lock_guard lock(sReportedMutex);
+                if (sReported.insert(Misc::StringUtils::lowerCase(model)).second)
+                    Log(Debug::Warning) << "FaceGen: the meshes of " << model << " do not have the "
+                                        << morphs->mVertexCount << " vertices of its morph file";
+            }
         }
 
         // The skin: a texture that the editor wrote for the character, of the plugin that made the character
