@@ -9,6 +9,7 @@
 #include <components/detournavigator/areatype.hpp>
 #include <components/detournavigator/flags.hpp>
 #include <components/detournavigator/navigatorutils.hpp>
+#include <components/detournavigator/status.hpp>
 #include <components/esm/util.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -88,6 +89,7 @@ namespace OFMechanics
         bool mHasFacing = false;
         float mFacing = 0.f; // which way it faces when it gets there
 
+        bool mAgent = false; // the navigator has been told of an actor of its size, so that it makes a mesh for it
         float mReview = 0.f; // seconds until the packages are looked at again
         float mWait = 0.f; // seconds to stand still before it does anything else
         bool mWalking = false; // it goes to mDestination
@@ -122,7 +124,6 @@ namespace OFMechanics
             OFBase::World& mWorld;
             ESM4::PackageClock mClock;
             osg::Vec3f mPlayer;
-            DetourNavigator::AgentBounds mAgent;
             bool mNavigator = false;
         };
 
@@ -187,6 +188,30 @@ namespace OFMechanics
 
     }
 
+    namespace
+    {
+        /// The navigator makes a navigation mesh for each size of actor that it has been told of. The bodies of these
+        /// actors are not physics actors (which the scene tells the navigator about), and an interior has the mesh for
+        /// the size of its player only, so the actors tell it themselves.
+        void registerAgent(FalloutActors::Mind& mind)
+        {
+            OFBase::World& world = *OFBase::Environment::get().getWorld();
+            DetourNavigator::Navigator* navigator = world.getNavigator();
+            if (navigator != nullptr && navigator->addAgent(world.getPathfindingAgentBounds(mind.mPtr)))
+                mind.mAgent = true;
+        }
+
+        void releaseAgent(FalloutActors::Mind& mind)
+        {
+            if (!mind.mAgent)
+                return;
+            mind.mAgent = false;
+            OFBase::World& world = *OFBase::Environment::get().getWorld();
+            if (DetourNavigator::Navigator* navigator = world.getNavigator())
+                navigator->removeAgent(world.getPathfindingAgentBounds(mind.mPtr));
+        }
+    }
+
     FalloutActors::FalloutActors() = default;
     FalloutActors::~FalloutActors() = default;
 
@@ -206,12 +231,17 @@ namespace OFMechanics
         const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
         const std::uint64_t seed = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(refNum.mContentFile)) << 32)
             ^ refNum.mIndex ^ 0x9E3779B97F4A7C15ull;
-        mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packages, seed));
+        const auto mind = mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packages, seed)).first;
+        registerAgent(*mind->second);
     }
 
     void FalloutActors::remove(const OFWorld::Ptr& ptr)
     {
-        mMinds.erase(ptr.mRef);
+        const auto found = mMinds.find(ptr.mRef);
+        if (found == mMinds.end())
+            return;
+        releaseAgent(*found->second);
+        mMinds.erase(found);
     }
 
     void FalloutActors::updatePtr(const OFWorld::Ptr& old, const OFWorld::Ptr& ptr)
@@ -230,7 +260,10 @@ namespace OFMechanics
         for (auto it = mMinds.begin(); it != mMinds.end();)
         {
             if (it->second->mPtr.getCell() == cell)
+            {
+                releaseAgent(*it->second);
                 it = mMinds.erase(it);
+            }
             else
                 ++it;
         }
@@ -290,9 +323,9 @@ namespace OFMechanics
                 return Walk::Moving;
             }
 
-            const DetourNavigator::Status status = DetourNavigator::findPath(*frame.mWorld.getNavigator(), frame.mAgent,
-                start, destination, DetourNavigator::Flag_walk, DetourNavigator::AreaCosts(), endTolerance, {},
-                std::back_inserter(mind.mWaypoints));
+            const DetourNavigator::Status status = DetourNavigator::findPath(*frame.mWorld.getNavigator(),
+                frame.mWorld.getPathfindingAgentBounds(mind.mPtr), start, destination, DetourNavigator::Flag_walk,
+                DetourNavigator::AreaCosts(), endTolerance, {}, std::back_inserter(mind.mWaypoints));
             switch (status)
             {
                 case DetourNavigator::Status::Success:
@@ -304,6 +337,9 @@ namespace OFMechanics
                     mind.mWaypoints.clear();
                     return Walk::Waiting;
                 default:
+                    Log(Debug::Verbose) << "No path for " << mind.mPtr.getCellRef().getRefId() << " from " << start.x()
+                                        << "," << start.y() << " to " << destination.x() << "," << destination.y()
+                                        << ": " << DetourNavigator::getMessage(status);
                     mind.mWaypoints.clear();
                     return Walk::Failed;
             }
@@ -447,7 +483,7 @@ namespace OFMechanics
 
         const OFWorld::TimeStamp now = world.getTimeStamp();
         Frame frame{ world, falloutClock(now.getHour(), now.getDay()), player.getRefData().getPosition().asVec3(),
-            world.getPathfindingAgentBounds(player), Settings::navigator().mEnable };
+            Settings::navigator().mEnable };
         duration = std::min(duration, longestStep);
         const float range = static_cast<float>(Settings::game().mActorsProcessingRange);
 
