@@ -72,14 +72,16 @@ def compact_translation(points):
     return offset, half_range, shorts
 
 
-def sequence(cycle, start, stop):
-    """A sequence that drives one node, with the text keys after it. The names are those of the table of strings that
-    `idle_animation` writes: the sequence, the node and the kind of controller are its first three."""
+def sequence(cycle, start, stop, blocks):
+    """A sequence that drives nodes, with the text keys after it. The names are those of the table of strings that
+    `idle_animation` writes: the sequence, the node and the kind of controller are its first three. The blocks are
+    (the interpolator, the index of the name of the node in the table of strings), in the order of the records."""
     # NiSequence: the name, the number of controlled blocks, the growth of the array, the blocks
-    data = struct.pack("<iII", 0, 1, 0)
-    # The block: interpolator, controller, priority, the node, the kind of property, the controller, its id, the
-    # interpolator's id
-    data += struct.pack("<iiB", 2, NONE, 50) + struct.pack("<5i", 1, NONE, 2, NONE, NONE)
+    data = struct.pack("<iII", 0, len(blocks), 0)
+    for interpolator, node in blocks:
+        # The block: interpolator, controller, priority, the node, the kind of property, the controller, its id, the
+        # interpolator's id
+        data += struct.pack("<iiB", interpolator, NONE, 50) + struct.pack("<5i", node, NONE, 2, NONE, NONE)
     # The sequence: weight, text keys, cycle type, frequency, start, stop, manager, accumulation root, animation notes
     data += struct.pack("<fiIfff", 1.0, 1, cycle, 1.0, start, stop)
     data += struct.pack("<ii", NONE, NONE) + struct.pack("<H", 0)
@@ -87,31 +89,37 @@ def sequence(cycle, start, stop):
 
 
 def idle_animation(
-    name="MTIdle", node="Bip01 L Foot", cycle=CLAMP, stop=1.0, offset=-150.0, height=-26.0, spline=False
+    name="MTIdle", node="Bip01 L Foot", cycle=CLAMP, stop=1.0, offset=-150.0, height=-26.0, spline=False, root_speed=0.0
 ):
     """A sequence of `stop` seconds that moves the node from its place under the calf, at `height`, to `offset` to the
     side of it, with two keys or, when `spline` is true, with the four control points of a B-spline (the points of a
-    line are the ends of it and the places a third and two thirds of the way)"""
+    line are the ends of it and the places a third and two thirds of the way). When `root_speed` is more than 0 the
+    sequence moves the root of the skeleton, Bip01, forward (along y) at that many units a second, as the animations of
+    walking and running do: the engine takes the speed at which an animation travels from it."""
     strings = [name, node, "NiTransformController", "Start", "End"]
     keys = [(0.0, (0.0, 0.0, height)), (stop, (offset, 0.0, height))]
     if spline:
         points = [(offset * fraction, 0.0, height) for fraction in (0.0, 1 / 3, 2 / 3, 1.0)]
         bias, half_range, shorts = compact_translation(points)
-        blocks = [
-            ("NiControllerSequence", sequence(cycle, 0.0, stop)),
-            ("NiTextKeyExtraData", text_keys([(0.0, 3), (stop, 4)])),
+        records = [
             ("NiBSplineCompTransformInterpolator", spline_interpolator(0.0, stop, 3, 4, bias, half_range)),
             ("NiBSplineData", spline_data(shorts)),
             ("NiBSplineBasisData", struct.pack("<I", len(points))),
         ]
-        return nif(blocks, strings, [0])
-    blocks = [
-        ("NiControllerSequence", sequence(cycle, 0.0, stop)),
-        ("NiTextKeyExtraData", text_keys([(0.0, 3), (stop, 4)])),
-        ("NiTransformInterpolator", transform_interpolator(3)),
-        ("NiTransformData", translation_data(keys)),
-    ]
-    return nif(blocks, strings, [0])
+    else:
+        records = [("NiTransformInterpolator", transform_interpolator(3)), ("NiTransformData", translation_data(keys))]
+    # the records come after the sequence and its text keys, and the blocks of the sequence refer to them by index
+    blocks = [(2, 1)]
+    if root_speed > 0:
+        strings.append("Bip01")
+        root_keys = [(0.0, (0.0, 0.0, 0.0)), (stop, (0.0, root_speed * stop, 0.0))]
+        blocks.append((2 + len(records), len(strings) - 1))
+        records += [
+            ("NiTransformInterpolator", transform_interpolator(2 + len(records) + 1)),
+            ("NiTransformData", translation_data(root_keys)),
+        ]
+    return nif([("NiControllerSequence", sequence(cycle, 0.0, stop, blocks)),
+                ("NiTextKeyExtraData", text_keys([(0.0, 3), (stop, 4)]))] + records, strings, [0])
 
 
 if __name__ == "__main__":

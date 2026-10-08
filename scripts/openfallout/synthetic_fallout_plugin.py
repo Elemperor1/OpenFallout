@@ -82,6 +82,18 @@ FOOT_BONE = "Bip01 L Foot"
 FOOT_MARKER = (3.0, 3.0, 3.0)
 FOOT_MOVE = -150.0
 FOOT_PART = "openfallout\\person_foot.nif"
+# The animations of walking and running: `mtforward.kf` and `mtfastforward.kf` in the folder `locomotion` below that of the skeleton
+# (the files the engine looks for). Each moves the same foot, to a place of its own, and holds it there after a fifth of a
+# second, and moves the root of the skeleton forward at the speed of walking and of running, so that the engine can tell
+# how fast each travels. A person who is moved plays them: the foot is at WALK_MOVE from the calf while the person
+# walks, at RUN_MOVE while it runs, and back at FOOT_MOVE when it stands again.
+WALK_ANIMATION = "characters\\_male\\locomotion\\mtforward.kf"
+RUN_ANIMATION = "characters\\_male\\locomotion\\mtfastforward.kf"
+WALK_MOVE = -70.0
+RUN_MOVE = -10.0
+WALK_VELOCITY = 100.0
+RUN_VELOCITY = 300.0
+LOCOMOTION_SECONDS = 0.2
 # Where the foot is when the skeleton is at rest: the bones hang from each other (BONES in placeholder_skeleton.py), the
 # pelvis 64 units up, the thigh 8 to the left and 4 down from it, and the calf and the foot 26 down each.
 FOOT_REST = (-8.0, 0.0, 8.0)
@@ -516,6 +528,12 @@ def write(out, animation=True, spline=True):
     if animation:
         (out / "meshes" / Path(IDLE_ANIMATION.replace("\\", "/"))).write_bytes(
             idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE, spline=spline))
+        for path, name, move, velocity in ((WALK_ANIMATION, "MTForward", WALK_MOVE, WALK_VELOCITY),
+                                           (RUN_ANIMATION, "MTFastForward", RUN_MOVE, RUN_VELOCITY)):
+            target = out / "meshes" / Path(path.replace("\\", "/"))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(idle_animation.idle_animation(
+                name=name, node=FOOT_BONE, offset=move, stop=LOCOMOTION_SECONDS, spline=spline, root_speed=velocity))
     (out / "OFTest.esm").write_bytes(plugin())
     return out / "OFTest.esm"
 

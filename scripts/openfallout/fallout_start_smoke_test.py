@@ -130,12 +130,24 @@ SCENARIOS = [
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
 
-WALK_SECONDS = 18
+WALK_SECONDS = 24
 # The player stands still from the fifteenth second, where the walk west ends, and turns to face east, to the person,
 # for half a second, so that the person is seen: the body of a model that is skinned is only brought up to date when it
 # is seen, and a ray at what is drawn finds it where it was when it was last seen. A second later a ray looks at its foot.
 TURN_FROM = 15
 FOOT_RAY_FROM = TURN_FROM + 1.5
+
+# Then the person is moved east by a script of the world (PERSON_SCRIPT), which starts when the player script sends it
+# the word at PERSON_MOVE_FROM: at the speed of walking for WALK_FOR seconds and then, faster, at the speed of running
+# for RUN_FOR seconds, and stands still again. A character has no mechanics of its own yet, so the engine takes its speed
+# from how fast whatever moves it changes its place. A ray at the foot looks WALK_RAY_AFTER seconds after the person
+# starts to walk, one RUN_RAY_AFTER seconds after it starts, and one STAND_RAY_AFTER seconds after.
+PERSON_MOVE_FROM = 18.5
+WALK_FOR = 1.5
+RUN_FOR = 0.9
+WALK_RAY_AFTER = 1.0
+RUN_RAY_AFTER = WALK_FOR + 0.7
+STAND_RAY_AFTER = WALK_FOR + RUN_FOR + 1.5
 
 # The eight cells around the exterior cell 0,0 that the player starts in.
 NEIGHBOURS = [(x, y) for x in (-1, 0, 1) for y in (-1, 0, 1) if (x, y) != (0, 0)]
@@ -212,6 +224,14 @@ BODY_RAYS = {
     "top": ((0, 0, 300), (0, 0, 0), 2, person_face("hair", 2, +1)),
 }
 FOOT_RAY = ((-300, 0, FOOT_HEIGHT), (0, 0, FOOT_HEIGHT), 0, FOOT_PLAYED_FACE)
+# Where the box is, from the person, as it walks, runs and stands again. The person moves while the ray is cast, so the
+# coordinate is not exact: the poses are more than twice this apart.
+MOVING_FOOT_FACES = {
+    "footwalk": FOOT_REST_FACE + plugin.WALK_MOVE,
+    "footrun": FOOT_REST_FACE + plugin.RUN_MOVE,
+    "footstand": FOOT_PLAYED_FACE,
+}
+MOVING_FOOT_TOLERANCE = 25.0
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
@@ -236,6 +256,9 @@ local camera = require('openfallout.camera')
 local async = require('openfallout.async')
 
 local npcPos = nil
+local npcObject = nil
+local personMoving = false
+local footRaysDone = {}
 local bodyRaysDone = false
 local elapsed = 0
 local nextLog = 0
@@ -250,6 +273,15 @@ local function look(name, from, to)
     nearby.asyncCastRenderingRay(async:callback(function(res)
         log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
     end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
+end
+
+-- a ray at the foot of the person where it is now (it is moved), which logs where it is when the ray has found its foot
+local function lookFoot(name)
+    local pos = npcObject.position
+    nearby.asyncCastRenderingRay(async:callback(function(res)
+        log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '',
+            'person', fmt(npcObject.position))
+    end), pos + util.vector3(%s), pos + util.vector3(%s))
 end
 
 return {
@@ -294,6 +326,7 @@ return {
                 log('ray person hit=', tostring(person.hit), person.hit and fmt(person.hitPos) or '',
                     person.hitObject and tostring(person.hitObject.recordId) or '')
                 npcPos = person.hitObject and person.hitObject.position
+                npcObject = person.hitObject
             end
             -- rays at what is drawn of the person, from the outside to the middle of the body
             if elapsed >= 9 and not bodyRaysDone and npcPos then
@@ -316,12 +349,62 @@ return {
                 log('view', string.format('yaw=%%.2f pitch=%%.2f', camera.getYaw(), camera.getPitch()))
                 %s
             end
+            -- the person is moved from here, and its foot looked at while it walks, runs and stands again
+            if elapsed >= %.1f and npcObject and not personMoving then
+                personMoving = true
+                core.sendGlobalEvent('OFTestMovePerson', npcObject)
+            end
+            for _, ray in ipairs({ { 'footwalk', %.1f }, { 'footrun', %.1f }, { 'footstand', %.1f } }) do
+                if personMoving and elapsed >= ray[2] and not footRaysDone[ray[1]] then
+                    footRaysDone[ray[1]] = true
+                    lookFoot(ray[1])
+                end
+            end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (int(WEST_FROM), TURN_FROM, TURN_FROM, TURN_FROM, TURN_FROM, TURN_FROM, *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA,
-       int(WEST_FROM) + 4, FOOT_RAY_FROM, FOOT_RAY_LUA, WALK_SECONDS)
+""" % (", ".join(map(str, FOOT_RAY[0])), ", ".join(map(str, FOOT_RAY[1])), int(WEST_FROM), TURN_FROM, TURN_FROM, TURN_FROM,
+       TURN_FROM, TURN_FROM, *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, int(WEST_FROM) + 4,
+       FOOT_RAY_FROM, FOOT_RAY_LUA, PERSON_MOVE_FROM, PERSON_MOVE_FROM + WALK_RAY_AFTER,
+       PERSON_MOVE_FROM + RUN_RAY_AFTER, PERSON_MOVE_FROM + STAND_RAY_AFTER, WALK_SECONDS)
+
+# Moves the person that the player script names, east, in steps of a frame: teleporting it to where it would be at the
+# speed of walking and then of running (the speeds of the animation files, which the engine compares the speed of the
+# character with), then leaves it where it ends.
+PERSON_SCRIPT = """\
+local util = require('openfallout.util')
+
+local person, from, elapsed = nil, nil, 0
+local WALK = %g
+local RUN = %g
+local WALK_FOR = %g
+local RUN_FOR = %g
+
+return {
+    eventHandlers = {
+        OFTestMovePerson = function(object)
+            person, from, elapsed = object, object.position, 0
+        end,
+    },
+    engineHandlers = {
+        onUpdate = function(dt)
+            if person == nil then return end
+            elapsed = elapsed + dt
+            local distance
+            if elapsed < WALK_FOR then
+                distance = WALK * elapsed
+            elseif elapsed < WALK_FOR + RUN_FOR then
+                distance = WALK * WALK_FOR + RUN * (elapsed - WALK_FOR)
+            else
+                distance = WALK * WALK_FOR + RUN * RUN_FOR
+            end
+            person:teleport(person.cell, from + util.vector3(distance, 0, 0))
+            if elapsed >= WALK_FOR + RUN_FOR then person = nil end
+        end,
+    },
+}
+""" % (plugin.WALK_VELOCITY, plugin.RUN_VELOCITY, WALK_FOR, RUN_FOR)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
@@ -333,6 +416,9 @@ PERSON_RAY = re.compile(r"OFTEST\tray person hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]
 WALL_RAY = re.compile(r"OFTEST\tray wall hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
 WALL_RENDER_RAY = re.compile(r"OFTEST\trender ray wall hit=\t(\w+)")
 WATER_RAY = re.compile(r"OFTEST\tray water hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
+# a ray at the foot of the moved person: whether it hit, where along x, and where the person was along x then
+MOVING_FOOT_RAY = re.compile(r"OFTEST\trender ray (foot(?:walk|run|stand)) hit=\t(\w+)\t(?:(-?[\d.]+),-?[\d.]+,-?[\d.]+)?"
+                             r"\tperson\t(-?[\d.]+),")
 
 
 def start_xvfb():
@@ -550,6 +636,27 @@ def check(text, scenario, colours, animated=True):
     for line in text.splitlines():
         if re.search(r" [EW]\] .*(?:person_|Hair not found|Head part not found)", line):
             problems.append(line)
+    # The person is moved east, at the speed of walking, then running, and then stands: the engine takes the speed from
+    # how fast it changes its place, and plays the animation of each, which put the foot in a place of their own. The
+    # control run (--no-animation) has no animation files, so the foot stays where the skeleton has it.
+    moved = {}
+    for match in map(MOVING_FOOT_RAY.search, text.splitlines()):
+        if match:
+            moved[match.group(1)] = (match.group(2) == "true", float(match.group(3) or 0), float(match.group(4) or 0))
+    for name, face in MOVING_FOOT_FACES.items():
+        if name not in moved:
+            problems.append(f"the script did not log the ray at the foot of the person ('{name}')")
+            continue
+        hit, hit_x, person_x = moved[name]
+        want = person_x + (face if animated else FOOT_REST_FACE)
+        if not hit or abs(hit_x - want) > MOVING_FOOT_TOLERANCE:
+            problems.append(f"the ray '{name}' at the foot of the moved person should hit the box at x={want:.0f} "
+                            f"(the person is at {person_x:.0f}), it found x={hit_x:.0f} (hit: {hit})")
+    start_x = scenario.origin[0] + plugin.NPC_DISTANCE
+    for name, least in (("footwalk", 60.0), ("footrun", 280.0)):
+        if name in moved and moved[name][2] < start_x + least:
+            problems.append(f"the person was at x={moved[name][2]:.0f} at '{name}', expected it to have been moved "
+                            f"east at least {least:.0f} units from {start_x:.0f}")
     # The wall has nothing to draw, so a ray at what is drawn goes through it, and its Havok box is hit by a ray at the
     # world: the face of its box that the player faces, WALL_FACE west of the start
     wall_rays = [m for m in map(WALL_RAY.search, text.splitlines()) if m]
@@ -600,7 +707,9 @@ def main():
     plugin.write(data, animation=not args.no_animation, spline=not args.key_animation)
     (data / "scripts").mkdir()
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
-    (data / "walktest.omwscripts").write_text("PLAYER: scripts/walktest.lua\n", encoding="ascii")
+    (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
+    (data / "walktest.omwscripts").write_text("PLAYER: scripts/walktest.lua\nGLOBAL: scripts/personwalk.lua\n",
+                                              encoding="ascii")
 
     xvfb = start_xvfb()
     for scenario in SCENARIOS:
