@@ -492,12 +492,44 @@ return {
     },
 }
 """.replace("@ACTORS@", ", ".join("{ '%s', { %d, %d } }" % (name, *plugin.PACKAGE_REF_IDS[name])
-                                  for name in ("walker", "idler", "roamer")))
+                                  for name in ("walker", "idler", "roamer")) + ", " + ", ".join(
+                                      "{ '%s', { %d, %d } }" % (name, *plugin.FOLLOW_REF_IDS[name])
+                                      for name in ("follower", "companion")))
+
+# Tells the companion, a character with no package, to follow the player (a global script, from the game time that the
+# plugin names). The reference of each kind of cell is tried, the one that is loaded takes it.
+FOLLOW_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+
+local ids = { @IDS@ }
+local elapsed, done = 0, false
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ then return end
+            for _, id in ipairs(ids) do
+                local ok, actor = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+                if ok and actor:isValid() then
+                    actor:startFollowing(world.players[1], @DISTANCE@)
+                    print('OFTEST', 'companion told to follow')
+                    done = true
+                end
+            end
+        end,
+    },
+}
+""".replace("@IDS@", ", ".join(map(str, plugin.FOLLOW_REF_IDS["companion"]))).replace(
+    "@FROM@", str(plugin.COMPANION_FROM)).replace("@DISTANCE@", str(plugin.FOLLOW_DISTANCES["companion"]))
 
 # Where the three characters start relative to the player, and where the walker should end
 PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler", "roamer")}
 ARRIVAL_RANGE = 30.0  # how close to the marker of a package for the night the walker may come, units
 TRAVEL_SLACK = 20.0  # how far from the radius of its package the walker may have stopped (it stops at the edge of it)
+FOLLOW_SLACK = 64.0 + 40.0  # the slack of a follower (it starts to walk beyond it) and a margin
+FOLLOW_YAW_RANGE = 0.4  # how far from the way to the player a follower that has come to a stop faces, radians
 UNMOVED_RANGE = 2.0  # how far a character that must stay may be from where it was put
 ROAM_SLACK = 30.0  # how far outside the radius of its package the roamer may be (the radius of a package is in the data)
 WALK_YAW_RANGE = 0.35  # how far from north the walker faces while it walks north, radians
@@ -786,6 +818,41 @@ def angle_difference(a, b):
     return abs((a - b + math.pi) % (2 * math.pi) - math.pi)
 
 
+def check_followers(text, scenario, samples, animated, where):
+    """The problems with the characters that follow the player: they stand still until it is time (the companion is told
+    to follow by a script, the follower has a package), and later stay within their distance of the player (and a little
+    farther, for the slack) facing it. Without the animation to walk with they are not moved."""
+    problems = []
+    player = [(float(m.group(1)), float(m.group(4)), float(m.group(5)))
+              for m in map(SAMPLE.search, text.splitlines()) if m]
+    if "companion told to follow" not in text:
+        problems.append("the script did not tell the companion to follow the player")
+    _, px, py = player[-1]
+    for name, distance in plugin.FOLLOW_DISTANCES.items():
+        rows = samples[name]
+        home = where(name)
+        _, (x, y, z), yaw = rows[-1]
+        away = math.hypot(x - px, y - py)
+        if not animated:
+            moved = max(math.hypot(r[1][0] - home[0], r[1][1] - home[1]) for r in rows)
+            if moved > UNMOVED_RANGE:
+                problems.append(f"the {name} was moved {moved:.1f} units, but it has no animation to walk with")
+            continue
+        if name == "companion":
+            early = [r for r in rows if r[0] < plugin.COMPANION_FROM - 0.5]
+            if any(math.hypot(r[1][0] - home[0], r[1][1] - home[1]) > UNMOVED_RANGE for r in early):
+                problems.append("the companion was moved before the script told it to follow")
+        if not 60.0 <= away <= distance + FOLLOW_SLACK:
+            problems.append(f"the {name} ended {away:.0f} units from the player, expected it within {distance} units "
+                            f"and the slack ({distance + FOLLOW_SLACK:.0f}) and not on top of the player")
+        if angle_difference(yaw, math.atan2(px - x, py - y)) > FOLLOW_YAW_RANGE:
+            problems.append(f"the {name} ended facing {yaw:.2f}, expected it to face the player "
+                            f"({math.atan2(px - x, py - y):.2f})")
+        if math.hypot(x - home[0], y - home[1]) < 20.0:
+            problems.append(f"the {name} did not move from where it was put")
+    return problems
+
+
 def check_packages(text, scenario, animated):
     """The problems with the characters that have AI packages: the walker goes to the marker of its package that is on and
     turns the way the marker faces, the idler stays, the roamer goes about the radius of its package. Without the
@@ -796,14 +863,14 @@ def check_packages(text, scenario, animated):
         if match:
             samples.setdefault(match.group(1), []).append(
                 (float(match.group(2)), tuple(float(match.group(i)) for i in (3, 4, 5)), float(match.group(6))))
-    for name in PACKAGE_START:
+    for name in tuple(PACKAGE_START) + tuple(plugin.FOLLOW_PLACES):
         if len(samples.get(name, [])) < WALK_SECONDS - 5:
             problems.append(f"the script logged {len(samples.get(name, []))} positions of the '{name}', expected at least "
                             f"{WALK_SECONDS - 5}")
             return problems
 
     def where(name):
-        x, y = PACKAGE_START[name]
+        x, y = {**PACKAGE_START, **plugin.FOLLOW_PLACES}[name]
         return scenario.origin[0] + x, scenario.origin[1] + y
 
     def away(name, position):
@@ -823,6 +890,7 @@ def check_packages(text, scenario, animated):
     target = (scenario.origin[0] + plugin.PACKAGE_PLACES["target"][0], scenario.origin[1] + plugin.PACKAGE_PLACES["target"][1])
     night = (scenario.origin[0] + plugin.PACKAGE_PLACES["night"][0], scenario.origin[1] + plugin.PACKAGE_PLACES["night"][1])
     walker = samples["walker"]
+    problems += check_followers(text, scenario, samples, animated, where)
     if not animated:
         moved = max(away("walker", position) for _, position, _ in walker)
         if moved > UNMOVED_RANGE:
@@ -931,9 +999,10 @@ def main():
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
     (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
     (data / "scripts" / "packagetrack.lua").write_text(PACKAGE_SCRIPT, encoding="ascii")
+    (data / "scripts" / "followtest.lua").write_text(FOLLOW_SCRIPT, encoding="ascii")
     (data / "walktest.omwscripts").write_text(
-        "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n",
-        encoding="ascii")
+        "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
+        "GLOBAL: scripts/followtest.lua\n", encoding="ascii")
 
     xvfb = start_xvfb()
     for scenario in SCENARIOS:

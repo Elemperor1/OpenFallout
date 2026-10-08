@@ -179,6 +179,9 @@ namespace OFMechanics
         bool toggleAI() override;
         bool isAIActive() override;
 
+        void startFalloutFollowing(const OFWorld::Ptr& actor, const OFWorld::Ptr& target, float distance) override;
+        void stopFalloutFollowing(const OFWorld::Ptr& actor) override;
+
         void playerLoaded() override;
 
         bool onOpen(const OFWorld::Ptr& ptr) override;

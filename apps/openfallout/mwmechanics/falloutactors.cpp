@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <limits>
 #include <vector>
 
 #include <components/debug/debuglog.hpp>
@@ -68,6 +69,11 @@ namespace OFMechanics
         constexpr float giveUpTime = 10.f;
         // The navigator is asked for paths that end at the nearest place within this distance of the target
         constexpr float endTolerance = 96.f;
+        // A follower asks for a new path when the one it follows has gone this far from where its path ends
+        constexpr float repathDistance = 150.f;
+        // A follower that runs does so at this speed when its animation does not say, units a second
+        constexpr float defaultRunSpeed = 300.f;
+        constexpr float fastestRunSpeed = 800.f;
 
         enum class Walk
         {
@@ -92,6 +98,12 @@ namespace OFMechanics
         {
             return onSameFloor(a, b) && distanceAcross(a, b) <= reach;
         }
+
+        /// How far `a` is from `b` on the map; on another floor, too far for any distance to be near
+        float distanceByFloor(const osg::Vec3f& a, const osg::Vec3f& b)
+        {
+            return onSameFloor(a, b) ? distanceAcross(a, b) : std::numeric_limits<float>::max();
+        }
     }
 
     struct FalloutActors::Mind
@@ -100,8 +112,18 @@ namespace OFMechanics
         std::vector<const ESM4::AIPackage*> mPackages;
         ESM4::LevelledRandom mRandom;
 
+        /// Whom it follows: the player, or a reference
+        struct Following
+        {
+            bool mPlayer = false;
+            ESM::RefNum mRef;
+            float mDistance = 0.f;
+        };
+
         const ESM4::AIPackage* mPackage = nullptr; // the one that it follows now
         FalloutGoal mGoal;
+        Following mFollowing;
+        bool mCommanded = false; // a script told it to follow, which the packages do not change
         bool mHasFacing = false;
         float mFacing = 0.f; // which way it faces when it gets there
 
@@ -182,6 +204,12 @@ namespace OFMechanics
             return velocity > 0.f ? std::clamp(velocity, slowestWalkSpeed, fastestWalkSpeed) : defaultWalkSpeed;
         }
 
+        float runSpeed(const OFRender::FalloutActorAnimation& animation)
+        {
+            const float velocity = animation.getRunVelocity();
+            return velocity > 0.f ? std::clamp(velocity, slowestWalkSpeed, fastestRunSpeed) : defaultRunSpeed;
+        }
+
         /// Whether the other reference is somewhere the actor can walk to from where it is: in the same cell, or in an
         /// exterior cell of the same worldspace (an interior is a cell of its own)
         bool sharesSpace(const OFWorld::Ptr& actor, const OFWorld::Ptr& other)
@@ -193,6 +221,24 @@ namespace OFMechanics
             return otherCell == cell
                 || (otherCell->isExterior() && cell->isExterior()
                     && otherCell->getCell()->getWorldSpace() == cell->getCell()->getWorldSpace());
+        }
+
+        /// Where the actor is sent to follow, false when the one it follows is not around
+        bool followPosition(const Frame& frame, const OFWorld::Ptr& actor,
+            const FalloutActors::Mind::Following& following, osg::Vec3f& position)
+        {
+            if (following.mPlayer)
+            {
+                if (!sharesSpace(actor, frame.mWorld.getPlayerPtr()))
+                    return false;
+                position = frame.mPlayer;
+                return true;
+            }
+            const OFWorld::Ptr target = OFBase::Environment::get().getWorldModel()->getPtr(following.mRef);
+            if (!sharesSpace(actor, target) || !target.getRefData().isEnabled())
+                return false;
+            position = target.getRefData().getPosition().asVec3();
+            return isLoaded(frame, actor, position);
         }
 
         /// Where the feet should be: on the ground that a ray finds under the place, else at the height given
@@ -233,6 +279,14 @@ namespace OFMechanics
                 mind.mAgent = true;
         }
 
+        void stopWalking(FalloutActors::Mind& mind)
+        {
+            mind.mWalking = false;
+            mind.mWaypoints.clear();
+            mind.mStuck = 0.f;
+            mind.mYielded = false;
+        }
+
         void releaseAgent(FalloutActors::Mind& mind)
         {
             if (!mind.mAgent)
@@ -262,14 +316,67 @@ namespace OFMechanics
         remove(ptr);
         if (!handles(ptr))
             return;
-        const std::vector<const ESM4::AIPackage*>& packages = packagesOf(ptr);
-        if (packages.empty())
+        // A command from a script outlives the cell: the character takes it up again when the cell is loaded
+        const auto command = mCommands.find(ptr.getCellRef().getRefNum());
+        if (command == mCommands.end() && packagesOf(ptr).empty())
             return;
+        Mind& mind = makeMind(ptr);
+        if (command != mCommands.end())
+            obey(mind, command->second);
+    }
+
+    FalloutActors::Mind& FalloutActors::makeMind(const OFWorld::Ptr& ptr)
+    {
         const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
         const std::uint64_t seed = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(refNum.mContentFile)) << 32)
             ^ refNum.mIndex ^ 0x9E3779B97F4A7C15ull;
-        const auto mind = mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packages, seed)).first;
-        registerAgent(*mind->second);
+        Mind& mind = *mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packagesOf(ptr), seed)).first->second;
+        registerAgent(mind);
+        return mind;
+    }
+
+    void FalloutActors::follow(const OFWorld::Ptr& ptr, const OFWorld::Ptr& target, float distance)
+    {
+        if (!handles(ptr) || target.isEmpty() || target == ptr)
+            return;
+        const auto found = mMinds.find(ptr.mRef);
+        Mind& mind = found != mMinds.end() ? *found->second : makeMind(ptr);
+        Command command;
+        command.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
+        command.mTarget = target.getCellRef().getRefNum();
+        command.mDistance = falloutScriptFollowDistance(distance);
+        obey(mind, command);
+        if (const ESM::RefNum refNum = ptr.getCellRef().getRefNum(); refNum.isSet())
+            mCommands[refNum] = command;
+    }
+
+    void FalloutActors::obey(Mind& mind, const Command& command)
+    {
+        mind.mCommanded = true;
+        mind.mPackage = nullptr;
+        mind.mGoal = FalloutGoal();
+        mind.mGoal.mBehaviour = ESM4::PackageBehaviour::Follow;
+        mind.mHasFacing = false;
+        mind.mFollowing.mPlayer = command.mPlayer;
+        mind.mFollowing.mRef = command.mTarget;
+        mind.mFollowing.mDistance = command.mDistance;
+        mind.mWait = 0.f;
+        stopWalking(mind);
+    }
+
+    void FalloutActors::stopFollowing(const OFWorld::Ptr& ptr)
+    {
+        mCommands.erase(ptr.getCellRef().getRefNum());
+        const auto found = mMinds.find(ptr.mRef);
+        if (found == mMinds.end() || !found->second->mCommanded)
+            return;
+        Mind& mind = *found->second;
+        mind.mCommanded = false;
+        mind.mFollowing = Mind::Following();
+        mind.mPackage = nullptr;
+        mind.mGoal = FalloutGoal();
+        mind.mReview = 0.f;
+        stopWalking(mind);
     }
 
     void FalloutActors::remove(const OFWorld::Ptr& ptr)
@@ -306,17 +413,39 @@ namespace OFMechanics
         }
     }
 
+    void FalloutActors::clear()
+    {
+        // The cells are unloaded before this, so there are no minds left to give their agents back
+        mMinds.clear();
+        mCommands.clear();
+    }
+
     namespace
     {
         /// Where the package sends the actor: false when it cannot be done here (the reference it names is not in a
         /// cell that is loaded, or is not where the actor can go)
         bool makeGoal(const Frame& frame, const FalloutActors::Mind& mind, const ESM4::AIPackage& package,
-            FalloutGoal& goal, bool& hasFacing, float& facing)
+            FalloutGoal& goal, bool& hasFacing, float& facing, FalloutActors::Mind::Following& following)
         {
             goal = FalloutGoal();
             hasFacing = false;
+            following = FalloutActors::Mind::Following();
             goal.mBehaviour = ESM4::packageBehaviour(package.mData.type);
             goal.mRadius = falloutGoalRadius(package.mLocation.radius, goal.mBehaviour);
+
+            if (goal.mBehaviour == ESM4::PackageBehaviour::Follow)
+            {
+                // Only a reference can be followed: an object of a kind or a linked reference can not be told yet
+                if (package.mTarget.type != 0)
+                    return false;
+                const ESM::RefNum target = ESM::FormId::fromUint32(package.mTarget.target);
+                following.mPlayer
+                    = falloutIsPlayerReference(target, falloutFirstPlugin(frame.mWorld.getContentFiles()));
+                following.mRef = target;
+                following.mDistance = falloutFollowDistance(package.mTarget.distance);
+                osg::Vec3f position;
+                return followPosition(frame, mind.mPtr, following, position);
+            }
 
             // Where it was put by the file, which is where most packages are about
             goal.mCenter = mind.mPtr.getCellRef().getPosition().asVec3();
@@ -400,9 +529,10 @@ namespace OFMechanics
                     mind.mPtr, osg::Vec3f(position.rot[0], position.rot[1], turned), OFBase::RotationFlag_none);
         }
 
-        /// One frame of walking to the place. The actor is there within `arrival` units of the place (0: at it).
+        /// One frame of walking to the place. The actor is there within `arrival` units of the place (0: at it) and on
+        /// its floor, and may run.
         Walk walkTo(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination, float duration,
-            float arrival = 0.f)
+            float arrival = 0.f, bool run = false)
         {
             const OFRender::FalloutActorAnimation* animation = walker(frame.mWorld, mind.mPtr);
             if (animation == nullptr)
@@ -454,7 +584,7 @@ namespace OFMechanics
             }
 
             const osg::Vec3f next = mind.mWaypoints.front();
-            const float speed = walkSpeed(*animation);
+            const float speed = run && animation->canRun() ? runSpeed(*animation) : walkSpeed(*animation);
             osg::Vec3f place = falloutStepToward(position, next, speed * duration);
             place.z() = groundHeight(frame.mWorld, place);
 
@@ -489,26 +619,19 @@ namespace OFMechanics
             return mind.mStuck >= stuckTime ? Walk::Failed : Walk::Moving;
         }
 
-        void stopWalking(FalloutActors::Mind& mind)
-        {
-            mind.mWalking = false;
-            mind.mWaypoints.clear();
-            mind.mStuck = 0.f;
-            mind.mYielded = false;
-        }
-
         /// Looks at the packages and starts to follow the first that is on, if it is not the one that is followed
         void review(const Frame& frame, FalloutActors::Mind& mind)
         {
             const ESM4::AIPackage* chosen = nullptr;
             FalloutGoal goal;
+            FalloutActors::Mind::Following following;
             bool hasFacing = false;
             float facing = 0.f;
             for (const ESM4::AIPackage* package : mind.mPackages)
             {
                 if (package == nullptr || ESM4::packageSkip(*package, frame.mClock) != ESM4::PackageSkip::None)
                     continue;
-                if (!makeGoal(frame, mind, *package, goal, hasFacing, facing))
+                if (!makeGoal(frame, mind, *package, goal, hasFacing, facing, following))
                     continue;
                 chosen = package;
                 break;
@@ -533,6 +656,7 @@ namespace OFMechanics
 
             mind.mPackage = chosen;
             mind.mGoal = chosen != nullptr ? goal : FalloutGoal();
+            mind.mFollowing = chosen != nullptr ? following : FalloutActors::Mind::Following();
             mind.mHasFacing = chosen != nullptr && hasFacing;
             mind.mFacing = facing;
             mind.mAtGoal = false;
@@ -582,7 +706,8 @@ namespace OFMechanics
             if (mind.mReview <= 0.f)
             {
                 mind.mReview = reviewInterval;
-                review(frame, mind);
+                if (!mind.mCommanded)
+                    review(frame, mind);
             }
             mind.mWait = std::max(0.f, mind.mWait - duration);
 
@@ -615,6 +740,47 @@ namespace OFMechanics
                     }
                     if (mind.mAtGoal && mind.mHasFacing)
                         faceToward(frame, mind, mind.mFacing, duration);
+                    break;
+                }
+                case ESM4::PackageBehaviour::Follow:
+                {
+                    osg::Vec3f target;
+                    if (!followPosition(frame, mind.mPtr, mind.mFollowing, target))
+                    {
+                        // The one it follows is not around: it waits where it is
+                        stopWalking(mind);
+                        break;
+                    }
+                    const float away = distanceByFloor(mind.position(), target);
+                    if (!falloutFollowMoves(away, mind.mFollowing.mDistance, mind.mWalking))
+                    {
+                        if (mind.mWalking)
+                            stopWalking(mind);
+                        faceToward(frame, mind,
+                            std::atan2(target.x() - mind.position().x(), target.y() - mind.position().y()), duration);
+                        break;
+                    }
+                    if (mind.mWait > 0.f)
+                        break;
+                    // The one it follows has gone on: the path is made again
+                    if (!mind.mWalking || distanceAcross(target, mind.mDestination) > repathDistance)
+                    {
+                        mind.mDestination = target;
+                        mind.mWaypoints.clear();
+                    }
+                    switch (walkTo(frame, mind, mind.mDestination, duration, mind.mFollowing.mDistance,
+                        falloutFollowRuns(away, mind.mFollowing.mDistance)))
+                    {
+                        case Walk::Arrived:
+                            stopWalking(mind);
+                            break;
+                        case Walk::Failed:
+                            stopWalking(mind);
+                            mind.mWait = pathRetryTime;
+                            break;
+                        default:
+                            break;
+                    }
                     break;
                 }
                 case ESM4::PackageBehaviour::Roam:

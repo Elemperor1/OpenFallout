@@ -219,6 +219,11 @@ namespace OFBase
         virtual bool toggleAI() = 0;
         virtual bool isAIActive() = 0;
 
+        /// Makes a character or creature of Fallout follow the target, as a companion does, whatever its AI packages
+        /// say (distance 0: the usual one), until it is told to stop
+        virtual void startFalloutFollowing(const OFWorld::Ptr& actor, const OFWorld::Ptr& target, float distance) = 0;
+        virtual void stopFalloutFollowing(const OFWorld::Ptr& actor) = 0;
+
         virtual void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
             = 0;
         virtual void getActorsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) = 0;

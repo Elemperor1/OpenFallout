@@ -22,6 +22,7 @@
 #include "../mwmechanics/creaturestats.hpp"
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/world.hpp"
 
 #include "luaevents.hpp"
@@ -401,6 +402,18 @@ namespace OFLua
                 objectT["setScale"] = [context](const GObject& object, float scale) {
                     context.mLuaManager->addAction(
                         [object, scale] { OFBase::Environment::get().getWorld()->scaleObject(object.ptr(), scale); });
+                };
+                objectT["startFollowing"]
+                    = [context](const GObject& object, const GObject& target, const sol::optional<float>& distance) {
+                          context.mLuaManager->addAction([object, target, distance = distance.value_or(0.f)] {
+                              OFBase::Environment::get().getMechanicsManager()->startFalloutFollowing(
+                                  object.ptr(), target.ptr(), distance);
+                          });
+                      };
+                objectT["stopFollowing"] = [context](const GObject& object) {
+                    context.mLuaManager->addAction([object] {
+                        OFBase::Environment::get().getMechanicsManager()->stopFalloutFollowing(object.ptr());
+                    });
                 };
                 objectT["addScript"] = [context](const GObject& object, std::string_view path, sol::object initData) {
                     const LuaUtil::ScriptsConfiguration& cfg = context.mLua->getConfiguration();

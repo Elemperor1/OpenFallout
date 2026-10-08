@@ -211,6 +211,25 @@ namespace
         EXPECT_EQ(result[2].mTarget.target, 0x00000123u); // an object type is a number
     }
 
+    TEST(ESM4PackageTest, readsTheTargetOfAPackageOfFallout)
+    {
+        // type, target, distance and 4 bytes more (a float)
+        std::string data;
+        append<std::int32_t>(data, 0);
+        append<std::uint32_t>(data, 0x00000014);
+        append<std::int32_t>(data, 300);
+        append<float>(data, 1.5f);
+        const ESM4::AIPackage result = loadFromAFalloutFile(zString("EDID", "Follow") + falloutPackageData(1, 8)
+            + subRecord("PTDT", data) + subRecord("PLDT", bytePattern(12, 10)));
+
+        EXPECT_EQ(result.mData.type, 1);
+        EXPECT_EQ(result.mTarget.type, 0);
+        EXPECT_EQ(result.mTarget.target, 0x00000014u);
+        EXPECT_EQ(result.mTarget.distance, 300);
+        // the sub-record after it is read from the right place
+        EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
     TEST(ESM4PackageTest, ignoresSubrecordsThatNoEventClaims)
     {
         // The loader is shared with games whose packages have no event markers.

@@ -241,6 +241,23 @@
 -- @param #number scale Scale desired in game.
 
 ---
+-- Makes a character or creature of Fallout 3 and New Vegas follow another object, as a companion does.
+-- The follower stays within the distance of the target, walks after it when it goes and runs when it is far behind,
+-- whatever its AI packages say, until stopFollowing is called. Does nothing for objects that are not characters or
+-- creatures of Fallout. It lasts while the cell of the character is unloaded and loaded again, but is not kept in a save game.
+-- Can be called only from a global script.
+-- @function [parent=#GameObject] startFollowing
+-- @param self
+-- @param #GameObject target The object to follow, the player for instance.
+-- @param #number distance (optional) How close in game units to stay to the target (default 256, also for 0 or less; at least 128 and at most 1024).
+
+---
+-- Stops what startFollowing began, so that the character goes back to its AI packages.
+-- Can be called only from a global script.
+-- @function [parent=#GameObject] stopFollowing
+-- @param self
+
+---
 -- Sets whether the object will be written to the save game.
 -- For objects originating from a content file, setting this to false restores the object to its original state after loading.
 -- Objects spawned by scripts will not be restored on save load.

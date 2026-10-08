@@ -1,6 +1,7 @@
 #include "falloutpackages.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #include <osg/Math>
@@ -42,6 +43,46 @@ namespace OFMechanics
         constexpr float shortest = 3.f;
         constexpr float longest = 12.f;
         return shortest + (longest - shortest) * unit(random);
+    }
+
+    float falloutFollowDistance(std::int32_t packageDistance)
+    {
+        return falloutScriptFollowDistance(static_cast<float>(packageDistance));
+    }
+
+    float falloutScriptFollowDistance(float distance)
+    {
+        // The comparison is false for a number that is not one
+        if (!(distance > 0.f))
+            return falloutDefaultFollow;
+        return std::clamp(distance, falloutSmallestFollow, falloutLargestFollow);
+    }
+
+    bool falloutFollowMoves(float away, float distance, bool walking)
+    {
+        return away > (walking ? distance : distance + falloutFollowSlack);
+    }
+
+    bool falloutFollowRuns(float away, float distance)
+    {
+        return away > distance + falloutFollowRunBeyond;
+    }
+
+    int falloutFirstPlugin(const std::vector<std::string>& contentFiles)
+    {
+        for (std::size_t i = 0; i < contentFiles.size(); ++i)
+        {
+            const std::string& name = contentFiles[i];
+            const std::size_t dot = name.rfind('.');
+            if (dot == std::string::npos)
+                continue;
+            std::string extension = name.substr(dot + 1);
+            std::transform(extension.begin(), extension.end(), extension.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (extension == "esm" || extension == "esp" || extension == "esl")
+                return static_cast<int>(i);
+        }
+        return -1;
     }
 
     ESM4::PackageClock falloutClock(float hour, int daysPassed)

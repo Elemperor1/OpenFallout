@@ -18,6 +18,7 @@ South and west of the start there are three more characters that have AI package
 marker and turns the way the marker faces (the first package of its list is for the night, which it ignores at the
 time of day the game starts at), one that has no package and must stay where it is put, and one that goes about the
 place where it was put.
+Two more follow the player: one by a package (Follow, the player as the target) and one that a script tells to.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
@@ -91,7 +92,13 @@ NIGHT_PACKAGE_IDS = {"interior": 0x830, "exterior": 0x831}
 PACKAGE_REF_IDS = {"target": (0x832, 0x837), "night": (0x833, 0x838), "walker": (0x834, 0x839),
                    "idler": (0x835, 0x83A), "roamer": (0x836, 0x83B)}
 TARGET_MARKER_ID = 0x83C # a static with no model, for the characters to go to, which is not the entry marker of the cell
-LAST_ID = TARGET_MARKER_ID # the largest form ID of the plugin, which the next object ID of its header follows
+# Two characters that follow the player: the follower by a package (a Follow package that names the player as its target),
+# the companion by a script, which tells it to when the game has run for COMPANION_FROM seconds
+FOLLOW_PACKAGE_ID = 0x83D
+FOLLOWER_ID = 0x83E
+COMPANION_ID = 0x83F
+FOLLOW_REF_IDS = {"follower": (0x840, 0x842), "companion": (0x841, 0x843)}
+LAST_ID = 0x843 # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -153,6 +160,13 @@ TARGET_YAW = math.pi / 2
 NIGHT_YAW = math.pi
 ROAM_RADIUS = 200
 TRAVEL_RADIUS = 64 # the walker has arrived when it is this close to the marker (a character stops at the edge of the radius)
+# The followers start south of the start, and follow the player at these distances (units): the package names one, the
+# script the other
+FOLLOW_PLACES = {"follower": (-200.0, -600.0), "companion": (200.0, -600.0)}
+FOLLOW_DISTANCES = {"follower": 250, "companion": 200}
+COMPANION_FROM = 3.0
+PACKAGE_FOLLOW = 1
+PLAYER_REFERENCE = 0x14
 NIGHT_START = 22
 NIGHT_HOURS = 4
 PACKAGE_TRAVEL = 6
@@ -462,20 +476,24 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True):
     return record(b"NPC_", form_id, subs)
 
 
-def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0):
+def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0):
     """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
-    location as a type, a form ID or 0 and a radius, and the schedule (any month, any day, no date, the hour or 0xff for
-    any, how many hours it lasts)."""
+    location as a type, a form ID or 0 and a radius, the schedule (any month, any day, no date, the hour or 0xff for
+    any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout)."""
     subs = [zstr(b"EDID", name), sub(b"PKDT", struct.pack("<IBBH", 0, kind, 0, 0))]
     if location is not None:
         subs.append(sub(b"PLDT", struct.pack("<iIi", *location, radius)))
     subs.append(sub(b"PSDT", struct.pack("<BBBBI", 0xff, 0xff, 0, time, duration)))
+    if target is not None:
+        subs.append(sub(b"PTDT", struct.pack("<iIif", *target, distance, 0.0)))
     return record(b"PACK", form_id, subs)
 
 
 def packages():
-    """The packages of the walker (two for each kind of cell) and of the roamer."""
-    records = [package(ROAM_PACKAGE_ID, "OFTestRoam", PACKAGE_WANDER, (LOCATION_NEAR_EDITOR, 0), ROAM_RADIUS)]
+    """The packages of the walker (two for each kind of cell), of the roamer and of the follower."""
+    records = [package(ROAM_PACKAGE_ID, "OFTestRoam", PACKAGE_WANDER, (LOCATION_NEAR_EDITOR, 0), ROAM_RADIUS),
+               package(FOLLOW_PACKAGE_ID, "OFTestFollow", PACKAGE_FOLLOW, target=(0, PLAYER_REFERENCE),
+                       distance=FOLLOW_DISTANCES["follower"])]
     for index, kind in enumerate(("interior", "exterior")):
         records.append(package(NIGHT_PACKAGE_IDS[kind], "OFTestNight" + kind.capitalize(), PACKAGE_TRAVEL,
                                (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["night"][index]), 0, NIGHT_START, NIGHT_HOURS))
@@ -491,12 +509,14 @@ def package_people():
               for kind in ("interior", "exterior")]
     people.append(person(IDLER_ID, "OFTestIdler", dressed=False))
     people.append(person(ROAMER_ID, "OFTestRoamer", [ROAM_PACKAGE_ID], dressed=False))
+    people.append(person(FOLLOWER_ID, "OFTestFollower", [FOLLOW_PACKAGE_ID], dressed=False))
+    people.append(person(COMPANION_ID, "OFTestCompanion", dressed=False))
     return people
 
 
 def package_refs(index, origin):
-    """The markers and the three placed characters of a cell (0 for the interior cell, 1 for the exterior one), whose
-    origin is where the player starts in it."""
+    """The markers and the placed characters that follow packages, a script or the player, of a cell (0 for the interior
+    cell, 1 for the exterior one), whose origin is where the player starts in it."""
     ids = {name: refs[index] for name, refs in PACKAGE_REF_IDS.items()}
     kind = ("interior", "exterior")[index]
 
@@ -507,7 +527,10 @@ def package_refs(index, origin):
     return [refr(ids["target"], TARGET_MARKER_ID, place("target"), rotation=(0.0, 0.0, TARGET_YAW)),
             refr(ids["night"], TARGET_MARKER_ID, place("night"), rotation=(0.0, 0.0, NIGHT_YAW)),
             achr(ids["walker"], place("walker"), WALKER_IDS[kind]), achr(ids["idler"], place("idler"), IDLER_ID),
-            achr(ids["roamer"], place("roamer"), ROAMER_ID)]
+            achr(ids["roamer"], place("roamer"), ROAMER_ID)] + [
+        achr(FOLLOW_REF_IDS[name][index], (origin[0] + x, origin[1] + y, 0.0), base)
+        for name, base, (x, y) in (("follower", FOLLOWER_ID, FOLLOW_PLACES["follower"]),
+                                   ("companion", COMPANION_ID, FOLLOW_PLACES["companion"]))]
 
 
 def head_morphs():

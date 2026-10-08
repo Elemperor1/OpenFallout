@@ -843,6 +843,16 @@ namespace OFMechanics
         return mAI;
     }
 
+    void MechanicsManager::startFalloutFollowing(const OFWorld::Ptr& actor, const OFWorld::Ptr& target, float distance)
+    {
+        mFalloutActors.follow(actor, target, distance);
+    }
+
+    void MechanicsManager::stopFalloutFollowing(const OFWorld::Ptr& actor)
+    {
+        mFalloutActors.stopFollowing(actor);
+    }
+
     bool MechanicsManager::isAIActive()
     {
         return mAI;
@@ -1853,6 +1863,7 @@ namespace OFMechanics
     void MechanicsManager::clear()
     {
         mActors.clear();
+        mFalloutActors.clear();
         mStolenItems.clear();
         mClassSelected = false;
         mRaceSelected = false;
