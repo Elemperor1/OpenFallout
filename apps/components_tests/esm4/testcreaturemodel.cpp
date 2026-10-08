@@ -178,6 +178,19 @@ namespace
         EXPECT_EQ(ESM4::creatureModel(source, creature, playerLevel, 1).mSkeleton, "creatures/c/skeleton.nif");
     }
 
+    TEST(ESM4CreatureModelTest, aLevelledListInThePlaceOfATemplateIsResolvedForTheLevelOfThePlayer)
+    {
+        TestSource source;
+        source.addCreature(0x2011, "creatures\\a\\skeleton.nif");
+        source.addCreature(0x2012, "creatures\\b\\skeleton.nif");
+        source.addList(0x2010, { { 1, 0x2011 }, { 9, 0x2012 } });
+        // the creature says level 1 and takes its stats from the template, as nearly all of the real records do
+        const ESM4::Creature& creature = source.addCreature(0x2001, "", {}, useModel, 0x2010, 1);
+
+        EXPECT_EQ(ESM4::creatureTemplateChain(source, creature, 3, 1).at(1), &source.mCreatures.at(id(0x2011)));
+        EXPECT_EQ(ESM4::creatureTemplateChain(source, creature, 12, 1).at(1), &source.mCreatures.at(id(0x2012)));
+    }
+
     TEST(ESM4CreatureModelTest, endsAChainOfTemplatesThatIsACycle)
     {
         TestSource source;

@@ -160,9 +160,11 @@ namespace ESM4
             const Npc& current = *chain.back();
             if (current.mBaseTemplate.isZeroOrUnset())
                 break;
+            // A list in the place of a template is resolved for the level of the player: the level that the record
+            // names is one it takes from its template anyway, and 1 in nearly all of the records of the real files
             const Npc* next = resolveLevelledRecord<Npc>([&source](ESM::FormId id) { return source.findNpc(id); },
-                [&source](ESM::FormId id) { return source.findLevelledNpc(id); }, current.mBaseTemplate,
-                actorLevel(current, playerLevel), random, trace != nullptr ? &trace->mTemplateListsEmpty : nullptr);
+                [&source](ESM::FormId id) { return source.findLevelledNpc(id); }, current.mBaseTemplate, playerLevel,
+                random, trace != nullptr ? &trace->mTemplateListsEmpty : nullptr);
             if (next == nullptr || std::find(chain.begin(), chain.end(), next) != chain.end())
                 break;
             chain.push_back(next);

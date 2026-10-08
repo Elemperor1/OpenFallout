@@ -539,7 +539,7 @@ namespace
         EXPECT_THAT(wornAcrossSeeds(source, npc, playerLevel), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
     }
 
-    TEST(ESM4WornArmorTest, aLevelledListOfCharactersGivesOneCharacterByLevel)
+    TEST(ESM4WornArmorTest, aLevelledListOfCharactersGivesOneCharacterByTheLevelOfThePlayer)
     {
         TestSource source;
         source.addArmor(0x1001, upperBody);
@@ -551,11 +551,15 @@ namespace
         list.mLvlObject.push_back({ 1, 0, 0x2011, 1, 0 });
         list.mLvlObject.push_back({ 9, 0, 0x2012, 1, 0 });
         source.mLevelledNpcs[id(0x2010)] = list;
-        const ESM4::Npc& low = source.addNpc(0x2001, {}, ESM4::Npc::Template_UseInventory, 0x2010, 3);
-        const ESM4::Npc& high = source.addNpc(0x2002, {}, ESM4::Npc::Template_UseInventory, 0x2010, 12);
+        // the stored level of a record that takes its stats from its template is 1 in nearly all the real ones, so
+        // the list is no use if it is chosen from by that level; both characters get the same by the player's level
+        const ESM4::Npc& first = source.addNpc(0x2001, {}, ESM4::Npc::Template_UseInventory, 0x2010, 1);
+        const ESM4::Npc& second = source.addNpc(0x2002, {}, ESM4::Npc::Template_UseInventory, 0x2010, 30);
 
-        EXPECT_THAT(wornAcrossSeeds(source, low, playerLevel), ElementsAre(std::set<std::uint32_t>{ 0x1001 }));
-        EXPECT_THAT(wornAcrossSeeds(source, high, playerLevel), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
+        EXPECT_THAT(wornAcrossSeeds(source, first, 3), ElementsAre(std::set<std::uint32_t>{ 0x1001 }));
+        EXPECT_THAT(wornAcrossSeeds(source, first, 12), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
+        EXPECT_THAT(wornAcrossSeeds(source, second, 3), ElementsAre(std::set<std::uint32_t>{ 0x1001 }));
+        EXPECT_THAT(wornAcrossSeeds(source, second, 12), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
     }
 
     TEST(ESM4WornArmorTest, aLevelledListOfCharactersThatGivesNoneEndsTheChain)

@@ -46,8 +46,9 @@ namespace ESM4
             const Creature& current = *chain.back();
             if (current.mBaseTemplate.isZeroOrUnset())
                 break;
-            const Creature* next
-                = findInSource(source, current.mBaseTemplate, creatureLevel(current, playerLevel), random);
+            // As for characters, a list in the place of a template is resolved for the level of the player: the level
+            // of the record that names it is one it takes from its template
+            const Creature* next = findInSource(source, current.mBaseTemplate, playerLevel, random);
             if (next == nullptr || std::find(chain.begin(), chain.end(), next) != chain.end())
                 break;
             chain.push_back(next);
