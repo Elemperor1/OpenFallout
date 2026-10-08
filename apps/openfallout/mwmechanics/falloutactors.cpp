@@ -47,6 +47,9 @@ namespace OFMechanics
         constexpr float turnSpeed = 6.f;
         // Within this distance (across the ground) of a point of its path an actor goes on to the next
         constexpr float waypointDistance = 20.f;
+        // Two places that are further apart in height than this are not on the same floor, however near they are on the
+        // map: a character below a bed in a loft has not reached it
+        constexpr float floorReach = 128.f;
         // A path is followed from the navigator's points on the surface; the feet are put on the ground that a ray
         // finds from this far above them to this far below them
         constexpr float groundProbeUp = 48.f;
@@ -75,6 +78,17 @@ namespace OFMechanics
         float distanceAcross(const osg::Vec3f& a, const osg::Vec3f& b)
         {
             return (osg::Vec2f(a.x(), a.y()) - osg::Vec2f(b.x(), b.y())).length();
+        }
+
+        bool onSameFloor(const osg::Vec3f& a, const osg::Vec3f& b)
+        {
+            return std::abs(a.z() - b.z()) <= floorReach;
+        }
+
+        /// Whether `a` is within `reach` of `b` on the map and on the same floor
+        bool isNear(const osg::Vec3f& a, const osg::Vec3f& b, float reach)
+        {
+            return onSameFloor(a, b) && distanceAcross(a, b) <= reach;
         }
     }
 
@@ -357,7 +371,7 @@ namespace OFMechanics
                     // The place is on another island of the mesh, or in a part of it that is not made yet: the path
                     // goes as far as the navigator can, and a path that goes nowhere from here is no path
                     mind.mPartial = true;
-                    if (mind.mWaypoints.empty() || distanceAcross(start, mind.mWaypoints.back()) < waypointDistance)
+                    if (mind.mWaypoints.empty() || (start - mind.mWaypoints.back()).length() < waypointDistance)
                     {
                         mind.mWaypoints.clear();
                         return Walk::Failed;
@@ -392,7 +406,7 @@ namespace OFMechanics
             if (animation == nullptr)
                 return Walk::Failed;
 
-            if (arrival > 0.f && distanceAcross(mind.position(), destination) <= arrival)
+            if (arrival > 0.f && isNear(mind.position(), destination, arrival))
             {
                 mind.mWaypoints.clear();
                 return Walk::Arrived;
@@ -422,9 +436,9 @@ namespace OFMechanics
             }
 
             const osg::Vec3f position = mind.position();
-            while (mind.mWaypoints.size() > 1 && distanceAcross(position, mind.mWaypoints.front()) < waypointDistance)
+            while (mind.mWaypoints.size() > 1 && isNear(position, mind.mWaypoints.front(), waypointDistance))
                 mind.mWaypoints.pop_front();
-            if (distanceAcross(position, mind.mWaypoints.front()) < waypointDistance / 2.f)
+            if (isNear(position, mind.mWaypoints.front(), waypointDistance / 2.f))
             {
                 mind.mWaypoints.clear();
                 // The end of a path that stopped short is not the place: another path is asked for from here, which
@@ -560,8 +574,8 @@ namespace OFMechanics
                     break;
                 case ESM4::PackageBehaviour::Stay:
                 {
-                    // Something else (a script) moved it from where it stood: it goes back
-                    if (mind.mAtGoal && distanceAcross(mind.position(), mind.mRestPlace) > waypointDistance)
+                    // Something else (a script) moved it from where it stood, up or down as well: it goes back
+                    if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance)
                         mind.mAtGoal = false;
                     if (!mind.mAtGoal && mind.mWait <= 0.f)
                     {
