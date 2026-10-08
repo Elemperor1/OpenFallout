@@ -16,6 +16,8 @@
 #include <components/sceneutil/nodecallback.hpp>
 #include <components/sceneutil/statesetupdater.hpp>
 
+#include <components/nif/bspline.hpp>
+
 namespace osg
 {
     class MatrixTransform;
@@ -245,6 +247,8 @@ namespace NifOsg
         /// The keys of a transform interpolator, as a controller of a sequence (a sequence of Oblivion and later has
         /// no controller records for the nodes that it drives, only interpolators)
         explicit KeyframeController(const Nif::NiTransformInterpolator* interp);
+        /// The curves of a B-spline transform interpolator, as a controller of a sequence
+        explicit KeyframeController(const Nif::NiBSplineTransformInterpolator* interp);
 
         META_Object(NifOsg, KeyframeController)
 
@@ -257,6 +261,10 @@ namespace NifOsg
 
     private:
         void setInterpolator(const Nif::NiTransformInterpolator& interp);
+        void setDefaults(const Nif::NiQuatTransform& transform);
+
+        // The curves of a B-spline interpolator, instead of the keys
+        std::shared_ptr<const Nif::BSplineTransform> mSpline;
 
         QuaternionInterpolator mRotations;
 

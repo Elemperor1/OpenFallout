@@ -16,8 +16,9 @@ stands in the way (a character with a skeleton in its record, which is solid as 
 finds it) and whose body can be seen (rays at what is drawn find the suit it wears, its head, its hair and the hand that
 the suit does not cover, and none the parts of its race that the suit takes the place of; its race has a small box
 skinned to the left foot and the folder of the skeleton has an animation file that moves that foot, which a ray at the
-box finds where the animation put it: `--no-animation` leaves the file out, which must leave the foot where the skeleton
-has it)
+box finds where the animation put it: the file moves the foot with the control points of a B-spline, as most bones of
+the files of the games are driven, or with two keys under `--key-animation`; `--no-animation` leaves the file out, which
+must leave the foot where the skeleton has it)
 and, strafing west from
 there, at a wall that is not drawn (a mesh with only Havok collision: a ray at what is drawn goes through it, the player
 and a ray at the world stop at it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
@@ -580,6 +581,8 @@ def main():
     parser.add_argument("--no-animation", action="store_true",
                         help="leave the animation file of the person out, which must leave its foot where the skeleton "
                              "has it: the control of the check that the animation moves it")
+    parser.add_argument("--key-animation", action="store_true",
+                        help="move the foot with two translation keys, not the control points of a B-spline")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -594,7 +597,7 @@ def main():
 
     work = Path(tempfile.mkdtemp(prefix="openfallout-fallout-start-"))
     data = work / "data"
-    plugin.write(data, animation=not args.no_animation)
+    plugin.write(data, animation=not args.no_animation, spline=not args.key_animation)
     (data / "scripts").mkdir()
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
     (data / "walktest.omwscripts").write_text("PLAYER: scripts/walktest.lua\n", encoding="ascii")

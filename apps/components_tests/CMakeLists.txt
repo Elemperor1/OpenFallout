@@ -158,6 +158,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     nif/node.hpp
     nif/testanimsurvey.cpp
+    nif/testbspline.cpp
     nif/testphysics.cpp
 )
 

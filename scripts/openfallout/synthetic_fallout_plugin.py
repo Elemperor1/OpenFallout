@@ -489,9 +489,10 @@ def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):
     return "\n".join(lines)
 
 
-def write(out, animation=True):
+def write(out, animation=True, spline=True):
     """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
-    animation file."""
+    animation file. The animation moves the foot with the control points of a B-spline, as most bones of the files of
+    the games are, or with two keys when `spline` is false."""
     out = Path(out)
     mesh = out / "meshes" / "openfallout" / "cube.osgt"
     mesh.parent.mkdir(parents=True, exist_ok=True)
@@ -514,7 +515,7 @@ def write(out, animation=True):
         skinned_box.skinned_box(FOOT_BONE, FOOT_REST, FOOT_REST, FOOT_MARKER))
     if animation:
         (out / "meshes" / Path(IDLE_ANIMATION.replace("\\", "/"))).write_bytes(
-            idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE))
+            idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE, spline=spline))
     (out / "OFTest.esm").write_bytes(plugin())
     return out / "OFTest.esm"
 
