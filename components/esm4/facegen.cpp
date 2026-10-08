@@ -25,6 +25,16 @@ namespace ESM4
             return value;
         }
 
+        // The editor names the folder of a plugin with its extension ("falloutnv.esm"), the load order lists the plugin
+        // by its file name, and a stem is easier to be given; the folders are kept by the name without the extension
+        std::string_view withoutPluginExtension(std::string_view name)
+        {
+            for (const std::string_view extension : { ".esm", ".esp", ".esl" })
+                if (name.size() > extension.size() && name.ends_with(extension))
+                    return name.substr(0, name.size() - extension.size());
+            return name;
+        }
+
         bool fail(std::string& error, std::string message)
         {
             error = std::move(message);
@@ -183,7 +193,7 @@ namespace ESM4
             return;
 
         // Of several files with the same last six digits, the first is kept
-        auto& files = mFiles[kind].try_emplace(std::string(plugin)).first->second;
+        auto& files = mFiles[kind].try_emplace(std::string(withoutPluginExtension(plugin))).first->second;
         std::string full(root);
         full.append(directory).append("/").append(plugin).append("/").append(file);
         if (files.try_emplace(id, std::move(full)).second)
@@ -196,6 +206,7 @@ namespace ESM4
         if (kindFiles == mFiles.end())
             return nullptr;
         const std::uint32_t id = formId & 0x00FFFFFFu;
+        plugin = withoutPluginExtension(plugin);
 
         const auto own = kindFiles->second.find(plugin);
         if (own != kindFiles->second.end())

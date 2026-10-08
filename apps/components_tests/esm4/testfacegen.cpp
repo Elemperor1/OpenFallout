@@ -170,6 +170,26 @@ namespace
         EXPECT_EQ(index.find(ESM4::FaceTextureIndex::Kind::BodyMale, "falloutnv", 0x00aabbcc), nullptr);
     }
 
+    TEST(ESM4FaceTextureIndexTest, takesTheFolderOfAPluginWithOrWithoutItsExtension)
+    {
+        // the editor names the folder of a plugin with the extension of its file
+        ESM4::FaceTextureIndex index;
+        index.add("textures/characters/facemods/falloutnv.esm/00000001_0.dds");
+        index.add("textures/characters/facemods/deadmoney.esm/00000001_0.dds");
+        index.add("textures/characters/bodymods/honesthearts.esp/00000001modbodymale.dds");
+        EXPECT_EQ(index.size(), 3u);
+
+        for (const char* plugin : { "falloutnv", "falloutnv.esm" })
+            EXPECT_EQ(*index.find(ESM4::FaceTextureIndex::Kind::Face, plugin, 1),
+                "textures/characters/facemods/falloutnv.esm/00000001_0.dds");
+        EXPECT_EQ(*index.find(ESM4::FaceTextureIndex::Kind::Face, "deadmoney", 1),
+            "textures/characters/facemods/deadmoney.esm/00000001_0.dds");
+        EXPECT_EQ(*index.find(ESM4::FaceTextureIndex::Kind::BodyMale, "honesthearts.esp", 1),
+            "textures/characters/bodymods/honesthearts.esp/00000001modbodymale.dds");
+        // a plugin with no folder of its own, and two other folders with a file of those digits
+        EXPECT_EQ(index.find(ESM4::FaceTextureIndex::Kind::Face, "honesthearts", 1), nullptr);
+    }
+
     TEST(ESM4FaceTextureIndexTest, takesAnotherPluginsFolderOnlyWhenThereIsNoOtherChoice)
     {
         ESM4::FaceTextureIndex index;

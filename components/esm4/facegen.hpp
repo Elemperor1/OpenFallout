@@ -65,8 +65,9 @@ namespace ESM4
         void add(std::string_view path);
 
         // The texture of the character with the form id (the load order digits do not matter) that a plugin made. The
-        // folder of the plugin is tried first (its name without the extension); if it has no file for the character,
-        // a file in a folder of another plugin is taken only when no two folders have one.
+        // folder of the plugin is tried first (the editor names it with the extension of the plugin, "falloutnv.esm",
+        // and the name is taken with or without it); if it has no file for the character, a file in a folder of another
+        // plugin is taken only when no two folders have one.
         const std::string* find(Kind kind, std::string_view plugin, std::uint32_t formId) const;
 
         std::size_t size() const { return mCount; }
