@@ -167,7 +167,8 @@ namespace ESM4
             }
 
             // Adds the list `count` times: a list that calculates for each item in its count gives a new roll for every
-            // item, any other gives the same entries each time, which adds no armour that is not there already
+            // item, any other gives the same entries each time, which adds no armour that is not there already. A list
+            // that uses all is rolled once, as the flag supersedes the other two.
             void expand(ESM::FormId listId, std::size_t depth, std::uint32_t count)
             {
                 const LevelledItem* list = mSource.findLevelledItem(listId);
@@ -180,7 +181,8 @@ namespace ESM4
                     return;
                 }
 
-                const std::uint32_t rolls = list->calcEachItemInCount() ? std::max<std::uint32_t>(count, 1) : 1;
+                const std::uint32_t rolls
+                    = list->calcEachItemInCount() && !list->useAll() ? std::max<std::uint32_t>(count, 1) : 1;
                 for (std::uint32_t roll = 0; roll < rolls && mRollsLeft > 0; ++roll)
                     rollOnce(*list, depth);
             }

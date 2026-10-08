@@ -401,6 +401,21 @@ namespace
             UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001 }, std::set<std::uint32_t>{ 0x1002 }));
     }
 
+    TEST(ESM4WornArmorTest, aListThatUsesAllIsRolledOnceWhateverTheCount)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, hat);
+        // it also calculates for each item, which "use all" supersedes; half of the rolls give nothing
+        source.addList(0x1010, { { 1, 0x1001 }, { 1, 0x1002 } }, 0x06, 50);
+        ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010 });
+        npc.mInventory.back().count = 16;
+
+        // sixteen rolls would nearly always give both pieces, one roll gives both or nothing
+        EXPECT_THAT(wornAcrossSeeds(source, npc, 5),
+            UnorderedElementsAre(std::set<std::uint32_t>{}, std::set<std::uint32_t>{ 0x1001, 0x1002 }));
+    }
+
     TEST(ESM4WornArmorTest, aListInAListIsRolledOnceForEachItemOfTheCountOfItsEntry)
     {
         TestSource source;
