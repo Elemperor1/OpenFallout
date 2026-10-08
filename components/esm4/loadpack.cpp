@@ -32,7 +32,7 @@
 
 #include "reader.hpp"
 #include "recordreader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
 
 void ESM4::AIPackage::load(ESM4::Reader& reader)
 {
@@ -58,14 +58,23 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("PKDT"):
             {
-                if (subHdr.dataSize != sizeof(PKDT) && subHdr.dataSize == 4)
+                if (reader.isFalloutFile() && subHdr.dataSize >= sizeof(mData.flags) + sizeof(std::uint8_t))
                 {
-                    // std::cout << "skip fallout" << mEditorId << std::endl; // FIXME
+                    // Fallout 3 has 8 bytes and New Vegas 12: the flags, the type as one byte, and what the games
+                    // add (a byte, flags of the behaviour and, in New Vegas, flags of the type and padding)
+                    reader.get(mData.flags);
+                    std::uint8_t type = 0;
+                    reader.get(type);
+                    mData.type = type;
+                    reader.skipSubRecordData(subHdr.dataSize - sizeof(mData.flags) - sizeof(type));
+                }
+                else if (subHdr.dataSize != sizeof(PKDT) && subHdr.dataSize == 4)
+                {
                     reader.get(mData.flags);
                     mData.type = 0; // FIXME
                 }
                 else if (subHdr.dataSize != sizeof(mData))
-                    reader.skipSubRecordData(); // FIXME: FO3
+                    reader.skipSubRecordData();
                 else
                     reader.get(mData);
 

@@ -229,6 +229,10 @@ namespace ESM4
         std::vector<float> mSymTextureModeCoefficients; // size 0 or 50
         std::int16_t mFgRace;
 
+        // Whether the record takes the thing that the flag names (one of TemplateFlags) from its template. A record of
+        // Oblivion has no template flags.
+        bool takesFromTemplate(std::uint16_t flag) const;
+
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
 

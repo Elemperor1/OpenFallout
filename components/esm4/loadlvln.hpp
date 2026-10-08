@@ -50,10 +50,10 @@ namespace ESM4
         std::string mEditorId;
         ESM::Path mModel;
 
-        std::int8_t mChanceNone;
-        std::uint8_t mLvlActorFlags;
+        std::int8_t mChanceNone = 0;
+        std::uint8_t mLvlActorFlags = 0;
 
-        std::uint8_t mListCount;
+        std::uint8_t mListCount = 0;
         std::vector<LVLO> mLvlObject;
 
         inline bool calcAllLvlLessThanPlayer() const { return (mLvlActorFlags & 0x01) != 0; }

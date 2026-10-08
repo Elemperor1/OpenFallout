@@ -144,6 +144,53 @@ namespace
         EXPECT_THAT(result.mConditions, IsEmpty());
     }
 
+    // PKDT of Fallout 3 (8 bytes) and New Vegas (12): the flags, the type as one byte, a byte, flags of the behaviour
+    // and, in New Vegas, flags of the type and padding
+    std::string falloutPackageData(std::uint8_t type, std::size_t size)
+    {
+        std::string data;
+        append<std::uint32_t>(data, 0x00000011);
+        append(data, type);
+        append<std::uint8_t>(data, 0xAA);
+        append<std::uint16_t>(data, 0x1234);
+        data.resize(size, '\x77');
+        return subRecord("PKDT", data);
+    }
+
+    TEST(ESM4PackageTest, readsTheTypeOfAPackageOfFallout3AsOneByte)
+    {
+        const ESM4::AIPackage result = loadFromAFalloutFile(
+            zString("EDID", "Wander") + falloutPackageData(5, 8) + subRecord("PLDT", bytePattern(12, 10)));
+
+        EXPECT_EQ(result.mData.flags, 0x11u);
+        EXPECT_EQ(result.mData.type, 5);
+        // the sub-record after it is read from the right place
+        EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
+    TEST(ESM4PackageTest, readsTheTypeOfAPackageOfNewVegasAsOneByte)
+    {
+        const ESM4::AIPackage result = loadFromAFalloutFile(
+            zString("EDID", "Sandbox") + falloutPackageData(12, 12) + subRecord("PLDT", bytePattern(12, 10)));
+
+        EXPECT_EQ(result.mData.flags, 0x11u);
+        EXPECT_EQ(result.mData.type, 12);
+        EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
+    TEST(ESM4PackageTest, readsTheTypeOfAPackageOfOblivionAsAWord)
+    {
+        std::string pkdt;
+        append<std::uint32_t>(pkdt, 0x22);
+        append<std::int32_t>(pkdt, 9);
+        const std::vector<ESM4::AIPackage> result = loadRecords<ESM4::AIPackage>(
+            "PACK", record("PACK", 1, zString("EDID", "Ambush") + subRecord("PKDT", pkdt)));
+
+        ASSERT_EQ(result.size(), 1u);
+        EXPECT_EQ(result[0].mData.flags, 0x22u);
+        EXPECT_EQ(result[0].mData.type, 9);
+    }
+
     TEST(ESM4PackageTest, adjustsTheTargetOfAPackageByTheTypeOfTheTarget)
     {
         const auto target = [](std::int32_t type) {

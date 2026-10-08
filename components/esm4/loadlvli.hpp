@@ -48,12 +48,13 @@ namespace ESM4
 
         std::string mEditorId;
 
-        std::int8_t mChanceNone;
+        std::int8_t mChanceNone = 0;
+        ESM::FormId mGlobal; // LVLG (Fallout 3 and New Vegas): a global variable whose value is the chance of nothing
 
-        bool mHasLvlItemFlags;
-        std::uint8_t mLvlItemFlags;
+        bool mHasLvlItemFlags = false;
+        std::uint8_t mLvlItemFlags = 0;
 
-        std::uint8_t mData;
+        std::uint8_t mData = 0;
 
         std::vector<LVLO> mLvlObject;
 

@@ -56,6 +56,17 @@ namespace
     }
 }
 
+bool ESM4::Npc::takesFromTemplate(std::uint16_t flag) const
+{
+    if (mIsTES4)
+        return false;
+    if (mIsFONV)
+        return (mBaseConfig.fo3.templateFlags & flag) != 0;
+    if (mIsFO4)
+        return (mBaseConfig.fo4.templateFlags & flag) != 0;
+    return (mBaseConfig.tes5.templateFlags & flag) != 0;
+}
+
 void ESM4::Npc::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();

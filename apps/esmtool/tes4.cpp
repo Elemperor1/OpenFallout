@@ -24,6 +24,7 @@
 #include <components/esm4/referencecensus.hpp>
 #include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
+#include <components/esm4/wornarmorcensus.hpp>
 #include <components/files/conversion.hpp>
 #include <components/files/openfile.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -896,5 +897,10 @@ namespace EsmTool
     int creaturesTes4(const Arguments& info)
     {
         return countTes4<ESM4::CreatureCensus>(info, "Creatures", "creatures");
+    }
+
+    int wornTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::WornArmorCensus>(info, "Worn", "armour that the characters wear");
     }
 }
