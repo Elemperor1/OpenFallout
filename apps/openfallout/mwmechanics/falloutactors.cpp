@@ -165,6 +165,19 @@ namespace OFMechanics
             return velocity > 0.f ? std::clamp(velocity, slowestWalkSpeed, fastestWalkSpeed) : defaultWalkSpeed;
         }
 
+        /// Whether the other reference is somewhere the actor can walk to from where it is: in the same cell, or in an
+        /// exterior cell of the same worldspace (an interior is a cell of its own)
+        bool sharesSpace(const OFWorld::Ptr& actor, const OFWorld::Ptr& other)
+        {
+            if (other.isEmpty() || !other.isInCell() || !actor.isInCell())
+                return false;
+            const OFWorld::CellStore* cell = actor.getCell();
+            const OFWorld::CellStore* otherCell = other.getCell();
+            return otherCell == cell
+                || (otherCell->isExterior() && cell->isExterior()
+                    && otherCell->getCell()->getWorldSpace() == cell->getCell()->getWorldSpace());
+        }
+
         /// Where the feet should be: on the ground that a ray finds under the place, else at the height given
         float groundHeight(OFBase::World& world, const osg::Vec3f& place)
         {
@@ -193,7 +206,8 @@ namespace OFMechanics
     {
         /// The navigator makes a navigation mesh for each size of actor that it has been told of. The bodies of these
         /// actors are not physics actors (which the scene tells the navigator about), and an interior has the mesh for
-        /// the size of its player only, so the actors tell it themselves.
+        /// the size of its player only, so the actors tell it themselves. It is the default size for all of them, as
+        /// it is for every actor in an exterior: the game has no mesh for each size of creature.
         void registerAgent(FalloutActors::Mind& mind)
         {
             OFBase::World& world = *OFBase::Environment::get().getWorld();
@@ -297,9 +311,8 @@ namespace OFMechanics
                     const OFWorld::Ptr reference = OFBase::Environment::get().getWorldModel()->getPtr(target);
                     if (reference.isEmpty() || !reference.getRefData().isEnabled())
                         return false;
-                    // Only where it can go from where it is: an interior is a cell of its own
-                    if (reference.getCell() != mind.mPtr.getCell()
-                        && (!reference.getCell()->isExterior() || !mind.mPtr.getCell()->isExterior()))
+                    // Only where it can go from where it is
+                    if (!sharesSpace(mind.mPtr, reference))
                         return false;
                     goal.mCenter = reference.getRefData().getPosition().asVec3();
                     if (!isLoaded(frame, mind.mPtr, goal.mCenter))
