@@ -203,4 +203,75 @@ namespace
         EXPECT_EQ(*neck.mTranslation, osg::Vec3f(4, 0, 0));
         EXPECT_FALSE(neck.mRotation.has_value());
     }
+
+    // Most of the bones of the animation files of the games are driven by the control points of a B-spline
+    TEST(NifOsgLoadKfControllerSequence, makesAControllerOfTheCurvesOfABSplineInterpolator)
+    {
+        Nif::NIFFile file(idleKf);
+        auto& sequence = addSequence(file, "Idle", 0.f, 2.f, Nif::NiTimeController::ExtrapolationMode::Cycle, {});
+        SplineTrack track;
+        track.mNode = "Bip01 Head";
+        track.mStop = 2.f;
+        track.mCompact = false;
+        track.mNumControlPoints = 2;
+        track.mFloatPoints = { 0.f, 0.f, 0.f, 0.f, 0.f, 10.f };
+        track.mTranslationHandle = 0;
+        addSplineBlock(file, sequence, track);
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        ASSERT_EQ(holder.mKeyframeControllers.size(), 1u);
+        const auto& head = *holder.mKeyframeControllers.at("Bip01 Head");
+        EXPECT_EQ(head.getTranslation(1.f), osg::Vec3f(0, 0, 5));
+        EXPECT_EQ(head.getTranslation(2.f), osg::Vec3f(0, 0, 10));
+    }
+
+    // The pose that an interpolator holds is that of the channels that have no control points
+    TEST(NifOsgLoadKfControllerSequence, appliesTheHeldValuesToTheChannelsOfABSplineWithoutPoints)
+    {
+        Nif::NIFFile file(idleKf);
+        auto& sequence = addSequence(file, "Idle", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Constant, {});
+        SplineTrack track;
+        track.mNode = "Bip01 Head";
+        track.mCompact = false;
+        track.mNumControlPoints = 2;
+        track.mFloatPoints = { 4.f, 5.f, 6.f, 7.f, 8.f, 9.f };
+        track.mTranslationHandle = 0;
+        track.mValue = { osg::Vec3f(1, 2, 3), osg::Quat(0.5, osg::Vec3f(0, 0, 1)), 2.f };
+        addSplineBlock(file, sequence, track);
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        const auto transform = transformAtStart(*holder.mKeyframeControllers.at("Bip01 Head"));
+        ASSERT_TRUE(transform.mTranslation.has_value());
+        ASSERT_TRUE(transform.mRotation.has_value());
+        ASSERT_TRUE(transform.mScale.has_value());
+        EXPECT_EQ(*transform.mTranslation, osg::Vec3f(4, 5, 6));
+        EXPECT_EQ(*transform.mRotation, osg::Quat(0.5, osg::Vec3f(0, 0, 1)));
+        EXPECT_EQ(*transform.mScale, 2.f);
+    }
+
+    TEST(NifOsgLoadKfControllerSequence, leavesAChannelOfABSplineAloneThatTheFileMarksAsNotSet)
+    {
+        Nif::NIFFile file(idleKf);
+        auto& sequence = addSequence(file, "Idle", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Constant, {});
+        SplineTrack track;
+        track.mNode = "Bip01 Head";
+        track.mCompact = false;
+        track.mNumControlPoints = 2;
+        track.mFloatPoints = { 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f };
+        track.mRotationHandle = 0;
+        track.mValue = { osg::Vec3f(notSet, notSet, notSet), osg::Quat(notSet, 0, 0, 0), notSet };
+        addSplineBlock(file, sequence, track);
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        const auto transform = transformAtStart(*holder.mKeyframeControllers.at("Bip01 Head"));
+        EXPECT_FALSE(transform.mTranslation.has_value());
+        EXPECT_TRUE(transform.mRotation.has_value());
+        EXPECT_FALSE(transform.mScale.has_value());
+    }
 }

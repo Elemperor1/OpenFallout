@@ -366,19 +366,26 @@ namespace NifOsg
                 if (block.mInterpolator.empty() || block.mNodeName.empty())
                     continue;
 
-                if (block.mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
+                osg::ref_ptr<NifOsg::KeyframeController> controller;
+                switch (block.mInterpolator->mRecordType)
                 {
-                    // The other kinds drive the properties of a node (colours, visibility) or parts of one
-                    Log(Debug::Verbose) << "Unsupported interpolator type " << block.mInterpolator->mRecordName
-                                        << " for the node " << block.mNodeName << " in " << filename;
-                    continue;
+                    case Nif::RC_NiTransformInterpolator:
+                        controller = new NifOsg::KeyframeController(
+                            static_cast<const Nif::NiTransformInterpolator*>(block.mInterpolator.getPtr()));
+                        break;
+                    case Nif::RC_NiBSplineCompTransformInterpolator:
+                    case Nif::RC_NiBSplineTransformInterpolator:
+                        controller = new NifOsg::KeyframeController(
+                            static_cast<const Nif::NiBSplineTransformInterpolator*>(block.mInterpolator.getPtr()));
+                        break;
+                    default:
+                        // The other kinds drive the properties of a node (colours, visibility) or parts of one
+                        Log(Debug::Verbose) << "Unsupported interpolator type " << block.mInterpolator->mRecordName
+                                            << " for the node " << block.mNodeName << " in " << filename;
+                        continue;
                 }
 
-                if (!target.mKeyframeControllers
-                         .emplace(block.mNodeName,
-                             new NifOsg::KeyframeController(
-                                 static_cast<const Nif::NiTransformInterpolator*>(block.mInterpolator.getPtr())))
-                         .second)
+                if (!target.mKeyframeControllers.emplace(block.mNodeName, controller).second)
                     Log(Debug::Verbose) << "Controller " << block.mNodeName << " present more than once in " << filename
                                         << ", ignoring later version";
             }

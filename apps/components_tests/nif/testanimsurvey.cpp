@@ -58,6 +58,58 @@ namespace
         EXPECT_EQ(survey.count("Speed of that travel", "3: 50 to 100"), 1u);
     }
 
+    TEST(NifAnimSurvey, checksTheControlPointsOfABSpline)
+    {
+        NIFFile file(kfName);
+        auto& sequence = addSequence(file, "Idle", 0.f, 2.f, NiTimeController::ExtrapolationMode::Cycle, {});
+        SplineTrack track;
+        track.mNode = "Bip01 Head";
+        track.mStop = 2.f;
+        track.mCompact = false;
+        track.mNumControlPoints = 4;
+        // four unit quaternions, w first, that end where they began
+        track.mFloatPoints
+            = { 1.f, 0.f, 0.f, 0.f, 0.9f, 0.f, 0.f, 0.436f, 0.9f, 0.f, 0.f, -0.436f, 1.f, 0.f, 0.f, 0.f };
+        track.mRotationHandle = 0;
+        addSplineBlock(file, sequence, track);
+
+        AnimSurvey survey;
+        survey.addFile(file, "meshes/characters/_male/mtidle.kf");
+
+        EXPECT_EQ(survey.count("Interpolator of a block", "NiBSplineTransformInterpolator"), 1u);
+        EXPECT_EQ(survey.count("B-spline rotation of a block", "control points"), 1u);
+        EXPECT_EQ(survey.count("B-spline translation of a block", "no handle"), 1u);
+        EXPECT_EQ(survey.count("B-spline scale of a block", "no handle"), 1u);
+        EXPECT_EQ(survey.count("B-spline control points in a block", animSurveyCountAnswer(4)), 1u);
+        EXPECT_EQ(survey.count("B-spline interval compared with the sequence", "the same"), 1u);
+        EXPECT_EQ(survey.count("B-spline rotation control point, length of the quaternion", "1: within 1% of 1"), 4u);
+        EXPECT_EQ(
+            survey.count("Cycling B-spline rotation, angle between its ends (open knots)", "1: under 2 degrees"), 1u);
+    }
+
+    TEST(NifAnimSurvey, measuresHowFarTheAccumulationRootTravelsOnABSpline)
+    {
+        NIFFile file(kfName);
+        auto& sequence
+            = addSequence(file, "Walk", 0.f, 2.f, NiTimeController::ExtrapolationMode::Cycle, {}, {}, "Bip01");
+        SplineTrack track;
+        track.mNode = "Bip01";
+        track.mStop = 2.f;
+        track.mCompact = false;
+        track.mNumControlPoints = 4;
+        track.mFloatPoints = { 0.f, 0.f, 0.f, 0.f, 50.f, 0.f, 0.f, 100.f, 0.f, 0.f, 160.f, 0.f };
+        track.mTranslationHandle = 0;
+        addSplineBlock(file, sequence, track);
+
+        AnimSurvey survey;
+        survey.addFile(file, "meshes/characters/_male/locomotion/mtforward.kf");
+
+        EXPECT_EQ(survey.count("Travel of the accumulation root in a sequence", "5: 120 to 250"), 1u);
+        EXPECT_EQ(survey.count("Axis of that travel", "y"), 1u);
+        EXPECT_EQ(survey.count("Speed of that travel", "3: 50 to 100"), 1u);
+        EXPECT_EQ(survey.count("Sequence whose accumulation root is driven", "with a B-spline translation"), 1u);
+    }
+
     TEST(NifAnimSurvey, findsNodesThatTheSkeletonOfTheFolderLacks)
     {
         AnimSurvey survey;

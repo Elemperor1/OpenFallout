@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <set>
 
 #include <osg/BlendFunc>
 #include <osg/Matrix>
@@ -683,8 +684,12 @@ namespace OFRender
             NodeMap::const_iterator found = nodeMap.find(bonename);
             if (found == nodeMap.end())
             {
-                Log(Debug::Warning) << "Warning: addAnimSource: can't find bone '" + bonename << "' in " << baseModel
-                                    << " (referenced by " << kfname << ")";
+                // Every character that plays a file finds the same bones missing, and many files of Fallout drive nodes
+                // that its skeletons lack (the parts of weapons), so each bone is reported once for a file and model
+                static std::set<std::string> reported;
+                if (reported.insert(std::string(kfname.value()) + '\n' + baseModel + '\n' + bonename).second)
+                    Log(Debug::Warning) << "Warning: addAnimSource: can't find bone '" + bonename << "' in "
+                                        << baseModel << " (referenced by " << kfname << ")";
                 continue;
             }
 

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <osg/Vec2f>
+
 #include <components/esm4/loadarma.hpp>
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadclot.hpp>
@@ -23,9 +25,9 @@
 #include "../mwclass/esm4npc.hpp"
 #include "../mwmechanics/character.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/refdata.hpp"
 
 #include "blendmask.hpp"
-#include "falloutanimation.hpp"
 
 namespace OFRender
 {
@@ -59,7 +61,7 @@ namespace OFRender
     {
         setObjectRoot(mPtr.getClass().getCorrectedModel(mPtr), true, true, false);
         updateParts();
-        startIdle();
+        startAnimations();
     }
 
     ESM4NpcAnimation::~ESM4NpcAnimation()
@@ -70,10 +72,26 @@ namespace OFRender
 
     void ESM4NpcAnimation::advance(float duration)
     {
+        updateGait(duration);
         runAnimation(duration);
     }
 
-    void ESM4NpcAnimation::startIdle()
+    std::string ESM4NpcAnimation::addAnimation(const std::string& file, const std::string& skeleton)
+    {
+        if (file.empty())
+            return {};
+        addAnimSource(file, skeleton);
+        // The loader of animation files names the group of a file after it
+        std::string group(VFS::Path::Normalized(file).stem());
+        if (!hasAnimation(group))
+        {
+            Log(Debug::Warning) << "The animation " << file << " has nothing to play on " << skeleton;
+            return {};
+        }
+        return group;
+    }
+
+    void ESM4NpcAnimation::startAnimations()
     {
         if (mObjectRoot == nullptr)
             return;
@@ -92,30 +110,96 @@ namespace OFRender
             if (name.extension() == kf)
                 files.push_back(name.value());
 
+        bool playing = false;
         const std::string idle = chooseFalloutIdle(folder, files);
         if (idle.empty())
-        {
             Log(Debug::Verbose) << "No idle animation among the " << files.size() << " files in " << folder;
-            return;
-        }
-
-        Log(Debug::Verbose) << "Idle animation of " << mPtr.getCellRef().getRefId() << ": " << idle;
-        addAnimSource(idle, skeleton);
-        // The loader of animation files names the group of a file after it
-        const std::string group(VFS::Path::Normalized(idle).stem());
-        if (!hasAnimation(group))
+        else
         {
-            Log(Debug::Warning) << "The animation " << idle << " has nothing to play on " << skeleton;
-            return;
+            Log(Debug::Verbose) << "Idle animation of " << mPtr.getCellRef().getRefId() << ": " << idle;
+            const std::string group = addAnimation(idle, skeleton);
+            if (!group.empty())
+            {
+                // A sequence that loops has the keys "loop start" and "loop stop" (the loader makes them), so it plays
+                // on without end; one that clamps has none, and stays on its last frame
+                play(group, OFRender::AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false, 1.f,
+                    "start", "stop", 0.f, ~0u, false);
+                playing = true;
+            }
         }
 
-        // A sequence that loops has the keys "loop start" and "loop stop" (the loader makes them), so it plays on
-        // without end; one that clamps has none, and stays on its last frame
-        play(group, OFRender::AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false, 1.f, "start",
-            "stop", 0.f, ~0u, false);
+        // The animations that play over the idle one while the character is moved
+        const FalloutLocomotion locomotion = chooseFalloutLocomotion(folder, files, OFClass::ESM4Npc::isFemale(mPtr));
+        mWalkGroup = addAnimation(locomotion.mWalk, skeleton);
+        mRunGroup = addAnimation(locomotion.mRun, skeleton);
+        mGaits.mHasWalk = !mWalkGroup.empty();
+        mGaits.mHasRun = !mRunGroup.empty();
+        if (mGaits.mHasWalk)
+            mGaits.mWalkVelocity = getVelocity(mWalkGroup);
+        if (mGaits.mHasRun)
+            mGaits.mRunVelocity = getVelocity(mRunGroup);
+        if (mGaits.mHasWalk || mGaits.mHasRun)
+        {
+            Log(Debug::Verbose) << "Walking and running animations of " << mPtr.getCellRef().getRefId() << ": "
+                                << (mGaits.mHasWalk ? locomotion.mWalk : "none") << " (" << mGaits.mWalkVelocity
+                                << " units a second), " << (mGaits.mHasRun ? locomotion.mRun : "none") << " ("
+                                << mGaits.mRunVelocity << ")";
+            playing = true;
+        }
 
+        if (!playing)
+            return;
         mAdvanceCallback = new AdvanceCallback(*this);
         mInsert->addUpdateCallback(mAdvanceCallback);
+    }
+
+    void ESM4NpcAnimation::updateGait(float duration)
+    {
+        if (!mGaits.mHasWalk && !mGaits.mHasRun)
+            return;
+
+        // The character has no mechanics to say how fast it moves, so the speed is that at which whatever moves it
+        // (a script, the physics) changes its place from one frame to the next, across the ground. A jump from one
+        // place to another is a teleport and not a movement.
+        constexpr float teleportSpeed = 3000.f;
+        constexpr float smoothingTime = 0.2f;
+        const osg::Vec3f position = mPtr.getRefData().getPosition().asVec3();
+        if (mHasLastPosition && duration > 0.f)
+        {
+            const osg::Vec2f step(position.x() - mLastPosition.x(), position.y() - mLastPosition.y());
+            const float speed = step.length() / duration;
+            if (speed > teleportSpeed)
+                mSpeed = 0.f;
+            else
+                mSpeed += (speed - mSpeed) * std::min(1.f, duration / smoothingTime);
+        }
+        mLastPosition = position;
+        mHasLastPosition = true;
+
+        setGait(chooseFalloutGait(mSpeed, mGait, mGaits));
+
+        if (mGait == FalloutGait::Walk)
+            adjustSpeedMult(mWalkGroup, falloutAnimationSpeed(mSpeed, mGaits.mWalkVelocity));
+        else if (mGait == FalloutGait::Run)
+            adjustSpeedMult(mRunGroup, falloutAnimationSpeed(mSpeed, mGaits.mRunVelocity));
+    }
+
+    void ESM4NpcAnimation::setGait(FalloutGait gait)
+    {
+        if (gait == mGait)
+            return;
+
+        // The idle animation plays on below the others, so the character goes back to it when they stop
+        if (mGait == FalloutGait::Walk)
+            disable(mWalkGroup);
+        else if (mGait == FalloutGait::Run)
+            disable(mRunGroup);
+
+        const std::string& group = gait == FalloutGait::Walk ? mWalkGroup : mRunGroup;
+        if (gait != FalloutGait::Idle)
+            play(group, OFRender::AnimPriority(OFMechanics::Priority_Movement), OFRender::BlendMask_All, false, 1.f,
+                "start", "stop", 0.f, ~0u, false);
+        mGait = gait;
     }
 
     void ESM4NpcAnimation::updateParts()

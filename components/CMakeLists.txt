@@ -145,7 +145,7 @@ add_component_dir (sceneutil
     )
 
 add_component_dir (nif
-    animsurvey base controller data effect extra niffile nifkey nifstream niftypes node parent particle physics property record recordptr texture
+    animsurvey base bspline controller data effect extra niffile nifkey nifstream niftypes node parent particle physics property record recordptr texture
     )
 
 add_component_dir (nifosg
@@ -203,11 +203,14 @@ add_component_dir (esm4
     alternatetexture
     cellgrid
     census
+    censusreading
     common
+    creaturecensus
     destruction
     dialogue
     effect
     effectlist
+    equipmentcensus
     grid
     grouptype
     inventory
@@ -334,6 +337,7 @@ add_component_dir (esm4
     loadwrld
     loadwthr
     magiceffectid
+    packagecensus
     reader
     readerutils
     recordreader

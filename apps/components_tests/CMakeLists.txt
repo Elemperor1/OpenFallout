@@ -84,11 +84,13 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testchallenge.cpp
     esm4/testclimate.cpp
     esm4/testcombatstyle.cpp
+    esm4/testcreaturecensus.cpp
     esm4/testdebris.cpp
     esm4/testdehydrationstage.cpp
     esm4/testeffectshader.cpp
     esm4/testenchantment.cpp
     esm4/testencounterzone.cpp
+    esm4/testequipmentcensus.cpp
     esm4/testexplosion.cpp
     esm4/testfaction.cpp
     esm4/testhungerstage.cpp
@@ -107,6 +109,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testnpc.cpp
     esm4/testoptionalsubrecords.cpp
     esm4/testpackage.cpp
+    esm4/testpackagecensus.cpp
     esm4/testperk.cpp
     esm4/testpokerchip.cpp
     esm4/testprojectile.cpp
@@ -158,6 +161,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     nif/node.hpp
     nif/testanimsurvey.cpp
+    nif/testbspline.cpp
     nif/testphysics.cpp
 )
 

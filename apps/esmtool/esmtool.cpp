@@ -64,6 +64,19 @@ Allowed modes:
          (REFR, ACHR, ACRE and the like) by the record type of the object they
          place. Give the files in load order, masters first. Prints no record
          contents.
+  equipment Counts the armour that the characters of one or more Fallout 3 or
+         New Vegas files list in their inventory, how much of it covers the same
+         part of the body and what the armour has models for. Give the files in
+         load order, masters first. Prints no record contents.
+  packages Counts the AI packages of one or more Fallout 3 or New Vegas files by
+         type, schedule and location, and the packages that their characters
+         list. Give the files in load order, masters first. Prints no record
+         contents.
+  creatures Counts how the creatures of one or more Fallout 3 or New Vegas
+         files are made: the kind of creature, the model, the models of the
+         body and the animation files they list, with a few example file names.
+         Give the files in load order, masters first. Prints no other record
+         contents.
 
 Allowed options)");
         auto addOption = desc.add_options();
@@ -149,7 +162,8 @@ Allowed options)");
 
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
-                || info.mode == "survey" || info.mode == "references"))
+                || info.mode == "survey" || info.mode == "references" || info.mode == "equipment"
+                || info.mode == "packages" || info.mode == "creatures"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -171,9 +185,9 @@ Allowed options)");
               }*/
 
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
-        // Only a survey or a count of references takes any number of files, the other modes take an input file and an
-        // output file.
-        if (info.mode != "survey" && info.mode != "references" && inputFiles.size() > 2)
+        // Only a survey or a count takes any number of files, the other modes take an input file and an output file.
+        if (info.mode != "survey" && info.mode != "references" && info.mode != "equipment" && info.mode != "packages"
+            && info.mode != "creatures" && inputFiles.size() > 2)
         {
             std::cout << "\nERROR: more than two files specified\n\n";
             std::cout << desc << finalText << std::endl;
@@ -228,6 +242,12 @@ int main(int argc, char** argv)
             return surveyTes4(info);
         else if (info.mode == "references")
             return referencesTes4(info);
+        else if (info.mode == "equipment")
+            return equipmentTes4(info);
+        else if (info.mode == "packages")
+            return packagesTes4(info);
+        else if (info.mode == "creatures")
+            return creaturesTes4(info);
         else if (info.mode == "clone")
             return clone(info);
         else if (info.mode == "comp")

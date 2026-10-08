@@ -1,6 +1,7 @@
 #include "animsurvey.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <components/misc/strings/lower.hpp>
 
 #include "base.hpp"
+#include "bspline.hpp"
 #include "controller.hpp"
 #include "data.hpp"
 #include "extra.hpp"
@@ -135,6 +137,96 @@ namespace Nif
             return std::string(key.substr(0, colon));
         }
 
+        // How far two rotations are apart, in degrees
+        float angleBetween(const osg::Quat& a, const osg::Quat& b)
+        {
+            const double lengths = a.length() * b.length();
+            if (!(lengths > 1e-12))
+                return 180.f;
+            const double dot = std::min(1.0, std::abs(a.asVec4() * b.asVec4()) / lengths);
+            return static_cast<float>(2.0 * std::acos(dot) * 180.0 / osg::PI);
+        }
+
+        std::string closureAnswer(float degrees)
+        {
+            if (degrees < 2.f)
+                return "1: under 2 degrees";
+            if (degrees < 10.f)
+                return "2: 2 to 10";
+            if (degrees < 45.f)
+                return "3: 10 to 45";
+            return "4: over 45";
+        }
+
+        std::string lengthAnswer(float length)
+        {
+            const float error = std::abs(length - 1.f);
+            if (error < 0.01f)
+                return "1: within 1% of 1";
+            if (error < 0.1f)
+                return "2: within 10%";
+            return "3: farther from 1";
+        }
+
+        osg::Quat toQuat(const std::array<float, BSplineCurve::sMaxComponents>& wxyz)
+        {
+            return osg::Quat(wxyz[1], wxyz[2], wxyz[3], wxyz[0]);
+        }
+
+        // The control points of a B-spline interpolator and how its curves behave, to see whether they are read right:
+        // a rotation is a unit quaternion at every control point, and a sequence that cycles ends where it began
+        void addSpline(AnimSurvey& survey, const NiBSplineTransformInterpolator& spline,
+            const NiControllerSequence& seq, std::string_view file)
+        {
+            const BSplineTransform curves(spline);
+            const auto channel = [&](std::string_view name, const BSplineCurve& curve, uint32_t handle) {
+                const char* answer = !curve.empty()              ? "control points"
+                    : (handle == 0xFFFF || handle == 0xFFFFFFFF) ? "no handle"
+                                                                 : "a handle that reaches past the data";
+                survey.add("B-spline " + std::string(name) + " of a block", answer, file);
+            };
+            channel("translation", curves.getTranslationCurve(), spline.mTranslationHandle);
+            channel("rotation", curves.getRotationCurve(), spline.mRotationHandle);
+            channel("scale", curves.getScaleCurve(), spline.mScaleHandle);
+
+            if (!spline.mBasisData.empty())
+                survey.add("B-spline control points in a block",
+                    animSurveyCountAnswer(spline.mBasisData->mNumControlPoints), file);
+            survey.add("B-spline interval compared with the sequence",
+                spline.mStartTime == seq.mStartTime && spline.mStopTime == seq.mStopTime ? "the same" : "different",
+                file);
+
+            const BSplineCurve& rotation = curves.getRotationCurve();
+            if (rotation.empty())
+                return;
+            for (std::size_t i = 0; i < rotation.size(); ++i)
+            {
+                const auto point = rotation.getPoint(i);
+                survey.add("B-spline rotation control point, length of the quaternion",
+                    lengthAnswer(std::sqrt(
+                        point[0] * point[0] + point[1] * point[1] + point[2] * point[2] + point[3] * point[3])),
+                    file);
+            }
+
+            if (seq.mExtrapolationMode != NiTimeController::ExtrapolationMode::Cycle || rotation.size() < 3)
+                return;
+            // Where the curve starts and ends, with the knots that make the first and last control points its ends
+            // and, to compare, with uniform knots, where it is a blend of the three points near each end
+            survey.add("Cycling B-spline rotation, angle between its ends (open knots)",
+                closureAnswer(angleBetween(toQuat(rotation.evaluate(0.f)), toQuat(rotation.evaluate(1.f)))), file);
+            std::array<float, BSplineCurve::sMaxComponents> start{}, end{};
+            const std::size_t last = rotation.size() - 1;
+            for (std::size_t c = 0; c < 4; ++c)
+            {
+                start[c] = (rotation.getPoint(0)[c] + 4.f * rotation.getPoint(1)[c] + rotation.getPoint(2)[c]) / 6.f;
+                end[c] = (rotation.getPoint(last - 2)[c] + 4.f * rotation.getPoint(last - 1)[c]
+                             + rotation.getPoint(last)[c])
+                    / 6.f;
+            }
+            survey.add("Cycling B-spline rotation, angle between its ends (uniform knots)",
+                closureAnswer(angleBetween(toQuat(start), toQuat(end))), file);
+        }
+
         template <class KeyMap>
         void addTrack(
             AnimSurvey& survey, std::string_view name, const std::shared_ptr<KeyMap>& keys, std::string_view file)
@@ -166,6 +258,20 @@ namespace Nif
                 addTrack(survey, "Rotation", data.mRotations, file);
             addTrack(survey, "Translation", data.mTranslations, file);
             addTrack(survey, "Scale", data.mScales, file);
+        }
+
+        // How far the node that carries the movement travels in one run of the sequence
+        void addTravel(AnimSurvey& survey, const osg::Vec3f& delta, float duration, std::string_view file)
+        {
+            const float travel = delta.length();
+            const char* axis = std::abs(delta.x()) >= std::abs(delta.y()) && std::abs(delta.x()) >= std::abs(delta.z())
+                ? "x"
+                : std::abs(delta.y()) >= std::abs(delta.z()) ? "y"
+                                                             : "z";
+            survey.add("Travel of the accumulation root in a sequence", travelAnswer(travel), file);
+            survey.add("Axis of that travel", travel > 0.5f ? axis : "none", file);
+            if (duration > 0.f)
+                survey.add("Speed of that travel", speedAnswer(travel / duration), file);
         }
 
         void addSequence(AnimSurvey& survey, const NiControllerSequence& seq, std::string_view file)
@@ -206,6 +312,7 @@ namespace Nif
 
             const std::string accumRoot = Misc::StringUtils::lowerCase(seq.mAccumRootName);
             bool accumFound = false;
+            bool accumSpline = false;
             for (const ControlledBlock& block : seq.mControlledBlocks)
             {
                 survey.add("Controller type of a block", textAnswer(block.mControllerType), file);
@@ -229,6 +336,14 @@ namespace Nif
                     {
                         addTransformData(survey, *transform.mData.getPtr(), file);
 
+                        const auto& rotations = transform.mData->mRotations;
+                        if (seq.mExtrapolationMode == NiTimeController::ExtrapolationMode::Cycle && rotations != nullptr
+                            && rotations->mInterpolationType != InterpolationType_XYZ && rotations->mKeys.size() >= 2)
+                            survey.add("Cycling keyed rotation, angle between its first and last key",
+                                closureAnswer(angleBetween(
+                                    rotations->mKeys.front().second.mValue, rotations->mKeys.back().second.mValue)),
+                                file);
+
                         // How far the node that carries the movement travels in one run of the sequence
                         if (!accumFound && !accumRoot.empty() && Misc::StringUtils::ciEqual(block.mNodeName, accumRoot)
                             && transform.mData->mTranslations != nullptr
@@ -236,29 +351,38 @@ namespace Nif
                         {
                             accumFound = true;
                             const auto& keys = transform.mData->mTranslations->mKeys;
-                            const osg::Vec3f delta = keys.back().second.mValue - keys.front().second.mValue;
-                            const float travel = delta.length();
-                            const char* axis = std::abs(delta.x()) >= std::abs(delta.y())
-                                    && std::abs(delta.x()) >= std::abs(delta.z())
-                                ? "x"
-                                : std::abs(delta.y()) >= std::abs(delta.z()) ? "y"
-                                                                             : "z";
-                            survey.add("Travel of the accumulation root in a sequence", travelAnswer(travel), file);
-                            survey.add("Axis of that travel", travel > 0.5f ? axis : "none", file);
-                            if (duration > 0.f)
-                                survey.add("Speed of that travel", speedAnswer(travel / duration), file);
+                            addTravel(survey, keys.back().second.mValue - keys.front().second.mValue, duration, file);
                         }
                     }
                 }
                 else if (interp->mRecordType == RC_NiBSplineCompTransformInterpolator
                     || interp->mRecordType == RC_NiBSplineTransformInterpolator)
                 {
-                    const auto& spline = static_cast<const NiBSplineInterpolator&>(*interp);
+                    const auto& spline = static_cast<const NiBSplineTransformInterpolator&>(*interp);
                     survey.add("B-spline transform with data", spline.mSplineData.empty() ? "no" : "yes", file);
                     survey.add("B-spline transform with basis data", spline.mBasisData.empty() ? "no" : "yes", file);
+                    if (!spline.mSplineData.empty() && !spline.mBasisData.empty())
+                    {
+                        addSpline(survey, spline, seq, file);
+
+                        const BSplineTransform curves(spline);
+                        if (!accumFound && !accumRoot.empty() && Misc::StringUtils::ciEqual(block.mNodeName, accumRoot)
+                            && !curves.getTranslationCurve().empty())
+                        {
+                            accumFound = true;
+                            accumSpline = true;
+                            addTravel(survey,
+                                *curves.getTranslation(spline.mStopTime) - *curves.getTranslation(spline.mStartTime),
+                                duration, file);
+                        }
+                    }
                 }
             }
-            survey.add("Sequence whose accumulation root is driven", accumFound ? "with translation keys" : "no", file);
+            survey.add("Sequence whose accumulation root is driven",
+                accumSpline      ? "with a B-spline translation"
+                    : accumFound ? "with translation keys"
+                                 : "no",
+                file);
         }
     }
 

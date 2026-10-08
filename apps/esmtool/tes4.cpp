@@ -15,6 +15,9 @@
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
 #include <components/esm4/census.hpp>
+#include <components/esm4/creaturecensus.hpp>
+#include <components/esm4/equipmentcensus.hpp>
+#include <components/esm4/packagecensus.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
@@ -822,12 +825,14 @@ namespace EsmTool
         return survey.getFatalErrors().empty() ? result : -1;
     }
 
-    /// Count the references that every file named on the command line places, read in the order given, and print the
-    /// counts to standard output. Return 0 when every file was read to its end, or -1 if one could not be opened or
-    /// read.
-    int referencesTes4(const Arguments& info)
+    /// Read every file named on the command line in the order given, with its mod index and the indices of its
+    /// masters, into a census that has collect(Reader&), write(std::ostream&) and getFatalErrors(), and print what the
+    /// census counted. `mode` names the mode in the message for a file that is not TES4-format and `counted` what the
+    /// census counted. Return 0 when every file was read to its end, or -1 if one could not be opened or read.
+    template <class Census>
+    int countTes4(const Arguments& info, const char* mode, const char* counted)
     {
-        ESM4::ReferenceCensus census;
+        Census census;
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
         std::map<std::string, int> nameToIndex;
         int result = 0;
@@ -849,7 +854,7 @@ namespace EsmTool
                 }
                 if (ESM::readFormat(*stream) != ESM::Format::Tes4)
                 {
-                    std::cout << "References mode only supports TES4-format files: " << name << '\n';
+                    std::cout << mode << " mode only supports TES4-format files: " << name << '\n';
                     result = -1;
                     continue;
                 }
@@ -868,8 +873,28 @@ namespace EsmTool
             }
         }
 
-        std::cout << "Counted the references of " << info.inputFiles.size() << " files\n\n";
+        std::cout << "Counted the " << counted << " of " << info.inputFiles.size() << " files\n\n";
         census.write(std::cout);
         return census.getFatalErrors().empty() ? result : -1;
+    }
+
+    int referencesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::ReferenceCensus>(info, "References", "references");
+    }
+
+    int equipmentTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::EquipmentCensus>(info, "Equipment", "equipment");
+    }
+
+    int packagesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::PackageCensus>(info, "Packages", "packages");
+    }
+
+    int creaturesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::CreatureCensus>(info, "Creatures", "creatures");
     }
 }

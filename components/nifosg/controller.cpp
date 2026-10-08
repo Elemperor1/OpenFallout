@@ -81,6 +81,7 @@ namespace NifOsg
         : osg::Object(copy, copyop)
         , SceneUtil::KeyframeController(copy)
         , SceneUtil::NodeCallback<KeyframeController, NifOsg::MatrixTransform*>(copy, copyop)
+        , mSpline(copy.mSpline)
         , mRotations(copy.mRotations)
         , mXRotations(copy.mXRotations)
         , mYRotations(copy.mYRotations)
@@ -120,6 +121,12 @@ namespace NifOsg
         setInterpolator(*interp);
     }
 
+    KeyframeController::KeyframeController(const Nif::NiBSplineTransformInterpolator* interp)
+    {
+        setDefaults(interp->mValue);
+        mSpline = std::make_shared<const Nif::BSplineTransform>(*interp);
+    }
+
     namespace
     {
         // The files mark a value that is not set with the smallest float
@@ -129,17 +136,22 @@ namespace NifOsg
         }
     }
 
+    void KeyframeController::setDefaults(const Nif::NiQuatTransform& transform)
+    {
+        const osg::Vec3f& translation = transform.mTranslation;
+        if (isSet(translation.x()) && isSet(translation.y()) && isSet(translation.z()))
+            mDefaultTranslation = translation;
+        const osg::Quat& rotation = transform.mRotation;
+        if (isSet(rotation.w()) && isSet(rotation.x()) && isSet(rotation.y()) && isSet(rotation.z()))
+            mDefaultRotation = rotation;
+        if (isSet(transform.mScale))
+            mDefaultScale = transform.mScale;
+    }
+
     void KeyframeController::setInterpolator(const Nif::NiTransformInterpolator& interp)
     {
         const Nif::NiQuatTransform& defaultTransform = interp.mDefaultValue;
-        const osg::Vec3f& translation = defaultTransform.mTranslation;
-        if (isSet(translation.x()) && isSet(translation.y()) && isSet(translation.z()))
-            mDefaultTranslation = translation;
-        const osg::Quat& rotation = defaultTransform.mRotation;
-        if (isSet(rotation.w()) && isSet(rotation.x()) && isSet(rotation.y()) && isSet(rotation.z()))
-            mDefaultRotation = rotation;
-        if (isSet(defaultTransform.mScale))
-            mDefaultScale = defaultTransform.mScale;
+        setDefaults(defaultTransform);
 
         if (!interp.mData.empty())
         {
@@ -198,6 +210,12 @@ namespace NifOsg
 
     osg::Vec3f KeyframeController::getTranslation(float time) const
     {
+        if (mSpline)
+        {
+            if (const auto translation = mSpline->getTranslation(time))
+                return *translation;
+            return mDefaultTranslation.value_or(osg::Vec3f());
+        }
         if (!mTranslations.empty())
             return mTranslations.interpKey(time);
         return osg::Vec3f();
@@ -233,6 +251,21 @@ namespace NifOsg
         if (hasInput())
         {
             float time = getInputValue(nv);
+
+            if (mSpline)
+            {
+                out.mRotation = mSpline->getRotation(time);
+                out.mTranslation = mSpline->getTranslation(time);
+                out.mScale = mSpline->getScale(time);
+
+                if (!out.mRotation)
+                    out.mRotation = mDefaultRotation;
+                if (!out.mTranslation)
+                    out.mTranslation = mDefaultTranslation;
+                if (!out.mScale)
+                    out.mScale = mDefaultScale;
+                return out;
+            }
 
             if (!mRotations.empty())
                 out.mRotation = mRotations.interpKey(time);
