@@ -76,15 +76,22 @@ namespace ESM4
         return dayIncludes(schedule.dayOfWeek, clock.mHour < static_cast<float>(schedule.time) ? (day + 6) % 7 : day);
     }
 
-    PackageSkip packageSkip(const AIPackage& package, const PackageClock& clock)
+    PackageSkip packageSkip(
+        int packageType, const AIPackage::PSDT& schedule, bool hasConditions, const PackageClock& clock)
     {
-        if (packageBehaviour(package.mData.type) == PackageBehaviour::None)
+        if (packageBehaviour(packageType) == PackageBehaviour::None)
             return PackageSkip::Behaviour;
-        if (!scheduleIncludes(package.mSchedule, clock))
+        if (!scheduleIncludes(schedule, clock))
             return PackageSkip::Schedule;
-        if (!package.mConditions.empty() || !package.mTargetConditions.empty())
+        if (hasConditions)
             return PackageSkip::Conditions;
         return PackageSkip::None;
+    }
+
+    PackageSkip packageSkip(const AIPackage& package, const PackageClock& clock)
+    {
+        return packageSkip(package.mData.type, package.mSchedule,
+            !package.mConditions.empty() || !package.mTargetConditions.empty(), clock);
     }
 
     const AIPackage* choosePackage(const std::vector<const AIPackage*>& packages, const PackageClock& clock)

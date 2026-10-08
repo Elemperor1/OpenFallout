@@ -94,6 +94,8 @@ namespace ESM4
     // keep yet: a package that has any is not followed (the data has them on 2,242 of 4,885 packages of New Vegas, most
     // of them to switch a quest's behaviour on, which a game that has not started the quest has off).
     PackageSkip packageSkip(const AIPackage& package, const PackageClock& clock);
+    PackageSkip packageSkip(
+        int packageType, const AIPackage::PSDT& schedule, bool hasConditions, const PackageClock& clock);
 
     // The first package of the list that is followed, null when there is none. Null entries are skipped (a package
     // that no file has a record for).

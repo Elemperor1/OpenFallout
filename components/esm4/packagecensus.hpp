@@ -12,6 +12,8 @@
 
 #include <components/esm/formid.hpp>
 
+#include "loadpack.hpp"
+
 namespace ESM4
 {
     class Reader;
@@ -32,6 +34,9 @@ namespace ESM4
         static constexpr int noType = -1; // no PKDT of 5 bytes or more
         static constexpr int noLocation = -1; // no PLDT
         static constexpr int noTarget = -1; // no PTDT
+        // In the packages followed at an hour: the character follows none of the packages that it lists
+        static constexpr int followsNone = -2;
+        static constexpr int hoursInDay = 24;
         static std::string packageTypeName(int type);
 
         // A character with more packages than this counts as having this many.
@@ -50,6 +55,7 @@ namespace ESM4
             std::map<int, std::size_t> mTargets; // by the type in PTDT
             std::size_t mWithConditions = 0;
             std::size_t mWithEvents = 0; // runs something when it begins, ends or changes
+            std::map<std::uint32_t, std::size_t> mDurations; // by the hours they last, those that start at a time
 
             // The NPC_ records
             std::size_t mCharacters = 0;
@@ -60,6 +66,10 @@ namespace ESM4
             std::map<int, std::size_t> mFirstType; // the type of the first package, the one with the highest priority
             std::map<int, std::size_t> mAnyType; // characters that have a package of the type
             std::size_t mCharactersWithTime = 0; // characters that have a package that starts at a time of day
+            // The package that characters with packages of their own follow on a Monday at each hour, by its type
+            // (see ESM4::choosePackage): followsNone for those that follow none, because no package of theirs is on,
+            // has conditions or is of a kind that the game does nothing for.
+            std::array<std::map<int, std::size_t>, hoursInDay> mFollowedByHour;
         };
 
         void collect(Reader& reader);
@@ -80,6 +90,7 @@ namespace ESM4
             bool mDay = false;
             bool mMonth = false;
             bool mDate = false;
+            AIPackage::PSDT mSchedule;
             std::size_t mConditions = 0;
             bool mEvents = false;
         };

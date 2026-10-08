@@ -156,6 +156,62 @@ namespace
         EXPECT_EQ(summary.mCharactersWithTime, 1u);
     }
 
+    std::string scheduleWithDuration(std::uint8_t day, std::uint8_t time, std::uint32_t duration)
+    {
+        std::string data;
+        append<std::uint8_t>(data, any);
+        append(data, day);
+        append<std::uint8_t>(data, 0);
+        append(data, time);
+        append(data, duration);
+        return subRecord("PSDT", data);
+    }
+
+    TEST(ESM4PackageCensusTest, countsTheHoursThatPackagesLast)
+    {
+        ESM4::PackageCensus census;
+        collect(census, basePlugin());
+        // The wander package and the sleep package start at an hour and last for four hours
+        EXPECT_THAT(census.summarize().mDurations, UnorderedElementsAre(Pair(4u, 2u)));
+    }
+
+    TEST(ESM4PackageCensusTest, countsWhichPackageCharactersFollowAtEachHour)
+    {
+        const std::string packages
+            // travels from 9 to 12 on weekdays
+            = record("PACK", 0x1001, packageData(6) + scheduleWithDuration(7, 9, 3))
+            // sleeps from 22 to 6
+            + record("PACK", 0x1002, packageData(4) + scheduleWithDuration(any, 22, 8))
+            // sandboxes at any other time
+            + record("PACK", 0x1003, packageData(12) + scheduleWithDuration(any, any, 0))
+            // follows someone, which the game does nothing for yet
+            + record("PACK", 0x1004, packageData(1) + scheduleWithDuration(any, any, 0));
+        const std::string characters
+            = record(
+                  "NPC_", 0x2001, configuration(0) + listed(0x1004) + listed(0x1001) + listed(0x1002) + listed(0x1003))
+            // nothing of theirs is on from 6 to 22
+            + record("NPC_", 0x2002, configuration(0) + listed(0x1002) + listed(0x1004));
+        ESM4::PackageCensus census;
+        collect(census, header() + topGroup("PACK", packages) + topGroup("NPC_", characters));
+        const ESM4::PackageCensus::Summary summary = census.summarize();
+
+        EXPECT_THAT(summary.mFollowedByHour[3], UnorderedElementsAre(Pair(4, 2u)));
+        EXPECT_THAT(
+            summary.mFollowedByHour[8], UnorderedElementsAre(Pair(12, 1u), Pair(ESM4::PackageCensus::followsNone, 1u)));
+        EXPECT_THAT(
+            summary.mFollowedByHour[9], UnorderedElementsAre(Pair(6, 1u), Pair(ESM4::PackageCensus::followsNone, 1u)));
+        EXPECT_THAT(
+            summary.mFollowedByHour[11], UnorderedElementsAre(Pair(6, 1u), Pair(ESM4::PackageCensus::followsNone, 1u)));
+        EXPECT_THAT(summary.mFollowedByHour[12],
+            UnorderedElementsAre(Pair(12, 1u), Pair(ESM4::PackageCensus::followsNone, 1u)));
+        EXPECT_THAT(summary.mFollowedByHour[22], UnorderedElementsAre(Pair(4, 2u)));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("  09:00  nothing 1  Travel 1\n"));
+        EXPECT_THAT(out.str(), HasSubstr("  03:00  Sleep 2\n"));
+    }
+
     TEST(ESM4PackageCensusTest, namesThePackageTypes)
     {
         EXPECT_EQ(ESM4::PackageCensus::packageTypeName(5), "Wander");
