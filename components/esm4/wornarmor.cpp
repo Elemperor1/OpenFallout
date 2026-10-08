@@ -57,7 +57,9 @@ namespace ESM4
 
         // The entries of a levelled list that a character of the level gets. The entries of a list are all those at or
         // below the level; unless the list calculates from all levels, only the highest of them. Of those one is
-        // chosen, or all of them if the list uses all. The list may also give nothing, by a chance in a hundred.
+        // chosen. A list that uses all gives every entry it has instead, whatever the level of the entry (the GECK
+        // says "all the items on the list are added" and that it supersedes the other two flags). The list may also
+        // give nothing, by a chance in a hundred.
         struct Choice
         {
             ESM::FormId mItem;
@@ -72,12 +74,12 @@ namespace ESM4
 
             std::vector<const LVLO*> eligible;
             for (const LVLO& entry : entries)
-                if (entry.level <= level && entry.item != 0)
+                if (entry.item != 0 && (rules.mUseAll || entry.level <= level))
                     eligible.push_back(&entry);
             if (eligible.empty())
                 return Outcome::EmptyByLevel;
 
-            if (!rules.mAllLevels)
+            if (!rules.mUseAll && !rules.mAllLevels)
             {
                 const std::int16_t highest
                     = (*std::max_element(eligible.begin(), eligible.end(), [](const LVLO* a, const LVLO* b) {

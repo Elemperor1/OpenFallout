@@ -272,23 +272,26 @@ namespace
             UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001 }, std::set<std::uint32_t>{ 0x1002 }));
     }
 
-    TEST(ESM4WornArmorTest, aListThatUsesAllGivesEveryEntryItMay)
+    TEST(ESM4WornArmorTest, aListThatUsesAllGivesEveryEntryWhateverItsLevel)
     {
         TestSource source;
         source.addArmor(0x1001, upperBody);
         source.addArmor(0x1002, hat);
         source.addArmor(0x1003, leftHand);
-        source.addList(0x1010, { { 1, 0x1001 }, { 1, 0x1002 }, { 9, 0x1003 } }, 0x04);
+        // entries of level 1 and 3 are below the level of the character, the one of level 9 is above; without the flag
+        // only the highest one at or below the level, the entry of level 3, would be given
+        source.addList(0x1010, { { 1, 0x1001 }, { 3, 0x1002 }, { 9, 0x1003 } }, 0x04);
         const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010 });
 
         ESM4::WornArmorTrace trace;
         const auto armor = ESM4::wornArmor(source, npc, playerLevel, 1, &trace);
 
-        ASSERT_EQ(armor.size(), 2u);
+        ASSERT_EQ(armor.size(), 3u);
         EXPECT_EQ(armor[0]->mId.mIndex, 0x1001u);
         EXPECT_EQ(armor[1]->mId.mIndex, 0x1002u);
+        EXPECT_EQ(armor[2]->mId.mIndex, 0x1003u);
         EXPECT_EQ(trace.mListsUsingAll, 1u);
-        EXPECT_EQ(trace.mArmorFromLists, 2u);
+        EXPECT_EQ(trace.mArmorFromLists, 3u);
         EXPECT_EQ(trace.mListsEntered, 1u);
     }
 
