@@ -1,6 +1,7 @@
 #include "equipmentcensus.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <exception>
 #include <iomanip>
 #include <ostream>
@@ -10,6 +11,7 @@
 
 #include <components/esm/common.hpp>
 
+#include "censusreading.hpp"
 #include "common.hpp"
 #include "inventory.hpp"
 #include "reader.hpp"
@@ -17,6 +19,8 @@
 
 namespace ESM4
 {
+    using namespace CensusReading;
+
     namespace
     {
         // BMDT: the parts of the body in the low 20 bits of the first word, flags of the piece in the first byte of the
@@ -30,45 +34,6 @@ namespace ESM4
         constexpr std::uint16_t acbsSize = 24;
         constexpr std::size_t acbsTemplateFlagsOffset = 22;
         constexpr std::uint16_t useInventoryFlag = 0x0100;
-
-        std::string firstLine(std::string_view message)
-        {
-            return std::string(message.substr(0, message.find('\n')));
-        }
-
-        // Calls visit with the type of each sub-record of the current record and reads the rest of it when visit
-        // returns false. A sub-record that runs past the end of the record, a record that ends inside a sub-record
-        // header and a visit that reads past the end of the data of the sub-record are errors.
-        template <class Visit>
-        void forEachSubRecord(Reader& reader, Visit&& visit)
-        {
-            while (true)
-            {
-                const bool found = reader.getSubRecordHeader();
-                if (!reader.subRecordFitsRecord())
-                    throw std::runtime_error("A sub-record runs past the end of its record");
-                if (!found)
-                {
-                    if (reader.unreadRecordBytes() != 0)
-                        throw std::runtime_error("A record ends inside a sub-record header");
-                    return;
-                }
-                if (!visit(reader.subRecordHeader().typeId, reader.subRecordHeader().dataSize))
-                    reader.skipSubRecordData();
-            }
-        }
-
-        template <class T>
-        void readValue(Reader& reader, T& value)
-        {
-            if (!reader.getExact(value))
-                throw std::runtime_error("The file ends inside a sub-record");
-        }
-
-        std::uint32_t bodyPartsOf(std::uint32_t flags)
-        {
-            return flags & bodyPartMask;
-        }
     }
 
     const std::array<const char*, EquipmentCensus::bodyPartCount>& EquipmentCensus::bodyPartNames()
@@ -90,7 +55,7 @@ namespace ESM4
                     std::uint32_t general = 0;
                     readValue(r, flags);
                     readValue(r, general);
-                    armour.mBodyParts = bodyPartsOf(flags);
+                    armour.mBodyParts = flags & bodyPartMask;
                     armour.mFlags = general & 0xff;
                     return true;
                 }
@@ -140,8 +105,7 @@ namespace ESM4
                     if (!r.get(data.data(), data.size()))
                         throw std::runtime_error("The file ends inside the base configuration");
                     std::uint16_t templateFlags = 0;
-                    std::copy_n(data.data() + acbsTemplateFlagsOffset, sizeof(templateFlags),
-                        reinterpret_cast<char*>(&templateFlags));
+                    std::memcpy(&templateFlags, data.data() + acbsTemplateFlagsOffset, sizeof(templateFlags));
                     character.mInventoryFromTemplate = (templateFlags & useInventoryFlag) != 0;
                     return true;
                 }
@@ -171,9 +135,7 @@ namespace ESM4
             mArmour.erase(id);
             mLists.erase(id);
             mCharacters.erase(id);
-            if (type == REC_NPC_)
-                mTypes.erase(id);
-            else if ((flags & Rec_Deleted) != 0)
+            if ((flags & Rec_Deleted) != 0)
                 mTypes.erase(id);
             else
                 mTypes[id] = type;

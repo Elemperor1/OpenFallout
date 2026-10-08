@@ -22,6 +22,10 @@ namespace EsmTool
     // Counts the armour that the characters of every Fallout file named in info.inputFiles list, read in that order,
     // and prints one report.
     int equipmentTes4(const Arguments& info);
+
+    // Counts the AI packages of every Fallout file named in info.inputFiles, and the packages that their characters
+    // list, read in that order, and prints one report.
+    int packagesTes4(const Arguments& info);
 }
 
 #endif

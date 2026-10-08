@@ -203,6 +203,7 @@ add_component_dir (esm4
     alternatetexture
     cellgrid
     census
+    censusreading
     common
     destruction
     dialogue
@@ -335,6 +336,7 @@ add_component_dir (esm4
     loadwrld
     loadwthr
     magiceffectid
+    packagecensus
     reader
     readerutils
     recordreader

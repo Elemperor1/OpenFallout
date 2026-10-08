@@ -16,6 +16,7 @@
 #include <components/esm/typetraits.hpp>
 #include <components/esm4/census.hpp>
 #include <components/esm4/equipmentcensus.hpp>
+#include <components/esm4/packagecensus.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
@@ -823,12 +824,14 @@ namespace EsmTool
         return survey.getFatalErrors().empty() ? result : -1;
     }
 
-    /// Count the references that every file named on the command line places, read in the order given, and print the
-    /// counts to standard output. Return 0 when every file was read to its end, or -1 if one could not be opened or
-    /// read.
-    int referencesTes4(const Arguments& info)
+    /// Read every file named on the command line in the order given, with its mod index and the indices of its
+    /// masters, into a census that has collect(Reader&), write(std::ostream&) and getFatalErrors(), and print what the
+    /// census counted. `mode` names the mode in the message for a file that is not TES4-format and `counted` what the
+    /// census counted. Return 0 when every file was read to its end, or -1 if one could not be opened or read.
+    template <class Census>
+    int countTes4(const Arguments& info, const char* mode, const char* counted)
     {
-        ESM4::ReferenceCensus census;
+        Census census;
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
         std::map<std::string, int> nameToIndex;
         int result = 0;
@@ -850,7 +853,7 @@ namespace EsmTool
                 }
                 if (ESM::readFormat(*stream) != ESM::Format::Tes4)
                 {
-                    std::cout << "References mode only supports TES4-format files: " << name << '\n';
+                    std::cout << mode << " mode only supports TES4-format files: " << name << '\n';
                     result = -1;
                     continue;
                 }
@@ -869,59 +872,23 @@ namespace EsmTool
             }
         }
 
-        std::cout << "Counted the references of " << info.inputFiles.size() << " files\n\n";
+        std::cout << "Counted the " << counted << " of " << info.inputFiles.size() << " files\n\n";
         census.write(std::cout);
         return census.getFatalErrors().empty() ? result : -1;
     }
 
-    /// Count the armour that the characters of every file named on the command line list, read in the order given,
-    /// and print the counts to standard output. Return 0 when every file was read to its end, or -1 if one could not
-    /// be opened or read.
+    int referencesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::ReferenceCensus>(info, "References", "references");
+    }
+
     int equipmentTes4(const Arguments& info)
     {
-        ESM4::EquipmentCensus census;
-        const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
-        std::map<std::string, int> nameToIndex;
-        int result = 0;
+        return countTes4<ESM4::EquipmentCensus>(info, "Equipment", "equipment");
+    }
 
-        std::uint32_t index = 0;
-        for (const std::filesystem::path& path : info.inputFiles)
-        {
-            const std::string name = Files::pathToUnicodeString(path.filename());
-            const std::uint32_t modIndex = index++;
-            try
-            {
-                auto stream = Files::openBinaryInputFileStream(path);
-                if (!stream->is_open())
-                {
-                    std::cout << "Failed to open file " << name << ": " << std::generic_category().message(errno)
-                              << '\n';
-                    result = -1;
-                    continue;
-                }
-                if (ESM::readFormat(*stream) != ESM::Format::Tes4)
-                {
-                    std::cout << "Equipment mode only supports TES4-format files: " << name << '\n';
-                    result = -1;
-                    continue;
-                }
-                stream->seekg(0);
-
-                ESM4::Reader reader(std::move(stream), path, nullptr, &encoder, true);
-                reader.setModIndex(modIndex);
-                reader.updateModIndices(nameToIndex);
-                nameToIndex[Misc::StringUtils::lowerCase(name)] = static_cast<int>(modIndex);
-                census.collect(reader);
-            }
-            catch (const std::exception& e)
-            {
-                std::cout << "\nERROR in " << name << ":\n\n  " << e.what() << std::endl;
-                result = -1;
-            }
-        }
-
-        std::cout << "Counted the equipment of " << info.inputFiles.size() << " files\n\n";
-        census.write(std::cout);
-        return census.getFatalErrors().empty() ? result : -1;
+    int packagesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::PackageCensus>(info, "Packages", "packages");
     }
 }
