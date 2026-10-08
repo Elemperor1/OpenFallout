@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_NIFOSG_CONTROLLER_H
 #define COMPONENTS_NIFOSG_CONTROLLER_H
 
+#include <optional>
 #include <set>
 #include <type_traits>
 
@@ -241,6 +242,9 @@ namespace NifOsg
         KeyframeController();
         KeyframeController(const KeyframeController& copy, const osg::CopyOp& copyop);
         KeyframeController(const Nif::NiKeyframeController* keyctrl);
+        /// The keys of a transform interpolator, as a controller of a sequence (a sequence of Oblivion and later has
+        /// no controller records for the nodes that it drives, only interpolators)
+        explicit KeyframeController(const Nif::NiTransformInterpolator* interp);
 
         META_Object(NifOsg, KeyframeController)
 
@@ -252,6 +256,8 @@ namespace NifOsg
         void operator()(NifOsg::MatrixTransform*, osg::NodeVisitor*);
 
     private:
+        void setInterpolator(const Nif::NiTransformInterpolator& interp);
+
         QuaternionInterpolator mRotations;
 
         FloatInterpolator mXRotations;
@@ -260,6 +266,12 @@ namespace NifOsg
 
         Vec3Interpolator mTranslations;
         FloatInterpolator mScales;
+
+        // What an interpolator holds for a channel that it has no keys for. The value is applied as it is, unless the
+        // file marks it as not set (the smallest float)
+        std::optional<osg::Vec3f> mDefaultTranslation;
+        std::optional<osg::Quat> mDefaultRotation;
+        std::optional<float> mDefaultScale;
 
         Nif::NiKeyframeData::AxisOrder mAxisOrder{ Nif::NiKeyframeData::AxisOrder::Order_XYZ };
 

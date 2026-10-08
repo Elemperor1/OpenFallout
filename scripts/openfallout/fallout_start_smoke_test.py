@@ -14,7 +14,11 @@ that the climate of the worldspace lists, the player stands on the floor the who
 above the player, the player stops at the pillar that is in the way and, strafing east from there, at the person who
 stands in the way (a character with a skeleton in its record, which is solid as an actor is: a ray that looks for actors
 finds it) and whose body can be seen (rays at what is drawn find the suit it wears, its head, its hair and the hand that
-the suit does not cover, and none the parts of its race that the suit takes the place of) and, strafing west from
+the suit does not cover, and none the parts of its race that the suit takes the place of; its race has a small box
+skinned to the left foot and the folder of the skeleton has an animation file that moves that foot, which a ray at the
+box finds where the animation put it: `--no-animation` leaves the file out, which must leave the foot where the skeleton
+has it)
+and, strafing west from
 there, at a wall that is not drawn (a mesh with only Havok collision: a ray at what is drawn goes through it, the player
 and a ray at the world stop at it), nothing logs an error from Lua, and the engine quits by itself. When ImageMagick's `import` is installed,
 pixels of the screen are checked too: where nothing is drawn it has the colour of the fog of the cell or of the weather,
@@ -125,7 +129,12 @@ SCENARIOS = [
                clouded_sky(plugin.WEATHER_SKY[1], plugin.WEATHER_FOG[1], plugin.CLOUD_ALPHA))]),
 ]
 
-WALK_SECONDS = 17
+WALK_SECONDS = 18
+# The player stands still from the fifteenth second, where the walk west ends, and turns to face east, to the person,
+# for half a second, so that the person is seen: the body of a model that is skinned is only brought up to date when it
+# is seen, and a ray at what is drawn finds it where it was when it was last seen. A second later a ray looks at its foot.
+TURN_FROM = 15
+FOOT_RAY_FROM = TURN_FROM + 1.5
 
 # The eight cells around the exterior cell 0,0 that the player starts in.
 NEIGHBOURS = [(x, y) for x in (-1, 0, 1) for y in (-1, 0, 1) if (x, y) != (0, 0)]
@@ -184,18 +193,34 @@ def person_face(name, axis, side):
     return centre[axis] + side * half[axis]
 
 
+# The small box of the race is skinned to the left foot of the skeleton, which hangs from the calf under the thigh
+# (BONES in placeholder_skeleton.py). With no animation it is where the skeleton has the foot; with the idle animation,
+# which moves the foot FOOT_MOVE to the side of the calf, the ray from the west finds the box that far from it. The ray
+# runs at the height of the foot.
+FOOT_BONES = dict((name, offset) for name, _, offset in placeholder_skeleton.BONES)
+FOOT_CHAIN = [FOOT_BONES[name] for name in ("Bip01 Pelvis", "Bip01 L Thigh", "Bip01 L Calf", "Bip01 L Foot")]
+FOOT_HEIGHT = sum(offset[2] for offset in FOOT_CHAIN)
+FOOT_REST_FACE = sum(offset[0] for offset in FOOT_CHAIN) - plugin.FOOT_MARKER[0]
+FOOT_PLAYED_FACE = FOOT_REST_FACE + plugin.FOOT_MOVE
+
+
 BODY_RAYS = {
     "east": ((100, 0, 50), (-100, 0, 50), 0, person_face("suit", 0, +1)),
     "west": ((-100, 0, 50), (100, 0, 50), 0, person_face("lefthand", 0, -1)),
     "head": ((100, 0, 118), (-100, 0, 118), 0, person_face("head", 0, +1)),
     "top": ((0, 0, 300), (0, 0, 0), 2, person_face("hair", 2, +1)),
 }
+FOOT_RAY = ((-300, 0, FOOT_HEIGHT), (0, 0, FOOT_HEIGHT), 0, FOOT_PLAYED_FACE)
 
 # Height of the camera above the feet of the player, in game units: the head node of the placeholder skeleton is at 124.
 EYE_HEIGHT = (100.0, 140.0)
 
-BODY_RAY_LUA = "".join("                look('%s', { %s }, { %s })\n" % (name, ", ".join(map(str, start)), ", ".join(map(str, end)))
-                       for name, (start, end, _, _) in BODY_RAYS.items())
+def ray_lua(name, start, end):
+    return "look('%s', { %s }, { %s })" % (name, ", ".join(map(str, start)), ", ".join(map(str, end)))
+
+
+BODY_RAY_LUA = "".join("                %s\n" % ray_lua(name, start, end) for name, (start, end, _, _) in BODY_RAYS.items())
+FOOT_RAY_LUA = ray_lua("foot", FOOT_RAY[0], FOOT_RAY[1])
 
 # Waits for the player to settle, then walks north (the player faces north at the start) into the pillar, from the
 # eighth second strafes east into the person that stands there, and logs once a second. At 7.5 s, when it has stopped at
@@ -216,8 +241,15 @@ local nextLog = 0
 local rayDone = false
 local personRayDone = false
 local wallRayDone = false
+local footRayDone = false
 local function log(...) print('OFTEST', ...) end
 local function fmt(v) return string.format('%%.1f,%%.1f,%%.1f', v.x, v.y, v.z) end
+-- a ray at what is drawn of the person, from and to points relative to its position
+local function look(name, from, to)
+    nearby.asyncCastRenderingRay(async:callback(function(res)
+        log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
+    end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
+end
 
 return {
     engineHandlers = {
@@ -226,11 +258,12 @@ return {
             if elapsed >= 3 then
                 I.Controls.overrideMovementControls(true)
                 self.controls.movement = elapsed < 8 and 1 or 0
-                self.controls.sideMovement = elapsed < 8 and 0 or (elapsed < %d and 1 or -1)
+                self.controls.sideMovement = elapsed < 8 and 0 or (elapsed < %d and 1 or (elapsed < %d and -1 or 0))
                 self.controls.run = true
-                self.controls.yawChange = 0
-                -- looks up for a second, the pitch stops at straight up
-                self.controls.pitchChange = elapsed < 4 and -2 * dt or 0
+                self.controls.yawChange = (elapsed >= %d and elapsed < %d + 0.5) and (math.pi / 2) / 0.5 * dt or 0
+                -- looks up for a second, the pitch stops at straight up, and looks level again when it turns
+                self.controls.pitchChange = elapsed < 4 and -2 * dt
+                    or ((elapsed >= %d and elapsed < %d + 0.5) and (math.pi / 2) / 0.5 * dt or 0)
             end
             if elapsed >= nextLog then
                 nextLog = nextLog + 1
@@ -264,11 +297,6 @@ return {
             -- rays at what is drawn of the person, from the outside to the middle of the body
             if elapsed >= 9 and not bodyRaysDone and npcPos then
                 bodyRaysDone = true
-                local function look(name, from, to)
-                    nearby.asyncCastRenderingRay(async:callback(function(res)
-                        log('render ray ' .. name .. ' hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
-                    end), npcPos + util.vector3(table.unpack(from)), npcPos + util.vector3(table.unpack(to)))
-                end
 %s            end
             -- at the wall that is not drawn: a ray at the world finds it, a ray at what is drawn goes through
             if elapsed >= %d and not wallRayDone then
@@ -281,11 +309,18 @@ return {
                     log('render ray wall hit=', tostring(res.hit), res.hit and fmt(res.hitPos) or '')
                 end), from, from - util.vector3(300, 0, 0))
             end
+            -- the foot of the person, which the animation has moved (see TURN_FROM)
+            if elapsed >= %.1f and not footRayDone and npcPos then
+                footRayDone = true
+                log('view', string.format('yaw=%%.2f pitch=%%.2f', camera.getYaw(), camera.getPitch()))
+                %s
+            end
             if elapsed >= %d then core.quit() end
         end,
     },
 }
-""" % (int(WEST_FROM), *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, int(WEST_FROM) + 4, WALK_SECONDS)
+""" % (int(WEST_FROM), TURN_FROM, TURN_FROM, TURN_FROM, TURN_FROM, TURN_FROM, *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA,
+       int(WEST_FROM) + 4, FOOT_RAY_FROM, FOOT_RAY_LUA, WALK_SECONDS)
 
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
@@ -363,7 +398,7 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels):
     return process.returncode, colours
 
 
-def check(text, scenario, colours):
+def check(text, scenario, colours, animated=True):
     """The problems the log shows, as a list of sentences; empty when the run did what it should."""
     problems = []
     for line in text.splitlines():
@@ -503,7 +538,8 @@ def check(text, scenario, colours):
     # The ray goes along an axis, so the coordinate of that axis is the one of the face that it hits
     person = (scenario.origin[0] + plugin.NPC_DISTANCE, scenario.origin[1] + plugin.NPC_DEPTH, 0.0)
     found = {m.group(1): m for m in map(RENDER_RAY.search, text.splitlines()) if m}
-    for name, (_, _, axis, want) in BODY_RAYS.items():
+    foot = FOOT_RAY[:3] + (FOOT_PLAYED_FACE if animated else FOOT_REST_FACE,)
+    for name, (_, _, axis, want) in {**BODY_RAYS, "foot": foot}.items():
         ray = found.get(name)
         if ray is None:
             problems.append(f"the script did not log the ray at what is drawn of the person ('{name}')")
@@ -541,6 +577,9 @@ def main():
     parser.add_argument("--build", required=True, type=Path, help="build directory with the openfallout program")
     parser.add_argument("--seconds", type=float, default=90, help="how long to give the engine before stopping it")
     parser.add_argument("--keep", action="store_true", help="keep the temporary directory and print its path")
+    parser.add_argument("--no-animation", action="store_true",
+                        help="leave the animation file of the person out, which must leave its foot where the skeleton "
+                             "has it: the control of the check that the animation moves it")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -555,7 +594,7 @@ def main():
 
     work = Path(tempfile.mkdtemp(prefix="openfallout-fallout-start-"))
     data = work / "data"
-    plugin.write(data)
+    plugin.write(data, animation=not args.no_animation)
     (data / "scripts").mkdir()
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
     (data / "walktest.omwscripts").write_text("PLAYER: scripts/walktest.lua\n", encoding="ascii")
@@ -576,7 +615,7 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
-        found += check(text, scenario, colours)
+        found += check(text, scenario, colours, animated=not args.no_animation)
         for line in (line for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())
         for problem in found:

@@ -336,9 +336,58 @@ namespace NifOsg
         // This is used to queue look-at controllers whose target nodes may not have been created yet.
         mutable std::vector<std::pair<unsigned int, osg::ref_ptr<LookAtController>>> mLookAtQueue;
 
+        /// The animation of a file of Oblivion and later: a sequence that names the nodes it drives and, for each, an
+        /// interpolator with its keys. The engine's animation system plays a group of text keys, "<group>: start" and
+        /// "<group>: stop" between which the time runs, so the sequence is made one: the group is the name of the file
+        /// (a file holds one animation, `mtidle.kf` is the group `mtidle`). Its start and stop are those of the
+        /// sequence and a sequence that loops has the keys that make the group loop. The text keys of the sequence
+        /// itself come along, lower case. The controllers of a file belong to the file, not to a group, so only one
+        /// sequence can be taken from it (see loadKf).
+        void loadControllerSequence(const Nif::NiControllerSequence& seq, std::string_view group,
+            std::string_view filename, SceneUtil::KeyframeHolder& target) const
+        {
+            const std::string name = Misc::StringUtils::lowerCase(group);
+            target.mTextKeys.emplace(seq.mStartTime, name + ": start");
+            target.mTextKeys.emplace(seq.mStopTime, name + ": stop");
+            // The engine has no sequence that plays forward and back again; one that does is played forward over and
+            // over, which is nearer to it than a pose held after the first pass
+            if (seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Cycle
+                || seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Reverse)
+            {
+                target.mTextKeys.emplace(seq.mStartTime, name + ": loop start");
+                target.mTextKeys.emplace(seq.mStopTime, name + ": loop stop");
+            }
+
+            if (!seq.mTextKeys.empty() && seq.mTextKeys->mRecordType == Nif::RC_NiTextKeyExtraData)
+                extractTextKeys(static_cast<const Nif::NiTextKeyExtraData*>(seq.mTextKeys.getPtr()), target.mTextKeys);
+
+            for (const Nif::ControlledBlock& block : seq.mControlledBlocks)
+            {
+                if (block.mInterpolator.empty() || block.mNodeName.empty())
+                    continue;
+
+                if (block.mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
+                {
+                    // The other kinds drive the properties of a node (colours, visibility) or parts of one
+                    Log(Debug::Verbose) << "Unsupported interpolator type " << block.mInterpolator->mRecordName
+                                        << " for the node " << block.mNodeName << " in " << filename;
+                    continue;
+                }
+
+                if (!target.mKeyframeControllers
+                         .emplace(block.mNodeName,
+                             new NifOsg::KeyframeController(
+                                 static_cast<const Nif::NiTransformInterpolator*>(block.mInterpolator.getPtr())))
+                         .second)
+                    Log(Debug::Verbose) << "Controller " << block.mNodeName << " present more than once in " << filename
+                                        << ", ignoring later version";
+            }
+        }
+
         void loadKf(Nif::FileView nif, SceneUtil::KeyframeHolder& target) const
         {
             const Nif::NiSequenceStreamHelper* seq = nullptr;
+            std::vector<const Nif::NiControllerSequence*> sequences;
             const size_t numRoots = nif.numRoots();
             for (size_t i = 0; i < numRoots; ++i)
             {
@@ -348,6 +397,20 @@ namespace NifOsg
                     seq = static_cast<const Nif::NiSequenceStreamHelper*>(r);
                     break;
                 }
+                if (r && r->mRecordType == Nif::RC_NiControllerSequence)
+                    sequences.push_back(static_cast<const Nif::NiControllerSequence*>(r));
+            }
+
+            if (seq == nullptr && !sequences.empty())
+            {
+                // The animation system keeps the controllers by the name of the node, for the whole file, and the
+                // groups of text keys only say when to play them, so a second sequence would animate its group with
+                // the tracks of the first. The animation files of the games hold one sequence each.
+                if (sequences.size() > 1)
+                    Log(Debug::Verbose) << "The file " << nif.getFilename() << " holds " << sequences.size()
+                                        << " animation sequences, using only the first";
+                loadControllerSequence(*sequences.front(), nif.getFilename().stem(), nif.getFilename().value(), target);
+                return;
             }
 
             if (!seq)

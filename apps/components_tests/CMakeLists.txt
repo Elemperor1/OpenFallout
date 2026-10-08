@@ -138,6 +138,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     myguiplatform/testmyguitexture.cpp
 
+    nifosg/testkeyframes.cpp
     nifosg/testnifloader.cpp
 
     esmterrain/testgridsampling.cpp
@@ -156,6 +157,7 @@ file(GLOB UNITTEST_SRC_FILES
     bsa/testcompressedbsafile.cpp
 
     nif/node.hpp
+    nif/testanimsurvey.cpp
     nif/testphysics.cpp
 )
 

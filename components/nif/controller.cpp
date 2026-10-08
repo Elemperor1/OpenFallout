@@ -113,7 +113,20 @@ namespace Nif
 
         nif->read(mWeight);
         mTextKeys.read(nif);
-        mExtrapolationMode = static_cast<NiTimeController::ExtrapolationMode>(nif->get<uint32_t>());
+        // The cycle type of a sequence is 0 for loop, 1 for reverse and 2 for clamp, not the bits of the flags of a
+        // controller
+        switch (nif->get<uint32_t>())
+        {
+            case 0:
+                mExtrapolationMode = NiTimeController::ExtrapolationMode::Cycle;
+                break;
+            case 1:
+                mExtrapolationMode = NiTimeController::ExtrapolationMode::Reverse;
+                break;
+            default:
+                mExtrapolationMode = NiTimeController::ExtrapolationMode::Constant;
+                break;
+        }
         nif->read(mFrequency);
         if (nif->getVersion() <= NIFStream::generateVersion(10, 4, 0, 1))
             nif->read(mPhase);
