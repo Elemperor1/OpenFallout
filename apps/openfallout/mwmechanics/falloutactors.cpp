@@ -95,6 +95,7 @@ namespace OFMechanics
         bool mWalking = false; // it goes to mDestination
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
+        osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
         std::deque<osg::Vec3f> mWaypoints;
         float mPathRetry = 0.f;
@@ -559,12 +560,16 @@ namespace OFMechanics
                     break;
                 case ESM4::PackageBehaviour::Stay:
                 {
+                    // Something else (a script) moved it from where it stood: it goes back
+                    if (mind.mAtGoal && distanceAcross(mind.position(), mind.mRestPlace) > waypointDistance)
+                        mind.mAtGoal = false;
                     if (!mind.mAtGoal && mind.mWait <= 0.f)
                     {
                         switch (walkTo(frame, mind, mind.mGoal.mCenter, duration, mind.mGoal.mRadius))
                         {
                             case Walk::Arrived:
                                 mind.mAtGoal = true;
+                                mind.mRestPlace = mind.position();
                                 stopWalking(mind);
                                 break;
                             case Walk::Failed:
