@@ -69,6 +69,15 @@ namespace
         EXPECT_FALSE(ESM4::readFaceMorphs(notMorphs, morphs, error));
         EXPECT_THAT(error, HasSubstr("not a FaceGen"));
 
+        // only the version 002 has the layout that is read
+        for (const char version : { '1', '3', 'x' })
+        {
+            std::string other = morphFile(1, { { 1, 2, 3 } }, {});
+            other[7] = version;
+            EXPECT_FALSE(ESM4::readFaceMorphs(other, morphs, error)) << version;
+            EXPECT_THAT(error, HasSubstr("not a FaceGen"));
+        }
+
         // the file ends in the middle of the last morph
         std::string cut = morphFile(2, { { 1, 2, 3, 4, 5, 6 } }, {});
         cut.resize(cut.size() - 2);
@@ -133,6 +142,18 @@ namespace
         // coefficients beyond the morphs of the file are left out
         EXPECT_EQ(ESM4::applyFaceMorphs(morphs, { 1.f, 5.f, 5.f }, { 3.f }, positions.data(), 1), 1u);
         EXPECT_THAT(positions, Pointwise(FloatEq(), { 2.f, 0.f, 0.f }));
+    }
+
+    TEST(ESM4FaceGenTest, addsTheCoefficientsOfACharacterToThoseOfItsRace)
+    {
+        EXPECT_THAT(ESM4::addFaceCoefficients({ 1.f, 2.f, 3.f }, { 0.5f, -2.f, 0.f }), ElementsAre(1.5f, 0.f, 3.f));
+        // a character with none of its own has the face of the race, and a race with none leaves the character's
+        EXPECT_THAT(ESM4::addFaceCoefficients({ 1.f, 2.f }, {}), ElementsAre(1.f, 2.f));
+        EXPECT_THAT(ESM4::addFaceCoefficients({}, { 4.f }), ElementsAre(4.f));
+        EXPECT_TRUE(ESM4::addFaceCoefficients({}, {}).empty());
+        // numbers that only one of them has are kept
+        EXPECT_THAT(ESM4::addFaceCoefficients({ 1.f }, { 1.f, 5.f }), ElementsAre(2.f, 5.f));
+        EXPECT_THAT(ESM4::addFaceCoefficients({ 1.f, 7.f }, { 1.f }), ElementsAre(2.f, 7.f));
     }
 
     TEST(ESM4FaceGenTest, namesTheMorphFileOfAModel)

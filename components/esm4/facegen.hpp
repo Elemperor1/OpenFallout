@@ -40,6 +40,12 @@ namespace ESM4
     std::size_t applyFaceMorphs(const FaceMorphs& morphs, const std::vector<float>& symmetric,
         const std::vector<float>& asymmetric, float* positions, std::size_t vertexCount, std::size_t first = 0);
 
+    // The coefficients of a face are the numbers of its race for the sex of the character, and those of the character
+    // itself on top (the numbers of the characters in the games centre on 0, the numbers of the races do not, and a
+    // character with all of them 0 has the face of its race). Either may be shorter or empty; the result has as many
+    // numbers as the longer.
+    std::vector<float> addFaceCoefficients(const std::vector<float>& race, const std::vector<float>& character);
+
     // The .egm file that goes with a model: the same file name with the extension .egm
     // ("meshes/characters/head/headhuman.nif" has "meshes/characters/head/headhuman.egm"). Empty if the file name has
     // no extension.

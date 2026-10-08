@@ -1,6 +1,8 @@
 #ifndef GAME_RENDER_ESM4NPCANIMATION_H
 #define GAME_RENDER_ESM4NPCANIMATION_H
 
+#include <vector>
+
 #include <osg/Vec3f>
 
 #include "animation.hpp"
@@ -42,11 +44,11 @@ namespace OFRender
         /// Adds a model to the character and returns the node that it is, null when there is no model
         osg::ref_ptr<osg::Node> insertPart(std::string_view model);
 
-        /// Gives a part of a Fallout character the face that its record asks for: the shape of the morph file beside
-        /// the model (the coefficients FGGS and FGGA), and the texture of the face or of the body that the editor wrote
-        /// for the character, if there is one
-        void shapeFalloutPart(
-            osg::Node& part, std::string_view model, const ESM4::Npc& traits, bool isHead, bool isBody);
+        /// Gives a part of a Fallout character its face: the shape of the morph file beside the model, moved by the
+        /// coefficients (FGGS and FGGA of the race and of the character together), and the texture of the face or of
+        /// the body that the editor wrote for the character, if there is one
+        void shapeFalloutPart(osg::Node& part, std::string_view model, const ESM4::Npc& traits,
+            const std::vector<float>& symmetric, const std::vector<float>& asymmetric, bool isHead, bool isBody);
 
         // Works for FO3/FONV/TES5
         void insertHeadParts(const std::vector<ESM::FormId>& partIds, std::set<uint32_t>& usedHeadPartTypes);

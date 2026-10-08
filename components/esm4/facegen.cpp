@@ -83,8 +83,8 @@ namespace ESM4
     {
         if (bytes.size() < sHeaderSize)
             return fail(error, "the file is shorter than its header");
-        if (bytes.substr(0, 5) != "FREGM")
-            return fail(error, "the file is not a FaceGen morph file");
+        if (bytes.substr(0, 8) != "FREGM002")
+            return fail(error, "the file is not a FaceGen morph file of the version 002");
 
         const std::uint32_t vertices = readAt<std::uint32_t>(bytes, 8);
         const std::uint32_t symmetric = readAt<std::uint32_t>(bytes, 12);
@@ -111,6 +111,16 @@ namespace ESM4
         readMorphs(bytes, offset, asymmetric, vertices, result.mAsymmetric);
         morphs = std::move(result);
         return true;
+    }
+
+    std::vector<float> addFaceCoefficients(const std::vector<float>& race, const std::vector<float>& character)
+    {
+        std::vector<float> result(std::max(race.size(), character.size()), 0.f);
+        for (std::size_t i = 0; i < race.size(); ++i)
+            result[i] += race[i];
+        for (std::size_t i = 0; i < character.size(); ++i)
+            result[i] += character[i];
+        return result;
     }
 
     std::size_t applyFaceMorphs(const FaceMorphs& morphs, const std::vector<float>& symmetric,

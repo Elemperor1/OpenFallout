@@ -252,16 +252,14 @@ namespace OFRender
         return part;
     }
 
-    void ESM4NpcAnimation::shapeFalloutPart(
-        osg::Node& part, std::string_view model, const ESM4::Npc& traits, bool isHead, bool isBody)
+    void ESM4NpcAnimation::shapeFalloutPart(osg::Node& part, std::string_view model, const ESM4::Npc& traits,
+        const std::vector<float>& symmetric, const std::vector<float>& asymmetric, bool isHead, bool isBody)
     {
-        // The shape: the morphs of the file beside the model, moved by the coefficients of the character
-        if (!traits.mSymShapeModeCoefficients.empty() || !traits.mAsymShapeModeCoefficients.empty())
+        // The shape: the morphs of the file beside the model, moved by the coefficients of the face
+        if (!symmetric.empty() || !asymmetric.empty())
         {
             const std::shared_ptr<const ESM4::FaceMorphs> morphs = getFaceMorphs(*mResourceSystem->getVFS(), model);
-            if (morphs != nullptr
-                && morphFaceMeshes(part, *morphs, traits.mSymShapeModeCoefficients, traits.mAsymShapeModeCoefficients)
-                    == 0)
+            if (morphs != nullptr && morphFaceMeshes(part, *morphs, symmetric, asymmetric) == 0)
             {
                 // Said once for each model, whatever number of characters wear it
                 static std::mutex sReportedMutex;
@@ -321,12 +319,21 @@ namespace OFRender
         const bool isFemale = OFClass::ESM4Npc::isFemale(mPtr);
         const std::string headModel = OFClass::falloutHeadModel(*race, isFemale);
         const std::string bodyModel = OFClass::falloutBodyModel(*race, isFemale);
+
+        // The face of the character is that of its race for its sex, and the numbers of the record on top
+        const std::vector<float> symmetric
+            = ESM4::addFaceCoefficients(isFemale ? race->mSymShapeModeCoeffFemale : race->mSymShapeModeCoefficients,
+                traits.mSymShapeModeCoefficients);
+        const std::vector<float> asymmetric
+            = ESM4::addFaceCoefficients(isFemale ? race->mAsymShapeModeCoeffFemale : race->mAsymShapeModeCoefficients,
+                traits.mAsymShapeModeCoefficients);
+
         for (const std::string& model :
             OFClass::falloutNpcModels(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr)))
         {
             const osg::ref_ptr<osg::Node> part = insertPart(model);
             if (part != nullptr)
-                shapeFalloutPart(*part, model, traits,
+                shapeFalloutPart(*part, model, traits, symmetric, asymmetric,
                     !headModel.empty() && Misc::StringUtils::ciEqual(model, headModel),
                     !bodyModel.empty() && Misc::StringUtils::ciEqual(model, bodyModel));
         }

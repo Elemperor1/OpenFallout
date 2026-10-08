@@ -49,6 +49,11 @@ namespace Shader
 
 namespace Resource
 {
+    /// The optimizations that a mesh gets when it is loaded. Merging geometries is left out for a mesh that has a
+    /// FaceGen morph file beside it (the file name with the extension egm): the file addresses the vertices in the
+    /// order that the mesh was written in, and merging puts them in another.
+    unsigned int getMeshOptimizationOptions(const VFS::Manager& vfs, VFS::Path::NormalizedView path);
+
     /// @brief Handles loading and caching of scenes, e.g. .nif files or .osg files
     /// @note Some methods of the scene manager can be used from any thread, see the methods documentation for more
     /// details.

@@ -147,9 +147,13 @@ PERSON_PARTS = {
     "suit": ((12.0, 8.0, 30.0), (0.0, 0.0, 60.0)),
 }
 # The face of the person: the head box has a FaceGen file beside it (person_head.egm) with 50 symmetric and 30 asymmetric
-# morphs that move nothing but the first, which moves each vertex FACE_SHIFT units east when the coefficient is 1, and the
-# person has that coefficient in FGGS. The head is where the shift puts it only when the engine morphs it.
+# morphs that move nothing but the first, which moves each vertex FACE_SHIFT units east when the coefficient is 1. The
+# coefficient is the sum of the race's FGGS (for men) and the person's: RACE_FACE and PERSON_FACE, which only add up to 1
+# when the engine puts the face of the race and the numbers of the person together. The head is where the shift puts it
+# only when the engine morphs it.
 FACE_SHIFT = 20.0
+RACE_FACE = 0.75
+PERSON_FACE = 0.25
 HEAD_VERTICES = 24  # four for each face of the box (box_mesh)
 
 # The biped slots of Fallout 3 that the suit covers: the upper body (0x04) and the right hand (0x10)
@@ -358,7 +362,7 @@ def race():
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
     return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
-                                     sub(b"FNAM"),
+                                     sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
                                      *part(2, "righthand"), sub(b"FNAM")])
 
@@ -388,7 +392,7 @@ def person():
                                     sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)),
                                     sub(b"RNAM", struct.pack("<I", RACE_ID)),
                                     sub(b"HNAM", struct.pack("<I", HAIR_ID)),
-                                    sub(b"FGGS", struct.pack("<50f", 1.0, *([0.0] * 49)))])
+                                    sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))])
 
 
 def head_morphs():

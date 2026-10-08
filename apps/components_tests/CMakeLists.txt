@@ -150,6 +150,7 @@ file(GLOB UNITTEST_SRC_FILES
     esmterrain/testgridsampling.cpp
     esmterrain/testtexturepath.cpp
 
+    resource/testmeshoptimization.cpp
     resource/testmultiobjectcache.cpp
     resource/testobjectcache.cpp
     resource/testresourcesystem.cpp

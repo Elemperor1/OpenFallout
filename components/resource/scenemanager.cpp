@@ -943,6 +943,20 @@ namespace Resource
         return options;
     }
 
+    unsigned int getMeshOptimizationOptions(const VFS::Manager& vfs, VFS::Path::NormalizedView path)
+    {
+        static const unsigned int options = getOptimizationOptions() | SceneUtil::Optimizer::SHARE_DUPLICATE_STATE;
+
+        const std::string_view name = path.value();
+        const std::size_t dot = name.find_last_of('.');
+        if (dot == std::string_view::npos || name.find('/', dot) != std::string_view::npos)
+            return options;
+        const VFS::Path::Normalized morphs(std::string(name.substr(0, dot)) + ".egm");
+        if (vfs.exists(morphs))
+            return options & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY);
+        return options;
+    }
+
     void SceneManager::shareState(osg::ref_ptr<osg::Node> node)
     {
         mSharedStateMutex.lock();
@@ -1031,10 +1045,7 @@ namespace Resource
                 optimizer.setSharedStateManager(mSharedStateManager, &mSharedStateMutex);
                 optimizer.setIsOperationPermissibleForObjectCallback(new CanOptimizeCallback);
 
-                static const unsigned int options
-                    = getOptimizationOptions() | SceneUtil::Optimizer::SHARE_DUPLICATE_STATE;
-
-                optimizer.optimize(loaded, options);
+                optimizer.optimize(loaded, getMeshOptimizationOptions(*mVFS, path));
             }
             else
                 shareState(loaded);
