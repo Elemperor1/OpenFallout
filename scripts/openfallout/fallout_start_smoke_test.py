@@ -36,7 +36,7 @@ none. The game has no files of the sky of Morrowind here, and the log must not m
 missing. Three more characters stand south and west of the start, where the player does not walk, and a Lua player
 script (PACKAGE_SCRIPT) logs where each is once a second: one that has two AI packages (the first is for the night,
 which it must ignore at the time of day the game starts at, the second sends it to a marker 300 units north of it) must
-walk there, turn to the way the marker faces and stay; one that has no package must stay where it was put; one that has
+walk there (to the edge of the radius that the package names), turn to the way the marker faces and stay; one that has no package must stay where it was put; one that has
 a package that sends it about the place where it stands must stay within the radius of the package and move. A
 character with no animation to walk with (`--no-animation`) is not moved at all.
 
@@ -496,7 +496,8 @@ return {
 
 # Where the three characters start relative to the player, and where the walker should end
 PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler", "roamer")}
-ARRIVAL_RANGE = 30.0  # how close to the marker the walker comes, units
+ARRIVAL_RANGE = 30.0  # how close to the marker of a package for the night the walker may come, units
+TRAVEL_SLACK = 20.0  # how far from the radius of its package the walker may have stopped (it stops at the edge of it)
 UNMOVED_RANGE = 2.0  # how far a character that must stay may be from where it was put
 ROAM_SLACK = 30.0  # how far outside the radius of its package the roamer may be (the radius of a package is in the data)
 WALK_YAW_RANGE = 0.35  # how far from north the walker faces while it walks north, radians
@@ -832,16 +833,19 @@ def check_packages(text, scenario, animated):
         return problems
 
     _, (x, y, _), yaw = walker[-1]
-    if math.hypot(x - target[0], y - target[1]) > ARRIVAL_RANGE:
-        problems.append(f"the walker ended at {x:.0f},{y:.0f}, expected it within {ARRIVAL_RANGE:.0f} units of the marker "
-                        f"of its package at {target[0]:.0f},{target[1]:.0f}")
+    arrived_at = math.hypot(x - target[0], y - target[1])
+    if abs(arrived_at - plugin.TRAVEL_RADIUS) > TRAVEL_SLACK:
+        problems.append(f"the walker ended at {x:.0f},{y:.0f}, {arrived_at:.0f} units from the marker of its package at "
+                        f"{target[0]:.0f},{target[1]:.0f}, expected it at the edge of the radius of the package, "
+                        f"{plugin.TRAVEL_RADIUS} units from it")
     if angle_difference(yaw, plugin.TARGET_YAW) > YAW_RANGE:
         problems.append(f"the walker ended facing {yaw:.2f}, expected the way the marker faces, {plugin.TARGET_YAW:.2f}")
     if any(math.hypot(x - night[0], y - night[1]) < ARRIVAL_RANGE * 3 for _, (x, y, _), _ in walker):
         problems.append("the walker went to the marker of the package for the night, which is not on")
     # on its way north it faces north
     start_y = where("walker")[1]
-    walking = [yaw for _, (x, y, _), yaw in walker if start_y + 60.0 < y < target[1] - 60.0]
+    walking = [yaw for _, (x, y, _), yaw in walker
+               if start_y + 40.0 < y < target[1] - plugin.TRAVEL_RADIUS - TRAVEL_SLACK]
     if not walking:
         problems.append("the walker was never seen between its start and the marker")
     elif any(angle_difference(yaw, 0.0) > WALK_YAW_RANGE for yaw in walking):

@@ -143,7 +143,7 @@ CREATURE_POSITIONS = {"beast": (450.0, 140.0), "user": (450.0, 540.0), "list": (
 CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80
 # Characters with AI packages stand south and west of where the player starts, away from where the player walks (x from
 # -150 to 300, y from 0 to 600). The walker starts at WALKER_START, and travels (package type Travel) to a marker 300
-# units north of it, which faces east; its first package, for the night (22:00 to 02:00, to another marker), is not on
+# units north of it, which faces east, and stops TRAVEL_RADIUS from it; its first package, for the night (22:00 to 02:00, to another marker), is not on
 # when the game starts at about nine in the morning, and the second is on at any time. The idler has no packages. The
 # roamer has a package that sends it about where it stands, ROAM_RADIUS around it (Wander near the editor location).
 # Positions are relative to where the player starts, as the creatures' are.
@@ -152,6 +152,7 @@ PACKAGE_PLACES = {"target": (-500.0, -100.0), "night": (-900.0, -400.0), "walker
 TARGET_YAW = math.pi / 2
 NIGHT_YAW = math.pi
 ROAM_RADIUS = 200
+TRAVEL_RADIUS = 64 # the walker has arrived when it is this close to the marker (a character stops at the edge of the radius)
 NIGHT_START = 22
 NIGHT_HOURS = 4
 PACKAGE_TRAVEL = 6
@@ -479,7 +480,7 @@ def packages():
         records.append(package(NIGHT_PACKAGE_IDS[kind], "OFTestNight" + kind.capitalize(), PACKAGE_TRAVEL,
                                (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["night"][index]), 0, NIGHT_START, NIGHT_HOURS))
         records.append(package(TRAVEL_PACKAGE_IDS[kind], "OFTestTravel" + kind.capitalize(), PACKAGE_TRAVEL,
-                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index])))
+                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index]), TRAVEL_RADIUS))
     return records
 
 

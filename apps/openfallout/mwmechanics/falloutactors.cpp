@@ -93,6 +93,7 @@ namespace OFMechanics
         float mReview = 0.f; // seconds until the packages are looked at again
         float mWait = 0.f; // seconds to stand still before it does anything else
         bool mWalking = false; // it goes to mDestination
+        bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
         osg::Vec3f mDestination;
         std::deque<osg::Vec3f> mWaypoints;
@@ -217,7 +218,7 @@ namespace OFMechanics
 
     bool FalloutActors::handles(const OFWorld::Ptr& ptr)
     {
-        // Only the records of Fallout 3 and New Vegas: the packages and the sizes of the others are laid out differently
+        // Only the records of Fallout 3 and New Vegas: the packages of the other games are laid out differently
         if (ptr.getType() == ESM4::Npc::sRecordId)
             return ptr.get<ESM4::Npc>()->mBase->mIsFONV;
         if (ptr.getType() == ESM4::Creature::sRecordId)
@@ -320,6 +321,7 @@ namespace OFMechanics
         Walk buildPath(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination)
         {
             mind.mWaypoints.clear();
+            mind.mPartial = false;
             const osg::Vec3f start = mind.position();
             if (!frame.mNavigator)
             {
@@ -334,10 +336,19 @@ namespace OFMechanics
             switch (status)
             {
                 case DetourNavigator::Status::Success:
-                case DetourNavigator::Status::PartialPath:
                     if (!mind.mWaypoints.empty())
                         return Walk::Moving;
                     return Walk::Failed;
+                case DetourNavigator::Status::PartialPath:
+                    // The place is on another island of the mesh, or in a part of it that is not made yet: the path
+                    // goes as far as the navigator can, and a path that goes nowhere from here is no path
+                    mind.mPartial = true;
+                    if (mind.mWaypoints.empty() || distanceAcross(start, mind.mWaypoints.back()) < waypointDistance)
+                    {
+                        mind.mWaypoints.clear();
+                        return Walk::Failed;
+                    }
+                    return Walk::Moving;
                 case DetourNavigator::Status::NavMeshNotFound:
                     mind.mWaypoints.clear();
                     return Walk::Waiting;
@@ -359,12 +370,19 @@ namespace OFMechanics
                     mind.mPtr, osg::Vec3f(position.rot[0], position.rot[1], turned), OFBase::RotationFlag_none);
         }
 
-        /// One frame of walking to the place
-        Walk walkTo(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination, float duration)
+        /// One frame of walking to the place. The actor is there within `arrival` units of the place (0: at it).
+        Walk walkTo(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination, float duration,
+            float arrival = 0.f)
         {
             const OFRender::FalloutActorAnimation* animation = walker(frame.mWorld, mind.mPtr);
             if (animation == nullptr)
                 return Walk::Failed;
+
+            if (arrival > 0.f && distanceAcross(mind.position(), destination) <= arrival)
+            {
+                mind.mWaypoints.clear();
+                return Walk::Arrived;
+            }
 
             if (!mind.mWalking)
             {
@@ -395,6 +413,13 @@ namespace OFMechanics
             if (distanceAcross(position, mind.mWaypoints.front()) < waypointDistance / 2.f)
             {
                 mind.mWaypoints.clear();
+                // The end of a path that stopped short is not the place: another path is asked for from here, which
+                // fails when it gets no nearer
+                if (mind.mPartial)
+                {
+                    mind.mPathRetry = 0.f;
+                    return Walk::Waiting;
+                }
                 return Walk::Arrived;
             }
 
@@ -523,7 +548,7 @@ namespace OFMechanics
                 {
                     if (!mind.mAtGoal && mind.mWait <= 0.f)
                     {
-                        switch (walkTo(frame, mind, mind.mGoal.mCenter, duration))
+                        switch (walkTo(frame, mind, mind.mGoal.mCenter, duration, mind.mGoal.mRadius))
                         {
                             case Walk::Arrived:
                                 mind.mAtGoal = true;
