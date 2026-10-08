@@ -120,6 +120,41 @@ namespace
         EXPECT_EQ(part->getChild(0), shared.get());
     }
 
+    TEST(OpenFalloutRenderMorphFaceMeshes, movesTheFirstVerticesOfALongerFileWhenToldTo)
+    {
+        // a head of 3 vertices and a file of 5: the head is the first three
+        const ESM4::FaceMorphs morphs = makeMorphs(5, { 2 });
+        {
+            osg::ref_ptr<osg::Group> part = new osg::Group;
+            part->addChild(makeGeometry(3));
+            EXPECT_EQ(morphFaceMeshes(*part, morphs, { 1.f }, {}, true), 1u);
+            const osg::Vec3Array& moved = positionsOf(childGeometry(*part, 0));
+            ASSERT_EQ(moved.size(), 3u);
+            // x moves by 2 and z by the number of the vertex, so no vertex got the morph of one after the third
+            EXPECT_FLOAT_EQ(moved[0].x(), 2.f);
+            EXPECT_FLOAT_EQ(moved[2].x(), 4.f);
+            EXPECT_FLOAT_EQ(moved[2].z(), 22.f);
+        }
+        {
+            // not unless told to
+            osg::ref_ptr<osg::Group> part = new osg::Group;
+            part->addChild(makeGeometry(3));
+            EXPECT_EQ(morphFaceMeshes(*part, morphs, { 1.f }, {}), 0u);
+            EXPECT_EQ(morphFaceMeshes(*part, morphs, { 1.f }, {}, false), 0u);
+        }
+        {
+            // not for several meshes, and not for a part with more vertices than the file
+            osg::ref_ptr<osg::Group> several = new osg::Group;
+            several->addChild(makeGeometry(2));
+            several->addChild(makeGeometry(2));
+            EXPECT_EQ(morphFaceMeshes(*several, morphs, { 1.f }, {}, true), 0u);
+
+            osg::ref_ptr<osg::Group> bigger = new osg::Group;
+            bigger->addChild(makeGeometry(7));
+            EXPECT_EQ(morphFaceMeshes(*bigger, morphs, { 1.f }, {}, true), 0u);
+        }
+    }
+
     TEST(OpenFalloutRenderMorphFaceMeshes, movesTheMeshesOfAFileForSeveralOneAfterTheOther)
     {
         osg::ref_ptr<osg::Group> part = new osg::Group;

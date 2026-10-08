@@ -126,7 +126,7 @@ namespace OFRender
     }
 
     std::size_t morphFaceMeshes(osg::Node& part, const ESM4::FaceMorphs& morphs, const std::vector<float>& symmetric,
-        const std::vector<float>& asymmetric)
+        const std::vector<float>& asymmetric, bool firstOfLongerFile)
     {
         CollectMeshes collect;
         part.accept(collect);
@@ -142,13 +142,18 @@ namespace OFRender
             std::size_t total = 0;
             for (const Mesh& mesh : collect.mMeshes)
                 total += mesh.mVertices;
-            if (total != morphs.mVertexCount)
+            if (firstOfLongerFile && collect.mMeshes.size() == 1 && total < morphs.mVertexCount)
+                moves.emplace_back(&collect.mMeshes.front(), 0);
+            else if (total != morphs.mVertexCount)
                 return 0;
-            std::size_t first = 0;
-            for (Mesh& mesh : collect.mMeshes)
+            else
             {
-                moves.emplace_back(&mesh, first);
-                first += mesh.mVertices;
+                std::size_t first = 0;
+                for (Mesh& mesh : collect.mMeshes)
+                {
+                    moves.emplace_back(&mesh, first);
+                    first += mesh.mVertices;
+                }
             }
         }
 

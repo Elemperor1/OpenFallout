@@ -259,7 +259,7 @@ namespace OFRender
         if (!symmetric.empty() || !asymmetric.empty())
         {
             const std::shared_ptr<const ESM4::FaceMorphs> morphs = getFaceMorphs(*mResourceSystem->getVFS(), model);
-            if (morphs != nullptr && morphFaceMeshes(part, *morphs, symmetric, asymmetric) == 0)
+            if (morphs != nullptr && morphFaceMeshes(part, *morphs, symmetric, asymmetric, isHead) == 0)
             {
                 // Said once for each model, whatever number of characters wear it
                 static std::mutex sReportedMutex;

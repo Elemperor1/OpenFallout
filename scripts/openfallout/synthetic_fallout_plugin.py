@@ -155,6 +155,9 @@ FACE_SHIFT = 20.0
 RACE_FACE = 0.75
 PERSON_FACE = 0.25
 HEAD_VERTICES = 24  # four for each face of the box (box_mesh)
+# The file has more vertices than the head, as the head files of the games do (1449 for a head of 1211): the head is
+# the first of them
+HEAD_FILE_EXTRA_VERTICES = 10
 
 # The biped slots of Fallout 3 that the suit covers: the upper body (0x04) and the right hand (0x10)
 SUIT_SLOTS = 0x04 | 0x10
@@ -399,10 +402,11 @@ def head_morphs():
     """The FaceGen morph file of the head: a header of 64 bytes (FREGM002, the numbers of vertices and of morphs, a number,
     40 bytes that are not used), then each morph with its scale and three deltas for each vertex. The scale of the first
     symmetric morph is 0.5, so its deltas are twice the shift."""
-    data = b"FREGM002" + struct.pack("<4I", HEAD_VERTICES, 50, 30, 0) + bytes(40)
+    vertices = HEAD_VERTICES + HEAD_FILE_EXTRA_VERTICES
+    data = b"FREGM002" + struct.pack("<4I", vertices, 50, 30, 0) + bytes(40)
     for index in range(80):
         move = int(round(FACE_SHIFT * 2)) if index == 0 else 0
-        data += struct.pack("<f", 0.5) + struct.pack("<3h", move, 0, 0) * HEAD_VERTICES
+        data += struct.pack("<f", 0.5) + struct.pack("<3h", move, 0, 0) * vertices
     return data
 
 

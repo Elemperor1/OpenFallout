@@ -22,9 +22,13 @@ namespace OFRender
     /// of the character. The meshes of the part are shared with every other character that wears it, so each mesh that
     /// moves is replaced by a copy in this part only. A file for a single mesh moves the mesh that has as many vertices
     /// as the file; a file for several meshes moves them one after the other, in the order of the part. Returns how
-    /// many meshes moved, which is none when the vertices of the part are not those of the file.
+    /// many meshes moved, which is none when the vertices of the part are not those of the file. With
+    /// `firstOfLongerFile` a part of a single mesh that has fewer vertices than the file moves by the first vertices of
+    /// the file: the head files of the games have 1449 (men) or 2289 (women) vertices for a head of 1211, and the
+    /// head is the first 1211 (the morphs move neighbouring vertices, and the mirror images of a vertex, alike at
+    /// that place of the file and at no other, in the real files).
     std::size_t morphFaceMeshes(osg::Node& part, const ESM4::FaceMorphs& morphs, const std::vector<float>& symmetric,
-        const std::vector<float>& asymmetric);
+        const std::vector<float>& asymmetric, bool firstOfLongerFile = false);
 
     /// Gives the part another image for the diffuse map, on the nodes of this part only. Returns how many nodes it
     /// changed, which is none when the part has no diffuse map.
