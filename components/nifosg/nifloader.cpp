@@ -336,9 +336,54 @@ namespace NifOsg
         // This is used to queue look-at controllers whose target nodes may not have been created yet.
         mutable std::vector<std::pair<unsigned int, osg::ref_ptr<LookAtController>>> mLookAtQueue;
 
+        /// The animation of a file of Oblivion and later: a sequence that names the nodes it drives and, for each, an
+        /// interpolator with its keys. The engine's animation system plays a group of text keys, "<group>: start" and
+        /// "<group>: stop" between which the time runs, so the sequence is made one: the group is the name of the file
+        /// (a file holds one animation, `mtidle.kf` is the group `mtidle`), or the name of the sequence when the file
+        /// holds several. Its start and stop are those of the sequence and a sequence that loops has the keys that
+        /// make the group loop. The text keys of the sequence itself come along, lower case.
+        void loadControllerSequence(const Nif::NiControllerSequence& seq, std::string_view group,
+            std::string_view filename, SceneUtil::KeyframeHolder& target) const
+        {
+            const std::string name = Misc::StringUtils::lowerCase(group);
+            target.mTextKeys.emplace(seq.mStartTime, name + ": start");
+            target.mTextKeys.emplace(seq.mStopTime, name + ": stop");
+            if (seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Cycle)
+            {
+                target.mTextKeys.emplace(seq.mStartTime, name + ": loop start");
+                target.mTextKeys.emplace(seq.mStopTime, name + ": loop stop");
+            }
+
+            if (!seq.mTextKeys.empty() && seq.mTextKeys->mRecordType == Nif::RC_NiTextKeyExtraData)
+                extractTextKeys(static_cast<const Nif::NiTextKeyExtraData*>(seq.mTextKeys.getPtr()), target.mTextKeys);
+
+            for (const Nif::ControlledBlock& block : seq.mControlledBlocks)
+            {
+                if (block.mInterpolator.empty() || block.mNodeName.empty())
+                    continue;
+
+                if (block.mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
+                {
+                    // The other kinds drive the properties of a node (colours, visibility) or parts of one
+                    Log(Debug::Verbose) << "Unsupported interpolator type " << block.mInterpolator->mRecordName
+                                        << " for the node " << block.mNodeName << " in " << filename;
+                    continue;
+                }
+
+                if (!target.mKeyframeControllers
+                         .emplace(block.mNodeName,
+                             new NifOsg::KeyframeController(
+                                 static_cast<const Nif::NiTransformInterpolator*>(block.mInterpolator.getPtr())))
+                         .second)
+                    Log(Debug::Verbose) << "Controller " << block.mNodeName << " present more than once in " << filename
+                                        << ", ignoring later version";
+            }
+        }
+
         void loadKf(Nif::FileView nif, SceneUtil::KeyframeHolder& target) const
         {
             const Nif::NiSequenceStreamHelper* seq = nullptr;
+            std::vector<const Nif::NiControllerSequence*> sequences;
             const size_t numRoots = nif.numRoots();
             for (size_t i = 0; i < numRoots; ++i)
             {
@@ -348,6 +393,17 @@ namespace NifOsg
                     seq = static_cast<const Nif::NiSequenceStreamHelper*>(r);
                     break;
                 }
+                if (r && r->mRecordType == Nif::RC_NiControllerSequence)
+                    sequences.push_back(static_cast<const Nif::NiControllerSequence*>(r));
+            }
+
+            if (seq == nullptr && !sequences.empty())
+            {
+                for (const Nif::NiControllerSequence* sequence : sequences)
+                    loadControllerSequence(*sequence,
+                        sequences.size() == 1 ? nif.getFilename().stem() : sequence->mName, nif.getFilename().value(),
+                        target);
+                return;
             }
 
             if (!seq)

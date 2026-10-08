@@ -20,15 +20,18 @@ files of the games.
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
 writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
-`meshes/openfallout/wall.nif`, `meshes/characters/_male/skeleton.nif`, `textures/sky/oftestclouds.dds` and
-`textures/landscape/oftestground.dds` into the folder.
+`meshes/openfallout/wall.nif`, `meshes/openfallout/person_foot.nif`, `meshes/characters/_male/skeleton.nif`,
+`meshes/characters/_male/mtidle.kf`,
+`textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
 """
 import argparse
 import struct
 from pathlib import Path
 
 import havok_wall
+import idle_animation
 import placeholder_skeleton
+import skinned_box
 
 CUBE_ID = 0x800
 CELL_ID = 0x801
@@ -69,6 +72,19 @@ RACE_NAME = "OFTestRace"
 # The skeleton of the character, as the record names it: Fallout characters have theirs in the NPC_ record, not in the
 # race. The file is the placeholder skeleton of the engine, which is the one with the bounding box.
 SKELETON = "characters\\_male\\skeleton.nif"
+# The animation of the character: the file `mtidle.kf` in the folder of its skeleton (idle_animation.py), which moves the
+# left foot to the left of the actor, 150 units from where the skeleton has it, in the first second and holds it there.
+# The race has a small box skinned to that foot (skinned_box.py), as the head part after the head (the ears), so that a
+# ray at what is drawn finds where the animation put it (the other parts of the body are plain models, they do not
+# follow the bones).
+IDLE_ANIMATION = "characters\\_male\\mtidle.kf"
+FOOT_BONE = "Bip01 L Foot"
+FOOT_MARKER = (3.0, 3.0, 3.0)
+FOOT_MOVE = -150.0
+FOOT_PART = "openfallout\\person_foot.nif"
+# Where the foot is when the skeleton is at rest: the bones hang from each other (BONES in placeholder_skeleton.py), the
+# pelvis 64 units up, the thigh 8 to the left and 4 down from it, and the calf and the foot 26 down each.
+FOOT_REST = (-8.0, 0.0, 8.0)
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
@@ -311,9 +327,9 @@ def part_path(name):
     return "openfallout\\person_%s.osgt" % name
 
 
-def part(index, name):
+def part(index, name, path=None):
     """The INDX and MODL of a part of the body or head of a race."""
-    return [sub(b"INDX", struct.pack("<I", index)), zstr(b"MODL", part_path(name))]
+    return [sub(b"INDX", struct.pack("<I", index)), zstr(b"MODL", path or part_path(name))]
 
 
 def race():
@@ -323,7 +339,8 @@ def race():
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
     return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
-                                     sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), sub(b"FNAM"),
+                                     sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
+                                     sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
                                      *part(2, "righthand"), sub(b"FNAM")])
 
@@ -472,7 +489,9 @@ def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):
     return "\n".join(lines)
 
 
-def write(out):
+def write(out, animation=True):
+    """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
+    animation file."""
     out = Path(out)
     mesh = out / "meshes" / "openfallout" / "cube.osgt"
     mesh.parent.mkdir(parents=True, exist_ok=True)
@@ -491,6 +510,11 @@ def write(out):
     skeleton = out / "meshes" / Path(SKELETON.replace("\\", "/"))
     skeleton.parent.mkdir(parents=True, exist_ok=True)
     skeleton.write_bytes(placeholder_skeleton.skeleton())
+    (out / "meshes" / Path(FOOT_PART.replace("\\", "/"))).write_bytes(
+        skinned_box.skinned_box(FOOT_BONE, FOOT_REST, FOOT_REST, FOOT_MARKER))
+    if animation:
+        (out / "meshes" / Path(IDLE_ANIMATION.replace("\\", "/"))).write_bytes(
+            idle_animation.idle_animation(node=FOOT_BONE, offset=FOOT_MOVE))
     (out / "OFTest.esm").write_bytes(plugin())
     return out / "OFTest.esm"
 

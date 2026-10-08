@@ -241,6 +241,9 @@ namespace NifOsg
         KeyframeController();
         KeyframeController(const KeyframeController& copy, const osg::CopyOp& copyop);
         KeyframeController(const Nif::NiKeyframeController* keyctrl);
+        /// The keys of a transform interpolator, as a controller of a sequence (a sequence of Oblivion and later has
+        /// no controller records for the nodes that it drives, only interpolators)
+        explicit KeyframeController(const Nif::NiTransformInterpolator* interp);
 
         META_Object(NifOsg, KeyframeController)
 
@@ -252,6 +255,8 @@ namespace NifOsg
         void operator()(NifOsg::MatrixTransform*, osg::NodeVisitor*);
 
     private:
+        void setInterpolator(const Nif::NiTransformInterpolator& interp);
+
         QuaternionInterpolator mRotations;
 
         FloatInterpolator mXRotations;

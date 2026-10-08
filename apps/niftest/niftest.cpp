@@ -14,6 +14,7 @@
 #include <components/files/constrainedfilestream.hpp>
 #include <components/files/conversion.hpp>
 #include <components/misc/strings/algorithm.hpp>
+#include <components/nif/animsurvey.hpp>
 #include <components/nif/niffile.hpp>
 #include <components/nifbullet/bulletnifloader.hpp>
 #include <components/nifbullet/havoksurvey.hpp>
@@ -123,7 +124,7 @@ std::unique_ptr<VFS::Archive> makeArchive(const std::filesystem::path& path)
 }
 
 bool readFile(const std::filesystem::path& source, const std::filesystem::path& path, const VFS::Manager* vfs,
-    bool quiet, NifBullet::HavokSurvey* havokSurvey)
+    bool quiet, NifBullet::HavokSurvey* havokSurvey, Nif::AnimSurvey* animSurvey)
 {
     const auto [fileType, fileClass] = classifyFile(path);
     if (fileClass != FileClass::NIF && fileClass != FileClass::Material)
@@ -150,6 +151,9 @@ bool readFile(const std::filesystem::path& source, const std::filesystem::path& 
                     reader.parse(vfs->get(VFS::Path::Normalized(pathStr)));
                 else
                     reader.parse(Files::openConstrainedFileStream(fullPath));
+
+                if (animSurvey != nullptr)
+                    animSurvey->addFile(file, pathStr);
 
                 if (havokSurvey != nullptr && fileType == FileType::NIF)
                 {
@@ -181,7 +185,7 @@ bool readFile(const std::filesystem::path& source, const std::filesystem::path& 
 /// Check all the nif files in a given VFS::Archive
 /// \note Can not read a bsa file inside of a bsa file.
 void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::path& archivePath, bool quiet,
-    NifBullet::HavokSurvey* havokSurvey)
+    NifBullet::HavokSurvey* havokSurvey, Nif::AnimSurvey* animSurvey)
 {
     if (archive == nullptr)
         return;
@@ -195,7 +199,7 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
 
     for (const auto& name : vfs.getRecursiveDirectoryIterator())
     {
-        readFile(archivePath, name.value(), &vfs, quiet, havokSurvey);
+        readFile(archivePath, name.value(), &vfs, quiet, havokSurvey, animSurvey);
     }
 
     if (!archivePath.empty() && !isBSA(archivePath))
@@ -209,7 +213,7 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
             {
                 try
                 {
-                    readVFS(VFS::makeBsaArchive(file.second, nullptr), file.second, quiet, havokSurvey);
+                    readVFS(VFS::makeBsaArchive(file.second, nullptr), file.second, quiet, havokSurvey, animSurvey);
                 }
                 catch (const std::exception& e)
                 {
@@ -222,7 +226,8 @@ void readVFS(std::unique_ptr<VFS::Archive>&& archive, const std::filesystem::pat
 }
 
 bool parseOptions(int argc, char** argv, Files::PathContainer& files, Files::PathContainer& archives,
-    bool& writeDebugLog, bool& quiet, bool& havokSurvey, std::size_t& havokExamples)
+    bool& writeDebugLog, bool& quiet, bool& havokSurvey, std::size_t& havokExamples, bool& animSurvey,
+    std::size_t& animExamples, std::size_t& animAnswers)
 {
     bpo::options_description desc(
         R"(Ensure that OpenMW can use the provided NIF, KF, BTO/BTR, RDT, PSA, BGEM/BGSM and BSA/BA2 files
@@ -241,6 +246,13 @@ Allowed options)");
         "the Havok data of the files is and which files get it (counts and file names only)");
     addOption("havok-examples", bpo::value<std::size_t>()->default_value(3),
         "with --havok-survey: how many file names to print for each count");
+    addOption("anim-survey",
+        "also count what the animation data of the files holds (sequences, interpolators, text keys, the nodes they "
+        "drive, skeletons), and print it at the end (counts, names of files, nodes and animation events only)");
+    addOption("anim-examples", bpo::value<std::size_t>()->default_value(3),
+        "with --anim-survey: how many file names to print for each count");
+    addOption("anim-answers", bpo::value<std::size_t>()->default_value(60),
+        "with --anim-survey: how many answers to print for each question, the commonest first, 0 for all of them");
     addOption("archives", bpo::value<Files::MaybeQuotedPathContainer>(), "path to archive files to provide files");
     addOption("input-file", bpo::value<Files::MaybeQuotedPathContainer>(), "input file");
 
@@ -263,6 +275,9 @@ Allowed options)");
         quiet = variables.count("quiet") > 0;
         havokSurvey = variables.count("havok-survey") > 0;
         havokExamples = variables["havok-examples"].as<std::size_t>();
+        animSurvey = variables.count("anim-survey") > 0;
+        animExamples = variables["anim-examples"].as<std::size_t>();
+        animAnswers = variables["anim-answers"].as<std::size_t>();
         if (variables.count("input-file"))
         {
             files = asPathContainer(variables["input-file"].as<Files::MaybeQuotedPathContainer>());
@@ -289,13 +304,19 @@ int main(int argc, char** argv)
     bool quiet = false;
     bool havokSurveyRequested = false;
     std::size_t havokExamples = 0;
-    if (!parseOptions(argc, argv, files, sources, writeDebugLog, quiet, havokSurveyRequested, havokExamples))
+    bool animSurveyRequested = false;
+    std::size_t animExamples = 0;
+    std::size_t animAnswers = 0;
+    if (!parseOptions(argc, argv, files, sources, writeDebugLog, quiet, havokSurveyRequested, havokExamples,
+            animSurveyRequested, animExamples, animAnswers))
         return 1;
 
     NifBullet::HavokSurvey survey(havokExamples);
     NifBullet::HavokSurvey* havokSurvey = havokSurveyRequested ? &survey : nullptr;
+    Nif::AnimSurvey animSurveyData(animExamples, animAnswers);
+    Nif::AnimSurvey* animSurvey = animSurveyRequested ? &animSurveyData : nullptr;
     // The survey tells what the loader says about each file, in counts
-    if (havokSurvey != nullptr)
+    if (havokSurvey != nullptr || animSurvey != nullptr)
         Log::sMinDebugLevel = Debug::Warning;
 
     Nif::Reader::setWriteNifDebugLog(writeDebugLog);
@@ -331,12 +352,12 @@ int main(int argc, char** argv)
         const std::string pathStr = Files::pathToUnicodeString(path);
         try
         {
-            const bool isFile = readFile({}, path, vfs.get(), quiet, havokSurvey);
+            const bool isFile = readFile({}, path, vfs.get(), quiet, havokSurvey, animSurvey);
             if (!isFile)
             {
                 if (auto archive = makeArchive(path))
                 {
-                    readVFS(std::move(archive), path, quiet, havokSurvey);
+                    readVFS(std::move(archive), path, quiet, havokSurvey, animSurvey);
                 }
                 else
                 {
@@ -353,5 +374,7 @@ int main(int argc, char** argv)
 
     if (havokSurvey != nullptr)
         survey.print(std::cout);
+    if (animSurvey != nullptr)
+        animSurvey->print(std::cout);
     return 0;
 }
