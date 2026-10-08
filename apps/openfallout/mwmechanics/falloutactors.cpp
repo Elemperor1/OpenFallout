@@ -342,7 +342,7 @@ namespace OFMechanics
         mind.mHasFacing = false;
         mind.mFollowing.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
         mind.mFollowing.mRef = target.getCellRef().getRefNum();
-        mind.mFollowing.mDistance = falloutFollowDistance(static_cast<std::int32_t>(distance));
+        mind.mFollowing.mDistance = falloutScriptFollowDistance(distance);
         mind.mWait = 0.f;
         stopWalking(mind);
     }

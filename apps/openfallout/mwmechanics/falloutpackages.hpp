@@ -57,6 +57,10 @@ namespace OFMechanics
 
     float falloutFollowDistance(std::int32_t packageDistance);
 
+    /// The same for the distance that a script names, a number of any size or none at all: not a number, 0 or less is
+    /// the default, and the rest is kept within the limits
+    float falloutScriptFollowDistance(float distance);
+
     /// Whether a follower that is `away` units from the one it follows (across the ground) walks: one that stands
     /// still starts when it is farther than `distance` and the slack, and one that walks stops when it is within
     /// `distance`

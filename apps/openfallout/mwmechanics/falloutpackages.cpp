@@ -47,9 +47,15 @@ namespace OFMechanics
 
     float falloutFollowDistance(std::int32_t packageDistance)
     {
-        if (packageDistance <= 0)
+        return falloutScriptFollowDistance(static_cast<float>(packageDistance));
+    }
+
+    float falloutScriptFollowDistance(float distance)
+    {
+        // The comparison is false for a number that is not one
+        if (!(distance > 0.f))
             return falloutDefaultFollow;
-        return std::clamp(static_cast<float>(packageDistance), falloutSmallestFollow, falloutLargestFollow);
+        return std::clamp(distance, falloutSmallestFollow, falloutLargestFollow);
     }
 
     bool falloutFollowMoves(float away, float distance, bool walking)

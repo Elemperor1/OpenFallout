@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include <osg/Math>
 
@@ -142,6 +143,18 @@ namespace
         EXPECT_FLOAT_EQ(falloutFollowDistance(-4), falloutDefaultFollow);
         EXPECT_FLOAT_EQ(falloutFollowDistance(10), falloutSmallestFollow);
         EXPECT_FLOAT_EQ(falloutFollowDistance(100000), falloutLargestFollow);
+    }
+
+    TEST(FalloutPackagesTest, aScriptCanNameAnyDistanceToFollowAt)
+    {
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(300.5f), 300.5f);
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(0.f), falloutDefaultFollow);
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(-4.f), falloutDefaultFollow);
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(std::numeric_limits<float>::quiet_NaN()), falloutDefaultFollow);
+        // A fraction is a distance that is too short, not none
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(0.5f), falloutSmallestFollow);
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(1e20f), falloutLargestFollow);
+        EXPECT_FLOAT_EQ(falloutScriptFollowDistance(std::numeric_limits<float>::infinity()), falloutLargestFollow);
     }
 
     TEST(FalloutPackagesTest, aFollowerStartsToWalkBeyondTheSlackAndStopsWithinTheDistance)

@@ -249,7 +249,7 @@
 -- @function [parent=#GameObject] startFollowing
 -- @param self
 -- @param #GameObject target The object to follow, the player for instance.
--- @param #number distance (optional) How close in game units to stay to the target (default 256, at least 128).
+-- @param #number distance (optional) How close in game units to stay to the target (default 256, also for 0 or less; at least 128 and at most 1024).
 
 ---
 -- Stops what startFollowing began, so that the character goes back to its AI packages.
