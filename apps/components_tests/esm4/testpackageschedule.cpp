@@ -153,10 +153,11 @@ namespace
         for (const int type :
             std::initializer_list<int>{ ESM4::Package_Sandbox, ESM4::Package_Wander, ESM4::Package_Patrol })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Roam) << type;
-        for (const int type :
-            std::initializer_list<int>{ ESM4::Package_Find, ESM4::Package_Follow, ESM4::Package_Escort,
-                ESM4::Package_Accompany, ESM4::Package_UseItemAt, ESM4::Package_Ambush, ESM4::Package_FleeNotCombat,
-                ESM4::Package_CastMagic, ESM4::Package_Dialogue, ESM4::Package_UseWeapon, 99, -1 })
+        for (const int type : std::initializer_list<int>{ ESM4::Package_Follow, ESM4::Package_Accompany })
+            EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Follow) << type;
+        for (const int type : std::initializer_list<int>{ ESM4::Package_Find, ESM4::Package_Escort,
+                 ESM4::Package_UseItemAt, ESM4::Package_Ambush, ESM4::Package_FleeNotCombat, ESM4::Package_CastMagic,
+                 ESM4::Package_Dialogue, ESM4::Package_UseWeapon, 99, -1 })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::None) << type;
     }
 
@@ -165,7 +166,8 @@ namespace
         const ESM4::PackageClock noon = clock(12.f);
 
         EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Sandbox), noon), ESM4::PackageSkip::None);
-        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Follow), noon), ESM4::PackageSkip::Behaviour);
+        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Find), noon), ESM4::PackageSkip::Behaviour);
+        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Follow), noon), ESM4::PackageSkip::None);
         EXPECT_EQ(
             ESM4::packageSkip(package(ESM4::Package_Sandbox, schedule(20, 2)), noon), ESM4::PackageSkip::Schedule);
         // A package of no use is skipped whatever its schedule says

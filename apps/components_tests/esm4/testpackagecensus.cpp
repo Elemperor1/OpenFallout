@@ -184,8 +184,8 @@ namespace
             + record("PACK", 0x1002, packageData(4) + scheduleWithDuration(any, 22, 8))
             // sandboxes at any other time
             + record("PACK", 0x1003, packageData(12) + scheduleWithDuration(any, any, 0))
-            // follows someone, which the game does nothing for yet
-            + record("PACK", 0x1004, packageData(1) + scheduleWithDuration(any, any, 0));
+            // finds something, which the game does nothing for yet
+            + record("PACK", 0x1004, packageData(0) + scheduleWithDuration(any, any, 0));
         const std::string characters
             = record(
                   "NPC_", 0x2001, configuration(0) + listed(0x1004) + listed(0x1001) + listed(0x1002) + listed(0x1003))

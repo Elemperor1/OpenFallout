@@ -104,11 +104,14 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
             }
             case ESM::fourCC("PTDT"):
             {
-                if (subHdr.dataSize != sizeof(mTarget))
-                    reader.skipSubRecordData(); // FIXME: FO3
+                // Fallout 3 and New Vegas have 4 bytes more than Oblivion after the same three fields
+                if (subHdr.dataSize != sizeof(mTarget)
+                    && !(reader.isFalloutFile() && subHdr.dataSize > sizeof(mTarget)))
+                    reader.skipSubRecordData(); // FIXME: other games
                 else
                 {
                     reader.get(mTarget); // TES4
+                    reader.skipSubRecordData(subHdr.dataSize - sizeof(mTarget));
                     // Only a reference (0) and an object ID (1) are form IDs; 2 is an object type.
                     if (mTarget.type == 0 || mTarget.type == 1)
                         reader.adjustFormId(mTarget.target);

@@ -51,6 +51,9 @@ namespace ESM4
             case Package_Wander:
             case Package_Patrol:
                 return PackageBehaviour::Roam;
+            case Package_Follow:
+            case Package_Accompany:
+                return PackageBehaviour::Follow;
             default:
                 return PackageBehaviour::None;
         }

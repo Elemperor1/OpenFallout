@@ -28,6 +28,10 @@ namespace OFRender
         bool canWalk() const { return mGaits.mHasWalk; }
         float getWalkVelocity() const { return mGaits.mWalkVelocity; }
 
+        /// The same for running
+        bool canRun() const { return mGaits.mHasRun; }
+        float getRunVelocity() const { return mGaits.mRunVelocity; }
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);

@@ -2,9 +2,12 @@
 #define OPENFALLOUT_MWMECHANICS_FALLOUTPACKAGES_H
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include <osg/Vec3f>
 
+#include <components/esm/formid.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/packageschedule.hpp>
 
@@ -42,6 +45,37 @@ namespace OFMechanics
 
     /// How long, in seconds, a character stands still where it has gone to before it goes on
     float falloutRoamPause(ESM4::LevelledRandom& random);
+
+    /// The distances, in game units, at which a character that follows another one keeps from it, whatever distance
+    /// the package names (the target of a package, PTDT, has one, and many name none), how far beyond that distance the
+    /// follower is when it starts to walk after the one it follows, and when it runs
+    constexpr float falloutDefaultFollow = 256.f;
+    constexpr float falloutSmallestFollow = 128.f;
+    constexpr float falloutLargestFollow = 1024.f;
+    constexpr float falloutFollowSlack = 64.f;
+    constexpr float falloutFollowRunBeyond = 500.f;
+
+    float falloutFollowDistance(std::int32_t packageDistance);
+
+    /// Whether a follower that is `away` units from the one it follows (across the ground) walks: one that stands
+    /// still starts when it is farther than `distance` and the slack, and one that walks stops when it is within
+    /// `distance`
+    bool falloutFollowMoves(float away, float distance, bool walking);
+
+    /// Whether the follower runs after the one it follows
+    bool falloutFollowRuns(float away, float distance);
+
+    /// The position in the content files of the first plugin (a file with the extension esm, esp or esl, whatever the
+    /// case; the scripts the engine adds come first), where the games keep the player's reference: -1 when there is
+    /// none
+    int falloutFirstPlugin(const std::vector<std::string>& contentFiles);
+
+    /// The reference the games give the player (PlayerRef, form 0x14 of the first plugin), which a package names as the
+    /// target to follow
+    constexpr bool falloutIsPlayerReference(const ESM::FormId& id, int firstPlugin)
+    {
+        return id.mIndex == 0x14 && firstPlugin >= 0 && id.mContentFile == firstPlugin;
+    }
 
     /// The clock for the schedules from the time of day (0 to 24) and the number of days that have passed since the
     /// game began. The files of the games do not say what day the game begins on; it is a Monday here.

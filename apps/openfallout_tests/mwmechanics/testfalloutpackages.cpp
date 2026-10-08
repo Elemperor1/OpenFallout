@@ -134,4 +134,55 @@ namespace
         EXPECT_NEAR(rising.y(), 1.5f, epsilon);
         EXPECT_NEAR(rising.z(), 2.f, epsilon);
     }
+
+    TEST(FalloutPackagesTest, aFollowerKeepsTheDistanceOfThePackageWithinLimits)
+    {
+        EXPECT_FLOAT_EQ(falloutFollowDistance(300), 300.f);
+        EXPECT_FLOAT_EQ(falloutFollowDistance(0), falloutDefaultFollow);
+        EXPECT_FLOAT_EQ(falloutFollowDistance(-4), falloutDefaultFollow);
+        EXPECT_FLOAT_EQ(falloutFollowDistance(10), falloutSmallestFollow);
+        EXPECT_FLOAT_EQ(falloutFollowDistance(100000), falloutLargestFollow);
+    }
+
+    TEST(FalloutPackagesTest, aFollowerStartsToWalkBeyondTheSlackAndStopsWithinTheDistance)
+    {
+        const float distance = 200.f;
+        // Standing still, it waits until the one it follows is out of the distance and the slack
+        EXPECT_FALSE(falloutFollowMoves(distance, distance, false));
+        EXPECT_FALSE(falloutFollowMoves(distance + falloutFollowSlack - 1.f, distance, false));
+        EXPECT_TRUE(falloutFollowMoves(distance + falloutFollowSlack + 1.f, distance, false));
+        // Walking, it goes on until it is within the distance
+        EXPECT_TRUE(falloutFollowMoves(distance + 1.f, distance, true));
+        EXPECT_FALSE(falloutFollowMoves(distance, distance, true));
+        EXPECT_FALSE(falloutFollowMoves(0.f, distance, true));
+    }
+
+    TEST(FalloutPackagesTest, aFollowerRunsOnlyWhenFarBehind)
+    {
+        EXPECT_FALSE(falloutFollowRuns(300.f, 200.f));
+        EXPECT_FALSE(falloutFollowRuns(200.f + falloutFollowRunBeyond, 200.f));
+        EXPECT_TRUE(falloutFollowRuns(200.f + falloutFollowRunBeyond + 1.f, 200.f));
+    }
+
+    TEST(FalloutPackagesTest, thePlayerReferenceIsForm14OfTheFirstPlugin)
+    {
+        // (the scripts that the engine adds come first in the list of content files)
+        const std::vector<std::string> files{ "builtin.omwscripts", "FalloutNV.ESM", "DeadMoney.esm" };
+        const int first = falloutFirstPlugin(files);
+        EXPECT_EQ(first, 1);
+        EXPECT_TRUE(falloutIsPlayerReference(ESM::FormId::fromUint32(0x01000014), first));
+        EXPECT_FALSE(falloutIsPlayerReference(ESM::FormId::fromUint32(0x02000014), first));
+        EXPECT_FALSE(falloutIsPlayerReference(ESM::FormId::fromUint32(0x01000015), first));
+        EXPECT_FALSE(falloutIsPlayerReference(ESM::FormId{}, first));
+        EXPECT_FALSE(falloutIsPlayerReference(ESM::FormId::fromUint32(0x01000014), -1));
+    }
+
+    TEST(FalloutPackagesTest, theFirstPluginIsTheFirstFileOfAGameFormat)
+    {
+        EXPECT_EQ(falloutFirstPlugin({}), -1);
+        EXPECT_EQ(falloutFirstPlugin({ "builtin.omwscripts", "mod.omwaddon" }), -1);
+        EXPECT_EQ(falloutFirstPlugin({ "a.omwscripts", "Fallout3.esm" }), 1);
+        EXPECT_EQ(falloutFirstPlugin({ "noextension", "x.ESP", "y.esm" }), 1);
+        EXPECT_EQ(falloutFirstPlugin({ "x.esl" }), 0);
+    }
 }
