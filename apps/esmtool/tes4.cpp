@@ -15,6 +15,7 @@
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
 #include <components/esm4/census.hpp>
+#include <components/esm4/creaturecensus.hpp>
 #include <components/esm4/equipmentcensus.hpp>
 #include <components/esm4/packagecensus.hpp>
 #include <components/esm4/reader.hpp>
@@ -890,5 +891,10 @@ namespace EsmTool
     int packagesTes4(const Arguments& info)
     {
         return countTes4<ESM4::PackageCensus>(info, "Packages", "packages");
+    }
+
+    int creaturesTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::CreatureCensus>(info, "Creatures", "creatures");
     }
 }

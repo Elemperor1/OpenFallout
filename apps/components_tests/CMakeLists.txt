@@ -84,6 +84,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testchallenge.cpp
     esm4/testclimate.cpp
     esm4/testcombatstyle.cpp
+    esm4/testcreaturecensus.cpp
     esm4/testdebris.cpp
     esm4/testdehydrationstage.cpp
     esm4/testeffectshader.cpp

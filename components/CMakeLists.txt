@@ -205,6 +205,7 @@ add_component_dir (esm4
     census
     censusreading
     common
+    creaturecensus
     destruction
     dialogue
     effect
