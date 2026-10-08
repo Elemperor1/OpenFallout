@@ -76,6 +76,10 @@ namespace ESM4
         // plugin is taken only when no two folders have one.
         const std::string* find(Kind kind, std::string_view plugin, std::uint32_t formId) const;
 
+        // The texture in the folder of the plugin only, which is where the editor puts the texture of a character in
+        // the plugin that last saved the character
+        const std::string* findIn(Kind kind, std::string_view plugin, std::uint32_t formId) const;
+
         std::size_t size() const { return mCount; }
 
     private:

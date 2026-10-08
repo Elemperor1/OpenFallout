@@ -271,19 +271,24 @@ namespace OFRender
             }
         }
 
-        // The skin: a texture that the editor wrote for the character, of the plugin that made the character
+        // The skin: a texture that the editor wrote for the character. It writes it in the folder of the plugin that
+        // saved the character last, so a plugin that changes the character has its own, and for a character that no
+        // plugin changed it is the plugin that made it
         if (!isHead && !isBody)
             return;
         const std::vector<std::string>& contentFiles = OFBase::Environment::get().getWorld()->getContentFiles();
-        std::string plugin;
-        if (traits.mId.mContentFile >= 0 && static_cast<std::size_t>(traits.mId.mContentFile) < contentFiles.size())
-            plugin = Misc::StringUtils::lowerCase(
-                std::filesystem::path(contentFiles[traits.mId.mContentFile]).stem().string());
+        const auto pluginOf = [&](std::int32_t contentFile) {
+            if (contentFile < 0 || static_cast<std::size_t>(contentFile) >= contentFiles.size())
+                return std::string();
+            return Misc::StringUtils::lowerCase(std::filesystem::path(contentFiles[contentFile]).stem().string());
+        };
         const ESM4::FaceTextureIndex& textures = getFaceTextures(*mResourceSystem->getVFS());
         const ESM4::FaceTextureIndex::Kind kind = isHead ? ESM4::FaceTextureIndex::Kind::Face
             : OFClass::ESM4Npc::isFemale(mPtr)           ? ESM4::FaceTextureIndex::Kind::BodyFemale
                                                          : ESM4::FaceTextureIndex::Kind::BodyMale;
-        const std::string* path = textures.find(kind, plugin, traits.mId.mIndex);
+        const std::string* path = textures.findIn(kind, pluginOf(traits.mSourceFile), traits.mId.mIndex);
+        if (path == nullptr)
+            path = textures.find(kind, pluginOf(traits.mId.mContentFile), traits.mId.mIndex);
         if (path == nullptr)
             return;
         const osg::ref_ptr<osg::Image> image

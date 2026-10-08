@@ -71,6 +71,7 @@ void ESM4::Npc::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
+    mSourceFile = static_cast<std::int32_t>(reader.modIndex());
 
     std::uint32_t esmVer = reader.esmVersion();
     mIsTES4 = (esmVer == ESM::VER_080 || esmVer == ESM::VER_100) && !reader.hasFormVersion();

@@ -1,5 +1,6 @@
 #include "falloutface.hpp"
 
+#include <algorithm>
 #include <iterator>
 #include <map>
 #include <mutex>
@@ -169,7 +170,16 @@ namespace OFRender
             copy->dirtyBound();
 
             if (mesh->mRig != nullptr)
+            {
+                // The bounds of a skinned mesh are those of the vertices that each bone moves, from the shared data of
+                // the mesh before the face: a vertex that moved out of them would not be drawn at the edge of the view
+                const osg::Vec3Array& before = static_cast<const osg::Vec3Array&>(*original.getVertexArray());
+                float farthest = 0.f;
+                for (std::size_t i = 0; i < mesh->mVertices; ++i)
+                    farthest = std::max(farthest, ((*positions)[i] - before[i]).length());
+                mesh->mRig->expandBounds(farthest);
                 mesh->mRig->setSourceGeometry(copy);
+            }
             else
                 mesh->mParent->replaceChild(mesh->mGeometry, copy);
             ++moved;

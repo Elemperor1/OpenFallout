@@ -953,7 +953,9 @@ namespace Resource
             return options;
         const VFS::Path::Normalized morphs(std::string(name.substr(0, dot)) + ".egm");
         if (vfs.exists(morphs))
-            return options & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY);
+            return options
+                & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
+                    | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
         return options;
     }
 

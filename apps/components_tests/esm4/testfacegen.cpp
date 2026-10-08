@@ -228,6 +228,26 @@ namespace
         EXPECT_EQ(index.find(ESM4::FaceTextureIndex::Kind::Face, "honesthearts", 1), nullptr);
     }
 
+    TEST(ESM4FaceTextureIndexTest, findsInTheFolderOfAPluginOnlyWhenAskedTo)
+    {
+        ESM4::FaceTextureIndex index;
+        index.add("textures/characters/facemods/falloutnv.esm/00000001_0.dds");
+        index.add("textures/characters/facemods/deadmoney.esm/00000001_0.dds");
+        index.add("textures/characters/facemods/falloutnv.esm/00000002_0.dds");
+
+        // a character that a plugin changed has its texture in the folder of that plugin, and the one of the plugin
+        // that made it is another file
+        EXPECT_EQ(*index.findIn(ESM4::FaceTextureIndex::Kind::Face, "deadmoney", 0x03000001),
+            "textures/characters/facemods/deadmoney.esm/00000001_0.dds");
+        EXPECT_EQ(*index.findIn(ESM4::FaceTextureIndex::Kind::Face, "falloutnv.esm", 1),
+            "textures/characters/facemods/falloutnv.esm/00000001_0.dds");
+        // no file of that plugin: nothing, where find would take the only other file
+        EXPECT_EQ(index.findIn(ESM4::FaceTextureIndex::Kind::Face, "deadmoney", 2), nullptr);
+        EXPECT_NE(index.find(ESM4::FaceTextureIndex::Kind::Face, "deadmoney", 2), nullptr);
+        EXPECT_EQ(index.findIn(ESM4::FaceTextureIndex::Kind::Face, "", 1), nullptr);
+        EXPECT_EQ(index.findIn(ESM4::FaceTextureIndex::Kind::BodyMale, "falloutnv", 1), nullptr);
+    }
+
     TEST(ESM4FaceTextureIndexTest, leavesOutPathsThatAreNotTexturesOfCharacters)
     {
         ESM4::FaceTextureIndex index;

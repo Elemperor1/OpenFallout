@@ -60,6 +60,12 @@ namespace SceneUtil
 
         void setRootBone(std::string_view name);
 
+        /// Makes the bounds of the skin larger by `margin` around each bone, for a source geometry whose vertices are
+        /// moved from where the skin data of the bones put them (the bone spheres are those of the original
+        /// vertices). Only this geometry is changed, not the skin data that its copies share.
+        void expandBounds(float margin);
+        float getBoundsMargin() const { return mBoundsMargin; }
+
         osg::ref_ptr<osg::Geometry> getSourceGeometry() const;
 
         void accept(osg::NodeVisitor& nv) override;
@@ -106,6 +112,7 @@ namespace SceneUtil
 
         unsigned int mLastFrameNumber{ 0 };
         bool mBoundsFirstFrame{ true };
+        float mBoundsMargin{ 0.f };
 
         bool initFromParentSkeleton(osg::NodeVisitor* nv);
 

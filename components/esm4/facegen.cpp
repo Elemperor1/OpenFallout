@@ -210,21 +210,27 @@ namespace ESM4
             ++mCount;
     }
 
+    const std::string* FaceTextureIndex::findIn(Kind kind, std::string_view plugin, std::uint32_t formId) const
+    {
+        const auto kindFiles = mFiles.find(kind);
+        if (kindFiles == mFiles.end())
+            return nullptr;
+        const auto own = kindFiles->second.find(withoutPluginExtension(plugin));
+        if (own == kindFiles->second.end())
+            return nullptr;
+        const auto file = own->second.find(formId & 0x00FFFFFFu);
+        return file != own->second.end() ? &file->second : nullptr;
+    }
+
     const std::string* FaceTextureIndex::find(Kind kind, std::string_view plugin, std::uint32_t formId) const
     {
+        if (const std::string* own = findIn(kind, plugin, formId))
+            return own;
         const auto kindFiles = mFiles.find(kind);
         if (kindFiles == mFiles.end())
             return nullptr;
         const std::uint32_t id = formId & 0x00FFFFFFu;
         plugin = withoutPluginExtension(plugin);
-
-        const auto own = kindFiles->second.find(plugin);
-        if (own != kindFiles->second.end())
-        {
-            const auto file = own->second.find(id);
-            if (file != own->second.end())
-                return &file->second;
-        }
 
         const std::string* only = nullptr;
         std::size_t found = 0;

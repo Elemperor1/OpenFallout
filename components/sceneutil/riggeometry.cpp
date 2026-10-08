@@ -22,6 +22,7 @@ namespace SceneUtil
     RigGeometry::RigGeometry(const RigGeometry& copy, const osg::CopyOp& copyop)
         : Drawable(copy, copyop)
         , mData(copy.mData)
+        , mBoundsMargin(copy.mBoundsMargin)
     {
         setSourceGeometry(copy.mSourceGeometry);
         setNumChildrenRequiringUpdateTraversal(1);
@@ -262,6 +263,7 @@ namespace SceneUtil
                 continue;
 
             osg::BoundingSpheref bs = info.mBoundSphere;
+            bs.radius() += mBoundsMargin;
             transformBoundingSphere(bone->mMatrixInSkeletonSpace * transform, bs);
             box.expandBy(bs);
         }
@@ -320,6 +322,15 @@ namespace SceneUtil
                 trans->computeWorldToLocalMatrix(*mSkinToSkelMatrix, nullptr);
             }
         }
+    }
+
+    void RigGeometry::expandBounds(float margin)
+    {
+        if (margin <= mBoundsMargin)
+            return;
+        mBoundsMargin = margin;
+        // the bounds are worked out again at the next update, whether or not the skeleton is moving
+        mBoundsFirstFrame = true;
     }
 
     void RigGeometry::setBoneInfo(std::vector<BoneInfo>&& bones)

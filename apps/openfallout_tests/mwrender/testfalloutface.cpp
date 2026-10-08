@@ -9,6 +9,7 @@
 #include <osg/Group>
 #include <osg/Texture2D>
 
+#include <cmath>
 #include <vector>
 
 namespace
@@ -107,6 +108,31 @@ namespace
         EXPECT_NE(rig->getSourceGeometry().get(), source.get());
         EXPECT_FLOAT_EQ(positionsOf(*rig->getSourceGeometry())[1].x(), 5.f);
         EXPECT_FLOAT_EQ(positionsOf(*source)[1].x(), 1.f);
+    }
+
+    TEST(OpenFalloutRenderMorphFaceMeshes, makesTheBoundsOfASkinnedMeshLargerByTheFarthestMove)
+    {
+        osg::ref_ptr<SceneUtil::RigGeometry> rig = new SceneUtil::RigGeometry;
+        rig->setSourceGeometry(makeGeometry(2));
+        osg::ref_ptr<osg::Group> part = new osg::Group;
+        part->addChild(rig);
+        EXPECT_FLOAT_EQ(rig->getBoundsMargin(), 0.f);
+
+        // the vertex 1 moves by (4, 0, 1)
+        EXPECT_EQ(morphFaceMeshes(*part, makeMorphs(2, { 4 }), { 1.f }, {}), 1u);
+        EXPECT_NEAR(rig->getBoundsMargin(), std::sqrt(17.f), 1e-4f);
+
+        // a copy of the mesh, as the scene manager makes for the next character, keeps the margin of its source
+        osg::ref_ptr<SceneUtil::RigGeometry> copy = new SceneUtil::RigGeometry(*rig, osg::CopyOp::SHALLOW_COPY);
+        EXPECT_NEAR(copy->getBoundsMargin(), std::sqrt(17.f), 1e-4f);
+
+        // and a mesh that no morph moves keeps a margin of none
+        osg::ref_ptr<SceneUtil::RigGeometry> other = new SceneUtil::RigGeometry;
+        other->setSourceGeometry(makeGeometry(3));
+        osg::ref_ptr<osg::Group> otherPart = new osg::Group;
+        otherPart->addChild(other);
+        EXPECT_EQ(morphFaceMeshes(*otherPart, makeMorphs(5, { 4 }), { 1.f }, {}), 0u);
+        EXPECT_FLOAT_EQ(other->getBoundsMargin(), 0.f);
     }
 
     TEST(OpenFalloutRenderMorphFaceMeshes, leavesAPartAloneWhoseVerticesAreNotThoseOfTheFile)
