@@ -244,7 +244,7 @@
 -- Makes a character or creature of Fallout 3 and New Vegas follow another object, as a companion does.
 -- The follower stays within the distance of the target, walks after it when it goes and runs when it is far behind,
 -- whatever its AI packages say, until stopFollowing is called. Does nothing for objects that are not characters or
--- creatures of Fallout. It is not kept in a save game.
+-- creatures of Fallout. It lasts while the cell of the character is unloaded and loaded again, but is not kept in a save game.
 -- Can be called only from a global script.
 -- @function [parent=#GameObject] startFollowing
 -- @param self

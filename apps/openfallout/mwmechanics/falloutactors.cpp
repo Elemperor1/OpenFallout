@@ -314,9 +314,15 @@ namespace OFMechanics
     void FalloutActors::add(const OFWorld::Ptr& ptr)
     {
         remove(ptr);
-        if (!handles(ptr) || packagesOf(ptr).empty())
+        if (!handles(ptr))
             return;
-        makeMind(ptr);
+        // A command from a script outlives the cell: the character takes it up again when the cell is loaded
+        const auto command = mCommands.find(ptr.getCellRef().getRefNum());
+        if (command == mCommands.end() && packagesOf(ptr).empty())
+            return;
+        Mind& mind = makeMind(ptr);
+        if (command != mCommands.end())
+            obey(mind, command->second);
     }
 
     FalloutActors::Mind& FalloutActors::makeMind(const OFWorld::Ptr& ptr)
@@ -335,20 +341,32 @@ namespace OFMechanics
             return;
         const auto found = mMinds.find(ptr.mRef);
         Mind& mind = found != mMinds.end() ? *found->second : makeMind(ptr);
+        Command command;
+        command.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
+        command.mTarget = target.getCellRef().getRefNum();
+        command.mDistance = falloutScriptFollowDistance(distance);
+        obey(mind, command);
+        if (const ESM::RefNum refNum = ptr.getCellRef().getRefNum(); refNum.isSet())
+            mCommands[refNum] = command;
+    }
+
+    void FalloutActors::obey(Mind& mind, const Command& command)
+    {
         mind.mCommanded = true;
         mind.mPackage = nullptr;
         mind.mGoal = FalloutGoal();
         mind.mGoal.mBehaviour = ESM4::PackageBehaviour::Follow;
         mind.mHasFacing = false;
-        mind.mFollowing.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
-        mind.mFollowing.mRef = target.getCellRef().getRefNum();
-        mind.mFollowing.mDistance = falloutScriptFollowDistance(distance);
+        mind.mFollowing.mPlayer = command.mPlayer;
+        mind.mFollowing.mRef = command.mTarget;
+        mind.mFollowing.mDistance = command.mDistance;
         mind.mWait = 0.f;
         stopWalking(mind);
     }
 
     void FalloutActors::stopFollowing(const OFWorld::Ptr& ptr)
     {
+        mCommands.erase(ptr.getCellRef().getRefNum());
         const auto found = mMinds.find(ptr.mRef);
         if (found == mMinds.end() || !found->second->mCommanded)
             return;

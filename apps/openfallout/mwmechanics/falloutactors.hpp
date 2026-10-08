@@ -5,6 +5,8 @@
 #include <map>
 #include <memory>
 
+#include <components/esm3/refnum.hpp>
+
 namespace OFWorld
 {
     class CellStore;
@@ -27,7 +29,8 @@ namespace OFMechanics
     /// kinds of package and places and targets in a cell that is not loaded are left for the next package in the list.
     ///
     /// A script can also tell a character to follow another one, as a companion does (follow): that takes the place
-    /// of the packages until it is told to stop, and is not kept in a save game.
+    /// of the packages until it is told to stop: that lasts while its cell is unloaded and loaded again, but is not
+    /// kept in a save game.
     class FalloutActors
     {
     public:
@@ -57,9 +60,20 @@ namespace OFMechanics
         struct Mind;
 
     private:
+        /// What a script told a character to do, kept for as long as it is not told to stop, in a cell that is loaded
+        /// or not
+        struct Command
+        {
+            bool mPlayer = false;
+            ESM::RefNum mTarget;
+            float mDistance = 0.f;
+        };
+
         Mind& makeMind(const OFWorld::Ptr& ptr);
+        static void obey(Mind& mind, const Command& command);
 
         std::map<const OFWorld::LiveCellRefBase*, std::unique_ptr<Mind>> mMinds;
+        std::map<ESM::RefNum, Command> mCommands;
     };
 }
 
