@@ -30,6 +30,10 @@ namespace EsmTool
     // Counts how the creatures of every Fallout file named in info.inputFiles are made (model, body models and
     // animation files), read in that order, and prints one report.
     int creaturesTes4(const Arguments& info);
+
+    // Counts the armour that the characters of every Fallout file named in info.inputFiles wear, read in that order,
+    // and prints one report.
+    int wornTes4(const Arguments& info);
 }
 
 #endif

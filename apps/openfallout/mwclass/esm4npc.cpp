@@ -14,6 +14,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadotft.hpp>
 #include <components/esm4/loadrace.hpp>
+#include <components/esm4/wornarmor.hpp>
 
 #include <components/misc/resourcehelpers.hpp>
 
@@ -58,22 +59,9 @@ namespace OFClass
     std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
         const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor)
     {
-        // The part of the body that a piece covers are its biped flags. A piece is worn if no piece before it covers
-        // any of them, so that a character with two suits wears the first.
-        constexpr std::uint32_t sBipedSlots = 0x000FFFFF;
-        std::uint32_t covered = 0;
-        std::vector<std::string> worn;
-        for (const ESM4::Armor* piece : armor)
-        {
-            if (piece == nullptr)
-                continue;
-            const std::uint32_t slots = piece->mArmorFlags & sBipedSlots;
-            const ESM::Path& model = isFemale && !piece->mModelFemale.empty() ? piece->mModelFemale : piece->mModelMale;
-            if (slots == 0 || model.empty() || (slots & covered) != 0)
-                continue;
-            covered |= slots;
-            worn.push_back(model.getOriginal());
-        }
+        // Which of the pieces show, and the parts of the body they cover
+        const ESM4::WornPieces worn = ESM4::wornPieces(armor, isFemale);
+        const std::uint32_t covered = worn.mCovered;
 
         std::vector<std::string> models;
         // The index of a part of the body in the race, and the biped slot that hides it: the upper body, left hand and
@@ -98,7 +86,8 @@ namespace OFClass
         if (hair != nullptr && !hair->mModel.empty() && (covered & ESM4::Armor::FO3_Hair) == 0)
             models.push_back(hair->mModel.getOriginal());
 
-        models.insert(models.end(), worn.begin(), worn.end());
+        for (const ESM4::WornPiece& piece : worn.mPieces)
+            models.push_back(piece.mModel->getOriginal());
         return models;
     }
 
@@ -120,26 +109,42 @@ namespace OFClass
     static const ESM4::Npc* chooseTemplate(const std::vector<const ESM4::Npc*>& recs, uint16_t flag)
     {
         for (const auto* rec : recs)
-        {
-            if (rec->mIsTES4)
+            if (!rec->takesFromTemplate(flag))
                 return rec;
-            else if (rec->mIsFONV)
-            {
-                // TODO: FO3 should use this branch as well. But it is not clear how to distinguish FO3 from
-                // TES5. Currently FO3 uses wrong template flags that can lead to "ESM4 NPC traits not found"
-                // exception the NPC will not be added to the scene. But in any way it shouldn't cause a crash.
-                if (!(rec->mBaseConfig.fo3.templateFlags & flag))
-                    return rec;
-            }
-            else if (rec->mIsFO4)
-            {
-                if (!(rec->mBaseConfig.fo4.templateFlags & flag))
-                    return rec;
-            }
-            else if (!(rec->mBaseConfig.tes5.templateFlags & flag))
-                return rec;
-        }
         return nullptr;
+    }
+
+    // The records that the armour of a Fallout character is chosen from are the ones of the store
+    class StoreWornArmorSource final : public ESM4::WornArmorSource
+    {
+    public:
+        explicit StoreWornArmorSource(const OFWorld::ESMStore& store)
+            : mStore(store)
+        {
+        }
+
+        const ESM4::Npc* findNpc(ESM::FormId id) const override { return mStore.get<ESM4::Npc>().search(id); }
+        const ESM4::LevelledNpc* findLevelledNpc(ESM::FormId id) const override
+        {
+            return mStore.get<ESM4::LevelledNpc>().search(id);
+        }
+        const ESM4::Armor* findArmor(ESM::FormId id) const override { return mStore.get<ESM4::Armor>().search(id); }
+        const ESM4::LevelledItem* findLevelledItem(ESM::FormId id) const override
+        {
+            return mStore.get<ESM4::LevelledItem>().search(id);
+        }
+
+    private:
+        const OFWorld::ESMStore& mStore;
+    };
+
+    // What chooses among the entries of a levelled list: the same character is dressed the same each time, and two
+    // characters of one base record are not necessarily dressed alike.
+    static std::uint32_t equipmentSeed(const OFWorld::ConstPtr& ptr, const ESM4::Npc& base)
+    {
+        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
+        return (refNum.mIndex * 2654435761u + static_cast<std::uint32_t>(refNum.mContentFile))
+            ^ (base.mId.mIndex * 40503u);
     }
 
     class ESM4NpcCustomData : public OFWorld::TypedCustomData<ESM4NpcCustomData>
@@ -176,7 +181,12 @@ namespace OFClass
 
         const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
         const ESM4::Npc* const base = ptr.get<ESM4::Npc>()->mBase;
-        auto npcRecs = withBaseTemplates<ESM4::LevelledNpc, ESM4::Npc>(base);
+        const StoreWornArmorSource armorSource(*store);
+        const std::uint32_t seed = equipmentSeed(ptr, *base);
+        // Fallout chooses among the characters of a levelled template by the level of the character; the games before
+        // it keep what they did.
+        auto npcRecs = base->mIsFONV ? ESM4::templateChain(armorSource, *base, ESM4Impl::sDefaultLevel, seed)
+                                     : withBaseTemplates<ESM4::LevelledNpc, ESM4::Npc>(base);
 
         data->mTraits = chooseTemplate(npcRecs, ESM4::Npc::Template_UseTraits);
 
@@ -214,7 +224,9 @@ namespace OFClass
                 data->mIsFemale = data->mTraits->mBaseConfig.tes5.flags & ESM4::Npc::TES5_Female;
         }
 
-        if (auto inv = chooseTemplate(npcRecs, ESM4::Npc::Template_UseInventory))
+        if (base->mIsFONV)
+            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, ESM4Impl::sDefaultLevel, seed);
+        else if (auto inv = chooseTemplate(npcRecs, ESM4::Npc::Template_UseInventory))
         {
             for (const ESM4::InventoryItem& item : inv->mInventory)
             {

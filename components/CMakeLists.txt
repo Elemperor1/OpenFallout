@@ -347,6 +347,8 @@ add_component_dir (esm4
     survey
     typetraits
     vertex
+    wornarmor
+    wornarmorcensus
 )
 
 add_component_dir (misc
