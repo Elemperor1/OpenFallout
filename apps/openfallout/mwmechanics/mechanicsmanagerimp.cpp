@@ -1863,6 +1863,7 @@ namespace OFMechanics
     void MechanicsManager::clear()
     {
         mActors.clear();
+        mFalloutActors.clear();
         mStolenItems.clear();
         mClassSelected = false;
         mRaceSelected = false;

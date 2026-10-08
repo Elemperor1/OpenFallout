@@ -413,6 +413,13 @@ namespace OFMechanics
         }
     }
 
+    void FalloutActors::clear()
+    {
+        // The cells are unloaded before this, so there are no minds left to give their agents back
+        mMinds.clear();
+        mCommands.clear();
+    }
+
     namespace
     {
         /// Where the package sends the actor: false when it cannot be done here (the reference it names is not in a

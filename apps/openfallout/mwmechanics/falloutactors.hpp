@@ -46,6 +46,8 @@ namespace OFMechanics
         /// An actor that moved to another cell is another reference
         void updatePtr(const OFWorld::Ptr& old, const OFWorld::Ptr& ptr);
         void drop(const OFWorld::CellStore* cell);
+        /// Forgets everything, the commands of scripts too: a game was loaded or ended (the cells are unloaded by then)
+        void clear();
 
         /// Makes the actor follow the target (a character or the player), keeping within `distance` units of it (0:
         /// the usual distance). Whatever the packages say, until stopFollowing.
