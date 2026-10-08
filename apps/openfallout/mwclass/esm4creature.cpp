@@ -105,8 +105,20 @@ namespace OFClass
         return getCustomData(ptr).mModel;
     }
 
+    namespace
+    {
+        // A creature of Oblivion keeps the generic behaviour of the records of its kind: its model is drawn as it is
+        // and collides as a mesh. What the class adds is for the records of Fallout 3 and New Vegas.
+        bool isFalloutCreature(const OFWorld::ConstPtr& ptr)
+        {
+            return ptr.get<ESM4::Creature>()->mBase->mIsFONV;
+        }
+    }
+
     VFS::Path::NormalizedView ESM4Creature::getModel(const OFWorld::ConstPtr& ptr) const
     {
+        if (!isFalloutCreature(ptr))
+            return ESM4Base<ESM4::Creature>::getModel(ptr);
         const ESM4CreatureCustomData& data = getCustomData(ptr);
         if (data.mModel.mOwner == nullptr)
             return {};
@@ -115,6 +127,8 @@ namespace OFClass
 
     std::string_view ESM4Creature::getName(const OFWorld::ConstPtr& ptr) const
     {
+        if (!isFalloutCreature(ptr))
+            return ptr.get<ESM4::Creature>()->mBase->mFullName;
         const ESM4::Creature* baseData = getCustomData(ptr).mBaseData;
         return baseData == nullptr ? std::string_view() : std::string_view(baseData->mFullName);
     }
@@ -122,6 +136,11 @@ namespace OFClass
     void ESM4Creature::insertObjectRendering(
         const OFWorld::Ptr& ptr, const std::string& model, OFRender::RenderingInterface& renderingInterface) const
     {
+        if (!isFalloutCreature(ptr))
+        {
+            ESM4Impl::insertObjectRendering(ptr, model, renderingInterface);
+            return;
+        }
         if (!model.empty())
             renderingInterface.getObjects().insertESM4Creature(ptr);
     }
@@ -129,6 +148,11 @@ namespace OFClass
     void ESM4Creature::insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
         OFPhysics::PhysicsSystem& physics) const
     {
+        if (!isFalloutCreature(ptr))
+        {
+            ESM4Impl::insertObjectPhysics(ptr, model, rotation, physics);
+            return;
+        }
         // The box is the one of the record that has the model
         const ESM4::Creature* boxOwner = getCustomData(ptr).mModel.mOwner;
         if (boxOwner == nullptr)
