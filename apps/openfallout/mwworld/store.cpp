@@ -1169,6 +1169,7 @@ template class OFWorld::TypedDynamicStore<ESM4::ActorCharacter, ESM::FormId>;
 template class OFWorld::TypedDynamicStore<ESM4::ActorCreature, ESM::FormId>;
 
 template class OFWorld::TypedDynamicStore<ESM4::Activator>;
+template class OFWorld::TypedDynamicStore<ESM4::AIPackage>;
 template class OFWorld::TypedDynamicStore<ESM4::Ammunition>;
 template class OFWorld::TypedDynamicStore<ESM4::Armor>;
 template class OFWorld::TypedDynamicStore<ESM4::ArmorAddon>;

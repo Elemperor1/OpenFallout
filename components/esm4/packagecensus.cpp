@@ -14,6 +14,7 @@
 
 #include "censusreading.hpp"
 #include "common.hpp"
+#include "packageschedule.hpp"
 #include "reader.hpp"
 #include "readerutils.hpp"
 
@@ -93,6 +94,11 @@ namespace ESM4
                         package.mDay = static_cast<std::uint8_t>(data[1]) != any;
                         package.mDate = data[2] != 0;
                         package.mTime = static_cast<std::uint8_t>(data[3]) != any;
+                        package.mSchedule.month = static_cast<std::uint8_t>(data[0]);
+                        package.mSchedule.dayOfWeek = static_cast<std::uint8_t>(data[1]);
+                        package.mSchedule.date = static_cast<std::uint8_t>(data[2]);
+                        package.mSchedule.time = static_cast<std::uint8_t>(data[3]);
+                        std::memcpy(&package.mSchedule.duration, data.data() + 4, sizeof(std::uint32_t));
                         return true;
                     }
                     case ESM::fourCC("PLDT"):
@@ -204,6 +210,8 @@ namespace ESM4
             summary.mWithDate += package.mDate ? 1 : 0;
             summary.mWithConditions += package.mConditions != 0 ? 1 : 0;
             summary.mWithEvents += package.mEvents ? 1 : 0;
+            if (package.mTime)
+                ++summary.mDurations[package.mSchedule.duration];
         }
 
         for (const auto& [id, character] : mCharacters)
@@ -243,6 +251,26 @@ namespace ESM4
                 ++summary.mAnyType[type];
             if (timed)
                 ++summary.mCharactersWithTime;
+
+            for (int hour = 0; hour < hoursInDay; ++hour)
+            {
+                PackageClock clock;
+                clock.mHour = static_cast<float>(hour);
+                clock.mDayOfWeek = 1;
+                int followed = followsNone;
+                for (const ESM::FormId listed : character.mPackages)
+                {
+                    const auto it = mPackages.find(listed);
+                    if (it != mPackages.end()
+                        && packageSkip(it->second.mType, it->second.mSchedule, it->second.mConditions != 0, clock)
+                            == PackageSkip::None)
+                    {
+                        followed = it->second.mType;
+                        break;
+                    }
+                }
+                ++summary.mFollowedByHour[hour][followed];
+            }
         }
 
         return summary;
@@ -270,6 +298,11 @@ namespace ESM4
         stream << "  with an idle, a script or a topic for when it begins, ends or changes: " << summary.mWithEvents
                << '\n';
 
+        stream << "\nPackages that start at an hour of the day, by the hours they last\n";
+        for (const auto& [hours, number] : summary.mDurations)
+            stream << "  " << std::left << std::setw(nameWidth) << hours << std::right << std::setw(countWidth)
+                   << number << '\n';
+
         stream << "\nPackages by type\n";
         writeMap(summary.mTypes, true);
         stream << "\nPackages by the type of their location (-1 is no location)\n";
@@ -292,6 +325,17 @@ namespace ESM4
         writeMap(summary.mFirstType, true);
         stream << "\nCharacters that have a package of the type\n";
         writeMap(summary.mAnyType, true);
+
+        stream << "\nThe package that characters with packages of their own follow, by the hour of the day on a Monday "
+                  "(the first of their packages that is on, has no conditions and is of a kind the game does something "
+                  "for)\n";
+        for (int hour = 0; hour < hoursInDay; ++hour)
+        {
+            stream << "  " << std::setfill('0') << std::setw(2) << hour << std::setfill(' ') << ":00";
+            for (const auto& [type, number] : summary.mFollowedByHour[hour])
+                stream << "  " << (type == followsNone ? "nothing" : packageTypeName(type)) << ' ' << number;
+            stream << '\n';
+        }
 
         if (!mFatalErrors.empty())
         {

@@ -46,32 +46,32 @@ namespace ESM4
 #pragma pack(push, 1)
         struct PKDT // data
         {
-            std::uint32_t flags;
-            std::int32_t type;
+            std::uint32_t flags = 0;
+            std::int32_t type = 0;
         };
 
         struct PSDT // schedule
         {
-            std::uint8_t month; // Any = 0xff
-            std::uint8_t dayOfWeek; // Any = 0xff
-            std::uint8_t date; // Any = 0
-            std::uint8_t time; // Any = 0xff
-            std::uint32_t duration;
+            std::uint8_t month = 0xff; // Any = 0xff
+            std::uint8_t dayOfWeek = 0xff; // Any = 0xff
+            std::uint8_t date = 0; // Any = 0
+            std::uint8_t time = 0xff; // Any = 0xff
+            std::uint32_t duration = 0;
         };
 
         struct PLDT // location
         {
             std::int32_t type = 0xff; // 0 = near ref, 1 = in cell, 2 = current loc, 3 = editor loc, 4 = obj id, 5 = obj
                                       // type, 0xff = no location data
-            ESM::FormId32 location; // uint32_t if type = 5
-            std::int32_t radius;
+            ESM::FormId32 location = 0; // uint32_t if type = 5
+            std::int32_t radius = 0;
         };
 
         struct PTDT // target
         {
             std::int32_t type = 0xff; // 0 = specific ref, 1 = obj id, 2 = obj type, 0xff = no target data
-            ESM::FormId32 target; // uint32_t if type = 2
-            std::int32_t distance;
+            ESM::FormId32 target = 0; // uint32_t if type = 2
+            std::int32_t distance = 0;
         };
 
         // NOTE: param1/param2 can be FormId or number, but assume FormId so that adjustFormId

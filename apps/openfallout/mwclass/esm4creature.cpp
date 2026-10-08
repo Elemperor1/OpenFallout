@@ -4,6 +4,8 @@
 #include <cmath>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadpack.hpp>
+#include <components/esm4/packageschedule.hpp>
 
 #include "../mwphysics/physicssystem.hpp"
 #include "../mwworld/customdata.hpp"
@@ -63,6 +65,7 @@ namespace OFClass
         ESM4::CreatureModel mModel;
         /// The record that has the name of the creature, if any has one
         const ESM4::Creature* mBaseData = nullptr;
+        std::vector<const ESM4::AIPackage*> mPackages;
 
         ESM4CreatureCustomData& asESM4CreatureCustomData() override { return *this; }
         const ESM4CreatureCustomData& asESM4CreatureCustomData() const override { return *this; }
@@ -94,6 +97,8 @@ namespace OFClass
                                 << ESM::RefId(base.mId) << ")";
 
         data->mBaseData = ESM4::creatureTemplateOwner(chain, ESM4::Creature::Template_UseBaseData);
+        for (const ESM::FormId package : ESM4::creaturePackages(chain))
+            data->mPackages.push_back(store->get<ESM4::AIPackage>().search(package));
 
         ESM4CreatureCustomData& res = *data;
         refData.setCustomData(std::move(data));
@@ -103,6 +108,11 @@ namespace OFClass
     const ESM4::CreatureModel& ESM4Creature::getCreatureModel(const OFWorld::Ptr& ptr)
     {
         return getCustomData(ptr).mModel;
+    }
+
+    const std::vector<const ESM4::AIPackage*>& ESM4Creature::getPackages(const OFWorld::Ptr& ptr)
+    {
+        return getCustomData(ptr).mPackages;
     }
 
     namespace

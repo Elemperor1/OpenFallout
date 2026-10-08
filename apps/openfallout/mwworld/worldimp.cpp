@@ -1415,7 +1415,10 @@ namespace OFWorld
     void World::updateNavigatorObject(
         const OFPhysics::Object& object, const DetourNavigator::UpdateGuard* navigatorUpdateGuard)
     {
-        if (object.getShapeInstance()->mVisualCollisionType != Resource::VisualCollisionType::None)
+        // The body of a person is not a part of the world that the navigator builds a mesh of (and it is a cylinder,
+        // which the navigator has no shape for)
+        if (object.getShapeInstance()->mVisualCollisionType != Resource::VisualCollisionType::None
+            || object.isActorBody())
             return;
         const OFWorld::Ptr ptr = object.getPtr();
         const DetourNavigator::ObjectShapes shapes(object.getShapeInstance(),

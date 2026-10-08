@@ -8,6 +8,7 @@
 #include "../mwworld/ptr.hpp"
 
 #include "actors.hpp"
+#include "falloutactors.hpp"
 #include "npcstats.hpp"
 #include "objects.hpp"
 
@@ -32,6 +33,7 @@ namespace OFMechanics
 
         Objects mObjects;
         Actors mActors;
+        FalloutActors mFalloutActors;
 
         typedef std::pair<ESM::RefId, bool> Owner; // < Owner id, bool isFaction >
         typedef std::map<Owner, int> OwnerMap; // < Owner, number of stolen items with this id from this owner >

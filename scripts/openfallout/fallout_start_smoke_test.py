@@ -33,7 +33,12 @@ be (it is green, as the kind of water of the worldspace says, so greener than th
 colour of a texture that the engine can not find). The water of the cell that has a
 height of its own is logged once, with its kind of water, and the cell that holds the largest float as its height has
 none. The game has no files of the sky of Morrowind here, and the log must not mention a texture or a mesh of the sky as
-missing.
+missing. Three more characters stand south and west of the start, where the player does not walk, and a Lua player
+script (PACKAGE_SCRIPT) logs where each is once a second: one that has two AI packages (the first is for the night,
+which it must ignore at the time of day the game starts at, the second sends it to a marker 300 units north of it) must
+walk there (to the edge of the radius that the package names), turn to the way the marker faces and stay; one that has no package must stay where it was put; one that has
+a package that sends it about the place where it stands must stay within the radius of the package and move. A
+character with no animation to walk with (`--no-animation`) is not moved at all.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
 
@@ -42,6 +47,7 @@ The exit status is 0 when every check holds. It also checks that files/data/mesh
 placeholder_skeleton.py writes.
 """
 import argparse
+import math
 import os
 import pty
 import re
@@ -456,6 +462,48 @@ return {
 }
 """ % (plugin.WALK_VELOCITY, plugin.RUN_VELOCITY, WALK_FOR, RUN_FOR)
 
+# Logs where the characters that follow packages are and which way they face, once a second. They are looked up by the form
+# ID of their reference (the interior and the exterior cell each have their own).
+PACKAGE_SCRIPT = """\
+local nearby = require('openfallout.nearby')
+local core = require('openfallout.core')
+
+local actors = { @ACTORS@ }
+local elapsed, nextLog = 0, 0
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if elapsed < nextLog then return end
+            nextLog = nextLog + 1
+            for _, actor in ipairs(actors) do
+                for _, id in ipairs(actor[2]) do
+                    local ok, line = pcall(function()
+                        local object = nearby.getObjectByFormId(core.getFormId('OFTest.esm', id))
+                        local p = object.position
+                        return string.format('actor %s t=%.1f pos=%.1f,%.1f,%.1f yaw=%.3f', actor[1], elapsed,
+                            p.x, p.y, p.z, object.rotation:getYaw())
+                    end)
+                    if ok then print('OFTEST', line) break end
+                end
+            end
+        end,
+    },
+}
+""".replace("@ACTORS@", ", ".join("{ '%s', { %d, %d } }" % (name, *plugin.PACKAGE_REF_IDS[name])
+                                  for name in ("walker", "idler", "roamer")))
+
+# Where the three characters start relative to the player, and where the walker should end
+PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler", "roamer")}
+ARRIVAL_RANGE = 30.0  # how close to the marker of a package for the night the walker may come, units
+TRAVEL_SLACK = 20.0  # how far from the radius of its package the walker may have stopped (it stops at the edge of it)
+UNMOVED_RANGE = 2.0  # how far a character that must stay may be from where it was put
+ROAM_SLACK = 30.0  # how far outside the radius of its package the roamer may be (the radius of a package is in the data)
+WALK_YAW_RANGE = 0.35  # how far from north the walker faces while it walks north, radians
+YAW_RANGE = 0.2  # how far from the way the marker faces the walker is when it has arrived
+ACTOR_LINE = re.compile(r"OFTEST\tactor (\w+) t=([\d.]+) pos=" + r"(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)" + r" yaw=(-?[\d.]+)")
+
 NUMBER = r"(-?[\d.]+)"
 VECTOR = ",".join([NUMBER] * 3)
 SAMPLE = re.compile(r"OFTEST\tt=([\d.]+) exterior=(\w+) name=(.*) pos=" + VECTOR + " cam=" + VECTOR)
@@ -727,8 +775,89 @@ def check(text, scenario, colours, animated=True):
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
                         "the water should have no sides")
+    problems += check_packages(text, scenario, animated)
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def angle_difference(a, b):
+    """How far apart two angles are, radians, 0 to pi."""
+    return abs((a - b + math.pi) % (2 * math.pi) - math.pi)
+
+
+def check_packages(text, scenario, animated):
+    """The problems with the characters that have AI packages: the walker goes to the marker of its package that is on and
+    turns the way the marker faces, the idler stays, the roamer goes about the radius of its package. Without the
+    animation to walk with none of them is moved."""
+    problems = []
+    samples = {}
+    for match in map(ACTOR_LINE.search, text.splitlines()):
+        if match:
+            samples.setdefault(match.group(1), []).append(
+                (float(match.group(2)), tuple(float(match.group(i)) for i in (3, 4, 5)), float(match.group(6))))
+    for name in PACKAGE_START:
+        if len(samples.get(name, [])) < WALK_SECONDS - 5:
+            problems.append(f"the script logged {len(samples.get(name, []))} positions of the '{name}', expected at least "
+                            f"{WALK_SECONDS - 5}")
+            return problems
+
+    def where(name):
+        x, y = PACKAGE_START[name]
+        return scenario.origin[0] + x, scenario.origin[1] + y
+
+    def away(name, position):
+        home = where(name)
+        return math.hypot(position[0] - home[0], position[1] - home[1])
+
+    for name, rows in samples.items():
+        for time_, (x, y, z), _ in rows:
+            if not -2.0 <= z <= 4.0:
+                problems.append(f"at {time_:.0f} s the '{name}' is {z:.1f} units high, not on the floor at 0")
+                break
+    for time_, position, _ in samples["idler"]:
+        if away("idler", position) > UNMOVED_RANGE:
+            problems.append(f"the idler, which has no package, was moved {away('idler', position):.1f} units at "
+                            f"{time_:.0f} s")
+            break
+    target = (scenario.origin[0] + plugin.PACKAGE_PLACES["target"][0], scenario.origin[1] + plugin.PACKAGE_PLACES["target"][1])
+    night = (scenario.origin[0] + plugin.PACKAGE_PLACES["night"][0], scenario.origin[1] + plugin.PACKAGE_PLACES["night"][1])
+    walker = samples["walker"]
+    if not animated:
+        moved = max(away("walker", position) for _, position, _ in walker)
+        if moved > UNMOVED_RANGE:
+            problems.append(f"the walker was moved {moved:.1f} units, but it has no animation to walk with")
+        moved = max(away("roamer", position) for _, position, _ in samples["roamer"])
+        if moved > UNMOVED_RANGE:
+            problems.append(f"the roamer was moved {moved:.1f} units, but it has no animation to walk with")
+        return problems
+
+    _, (x, y, _), yaw = walker[-1]
+    arrived_at = math.hypot(x - target[0], y - target[1])
+    if abs(arrived_at - plugin.TRAVEL_RADIUS) > TRAVEL_SLACK:
+        problems.append(f"the walker ended at {x:.0f},{y:.0f}, {arrived_at:.0f} units from the marker of its package at "
+                        f"{target[0]:.0f},{target[1]:.0f}, expected it at the edge of the radius of the package, "
+                        f"{plugin.TRAVEL_RADIUS} units from it")
+    if angle_difference(yaw, plugin.TARGET_YAW) > YAW_RANGE:
+        problems.append(f"the walker ended facing {yaw:.2f}, expected the way the marker faces, {plugin.TARGET_YAW:.2f}")
+    if any(math.hypot(x - night[0], y - night[1]) < ARRIVAL_RANGE * 3 for _, (x, y, _), _ in walker):
+        problems.append("the walker went to the marker of the package for the night, which is not on")
+    # on its way north it faces north
+    start_y = where("walker")[1]
+    walking = [yaw for _, (x, y, _), yaw in walker
+               if start_y + 40.0 < y < target[1] - plugin.TRAVEL_RADIUS - TRAVEL_SLACK]
+    if not walking:
+        problems.append("the walker was never seen between its start and the marker")
+    elif any(angle_difference(yaw, 0.0) > WALK_YAW_RANGE for yaw in walking):
+        problems.append(f"the walker did not face the way it walked (north) between its start and the marker: "
+                        f"{[round(yaw, 2) for yaw in walking]}")
+    roamer = samples["roamer"]
+    farthest = max(away("roamer", position) for _, position, _ in roamer)
+    if farthest > plugin.ROAM_RADIUS + ROAM_SLACK:
+        problems.append(f"the roamer went {farthest:.0f} units from where it was put, its package says "
+                        f"{plugin.ROAM_RADIUS}")
+    if farthest < 5.0:
+        problems.append("the roamer, which has a package that sends it about, did not move")
     return problems
 
 
@@ -781,6 +910,8 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS],
+                        help="run only this start, not both")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -799,11 +930,15 @@ def main():
     (data / "scripts").mkdir()
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
     (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
-    (data / "walktest.omwscripts").write_text("PLAYER: scripts/walktest.lua\nGLOBAL: scripts/personwalk.lua\n",
-                                              encoding="ascii")
+    (data / "scripts" / "packagetrack.lua").write_text(PACKAGE_SCRIPT, encoding="ascii")
+    (data / "walktest.omwscripts").write_text(
+        "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n",
+        encoding="ascii")
 
     xvfb = start_xvfb()
     for scenario in SCENARIOS:
+        if args.only not in (None, scenario.name):
+            continue
         home = work / scenario.name / "home"
         home.mkdir(parents=True)
         runtime = work / scenario.name / "runtime"

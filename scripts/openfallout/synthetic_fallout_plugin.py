@@ -14,6 +14,10 @@ east of the end of the player's walk. The person has the parts of a body: the ra
 head (boxes of different sizes), the person a hair and a suit that covers the upper body and the right hand, so that the
 body of the race is there where the suit is not. West of the start there is a wall that is not drawn: a mesh with a
 Havok box and nothing to draw (havok_wall.py).
+South and west of the start there are three more characters that have AI packages (PACK) or none: one that goes to a
+marker and turns the way the marker faces (the first package of its list is for the night, which it ignores at the
+time of day the game starts at), one that has no package and must stay where it is put, and one that goes about the
+place where it was put.
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
@@ -25,6 +29,7 @@ writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`
 `textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
 """
 import argparse
+import math
 import struct
 from pathlib import Path
 
@@ -74,7 +79,19 @@ CREATURE_LIST_REF_ID = 0x825
 EXTERIOR_CREATURE_REF_ID = 0x826
 EXTERIOR_CREATURE_USER_REF_ID = 0x827
 EXTERIOR_CREATURE_LIST_REF_ID = 0x828
-LAST_ID = EXTERIOR_CREATURE_LIST_REF_ID # the largest form ID of the plugin, which the next object ID of its header follows
+IDLER_ID = 0x829
+ROAMER_ID = 0x82A
+ROAM_PACKAGE_ID = 0x82B
+# The character that walks and its packages are one set for each kind of cell, because a package names the reference to
+# go to, and a reference is in one cell
+WALKER_IDS = {"interior": 0x82C, "exterior": 0x82D}
+TRAVEL_PACKAGE_IDS = {"interior": 0x82E, "exterior": 0x82F}
+NIGHT_PACKAGE_IDS = {"interior": 0x830, "exterior": 0x831}
+# The references of the characters and of the markers they go to, in the interior cell and in the exterior one
+PACKAGE_REF_IDS = {"target": (0x832, 0x837), "night": (0x833, 0x838), "walker": (0x834, 0x839),
+                   "idler": (0x835, 0x83A), "roamer": (0x836, 0x83B)}
+TARGET_MARKER_ID = 0x83C # a static with no model, for the characters to go to, which is not the entry marker of the cell
+LAST_ID = TARGET_MARKER_ID # the largest form ID of the plugin, which the next object ID of its header follows
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -124,6 +141,24 @@ CREATURE_BOUNDS = (-30, -15, 0, 30, 15, 80)
 CREATURE_POSITIONS = {"beast": (450.0, 140.0), "user": (450.0, 540.0), "list": (800.0, 340.0)}
 # The flags of ACBS that take the model and the name from the template
 CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80
+# Characters with AI packages stand south and west of where the player starts, away from where the player walks (x from
+# -150 to 300, y from 0 to 600). The walker starts at WALKER_START, and travels (package type Travel) to a marker 300
+# units north of it, which faces east, and stops TRAVEL_RADIUS from it; its first package, for the night (22:00 to 02:00, to another marker), is not on
+# when the game starts at about nine in the morning, and the second is on at any time. The idler has no packages. The
+# roamer has a package that sends it about where it stands, ROAM_RADIUS around it (Wander near the editor location).
+# Positions are relative to where the player starts, as the creatures' are.
+PACKAGE_PLACES = {"target": (-500.0, -100.0), "night": (-900.0, -400.0), "walker": (-500.0, -400.0),
+                  "idler": (-300.0, -700.0), "roamer": (-700.0, -700.0)}
+TARGET_YAW = math.pi / 2
+NIGHT_YAW = math.pi
+ROAM_RADIUS = 200
+TRAVEL_RADIUS = 64 # the walker has arrived when it is this close to the marker (a character stops at the edge of the radius)
+NIGHT_START = 22
+NIGHT_HOURS = 4
+PACKAGE_TRAVEL = 6
+PACKAGE_WANDER = 5
+LOCATION_NEAR_REFERENCE = 0
+LOCATION_NEAR_EDITOR = 3
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
@@ -261,11 +296,11 @@ def top_group(code, children):
     return group(code, 0, children)
 
 
-def refr(form_id, base, position, scale=None):
+def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0)):
     subs = [sub(b"NAME", struct.pack("<I", base))]
     if scale is not None:
         subs.append(sub(b"XSCL", struct.pack("<f", scale)))
-    subs.append(sub(b"DATA", struct.pack("<6f", *position, 0.0, 0.0, 0.0)))
+    subs.append(sub(b"DATA", struct.pack("<6f", *position, *rotation)))
     return record(b"REFR", form_id, subs)
 
 
@@ -412,17 +447,67 @@ def suit():
                                      sub(b"DATA", struct.pack("<IIf", 1, 1, 1.0))])
 
 
-def person():
-    """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL)."""
+def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True):
+    """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
+    the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
     # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
     acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, 100, 0.0, 0, 0)
-    return record(b"NPC_", NPC_ID, [zstr(b"EDID", NPC_NAME), zstr(b"FULL", "OpenFallout Test Person"),
-                                    zstr(b"MODL", SKELETON), sub(b"ACBS", acbs),
-                                    sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)),
-                                    sub(b"RNAM", struct.pack("<I", RACE_ID)),
-                                    sub(b"HNAM", struct.pack("<I", HAIR_ID)),
-                                    sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))])
+    subs = [zstr(b"EDID", name), zstr(b"FULL", "OpenFallout Test Person"), zstr(b"MODL", SKELETON),
+            sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID))]
+    if dressed:
+        subs += [sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)), sub(b"HNAM", struct.pack("<I", HAIR_ID)),
+                 sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))]
+    subs += [sub(b"PKID", struct.pack("<I", package)) for package in packages]
+    return record(b"NPC_", form_id, subs)
+
+
+def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0):
+    """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
+    location as a type, a form ID or 0 and a radius, and the schedule (any month, any day, no date, the hour or 0xff for
+    any, how many hours it lasts)."""
+    subs = [zstr(b"EDID", name), sub(b"PKDT", struct.pack("<IBBH", 0, kind, 0, 0))]
+    if location is not None:
+        subs.append(sub(b"PLDT", struct.pack("<iIi", *location, radius)))
+    subs.append(sub(b"PSDT", struct.pack("<BBBBI", 0xff, 0xff, 0, time, duration)))
+    return record(b"PACK", form_id, subs)
+
+
+def packages():
+    """The packages of the walker (two for each kind of cell) and of the roamer."""
+    records = [package(ROAM_PACKAGE_ID, "OFTestRoam", PACKAGE_WANDER, (LOCATION_NEAR_EDITOR, 0), ROAM_RADIUS)]
+    for index, kind in enumerate(("interior", "exterior")):
+        records.append(package(NIGHT_PACKAGE_IDS[kind], "OFTestNight" + kind.capitalize(), PACKAGE_TRAVEL,
+                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["night"][index]), 0, NIGHT_START, NIGHT_HOURS))
+        records.append(package(TRAVEL_PACKAGE_IDS[kind], "OFTestTravel" + kind.capitalize(), PACKAGE_TRAVEL,
+                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index]), TRAVEL_RADIUS))
+    return records
+
+
+def package_people():
+    """The walker of each kind of cell, the idler and the roamer."""
+    people = [person(WALKER_IDS[kind], "OFTestWalker" + kind.capitalize(),
+                     [NIGHT_PACKAGE_IDS[kind], TRAVEL_PACKAGE_IDS[kind]], dressed=False)
+              for kind in ("interior", "exterior")]
+    people.append(person(IDLER_ID, "OFTestIdler", dressed=False))
+    people.append(person(ROAMER_ID, "OFTestRoamer", [ROAM_PACKAGE_ID], dressed=False))
+    return people
+
+
+def package_refs(index, origin):
+    """The markers and the three placed characters of a cell (0 for the interior cell, 1 for the exterior one), whose
+    origin is where the player starts in it."""
+    ids = {name: refs[index] for name, refs in PACKAGE_REF_IDS.items()}
+    kind = ("interior", "exterior")[index]
+
+    def place(name):
+        x, y = PACKAGE_PLACES[name]
+        return (origin[0] + x, origin[1] + y, 0.0)
+
+    return [refr(ids["target"], TARGET_MARKER_ID, place("target"), rotation=(0.0, 0.0, TARGET_YAW)),
+            refr(ids["night"], TARGET_MARKER_ID, place("night"), rotation=(0.0, 0.0, NIGHT_YAW)),
+            achr(ids["walker"], place("walker"), WALKER_IDS[kind]), achr(ids["idler"], place("idler"), IDLER_ID),
+            achr(ids["roamer"], place("roamer"), ROAMER_ID)]
 
 
 def head_morphs():
@@ -478,9 +563,9 @@ def placed_creatures(origin, ids):
             for name, (x, y) in CREATURE_POSITIONS.items()]
 
 
-def achr(form_id, position):
+def achr(form_id, position, base=NPC_ID):
     """A placed character: the base record and where it stands."""
-    return record(b"ACHR", form_id, [sub(b"NAME", struct.pack("<I", NPC_ID)),
+    return record(b"ACHR", form_id, [sub(b"NAME", struct.pack("<I", base)),
                                      sub(b"DATA", struct.pack("<6f", *position, 0.0, 0.0, 0.0))])
 
 
@@ -513,6 +598,7 @@ def worldspace():
         refr(EXTERIOR_WALL_REF_ID, WALL_ID, (half - WALL_DISTANCE, half + NPC_DEPTH, 0.0)),
         *placed_creatures((half, half), {"beast": EXTERIOR_CREATURE_REF_ID, "user": EXTERIOR_CREATURE_USER_REF_ID,
                                          "list": EXTERIOR_CREATURE_LIST_REF_ID}),
+        *package_refs(1, (half, half)),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
     water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
@@ -536,6 +622,7 @@ def plugin():
     wall = record(b"STAT", WALL_ID, [zstr(b"EDID", "OFTestWall"), zstr(b"MODL", WALL_MESH)])
     # The static that real cells use to say where to enter them, with no model.
     marker = record(b"STAT", MARKER_ID, [zstr(b"EDID", "COCMarkerHeading")])
+    target_marker = record(b"STAT", TARGET_MARKER_ID, [zstr(b"EDID", "OFTestTargetMarker")])
     template = record(b"LGTM", TEMPLATE_ID, [
         zstr(b"EDID", "OFTestLighting"),
         sub(b"DATA", lighting((1, 2, 3), (4, 5, 6), TEMPLATE_FOG, 1.0, TEMPLATE_FOG_FAR))])
@@ -552,17 +639,19 @@ def plugin():
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
         *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
                                       "list": CREATURE_LIST_REF_ID}),
+        *package_refs(0, (0.0, 0.0)),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
-    return (header + top_group(b"STAT", [cube, marker, wall]) + top_group(b"LGTM", [template])
+    return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
-            + top_group(b"NPC_", [person()]) + top_group(b"CREA", list(creatures()[:2]))
+            + top_group(b"PACK", packages()) + top_group(b"NPC_", [person(), *package_people()])
+            + top_group(b"CREA", list(creatures()[:2]))
             + top_group(b"LVLC", [creatures()[2]])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 

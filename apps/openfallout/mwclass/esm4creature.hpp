@@ -14,6 +14,11 @@
 
 #include "esm4base.hpp"
 
+namespace ESM4
+{
+    struct AIPackage;
+}
+
 namespace OFClass
 {
     class ESM4CreatureCustomData;
@@ -52,6 +57,10 @@ namespace OFClass
 
         /// The skeleton, body models and animation files of the creature, found through its templates
         static const ESM4::CreatureModel& getCreatureModel(const OFWorld::Ptr& ptr);
+
+        /// The AI packages of the creature, in the order of their priority, from its record or its template (null
+        /// for a package that no file has a record for)
+        static const std::vector<const ESM4::AIPackage*>& getPackages(const OFWorld::Ptr& ptr);
 
     private:
         static ESM4CreatureCustomData& getCustomData(const OFWorld::ConstPtr& ptr);

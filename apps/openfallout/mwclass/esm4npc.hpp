@@ -19,6 +19,7 @@
 
 namespace ESM4
 {
+    struct AIPackage;
     struct Armor;
     struct Hair;
     struct HeadPart;
@@ -100,6 +101,10 @@ namespace OFClass
         static bool isFemale(const OFWorld::Ptr& ptr);
         static const std::vector<const ESM4::Armor*>& getEquippedArmor(const OFWorld::Ptr& ptr);
         static const std::vector<const ESM4::Clothing*>& getEquippedClothing(const OFWorld::Ptr& ptr);
+        /// The AI packages of a character of Fallout, in the order of their priority (the first is the highest):
+        /// those of its record or, for a record that takes them from a template, of the template. A package that no
+        /// file has a record for is null. Always empty for a character of the games before Fallout.
+        static const std::vector<const ESM4::AIPackage*>& getPackages(const OFWorld::Ptr& ptr);
 
     private:
         static ESM4NpcCustomData& getCustomData(const OFWorld::ConstPtr& ptr);
