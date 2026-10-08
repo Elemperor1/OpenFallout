@@ -18,6 +18,10 @@ namespace EsmTool
 
     // Counts the references placed by every file named in info.inputFiles, read in that order, and prints one report.
     int referencesTes4(const Arguments& info);
+
+    // Counts the armour that the characters of every Fallout file named in info.inputFiles list, read in that order,
+    // and prints one report.
+    int equipmentTes4(const Arguments& info);
 }
 
 #endif

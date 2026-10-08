@@ -208,6 +208,7 @@ add_component_dir (esm4
     dialogue
     effect
     effectlist
+    equipmentcensus
     grid
     grouptype
     inventory

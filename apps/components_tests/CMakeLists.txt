@@ -89,6 +89,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testeffectshader.cpp
     esm4/testenchantment.cpp
     esm4/testencounterzone.cpp
+    esm4/testequipmentcensus.cpp
     esm4/testexplosion.cpp
     esm4/testfaction.cpp
     esm4/testhungerstage.cpp
