@@ -11,6 +11,8 @@ namespace ESM4
         // A list of lists that goes deeper than this, or a chain of templates that is longer, is a cycle or a mistake
         constexpr std::size_t maxListDepth = 8;
         constexpr std::size_t maxTemplateDepth = 16;
+        // A list that calculates for each item in its count is rolled once per item, up to this many times
+        constexpr int maxRollsPerEntry = 16;
 
         // splitmix64, which gives the same numbers on every platform
         class Random
@@ -53,8 +55,14 @@ namespace ESM4
         // The entries of a levelled list that a character of the level gets. The entries of a list are all those at or
         // below the level; unless the list calculates from all levels, only the highest of them. Of those one is
         // chosen, or all of them if the list uses all. The list may also give nothing, by a chance in a hundred.
+        struct Choice
+        {
+            ESM::FormId mItem;
+            int mCount;
+        };
+
         Outcome chooseEntries(const std::vector<LVLO>& entries, const LevelledRules& rules, int level, Random& random,
-            std::vector<ESM::FormId>& chosen)
+            std::vector<Choice>& chosen)
         {
             if (rules.mChanceNone > 0 && static_cast<int>(random.below(100)) < rules.mChanceNone)
                 return Outcome::EmptyByChance;
@@ -80,10 +88,13 @@ namespace ESM4
             if (rules.mUseAll)
             {
                 for (const LVLO* entry : eligible)
-                    chosen.push_back(ESM::FormId::fromUint32(entry->item));
+                    chosen.push_back({ ESM::FormId::fromUint32(entry->item), std::max<int>(entry->count, 1) });
             }
             else
-                chosen.push_back(ESM::FormId::fromUint32(eligible[random.below(eligible.size())]->item));
+            {
+                const LVLO* entry = eligible[random.below(eligible.size())];
+                chosen.push_back({ ESM::FormId::fromUint32(entry->item), std::max<int>(entry->count, 1) });
+            }
             return Outcome::Chosen;
         }
 
@@ -99,10 +110,10 @@ namespace ESM4
             LevelledRules rules;
             rules.mChanceNone = list->chanceNone();
             rules.mAllLevels = list->calcAllLvlLessThanPlayer();
-            std::vector<ESM::FormId> chosen;
+            std::vector<Choice> chosen;
             chooseEntries(list->mLvlObject, rules, level, random, chosen);
-            for (const ESM::FormId entry : chosen)
-                if (const Npc* npc = resolveNpc(source, entry, level, random, trace, depth + 1))
+            for (const Choice& entry : chosen)
+                if (const Npc* npc = resolveNpc(source, entry.mItem, level, random, trace, depth + 1))
                     return npc;
             if (trace != nullptr)
                 ++trace->mTemplateListsEmpty;
@@ -120,7 +131,7 @@ namespace ESM4
             {
             }
 
-            void addEntry(ESM::FormId id)
+            void addEntry(ESM::FormId id, std::uint32_t count)
             {
                 if (mTrace != nullptr)
                     ++mTrace->mItems;
@@ -134,7 +145,7 @@ namespace ESM4
                 {
                     if (mTrace != nullptr)
                         ++mTrace->mListsEntered;
-                    expand(id, 0);
+                    expand(id, 0, count);
                 }
                 else if (mTrace != nullptr)
                     ++mTrace->mOtherItems;
@@ -150,7 +161,9 @@ namespace ESM4
                     mArmor.push_back(armor);
             }
 
-            void expand(ESM::FormId listId, std::size_t depth)
+            // Adds the list `count` times: a list that calculates for each item in its count gives a new roll for every
+            // item, any other gives the same entries each time, which adds no armour that is not there already
+            void expand(ESM::FormId listId, std::size_t depth, std::uint32_t count)
             {
                 const LevelledItem* list = mSource.findLevelledItem(listId);
                 if (list == nullptr)
@@ -162,12 +175,21 @@ namespace ESM4
                     return;
                 }
 
+                const int rolls = list->calcEachItemInCount()
+                    ? static_cast<int>(std::clamp<std::uint32_t>(count, 1, maxRollsPerEntry))
+                    : 1;
+                for (int roll = 0; roll < rolls; ++roll)
+                    rollOnce(*list, depth);
+            }
+
+            void rollOnce(const LevelledItem& list, std::size_t depth)
+            {
                 LevelledRules rules;
-                rules.mChanceNone = list->chanceNone();
-                rules.mAllLevels = list->calcAllLvlLessThanPlayer();
-                rules.mUseAll = list->useAll();
-                std::vector<ESM::FormId> chosen;
-                switch (chooseEntries(list->mLvlObject, rules, mLevel, mRandom, chosen))
+                rules.mChanceNone = list.chanceNone();
+                rules.mAllLevels = list.calcAllLvlLessThanPlayer();
+                rules.mUseAll = list.useAll();
+                std::vector<Choice> chosen;
+                switch (chooseEntries(list.mLvlObject, rules, mLevel, mRandom, chosen))
                 {
                     case Outcome::EmptyByChance:
                         if (mTrace != nullptr)
@@ -183,16 +205,16 @@ namespace ESM4
                 if (rules.mUseAll && mTrace != nullptr)
                     ++mTrace->mListsUsingAll;
 
-                for (const ESM::FormId entry : chosen)
+                for (const Choice& entry : chosen)
                 {
-                    if (mSource.findArmor(entry) != nullptr)
+                    if (mSource.findArmor(entry.mItem) != nullptr)
                     {
                         if (mTrace != nullptr)
                             ++mTrace->mArmorFromLists;
-                        add(entry);
+                        add(entry.mItem);
                     }
-                    else if (mSource.findLevelledItem(entry) != nullptr)
-                        expand(entry, depth + 1);
+                    else if (mSource.findLevelledItem(entry.mItem) != nullptr)
+                        expand(entry.mItem, depth + 1, static_cast<std::uint32_t>(entry.mCount));
                 }
             }
 
@@ -274,7 +296,7 @@ namespace ESM4
         Random random(seed);
         ArmorCollector collector(source, level, random, trace);
         for (const InventoryItem& item : inventoryOwner->mInventory)
-            collector.addEntry(ESM::FormId::fromUint32(item.item));
+            collector.addEntry(ESM::FormId::fromUint32(item.item), item.count);
         return collector.take();
     }
 

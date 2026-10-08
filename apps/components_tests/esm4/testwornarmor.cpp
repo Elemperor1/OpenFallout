@@ -310,6 +310,41 @@ namespace
         EXPECT_LT(dressed, 160);
     }
 
+    TEST(ESM4WornArmorTest, aListThatCalculatesForEachItemInTheCountIsRolledOnceForEachItem)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, hat);
+        source.addList(0x1010, { { 1, 0x1001 }, { 1, 0x1002 } }, 0x02);
+        source.addList(0x1011, { { 1, 0x1001 }, { 1, 0x1002 } }, 0);
+        ESM4::Npc& each = source.addNpc(0x2001, { 0x1010 });
+        each.mInventory.back().count = 16;
+        ESM4::Npc& once = source.addNpc(0x2002, { 0x1011 });
+        once.mInventory.back().count = 16;
+        ESM4::Npc& single = source.addNpc(0x2003, { 0x1010 });
+
+        // sixteen rolls of a list with two pieces give both of them, one roll gives one, whatever the count of a list
+        // that does not calculate for each item
+        EXPECT_THAT(wornAcrossSeeds(source, each, 5), UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001, 0x1002 }));
+        EXPECT_THAT(wornAcrossSeeds(source, once, 5),
+            UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001 }, std::set<std::uint32_t>{ 0x1002 }));
+        EXPECT_THAT(wornAcrossSeeds(source, single, 5),
+            UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001 }, std::set<std::uint32_t>{ 0x1002 }));
+    }
+
+    TEST(ESM4WornArmorTest, aListInAListIsRolledOnceForEachItemOfTheCountOfItsEntry)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, hat);
+        source.addList(0x1011, { { 1, 0x1001 }, { 1, 0x1002 } }, 0x02);
+        source.addList(0x1010, { { 1, 0x1011 } });
+        source.mLevelledItems.at(id(0x1010)).mLvlObject[0].count = 16;
+        const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010 });
+
+        EXPECT_THAT(wornAcrossSeeds(source, npc, 5), UnorderedElementsAre(std::set<std::uint32_t>{ 0x1001, 0x1002 }));
+    }
+
     TEST(ESM4WornArmorTest, followsListsInLists)
     {
         TestSource source;

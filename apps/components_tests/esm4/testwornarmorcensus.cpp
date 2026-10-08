@@ -215,8 +215,8 @@ namespace
         collect(census, basePlugin());
         const ESM4::WornArmorCensus::Summary summary = census.summarize();
 
-        // at level 1 the list gives the suit, at every level the characters with their own pieces are dressed; the
-        // three characters with a list are 0x2001, 0x2002 (its template) and nobody else
+        // 0x2001 and 0x2002 (its template) get a piece from the list at every level (the suit at level 1), and 0x2003
+        // and 0x2004 wear their own pieces; 0x2005 (no model) and 0x2006 (nothing) are never dressed
         for (const std::size_t dressed : summary.mDressedByLevel)
             EXPECT_EQ(dressed, 4u);
     }
