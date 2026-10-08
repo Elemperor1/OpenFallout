@@ -33,6 +33,7 @@ namespace
         std::map<ESM::FormId, ESM4::LevelledNpc> mLevelledNpcs;
         std::map<ESM::FormId, ESM4::Armor> mArmor;
         std::map<ESM::FormId, ESM4::LevelledItem> mLevelledItems;
+        std::map<ESM::FormId, ESM4::GlobalVariable> mGlobals;
 
         const ESM4::Npc* findNpc(ESM::FormId formId) const override { return find(mNpcs, formId); }
         const ESM4::LevelledNpc* findLevelledNpc(ESM::FormId formId) const override
@@ -43,6 +44,21 @@ namespace
         const ESM4::LevelledItem* findLevelledItem(ESM::FormId formId) const override
         {
             return find(mLevelledItems, formId);
+        }
+        const ESM4::GlobalVariable* findGlobal(ESM::FormId formId) const override { return find(mGlobals, formId); }
+
+        void addGlobal(std::uint32_t value, float number)
+        {
+            ESM4::GlobalVariable global{};
+            global.mId = id(value);
+            global.mValue = number;
+            mGlobals[id(value)] = global;
+        }
+
+        // Makes the chance of nothing of the list the value of the global variable
+        void useGlobalChance(std::uint32_t list, std::uint32_t global)
+        {
+            mLevelledItems.at(id(list)).mGlobal = id(global);
         }
 
         void addArmor(std::uint32_t value, std::uint32_t slots, const char* male = "male.nif", const char* female = "")
@@ -293,6 +309,56 @@ namespace
         EXPECT_FALSE(ESM4::wornArmor(source, never, playerLevel, 1, &trace).empty());
         EXPECT_EQ(trace.mListsEmptyByChance, 1u);
         EXPECT_EQ(trace.mListsEmptyByLevel, 1u);
+    }
+
+    TEST(ESM4WornArmorTest, aListThatNamesAGlobalTakesTheChanceOfNothingFromItsValue)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addGlobal(0x3001, 100.f);
+        source.addGlobal(0x3002, 0.f);
+        source.addGlobal(0x3003, 250.f);
+        source.addGlobal(0x3004, -4.f);
+        // The chance stored in the list is the opposite of what the global says, so that it shows which one counts
+        source.addList(0x1010, { { 1, 0x1001 } }, 0, 0);
+        source.addList(0x1011, { { 1, 0x1001 } }, 0, 100);
+        source.addList(0x1012, { { 1, 0x1001 } }, 0, 0);
+        source.addList(0x1013, { { 1, 0x1001 } }, 0, 100);
+        source.useGlobalChance(0x1010, 0x3001);
+        source.useGlobalChance(0x1011, 0x3002);
+        source.useGlobalChance(0x1012, 0x3003);
+        source.useGlobalChance(0x1013, 0x3004);
+        const ESM4::Npc& alwaysNothing = source.addNpc(0x2001, { 0x1010 });
+        const ESM4::Npc& alwaysSomething = source.addNpc(0x2002, { 0x1011 });
+        const ESM4::Npc& aboveAHundred = source.addNpc(0x2003, { 0x1012 });
+        const ESM4::Npc& belowZero = source.addNpc(0x2004, { 0x1013 });
+
+        ESM4::WornArmorTrace trace;
+        for (std::uint32_t seed = 1; seed <= 16; ++seed)
+        {
+            EXPECT_TRUE(ESM4::wornArmor(source, alwaysNothing, playerLevel, seed, &trace).empty());
+            EXPECT_FALSE(ESM4::wornArmor(source, alwaysSomething, playerLevel, seed, &trace).empty());
+            EXPECT_TRUE(ESM4::wornArmor(source, aboveAHundred, playerLevel, seed, &trace).empty());
+            EXPECT_FALSE(ESM4::wornArmor(source, belowZero, playerLevel, seed, &trace).empty());
+        }
+        EXPECT_EQ(trace.mListsWithGlobalChance, 64u);
+    }
+
+    TEST(ESM4WornArmorTest, aListWhoseGlobalIsNotThereKeepsItsOwnChanceOfNothing)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addList(0x1010, { { 1, 0x1001 } }, 0, 100);
+        source.addList(0x1011, { { 1, 0x1001 } }, 0, 0);
+        source.useGlobalChance(0x1010, 0x3099);
+        source.useGlobalChance(0x1011, 0x3099);
+        const ESM4::Npc& always = source.addNpc(0x2001, { 0x1010 });
+        const ESM4::Npc& never = source.addNpc(0x2002, { 0x1011 });
+
+        ESM4::WornArmorTrace trace;
+        EXPECT_TRUE(ESM4::wornArmor(source, always, playerLevel, 1, &trace).empty());
+        EXPECT_FALSE(ESM4::wornArmor(source, never, playerLevel, 1, &trace).empty());
+        EXPECT_EQ(trace.mListsWithGlobalChance, 0u);
     }
 
     TEST(ESM4WornArmorTest, aListThatGivesNothingNinetyPercentOfTheTimeGivesSomethingAboutAtenth)

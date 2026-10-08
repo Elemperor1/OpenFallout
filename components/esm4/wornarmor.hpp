@@ -9,6 +9,7 @@
 #include <components/esm/path.hpp>
 
 #include "loadarmo.hpp"
+#include "loadglob.hpp"
 #include "loadlvli.hpp"
 #include "loadlvln.hpp"
 #include "loadnpc.hpp"
@@ -30,6 +31,7 @@ namespace ESM4
         virtual const LevelledNpc* findLevelledNpc(ESM::FormId id) const = 0;
         virtual const Armor* findArmor(ESM::FormId id) const = 0;
         virtual const LevelledItem* findLevelledItem(ESM::FormId id) const = 0;
+        virtual const GlobalVariable* findGlobal(ESM::FormId id) const = 0;
     };
 
     // What happened while the armour was chosen, for counting. Only the totals of the whole census use it.
@@ -43,6 +45,7 @@ namespace ESM4
         std::size_t mListsEntered = 0; // entries that are a levelled list
         std::size_t mArmorFromLists = 0; // pieces of armour that levelled lists gave
         std::size_t mListsEmptyByChance = 0;
+        std::size_t mListsWithGlobalChance = 0; // lists whose chance of nothing is the value of a global variable
         std::size_t mListsEmptyByLevel = 0; // no entry at or below the level of the character
         std::size_t mListsUsingAll = 0;
         std::size_t mListsTooDeep = 0;

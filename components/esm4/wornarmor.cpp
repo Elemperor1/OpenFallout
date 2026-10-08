@@ -183,13 +183,28 @@ namespace ESM4
                     rollOnce(*list, depth);
             }
 
+            // The chance in a hundred that the list gives nothing: the value of the global variable that the list
+            // names, if the file has it, and otherwise the chance that the list holds
+            int chanceNone(const LevelledItem& list)
+            {
+                if (list.mGlobal.isZeroOrUnset())
+                    return list.chanceNone();
+                const GlobalVariable* global = mSource.findGlobal(list.mGlobal);
+                if (global == nullptr)
+                    return list.chanceNone();
+                if (mTrace != nullptr)
+                    ++mTrace->mListsWithGlobalChance;
+                const float value = global->mValue;
+                return value > 0.f ? static_cast<int>(std::lround(std::min(value, 100.f))) : 0;
+            }
+
             void rollOnce(const LevelledItem& list, std::size_t depth)
             {
                 if (mRollsLeft == 0)
                     return;
                 --mRollsLeft;
                 LevelledRules rules;
-                rules.mChanceNone = list.chanceNone();
+                rules.mChanceNone = chanceNone(list);
                 rules.mAllLevels = list.calcAllLvlLessThanPlayer();
                 rules.mUseAll = list.useAll();
                 std::vector<Choice> chosen;

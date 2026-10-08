@@ -50,11 +50,16 @@ namespace ESM4
         return find(mLevelledItems, id);
     }
 
+    const GlobalVariable* WornArmorCensus::findGlobal(ESM::FormId id) const
+    {
+        return find(mGlobals, id);
+    }
+
     void WornArmorCensus::collect(Reader& reader)
     {
         auto visitRecord = [&](Reader& r) {
             const std::uint32_t type = r.hdr().record.typeId;
-            if (type != REC_NPC_ && type != REC_ARMO && type != REC_LVLI && type != REC_LVLN)
+            if (type != REC_NPC_ && type != REC_ARMO && type != REC_LVLI && type != REC_LVLN && type != REC_GLOB)
                 return false;
 
             const ESM::FormId id = r.getFormIdFromHeader();
@@ -63,6 +68,7 @@ namespace ESM4
             mLevelledNpcs.erase(id);
             mArmor.erase(id);
             mLevelledItems.erase(id);
+            mGlobals.erase(id);
 
             if ((r.hdr().record.flags & Rec_Deleted) == 0)
             {
@@ -84,6 +90,11 @@ namespace ESM4
                         Armor& record = mArmor[id];
                         record.load(r);
                     }
+                    else if (type == REC_GLOB)
+                    {
+                        GlobalVariable& record = mGlobals[id];
+                        record.load(r);
+                    }
                     else
                     {
                         LevelledItem& record = mLevelledItems[id];
@@ -97,6 +108,7 @@ namespace ESM4
                     mLevelledNpcs.erase(id);
                     mArmor.erase(id);
                     mLevelledItems.erase(id);
+                    mGlobals.erase(id);
                 }
             }
             r.skipFailedRecord(recordStart);
@@ -188,6 +200,7 @@ namespace ESM4
         stream << "\nLevelled lists of items\n";
         stream << "  pieces of armour that they gave: " << trace.mArmorFromLists << '\n';
         stream << "  that gave nothing by chance: " << trace.mListsEmptyByChance << '\n';
+        stream << "  with the chance taken from a global variable: " << trace.mListsWithGlobalChance << '\n';
         stream << "  that gave nothing for no entry at or below the level: " << trace.mListsEmptyByLevel << '\n';
         stream << "  that use all entries: " << trace.mListsUsingAll << '\n';
         stream << "  nested too deep: " << trace.mListsTooDeep << '\n';

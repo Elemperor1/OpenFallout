@@ -209,6 +209,51 @@ namespace
         EXPECT_EQ(summary.mTrace.mOtherItems, 1u);
     }
 
+    std::string global(std::uint32_t id, float value)
+    {
+        return rec("GLOB", id,
+            zString("EDID", "Global") + valueSubRecord<std::uint8_t>("FNAM", 'f')
+                + valueSubRecord<float>("FLTV", value));
+    }
+
+    // A list whose chance of nothing is `chanceNone` and, if the global is not 0, the value of that global
+    std::string listWithGlobal(
+        std::uint32_t id, std::int8_t chanceNone, std::uint32_t globalId, const std::string& entries)
+    {
+        std::string data = zString("EDID", "List") + valueSubRecord<std::int8_t>("LVLD", chanceNone)
+            + valueSubRecord<std::uint8_t>("LVLF", 0);
+        if (globalId != 0)
+            data += valueSubRecord<std::uint32_t>("LVLG", globalId);
+        return rec("LVLI", id, data + entries);
+    }
+
+    TEST(ESM4WornArmorCensusTest, takesTheChanceOfNothingOfAListFromItsGlobal)
+    {
+        // A list that never gives nothing by its own chance and a global of 100, and one that gives nothing by its own
+        // chance and a global of 0; the global decides
+        const std::string plugin = versionedHeader()
+            + versionedGroup("GLOB", global(0x3001, 100.f) + global(0x3002, 0.f))
+            + versionedGroup("ARMO", armour(suit, upperBody, "suit.nif"))
+            + versionedGroup("LVLI",
+                listWithGlobal(0x1011, 0, 0x3001, entry(1, suit)) + listWithGlobal(0x1012, 100, 0x3002, entry(1, suit)))
+            + versionedGroup("NPC_", character(0x2001, 0, 0, item(0x1011)) + character(0x2002, 0, 0, item(0x1012)));
+
+        ESM4::WornArmorCensus census;
+        collect(census, plugin);
+        const ESM4::WornArmorCensus::Summary summary = census.summarize();
+
+        EXPECT_TRUE(census.getFatalErrors().empty());
+        EXPECT_EQ(summary.mCharacters, 2u);
+        EXPECT_EQ(summary.mPieces[0], 1u);
+        EXPECT_EQ(summary.mPieces[1], 1u);
+        EXPECT_GT(summary.mTrace.mListsWithGlobalChance, 0u);
+        EXPECT_EQ(summary.mTrace.mArmorFromLists, 1u);
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("  with the chance taken from a global variable: "));
+    }
+
     TEST(ESM4WornArmorCensusTest, triesOtherLevelsOfThePlayer)
     {
         ESM4::WornArmorCensus census;

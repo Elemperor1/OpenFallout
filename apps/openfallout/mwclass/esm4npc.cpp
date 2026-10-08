@@ -133,6 +133,10 @@ namespace OFClass
         {
             return mStore.get<ESM4::LevelledItem>().search(id);
         }
+        const ESM4::GlobalVariable* findGlobal(ESM::FormId id) const override
+        {
+            return mStore.get<ESM4::GlobalVariable>().search(id);
+        }
 
     private:
         const OFWorld::ESMStore& mStore;

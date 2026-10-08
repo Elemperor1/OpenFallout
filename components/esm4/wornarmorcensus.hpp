@@ -13,6 +13,7 @@
 #include <components/esm/formid.hpp>
 
 #include "loadarmo.hpp"
+#include "loadglob.hpp"
 #include "loadlvli.hpp"
 #include "loadlvln.hpp"
 #include "loadnpc.hpp"
@@ -72,12 +73,14 @@ namespace ESM4
         const LevelledNpc* findLevelledNpc(ESM::FormId id) const override;
         const Armor* findArmor(ESM::FormId id) const override;
         const LevelledItem* findLevelledItem(ESM::FormId id) const override;
+        const GlobalVariable* findGlobal(ESM::FormId id) const override;
 
     private:
         std::unordered_map<ESM::FormId, Npc> mNpcs;
         std::unordered_map<ESM::FormId, LevelledNpc> mLevelledNpcs;
         std::unordered_map<ESM::FormId, Armor> mArmor;
         std::unordered_map<ESM::FormId, LevelledItem> mLevelledItems;
+        std::unordered_map<ESM::FormId, GlobalVariable> mGlobals;
         std::vector<std::string> mFatalErrors;
     };
 }
