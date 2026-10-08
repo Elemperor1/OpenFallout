@@ -13,7 +13,9 @@
 #include <components/esm4/loadlvln.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadotft.hpp>
+#include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadrace.hpp>
+#include <components/esm4/packageschedule.hpp>
 #include <components/esm4/wornarmor.hpp>
 
 #include <components/misc/resourcehelpers.hpp>
@@ -174,6 +176,7 @@ namespace OFClass
         // TODO: Use InventoryStore instead (currently doesn't support ESM4 objects)
         std::vector<const ESM4::Armor*> mEquippedArmor;
         std::vector<const ESM4::Clothing*> mEquippedClothing;
+        std::vector<const ESM4::AIPackage*> mPackages;
 
         ESM4NpcCustomData& asESM4NpcCustomData() override { return *this; }
         const ESM4NpcCustomData& asESM4NpcCustomData() const override { return *this; }
@@ -239,7 +242,11 @@ namespace OFClass
         }
 
         if (base->mIsFONV)
+        {
             data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, ESM4Impl::sDefaultLevel, seed);
+            for (const ESM::FormId package : ESM4::characterPackages(npcRecs))
+                data->mPackages.push_back(store->get<ESM4::AIPackage>().search(package));
+        }
         else if (auto inv = chooseTemplate(npcRecs, ESM4::Npc::Template_UseInventory))
         {
             for (const ESM4::InventoryItem& item : inv->mInventory)
@@ -281,6 +288,11 @@ namespace OFClass
     const std::vector<const ESM4::Clothing*>& ESM4Npc::getEquippedClothing(const OFWorld::Ptr& ptr)
     {
         return getCustomData(ptr).mEquippedClothing;
+    }
+
+    const std::vector<const ESM4::AIPackage*>& ESM4Npc::getPackages(const OFWorld::Ptr& ptr)
+    {
+        return getCustomData(ptr).mPackages;
     }
 
     const ESM4::Npc* ESM4Npc::getTraitsRecord(const OFWorld::Ptr& ptr)

@@ -35,6 +35,8 @@
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 
+#include "../mwmechanics/falloutactors.hpp"
+
 #include "../mwrender/camera.hpp"
 #include "../mwrender/landmanager.hpp"
 #include "../mwrender/postprocessor.hpp"
@@ -155,7 +157,7 @@ namespace
             ptr.getRefData().setBaseNode(pagedNode);
         setNodeRotation(ptr, rendering, rotation);
 
-        if (ptr.getClass().useAnim())
+        if (ptr.getClass().useAnim() || OFMechanics::FalloutActors::handles(ptr))
             OFBase::Environment::get().getMechanicsManager()->add(ptr);
 
         if (ptr.getClass().isActor())

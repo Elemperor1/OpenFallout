@@ -248,6 +248,8 @@ namespace OFMechanics
     {
         if (ptr.getClass().isActor())
             mActors.addActor(ptr);
+        else if (FalloutActors::handles(ptr))
+            mFalloutActors.add(ptr);
         else
             mObjects.addObject(ptr);
     }
@@ -264,6 +266,7 @@ namespace OFMechanics
             OFBase::Environment::get().getWindowManager()->watchActor(OFWorld::Ptr());
         mActors.removeActor(ptr, keepActive);
         mObjects.removeObject(ptr);
+        mFalloutActors.remove(ptr);
     }
 
     void MechanicsManager::updateCell(const OFWorld::Ptr& old, const OFWorld::Ptr& ptr)
@@ -273,6 +276,8 @@ namespace OFMechanics
 
         if (ptr.getClass().isActor())
             mActors.updateActor(old, ptr);
+        else if (FalloutActors::handles(ptr))
+            mFalloutActors.updatePtr(old, ptr);
         else
             mObjects.updateObject(old, ptr);
     }
@@ -281,6 +286,7 @@ namespace OFMechanics
     {
         mActors.dropActors(cellStore, getPlayer());
         mObjects.dropObjects(cellStore);
+        mFalloutActors.drop(cellStore);
     }
 
     void MechanicsManager::update(float duration, bool paused)
@@ -323,6 +329,8 @@ namespace OFMechanics
 
         mActors.update(duration, paused);
         mObjects.update(duration, paused);
+        if (!paused && mAI)
+            mFalloutActors.update(duration);
     }
 
     void MechanicsManager::processChangedSettings(const Settings::CategorySettingVector& changed)

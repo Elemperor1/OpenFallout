@@ -23,6 +23,11 @@ namespace OFRender
         /// walking and running with the speed at which the actor is moved
         void advance(float duration);
 
+        /// Whether the actor has an animation to walk with, and the speed (units a second) at which that animation
+        /// carries it, which an actor that is moved at that speed does not slide at
+        bool canWalk() const { return mGaits.mHasWalk; }
+        float getWalkVelocity() const { return mGaits.mWalkVelocity; }
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
