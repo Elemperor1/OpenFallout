@@ -92,6 +92,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testencounterzone.cpp
     esm4/testequipmentcensus.cpp
     esm4/testexplosion.cpp
+    esm4/testfacegen.cpp
     esm4/testfaction.cpp
     esm4/testhungerstage.cpp
     esm4/testimagespace.cpp

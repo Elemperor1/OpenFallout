@@ -211,6 +211,7 @@ add_component_dir (esm4
     effect
     effectlist
     equipmentcensus
+    facegen
     grid
     grouptype
     inventory
