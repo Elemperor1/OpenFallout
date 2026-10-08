@@ -339,16 +339,20 @@ namespace NifOsg
         /// The animation of a file of Oblivion and later: a sequence that names the nodes it drives and, for each, an
         /// interpolator with its keys. The engine's animation system plays a group of text keys, "<group>: start" and
         /// "<group>: stop" between which the time runs, so the sequence is made one: the group is the name of the file
-        /// (a file holds one animation, `mtidle.kf` is the group `mtidle`), or the name of the sequence when the file
-        /// holds several. Its start and stop are those of the sequence and a sequence that loops has the keys that
-        /// make the group loop. The text keys of the sequence itself come along, lower case.
+        /// (a file holds one animation, `mtidle.kf` is the group `mtidle`). Its start and stop are those of the
+        /// sequence and a sequence that loops has the keys that make the group loop. The text keys of the sequence
+        /// itself come along, lower case. The controllers of a file belong to the file, not to a group, so only one
+        /// sequence can be taken from it (see loadKf).
         void loadControllerSequence(const Nif::NiControllerSequence& seq, std::string_view group,
             std::string_view filename, SceneUtil::KeyframeHolder& target) const
         {
             const std::string name = Misc::StringUtils::lowerCase(group);
             target.mTextKeys.emplace(seq.mStartTime, name + ": start");
             target.mTextKeys.emplace(seq.mStopTime, name + ": stop");
-            if (seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Cycle)
+            // The engine has no sequence that plays forward and back again; one that does is played forward over and
+            // over, which is nearer to it than a pose held after the first pass
+            if (seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Cycle
+                || seq.mExtrapolationMode == Nif::NiTimeController::ExtrapolationMode::Reverse)
             {
                 target.mTextKeys.emplace(seq.mStartTime, name + ": loop start");
                 target.mTextKeys.emplace(seq.mStopTime, name + ": loop stop");
@@ -399,10 +403,13 @@ namespace NifOsg
 
             if (seq == nullptr && !sequences.empty())
             {
-                for (const Nif::NiControllerSequence* sequence : sequences)
-                    loadControllerSequence(*sequence,
-                        sequences.size() == 1 ? nif.getFilename().stem() : sequence->mName, nif.getFilename().value(),
-                        target);
+                // The animation system keeps the controllers by the name of the node, for the whole file, and the
+                // groups of text keys only say when to play them, so a second sequence would animate its group with
+                // the tracks of the first. The animation files of the games hold one sequence each.
+                if (sequences.size() > 1)
+                    Log(Debug::Verbose) << "The file " << nif.getFilename() << " holds " << sequences.size()
+                                        << " animation sequences, using only the first";
+                loadControllerSequence(*sequences.front(), nif.getFilename().stem(), nif.getFilename().value(), target);
                 return;
             }
 

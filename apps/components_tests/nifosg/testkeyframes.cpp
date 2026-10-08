@@ -101,15 +101,35 @@ namespace
         EXPECT_EQ(holder.mKeyframeControllers.begin()->second->getTranslation(0.f), osg::Vec3f(1, 0, 0));
     }
 
-    TEST(NifOsgLoadKfControllerSequence, namesTheGroupsOfAFileWithSeveralSequencesAfterThem)
+    // The controllers are kept by the name of the node for the whole file, so a second sequence would play its group
+    // with the tracks of the first.
+    TEST(NifOsgLoadKfControllerSequence, takesOnlyTheFirstSequenceOfAFileWithSeveral)
     {
         Nif::NIFFile file(idleKf);
-        addSequence(file, "Walk", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Cycle, {});
-        addSequence(file, "Run", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Cycle, {});
+        addSequence(file, "Walk", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Cycle,
+            { { "Bip01 Head", { { 0.f, osg::Vec3f(1, 0, 0) } } } });
+        addSequence(file, "Run", 0.f, 1.f, Nif::NiTimeController::ExtrapolationMode::Cycle,
+            { { "Bip01 Head", { { 0.f, osg::Vec3f(7, 0, 0) } } } });
 
         SceneUtil::KeyframeHolder holder;
         NifOsg::Loader::loadKf(file, holder);
 
-        EXPECT_THAT(holder.mTextKeys.getGroups(), ElementsAre("run", "walk"));
+        EXPECT_THAT(holder.mTextKeys.getGroups(), ElementsAre("mtidle"));
+        ASSERT_EQ(holder.mKeyframeControllers.size(), 1u);
+        EXPECT_EQ(holder.mKeyframeControllers.begin()->second->getTranslation(0.f), osg::Vec3f(1, 0, 0));
+    }
+
+    // The engine cannot play a sequence forward and back, a pose held after one pass is further from it than a loop.
+    TEST(NifOsgLoadKfControllerSequence, loopsASequenceThatReverses)
+    {
+        Nif::NIFFile file(idleKf);
+        addSequence(file, "Idle", 0.f, 2.f, Nif::NiTimeController::ExtrapolationMode::Reverse, {});
+
+        SceneUtil::KeyframeHolder holder;
+        NifOsg::Loader::loadKf(file, holder);
+
+        EXPECT_THAT(textKeys(holder.mTextKeys),
+            UnorderedElementsAre("0.000000 mtidle: start", "0.000000 mtidle: loop start", "2.000000 mtidle: stop",
+                "2.000000 mtidle: loop stop"));
     }
 }
