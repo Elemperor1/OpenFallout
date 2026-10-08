@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <limits>
 #include <vector>
 
 #include <components/debug/debuglog.hpp>
@@ -96,6 +97,12 @@ namespace OFMechanics
         bool isNear(const osg::Vec3f& a, const osg::Vec3f& b, float reach)
         {
             return onSameFloor(a, b) && distanceAcross(a, b) <= reach;
+        }
+
+        /// How far `a` is from `b` on the map; on another floor, too far for any distance to be near
+        float distanceByFloor(const osg::Vec3f& a, const osg::Vec3f& b)
+        {
+            return onSameFloor(a, b) ? distanceAcross(a, b) : std::numeric_limits<float>::max();
         }
     }
 
@@ -497,8 +504,8 @@ namespace OFMechanics
                     mind.mPtr, osg::Vec3f(position.rot[0], position.rot[1], turned), OFBase::RotationFlag_none);
         }
 
-        /// One frame of walking to the place. The actor is there within `arrival` units of the place (0: at it), and may
-        /// run.
+        /// One frame of walking to the place. The actor is there within `arrival` units of the place (0: at it) and on
+        /// its floor, and may run.
         Walk walkTo(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination, float duration,
             float arrival = 0.f, bool run = false)
         {
@@ -719,7 +726,7 @@ namespace OFMechanics
                         stopWalking(mind);
                         break;
                     }
-                    const float away = distanceAcross(mind.position(), target);
+                    const float away = distanceByFloor(mind.position(), target);
                     if (!falloutFollowMoves(away, mind.mFollowing.mDistance, mind.mWalking))
                     {
                         if (mind.mWalking)
