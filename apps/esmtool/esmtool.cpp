@@ -163,7 +163,7 @@ Allowed options)");
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
                 || info.mode == "survey" || info.mode == "references" || info.mode == "equipment"
-                || info.mode == "packages"))
+                || info.mode == "packages" || info.mode == "creatures"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
