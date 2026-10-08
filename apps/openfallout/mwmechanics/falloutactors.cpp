@@ -56,6 +56,8 @@ namespace OFMechanics
         constexpr float groundProbeDown = 160.f;
         // An actor waits for the player to move out of the way when it would come this close
         constexpr float yieldDistance = 70.f;
+        // ... unless the player is this far above or below it: a player upstairs is not in the way
+        constexpr float yieldHeight = 64.f;
         // An actor that has not come this fraction of the distance that it should have for this long is stuck
         constexpr float progressInterval = 1.5f;
         constexpr float progressFraction = 0.3f;
@@ -460,7 +462,8 @@ namespace OFMechanics
 
             // The player is in the way: wait where it is
             const float toPlayer = distanceAcross(place, frame.mPlayer);
-            if (toPlayer < yieldDistance && toPlayer < distanceAcross(position, frame.mPlayer))
+            if (std::abs(place.z() - frame.mPlayer.z()) < yieldHeight && toPlayer < yieldDistance
+                && toPlayer < distanceAcross(position, frame.mPlayer))
             {
                 mind.mYielded = true;
                 return Walk::Moving;
