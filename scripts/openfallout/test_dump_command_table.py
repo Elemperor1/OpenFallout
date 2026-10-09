@@ -93,6 +93,16 @@ class DumpCommandTableTest(unittest.TestCase):
         self.assertNotEqual(result, 0)
         self.assertEqual(rows, [])
 
+    def test_a_section_that_is_longer_than_the_file_does_not_break_it(self):
+        data = bytearray(build_executable())
+        # the section header says the section holds a thousand bytes more than the file has
+        section_header = 0x84 + 20 + 224
+        size = struct.unpack_from("<I", data, section_header + 16)[0]
+        struct.pack_into("<I", data, section_header + 16, size + 1000)
+        result, rows = self.dump(bytes(data))
+        self.assertEqual(result, 0)
+        self.assertEqual([r[2] for r in rows], ["Activate", "GetStage", "SetStage"])
+
     def test_refuses_what_is_not_an_executable(self):
         with self.assertRaises(SystemExit):
             self.dump(b"not an executable at all")

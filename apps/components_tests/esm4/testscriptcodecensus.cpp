@@ -194,6 +194,28 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("1d 00 00 00 [40 00 00 00"));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, doesNotCheckTheNestingOfAScriptThatStoppedAtAnError)
+    {
+        // A block is open and the script stops at a code that is nothing: the End and EndIf are not missing, they were
+        // not reached
+        std::string beginData;
+        put16(beginData, 0);
+        append<std::uint32_t>(beginData, 0);
+        std::string ifData;
+        put16(ifData, 0);
+        put16(ifData, 1);
+        ifData += '1';
+        ESM4::ScriptCodeCensus census;
+        collect(census,
+            scriptRecord(
+                0x1001, statement(0x1D) + statement(0x10, beginData) + statement(0x16, ifData) + statement(0x40)));
+
+        EXPECT_EQ(census.getHolders().at("SCPT").mFailed, 1u);
+        EXPECT_THAT(census.getStructure(), IsEmpty());
+        EXPECT_EQ(census.getBeginJumps().mTotal, 0u);
+        EXPECT_EQ(census.getIfJumps().mTotal, 0u);
+    }
+
     TEST(ESM4ScriptCodeCensusTest, reportsABlockThatIsNotClosed)
     {
         ESM4::ScriptCodeCensus census;

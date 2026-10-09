@@ -144,9 +144,10 @@ def read_entry(pe, offset, stride):
 def find_tables(pe, stride, minimum):
     """Runs of entries one stride apart. Returns a list of lists of Entry."""
     found = {}
-    for _, start, size, raw_pointer, raw_size in pe.sections:
-        # The tables are data: skip sections that hold only code
-        for offset in range(raw_pointer, raw_pointer + raw_size - stride + 1, 4):
+    for _, _, _, raw_pointer, raw_size in pe.sections:
+        # A section can say it holds more bytes than the file has
+        end = min(raw_pointer + raw_size, len(pe.data))
+        for offset in range(raw_pointer, end - stride + 1, 4):
             if offset in found:
                 continue
             # a cheap test before the full one: the first word must point into the image

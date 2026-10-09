@@ -445,8 +445,51 @@ namespace
         {
             const Program program = decodeText(code.substr(0, size));
             if (size == code.size())
+            {
                 EXPECT_EQ(program.mError, Error::None) << errorText(program.mError);
+            }
         }
+    }
+
+    TEST(ESM4ScriptCodeTest, aStatementThatFailsLeavesNoTokensOrCallsBehind)
+    {
+        // a valid number and a command, then a byte that is no token
+        const std::string expression = std::string("1 ") + call(firstCommand + 5, "ab") + "#";
+        const std::string code = scriptName + statement(Statement_SetTo, assignment(variable('s', 1), expression));
+        const Program program = decodeText(code);
+
+        EXPECT_EQ(program.mError, Error::BadExpression);
+        EXPECT_EQ(program.mStatements.size(), 1u);
+        EXPECT_THAT(program.mTokens, IsEmpty());
+        EXPECT_THAT(program.mCalls, IsEmpty());
+    }
+
+    TEST(ESM4ScriptCodeTest, theTokensOfStatementsThatDecodedStayWhenALaterOneFails)
+    {
+        const std::string good = statement(Statement_SetTo, assignment(variable('s', 1), "1 "));
+        const std::string bad = statement(Statement_SetTo, assignment(variable('s', 1), "2 #"));
+        const Program program = decodeText(scriptName + good + bad);
+
+        EXPECT_EQ(program.mError, Error::BadExpression);
+        EXPECT_EQ(program.mStatements.size(), 2u);
+        ASSERT_EQ(program.mTokens.size(), 1u);
+        EXPECT_EQ(program.mTokens[0].mNumber, 1);
+    }
+
+    TEST(ESM4ScriptCodeTest, aVariableOfAnotherScriptCountsFromOne)
+    {
+        // r <reference 2> s 0: the script of the reference is not known, but there is no variable 0 in any
+        const std::string inExpression
+            = scriptName + statement(Statement_SetTo, assignment(variable('s', 1), variable('s', 0, 2)));
+        EXPECT_EQ(decodeText(inExpression).mError, Error::BadVariable);
+
+        const std::string asTarget = scriptName + statement(Statement_SetTo, assignment(variable('s', 0, 2), "1 "));
+        EXPECT_EQ(decodeText(asTarget).mError, Error::BadVariable);
+
+        // an index above the variables of this script is fine for another script
+        const std::string far
+            = scriptName + statement(Statement_SetTo, assignment(variable('s', 1), variable('s', 40, 2)));
+        EXPECT_EQ(decodeText(far).mError, Error::None);
     }
 
     TEST(ESM4ScriptCodeTest, describesEveryError)

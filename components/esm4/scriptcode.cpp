@@ -104,8 +104,9 @@ namespace ESM4::ScriptCode
                     return fail(Error::Truncated, start);
                 out.mType = type == 'f' ? 'f' : 's';
                 out.mIndex = u16(position + 1);
-                // A variable of another script can not be checked against the variables of this one
-                if (out.mRemote == 0 && (out.mIndex < 1 || out.mIndex > mLimits.mVariables))
+                // A variable of another script can not be checked against the variables of this one, but an index
+                // counts from 1 in any script
+                if (out.mIndex < 1 || (out.mRemote == 0 && out.mIndex > mLimits.mVariables))
                     return fail(Error::BadVariable, start, out.mIndex);
                 position += 3;
                 return true;
@@ -152,8 +153,10 @@ namespace ESM4::ScriptCode
                             token.mVariable.mRemote = haveRemote ? remote : 0;
                             token.mVariable.mType = c == 'f' ? 'f' : 's';
                             token.mVariable.mIndex = u16(position + 1);
-                            if (!haveRemote
-                                && (token.mVariable.mIndex < 1 || token.mVariable.mIndex > mLimits.mVariables))
+                            // The variable of another script can not be checked against the variables of this one,
+                            // but an index counts from 1 in any script
+                            if (token.mVariable.mIndex < 1
+                                || (!haveRemote && token.mVariable.mIndex > mLimits.mVariables))
                                 return fail(Error::BadVariable, tokenStart, token.mVariable.mIndex);
                             position += 3;
                             haveRemote = false;
@@ -322,6 +325,8 @@ namespace ESM4::ScriptCode
             // Decodes the statement that starts at `start` and returns where the next one starts.
             std::size_t statement(std::size_t start)
             {
+                const std::size_t tokensAtStart = mProgram.mTokens.size();
+                const std::size_t callsAtStart = mProgram.mCalls.size();
                 if (mCode.size() - start < 4)
                 {
                     fail(Error::Truncated, start);
@@ -485,7 +490,12 @@ namespace ESM4::ScriptCode
                 }
 
                 if (!ok)
+                {
+                    // What the statement read before it failed belongs to no statement
+                    mProgram.mTokens.resize(tokensAtStart);
+                    mProgram.mCalls.resize(callsAtStart);
                     return mCode.size();
+                }
                 mProgram.mStatements.push_back(std::move(statement));
                 return end;
             }

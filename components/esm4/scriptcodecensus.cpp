@@ -361,7 +361,10 @@ namespace ESM4
         for (const std::uint16_t opcode : called)
             ++mCommands[opcode].mScripts;
 
-        checkStructure(program);
+        // A script that stopped at an error holds the statements before it only, so its blocks and conditions are
+        // not closed and its jumps lead nowhere
+        if (program.mError == Error::None)
+            checkStructure(program);
     }
 
     void ScriptCodeCensus::collect(Reader& reader)
