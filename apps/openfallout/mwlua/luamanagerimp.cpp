@@ -26,8 +26,11 @@
 #include <components/lua_ui/registerscriptsettings.hpp>
 #include <components/lua_ui/util.hpp>
 
+#include "../mwbase/environment.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+
+#include "../mwscript/falloutscripts.hpp"
 
 #include "../mwrender/bonegroup.hpp"
 #include "../mwrender/postprocessor.hpp"
@@ -612,6 +615,13 @@ namespace OFLua
 
             mGlobalScripts.onProjectileHit(projectile, hitResult);
         });
+    }
+
+    void LuaManager::objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
+        // The script of a Fallout object has its say first; the scripts of Lua are told as before
+        OFBase::Environment::get().getFalloutScripts()->activated(object, actor);
+        mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 
     void LuaManager::useItem(const OFWorld::Ptr& object, const OFWorld::Ptr& actor, bool force)

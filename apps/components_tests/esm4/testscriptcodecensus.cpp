@@ -92,10 +92,10 @@ namespace
         return record("SCPT", id, data);
     }
 
-    void collect(ESM4::ScriptCodeCensus& census, const std::string& records)
+    void collect(ESM4::ScriptCodeCensus& census, const std::string& records, std::string_view group = "SCPT")
     {
         ESM4::Reader reader(
-            std::make_unique<std::istringstream>(header() + topGroup("SCPT", records)), "base.esm", nullptr, nullptr);
+            std::make_unique<std::istringstream>(header() + topGroup(group, records)), "base.esm", nullptr, nullptr);
         reader.setModIndex(0);
         census.collect(reader);
         EXPECT_THAT(census.getFatalErrors(), IsEmpty());
@@ -455,6 +455,61 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("0x1010 TakeNumbers"));
         EXPECT_THAT(out.str(), HasSubstr("0x1011 TakeForm"));
         EXPECT_THAT(out.str(), HasSubstr("badref:1"));
+    }
+
+    // A condition of 28 bytes: the type, the value to compare with, the function, two parameters, the run on and the
+    // reference
+    std::string condition(std::uint32_t function, std::uint32_t param1, std::uint32_t param2, std::uint32_t reference)
+    {
+        std::string data;
+        append<std::uint32_t>(data, 0);
+        append<float>(data, 1.0f);
+        append(data, function);
+        append(data, param1);
+        append(data, param2);
+        append<std::uint32_t>(data, reference != 0 ? 2 : 0);
+        append(data, reference);
+        return subRecord("CTDA", data);
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, countsTheFunctionsOfTheConditionsOfAQuest)
+    {
+        // a condition before the first stage, two on the entry of a stage and one on the target of an objective
+        std::string data = zString("EDID", "OFTestQuest") + condition(58, 0x1234, 0, 0)
+            + subRecord("INDX", std::string("\x0a\0", 2)) + subRecord("QSDT", std::string(1, '\0'))
+            + condition(58, 0x1235, 0, 0) + condition(59, 0x1234, 10, 0x1400)
+            + subRecord("QOBJ", std::string("\x05\0\0\0", 4)) + zString("NNAM", "Go there")
+            + subRecord("QSTA", std::string("\x40\x14\0\0\0\0\0\0", 8)) + condition(77, 0, 0, 0);
+
+        ESM4::ScriptCodeCensus census;
+        census.setCommandLookup([](std::uint16_t opcode) {
+            static const std::vector<ESM4::ScriptCode::Parameter> parameters{ { 14, false } };
+            ESM4::ScriptCodeCensus::CommandSignature signature;
+            if (opcode == 0x103A || opcode == 0x103B)
+            {
+                signature.mName = opcode == 0x103A ? "GetStage" : "GetStageDone";
+                signature.mParameters = &parameters;
+            }
+            return signature;
+        });
+        collect(census, record("QUST", 0x1001, data), "QUST");
+
+        const auto& functions = census.getConditionFunctions();
+        ASSERT_EQ(functions.size(), 3u);
+        EXPECT_EQ(functions.at(58).mUses, 2u);
+        EXPECT_EQ(functions.at(58).mFirstParameter, 2u);
+        EXPECT_EQ(functions.at(58).mSecondParameter, 0u);
+        EXPECT_EQ(functions.at(59).mUses, 1u);
+        EXPECT_EQ(functions.at(59).mSecondParameter, 1u);
+        EXPECT_EQ(functions.at(59).mOnReference, 1u);
+        EXPECT_EQ(functions.at(77).mUses, 1u);
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("Conditions of quests, terminals, packages and perks: 4 naming 3 functions"));
+        EXPECT_THAT(out.str(), HasSubstr("functions the table of commands does not have: 1 (1 conditions)"));
+        EXPECT_THAT(out.str(), HasSubstr("GetStage"));
+        EXPECT_THAT(out.str(), HasSubstr("(not in the table)"));
     }
 
     TEST(ESM4ScriptCodeCensusTest, readsNoArgumentsWithoutATableOfCommands)

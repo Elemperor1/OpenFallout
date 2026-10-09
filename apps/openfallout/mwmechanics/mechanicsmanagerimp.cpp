@@ -853,6 +853,11 @@ namespace OFMechanics
         mFalloutActors.stopFollowing(actor);
     }
 
+    void MechanicsManager::evaluateFalloutPackages(const OFWorld::Ptr& actor)
+    {
+        mFalloutActors.evaluate(actor);
+    }
+
     bool MechanicsManager::isAIActive()
     {
         return mAI;

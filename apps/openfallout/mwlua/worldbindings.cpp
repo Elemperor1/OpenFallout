@@ -40,6 +40,7 @@
 #include "context.hpp"
 #include "corebindings.hpp"
 #include "mwscriptbindings.hpp"
+#include "questbindings.hpp"
 
 namespace OFLua
 {
@@ -163,6 +164,7 @@ namespace OFLua
         addWorldTimeBindings(api, context);
         addCellGetters(api, context);
         api["mwscript"] = initMWScriptBindings(context);
+        addQuestBindings(api, context);
 
         ObjectLists* objectLists = context.mObjectLists;
         api["activeActors"] = GObjectList{ objectLists->getActorsInScene() };

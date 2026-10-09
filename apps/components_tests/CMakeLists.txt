@@ -84,6 +84,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testchallenge.cpp
     esm4/testclimate.cpp
     esm4/testcombatstyle.cpp
+    esm4/testconditionparams.cpp
     esm4/testcreature.cpp
     esm4/testcreaturecensus.cpp
     esm4/testcreaturemodel.cpp
@@ -141,6 +142,14 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmorcensus.cpp
 
     falloutscript/testcommandtable.cpp
+    falloutscript/testconditions.cpp
+    falloutscript/testmessagecommands.cpp
+    falloutscript/testinterpreter.cpp
+    falloutscript/testobjects.cpp
+    falloutscript/testpackagecommands.cpp
+    falloutscript/testquests.cpp
+    falloutscript/testscript.cpp
+    falloutscript/testvanillacommands.cpp
     fx/lexer.cpp
     fx/technique.cpp
 

@@ -60,6 +60,19 @@ namespace OFClass
             return res;
         }
 
+        /// The script a base record names (SCRI), 0 for a record that has none. The record of ammunition calls it
+        /// `mScript`, the others `mScriptId`.
+        template <class Record>
+        std::uint32_t scriptOf(const Record& record)
+        {
+            if constexpr (requires { record.mScriptId; })
+                return record.mScriptId.isZeroOrUnset() ? 0 : record.mScriptId.toUint32();
+            else if constexpr (requires { record.mScript; })
+                return record.mScript.isZeroOrUnset() ? 0 : record.mScript.toUint32();
+            else
+                return 0;
+        }
+
         // TODO: Figure out a better way to find markers and LOD meshes
         inline bool isMarkerModel(std::string_view model)
         {
@@ -107,6 +120,11 @@ namespace OFClass
         }
 
         bool hasToolTip(const OFWorld::ConstPtr& ptr) const override { return false; }
+
+        std::uint32_t getFalloutScript(const OFWorld::ConstPtr& ptr) const override
+        {
+            return ESM4Impl::scriptOf(*ptr.get<Record>()->mBase);
+        }
 
         std::string_view getName(const OFWorld::ConstPtr& ptr) const override { return {}; }
 

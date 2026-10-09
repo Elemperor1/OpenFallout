@@ -46,6 +46,7 @@
 #include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/npcstats.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwscript/globalscripts.hpp"
 
 #include "quicksavemanager.hpp"
@@ -62,6 +63,8 @@ void OFState::StateManager::cleanup(bool force)
         OFBase::Environment::get().getWorld()->clear();
         OFBase::Environment::get().getInputManager()->clear();
         OFBase::Environment::get().getMechanicsManager()->clear();
+        // The objects it kept were in the cells of the world that is gone
+        OFBase::Environment::get().getFalloutScripts()->reset();
 
         mCharacterManager.setCurrentCharacter(nullptr);
         mTimePlayed = 0;
@@ -172,6 +175,7 @@ void OFState::StateManager::newGame(bool bypass)
     {
         Log(Debug::Info) << "Starting a new game";
         OFBase::Environment::get().getScriptManager()->getGlobalScripts().addStartup();
+        OFBase::Environment::get().getFalloutScripts()->reset();
         OFBase::Environment::get().getWorld()->startNewGame(bypass);
 
         mState = State_Running;
@@ -453,6 +457,8 @@ void OFState::StateManager::loadGame(const Character* character, const std::file
     try
     {
         cleanup();
+        // The state of the scripts of Fallout is not in the saves yet: the game starts from the quests as they begin
+        OFBase::Environment::get().getFalloutScripts()->reset();
 
         Log(Debug::Info) << "Reading save file " << filepath.filename();
 

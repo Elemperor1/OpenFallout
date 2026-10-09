@@ -413,7 +413,7 @@ namespace
     }
 
     /// Verify quest stages retain separate log entries, scripts, text, conditions and next quests.
-    /// Quest conditions stay separate and objective conditions are skipped.
+    /// Quest conditions stay separate from those of the objective targets.
     TEST(ESM4QuestTest, putsConditionsTextAndScriptsInTheLogEntryTheyBelongTo)
     {
         const std::string firstCode("\x01\x02\x03", 3);
@@ -487,6 +487,73 @@ namespace
         ASSERT_EQ(other.mLogEntries[0].mScript.references.size(), 1u);
         EXPECT_TRUE(other.mLogEntries[0].mScript.references[0].isVariable);
         EXPECT_TRUE(other.mLogEntries[0].mScript.isConsistent());
+
+        // The condition after the target is the target's, not the quest's
+        ASSERT_EQ(quest.mObjectives.size(), 1u);
+        ASSERT_EQ(quest.mObjectives[0].mTargets.size(), 1u);
+        ASSERT_EQ(quest.mObjectives[0].mTargets[0].mTargetConditions.size(), 1u);
+        EXPECT_EQ(quest.mObjectives[0].mTargets[0].mTargetConditions[0].functionIndex, 300u);
+    }
+
+    std::string objectiveTarget(std::uint32_t reference, std::uint8_t flags)
+    {
+        std::string target;
+        append<std::uint32_t>(target, reference);
+        append<std::uint8_t>(target, flags);
+        append<std::uint8_t>(target, 0);
+        append<std::uint16_t>(target, 0);
+        return subRecord("QSTA", target);
+    }
+
+    /// Verify the objectives keep their index, text and targets, and the conditions go to the target before them.
+    TEST(ESM4QuestTest, readsTheObjectivesWithTheirTargets)
+    {
+        const std::string data = zString("EDID", "Quest") + questData() + valueSubRecord<std::int32_t>("QOBJ", 10)
+            + zString("NNAM", "Find the doctor") + objectiveTarget(0x000a0009, 1) + condition(11) + condition(12)
+            + objectiveTarget(0x000a000a, 0) + valueSubRecord<std::int32_t>("QOBJ", 20) + zString("NNAM", "Come back")
+            + objectiveTarget(0x000a000b, 0) + valueSubRecord<std::int32_t>("QOBJ", 30)
+            + zString("NNAM", "Nothing to see");
+
+        const std::vector<ESM4::Quest> quests = loadRecords<ESM4::Quest>("QUST", record("QUST", 1, data));
+
+        ASSERT_EQ(quests.size(), 1u);
+        const ESM4::Quest& quest = quests.front();
+        EXPECT_TRUE(quest.mTargetConditions.empty());
+        ASSERT_EQ(quest.mObjectives.size(), 3u);
+
+        const ESM4::QuestObjective& first = quest.mObjectives[0];
+        EXPECT_EQ(first.mIndex, 10);
+        EXPECT_EQ(first.mText, "Find the doctor");
+        ASSERT_EQ(first.mTargets.size(), 2u);
+        EXPECT_EQ(first.mTargets[0].mTarget.mIndex, 0x0a0009u);
+        EXPECT_EQ(first.mTargets[0].mFlags, static_cast<std::uint8_t>(ESM4::QuestTarget::Flag_IgnoresLocks));
+        ASSERT_EQ(first.mTargets[0].mTargetConditions.size(), 2u);
+        EXPECT_EQ(first.mTargets[0].mTargetConditions[0].functionIndex, 11u);
+        EXPECT_EQ(first.mTargets[0].mTargetConditions[1].functionIndex, 12u);
+        EXPECT_EQ(first.mTargets[1].mTarget.mIndex, 0x0a000au);
+        EXPECT_TRUE(first.mTargets[1].mTargetConditions.empty());
+
+        EXPECT_EQ(quest.mObjectives[1].mIndex, 20);
+        EXPECT_EQ(quest.mObjectives[1].mText, "Come back");
+        ASSERT_EQ(quest.mObjectives[1].mTargets.size(), 1u);
+        EXPECT_EQ(quest.mObjectives[1].mTargets[0].mTarget.mIndex, 0x0a000bu);
+
+        EXPECT_EQ(quest.mObjectives[2].mIndex, 30);
+        EXPECT_TRUE(quest.mObjectives[2].mTargets.empty());
+    }
+
+    /// Verify an objective of another layout (a QOBJ that is not four bytes, as in Skyrim) is skipped with what follows
+    /// it, and that a target that is not eight bytes is skipped without taking the conditions of the quest.
+    TEST(ESM4QuestTest, skipsObjectivesInAnotherLayout)
+    {
+        const std::string data = zString("EDID", "Quest") + questData() + valueSubRecord<std::uint16_t>("QOBJ", 5)
+            + zString("NNAM", "A Skyrim objective") + valueSubRecord<std::uint32_t>("QSTA", 7) + condition(1);
+
+        const std::vector<ESM4::Quest> quests = loadRecords<ESM4::Quest>("QUST", record("QUST", 1, data));
+
+        ASSERT_EQ(quests.size(), 1u);
+        EXPECT_TRUE(quests[0].mObjectives.empty());
+        EXPECT_TRUE(quests[0].mTargetConditions.empty());
     }
 
     /// Verify a stage index above 32767 is kept as it is, not read as a negative number.

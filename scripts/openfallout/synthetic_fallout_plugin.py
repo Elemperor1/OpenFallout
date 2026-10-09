@@ -19,6 +19,9 @@ marker and turns the way the marker faces (the first package of its list is for 
 time of day the game starts at), one that has no package and must stay where it is put, and one that goes about the
 place where it was put.
 Two more follow the player: one by a package (Follow, the player as the target) and one that a script tells to.
+Two more, far to the south, have packages that depend on scripts: one has two packages with conditions on quest C (one
+that never holds, one that holds once the test has set a stage of the quest), and one has none until the script of the
+scripted object gives it one (AddScriptPackage).
 It holds no Bethesda data. The mesh is an OpenSceneGraph text file, a cube, which the engine can load beside the NIF
 files of the games.
 
@@ -34,6 +37,7 @@ import math
 import struct
 from pathlib import Path
 
+import fallout_script
 import havok_wall
 import idle_animation
 import placeholder_skeleton
@@ -98,7 +102,35 @@ FOLLOW_PACKAGE_ID = 0x83D
 FOLLOWER_ID = 0x83E
 COMPANION_ID = 0x83F
 FOLLOW_REF_IDS = {"follower": (0x840, 0x842), "companion": (0x841, 0x843)}
-LAST_ID = 0x843 # the largest form ID of the plugin, which the next object ID of its header follows
+COUNTER_ID = 0x844 # a global the quests change
+QUEST_A_ID = 0x845
+QUEST_B_ID = 0x846
+QUEST_SCRIPT_ID = 0x847
+# An activator with a script of an object (each kind of cell has its own, since a script names the references it works
+# on), the references that place it and the cube it disables, and the globals the script changes
+OBJECT_SCRIPT_IDS = {"interior": 0x848, "exterior": 0x849}
+SCRIPTED_IDS = {"interior": 0x84A, "exterior": 0x84B}
+SCRIPTED_REF_IDS = {"interior": 0x84C, "exterior": 0x84D}
+VICTIM_REF_IDS = {"interior": 0x84E, "exterior": 0x84F}
+OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTestObjectFrames"),
+                  "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
+                  "victim": (0x854, "OFTestObjectVictimDisabled")}
+# Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
+# first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
+# stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
+# the scripted object gives it one when the cell is loaded (AddScriptPackage and EvaluatePackage).
+CONDITIONAL_IDS = {"interior": 0x855, "exterior": 0x856}
+SCRIPTED_WALKER_IDS = {"interior": 0x857, "exterior": 0x858}
+GATED_PACKAGE_IDS = {"interior": 0x859, "exterior": 0x85A}
+BLOCKED_PACKAGE_IDS = {"interior": 0x85B, "exterior": 0x85C}
+SCRIPT_PACKAGE_IDS = {"interior": 0x85D, "exterior": 0x85E}
+GATE_REF_IDS = {"conditional": (0x85F, 0x860), "gated": (0x861, 0x862), "blocked": (0x863, 0x864),
+                "scripted": (0x865, 0x866), "scripted_marker": (0x867, 0x868)}
+QUEST_C_ID = 0x869
+MESSAGE_ID = 0x86A # the message that the script of the scripted object shows when its cell is loaded
+LAST_ID = 0x86A # the largest form ID of the plugin, which the next object ID of its header follows
+SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
+VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -156,6 +188,13 @@ CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80
 # Positions are relative to where the player starts, as the creatures' are.
 PACKAGE_PLACES = {"target": (-500.0, -100.0), "night": (-900.0, -400.0), "walker": (-500.0, -400.0),
                   "idler": (-300.0, -700.0), "roamer": (-700.0, -700.0)}
+# The characters whose packages depend on scripts, and their markers (300 units north of where the characters start)
+GATE_PLACES = {"conditional": (-1200.0, -1200.0), "gated": (-1200.0, -900.0), "blocked": (-1500.0, -1200.0),
+               "scripted": (1200.0, -1200.0), "scripted_marker": (1200.0, -900.0)}
+GATE_FROM = 5.0 # the game time at which the test sets stage QUEST_C_STAGE of quest C, which the second package needs
+QUEST_C_NAME = "OFTestQuestC"
+QUEST_C_STAGE = 5
+QUEST_C_TEXT = "Gate opened"
 TARGET_YAW = math.pi / 2
 NIGHT_YAW = math.pi
 ROAM_RADIUS = 200
@@ -173,6 +212,28 @@ PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
 LOCATION_NEAR_REFERENCE = 0
 LOCATION_NEAR_EDITOR = 3
+# The quests: A starts with the game and its script counts the delays of the quest (QUEST_DELAY seconds each) and sets
+# stage 10 on the third. The result script of that stage sets stage 20 of B and adds COUNTER_ADDS to a global, and B
+# completes at that stage and completes an objective. The text of each stage goes to the journal.
+QUEST_A_NAME = "OFTestQuestA"
+QUEST_B_NAME = "OFTestQuestB"
+COUNTER_NAME = "OFTestCounter"
+QUEST_DELAY = 0.1
+QUEST_TICKS = 3
+COUNTER_ADDS = 7
+QUEST_A_STAGE = 10
+QUEST_B_STAGE = 20
+QUEST_OBJECTIVE = 5
+QUEST_A_TEXT = "Stage ten reached"
+QUEST_B_TEXT = "Stage twenty reached"
+MESSAGE_TEXT = "The object script was here"
+QUEST_NEVER_TEXT = "Never told"
+COUNTER_NEVER_ADDS = 1000
+GET_STAGE_FUNCTION = 58 # the number the games give GetStage in a condition
+CONDITION_AT_LEAST = 0x60 # the comparison "greater than or equal to" of a condition
+QUEST_OBJECTIVE_TEXT = "Do the thing"
+QUEST_FLAG_START_GAME = 0x01
+STAGE_FLAG_COMPLETE_QUEST = 0x01
 WORLD_NAME = "OFTestWorld"
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
@@ -380,12 +441,152 @@ def water_type():
                                            sub(b"FNAM", b"\x02"), sub(b"DATA", bytes(2)), sub(b"DNAM", visual)])
 
 
-def global_variable():
-    """A GLOB record, a float that is 0."""
-    return record(b"GLOB", GLOBAL_ID, [zstr(b"EDID", "OFTestWeatherGlobal"), sub(b"FNAM", b"f"),
-                                       sub(b"FLTV", struct.pack("<f", 0.0))])
+def global_variable(form_id=GLOBAL_ID, name="OFTestWeatherGlobal", kind=b"f", value=0.0):
+    """A GLOB record, by default a float that is 0 (a short or a long is `s` or `l`, and its value is a float too)."""
+    return record(b"GLOB", form_id, [zstr(b"EDID", name), sub(b"FNAM", kind), sub(b"FLTV", struct.pack("<f", value))])
 
 
+def quest_script():
+    """The script of quest A (an SCPT record): on every delay of the quest it adds one to `ticks`, and on the
+    QUEST_TICKS-th it sets stage 10 of the quest."""
+    script = fallout_script.Script(1)
+    ticks = script.variable("ticks")
+    quest = script.form(QUEST_A_ID)
+    script.add(
+        fallout_script.statement(fallout_script.SCRIPT_NAME),
+        fallout_script.block(fallout_script.GAME_MODE, b"".join([
+            fallout_script.set_to(fallout_script.variable(ticks),
+                                  fallout_script.variable(ticks) + fallout_script.number("1")
+                                  + fallout_script.operator("+")),
+            fallout_script.branch(fallout_script.IF, fallout_script.variable(ticks)
+                                  + fallout_script.number(str(QUEST_TICKS)) + fallout_script.operator("==")),
+            fallout_script.call(fallout_script.SET_STAGE, fallout_script.form_argument(quest),
+                                fallout_script.int_argument(QUEST_A_STAGE)),
+            fallout_script.statement(fallout_script.END_IF)])))
+    return record(b"SCPT", QUEST_SCRIPT_ID, [zstr(b"EDID", "OFTestQuestScript"), *fallout_script.sub_records(script)])
+
+
+def message():
+    """The MESG record that the scripted object shows: a text and no buttons."""
+    return record(b"MESG", MESSAGE_ID, [zstr(b"EDID", "OFTestMessage"), zstr(b"DESC", MESSAGE_TEXT),
+                                        sub(b"DNAM", struct.pack("<I", 0)), sub(b"TNAM", struct.pack("<f", 2.0))])
+
+
+def object_script(kind):
+    """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
+    disables the cube next to it and gives the scripted walker its package; every frame it counts the frames, measures its distance to
+    the player and keeps whether the cube is disabled; when activated it counts the activations by the player."""
+    sf = fallout_script
+    script = sf.Script(0)
+    index = ("interior", "exterior").index(kind)
+    victim = script.form(VICTIM_REF_IDS[kind])
+    player = script.form(PLAYER_REFERENCE)
+    walker = script.form(GATE_REF_IDS["scripted"][index])
+    walker_package = script.form(SCRIPT_PACKAGE_IDS[kind])
+    greeting = script.form(MESSAGE_ID)
+    loads, frames, activated, distance, disabled = (script.form(OBJECT_GLOBALS[name][0])
+                                                    for name in ("loads", "frames", "activated", "distance", "victim"))
+
+    def add_one(global_index):
+        return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
+                         + sf.operator("+"))
+
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.ON_LOAD, add_one(loads) + sf.call(sf.SHOW_MESSAGE, sf.form_argument(greeting))
+                 + sf.call_on(victim, sf.DISABLE)
+                 + sf.call_on(walker, sf.ADD_SCRIPT_PACKAGE, sf.form_argument(walker_package))
+                 + sf.call_on(walker, sf.EVALUATE_PACKAGE)),
+        sf.block(sf.GAME_MODE, b"".join([
+            add_one(frames),
+            sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
+            sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim))])),
+        sf.block(sf.ON_ACTIVATE, b"".join([
+            sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
+            add_one(activated),
+            sf.statement(sf.END_IF)])))
+    return record(b"SCPT", OBJECT_SCRIPT_IDS[kind], [zstr(b"EDID", "OFTestObjectScript" + kind.title()),
+                                                     *fallout_script.sub_records(script)])
+
+
+def scripted_object(kind):
+    """The activator with the script (an ACTI record with no model: nothing to see)."""
+    return record(b"ACTI", SCRIPTED_IDS[kind], [zstr(b"EDID", "OFTestScripted" + kind.title()),
+                                                sub(b"SCRI", struct.pack("<I", OBJECT_SCRIPT_IDS[kind]))])
+
+
+def object_refs(kind, origin):
+    """The references of the scripted object and of the cube its script disables, around the origin of the cell."""
+    x, y = origin
+    return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
+            refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2))]
+
+
+def stage_script(statements, references):
+    """The sub-records of the script that runs when a stage is set: a list of statements with no block."""
+    script = fallout_script.Script(1)
+    for form_id in references:
+        script.form(form_id)
+    script.add(*statements)
+    return fallout_script.sub_records(script)
+
+
+def condition(function, param1=0, param2=0, compare=0x00, value=0.0, flags=0):
+    """A CTDA sub-record as Fallout 3 and New Vegas write it, 28 bytes. `function` is the number the games give the
+    function (the code of its command less 0x1000), `compare` one of the six comparisons (0x00 equal, 0x20 not equal,
+    0x40 greater ...), and `flags` 0x01 for OR with the next condition."""
+    return sub(b"CTDA", struct.pack("<BxxxfIIIII", compare | flags, value, function, param1, param2, 0, 0))
+
+
+def quest(form_id, name, title, flags, entries, script=None, objective=None):
+    """A QUST record. Each entry is (stage, text, stage flags, conditions, result script statements, forms the result
+    script names): the log entries of a stage follow each other, and the conditions say which of them applies."""
+    subs = [zstr(b"EDID", name), zstr(b"FULL", title)]
+    if script is not None:
+        subs.append(sub(b"SCRI", struct.pack("<I", script)))
+    subs.append(sub(b"DATA", struct.pack("<BBHf", flags, 0, 0, QUEST_DELAY)))
+    stage = None
+    for index, text, stage_flags, conditions, result, references in entries:
+        if index != stage:
+            subs.append(sub(b"INDX", struct.pack("<H", index)))
+            stage = index
+        subs += [sub(b"QSDT", bytes([stage_flags])), *conditions, zstr(b"CNAM", text)]
+        subs += stage_script(result, references)
+    if objective is not None:
+        subs += [sub(b"QOBJ", struct.pack("<i", objective[0])), zstr(b"NNAM", objective[1])]
+    return record(b"QUST", form_id, subs)
+
+
+def quests():
+    """Quest A, quest B and quest C, in the order they are in the file."""
+    sf = fallout_script
+    # Stage 10 of A: set stage 20 of B, show its objective and add COUNTER_ADDS to the global
+    a_result = [
+        sf.call(sf.SET_STAGE, sf.form_argument(1), sf.int_argument(QUEST_B_STAGE)),
+        sf.call(sf.SET_OBJECTIVE_DISPLAYED, sf.form_argument(1), sf.int_argument(QUEST_OBJECTIVE),
+                sf.int_argument(1)),
+        sf.set_to(sf.global_target(2), sf.global_target(2) + sf.number(str(COUNTER_ADDS)) + sf.operator("+"))]
+    # Stage 20 of B has two log entries, which the conditions tell apart: the first applies when quest A is at its stage
+    # 10 (it is, as the script of A set it before this) and completes the quest and the objective. The second applies
+    # when quest A is at stage 99, which it never is: its text must stay out of the journal and its result script, which
+    # adds a thousand to the global, must not run.
+    b_result = [sf.call(sf.SET_OBJECTIVE_COMPLETED, sf.form_argument(1), sf.int_argument(QUEST_OBJECTIVE),
+                        sf.int_argument(1))]
+    never_result = [sf.set_to(sf.global_target(1), sf.global_target(1) + sf.number(str(COUNTER_NEVER_ADDS))
+                              + sf.operator("+"))]
+    a_at_ten = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=float(QUEST_A_STAGE))
+    a_at_ninety_nine = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=99.0)
+    return [
+        quest(QUEST_A_ID, QUEST_A_NAME, "OpenFallout Test Quest A", QUEST_FLAG_START_GAME,
+              [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID),
+        quest(QUEST_B_ID, QUEST_B_NAME, "OpenFallout Test Quest B", 0,
+              [(QUEST_B_STAGE, QUEST_B_TEXT, STAGE_FLAG_COMPLETE_QUEST, [a_at_ten], b_result, [QUEST_B_ID]),
+               (QUEST_B_STAGE, QUEST_NEVER_TEXT, 0, [a_at_ninety_nine], never_result, [COUNTER_ID])],
+              objective=(QUEST_OBJECTIVE, QUEST_OBJECTIVE_TEXT)),
+        # The quest that opens the gate of the packages: it has the one stage, which the test sets from Lua
+        quest(QUEST_C_ID, QUEST_C_NAME, "OpenFallout Test Quest C", 0,
+              [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], [], [])]),
+    ]
 def climate():
     """A CLMT record that lists the weather and one that needs a global that is 0, with the times of sunrise and
     sunset."""
@@ -476,16 +677,19 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True):
     return record(b"NPC_", form_id, subs)
 
 
-def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0):
+def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0,
+            conditions=()):
     """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
     location as a type, a form ID or 0 and a radius, the schedule (any month, any day, no date, the hour or 0xff for
-    any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout)."""
+    any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout),
+    then the conditions (CTDA sub-records) that must hold."""
     subs = [zstr(b"EDID", name), sub(b"PKDT", struct.pack("<IBBH", 0, kind, 0, 0))]
     if location is not None:
         subs.append(sub(b"PLDT", struct.pack("<iIi", *location, radius)))
     subs.append(sub(b"PSDT", struct.pack("<BBBBI", 0xff, 0xff, 0, time, duration)))
     if target is not None:
         subs.append(sub(b"PTDT", struct.pack("<iIif", *target, distance, 0.0)))
+    subs += conditions
     return record(b"PACK", form_id, subs)
 
 
@@ -499,6 +703,17 @@ def packages():
                                (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["night"][index]), 0, NIGHT_START, NIGHT_HOURS))
         records.append(package(TRAVEL_PACKAGE_IDS[kind], "OFTestTravel" + kind.capitalize(), PACKAGE_TRAVEL,
                                (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index]), TRAVEL_RADIUS))
+        # Quest C is at its stage when the test sets it (GATE_FROM): at least that stage, or stage 99 which it never has
+        gate_open = condition(GET_STAGE_FUNCTION, QUEST_C_ID, compare=CONDITION_AT_LEAST, value=float(QUEST_C_STAGE))
+        gate_never = condition(GET_STAGE_FUNCTION, QUEST_C_ID, compare=0x00, value=99.0)
+        records.append(package(BLOCKED_PACKAGE_IDS[kind], "OFTestBlocked" + kind.capitalize(), PACKAGE_TRAVEL,
+                               (LOCATION_NEAR_REFERENCE, GATE_REF_IDS["blocked"][index]), TRAVEL_RADIUS,
+                               conditions=[gate_never]))
+        records.append(package(GATED_PACKAGE_IDS[kind], "OFTestGated" + kind.capitalize(), PACKAGE_TRAVEL,
+                               (LOCATION_NEAR_REFERENCE, GATE_REF_IDS["gated"][index]), TRAVEL_RADIUS,
+                               conditions=[gate_open]))
+        records.append(package(SCRIPT_PACKAGE_IDS[kind], "OFTestScripted" + kind.capitalize(), PACKAGE_TRAVEL,
+                               (LOCATION_NEAR_REFERENCE, GATE_REF_IDS["scripted_marker"][index]), TRAVEL_RADIUS))
     return records
 
 
@@ -511,6 +726,10 @@ def package_people():
     people.append(person(ROAMER_ID, "OFTestRoamer", [ROAM_PACKAGE_ID], dressed=False))
     people.append(person(FOLLOWER_ID, "OFTestFollower", [FOLLOW_PACKAGE_ID], dressed=False))
     people.append(person(COMPANION_ID, "OFTestCompanion", dressed=False))
+    for kind in ("interior", "exterior"):
+        people.append(person(CONDITIONAL_IDS[kind], "OFTestConditional" + kind.capitalize(),
+                             [BLOCKED_PACKAGE_IDS[kind], GATED_PACKAGE_IDS[kind]], dressed=False))
+        people.append(person(SCRIPTED_WALKER_IDS[kind], "OFTestScriptedWalker" + kind.capitalize(), dressed=False))
     return people
 
 
@@ -524,7 +743,18 @@ def package_refs(index, origin):
         x, y = PACKAGE_PLACES[name]
         return (origin[0] + x, origin[1] + y, 0.0)
 
-    return [refr(ids["target"], TARGET_MARKER_ID, place("target"), rotation=(0.0, 0.0, TARGET_YAW)),
+    def gate_place(name):
+        x, y = GATE_PLACES[name]
+        return (origin[0] + x, origin[1] + y, 0.0)
+
+    gate_ids = {name: refs[index] for name, refs in GATE_REF_IDS.items()}
+    gate_refs = [achr(gate_ids["conditional"], gate_place("conditional"), CONDITIONAL_IDS[kind]),
+                 refr(gate_ids["gated"], TARGET_MARKER_ID, gate_place("gated"), rotation=(0.0, 0.0, TARGET_YAW)),
+                 refr(gate_ids["blocked"], TARGET_MARKER_ID, gate_place("blocked"), rotation=(0.0, 0.0, NIGHT_YAW)),
+                 achr(gate_ids["scripted"], gate_place("scripted"), SCRIPTED_WALKER_IDS[kind]),
+                 refr(gate_ids["scripted_marker"], TARGET_MARKER_ID, gate_place("scripted_marker"),
+                      rotation=(0.0, 0.0, TARGET_YAW))]
+    return gate_refs + [refr(ids["target"], TARGET_MARKER_ID, place("target"), rotation=(0.0, 0.0, TARGET_YAW)),
             refr(ids["night"], TARGET_MARKER_ID, place("night"), rotation=(0.0, 0.0, NIGHT_YAW)),
             achr(ids["walker"], place("walker"), WALKER_IDS[kind]), achr(ids["idler"], place("idler"), IDLER_ID),
             achr(ids["roamer"], place("roamer"), ROAMER_ID)] + [
@@ -622,6 +852,7 @@ def worldspace():
         *placed_creatures((half, half), {"beast": EXTERIOR_CREATURE_REF_ID, "user": EXTERIOR_CREATURE_USER_REF_ID,
                                          "list": EXTERIOR_CREATURE_LIST_REF_ID}),
         *package_refs(1, (half, half)),
+        *object_refs("exterior", (half, half)),
     ])
     children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [refs])
     water_children = group(struct.pack("<I", WATER_CELL_ID), 6, [
@@ -663,12 +894,18 @@ def plugin():
         *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
                                       "list": CREATURE_LIST_REF_ID}),
         *package_refs(0, (0.0, 0.0)),
+        *object_refs("interior", (0.0, 0.0)),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
-            + top_group(b"GLOB", [global_variable()])
+            + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values())])
+            + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
+            + top_group(b"MESG", [message()])
+            + top_group(b"SCPT", [quest_script(), object_script("interior"), object_script("exterior")])
+            + top_group(b"QUST", quests())
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])

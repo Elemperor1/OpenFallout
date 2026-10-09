@@ -5,6 +5,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "conditionparams.hpp"
+
 namespace ESM4
 {
     namespace
@@ -149,18 +151,12 @@ namespace ESM4
             value.runOn = 1;
         }
         adjustComparison(value);
+        adjustConditionParameters(mReader, value);
     }
 
     void RecordReader::adjustComparison(TargetCondition& value) const
     {
-        if ((value.condition & CTF_UseGlobal) != 0)
-        {
-            ESM::FormId32 global;
-            static_assert(sizeof(global) == sizeof(value.comparison));
-            std::memcpy(&global, &value.comparison, sizeof(global));
-            adjustReference(global);
-            std::memcpy(&value.comparison, &global, sizeof(global));
-        }
+        adjustConditionComparison(mReader, value);
     }
 
     void RecordReader::bytes(void* data, std::size_t count)
