@@ -165,6 +165,15 @@ class DumpCommandTableTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.dump(b"not an executable at all")
 
+    def test_refuses_an_executable_that_is_cut_short(self):
+        # cut inside each of the headers: the DOS header, the PE header, the optional header and the section headers
+        whole = build_executable()
+        for length in (2, 0x20, 0x40, 0x80, 0x86, 0x90, 0xA0, 0x84 + 20 + 30, 0x84 + 20 + 224, 0x84 + 20 + 224 + 20):
+            with self.subTest(length=length):
+                with self.assertRaises(SystemExit) as caught:
+                    self.dump(whole[:length])
+                self.assertIn("Windows executable", str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

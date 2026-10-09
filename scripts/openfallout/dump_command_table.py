@@ -39,30 +39,35 @@ import struct
 import sys
 
 
+def read(fmt, data, offset):
+    """struct.unpack_from, but a header that is cut short (a file that is not all there) ends the tool with a message."""
+    if offset < 0 or offset + struct.calcsize(fmt) > len(data):
+        raise SystemExit("not a Windows executable (a header is cut short)")
+    return struct.unpack_from(fmt, data, offset)
+
+
 class PE:
     def __init__(self, data):
         self.data = data
         if data[:2] != b"MZ":
             raise SystemExit("not a Windows executable (no MZ header)")
-        (pe_offset,) = struct.unpack_from("<I", data, 0x3C)
+        (pe_offset,) = read("<I", data, 0x3C)
         if data[pe_offset:pe_offset + 4] != b"PE\0\0":
             raise SystemExit("not a Windows executable (no PE header)")
         coff = pe_offset + 4
-        machine, sections, _, _, _, optional_size, _ = struct.unpack_from("<HHIIIHH", data, coff)
+        machine, sections, _, _, _, optional_size, _ = read("<HHIIIHH", data, coff)
         if machine != 0x14C:
             raise SystemExit("not a 32 bit executable (machine 0x%X)" % machine)
         optional = coff + 20
-        (magic,) = struct.unpack_from("<H", data, optional)
+        (magic,) = read("<H", data, optional)
         if magic != 0x10B:
             raise SystemExit("not a PE32 image")
-        (self.image_base,) = struct.unpack_from("<I", data, optional + 28)
-        (self.image_size,) = struct.unpack_from("<I", data, optional + 56)
+        (self.image_base,) = read("<I", data, optional + 28)
+        (self.image_size,) = read("<I", data, optional + 56)
         table = optional + optional_size
         self.sections = []
         for i in range(sections):
-            name, virtual_size, virtual_address, raw_size, raw_pointer = struct.unpack_from(
-                "<8sIIII", data, table + i * 40
-            )
+            name, virtual_size, virtual_address, raw_size, raw_pointer = read("<8sIIII", data, table + i * 40)
             self.sections.append(
                 (name.rstrip(b"\0").decode("ascii", "replace"), self.image_base + virtual_address,
                  max(virtual_size, raw_size) if raw_size else virtual_size, raw_pointer, raw_size)
