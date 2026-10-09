@@ -34,6 +34,10 @@ namespace EsmTool
     // Counts the armour that the characters of every Fallout file named in info.inputFiles wear, read in that order,
     // and prints one report.
     int wornTes4(const Arguments& info);
+
+    // Decodes the compiled scripts of every Fallout file named in info.inputFiles, read in that order, and prints
+    // counts of what they hold and of the scripts that do not decode.
+    int scriptCodeTes4(const Arguments& info);
 }
 
 #endif

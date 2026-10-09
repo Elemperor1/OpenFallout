@@ -127,6 +127,9 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testreferencecensus.cpp
     esm4/testreputation.cpp
     esm4/testscript.cpp
+    esm4/testscriptargs.cpp
+    esm4/testscriptcode.cpp
+    esm4/testscriptcodecensus.cpp
     esm4/testsleepdeprivationstage.cpp
     esm4/testspell.cpp
     esm4/testsurvey.cpp
@@ -137,6 +140,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmor.cpp
     esm4/testwornarmorcensus.cpp
 
+    falloutscript/testcommandtable.cpp
     fx/lexer.cpp
     fx/technique.cpp
 

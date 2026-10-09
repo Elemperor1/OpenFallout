@@ -346,6 +346,9 @@ add_component_dir (esm4
     reference
     referencecensus
     script
+    scriptargs
+    scriptcode
+    scriptcodecensus
     survey
     typetraits
     vertex
@@ -354,6 +357,10 @@ add_component_dir (esm4
     wornarmor
     wornarmorcensus
 )
+
+add_component_dir (falloutscript
+    commandtable
+    )
 
 add_component_dir (misc
     barrier budgetmeasurement color compression constants convert coordinateconverter display endianness float16 frameratelimiter
