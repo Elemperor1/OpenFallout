@@ -346,6 +346,7 @@ add_component_dir (esm4
     reference
     referencecensus
     script
+    scriptargs
     scriptcode
     scriptcodecensus
     survey
