@@ -156,6 +156,15 @@ namespace
         EXPECT_EQ(arguments.mValues[0].mVariable.mRemote, 0);
     }
 
+    TEST(ESM4ScriptArgsTest, aFormIsNotHeldByAnIntegerVariable)
+    {
+        Bytes bytes = call(1);
+        bytes.variable('s', 2);
+        const Arguments arguments = decode(bytes, { { TypeObjectRef, false } });
+        EXPECT_EQ(arguments.mError, ArgumentError::BadArgument);
+        EXPECT_THAT(arguments.mValues, IsEmpty());
+    }
+
     TEST(ESM4ScriptArgsTest, readsAStageAndAFormLikeSetStage)
     {
         Bytes bytes = call(2);

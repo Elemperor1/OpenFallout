@@ -242,7 +242,8 @@ namespace ESM4::ScriptCode
                 return true;
             }
 
-            // 'r' and a reference, or the local variable that holds one
+            // 'r' and a reference, or the local variable that holds one, which is written with an 'f' (the games read
+            // a form from those two and nothing else; an integer variable, 's', is no form)
             bool form(Argument& argument)
             {
                 if (left() < 1)
@@ -258,7 +259,7 @@ namespace ESM4::ScriptCode
                     mPosition += 3;
                     return true;
                 }
-                if (mCode[mPosition] != 'f' && mCode[mPosition] != 's')
+                if (mCode[mPosition] != 'f')
                     return fail(ArgumentError::BadArgument);
                 return variable(argument);
             }
