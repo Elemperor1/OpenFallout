@@ -26,6 +26,7 @@
 #include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
 #include <components/esm4/wornarmorcensus.hpp>
+#include <components/falloutscript/commandtable.hpp>
 #include <components/files/conversion.hpp>
 #include <components/files/openfile.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -830,11 +831,13 @@ namespace EsmTool
     /// Read every file named on the command line in the order given, with its mod index and the indices of its
     /// masters, into a census that has collect(Reader&), write(std::ostream&) and getFatalErrors(), and print what the
     /// census counted. `mode` names the mode in the message for a file that is not TES4-format and `counted` what the
-    /// census counted. Return 0 when every file was read to its end, or -1 if one could not be opened or read.
-    template <class Census>
-    int countTes4(const Arguments& info, const char* mode, const char* counted)
+    /// census counted. `prepare` gets the census before it reads. Return 0 when every file was read to its end, or -1
+    /// if one could not be opened or read.
+    template <class Census, class Prepare>
+    int countTes4(const Arguments& info, const char* mode, const char* counted, Prepare&& prepare)
     {
         Census census;
+        prepare(census);
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::calculateEncoding(info.encoding));
         std::map<std::string, int> nameToIndex;
         int result = 0;
@@ -880,6 +883,12 @@ namespace EsmTool
         return census.getFatalErrors().empty() ? result : -1;
     }
 
+    template <class Census>
+    int countTes4(const Arguments& info, const char* mode, const char* counted)
+    {
+        return countTes4<Census>(info, mode, counted, [](Census&) {});
+    }
+
     int referencesTes4(const Arguments& info)
     {
         return countTes4<ESM4::ReferenceCensus>(info, "References", "references");
@@ -907,6 +916,40 @@ namespace EsmTool
 
     int scriptCodeTes4(const Arguments& info)
     {
-        return countTes4<ESM4::ScriptCodeCensus>(info, "Script code", "compiled scripts");
+        FalloutScript::CommandTable commands;
+        if (!info.commandsFile.empty())
+        {
+            std::ifstream stream(info.commandsFile);
+            if (!stream)
+            {
+                std::cout << "Failed to open the commands file " << Files::pathToUnicodeString(info.commandsFile)
+                          << '\n';
+                return -1;
+            }
+            const FalloutScript::CommandCsvResult read = FalloutScript::readCommandTableCsv(stream, commands);
+            std::cout << "Read " << read.mCommands << " script commands from the commands file (" << read.mRows
+                      << " rows, " << read.mOther << " block types and console commands left out)\n";
+            for (const std::string& problem : read.mProblems)
+                std::cout << "  " << problem << '\n';
+            if (commands.size() == 0)
+            {
+                std::cout << "The commands file has no script commands\n";
+                return -1;
+            }
+        }
+        return countTes4<ESM4::ScriptCodeCensus>(
+            info, "Script code", "compiled scripts", [&commands, &info](ESM4::ScriptCodeCensus& census) {
+                if (info.commandsFile.empty())
+                    return;
+                census.setCommandLookup([&commands](std::uint16_t opcode) {
+                    ESM4::ScriptCodeCensus::CommandSignature signature;
+                    if (const FalloutScript::CommandInfo* command = commands.find(opcode))
+                    {
+                        signature.mName = command->mName;
+                        signature.mParameters = &command->mParameters;
+                    }
+                    return signature;
+                });
+            });
     }
 }

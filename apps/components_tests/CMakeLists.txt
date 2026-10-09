@@ -140,6 +140,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmor.cpp
     esm4/testwornarmorcensus.cpp
 
+    falloutscript/testcommandtable.cpp
     fx/lexer.cpp
     fx/technique.cpp
 

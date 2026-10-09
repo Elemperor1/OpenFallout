@@ -261,6 +261,59 @@ namespace ESM4
             return failure;
         }
 
+        const char* argumentErrorLabel(ScriptCode::ArgumentError error)
+        {
+            switch (error)
+            {
+                case ScriptCode::ArgumentError::Truncated:
+                    return "truncated";
+                case ScriptCode::ArgumentError::TooMany:
+                    return "toomany";
+                case ScriptCode::ArgumentError::BadReference:
+                    return "badref";
+                case ScriptCode::ArgumentError::BadVariable:
+                    return "badvar";
+                case ScriptCode::ArgumentError::BadArgument:
+                    return "badarg";
+                case ScriptCode::ArgumentError::InlineExpression:
+                    return "expression";
+                case ScriptCode::ArgumentError::None:
+                    break;
+            }
+            return "none";
+        }
+
+        // The bytes of a call as hexadecimal, the first few of them
+        std::string callBytes(const std::vector<std::uint8_t>& code, const ScriptCode::Call& call)
+        {
+            constexpr std::size_t most = 32;
+            std::ostringstream stream;
+            stream << std::hex << std::uppercase << std::setfill('0');
+            const std::size_t end
+                = std::min<std::size_t>(code.size(), static_cast<std::size_t>(call.mOffset) + call.mLength);
+            std::size_t shown = 0;
+            for (std::size_t at = call.mOffset; at < end && shown < most; ++at, ++shown)
+                stream << (shown == 0 ? "" : " ") << std::setw(2) << static_cast<int>(code[at]);
+            if (static_cast<std::size_t>(end) - call.mOffset > most)
+                stream << " ...";
+            return stream.str();
+        }
+
+        // The parameter types of a command: 1 for an integer, 5? for an optional actor value
+        std::string parameterText(const std::vector<ScriptCode::Parameter>& parameters)
+        {
+            std::string text;
+            for (const ScriptCode::Parameter& parameter : parameters)
+            {
+                if (!text.empty())
+                    text += ' ';
+                text += std::to_string(parameter.mType);
+                if (parameter.mOptional)
+                    text += '?';
+            }
+            return text.empty() ? "no parameters" : text;
+        }
+
         void writeFailures(std::ostream& stream, const std::vector<ScriptCodeCensus::Failure>& failures)
         {
             for (const ScriptCodeCensus::Failure& failure : failures)
@@ -380,6 +433,56 @@ namespace ESM4
         }
     }
 
+    void ScriptCodeCensus::checkArguments(const ScriptCode::Call& call, const std::string& holder, ESM::FormId record,
+        const ScriptDefinition& script, const ScriptCode::Limits& limits)
+    {
+        if (!mLookup)
+            return;
+        const CommandSignature signature = mLookup(call.mOpcode);
+        if (signature.mParameters == nullptr)
+        {
+            ++mUnknownCommands[call.mOpcode];
+            return;
+        }
+        ArgumentTally& tally = mArguments[call.mOpcode];
+        ++tally.mCalls;
+        const ScriptCode::Arguments arguments
+            = ScriptCode::decodeArguments(script.compiledScript, call, *signature.mParameters, limits);
+        if (arguments.mError != ScriptCode::ArgumentError::None)
+        {
+            ++tally.mErrors[arguments.mError];
+            const std::pair<std::uint16_t, ScriptCode::ArgumentError> key{ call.mOpcode, arguments.mError };
+            if (mArgumentExamples.count(key) != 0 || mArgumentExamples.size() < maxArgumentExampleKeys)
+            {
+                std::vector<Failure>& examples = mArgumentExamples[key];
+                if (examples.size() < maxArgumentExamples)
+                {
+                    Failure failure;
+                    failure.mHolder = holder;
+                    failure.mRecord = record;
+                    failure.mSize = call.mLength;
+                    failure.mOffset = arguments.mErrorOffset - call.mOffset;
+                    failure.mValue = call.mOpcode;
+                    failure.mBytes = callBytes(script.compiledScript, call);
+                    failure.mStatements = std::string(signature.mName) + " (" + parameterText(*signature.mParameters)
+                        + "), the call has " + std::to_string(arguments.mCount) + " arguments";
+                    examples.push_back(std::move(failure));
+                }
+            }
+            return;
+        }
+        ++tally.mDecoded;
+        if (arguments.mTrailing != 0)
+        {
+            ++tally.mTrailing;
+            tally.mMaxTrailing = std::max(tally.mMaxTrailing, arguments.mTrailing);
+        }
+        const std::size_t required = static_cast<std::size_t>(std::count_if(signature.mParameters->begin(),
+            signature.mParameters->end(), [](const ScriptCode::Parameter& parameter) { return !parameter.mOptional; }));
+        if (arguments.mCount < required)
+            ++tally.mFewer;
+    }
+
     void ScriptCodeCensus::addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script)
     {
         const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
@@ -444,6 +547,7 @@ namespace ESM4
                 use.mTotalArgumentBytes += call.mLength;
                 use.mMaxArgumentBytes = std::max(use.mMaxArgumentBytes, call.mLength);
                 called.insert(call.mOpcode);
+                checkArguments(call, holder, record, script, limits);
             }
         }
         for (const Token& token : program.mTokens)
@@ -480,6 +584,7 @@ namespace ESM4
                     use.mTotalArgumentBytes += call.mLength;
                     use.mMaxArgumentBytes = std::max(use.mMaxArgumentBytes, call.mLength);
                     called.insert(call.mOpcode);
+                    checkArguments(call, holder, record, script, limits);
                     break;
                 }
             }
@@ -579,6 +684,136 @@ namespace ESM4
         {
             // Raised by the reader while it walks record and group headers, so it holds offsets and sizes only.
             mFatalErrors.push_back(firstLine(e.what()));
+        }
+    }
+
+    void ScriptCodeCensus::writeArguments(std::ostream& stream) const
+    {
+        if (!mLookup)
+            return;
+        constexpr std::size_t countWidth = 9;
+        constexpr std::size_t listed = 60;
+        ArgumentTally all;
+        for (const auto& [opcode, tally] : mArguments)
+        {
+            all.mCalls += tally.mCalls;
+            all.mDecoded += tally.mDecoded;
+            all.mTrailing += tally.mTrailing;
+            all.mFewer += tally.mFewer;
+            for (const auto& [error, count] : tally.mErrors)
+                all.mErrors[error] += count;
+        }
+        std::size_t unknownCalls = 0;
+        for (const auto& [opcode, count] : mUnknownCommands)
+            unknownCalls += count;
+
+        stream << "\nArguments, read with the parameters each command has in the table\n";
+        stream << "  calls of commands the table has: " << all.mCalls << ", arguments decoded: " << all.mDecoded
+               << ", with bytes left over: " << all.mTrailing << ", with fewer arguments than required: " << all.mFewer
+               << '\n';
+        for (const auto& [error, count] : all.mErrors)
+            stream << "    " << ScriptCode::argumentErrorText(error) << ": " << count << '\n';
+        stream << "  calls of commands the table does not have: " << unknownCalls << " (" << mUnknownCommands.size()
+               << " different codes)\n";
+
+        auto name = [this](std::uint16_t opcode) { return std::string(mLookup(opcode).mName); };
+
+        std::vector<std::pair<std::size_t, std::uint16_t>> rows;
+        for (const auto& [opcode, tally] : mArguments)
+            if (tally.mCalls != tally.mDecoded)
+                rows.emplace_back(tally.mCalls - tally.mDecoded, opcode);
+        std::sort(rows.begin(), rows.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+        if (!rows.empty())
+        {
+            stream << "\nCommands with calls that do not decode: code, name, calls, decoded, then the problems\n";
+            for (std::size_t i = 0; i < rows.size() && i < listed; ++i)
+            {
+                const ArgumentTally& tally = mArguments.at(rows[i].second);
+                stream << "  " << hex(rows[i].second, 4) << ' ' << name(rows[i].second) << std::setw(countWidth)
+                       << tally.mCalls << std::setw(countWidth) << tally.mDecoded;
+                for (const auto& [error, count] : tally.mErrors)
+                    stream << "  " << argumentErrorLabel(error) << ':' << count;
+                stream << '\n';
+            }
+            if (rows.size() > listed)
+                stream << "  and " << rows.size() - listed << " more commands\n";
+            stream << "  (truncated: an argument runs past the data of the call, toomany: more arguments than "
+                      "parameters,\n"
+                      "  badref and badvar: an index out of range, badarg: no tag, expression: an inline expression)\n";
+        }
+
+        rows.clear();
+        for (const auto& [opcode, tally] : mArguments)
+            if (tally.mTrailing != 0)
+                rows.emplace_back(tally.mTrailing, opcode);
+        std::sort(rows.begin(), rows.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+        if (!rows.empty())
+        {
+            stream
+                << "\nCommands whose calls have bytes left after the arguments: code, name, calls, with bytes left,\n"
+                   "most bytes left\n";
+            for (std::size_t i = 0; i < rows.size() && i < listed; ++i)
+            {
+                const ArgumentTally& tally = mArguments.at(rows[i].second);
+                stream << "  " << hex(rows[i].second, 4) << ' ' << name(rows[i].second) << std::setw(countWidth)
+                       << tally.mCalls << std::setw(countWidth) << tally.mTrailing << std::setw(countWidth)
+                       << tally.mMaxTrailing << '\n';
+            }
+            if (rows.size() > listed)
+                stream << "  and " << rows.size() - listed << " more commands\n";
+        }
+
+        rows.clear();
+        for (const auto& [opcode, tally] : mArguments)
+            if (tally.mFewer != 0)
+                rows.emplace_back(tally.mFewer, opcode);
+        std::sort(rows.begin(), rows.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+        if (!rows.empty())
+        {
+            stream << "\nCommands called with fewer arguments than required: code, name, calls, such calls\n";
+            for (std::size_t i = 0; i < rows.size() && i < listed; ++i)
+            {
+                const ArgumentTally& tally = mArguments.at(rows[i].second);
+                stream << "  " << hex(rows[i].second, 4) << ' ' << name(rows[i].second) << std::setw(countWidth)
+                       << tally.mCalls << std::setw(countWidth) << tally.mFewer << '\n';
+            }
+        }
+
+        rows.clear();
+        for (const auto& [opcode, count] : mUnknownCommands)
+            rows.emplace_back(count, opcode);
+        std::sort(rows.begin(), rows.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+        if (!rows.empty())
+        {
+            stream << "\nCommands called that the table does not have: code, calls\n";
+            for (std::size_t i = 0; i < rows.size() && i < listed; ++i)
+                stream << "  " << hex(rows[i].second, 4) << std::setw(countWidth) << rows[i].first << '\n';
+            if (rows.size() > listed)
+                stream << "  and " << rows.size() - listed << " more codes\n";
+        }
+
+        if (!mArgumentExamples.empty())
+        {
+            stream
+                << "\nThe first calls that do not decode, by command and problem: record, form id, size of the call,\n"
+                   "offset of the problem in it and the first bytes of the call (the count, then the arguments)\n";
+            for (const auto& [key, examples] : mArgumentExamples)
+            {
+                stream << "  " << hex(key.first, 4) << ' ' << name(key.first) << ": "
+                       << ScriptCode::argumentErrorText(key.second) << '\n';
+                for (const Failure& failure : examples)
+                    stream << "    " << failure.mHolder << ' ' << failure.mRecord.toString() << ", " << failure.mSize
+                           << " bytes, offset " << failure.mOffset << ": " << failure.mBytes << "\n      "
+                           << failure.mStatements << '\n';
+            }
         }
     }
 
@@ -712,6 +947,8 @@ namespace ESM4
         stream << "  " << mCommands.size() << " different commands, " << commandStatements
                << " statements call one; codes from 0x1400 on (extensions of the script language) are used by "
                << nvseCommands << " (script, command) pairs\n";
+
+        writeArguments(stream);
 
         for (const std::string& error : mFatalErrors)
             stream << "\nFATAL ERROR: " << error << '\n';

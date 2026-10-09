@@ -80,8 +80,10 @@ Allowed modes:
   scriptcode Decodes the compiled scripts (SCDA) of one or more Fallout 3 or New
          Vegas files and counts the statements, blocks, commands and jumps
          they hold, and the scripts that do not decode. Give the files in load
-         order, masters first. Prints no script contents, except a few bytes
-         around the place where the first scripts that fail to decode stop.
+         order, masters first. With --commands it also decodes the arguments of
+         every call. Prints no script contents, except a few bytes around the
+         place where the first scripts that fail to decode stop, and the first
+         calls whose arguments do not decode.
   worn   Counts the armour that the characters of one or more Fallout 3 or New
          Vegas files wear, with the code the game uses: the inventory, the
          template, the levelled lists and which pieces show on the body. Give
@@ -108,6 +110,9 @@ Allowed options)");
         addOption("quiet,q", "Suppress all record information. Useful for speed tests.");
         addOption("loadcells,C", "Browse through contents of all cells.");
         addOption("failed", "Survey only the records that a loader rejects.  Only affects survey mode.");
+        addOption("commands", bpo::value<std::string>(),
+            "The CSV of the script commands of the game, which scripts/openfallout/dump_command_table.py writes.  Only "
+            "affects scriptcode mode.");
 
         addOption("encoding,e", bpo::value<std::string>(&(info.encoding))->default_value("win1252"),
             "Character encoding used in ESMTool:\n"
@@ -168,6 +173,8 @@ Allowed options)");
             info.types = variables["type"].as<std::vector<std::string>>();
         if (variables.count("name") > 0)
             info.name = variables["name"].as<std::string>();
+        if (variables.count("commands") > 0)
+            info.commandsFile = Files::pathFromUnicodeString(variables["commands"].as<std::string>());
 
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"

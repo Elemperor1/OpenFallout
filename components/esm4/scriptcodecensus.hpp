@@ -4,13 +4,16 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iosfwd>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "script.hpp"
+#include "scriptargs.hpp"
 #include "scriptcode.hpp"
 
 namespace ESM4
@@ -25,6 +28,10 @@ namespace ESM4
     // contents of a script (no names, strings, numbers or source text). The one exception is the first few scripts
     // that fail to decode: for each it names the record and keeps a few bytes around the place where the decoder
     // stopped, which is what it takes to see why.
+    //
+    // With a table of the commands (setCommandLookup) it also decodes the arguments of every call by the parameters of
+    // the command, and counts the calls whose arguments do not decode, per command and per kind of problem, with the
+    // bytes of the first few calls of each.
     //
     // The files must be read in load order, with the mod index and the indices of the masters set on the reader.
     class ScriptCodeCensus
@@ -90,6 +97,31 @@ namespace ESM4
         };
         static constexpr std::size_t maxFailuresPerError = 5;
         static constexpr std::size_t maxDifferences = 24;
+        static constexpr std::size_t maxArgumentExamples = 3; // calls kept for each command and kind of problem
+        static constexpr std::size_t maxArgumentExampleKeys = 80; // commands and kinds of problem that keep examples
+
+        // What the census needs to know of a command to check the arguments of its calls
+        struct CommandSignature
+        {
+            std::string_view mName;
+            // The parameters, or null when the table has no command of that code
+            const std::vector<ScriptCode::Parameter>* mParameters = nullptr;
+        };
+        using CommandLookup = std::function<CommandSignature(std::uint16_t opcode)>;
+
+        // How the calls of one command fared
+        struct ArgumentTally
+        {
+            std::size_t mCalls = 0;
+            std::size_t mDecoded = 0;
+            std::size_t mTrailing = 0; // decoded, with bytes left that no parameter takes
+            std::uint32_t mMaxTrailing = 0;
+            std::size_t mFewer
+                = 0; // decoded, with fewer arguments than the command has parameters that are not optional
+            std::map<ScriptCode::ArgumentError, std::size_t> mErrors;
+        };
+
+        void setCommandLookup(CommandLookup lookup) { mLookup = std::move(lookup); }
 
         void collect(Reader& reader);
 
@@ -103,6 +135,13 @@ namespace ESM4
         const std::map<std::uint16_t, CommandUse>& getCommands() const { return mCommands; }
         const std::map<std::string, std::size_t>& getStructure() const { return mStructure; }
         const std::map<std::string, std::vector<Failure>>& getStructureExamples() const { return mStructureExamples; }
+        const std::map<std::uint16_t, ArgumentTally>& getArguments() const { return mArguments; }
+        const std::map<std::uint16_t, std::size_t>& getUnknownCommands() const { return mUnknownCommands; }
+        const std::map<std::pair<std::uint16_t, ScriptCode::ArgumentError>, std::vector<Failure>>&
+        getArgumentExamples() const
+        {
+            return mArgumentExamples;
+        }
         const JumpTally& getBeginJumps() const { return mBeginJumps; }
         const JumpTally& getIfJumps() const { return mIfJumps; }
         const JumpTally& getElseIfJumps() const { return mElseIfJumps; }
@@ -114,6 +153,9 @@ namespace ESM4
         void addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script);
         void checkStructure(const ScriptCode::Program& program, const std::string& holder, ESM::FormId record,
             const ScriptDefinition& script);
+        void checkArguments(const ScriptCode::Call& call, const std::string& holder, ESM::FormId record,
+            const ScriptDefinition& script, const ScriptCode::Limits& limits);
+        void writeArguments(std::ostream& stream) const;
 
         std::map<std::string, HolderTotals> mHolders;
         std::map<std::string, std::size_t> mRecordsFailed;
@@ -129,6 +171,10 @@ namespace ESM4
         std::map<std::string, std::size_t> mOperators;
         std::map<std::string, std::size_t> mStructure; // problems with the nesting of blocks and conditions
         std::map<std::string, std::vector<Failure>> mStructureExamples; // the first scripts of each problem
+        CommandLookup mLookup;
+        std::map<std::uint16_t, ArgumentTally> mArguments;
+        std::map<std::uint16_t, std::size_t> mUnknownCommands; // calls of commands the table does not have, by code
+        std::map<std::pair<std::uint16_t, ScriptCode::ArgumentError>, std::vector<Failure>> mArgumentExamples;
         JumpTally mBeginJumps;
         JumpTally mIfJumps;
         JumpTally mElseIfJumps;

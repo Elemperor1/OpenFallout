@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -309,5 +310,103 @@ namespace
 
         EXPECT_EQ(census.getRecordsFailed().at("SCPT"), 1u);
         EXPECT_EQ(census.getHolders().at("SCPT").mScripts, 1u);
+    }
+
+    // The parameters of a few commands, by code: 0x1010 takes an integer and an optional integer, 0x1011 a reference
+    ESM4::ScriptCodeCensus::CommandLookup testCommands(
+        const std::vector<ESM4::ScriptCode::Parameter>& integers, const std::vector<ESM4::ScriptCode::Parameter>& form)
+    {
+        return [&integers, &form](std::uint16_t opcode) {
+            ESM4::ScriptCodeCensus::CommandSignature signature;
+            if (opcode == 0x1010)
+            {
+                signature.mName = "TakeNumbers";
+                signature.mParameters = &integers;
+            }
+            else if (opcode == 0x1011)
+            {
+                signature.mName = "TakeForm";
+                signature.mParameters = &form;
+            }
+            return signature;
+        };
+    }
+
+    std::string integerArgument(std::int32_t value)
+    {
+        std::string result(1, 'n');
+        append(result, value);
+        return result;
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, readsTheArgumentsOfCallsByTheParametersOfTheirCommands)
+    {
+        const std::vector<ESM4::ScriptCode::Parameter> integers{ { 1, false }, { 1, true } };
+        const std::vector<ESM4::ScriptCode::Parameter> form{ { 14, false } };
+        std::string call;
+        put16(call, 1);
+        call += integerArgument(5);
+        std::string twoNumbers;
+        put16(twoNumbers, 2);
+        twoNumbers += integerArgument(5) + integerArgument(6);
+        std::string tooMany;
+        put16(tooMany, 3);
+        tooMany += integerArgument(5) + integerArgument(6) + integerArgument(7);
+        std::string badReference;
+        put16(badReference, 1);
+        badReference += 'r';
+        put16(badReference, 4);
+        std::string extra = twoNumbers + std::string(3, 'x');
+        std::string none;
+        put16(none, 0);
+
+        const std::string code = statement(0x1D) + statement(0x1010, call) + statement(0x1010, twoNumbers)
+            + statement(0x1010, tooMany) + statement(0x1010, extra) + statement(0x1011, badReference)
+            + statement(0x1010, none) + statement(0x1234, none);
+        ESM4::ScriptCodeCensus census;
+        census.setCommandLookup(testCommands(integers, form));
+        collect(census, scriptRecord(0x1001, code));
+
+        const auto& numbers = census.getArguments().at(0x1010);
+        EXPECT_EQ(numbers.mCalls, 5u);
+        EXPECT_EQ(numbers.mDecoded, 4u);
+        EXPECT_EQ(numbers.mTrailing, 1u);
+        EXPECT_EQ(numbers.mMaxTrailing, 3u);
+        EXPECT_EQ(numbers.mFewer, 1u);
+        EXPECT_EQ(numbers.mErrors.at(ESM4::ScriptCode::ArgumentError::TooMany), 1u);
+        const auto& forms = census.getArguments().at(0x1011);
+        EXPECT_EQ(forms.mCalls, 1u);
+        EXPECT_EQ(forms.mErrors.at(ESM4::ScriptCode::ArgumentError::BadReference), 1u);
+        EXPECT_EQ(census.getUnknownCommands().at(0x1234), 1u);
+
+        const auto& examples = census.getArgumentExamples();
+        ASSERT_EQ(examples.size(), 2u);
+        const auto& example = examples.at({ 0x1011, ESM4::ScriptCode::ArgumentError::BadReference }).front();
+        EXPECT_EQ(example.mSize, 5u);
+        EXPECT_EQ(example.mOffset, 2u);
+        EXPECT_EQ(example.mBytes, "01 00 72 04 00");
+        EXPECT_THAT(example.mStatements, HasSubstr("TakeForm (14)"));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("calls of commands the table has: 6, arguments decoded: 4"));
+        EXPECT_THAT(out.str(), HasSubstr("calls of commands the table does not have: 1 (1 different codes)"));
+        EXPECT_THAT(out.str(), HasSubstr("0x1010 TakeNumbers"));
+        EXPECT_THAT(out.str(), HasSubstr("0x1011 TakeForm"));
+        EXPECT_THAT(out.str(), HasSubstr("badref:1"));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, readsNoArgumentsWithoutATableOfCommands)
+    {
+        std::string none;
+        put16(none, 0);
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, statement(0x1D) + statement(0x1010, none)));
+
+        EXPECT_THAT(census.getArguments(), IsEmpty());
+        EXPECT_THAT(census.getUnknownCommands(), IsEmpty());
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), Not(HasSubstr("Arguments, read with")));
     }
 }

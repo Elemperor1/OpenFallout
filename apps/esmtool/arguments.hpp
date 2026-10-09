@@ -26,6 +26,8 @@ namespace EsmTool
 
         std::vector<std::string> types;
         std::string name;
+        // The CSV of the script commands of a game, for the scriptcode mode
+        std::filesystem::path commandsFile;
     };
 }
 
