@@ -49,6 +49,9 @@ namespace FalloutScript
     private:
         std::map<std::uint16_t, CommandInfo> mCommands;
         std::map<std::string, std::uint16_t> mNames; // in lower case
+        // The codes of the commands that have each name, in the order they were added, for when the one that owns it
+        // is replaced
+        std::map<std::string, std::vector<std::uint16_t>> mClaims;
     };
 
     std::string lowerCase(std::string_view text);

@@ -98,6 +98,13 @@ class DumpCommandTableTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual([r[1] for r in rows], ["0x%X" % (0x1000 + i) for i in (0, 1, 2, 3, 4, 5, 7, 9, 11)])
 
+    def test_keeps_the_commands_on_both_sides_of_a_long_run(self):
+        # a stray before a run of 69 and one after it: the one after is close to the run, and the one before must not
+        # make it look far
+        result, rows = self.dump(build_executable(entries=73, broken=(1, 71)), "--minimum", "5")
+        self.assertEqual(result, 0)
+        self.assertEqual([r[1] for r in rows], ["0x%X" % (0x1000 + i) for i in [0, *range(2, 71), 72]])
+
     def test_leaves_out_a_command_that_is_far_from_every_table(self):
         # entry 5 stands far from the run of 0 to 2 and has a code that the table does not come near
         data = bytearray(build_executable(entries=8, broken=(3, 4, 6, 7)))

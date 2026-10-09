@@ -234,10 +234,13 @@ def attach_strays(tables, found, stride):
             continue
         entry = found[offset]
         for table in tables:
-            first, last = table[0], table[-1]
-            if (offset - first.offset) % stride:
+            # The strays are added in the order of their offsets, so the ends of the table are not the first and the
+            # last of its list: one before the run is added after it
+            first = min(e.offset for e in table)
+            last = max(e.offset for e in table)
+            if (offset - first) % stride:
                 continue
-            if not first.offset - STRAY_DISTANCE * stride <= offset <= last.offset + STRAY_DISTANCE * stride:
+            if not first - STRAY_DISTANCE * stride <= offset <= last + STRAY_DISTANCE * stride:
                 continue
             codes = [e.opcode for e in table]
             if not min(codes) - STRAY_CODES <= entry.opcode <= max(codes) + STRAY_CODES:

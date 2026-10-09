@@ -15,41 +15,56 @@ namespace FalloutScript
         return result;
     }
 
+    namespace
+    {
+        // The distinct names of a command in lower case, long name first, without the one it does not have
+        std::vector<std::string> namesOf(const CommandInfo& info)
+        {
+            std::vector<std::string> names;
+            for (const std::string& name : { info.mName, info.mShortName })
+            {
+                std::string lower = lowerCase(name);
+                if (!lower.empty() && std::find(names.begin(), names.end(), lower) == names.end())
+                    names.push_back(std::move(lower));
+            }
+            return names;
+        }
+    }
+
     void CommandTable::add(CommandInfo info)
     {
         const std::uint16_t opcode = info.mOpcode;
-        // A command that is replaced gives up the names it had
-        std::vector<std::string> freed;
+        const std::vector<std::string> names = namesOf(info);
+
+        // A command that is replaced gives up the names it does not keep, and each goes to the command that claimed it
+        // next, in the order the commands were added
         if (const auto old = mCommands.find(opcode); old != mCommands.end())
         {
-            for (const std::string& name : { old->second.mName, old->second.mShortName })
+            for (const std::string& name : namesOf(old->second))
             {
-                const auto entry = mNames.find(lowerCase(name));
-                if (entry != mNames.end() && entry->second == opcode)
-                {
-                    freed.push_back(entry->first);
-                    mNames.erase(entry);
-                }
+                if (std::find(names.begin(), names.end(), name) != names.end())
+                    continue;
+                std::vector<std::uint16_t>& claims = mClaims[name];
+                claims.erase(std::remove(claims.begin(), claims.end(), opcode), claims.end());
+                const auto owner = mNames.find(name);
+                if (owner == mNames.end() || owner->second != opcode)
+                    continue;
+                if (claims.empty())
+                    mNames.erase(owner);
+                else
+                    owner->second = claims.front();
             }
         }
-        // The first command to have a name keeps it: the short name of a command can be the long name of another
-        for (const std::string& name : { info.mName, info.mShortName })
-            if (!name.empty())
-                mNames.emplace(lowerCase(name), opcode);
-        mCommands[opcode] = std::move(info);
 
-        // A name the replaced command gave up goes to the command that has it, if any: it was shadowed before
-        for (const std::string& name : freed)
+        // The first command to have a name keeps it: the short name of a command can be the long name of another
+        for (const std::string& name : names)
         {
-            if (mNames.count(name) != 0)
-                continue;
-            for (const auto& [code, command] : mCommands)
-                if (lowerCase(command.mName) == name || lowerCase(command.mShortName) == name)
-                {
-                    mNames.emplace(name, code);
-                    break;
-                }
+            std::vector<std::uint16_t>& claims = mClaims[name];
+            if (std::find(claims.begin(), claims.end(), opcode) == claims.end())
+                claims.push_back(opcode);
+            mNames.emplace(name, opcode);
         }
+        mCommands[opcode] = std::move(info);
     }
 
     const CommandInfo* CommandTable::find(std::uint16_t opcode) const
