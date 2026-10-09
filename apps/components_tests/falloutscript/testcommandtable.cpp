@@ -41,6 +41,27 @@ namespace
         EXPECT_EQ(table.find("other")->mOpcode, 0x1004);
     }
 
+    TEST(FalloutScriptCommandTableTest, aNameThatAReplacedCommandHeldGoesToTheCommandItShadowed)
+    {
+        FalloutScript::CommandTable table;
+        FalloutScript::CommandInfo first;
+        first.mOpcode = 0x1001;
+        first.mName = "Foo";
+        FalloutScript::CommandInfo second;
+        second.mOpcode = 0x1002;
+        second.mName = "Other";
+        second.mShortName = "foo";
+        table.add(first);
+        table.add(second);
+        ASSERT_EQ(table.find("foo")->mOpcode, 0x1001);
+
+        first.mName = "Bar";
+        table.add(first);
+
+        EXPECT_EQ(table.find("foo")->mOpcode, 0x1002);
+        EXPECT_EQ(table.find("bar")->mOpcode, 0x1001);
+    }
+
     TEST(FalloutScriptCommandTableTest, theFirstCommandToHaveANameKeepsIt)
     {
         FalloutScript::CommandTable table;

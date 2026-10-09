@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_COMPONENTS_ESM4_SCRIPTCODE_H
 #define OPENFALLOUT_COMPONENTS_ESM4_SCRIPTCODE_H
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -187,6 +188,15 @@ namespace ESM4::ScriptCode
         // (SLSD). A reference or variable index beyond them is an error.
         std::size_t mReferences = 0;
         std::size_t mVariables = 0;
+        // The indices up to mVariables that no SLSD declares, in ascending order. The games write the highest index
+        // that was ever used, so a script can have gaps, and a variable in a gap is an error as well.
+        std::vector<std::uint32_t> mUndeclared = {};
+
+        bool variableDeclared(std::size_t index) const
+        {
+            return index >= 1 && index <= mVariables
+                && !std::binary_search(mUndeclared.begin(), mUndeclared.end(), index);
+        }
     };
 
     // Decodes the compiled script. It does not throw: a script that is damaged or uses something this does not know

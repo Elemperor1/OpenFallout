@@ -19,13 +19,17 @@ namespace FalloutScript
     {
         const std::uint16_t opcode = info.mOpcode;
         // A command that is replaced gives up the names it had
+        std::vector<std::string> freed;
         if (const auto old = mCommands.find(opcode); old != mCommands.end())
         {
             for (const std::string& name : { old->second.mName, old->second.mShortName })
             {
                 const auto entry = mNames.find(lowerCase(name));
                 if (entry != mNames.end() && entry->second == opcode)
+                {
+                    freed.push_back(entry->first);
                     mNames.erase(entry);
+                }
             }
         }
         // The first command to have a name keeps it: the short name of a command can be the long name of another
@@ -33,6 +37,19 @@ namespace FalloutScript
             if (!name.empty())
                 mNames.emplace(lowerCase(name), opcode);
         mCommands[opcode] = std::move(info);
+
+        // A name the replaced command gave up goes to the command that has it, if any: it was shadowed before
+        for (const std::string& name : freed)
+        {
+            if (mNames.count(name) != 0)
+                continue;
+            for (const auto& [code, command] : mCommands)
+                if (lowerCase(command.mName) == name || lowerCase(command.mShortName) == name)
+                {
+                    mNames.emplace(name, code);
+                    break;
+                }
+        }
     }
 
     const CommandInfo* CommandTable::find(std::uint16_t opcode) const

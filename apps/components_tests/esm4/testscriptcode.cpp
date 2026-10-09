@@ -492,6 +492,35 @@ namespace
         EXPECT_EQ(decodeText(far).mError, Error::None);
     }
 
+    TEST(ESM4ScriptCodeTest, aVariableInAGapOfTheDeclaredOnesIsAnError)
+    {
+        // the script declares the variables 1 and 3 (the highest is 3)
+        Limits limits{ 4, 3 };
+        limits.mUndeclared = { 2 };
+        const auto errorOf = [&limits](const std::string& code) {
+            return decode(std::vector<std::uint8_t>(code.begin(), code.end()), limits).mError;
+        };
+
+        EXPECT_EQ(errorOf(scriptName + statement(Statement_SetTo, assignment(variable('s', 1), variable('s', 3)))),
+            Error::None);
+        EXPECT_EQ(errorOf(scriptName + statement(Statement_SetTo, assignment(variable('s', 1), variable('s', 2)))),
+            Error::BadVariable);
+        EXPECT_EQ(
+            errorOf(scriptName + statement(Statement_SetTo, assignment(variable('s', 2), "1 "))), Error::BadVariable);
+        // the variables of another script are not checked against these
+        EXPECT_EQ(errorOf(scriptName + statement(Statement_SetTo, assignment(variable('s', 1), variable('s', 2, 2)))),
+            Error::None);
+    }
+
+    TEST(ESM4ScriptCodeTest, aStatementThatHasNoDataHasNone)
+    {
+        for (const std::uint16_t code : { Statement_ScriptName, Statement_End, Statement_Return, Statement_EndIf })
+        {
+            EXPECT_EQ(decodeText(statement(code, "ab")).mError, Error::BadLength) << code;
+            EXPECT_EQ(decodeText(statement(code)).mError, Error::None) << code;
+        }
+    }
+
     TEST(ESM4ScriptCodeTest, describesEveryError)
     {
         for (const Error error : { Error::None, Error::Truncated, Error::UnknownStatement, Error::BadReference,

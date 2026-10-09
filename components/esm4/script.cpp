@@ -143,4 +143,20 @@ namespace ESM4
             result = std::max(result, variable.index);
         return result;
     }
+
+    /// Return the indices from 1 up to the greatest stored SLSD variable index that no SLSD entry has. The bytecode
+    /// names a variable by 16 bits, so indices beyond that do not matter.
+    std::vector<std::uint32_t> ScriptDefinition::undeclaredVariableIndices() const
+    {
+        const std::uint32_t highest = std::min<std::uint32_t>(highestVariableIndex(), 0xFFFF);
+        std::vector<bool> declared(highest + 1, false);
+        for (const ScriptLocalVariableData& variable : localVarData)
+            if (variable.index <= highest)
+                declared[variable.index] = true;
+        std::vector<std::uint32_t> result;
+        for (std::uint32_t index = 1; index <= highest; ++index)
+            if (!declared[index])
+                result.push_back(index);
+        return result;
+    }
 }

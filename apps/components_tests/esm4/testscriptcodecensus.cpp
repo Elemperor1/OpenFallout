@@ -277,6 +277,47 @@ namespace
         EXPECT_EQ(census.getBeginJumps().mUnresolved, 1u);
     }
 
+    TEST(ESM4ScriptCodeCensusTest, aConditionThatIsOpenAtTheEndOfItsBlockDoesNotReachTheNextBlock)
+    {
+        std::string beginData;
+        put16(beginData, 0);
+        append<std::uint32_t>(beginData, 0);
+        std::string ifData;
+        put16(ifData, 0);
+        put16(ifData, 1);
+        ifData += '1';
+        // the first block opens a condition and ends, the second closes one
+        const std::string code = statement(0x1D) + statement(0x10, beginData) + statement(0x16, ifData)
+            + statement(0x11) + statement(0x10, beginData) + statement(0x19) + statement(0x11);
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, code));
+
+        EXPECT_EQ(census.getStructure().at("If without EndIf"), 1u);
+        EXPECT_EQ(census.getStructure().at("EndIf without If"), 1u);
+        EXPECT_EQ(census.getIfJumps().mUnresolved, 1u);
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, noBranchFollowsAnElse)
+    {
+        std::string ifData;
+        put16(ifData, 0);
+        put16(ifData, 1);
+        ifData += '1';
+        std::string elseData;
+        put16(elseData, 0);
+        // If, Else, ElseIf, Else, EndIf
+        const std::string code = statement(0x1D) + statement(0x16, ifData) + statement(0x17, elseData)
+            + statement(0x18, ifData) + statement(0x17, elseData) + statement(0x19);
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, code));
+
+        EXPECT_EQ(census.getStructure().at("ElseIf or Else after Else"), 2u);
+        EXPECT_EQ(census.getStructure().count("If without EndIf"), 0u);
+        EXPECT_EQ(census.getIfJumps().mTotal, 1u);
+        EXPECT_EQ(census.getElseJumps().mTotal, 1u);
+        EXPECT_EQ(census.getElseIfJumps().mTotal, 0u);
+    }
+
     TEST(ESM4ScriptCodeCensusTest, countsTheCommandsByCode)
     {
         std::string code = statement(0x1D) + statement(0x1000 + 58, std::string(4, '\0'));

@@ -234,7 +234,7 @@ namespace ESM4::ScriptCode
                 ref.mIndex = u16(mPosition + 1);
                 // A variable of another script is not checked against the variables of this one, but an index counts
                 // from 1 in any script
-                if (ref.mIndex < 1 || (ref.mRemote == 0 && ref.mIndex > mLimits.mVariables))
+                if (ref.mIndex < 1 || (ref.mRemote == 0 && !mLimits.variableDeclared(ref.mIndex)))
                     return fail(ArgumentError::BadVariable);
                 mPosition += 3;
                 argument.mKind = Argument::Kind::Variable;

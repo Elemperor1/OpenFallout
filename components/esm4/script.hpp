@@ -412,6 +412,8 @@ namespace ESM4
 
         /// The highest SLSD index, or 0 when the script has no local variables.
         std::uint32_t highestVariableIndex() const;
+        /// The indices from 1 to the highest that no SLSD declares, in ascending order.
+        std::vector<std::uint32_t> undeclaredVariableIndices() const;
     };
 }
 

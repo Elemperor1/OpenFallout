@@ -366,8 +366,14 @@ namespace ESM4
             ++mBeginJumps.mUnresolved;
         }
 
-        // Conditions: the branch that was last seen jumps to the one that follows it
-        std::vector<std::size_t> branches;
+        // Conditions: the branch that was last seen jumps to the one that follows it. A condition has to be closed
+        // inside its block, so the ones that are open when a block begins or ends are problems, and are dropped.
+        struct OpenCondition
+        {
+            std::size_t mBranch; // the If, ElseIf or Else that was seen last
+            bool mHasElse; // an Else was seen: no branch can follow it
+        };
+        std::vector<OpenCondition> branches;
         auto tally = [&](std::size_t branch, const Statement& target) {
             const Statement& from = statements[branch];
             switch (from.mKind)
@@ -383,13 +389,39 @@ namespace ESM4
                     break;
             }
         };
+        auto closeOpenConditions = [&]() {
+            for (const OpenCondition& condition : branches)
+            {
+                problem("If without EndIf", condition.mBranch);
+                switch (statements[condition.mBranch].mKind)
+                {
+                    case Statement::Kind::If:
+                        ++mIfJumps.mTotal;
+                        ++mIfJumps.mUnresolved;
+                        break;
+                    case Statement::Kind::ElseIf:
+                        ++mElseIfJumps.mTotal;
+                        ++mElseIfJumps.mUnresolved;
+                        break;
+                    default:
+                        ++mElseJumps.mTotal;
+                        ++mElseJumps.mUnresolved;
+                        break;
+                }
+            }
+            branches.clear();
+        };
         for (std::size_t i = 0; i < statements.size(); ++i)
         {
             const Statement& statement = statements[i];
             switch (statement.mKind)
             {
+                case Statement::Kind::Begin:
+                case Statement::Kind::End:
+                    closeOpenConditions();
+                    break;
                 case Statement::Kind::If:
-                    branches.push_back(i);
+                    branches.push_back({ i, false });
                     break;
                 case Statement::Kind::ElseIf:
                 case Statement::Kind::Else:
@@ -398,8 +430,13 @@ namespace ESM4
                         problem("ElseIf or Else without If", i);
                         break;
                     }
-                    tally(branches.back(), statement);
-                    branches.back() = i;
+                    if (branches.back().mHasElse)
+                    {
+                        problem("ElseIf or Else after Else", i);
+                        break;
+                    }
+                    tally(branches.back().mBranch, statement);
+                    branches.back() = { i, statement.mKind == Statement::Kind::Else };
                     break;
                 case Statement::Kind::EndIf:
                     if (branches.empty())
@@ -407,32 +444,14 @@ namespace ESM4
                         problem("EndIf without If", i);
                         break;
                     }
-                    tally(branches.back(), statement);
+                    tally(branches.back().mBranch, statement);
                     branches.pop_back();
                     break;
                 default:
                     break;
             }
         }
-        for (const std::size_t branch : branches)
-        {
-            problem("If without EndIf", branch);
-            switch (statements[branch].mKind)
-            {
-                case Statement::Kind::If:
-                    ++mIfJumps.mTotal;
-                    ++mIfJumps.mUnresolved;
-                    break;
-                case Statement::Kind::ElseIf:
-                    ++mElseIfJumps.mTotal;
-                    ++mElseIfJumps.mUnresolved;
-                    break;
-                default:
-                    ++mElseJumps.mTotal;
-                    ++mElseJumps.mUnresolved;
-                    break;
-            }
-        }
+        closeOpenConditions();
         if (found)
             ++mStructureScripts;
     }
@@ -509,6 +528,7 @@ namespace ESM4
         ScriptCode::Limits limits;
         limits.mReferences = script.references.size();
         limits.mVariables = script.highestVariableIndex();
+        limits.mUndeclared = script.undeclaredVariableIndices();
         const Program program = ScriptCode::decode(script.compiledScript, limits);
         totals.mStatements += program.mStatements.size();
         mMaxStatements = std::max(mMaxStatements, program.mStatements.size());

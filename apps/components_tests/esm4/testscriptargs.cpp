@@ -313,6 +313,25 @@ namespace
             ArgumentError::BadVariable);
     }
 
+    TEST(ESM4ScriptArgsTest, aVariableInAGapOfTheDeclaredOnesIsAnError)
+    {
+        Call command;
+        command.mOpcode = firstCommand;
+        command.mOffset = 0;
+        Limits limits;
+        limits.mReferences = 4;
+        limits.mVariables = 3;
+        limits.mUndeclared = { 2 };
+        const auto errorOf = [&](const Bytes& bytes) {
+            command.mLength = static_cast<std::uint16_t>(bytes.data().size());
+            return decodeArguments(bytes.data(), command, { { TypeInteger, false } }, limits).mError;
+        };
+
+        EXPECT_EQ(errorOf(call(1).variable('s', 3)), ArgumentError::None);
+        EXPECT_EQ(errorOf(call(1).variable('s', 2)), ArgumentError::BadVariable);
+        EXPECT_EQ(errorOf(call(1).reference(2).variable('s', 2)), ArgumentError::None);
+    }
+
     TEST(ESM4ScriptArgsTest, rejectsAByteThatIsNoTag)
     {
         EXPECT_EQ(decode(call(1).u8('q').u16(1), { { TypeObjectRef, false } }).mError, ArgumentError::BadArgument);

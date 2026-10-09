@@ -106,7 +106,7 @@ namespace ESM4::ScriptCode
                 out.mIndex = u16(position + 1);
                 // A variable of another script can not be checked against the variables of this one, but an index
                 // counts from 1 in any script
-                if (out.mIndex < 1 || (out.mRemote == 0 && out.mIndex > mLimits.mVariables))
+                if (out.mIndex < 1 || (out.mRemote == 0 && !mLimits.variableDeclared(out.mIndex)))
                     return fail(Error::BadVariable, start, out.mIndex);
                 position += 3;
                 return true;
@@ -156,7 +156,7 @@ namespace ESM4::ScriptCode
                             // The variable of another script can not be checked against the variables of this one,
                             // but an index counts from 1 in any script
                             if (token.mVariable.mIndex < 1
-                                || (!haveRemote && token.mVariable.mIndex > mLimits.mVariables))
+                                || (!haveRemote && !mLimits.variableDeclared(token.mVariable.mIndex)))
                                 return fail(Error::BadVariable, tokenStart, token.mVariable.mIndex);
                             position += 3;
                             haveRemote = false;
@@ -376,6 +376,7 @@ namespace ESM4::ScriptCode
                 {
                     case Statement_ScriptName:
                         statement.mKind = Statement::Kind::ScriptName;
+                        ok = length == 0 || fail(Error::BadLength, start);
                         break;
                     case Statement_Begin:
                         statement.mKind = Statement::Kind::Begin;
@@ -390,6 +391,7 @@ namespace ESM4::ScriptCode
                         break;
                     case Statement_End:
                         statement.mKind = Statement::Kind::End;
+                        ok = length == 0 || fail(Error::BadLength, start);
                         break;
                     case Statement_Short:
                     case Statement_Long:
@@ -399,9 +401,11 @@ namespace ESM4::ScriptCode
                         break;
                     case Statement_Return:
                         statement.mKind = Statement::Kind::Return;
+                        ok = length == 0 || fail(Error::BadLength, start);
                         break;
                     case Statement_EndIf:
                         statement.mKind = Statement::Kind::EndIf;
+                        ok = length == 0 || fail(Error::BadLength, start);
                         break;
                     case Statement_Else:
                         statement.mKind = Statement::Kind::Else;
