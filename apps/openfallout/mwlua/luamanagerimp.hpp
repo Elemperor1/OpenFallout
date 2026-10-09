@@ -90,10 +90,7 @@ namespace OFLua
         {
             mEngineEvents.addToQueue(EngineEvents::OnConsume{ getId(actor), getId(consumable) });
         }
-        void objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor) override
-        {
-            mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
-        }
+        void objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor) override;
         void useItem(const OFWorld::Ptr& object, const OFWorld::Ptr& actor, bool force) override;
         void objectDropped(const OFWorld::Ptr& object, const OFWorld::Ptr& actor, const osg::Vec3f& position,
             const osg::Quat& rotation) override;

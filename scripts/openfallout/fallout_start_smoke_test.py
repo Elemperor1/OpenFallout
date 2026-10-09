@@ -37,7 +37,10 @@ missing. Three more characters stand south and west of the start, where the play
 script (PACKAGE_SCRIPT) logs where each is once a second: one that has two AI packages (the first is for the night,
 which it must ignore at the time of day the game starts at, the second sends it to a marker 300 units north of it) must
 walk there (to the edge of the radius that the package names), turn to the way the marker faces and stay; one that has no package must stay where it was put; one that has
-a package that sends it about the place where it stands must stay within the radius of the package and move. A
+a package that sends it about the place where it stands must stay within the radius of the package and move. Two
+more have packages that depend on scripts: one has a package whose condition never holds and one whose condition holds
+from the stage of quest C that a Lua global script sets (GATE_SCRIPT), so it stays until then and goes to the marker of
+the second; the other has no package until the script of the scripted object gives it one, and goes to its marker. A
 character with no animation to walk with (`--no-animation`) is not moved at all.
 
     scripts/openfallout/fallout_start_smoke_test.py --build build
@@ -110,9 +113,10 @@ PIXEL_TOLERANCE = 12
 # and blue the pixel must be for that water to be there.
 WATER_PIXEL = (900, 380)
 WATER_GREEN = 25
-# A pixel of the ground a little before the player, below the pillar at the bottom of the window. The texture of the
-# ground is red; the default texture of the game is not in the data files of the test.
-GROUND_PIXEL = (640, 600)
+# A pixel of the ground a little before the player, on the left at the bottom of the window (the messages that the
+# scripts show are in the middle of the bottom, and dark behind their text). The texture of the ground is red; the
+# default texture of the game is not in the data files of the test.
+GROUND_PIXEL = (240, 600)
 # The least that the strongest channel of a tinted pixel has, which a black pixel (nothing drawn there) does not
 TINT_MINIMUM = 40
 
@@ -494,7 +498,30 @@ return {
 """.replace("@ACTORS@", ", ".join("{ '%s', { %d, %d } }" % (name, *plugin.PACKAGE_REF_IDS[name])
                                   for name in ("walker", "idler", "roamer")) + ", " + ", ".join(
                                       "{ '%s', { %d, %d } }" % (name, *plugin.FOLLOW_REF_IDS[name])
-                                      for name in ("follower", "companion")))
+                                      for name in ("follower", "companion")) + ", " + ", ".join(
+                                      "{ '%s', { %d, %d } }" % (name, *plugin.GATE_REF_IDS[name])
+                                      for name in ("conditional", "scripted")))
+
+# Opens the gate of the packages of the conditional character: sets the stage of quest C that the second of its packages
+# needs (a global script, at the game time that the plugin names)
+GATE_SCRIPT = """\
+local world = require('openfallout.world')
+
+local elapsed, done = 0, false
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ then return end
+            done = true
+            local quest = world.quests.find('@QUEST@')
+            print('OFTEST', 'gate opened', tostring(quest ~= nil and quest:setStage(@STAGE@)))
+        end,
+    },
+}
+""".replace("@FROM@", str(plugin.GATE_FROM)).replace("@QUEST@", plugin.QUEST_C_NAME).replace(
+    "@STAGE@", str(plugin.QUEST_C_STAGE))
 
 # Tells the companion, a character with no package, to follow the player (a global script, from the game time that the
 # plugin names). The reference of each kind of cell is tried, the one that is loaded takes it.
@@ -524,8 +551,139 @@ return {
 """.replace("@IDS@", ", ".join(map(str, plugin.FOLLOW_REF_IDS["companion"]))).replace(
     "@FROM@", str(plugin.COMPANION_FROM)).replace("@DISTANCE@", str(plugin.FOLLOW_DISTANCES["companion"]))
 
+# Reads the quests of the plugin through world.quests and world.globals once the quest script has had time to run (its
+# delay is plugin.QUEST_DELAY and it sets the first stage on its plugin.QUEST_TICKS-th run), and logs what it finds. It
+# also asks for a stage again that was reached (the quests do not allow that), for one the quest does not have, and
+# sets the global from Lua.
+QUEST_SCRIPT = """\
+local world = require('openfallout.world')
+
+local elapsed, done = 0, false
+
+local function describe(quest)
+    if not quest then return 'none' end
+    local journal = {}
+    for _, entry in ipairs(quest.journal) do
+        table.insert(journal, entry.stage .. '=' .. entry.text)
+    end
+    return string.format('%s id=%s name=%s stage=%d running=%s completed=%s failed=%s journal=[%s]',
+        quest.editorId, quest.id, quest.name, quest.stage, tostring(quest.running), tostring(quest.completed),
+        tostring(quest.failed), table.concat(journal, ';'))
+end
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ then return end
+            done = true
+            local a = world.quests.find('@A@')
+            local b = world.quests.find(string.lower('@B@'))
+            print('OFTEST', 'quest a', describe(a))
+            print('OFTEST', 'quest b', describe(b))
+            if a and b then
+                print('OFTEST', 'quest objective', tostring(b:objectiveDisplayed(@OBJECTIVE@)),
+                    tostring(b:objectiveCompleted(@OBJECTIVE@)), tostring(b:objectiveDisplayed(@OBJECTIVE@ + 1)))
+                -- the id as core.getFormId writes it ("FormId:0x" and digits), and the same without "FormId:"
+                print('OFTEST', 'quest by id', tostring(world.quests.find(a.id) == a),
+                    tostring(world.quests.find(string.sub(a.id, 8)) == a))
+                print('OFTEST', 'quest again', tostring(a:setStage(@A_STAGE@)), tostring(a:setStage(99)),
+                    tostring(a:stageDone(@A_STAGE@)), tostring(a:stageDone(99)))
+            end
+            print('OFTEST', 'quest missing', tostring(world.quests.find('NoSuchQuest')))
+            print('OFTEST', 'quest counter', tostring(world.globals.@COUNTER@),
+                tostring(world.globals.NoSuchGlobal))
+            world.globals.@COUNTER@ = 100.9
+            print('OFTEST', 'quest counter set', tostring(world.globals.@COUNTER@),
+                tostring(pcall(function() world.globals.NoSuchGlobal = 1 end)))
+        end,
+    },
+}
+"""
+QUEST_SCRIPT = (QUEST_SCRIPT.replace("@FROM@", str(plugin.QUEST_DELAY * (plugin.QUEST_TICKS + 5)))
+                .replace("@A@", plugin.QUEST_A_NAME).replace("@B@", plugin.QUEST_B_NAME)
+                .replace("@OBJECTIVE@", str(plugin.QUEST_OBJECTIVE))
+                .replace("@A_STAGE@", str(plugin.QUEST_A_STAGE)).replace("@COUNTER@", plugin.COUNTER_NAME))
+
+# Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
+# disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
+# script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
+# scripts have had to run it logs what the globals say, activates the object by the player twice, enables the cube again
+# from Lua and, a little later, logs what the script saw.
+OBJECT_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
+
+local scripted_ids, victim_ids = { @SCRIPTED@ }, { @VICTIM@ }
+local elapsed, step = 0, 0
+
+local function find(ids)
+    for _, id in ipairs(ids) do
+        local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+        if ok and object:isValid() then return object end
+    end
+end
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if step == 0 and elapsed >= @FROM@ then
+                step = 1
+                local scripted, victim = find(scripted_ids), find(victim_ids)
+                local player = world.players[1]
+                if not (scripted and victim) then
+                    print('OFTEST', 'object missing', tostring(scripted ~= nil), tostring(victim ~= nil))
+                    step = 3
+                    return
+                end
+                local g = world.globals
+                print('OFTEST', 'object state', tostring(victim.enabled), tostring(g.@LOADS@ == 1),
+                    tostring(g.@FRAMES@ > 10), tostring(g.@VICTIM_DISABLED@), tostring(g.@ACTIVATED@),
+                    string.format('%d %d', math.floor(g.@DISTANCE@),
+                        math.floor((scripted.position - player.position):length())))
+                scripted:activateBy(player)
+                local once = g.@ACTIVATED@
+                scripted:activateBy(player)
+                print('OFTEST', 'object activated', tostring(once), tostring(g.@ACTIVATED@))
+                victim.enabled = true
+                -- An object made while the game runs has no reference number of a plugin, and the scripts of Fallout
+                -- must let it be put in the cell and activated like the others
+                local ok, err = pcall(function()
+                    local made = world.createObject(core.getFormId('OFTest.esm', @CUBE@), 1)
+                    made:teleport(scripted.cell, scripted.position + util.vector3(0, -200, 0))
+                    made:activateBy(player)
+                end)
+                print('OFTEST', 'object made', tostring(ok), ok and '' or tostring(err))
+            elseif step == 1 and elapsed >= @FROM@ + 1 then
+                step = 3
+                local victim = find(victim_ids)
+                print('OFTEST', 'object victim again', tostring(victim.enabled),
+                    tostring(world.globals.@VICTIM_DISABLED@))
+            end
+        end,
+    },
+}
+"""
+OBJECT_FROM = 4.0  # game seconds before the Lua script looks, enough for the cell to load and a number of frames to pass
+OBJECT_SCRIPT = (OBJECT_SCRIPT
+                 .replace("@SCRIPTED@", ", ".join(map(str, plugin.SCRIPTED_REF_IDS.values())))
+                 .replace("@VICTIM@", ", ".join(map(str, plugin.VICTIM_REF_IDS.values())))
+                 .replace("@CUBE@", str(plugin.CUBE_ID))
+                 .replace("@FROM@", str(OBJECT_FROM))
+                 .replace("@LOADS@", plugin.OBJECT_GLOBALS["loads"][1])
+                 .replace("@FRAMES@", plugin.OBJECT_GLOBALS["frames"][1])
+                 .replace("@ACTIVATED@", plugin.OBJECT_GLOBALS["activated"][1])
+                 .replace("@DISTANCE@", plugin.OBJECT_GLOBALS["distance"][1])
+                 .replace("@VICTIM_DISABLED@", plugin.OBJECT_GLOBALS["victim"][1]))
+
 # Where the three characters start relative to the player, and where the walker should end
 PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler", "roamer")}
+# and the two characters whose packages depend on scripts
+GATE_START = {name: plugin.GATE_PLACES[name] for name in ("conditional", "scripted")}
+GATE_MARGIN = 1.0  # seconds either side of GATE_FROM that the two Lua scripts' clocks may differ by
+OBJECT_DISTANCE_SLACK = 60  # how far the distance a script measures may be from the one Lua sees (the player walks)
 ARRIVAL_RANGE = 30.0  # how close to the marker of a package for the night the walker may come, units
 TRAVEL_SLACK = 20.0  # how far from the radius of its package the walker may have stopped (it stops at the edge of it)
 FOLLOW_SLACK = 64.0 + 40.0  # the slack of a follower (it starts to walk beyond it) and a margin
@@ -808,8 +966,134 @@ def check(text, scenario, colours, animated=True):
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
                         "the water should have no sides")
     problems += check_packages(text, scenario, animated)
+    problems += check_quests(text)
+    problems += check_objects(text)
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_quests(text):
+    """The problems with the quests: the script of quest A must have set its stage, whose result script sets the stage of
+    quest B, which completes, and changes the global and the objective of B; the journals have the text of the stages;
+    asking for a stage again, or for one that is not there, changes nothing; and the Lua side can set the global. Stage 20
+    of B has two log entries, and only the one whose condition holds (about the stage of A, named by a form that the
+    reader must have given the index of the plugin in the load order) is told and runs its script: the other would add a
+    thousand to the global and put a text in the journal."""
+    problems = []
+
+    def lines(kind):
+        return [line.split("\t")[3:] for line in text.splitlines() if f"OFTEST\tquest {kind}\t" in line]
+
+    def one(kind):
+        found = lines(kind)
+        if len(found) != 1:
+            problems.append(f"expected one 'quest {kind}' line from the Lua script, found {len(found)}")
+            return None
+        return found[0]
+
+    def journal_of(stage, text_):
+        return f"journal=[{stage}={text_}]"
+
+    for kind, name, title, stage, journal, running, completed in (
+            ("a", plugin.QUEST_A_NAME, "OpenFallout Test Quest A", plugin.QUEST_A_STAGE,
+             journal_of(plugin.QUEST_A_STAGE, plugin.QUEST_A_TEXT), "true", "false"),
+            ("b", plugin.QUEST_B_NAME, "OpenFallout Test Quest B", plugin.QUEST_B_STAGE,
+             journal_of(plugin.QUEST_B_STAGE, plugin.QUEST_B_TEXT), "false", "true")):
+        found = one(kind)
+        if found is None:
+            continue
+        line = found[0]
+        want = [f"{name} id=", f"name={title} stage={stage} running={running} completed={completed} failed=false",
+                journal]
+        if not all(part in line for part in want):
+            problems.append(f"quest {kind.upper()} should be '{name}' at stage {stage} (running={running}, "
+                            f"completed={completed}) with the journal '{journal}': {line}")
+
+    found = one("objective")
+    if found is not None and found != ["true", "true", "false"]:
+        problems.append("objective of B should be displayed and completed (set by the result scripts of the stages) and "
+                        f"the next one should not be displayed: {found}")
+    found = one("by id")
+    if found is not None and found != ["true", "true"]:
+        problems.append(f"quest A should be found again by the id it reports and by 0x and hexadecimal digits: {found}")
+    found = one("again")
+    if found is not None and found != ["false", "false", "true", "false"]:
+        problems.append("setting the stage that was reached, or one that quest A does not have, should return false "
+                        f"and the stages done should be 10 and not 99: {found}")
+    found = one("missing")
+    if found is not None and found != ["nil"]:
+        problems.append(f"a quest that is not in the plugin should be nil: {found}")
+    found = one("counter")
+    if found is not None and found != [str(plugin.COUNTER_ADDS), "nil"]:
+        problems.append(f"the global should be what the result script of the stage added to it ({plugin.COUNTER_ADDS}) "
+                        f"and one that is not there should be nil: {found}")
+    found = one("counter set")
+    if found is not None and found != ["100", "false"]:
+        problems.append("setting the global to 100.9 from Lua should keep the whole part, and setting one that is not "
+                        f"there should raise an error: {found}")
+    # What the player is told: the engine logs the text of each log entry it puts on the screen
+    for name, stage, words in ((plugin.QUEST_A_NAME, plugin.QUEST_A_STAGE, plugin.QUEST_A_TEXT),
+                               (plugin.QUEST_B_NAME, plugin.QUEST_B_STAGE, plugin.QUEST_B_TEXT)):
+        told = [line for line in text.splitlines() if f"Journal: {name} stage {stage}: {words}" in line]
+        if len(told) != 1:
+            problems.append(f"the player should be told '{words}' once for stage {stage} of {name}, not {len(told)} times")
+    if "cannot be run" in text:
+        problems.append("a script of a quest could not be run: " + next(
+            line for line in text.splitlines() if "cannot be run" in line))
+    return problems
+
+
+def check_objects(text):
+    """The problems with the script of the scripted object: it must have run its OnLoad block once (it disables the cube
+    next to it) and its GameMode block every frame (frames counted, the distance to the player measured, the disabled
+    cube seen), its OnActivate block must count the activation by the player and not the one by a person, and when the
+    Lua script enables the cube again the script must see it."""
+    problems = []
+
+    def lines(kind):
+        return [line.split("\t")[3:] for line in text.splitlines() if f"OFTEST\tobject {kind}\t" in line]
+
+    def one(kind):
+        found = lines(kind)
+        if len(found) != 1:
+            problems.append(f"expected one 'object {kind}' line from the Lua script, found {len(found)}")
+            return None
+        return found[0]
+
+    if lines("missing"):
+        problems.append(f"the scripted object, the cube or the person was not found: {lines('missing')[0]}")
+        return problems
+    found = one("state")
+    if found is not None:
+        enabled, loaded_once, frames, disabled_seen, activated, distances = found
+        if enabled != "false" or loaded_once != "true":
+            problems.append("OnLoad should have run once and disabled the cube (enabled=false, loads=1): " + str(found))
+        if frames != "true" or disabled_seen != "1":
+            problems.append("GameMode should have run every frame and seen the cube disabled: " + str(found))
+        if activated != "0":
+            problems.append("nothing should have activated the object yet: " + str(found))
+        measured, expected = (int(part) for part in distances.split())
+        if abs(measured - expected) > OBJECT_DISTANCE_SLACK:
+            problems.append(f"GetDistance should be within {OBJECT_DISTANCE_SLACK} units of the distance Lua sees: "
+                            + str(found))
+    found = one("activated")
+    if found is not None and found != ["1", "2"]:
+        problems.append("OnActivate should count each of the two activations by the player (1 then 2): " + str(found))
+    found = one("made")
+    if found is not None and found[0] != "true":
+        problems.append("an object made by Lua should be put in the cell and activated without an error: " + str(found))
+    found = one("victim again")
+    if found is not None and found != ["true", "0"]:
+        problems.append("the cube enabled by Lua should be enabled, and GetDisabled in the script should see it (true, "
+                        + "0): " + str(found))
+    told = [line for line in text.splitlines() if f"Message: {plugin.MESSAGE_TEXT}" in line]
+    if len(told) != 1:
+        problems.append(f"ShowMessage in OnLoad should have told the player '{plugin.MESSAGE_TEXT}' once, not "
+                        f"{len(told)} times")
+    for line in text.splitlines():
+        if re.search(r"The script 0x[0-9a-f]+ of an object|The script command .* is not implemented", line):
+            problems.append("a script of an object could not run: " + line)
     return problems
 
 
@@ -863,14 +1147,14 @@ def check_packages(text, scenario, animated):
         if match:
             samples.setdefault(match.group(1), []).append(
                 (float(match.group(2)), tuple(float(match.group(i)) for i in (3, 4, 5)), float(match.group(6))))
-    for name in tuple(PACKAGE_START) + tuple(plugin.FOLLOW_PLACES):
+    for name in tuple(PACKAGE_START) + tuple(plugin.FOLLOW_PLACES) + tuple(GATE_START):
         if len(samples.get(name, [])) < WALK_SECONDS - 5:
             problems.append(f"the script logged {len(samples.get(name, []))} positions of the '{name}', expected at least "
                             f"{WALK_SECONDS - 5}")
             return problems
 
     def where(name):
-        x, y = {**PACKAGE_START, **plugin.FOLLOW_PLACES}[name]
+        x, y = {**PACKAGE_START, **plugin.FOLLOW_PLACES, **GATE_START}[name]
         return scenario.origin[0] + x, scenario.origin[1] + y
 
     def away(name, position):
@@ -891,6 +1175,7 @@ def check_packages(text, scenario, animated):
     night = (scenario.origin[0] + plugin.PACKAGE_PLACES["night"][0], scenario.origin[1] + plugin.PACKAGE_PLACES["night"][1])
     walker = samples["walker"]
     problems += check_followers(text, scenario, samples, animated, where)
+    problems += check_scripted_packages(text, scenario, samples, animated, where)
     if not animated:
         moved = max(away("walker", position) for _, position, _ in walker)
         if moved > UNMOVED_RANGE:
@@ -926,6 +1211,57 @@ def check_packages(text, scenario, animated):
                         f"{plugin.ROAM_RADIUS}")
     if farthest < 5.0:
         problems.append("the roamer, which has a package that sends it about, did not move")
+    return problems
+
+
+def check_scripted_packages(text, scenario, samples, animated, where):
+    """The problems with the two characters whose packages depend on scripts. The conditional one has a package whose
+    condition never holds (it must not go to its marker) and one that holds from the time the test sets a stage of
+    quest C: it stays where it is put until then and goes to the marker of the second. The scripted one has no package
+    of its own, and the script of the scripted object gives it one: it goes to the marker of that. Without the
+    animation to walk with none of them is moved."""
+    problems = []
+    if "OFTEST\tgate opened\ttrue" not in text:
+        problems.append("the stage of quest C that opens the gate was not set from Lua")
+
+    def marker(name):
+        x, y = plugin.GATE_PLACES[name]
+        return scenario.origin[0] + x, scenario.origin[1] + y
+
+    def distance(position, place):
+        return math.hypot(position[0] - place[0], position[1] - place[1])
+
+    def edge_of(name, rows):
+        _, (x, y, _), _ = rows[-1]
+        arrived_at = distance((x, y), marker(name))
+        if abs(arrived_at - plugin.TRAVEL_RADIUS) > TRAVEL_SLACK:
+            return (f"ended at {x:.0f},{y:.0f}, {arrived_at:.0f} units from the marker at {marker(name)[0]:.0f},"
+                    f"{marker(name)[1]:.0f}, expected it at the edge of the radius of the package, "
+                    f"{plugin.TRAVEL_RADIUS} units from it")
+        return None
+
+    conditional, scripted = samples["conditional"], samples["scripted"]
+    if not animated:
+        for name, rows in (("conditional", conditional), ("scripted", scripted)):
+            if max(distance(position[:2], where(name)) for _, position, _ in rows) > UNMOVED_RANGE:
+                problems.append(f"the {name} character was moved, but it has no animation to walk with")
+        return problems
+
+    before = [(time_, position) for time_, position, _ in conditional if time_ < plugin.GATE_FROM - GATE_MARGIN]
+    if not before:
+        problems.append("the conditional character was never seen before the gate opened")
+    for time_, position in before:
+        if distance(position[:2], where("conditional")) > UNMOVED_RANGE:
+            problems.append(f"the conditional character, whose packages do not hold yet, was moved "
+                            f"{distance(position[:2], where('conditional')):.1f} units at {time_:.0f} s, before the gate "
+                            f"opened at {plugin.GATE_FROM:.0f} s")
+            break
+    if (message := edge_of("gated", conditional)) is not None:
+        problems.append("the conditional character, whose second package holds from the gate on, " + message)
+    if any(distance(position[:2], marker("blocked")) < ARRIVAL_RANGE * 3 for _, position, _ in conditional):
+        problems.append("the conditional character went to the marker of the package whose condition never holds")
+    if (message := edge_of("scripted_marker", scripted)) is not None:
+        problems.append("the scripted character, which a script gave a package, " + message)
     return problems
 
 
@@ -1000,9 +1336,13 @@ def main():
     (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
     (data / "scripts" / "packagetrack.lua").write_text(PACKAGE_SCRIPT, encoding="ascii")
     (data / "scripts" / "followtest.lua").write_text(FOLLOW_SCRIPT, encoding="ascii")
+    (data / "scripts" / "questtest.lua").write_text(QUEST_SCRIPT, encoding="ascii")
+    (data / "scripts" / "objecttest.lua").write_text(OBJECT_SCRIPT, encoding="ascii")
+    (data / "scripts" / "gatetest.lua").write_text(GATE_SCRIPT, encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
-        "GLOBAL: scripts/followtest.lua\n", encoding="ascii")
+        "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
+        "GLOBAL: scripts/gatetest.lua\n", encoding="ascii")
 
     xvfb = start_xvfb()
     for scenario in SCENARIOS:

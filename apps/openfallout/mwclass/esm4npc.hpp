@@ -93,6 +93,11 @@ namespace OFClass
             return ESM4Impl::getToolTipInfo(getName(ptr), count);
         }
 
+        std::uint32_t getFalloutScript(const OFWorld::ConstPtr& ptr) const override
+        {
+            return ESM4Impl::scriptOf(*ptr.get<ESM4::Npc>()->mBase);
+        }
+
         VFS::Path::NormalizedView getModel(const OFWorld::ConstPtr& ptr) const override;
         std::string_view getName(const OFWorld::ConstPtr& ptr) const override;
 

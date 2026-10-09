@@ -193,6 +193,10 @@ namespace OFWorld
         ///< Return name of the script attached to ptr (default implementation: return an empty
         /// string).
 
+        virtual std::uint32_t getFalloutScript(const ConstPtr& ptr) const;
+        ///< Return the form id (with the index of the plugin in the load order) of the compiled script of Fallout 3 or
+        /// New Vegas that the base record of ptr names, 0 for none (default implementation: 0).
+
         virtual float getWalkSpeed(const Ptr& ptr) const;
         virtual float getRunSpeed(const Ptr& ptr) const;
         virtual float getSwimSpeed(const Ptr& ptr) const;

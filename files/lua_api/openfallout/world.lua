@@ -63,6 +63,98 @@
 -- end
 
 ---
+-- The quests of Fallout 3 and New Vegas (see @{#QuestFunctions}). Empty of quests in a game without them.
+-- @field [parent=#world] #QuestFunctions quests
+
+---
+-- Functions related to the quests of Fallout 3 and New Vegas.
+-- @type QuestFunctions
+
+---
+-- Returns the quest with the given editor id (any case) or form id (``0x`` followed by hexadecimal digits, with the
+-- load order index of the plugin in the top byte, as ``core.getFormId`` writes it, with or without the ``FormId:``
+-- before them), or `nil` if the loaded content has no such quest.
+-- @function [parent=#QuestFunctions] find
+-- @param #string name
+-- @return #Quest, #nil
+-- @usage
+-- local quest = world.quests.find('VMQ01')
+-- if quest then quest:setStage(10) end
+
+---
+-- A quest and how far the player is in it.
+-- @type Quest
+-- @field #string id Form id of the quest, as ``core.getFormId`` writes it.
+-- @field #string editorId Editor id of the quest.
+-- @field #string name Name of the quest as the player reads it (can be empty).
+-- @field #number stage The stage that was set last, 0 if none was.
+-- @field #boolean running Whether the quest runs: it started with the game or a stage was set, and it is not completed.
+-- @field #boolean completed Whether the quest is completed.
+-- @field #boolean failed Whether the quest failed.
+-- @field #list<#QuestJournalEntry> journal The text of the stages that were reached and had one, in order.
+
+---
+-- @type QuestJournalEntry
+-- @field #number stage The stage the text belongs to.
+-- @field #string text The text.
+
+---
+-- Whether the stage was reached.
+-- @function [parent=#Quest] stageDone
+-- @param self
+-- @param #number stage
+-- @return #boolean
+
+---
+-- Sets the stage: runs the result scripts of the stage, adds its text to the journal, completes or fails the quest if
+-- the stage says so, and starts the quest. Returns false if the quest has no such stage, or if the stage was reached
+-- before and the quest does not allow it again. The scripts run at once, before this returns.
+-- @function [parent=#Quest] setStage
+-- @param self
+-- @param #number stage
+-- @return #boolean
+
+---
+-- Starts the quest, if it is not completed.
+-- @function [parent=#Quest] start
+-- @param self
+
+---
+-- Stops the quest.
+-- @function [parent=#Quest] stop
+-- @param self
+
+---
+-- Completes the quest.
+-- @function [parent=#Quest] complete
+-- @param self
+
+---
+-- Whether the quest shows the objective to the player.
+-- @function [parent=#Quest] objectiveDisplayed
+-- @param self
+-- @param #number objective
+-- @return #boolean
+
+---
+-- Whether the objective is completed.
+-- @function [parent=#Quest] objectiveCompleted
+-- @param self
+-- @param #number objective
+-- @return #boolean
+
+---
+-- The global variables of Fallout 3 and New Vegas by editor id (any case) or form id. Reading a variable that does not
+-- exist gives `nil`, setting one raises an error. A short or a long keeps its whole part.
+-- @field [parent=#world] #FalloutGlobals globals
+-- @usage
+-- world.globals.GameYear = 2281
+
+---
+-- @type FalloutGlobals
+-- @map <#string, #number>
+
+---
 -- Loads a named cell
 -- @function [parent=#world] getCellByName
 -- @param #string cellName

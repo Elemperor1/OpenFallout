@@ -97,6 +97,7 @@ namespace OFWorld
 namespace OFScript
 {
     class ScriptManager;
+    class FalloutScripts;
 }
 
 namespace OFMechanics
@@ -134,6 +135,7 @@ namespace OF
         std::unique_ptr<OFWorld::World> mWorld;
         std::unique_ptr<OFSound::SoundManager> mSoundManager;
         std::unique_ptr<OFScript::ScriptManager> mScriptManager;
+        std::unique_ptr<OFScript::FalloutScripts> mFalloutScripts;
         std::unique_ptr<OFGui::WindowManager> mWindowManager;
         std::unique_ptr<OFMechanics::MechanicsManager> mMechanicsManager;
         std::unique_ptr<OFDialogue::DialogueManager> mDialogueManager;

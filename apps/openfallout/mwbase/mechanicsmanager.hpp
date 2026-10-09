@@ -223,6 +223,9 @@ namespace OFBase
         /// say (distance 0: the usual one), until it is told to stop
         virtual void startFalloutFollowing(const OFWorld::Ptr& actor, const OFWorld::Ptr& target, float distance) = 0;
         virtual void stopFalloutFollowing(const OFWorld::Ptr& actor) = 0;
+        /// A character or creature of Fallout looks at its AI packages again, now and not at the next time it does:
+        /// scripts changed the packages they gave it, or what the conditions of its packages depend on
+        virtual void evaluateFalloutPackages(const OFWorld::Ptr& actor) = 0;
 
         virtual void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
             = 0;

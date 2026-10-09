@@ -22,6 +22,11 @@ namespace OFWorld
     class Scene;
 }
 
+namespace OFScript
+{
+    class FalloutScripts;
+}
+
 namespace OFBase
 {
     class World;
@@ -49,6 +54,7 @@ namespace OFBase
         OFWorld::ESMStore* mESMStore = nullptr;
         SoundManager* mSoundManager = nullptr;
         ScriptManager* mScriptManager = nullptr;
+        OFScript::FalloutScripts* mFalloutScripts = nullptr;
         WindowManager* mWindowManager = nullptr;
         MechanicsManager* mMechanicsManager = nullptr;
         DialogueManager* mDialogueManager = nullptr;
@@ -79,6 +85,8 @@ namespace OFBase
 
         void setScriptManager(ScriptManager& value) { mScriptManager = &value; }
 
+        void setFalloutScripts(OFScript::FalloutScripts& value) { mFalloutScripts = &value; }
+
         void setWindowManager(WindowManager& value) { mWindowManager = &value; }
 
         void setMechanicsManager(MechanicsManager& value) { mMechanicsManager = &value; }
@@ -105,6 +113,9 @@ namespace OFBase
         Misc::NotNullPtr<SoundManager> getSoundManager() const { return mSoundManager; }
 
         Misc::NotNullPtr<ScriptManager> getScriptManager() const { return mScriptManager; }
+
+        /// The compiled scripts of Fallout 3 and New Vegas
+        Misc::NotNullPtr<OFScript::FalloutScripts> getFalloutScripts() const { return mFalloutScripts; }
 
         Misc::NotNullPtr<WindowManager> getWindowManager() const { return mWindowManager; }
 
