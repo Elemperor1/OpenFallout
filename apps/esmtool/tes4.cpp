@@ -22,6 +22,7 @@
 #include <components/esm4/readerutils.hpp>
 #include <components/esm4/records.hpp>
 #include <components/esm4/referencecensus.hpp>
+#include <components/esm4/scriptcodecensus.hpp>
 #include <components/esm4/survey.hpp>
 #include <components/esm4/typetraits.hpp>
 #include <components/esm4/wornarmorcensus.hpp>
@@ -902,5 +903,10 @@ namespace EsmTool
     int wornTes4(const Arguments& info)
     {
         return countTes4<ESM4::WornArmorCensus>(info, "Worn", "armour that the characters wear");
+    }
+
+    int scriptCodeTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::ScriptCodeCensus>(info, "Script code", "compiled scripts");
     }
 }

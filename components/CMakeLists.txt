@@ -346,6 +346,8 @@ add_component_dir (esm4
     reference
     referencecensus
     script
+    scriptcode
+    scriptcodecensus
     survey
     typetraits
     vertex

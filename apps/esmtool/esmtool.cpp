@@ -77,6 +77,10 @@ Allowed modes:
          body and the animation files they list, with a few example file names.
          Give the files in load order, masters first. Prints no other record
          contents.
+  scriptcode Decodes the compiled scripts (SCDA) of one or more Fallout 3 or New
+         Vegas files and counts the statements, blocks, commands and jumps
+         they hold, and the scripts that do not decode. Give the files in load
+         order, masters first. Prints no script contents.
   worn   Counts the armour that the characters of one or more Fallout 3 or New
          Vegas files wear, with the code the game uses: the inventory, the
          template, the levelled lists and which pieces show on the body. Give
@@ -167,7 +171,8 @@ Allowed options)");
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
                 || info.mode == "survey" || info.mode == "references" || info.mode == "equipment"
-                || info.mode == "packages" || info.mode == "creatures" || info.mode == "worn"))
+                || info.mode == "packages" || info.mode == "creatures" || info.mode == "worn"
+                || info.mode == "scriptcode"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -191,7 +196,7 @@ Allowed options)");
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
         // Only a survey or a count takes any number of files, the other modes take an input file and an output file.
         if (info.mode != "survey" && info.mode != "references" && info.mode != "equipment" && info.mode != "packages"
-            && info.mode != "creatures" && info.mode != "worn" && inputFiles.size() > 2)
+            && info.mode != "creatures" && info.mode != "worn" && info.mode != "scriptcode" && inputFiles.size() > 2)
         {
             std::cout << "\nERROR: more than two files specified\n\n";
             std::cout << desc << finalText << std::endl;
@@ -254,6 +259,8 @@ int main(int argc, char** argv)
             return creaturesTes4(info);
         else if (info.mode == "worn")
             return wornTes4(info);
+        else if (info.mode == "scriptcode")
+            return scriptCodeTes4(info);
         else if (info.mode == "clone")
             return clone(info);
         else if (info.mode == "comp")
