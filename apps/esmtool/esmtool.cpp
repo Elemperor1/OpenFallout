@@ -80,7 +80,8 @@ Allowed modes:
   scriptcode Decodes the compiled scripts (SCDA) of one or more Fallout 3 or New
          Vegas files and counts the statements, blocks, commands and jumps
          they hold, and the scripts that do not decode. Give the files in load
-         order, masters first. Prints no script contents.
+         order, masters first. Prints no script contents, except a few bytes
+         around the place where the first scripts that fail to decode stop.
   worn   Counts the armour that the characters of one or more Fallout 3 or New
          Vegas files wear, with the code the game uses: the inventory, the
          template, the levelled lists and which pieces show on the body. Give

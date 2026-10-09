@@ -17,10 +17,12 @@ Windows executable (a structure is taken to be one when its name pointers lead t
 pointer leads into the image, and its parameter table is well formed). The executable is only read. It prints how many
 tables and entries it found, and writes one CSV line per entry:
 
-    table,opcode,name,short name,needs parent,parameters,flags
+    table,opcode,name,short name,needs parent,parameters,flags,parse
 
-where the parameters are `typeID` or `typeID?` for an optional one, separated by spaces. The help text is left out on
-purpose: it is text of the game, and nothing here needs it.
+where the parameters are `typeID` or `typeID?` for an optional one, separated by spaces, and parse is the address of the
+function that reads the arguments (most commands share one; the few that do not, read their arguments in another way).
+The summary lists how many commands use each parse function and names the commands of the rare ones. The help text is
+left out on purpose: it is text of the game, and nothing here needs it.
 
     scripts/openfallout/dump_command_table.py FalloutNV.exe --csv command_table_fnv.csv
 
@@ -90,7 +92,7 @@ class PE:
 
 
 class Entry:
-    def __init__(self, offset, name, short_name, opcode, needs_parent, params, flags):
+    def __init__(self, offset, name, short_name, opcode, needs_parent, params, flags, parse):
         self.offset = offset
         self.name = name
         self.short_name = short_name
@@ -98,6 +100,7 @@ class Entry:
         self.needs_parent = needs_parent
         self.params = params  # list of (type id, optional)
         self.flags = flags
+        self.parse = parse
 
 
 def read_entry(pe, offset, stride):
@@ -121,6 +124,9 @@ def read_entry(pe, offset, stride):
         return None
     if not pe.in_image(execute):
         return None
+    parse = struct.unpack_from("<I", data, offset + 0x1C)[0] if stride >= 0x20 else 0
+    if parse and not pe.in_image(parse):
+        return None
     flags = struct.unpack_from("<I", data, offset + 0x24)[0] if stride >= 0x28 else 0
     params = []
     if num_params:
@@ -132,7 +138,7 @@ def read_entry(pe, offset, stride):
             if (type_ptr and pe.string(type_ptr) is None) or type_id > 0x100 or optional > 1:
                 return None
             params.append((type_id, optional))
-    return Entry(offset, name, short_name, opcode, needs_parent, params, flags)
+    return Entry(offset, name, short_name, opcode, needs_parent, params, flags, parse)
 
 
 def find_tables(pe, stride, minimum):
@@ -208,13 +214,20 @@ def main(argv):
             kinds[type_id] = kinds.get(type_id, 0) + 1
     print("parameter types used: " + " ".join("%d:%d" % (k, kinds[k]) for k in sorted(kinds)))
 
+    parsers = {}
+    for _, e in rows:
+        parsers.setdefault(e.parse, []).append(e.name)
+    for parse in sorted(parsers, key=lambda p: -len(parsers[p])):
+        names = parsers[parse]
+        print("parse function 0x%X: %d commands%s" % (parse, len(names), (": " + " ".join(names)) if len(names) <= 30 else ""))
+
     if args.csv:
         with open(args.csv, "w", newline="") as stream:
             writer = csv.writer(stream)
             for number, e in rows:
                 params = " ".join(("%d?" if optional else "%d") % type_id for type_id, optional in e.params)
                 writer.writerow([number, "0x%04X" % e.opcode, e.name, e.short_name, e.needs_parent, params,
-                                 "0x%X" % e.flags])
+                                 "0x%X" % e.flags, "0x%X" % e.parse])
         print("wrote %d entries to %s" % (len(rows), args.csv))
     return 0
 

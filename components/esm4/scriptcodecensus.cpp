@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <ostream>
 #include <set>
+#include <sstream>
 
 #include "censusreading.hpp"
 #include "common.hpp"
@@ -239,7 +240,7 @@ namespace ESM4
         }
     }
 
-    void ScriptCodeCensus::addScript(const std::string& holder, const ScriptDefinition& script)
+    void ScriptCodeCensus::addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script)
     {
         const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
             || script.scriptHeader.refCount != 0 || !script.scriptSource.empty() || !script.localVarData.empty()
@@ -272,6 +273,27 @@ namespace ESM4
             ++mErrors[program.mError];
             if (mErrorValues.size() < maxErrorValues || mErrorValues.count({ program.mError, program.mErrorValue }))
                 ++mErrorValues[{ program.mError, program.mErrorValue }];
+            std::vector<Failure>& failures = mFailures[program.mError];
+            if (failures.size() < maxFailuresPerError)
+            {
+                Failure failure;
+                failure.mHolder = holder;
+                failure.mRecord = record;
+                failure.mSize = script.compiledScript.size();
+                failure.mOffset = program.mErrorOffset;
+                failure.mValue = program.mErrorValue;
+                constexpr std::size_t before = 12;
+                constexpr std::size_t length = 36;
+                const std::size_t from = failure.mOffset > before ? failure.mOffset - before : 0;
+                const std::size_t to = std::min(script.compiledScript.size(), from + length);
+                std::ostringstream bytes;
+                bytes << std::hex << std::setfill('0');
+                for (std::size_t i = from; i < to; ++i)
+                    bytes << (i == from ? "" : " ") << (i == failure.mOffset ? "[" : "") << std::setw(2)
+                          << static_cast<unsigned>(script.compiledScript[i]);
+                failure.mBytes = bytes.str();
+                failures.push_back(std::move(failure));
+            }
         }
         else
             ++totals.mDecoded;
@@ -362,15 +384,15 @@ namespace ESM4
                         {
                             Script record;
                             record.load(r);
-                            addScript("SCPT", record.mScript);
+                            addScript("SCPT", record.mId, record.mScript);
                             break;
                         }
                         case REC_INFO:
                         {
                             DialogInfo record;
                             record.load(r);
-                            addScript("INFO", record.mScript);
-                            addScript("INFO", record.mEndScript);
+                            addScript("INFO", record.mId, record.mScript);
+                            addScript("INFO", record.mId, record.mEndScript);
                             break;
                         }
                         case REC_QUST:
@@ -379,7 +401,7 @@ namespace ESM4
                             record.load(r);
                             for (const QuestStage& stage : record.mStages)
                                 for (const QuestLogEntry& entry : stage.mLogEntries)
-                                    addScript("QUST", entry.mScript);
+                                    addScript("QUST", record.mId, entry.mScript);
                             break;
                         }
                         case REC_TERM:
@@ -387,25 +409,25 @@ namespace ESM4
                             Terminal record;
                             record.load(r);
                             for (const Terminal::MenuItem& item : record.mMenuItems)
-                                addScript("TERM", item.mScript);
+                                addScript("TERM", record.mId, item.mScript);
                             break;
                         }
                         case REC_PACK:
                         {
                             AIPackage record;
                             record.load(r);
-                            addScript("PACK", record.mBegin.mScript);
-                            addScript("PACK", record.mEnd.mScript);
-                            addScript("PACK", record.mChange.mScript);
+                            addScript("PACK", record.mId, record.mBegin.mScript);
+                            addScript("PACK", record.mId, record.mEnd.mScript);
+                            addScript("PACK", record.mId, record.mChange.mScript);
                             break;
                         }
                         default:
                         {
                             Perk record;
                             record.load(r);
-                            addScript("PERK", record.mScript);
+                            addScript("PERK", record.mId, record.mScript);
                             for (const Perk::Entry& entry : record.mEntries)
-                                addScript("PERK", entry.mScript);
+                                addScript("PERK", record.mId, entry.mScript);
                             break;
                         }
                     }
@@ -477,6 +499,20 @@ namespace ESM4
         for (const auto& [key, count] : mErrorValues)
             stream << "    " << ScriptCode::errorText(key.first) << ", value " << hex(key.second, 4) << ": " << count
                    << '\n';
+
+        if (!mFailures.empty())
+        {
+            stream << "\nThe first scripts that failed, by kind of failure: record, its form id, size of the code,\n"
+                      "offset of the failure and the bytes from 12 before it ([ marks the offset)\n";
+            for (const auto& [error, failures] : mFailures)
+            {
+                stream << "  " << ScriptCode::errorText(error) << '\n';
+                for (const Failure& failure : failures)
+                    stream << "    " << failure.mHolder << ' ' << failure.mRecord.toString() << ", " << failure.mSize
+                           << " bytes, offset " << failure.mOffset << ", value " << hex(failure.mValue, 4) << ": "
+                           << failure.mBytes << '\n';
+            }
+        }
 
         stream << "\nStatements (all the commands are under one code)\n";
         for (const auto& [code, count] : mStatementCodes)

@@ -170,6 +170,30 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("value 0x0040: 1"));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, keepsTheFirstScriptsThatFail)
+    {
+        ESM4::ScriptCodeCensus census;
+        std::string records;
+        for (std::uint32_t i = 0; i < ESM4::ScriptCodeCensus::maxFailuresPerError + 2; ++i)
+            records += scriptRecord(0x1001 + i, statement(0x1D) + statement(0x40));
+        collect(census, records);
+
+        const auto& failures = census.getFailures().at(ESM4::ScriptCode::Error::UnknownStatement);
+        ASSERT_EQ(failures.size(), ESM4::ScriptCodeCensus::maxFailuresPerError);
+        EXPECT_EQ(failures[0].mHolder, "SCPT");
+        EXPECT_EQ(failures[0].mRecord.mIndex, 0x1001u);
+        EXPECT_EQ(failures[0].mSize, 8u);
+        EXPECT_EQ(failures[0].mOffset, 4u);
+        EXPECT_EQ(failures[0].mValue, 0x40u);
+        // the bytes start 12 before the offset, which is the start of the file here, and mark the offset
+        EXPECT_EQ(failures[0].mBytes, "1d 00 00 00 [40 00 00 00");
+        EXPECT_EQ(census.getHolders().at("SCPT").mFailed, ESM4::ScriptCodeCensus::maxFailuresPerError + 2);
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("1d 00 00 00 [40 00 00 00"));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, reportsABlockThatIsNotClosed)
     {
         ESM4::ScriptCodeCensus census;

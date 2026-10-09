@@ -22,7 +22,9 @@ namespace ESM4
     // not, the statements, the types of block, the commands (by their code), the tokens of expressions, and how the
     // jumps that statements write down relate to the statements they lead to. It is for checking the decoder against
     // the real scripts and for choosing which commands to implement first, so it keeps codes and counts, never the
-    // contents of a script (no names, strings, numbers or source text).
+    // contents of a script (no names, strings, numbers or source text). The one exception is the first few scripts
+    // that fail to decode: for each it names the record and keeps a few bytes around the place where the decoder
+    // stopped, which is what it takes to see why.
     //
     // The files must be read in load order, with the mod index and the indices of the masters set on the reader.
     class ScriptCodeCensus
@@ -71,6 +73,18 @@ namespace ESM4
             std::map<std::uint16_t, std::size_t> mTypes; // by the type in SCHR
         };
 
+        // A script that did not decode, for finding out why
+        struct Failure
+        {
+            std::string mHolder;
+            ESM::FormId mRecord;
+            std::size_t mSize = 0;
+            std::uint32_t mOffset = 0;
+            std::uint16_t mValue = 0;
+            std::string mBytes; // hexadecimal, from a few bytes before the offset
+        };
+        static constexpr std::size_t maxFailuresPerError = 5;
+
         void collect(Reader& reader);
 
         const std::vector<std::string>& getFatalErrors() const { return mFatalErrors; }
@@ -78,6 +92,7 @@ namespace ESM4
         const std::map<std::string, HolderTotals>& getHolders() const { return mHolders; }
         const std::map<std::string, std::size_t>& getRecordsFailed() const { return mRecordsFailed; }
         const std::map<ScriptCode::Error, std::size_t>& getErrors() const { return mErrors; }
+        const std::map<ScriptCode::Error, std::vector<Failure>>& getFailures() const { return mFailures; }
         const std::map<std::pair<std::uint16_t, std::uint16_t>, std::size_t>& getBlocks() const { return mBlocks; }
         const std::map<std::uint16_t, CommandUse>& getCommands() const { return mCommands; }
         const std::map<std::string, std::size_t>& getStructure() const { return mStructure; }
@@ -89,13 +104,14 @@ namespace ESM4
         void write(std::ostream& stream) const;
 
     private:
-        void addScript(const std::string& holder, const ScriptDefinition& script);
+        void addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script);
         void checkStructure(const ScriptCode::Program& program);
 
         std::map<std::string, HolderTotals> mHolders;
         std::map<std::string, std::size_t> mRecordsFailed;
         std::map<ScriptCode::Error, std::size_t> mErrors;
         std::map<std::pair<ScriptCode::Error, std::uint16_t>, std::size_t> mErrorValues;
+        std::map<ScriptCode::Error, std::vector<Failure>> mFailures;
         std::map<std::uint16_t, std::size_t> mStatementCodes;
         // Blocks by the type in SCHR (object, quest, magic effect) and the number of the block type
         std::map<std::pair<std::uint16_t, std::uint16_t>, std::size_t> mBlocks;

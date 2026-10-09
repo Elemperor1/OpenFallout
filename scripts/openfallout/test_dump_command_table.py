@@ -33,10 +33,11 @@ def build_executable(stride=0x28, entries=3):
     help_text = add(b"help\0")
     params = [0, one_param, two_params]
     counts = [0, 1, 2]
+    parsers = [IMAGE_BASE + SECTION_VA, IMAGE_BASE + SECTION_VA, IMAGE_BASE + SECTION_VA + 4]
     table = bytearray()
     for i in range(entries):
         entry = struct.pack("<IIIIHHIIIII", pointers[i][0], pointers[i][1], 0x1000 + i, help_text, 0, counts[i],
-                            params[i], IMAGE_BASE + SECTION_VA, 0, 0, 0)
+                            params[i], IMAGE_BASE + SECTION_VA, parsers[i], 0, 0)
         table.extend(entry[:stride])
     add(table)
     # Something that is not a table, to be skipped
@@ -75,9 +76,9 @@ class DumpCommandTableTest(unittest.TestCase):
         result, rows = self.dump(build_executable())
         self.assertEqual(result, 0)
         self.assertEqual(rows, [
-            ["0", "0x1000", "Activate", "act", "0", "", "0x0"],
-            ["0", "0x1001", "GetStage", "", "0", "14", "0x0"],
-            ["0", "0x1002", "SetStage", "", "0", "14 23?", "0x0"],
+            ["0", "0x1000", "Activate", "act", "0", "", "0x0", "0x401000"],
+            ["0", "0x1001", "GetStage", "", "0", "14", "0x0", "0x401000"],
+            ["0", "0x1002", "SetStage", "", "0", "14 23?", "0x0", "0x401004"],
         ])
 
     def test_finds_a_table_with_shorter_entries(self):
