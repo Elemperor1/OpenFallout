@@ -327,7 +327,9 @@ namespace ESM4
         const Program& program, const std::string& holder, ESM::FormId record, const ScriptDefinition& script)
     {
         const std::vector<Statement>& statements = program.mStatements;
+        bool found = false;
         auto problem = [&](const char* name, std::size_t index) {
+            found = true;
             ++mStructure[name];
             std::vector<Failure>& examples = mStructureExamples[name];
             if (examples.size() < maxFailuresPerError)
@@ -431,6 +433,8 @@ namespace ESM4
                     break;
             }
         }
+        if (found)
+            ++mStructureScripts;
     }
 
     void ScriptCodeCensus::checkArguments(const ScriptCode::Call& call, const std::string& holder, ESM::FormId record,
@@ -899,6 +903,8 @@ namespace ESM4
         stream << "\nNesting\n";
         if (mStructure.empty())
             stream << "  every Begin has its End and every If its EndIf\n";
+        else
+            stream << "  scripts with a problem: " << mStructureScripts << '\n';
         for (const auto& [problem, count] : mStructure)
             stream << "  " << problem << ": " << count << '\n';
         if (!mStructureExamples.empty())

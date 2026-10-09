@@ -76,7 +76,8 @@ namespace ESM4::ScriptCode
     {
         std::vector<Argument> mValues;
         // How many arguments the call says it has (the first u16), which can be fewer than the parameters of the
-        // command when the last ones are optional
+        // command when the last ones are optional. A call with no data at all (a command that takes no parameters
+        // is written that way) has none.
         std::uint16_t mCount = 0;
         // Bytes of the data of the call that the arguments do not use. A few commands (the ones that write a message
         // with values in it) put more arguments after these.

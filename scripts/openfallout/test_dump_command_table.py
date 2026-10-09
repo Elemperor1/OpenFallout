@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Checks dump_command_table.py on a small executable that this builds: one section with a table of three commands."""
+import contextlib
+import io
 import os
 import struct
 import sys
@@ -102,6 +104,27 @@ class DumpCommandTableTest(unittest.TestCase):
         result, rows = self.dump(bytes(data))
         self.assertEqual(result, 0)
         self.assertEqual([r[2] for r in rows], ["Activate", "GetStage", "SetStage"])
+
+    def test_probe_says_why_a_structure_is_not_a_command(self):
+        data = bytearray(build_executable())
+        # the second command loses its name: the table breaks there, but the probe still finds its code
+        entry = data.find(struct.pack("<I", 0x1001), SECTION_RAW) - 8
+        struct.pack_into("<I", data, entry, 0)
+        with tempfile.TemporaryDirectory() as folder:
+            exe = os.path.join(folder, "game.exe")
+            with open(exe, "wb") as stream:
+                stream.write(bytes(data))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                result = dump.main([exe, "--probe", "0x1001,0x1002,0x1777"])
+        text = out.getvalue()
+        self.assertEqual(result, 0)
+        self.assertIn("code 0x1001 at file offset", text)
+        self.assertIn("not a command", text)
+        self.assertIn("rejected: the name pointer 0x0 does not lead to a short printable string", text)
+        self.assertIn("code 0x1002 at file offset", text)
+        self.assertIn("SetStage ()", text)
+        self.assertIn("code 0x1777: no structure with this code", text)
 
     def test_refuses_what_is_not_an_executable(self):
         with self.assertRaises(SystemExit):

@@ -134,6 +134,7 @@ namespace ESM4
         const std::map<std::pair<std::uint16_t, std::uint16_t>, std::size_t>& getBlocks() const { return mBlocks; }
         const std::map<std::uint16_t, CommandUse>& getCommands() const { return mCommands; }
         const std::map<std::string, std::size_t>& getStructure() const { return mStructure; }
+        std::size_t getStructureScripts() const { return mStructureScripts; }
         const std::map<std::string, std::vector<Failure>>& getStructureExamples() const { return mStructureExamples; }
         const std::map<std::uint16_t, ArgumentTally>& getArguments() const { return mArguments; }
         const std::map<std::uint16_t, std::size_t>& getUnknownCommands() const { return mUnknownCommands; }
@@ -170,6 +171,7 @@ namespace ESM4
         std::map<std::string, std::size_t> mTokens;
         std::map<std::string, std::size_t> mOperators;
         std::map<std::string, std::size_t> mStructure; // problems with the nesting of blocks and conditions
+        std::size_t mStructureScripts = 0; // the scripts that have one or more of them
         std::map<std::string, std::vector<Failure>> mStructureExamples; // the first scripts of each problem
         CommandLookup mLookup;
         std::map<std::uint16_t, ArgumentTally> mArguments;

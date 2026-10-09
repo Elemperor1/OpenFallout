@@ -250,6 +250,7 @@ namespace
         collect(census, records);
 
         EXPECT_EQ(census.getStructure().at("EndIf without If"), ESM4::ScriptCodeCensus::maxFailuresPerError + 2);
+        EXPECT_EQ(census.getStructureScripts(), ESM4::ScriptCodeCensus::maxFailuresPerError + 2);
         const auto& examples = census.getStructureExamples().at("EndIf without If");
         ASSERT_EQ(examples.size(), ESM4::ScriptCodeCensus::maxFailuresPerError);
         EXPECT_EQ(examples[0].mHolder, "SCPT");
@@ -259,6 +260,7 @@ namespace
 
         std::ostringstream out;
         census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("scripts with a problem: 7"));
         EXPECT_THAT(out.str(), HasSubstr("The first scripts of each nesting problem"));
         EXPECT_THAT(out.str(), HasSubstr("statements: Sn St [Ef"));
     }

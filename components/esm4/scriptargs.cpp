@@ -49,6 +49,9 @@ namespace ESM4::ScriptCode
 
             void run(const std::vector<Parameter>& parameters)
             {
+                // A command without parameters is called with no data at all, not even a count
+                if (mEnd == mPosition)
+                    return;
                 if (mEnd - mPosition < 2)
                 {
                     fail(ArgumentError::Truncated);

@@ -26,6 +26,10 @@ left out on purpose: it is text of the game, and nothing here needs it.
 
     scripts/openfallout/dump_command_table.py FalloutNV.exe --csv command_table_fnv.csv
 
+A command that scripts call and no table lists (the census shows them) can be looked for with --probe 0x1177,0x116B,
+which prints every place where the data holds that code where the code of a command would be, the words of the
+structure there and why it is or is not taken for a command.
+
 Needs Python 3 only. An executable that is packed (the Steam copies are wrapped in a protection layer) has no readable
 table: use the one from the GOG installer.
 """
@@ -103,42 +107,81 @@ class Entry:
         self.parse = parse
 
 
-def read_entry(pe, offset, stride):
+def check_entry(pe, offset, stride):
+    """The Entry at an offset and None, or None and the reason the structure there is not a command."""
     data = pe.data
     if offset + stride > len(data):
-        return None
+        return None, "runs past the end of the file"
     name_ptr, short_ptr, opcode, help_ptr, needs_parent, num_params, params_ptr, execute = struct.unpack_from(
         "<IIIIHHII", data, offset
     )
     name = pe.string(name_ptr)
     if name is None:
-        return None
+        return None, "the name pointer 0x%X does not lead to a short printable string" % name_ptr
     short_name = ""
     if short_ptr:
         short_name = pe.string(short_ptr)
         if short_name is None:
-            return None
+            return None, "the short name pointer 0x%X does not lead to a short printable string" % short_ptr
     if opcode > 0xFFFF or needs_parent > 1 or num_params > 40:
-        return None
+        return None, "the code, the needs-parent flag (%d) or the number of parameters (%d) is out of range" % (
+            needs_parent, num_params)
     if help_ptr and not pe.in_image(help_ptr):
-        return None
+        return None, "the help text pointer 0x%X is outside the image" % help_ptr
     if not pe.in_image(execute):
-        return None
+        return None, "the execute function pointer 0x%X is outside the image" % execute
     parse = struct.unpack_from("<I", data, offset + 0x1C)[0] if stride >= 0x20 else 0
     if parse and not pe.in_image(parse):
-        return None
+        return None, "the parse function pointer 0x%X is outside the image" % parse
     flags = struct.unpack_from("<I", data, offset + 0x24)[0] if stride >= 0x28 else 0
     params = []
     if num_params:
         table = pe.to_offset(params_ptr)
         if table is None or table + 12 * num_params > len(data):
-            return None
+            return None, "the parameter table 0x%X is not in the file" % params_ptr
         for i in range(num_params):
             type_ptr, type_id, optional = struct.unpack_from("<III", data, table + 12 * i)
             if (type_ptr and pe.string(type_ptr) is None) or type_id > 0x100 or optional > 1:
-                return None
+                return None, "parameter %d is malformed (type %d, optional %d)" % (i, type_id, optional)
             params.append((type_id, optional))
-    return Entry(offset, name, short_name, opcode, needs_parent, params, flags, parse)
+    return Entry(offset, name, short_name, opcode, needs_parent, params, flags, parse), None
+
+
+def read_entry(pe, offset, stride):
+    return check_entry(pe, offset, stride)[0]
+
+
+def probe(pe, opcodes, stride):
+    """Says where the data of the executable holds each of these codes at the place of the code of a command
+    (the third word of a structure), and why that structure is or is not taken for a command. For the codes that a
+    script calls but no table lists. Prints names, never help text."""
+    wanted = set(opcodes)
+    found = {code: 0 for code in wanted}
+    for _, _, _, raw_pointer, raw_size in pe.sections:
+        end = min(raw_pointer + raw_size, len(pe.data))
+        for offset in range(raw_pointer + 8, end - 3, 4):
+            (value,) = struct.unpack_from("<I", pe.data, offset)
+            if value not in wanted:
+                continue
+            start = offset - 8
+            entry, reason = check_entry(pe, start, stride)
+            found[value] += 1
+            words = struct.unpack_from("<10I", pe.data, start) if start + 40 <= len(pe.data) else ()
+            print("code 0x%04X at file offset 0x%X: %s" % (value, start, "a command" if entry else "not a command"))
+            if words:
+                print("  words: " + " ".join("%08X" % w for w in words))
+            if entry:
+                print("  %s (%s), %d parameters, parse 0x%X" % (entry.name, entry.short_name, len(entry.params), entry.parse))
+            else:
+                print("  rejected: " + reason)
+            for name, delta in (("before", -stride), ("after", stride)):
+                around = start + delta
+                if 0 <= around and around + 12 <= len(pe.data):
+                    neighbour = struct.unpack_from("<I", pe.data, around + 8)[0]
+                    print("  %s: code word 0x%X" % (name, neighbour))
+    for code in sorted(wanted):
+        if not found[code]:
+            print("code 0x%04X: no structure with this code" % code)
 
 
 def find_tables(pe, stride, minimum):
@@ -179,11 +222,18 @@ def main(argv):
     parser.add_argument("--csv", help="write the entries to this file")
     parser.add_argument("--minimum", type=int, default=8, help="shortest run that counts as a table (default 8)")
     parser.add_argument("--stride", type=lambda v: int(v, 0), help="size of an entry (default: try 0x28, 0x24, 0x20)")
+    parser.add_argument(
+        "--probe", type=lambda v: [int(c, 0) for c in v.split(",")],
+        help="codes (comma separated) to look for where a table should hold them, and say why a structure there is "
+             "or is not a command; for commands that scripts call and no table lists")
     args = parser.parse_args(argv)
 
     with open(args.executable, "rb") as stream:
         pe = PE(stream.read())
     print("image base 0x%X, %d sections" % (pe.image_base, len(pe.sections)))
+    if args.probe:
+        probe(pe, args.probe, args.stride or 0x28)
+        return 0
 
     tables = []
     strides = [args.stride] if args.stride else [0x28, 0x24, 0x20]

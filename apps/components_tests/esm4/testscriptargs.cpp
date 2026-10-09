@@ -260,10 +260,20 @@ namespace
         EXPECT_EQ(arguments.mError, ArgumentError::TooMany);
     }
 
-    TEST(ESM4ScriptArgsTest, rejectsADataSectionWithNoCount)
+    TEST(ESM4ScriptArgsTest, aCallWithNoDataHasNoArguments)
+    {
+        // How the games write a call of a command that takes no parameters: not even a count
+        const Arguments arguments = decode(Bytes(), {});
+        EXPECT_EQ(arguments.mError, ArgumentError::None);
+        EXPECT_EQ(arguments.mCount, 0);
+        EXPECT_THAT(arguments.mValues, IsEmpty());
+        EXPECT_EQ(arguments.mTrailing, 0u);
+        EXPECT_EQ(decode(Bytes(), { { TypeInteger, true } }).mError, ArgumentError::None);
+    }
+
+    TEST(ESM4ScriptArgsTest, rejectsADataSectionThatIsTooShortForACount)
     {
         EXPECT_EQ(decode(Bytes().u8(0), {}).mError, ArgumentError::Truncated);
-        EXPECT_EQ(decode(Bytes(), {}).mError, ArgumentError::Truncated);
     }
 
     TEST(ESM4ScriptArgsTest, rejectsAnArgumentThatRunsPastTheData)
