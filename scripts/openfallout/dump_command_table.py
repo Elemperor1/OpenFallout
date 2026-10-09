@@ -229,21 +229,23 @@ def attach_strays(tables, found, stride):
     taken for a part of a table when it is far away or its code is, so what looks like a command by chance elsewhere
     stays out."""
     used = {e.offset for table in tables for e in table}
+    # The bounds are those of the runs as they were found. A stray that was taken must not move them, or a chain of
+    # entries each near the one before would pull in everything that lies along it.
+    bounds = [
+        (min(e.offset for e in table), max(e.offset for e in table), min(e.opcode for e in table),
+         max(e.opcode for e in table))
+        for table in tables
+    ]
     for offset in sorted(found):
         if offset in used:
             continue
         entry = found[offset]
-        for table in tables:
-            # The strays are added in the order of their offsets, so the ends of the table are not the first and the
-            # last of its list: one before the run is added after it
-            first = min(e.offset for e in table)
-            last = max(e.offset for e in table)
+        for table, (first, last, low, high) in zip(tables, bounds):
             if (offset - first) % stride:
                 continue
             if not first - STRAY_DISTANCE * stride <= offset <= last + STRAY_DISTANCE * stride:
                 continue
-            codes = [e.opcode for e in table]
-            if not min(codes) - STRAY_CODES <= entry.opcode <= max(codes) + STRAY_CODES:
+            if not low - STRAY_CODES <= entry.opcode <= high + STRAY_CODES:
                 continue
             table.append(entry)
             used.add(offset)

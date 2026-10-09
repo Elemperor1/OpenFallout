@@ -277,6 +277,24 @@ namespace
         EXPECT_EQ(census.getBeginJumps().mUnresolved, 1u);
     }
 
+    TEST(ESM4ScriptCodeCensusTest, aBlockThatIsReplacedByTheNextBeginHasNoEndToJumpTo)
+    {
+        ESM4::ScriptCodeCensus census;
+        std::string beginData;
+        put16(beginData, 0);
+        append<std::uint32_t>(beginData, 0);
+        // two Begin in a row, and one End: the first block is never closed
+        collect(census,
+            scriptRecord(
+                0x1001, statement(0x1D) + statement(0x10, beginData) + statement(0x10, beginData) + statement(0x11)));
+
+        EXPECT_EQ(census.getStructure().at("Begin inside a block"), 1u);
+        EXPECT_EQ(census.getStructure().count("Begin without End"), 0u);
+        // the outer Begin is counted and unresolved, the inner one is tallied against the End
+        EXPECT_EQ(census.getBeginJumps().mTotal, 2u);
+        EXPECT_EQ(census.getBeginJumps().mUnresolved, 1u);
+    }
+
     TEST(ESM4ScriptCodeCensusTest, aConditionThatIsOpenAtTheEndOfItsBlockDoesNotReachTheNextBlock)
     {
         std::string beginData;

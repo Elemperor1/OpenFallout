@@ -346,7 +346,12 @@ namespace ESM4
             if (statement.mKind == Statement::Kind::Begin)
             {
                 if (open)
+                {
+                    // The block that was open has no End of its own, so it has nothing to jump to
                     problem("Begin inside a block", i);
+                    ++mBeginJumps.mTotal;
+                    ++mBeginJumps.mUnresolved;
+                }
                 open = true;
                 begin = i;
             }

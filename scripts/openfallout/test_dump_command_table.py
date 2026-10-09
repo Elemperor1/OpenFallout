@@ -114,6 +114,15 @@ class DumpCommandTableTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual([r[1] for r in rows], ["0x1000", "0x1001", "0x1002"])
 
+    def test_a_chain_of_commands_does_not_pull_the_table_along_with_it(self):
+        # entries 60, 120 and 180 are each within the distance of the one before, and their codes are within reach of
+        # it, but only the first is near the run of 0 to 2: the others stay out
+        keep = {0, 1, 2, 60, 120, 180}
+        data = build_executable(entries=181, broken=[i for i in range(181) if i not in keep])
+        result, rows = self.dump(data, "--minimum", "3")
+        self.assertEqual(result, 0)
+        self.assertEqual([r[1] for r in rows], ["0x%X" % (0x1000 + i) for i in (0, 1, 2, 60)])
+
     def test_reports_a_file_with_no_table(self):
         data = bytearray(build_executable())
         data[SECTION_RAW:] = bytes(len(data) - SECTION_RAW)
