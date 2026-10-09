@@ -1,6 +1,7 @@
 #include "scriptcodecensus.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <exception>
 #include <iomanip>
 #include <ostream>
@@ -99,6 +100,8 @@ namespace ESM4
                     return "after the jump field";
                 case ScriptCodeCensus::FromStatementEnd:
                     return "end of the statement";
+                case ScriptCodeCensus::FromExpression:
+                    return "start of the expression";
                 default:
                     return "?";
             }
@@ -114,13 +117,23 @@ namespace ESM4
             const bool isBegin = from.mKind == Statement::Kind::Begin;
             const std::uint64_t jump = isBegin ? from.mBlockLength : from.mJump;
             const std::array<std::uint64_t, ScriptCodeCensus::JumpFromCount> bases{ from.mOffset, from.mDataOffset,
-                isBegin ? from.mArgumentsOffset : from.mDataOffset + 2, from.mEnd };
+                isBegin ? from.mArgumentsOffset : from.mDataOffset + 2, from.mEnd, from.mDataOffset + 4 };
             const std::array<std::uint64_t, ScriptCodeCensus::JumpToCount> ends{ target.mOffset, target.mEnd };
             ++tally.mTotal;
             for (std::size_t f = 0; f < bases.size(); ++f)
                 for (std::size_t t = 0; t < ends.size(); ++t)
+                {
                     if (bases[f] + jump == ends[t])
                         ++tally.mMatches[f][t];
+                    const std::int64_t difference
+                        = static_cast<std::int64_t>(ends[t]) - static_cast<std::int64_t>(bases[f] + jump);
+                    auto& counts = tally.mDifferences[f][t];
+                    const auto found = counts.find(difference);
+                    if (found != counts.end())
+                        ++found->second;
+                    else if (counts.size() < ScriptCodeCensus::maxDifferences)
+                        counts[difference] = 1;
+                }
         }
 
         void writeJumps(std::ostream& stream, const char* name, const ScriptCodeCensus::JumpTally& tally)
@@ -135,12 +148,139 @@ namespace ESM4
                         stream << "    counted from the " << fromName(static_cast<ScriptCodeCensus::JumpFrom>(f))
                                << " to the " << toName(static_cast<ScriptCodeCensus::JumpTo>(t)) << ": "
                                << tally.mMatches[f][t] << '\n';
+
+            // The rule that comes closest: the one whose most common difference is the most common of all
+            std::size_t bestFrom = 0;
+            std::size_t bestTo = 0;
+            std::size_t bestCount = 0;
+            std::int64_t bestDifference = 0;
+            for (std::size_t f = 0; f < tally.mDifferences.size(); ++f)
+                for (std::size_t t = 0; t < tally.mDifferences[f].size(); ++t)
+                    for (const auto& [difference, count] : tally.mDifferences[f][t])
+                        if (count > bestCount
+                            || (count == bestCount && std::abs(difference) < std::abs(bestDifference)))
+                        {
+                            bestCount = count;
+                            bestFrom = f;
+                            bestTo = t;
+                            bestDifference = difference;
+                        }
+            if (bestCount == 0)
+                return;
+            std::vector<std::pair<std::size_t, std::int64_t>> common;
+            for (const auto& [difference, count] : tally.mDifferences[bestFrom][bestTo])
+                common.emplace_back(count, difference);
+            std::sort(common.begin(), common.end(), [](const auto& left, const auto& right) {
+                return left.first != right.first ? left.first > right.first : left.second < right.second;
+            });
+            stream << "    the closest rule is from the " << fromName(static_cast<ScriptCodeCensus::JumpFrom>(bestFrom))
+                   << " to the " << toName(static_cast<ScriptCodeCensus::JumpTo>(bestTo))
+                   << ", the jump falls short by (bytes: jumps):";
+            for (std::size_t i = 0; i < common.size() && i < 6; ++i)
+                stream << ' ' << common[i].second << ':' << common[i].first;
+            stream << '\n';
+        }
+
+        const char* statementKind(Statement::Kind kind)
+        {
+            switch (kind)
+            {
+                case Statement::Kind::ScriptName:
+                    return "Sn";
+                case Statement::Kind::Begin:
+                    return "Bg";
+                case Statement::Kind::End:
+                    return "En";
+                case Statement::Kind::Declaration:
+                    return "Dc";
+                case Statement::Kind::SetTo:
+                    return "St";
+                case Statement::Kind::If:
+                    return "If";
+                case Statement::Kind::ElseIf:
+                    return "Ei";
+                case Statement::Kind::Else:
+                    return "El";
+                case Statement::Kind::EndIf:
+                    return "Ef";
+                case Statement::Kind::Return:
+                    return "Rt";
+                case Statement::Kind::Call:
+                    return "Cl";
+            }
+            return "??";
+        }
+
+        // The kinds of the statements around one: [ marks the statement at the index, which may be just past the
+        // last one when the script stopped there
+        std::string statementKinds(const Program& program, std::size_t index, std::size_t before, std::size_t after)
+        {
+            const std::vector<Statement>& statements = program.mStatements;
+            const std::size_t from = index > before ? index - before : 0;
+            const std::size_t to = std::min(statements.size(), index + after + 1);
+            std::string text;
+            for (std::size_t i = from; i < to; ++i)
+            {
+                if (!text.empty())
+                    text += ' ';
+                if (i == index)
+                    text += '[';
+                text += statementKind(statements[i].mKind);
+            }
+            if (index >= statements.size())
+                text += text.empty() ? "[" : " [";
+            return text;
+        }
+
+        // The bytes of a script from 12 before an offset, in hexadecimal, [ marking the offset
+        std::string bytesAround(const std::vector<std::uint8_t>& code, std::size_t offset)
+        {
+            constexpr std::size_t before = 12;
+            constexpr std::size_t length = 36;
+            const std::size_t from = offset > before ? offset - before : 0;
+            const std::size_t to = std::min(code.size(), from + length);
+            std::ostringstream bytes;
+            bytes << std::hex << std::setfill('0');
+            for (std::size_t i = from; i < to; ++i)
+                bytes << (i == from ? "" : " ") << (i == offset ? "[" : "") << std::setw(2)
+                      << static_cast<unsigned>(code[i]);
+            return bytes.str();
+        }
+
+        ScriptCodeCensus::Failure makeFailure(const std::string& holder, ESM::FormId record,
+            const std::vector<std::uint8_t>& code, std::size_t offset, std::uint16_t value, std::string statements)
+        {
+            ScriptCodeCensus::Failure failure;
+            failure.mHolder = holder;
+            failure.mRecord = record;
+            failure.mSize = code.size();
+            failure.mOffset = static_cast<std::uint32_t>(offset);
+            failure.mValue = value;
+            failure.mBytes = bytesAround(code, offset);
+            failure.mStatements = std::move(statements);
+            return failure;
+        }
+
+        void writeFailures(std::ostream& stream, const std::vector<ScriptCodeCensus::Failure>& failures)
+        {
+            for (const ScriptCodeCensus::Failure& failure : failures)
+                stream << "    " << failure.mHolder << ' ' << failure.mRecord.toString() << ", " << failure.mSize
+                       << " bytes, offset " << failure.mOffset << ", value " << hex(failure.mValue, 4) << ": "
+                       << failure.mBytes << "\n      statements: " << failure.mStatements << '\n';
         }
     }
 
-    void ScriptCodeCensus::checkStructure(const Program& program)
+    void ScriptCodeCensus::checkStructure(
+        const Program& program, const std::string& holder, ESM::FormId record, const ScriptDefinition& script)
     {
         const std::vector<Statement>& statements = program.mStatements;
+        auto problem = [&](const char* name, std::size_t index) {
+            ++mStructure[name];
+            std::vector<Failure>& examples = mStructureExamples[name];
+            if (examples.size() < maxFailuresPerError)
+                examples.push_back(makeFailure(holder, record, script.compiledScript, statements[index].mOffset,
+                    statements[index].mCode, statementKinds(program, index, 8, 3)));
+        };
 
         // Blocks: each Begin is followed by an End, and blocks do not nest
         bool open = false;
@@ -151,14 +291,14 @@ namespace ESM4
             if (statement.mKind == Statement::Kind::Begin)
             {
                 if (open)
-                    ++mStructure["Begin inside a block"];
+                    problem("Begin inside a block", i);
                 open = true;
                 begin = i;
             }
             else if (statement.mKind == Statement::Kind::End)
             {
                 if (!open)
-                    ++mStructure["End without Begin"];
+                    problem("End without Begin", i);
                 else
                     tallyJump(mBeginJumps, statements[begin], statement);
                 open = false;
@@ -166,7 +306,7 @@ namespace ESM4
         }
         if (open)
         {
-            ++mStructure["Begin without End"];
+            problem("Begin without End", begin);
             ++mBeginJumps.mTotal;
             ++mBeginJumps.mUnresolved;
         }
@@ -200,7 +340,7 @@ namespace ESM4
                 case Statement::Kind::Else:
                     if (branches.empty())
                     {
-                        ++mStructure["ElseIf or Else without If"];
+                        problem("ElseIf or Else without If", i);
                         break;
                     }
                     tally(branches.back(), statement);
@@ -209,7 +349,7 @@ namespace ESM4
                 case Statement::Kind::EndIf:
                     if (branches.empty())
                     {
-                        ++mStructure["EndIf without If"];
+                        problem("EndIf without If", i);
                         break;
                     }
                     tally(branches.back(), statement);
@@ -221,7 +361,7 @@ namespace ESM4
         }
         for (const std::size_t branch : branches)
         {
-            ++mStructure["If without EndIf"];
+            problem("If without EndIf", branch);
             switch (statements[branch].mKind)
             {
                 case Statement::Kind::If:
@@ -276,22 +416,8 @@ namespace ESM4
             std::vector<Failure>& failures = mFailures[program.mError];
             if (failures.size() < maxFailuresPerError)
             {
-                Failure failure;
-                failure.mHolder = holder;
-                failure.mRecord = record;
-                failure.mSize = script.compiledScript.size();
-                failure.mOffset = program.mErrorOffset;
-                failure.mValue = program.mErrorValue;
-                constexpr std::size_t before = 12;
-                constexpr std::size_t length = 36;
-                const std::size_t from = failure.mOffset > before ? failure.mOffset - before : 0;
-                const std::size_t to = std::min(script.compiledScript.size(), from + length);
-                std::ostringstream bytes;
-                bytes << std::hex << std::setfill('0');
-                for (std::size_t i = from; i < to; ++i)
-                    bytes << (i == from ? "" : " ") << (i == failure.mOffset ? "[" : "") << std::setw(2)
-                          << static_cast<unsigned>(script.compiledScript[i]);
-                failure.mBytes = bytes.str();
+                Failure failure = makeFailure(holder, record, script.compiledScript, program.mErrorOffset,
+                    program.mErrorValue, statementKinds(program, program.mStatements.size(), 8, 0));
                 failures.push_back(std::move(failure));
             }
         }
@@ -364,7 +490,7 @@ namespace ESM4
         // A script that stopped at an error holds the statements before it only, so its blocks and conditions are
         // not closed and its jumps lead nowhere
         if (program.mError == Error::None)
-            checkStructure(program);
+            checkStructure(program, holder, record, script);
     }
 
     void ScriptCodeCensus::collect(Reader& reader)
@@ -506,14 +632,14 @@ namespace ESM4
         if (!mFailures.empty())
         {
             stream << "\nThe first scripts that failed, by kind of failure: record, its form id, size of the code,\n"
-                      "offset of the failure and the bytes from 12 before it ([ marks the offset)\n";
+                      "offset of the failure and the bytes from 12 before it ([ marks the offset), then the kinds of\n"
+                      "the statements before it (Sn ScriptName, Bg Begin, En End, Dc declaration, St SetTo, If, Ei "
+                      "ElseIf,\n"
+                      "El Else, Ef EndIf, Rt Return, Cl command call)\n";
             for (const auto& [error, failures] : mFailures)
             {
                 stream << "  " << ScriptCode::errorText(error) << '\n';
-                for (const Failure& failure : failures)
-                    stream << "    " << failure.mHolder << ' ' << failure.mRecord.toString() << ", " << failure.mSize
-                           << " bytes, offset " << failure.mOffset << ", value " << hex(failure.mValue, 4) << ": "
-                           << failure.mBytes << '\n';
+                writeFailures(stream, failures);
             }
         }
 
@@ -540,6 +666,17 @@ namespace ESM4
             stream << "  every Begin has its End and every If its EndIf\n";
         for (const auto& [problem, count] : mStructure)
             stream << "  " << problem << ": " << count << '\n';
+        if (!mStructureExamples.empty())
+        {
+            stream
+                << "\nThe first scripts of each nesting problem: the same as above, with the kinds of the statements\n"
+                   "from 8 before the one at fault to 3 after it ([ marks it)\n";
+            for (const auto& [problem, examples] : mStructureExamples)
+            {
+                stream << "  " << problem << '\n';
+                writeFailures(stream, examples);
+            }
+        }
 
         stream << "\nJumps: how many bytes each jump counts, and what it leads to. A rule that matches every jump is\n"
                   "the one the compiler uses.\n";

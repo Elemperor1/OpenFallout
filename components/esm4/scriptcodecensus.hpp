@@ -37,6 +37,7 @@ namespace ESM4
             FromDataStart,
             FromAfterJumpField,
             FromStatementEnd,
+            FromExpression, // the expression of an If or ElseIf: after the jump and the length of the expression
             JumpFromCount
         };
         enum JumpTo
@@ -50,6 +51,9 @@ namespace ESM4
             std::size_t mTotal = 0;
             std::size_t mUnresolved = 0; // no statement of the kind to jump to was found
             std::array<std::array<std::size_t, JumpToCount>, JumpFromCount> mMatches{};
+            // For each rule, how many bytes short of the target the jump ends (0 when the rule matches), and how many
+            // jumps are that far off. Only the first maxDifferences different values are kept apart.
+            std::array<std::array<std::map<std::int64_t, std::size_t>, JumpToCount>, JumpFromCount> mDifferences{};
         };
 
         struct CommandUse
@@ -82,8 +86,10 @@ namespace ESM4
             std::uint32_t mOffset = 0;
             std::uint16_t mValue = 0;
             std::string mBytes; // hexadecimal, from a few bytes before the offset
+            std::string mStatements; // the kinds of the statements around the offset, [ marks the one at it
         };
         static constexpr std::size_t maxFailuresPerError = 5;
+        static constexpr std::size_t maxDifferences = 24;
 
         void collect(Reader& reader);
 
@@ -96,6 +102,7 @@ namespace ESM4
         const std::map<std::pair<std::uint16_t, std::uint16_t>, std::size_t>& getBlocks() const { return mBlocks; }
         const std::map<std::uint16_t, CommandUse>& getCommands() const { return mCommands; }
         const std::map<std::string, std::size_t>& getStructure() const { return mStructure; }
+        const std::map<std::string, std::vector<Failure>>& getStructureExamples() const { return mStructureExamples; }
         const JumpTally& getBeginJumps() const { return mBeginJumps; }
         const JumpTally& getIfJumps() const { return mIfJumps; }
         const JumpTally& getElseIfJumps() const { return mElseIfJumps; }
@@ -105,7 +112,8 @@ namespace ESM4
 
     private:
         void addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script);
-        void checkStructure(const ScriptCode::Program& program);
+        void checkStructure(const ScriptCode::Program& program, const std::string& holder, ESM::FormId record,
+            const ScriptDefinition& script);
 
         std::map<std::string, HolderTotals> mHolders;
         std::map<std::string, std::size_t> mRecordsFailed;
@@ -120,6 +128,7 @@ namespace ESM4
         std::map<std::string, std::size_t> mTokens;
         std::map<std::string, std::size_t> mOperators;
         std::map<std::string, std::size_t> mStructure; // problems with the nesting of blocks and conditions
+        std::map<std::string, std::vector<Failure>> mStructureExamples; // the first scripts of each problem
         JumpTally mBeginJumps;
         JumpTally mIfJumps;
         JumpTally mElseIfJumps;

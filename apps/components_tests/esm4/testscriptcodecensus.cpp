@@ -153,6 +153,26 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("counted from the end of the statement to the start of the target: 1"));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, tellsHowFarOffTheJumpsAreFromEachRule)
+    {
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, blockCode()));
+
+        using Census = ESM4::ScriptCodeCensus;
+        const auto& differences = census.getIfJumps().mDifferences;
+        EXPECT_THAT(differences[Census::FromStatementEnd][Census::ToStatementStart], ElementsAre(Pair(0, 1u)));
+        // counted from the start of the expression instead, the jump would be too short by the rest of the statement
+        const auto& other = differences[Census::FromExpression][Census::ToStatementStart];
+        ASSERT_EQ(other.size(), 1u);
+        EXPECT_GT(other.begin()->first, 0);
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(),
+            HasSubstr("the closest rule is from the end of the statement to the start of the target, the jump "
+                      "falls short by (bytes: jumps): 0:1"));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, reportsWhyAScriptDoesNotDecode)
     {
         ESM4::ScriptCodeCensus census;
@@ -187,6 +207,7 @@ namespace
         EXPECT_EQ(failures[0].mValue, 0x40u);
         // the bytes start 12 before the offset, which is the start of the file here, and mark the offset
         EXPECT_EQ(failures[0].mBytes, "1d 00 00 00 [40 00 00 00");
+        EXPECT_EQ(failures[0].mStatements, "Sn [");
         EXPECT_EQ(census.getHolders().at("SCPT").mFailed, ESM4::ScriptCodeCensus::maxFailuresPerError + 2);
 
         std::ostringstream out;
@@ -214,6 +235,31 @@ namespace
         EXPECT_THAT(census.getStructure(), IsEmpty());
         EXPECT_EQ(census.getBeginJumps().mTotal, 0u);
         EXPECT_EQ(census.getIfJumps().mTotal, 0u);
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, keepsTheFirstScriptsOfEachNestingProblem)
+    {
+        ESM4::ScriptCodeCensus census;
+        std::string records;
+        std::string setData = variable(1);
+        put16(setData, 1);
+        setData += '2';
+        for (std::uint32_t i = 0; i < ESM4::ScriptCodeCensus::maxFailuresPerError + 2; ++i)
+            records += scriptRecord(0x1001 + i, statement(0x1D) + statement(0x15, setData) + statement(0x19));
+        collect(census, records);
+
+        EXPECT_EQ(census.getStructure().at("EndIf without If"), ESM4::ScriptCodeCensus::maxFailuresPerError + 2);
+        const auto& examples = census.getStructureExamples().at("EndIf without If");
+        ASSERT_EQ(examples.size(), ESM4::ScriptCodeCensus::maxFailuresPerError);
+        EXPECT_EQ(examples[0].mHolder, "SCPT");
+        EXPECT_EQ(examples[0].mRecord.mIndex, 0x1001u);
+        EXPECT_EQ(examples[0].mValue, 0x19u);
+        EXPECT_EQ(examples[0].mStatements, "Sn St [Ef");
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("The first scripts of each nesting problem"));
+        EXPECT_THAT(out.str(), HasSubstr("statements: Sn St [Ef"));
     }
 
     TEST(ESM4ScriptCodeCensusTest, reportsABlockThatIsNotClosed)
