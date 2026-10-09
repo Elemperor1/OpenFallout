@@ -213,7 +213,40 @@ def find_tables(pe, stride, minimum):
             at += stride
         if len(run) >= minimum:
             tables.append(run)
+    attach_strays(tables, found, stride)
     return tables
+
+
+# How far from a table (in entries) and from its codes an entry may lie to be taken as part of it
+STRAY_DISTANCE = 64
+STRAY_CODES = 64
+
+
+def attach_strays(tables, found, stride):
+    """Adds to the tables the entries that stand between or beside their runs on the same grid and have codes that
+    fit. The executables have entries around which the neighbours are not taken for commands (the dummies that hold the
+    places of removed commands), so the run is cut short there and a short run is not told from chance. A stray is not
+    taken for a part of a table when it is far away or its code is, so what looks like a command by chance elsewhere
+    stays out."""
+    used = {e.offset for table in tables for e in table}
+    for offset in sorted(found):
+        if offset in used:
+            continue
+        entry = found[offset]
+        for table in tables:
+            first, last = table[0], table[-1]
+            if (offset - first.offset) % stride:
+                continue
+            if not first.offset - STRAY_DISTANCE * stride <= offset <= last.offset + STRAY_DISTANCE * stride:
+                continue
+            codes = [e.opcode for e in table]
+            if not min(codes) - STRAY_CODES <= entry.opcode <= max(codes) + STRAY_CODES:
+                continue
+            table.append(entry)
+            used.add(offset)
+            break
+    for table in tables:
+        table.sort(key=lambda e: e.offset)
 
 
 def main(argv):

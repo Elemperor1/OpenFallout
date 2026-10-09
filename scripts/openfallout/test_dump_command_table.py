@@ -16,7 +16,7 @@ SECTION_VA = 0x1000
 SECTION_RAW = 0x400
 
 
-def build_executable(stride=0x28, entries=3):
+def build_executable(stride=0x28, entries=3, broken=()):
     """A PE32 file whose one section holds the strings, parameter tables and a table of commands."""
     section = bytearray()
 
@@ -38,8 +38,11 @@ def build_executable(stride=0x28, entries=3):
     parsers = [IMAGE_BASE + SECTION_VA, IMAGE_BASE + SECTION_VA, IMAGE_BASE + SECTION_VA + 4]
     table = bytearray()
     for i in range(entries):
-        entry = struct.pack("<IIIIHHIIIII", pointers[i][0], pointers[i][1], 0x1000 + i, help_text, 0, counts[i],
-                            params[i], IMAGE_BASE + SECTION_VA, parsers[i], 0, 0)
+        kind = i % 3  # the names, parameters and parse functions are used over again for a longer table
+        # a command whose name pointer leads nowhere is not taken for a command
+        name = 0 if i in broken else pointers[kind][0]
+        entry = struct.pack("<IIIIHHIIIII", name, pointers[kind][1], 0x1000 + i, help_text, 0, counts[kind],
+                            params[kind], IMAGE_BASE + SECTION_VA, parsers[kind], 0, 0)
         table.extend(entry[:stride])
     add(table)
     # Something that is not a table, to be skipped
@@ -87,6 +90,22 @@ class DumpCommandTableTest(unittest.TestCase):
         result, rows = self.dump(build_executable(stride=0x24), "--stride", "0x24")
         self.assertEqual(result, 0)
         self.assertEqual([r[2] for r in rows], ["Activate", "GetStage", "SetStage"])
+
+    def test_keeps_the_commands_between_entries_that_are_not_commands(self):
+        # a table of twelve with dummies at 6, 8 and 10: the run of 0 to 5 is a table, 7 and 9 are runs of one each,
+        # and 11 stands after the last dummy. They belong to the table all the same.
+        result, rows = self.dump(build_executable(entries=12, broken=(6, 8, 10)), "--minimum", "5")
+        self.assertEqual(result, 0)
+        self.assertEqual([r[1] for r in rows], ["0x%X" % (0x1000 + i) for i in (0, 1, 2, 3, 4, 5, 7, 9, 11)])
+
+    def test_leaves_out_a_command_that_is_far_from_every_table(self):
+        # entry 5 stands far from the run of 0 to 2 and has a code that the table does not come near
+        data = bytearray(build_executable(entries=8, broken=(3, 4, 6, 7)))
+        far = data.find(struct.pack("<I", 0x1005), SECTION_RAW)
+        struct.pack_into("<I", data, far, 0x3777)
+        result, rows = self.dump(bytes(data), "--minimum", "3")
+        self.assertEqual(result, 0)
+        self.assertEqual([r[1] for r in rows], ["0x1000", "0x1001", "0x1002"])
 
     def test_reports_a_file_with_no_table(self):
         data = bytearray(build_executable())
