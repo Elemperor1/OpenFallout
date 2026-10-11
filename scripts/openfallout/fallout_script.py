@@ -125,7 +125,8 @@ def reference_value(reference):
 
 def string_argument(text):
     """A text, as a parameter that is a string holds it: its length in two bytes, then the characters."""
-    return u16(len(text)) + text.encode()
+    data = text.encode()
+    return u16(len(data)) + data
 
 
 def float_argument(value):

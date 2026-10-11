@@ -270,6 +270,22 @@ namespace
         EXPECT_EQ(values.current(guard, ActorValue::health), 100);
     }
 
+    TEST(FalloutScriptActorValuesTest, healing_brings_back_a_value_that_a_script_took_away_altogether)
+    {
+        ActorValues values;
+        values.setCurrent(guard, ActorValue::health, 0);
+        ASSERT_EQ(values.current(guard, ActorValue::health), 0);
+
+        values.heal(guard, ActorValue::health);
+
+        EXPECT_EQ(values.current(guard, ActorValue::health), 100);
+        // a modifier that leaves something of the value stays
+        values.modify(guard, ActorValue::health, 20);
+        values.damage(guard, ActorValue::health, 50);
+        values.heal(guard, ActorValue::health);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 120);
+    }
+
     TEST(FalloutScriptActorValuesTest, nobody_and_numbers_that_are_no_actor_values_change_nothing)
     {
         ActorValues values;

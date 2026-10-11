@@ -158,8 +158,14 @@ namespace FalloutScript
             return;
         const std::lock_guard lock(mMutex);
         const auto found = mEntries.find({ actor, value });
-        if (found != mEntries.end())
-            found->second.mDamage = 0;
+        if (found == mEntries.end())
+            return;
+        Entry& entry = found->second;
+        entry.mDamage = 0;
+        // A value that a script took away altogether (forced to nothing, or a modifier as large as the base) comes
+        // back to the base
+        if (baseOf(actor, entry, value) + entry.mModifier <= 0)
+            entry.mModifier = 0;
     }
 
     void addActorValueCommands(

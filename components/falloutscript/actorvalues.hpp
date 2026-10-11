@@ -89,7 +89,7 @@ namespace FalloutScript
         void damage(FormId actor, int value, double amount);
         /// Takes damage back, up to what there is
         void restore(FormId actor, int value, double amount);
-        /// Takes all the damage back
+        /// Takes all the damage back, and the modifier that left nothing of the value
         void heal(FormId actor, int value);
 
     private:
