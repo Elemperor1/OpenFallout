@@ -25,6 +25,7 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "esm4base.hpp"
+#include "esm4sources.hpp"
 
 namespace OFClass
 {
@@ -127,34 +128,6 @@ namespace OFClass
                 return rec;
         return nullptr;
     }
-
-    // The records that the armour of a Fallout character is chosen from are the ones of the store
-    class StoreWornArmorSource final : public ESM4::WornArmorSource
-    {
-    public:
-        explicit StoreWornArmorSource(const OFWorld::ESMStore& store)
-            : mStore(store)
-        {
-        }
-
-        const ESM4::Npc* findNpc(ESM::FormId id) const override { return mStore.get<ESM4::Npc>().search(id); }
-        const ESM4::LevelledNpc* findLevelledNpc(ESM::FormId id) const override
-        {
-            return mStore.get<ESM4::LevelledNpc>().search(id);
-        }
-        const ESM4::Armor* findArmor(ESM::FormId id) const override { return mStore.get<ESM4::Armor>().search(id); }
-        const ESM4::LevelledItem* findLevelledItem(ESM::FormId id) const override
-        {
-            return mStore.get<ESM4::LevelledItem>().search(id);
-        }
-        const ESM4::GlobalVariable* findGlobal(ESM::FormId id) const override
-        {
-            return mStore.get<ESM4::GlobalVariable>().search(id);
-        }
-
-    private:
-        const OFWorld::ESMStore& mStore;
-    };
 
     // What chooses among the entries of a levelled list: the same character is dressed the same each time, and two
     // characters of one base record are not necessarily dressed alike.

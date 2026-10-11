@@ -115,10 +115,8 @@ namespace OFWorld
         std::vector<std::pair<GlobalVariableName, ESM::Variant>> generateDefaultGlobals()
         {
             return {
-                // The days that have passed since the game began: 0 on the first day, as the games of Fallout count
-                // them (the schedules of the characters and GetDayOfWeek take that day for a Monday). Morrowind's
-                // addons start counting at 1 :(
-                { Globals::sDaysPassed, ESM::Variant(0) },
+                // vanilla Morrowind does not define dayspassed.
+                { Globals::sDaysPassed, ESM::Variant(1) }, // but the addons start counting at 1 :(
                 { Globals::sWerewolfClawMult, ESM::Variant(25.f) },
                 { Globals::sPCKnownWerewolf, ESM::Variant(0) },
                 // following should exist in all versions of MW, but not necessarily in TCs

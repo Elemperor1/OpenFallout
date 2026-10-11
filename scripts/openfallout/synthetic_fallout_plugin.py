@@ -263,6 +263,7 @@ PERSON_SKILLS = tuple(range(20, 34))
 PERSON_SPEED = 120
 PERSON_KARMA = 25.0
 PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
+BEAST_LEVEL = 7  # the level of the beast, which the creature that has the list as its template takes the stats from
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -272,8 +273,8 @@ ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6,
                        "person_karma": (0x8BD, "OFTestAvPersonKarma"),
                        "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing"),
                        "person_level": (0x8C0, "OFTestAvPersonLevel"), "day_of_week": (0x8C1, "OFTestAvDayOfWeek"),
-                       "current_package": (0x8C2, "OFTestAvCurrentPackage")}
-LAST_ID = 0x8C2 # the largest form ID of the plugin, which the next object ID of its header follows
+                       "current_package": (0x8C2, "OFTestAvCurrentPackage"), "user_level": (0x8C3, "OFTestAvUserLevel")}
+LAST_ID = 0x8C3 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -323,8 +324,8 @@ CREATURE_FOOT = "foot.nif"
 CREATURE_BODY_BOX = ((30.0, 15.0, 15.0), (0.0, 0.0, 60.0))
 CREATURE_BOUNDS = (-30, -15, 0, 30, 15, 80)
 CREATURE_POSITIONS = {"beast": (450.0, 140.0), "user": (450.0, 540.0), "list": (800.0, 340.0)}
-# The flags of ACBS that take the model and the name from the template
-CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80
+# The flags of ACBS that take the model, the name and the stats from the template
+CREATURE_TEMPLATE_FLAGS = 0x40 | 0x80 | 0x2
 # Characters with AI packages stand south and west of where the player starts, away from where the player walks (x from
 # -150 to 300, y from 0 to 600). The walker starts at WALKER_START, and travels (package type Travel) to a marker 300
 # units north of it, which faces east, and stops TRAVEL_RADIUS from it; its first package, for the night (22:00 to 02:00, to another marker), is not on
@@ -676,6 +677,7 @@ def object_script(kind):
     clock = {name: script.form(form_id) for name, (form_id, _) in CLOCK_GLOBALS.items()}
     values = {name: script.form(form_id) for name, (form_id, _) in ACTOR_VALUE_GLOBALS.items()}
     person_ref = script.form(NPC_REF_ID if kind == "interior" else EXTERIOR_NPC_REF_ID)
+    user_ref = script.form(CREATURE_USER_REF_ID if kind == "interior" else EXTERIOR_CREATURE_USER_REF_ID)
     # The actor values, on the locker cube (the player for karma): a number written bare in two bytes, then the amount
     actor_values = b"".join([
         sf.call_on(locker, sf.SET_ACTOR_VALUE, sf.u16(AV_VARIABLE), sf.int_argument(7)),
@@ -708,6 +710,8 @@ def object_script(kind):
         # begins on a Sunday)
         sf.set_to(sf.global_target(values["person_level"]), sf.call_token(sf.GET_LEVEL, reference=person_ref)),
         sf.set_to(sf.global_target(values["day_of_week"]), sf.call_token(sf.GET_DAY_OF_WEEK)),
+        # A creature whose template is a levelled list has the stats of the creature the list gives, and its level
+        sf.set_to(sf.global_target(values["user_level"]), sf.call_token(sf.GET_LEVEL, reference=user_ref)),
     ])
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
@@ -1170,8 +1174,9 @@ def creatures():
         zstr(b"FULL", "OpenFallout Test Beast"), zstr(b"MODL", CREATURE_SKELETON),
         sub(b"NIFZ", CREATURE_BODY.encode("ascii") + b"\0" + CREATURE_FOOT.encode("ascii") + b"\0"),
         sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS)), sub(b"CNTO", struct.pack("<II", SUIT_ID, CREATURE_ITEMS)),
-        sub(b"SCRI", struct.pack("<I", TEMPLATE_SCRIPT_ID))])
-    # the record of one that takes its model, and with it its name, from the template and keeps nothing of its own
+        sub(b"SCRI", struct.pack("<I", TEMPLATE_SCRIPT_ID))], level=BEAST_LEVEL)
+    # the record of one that takes its model, and with it its name and stats, from the template and keeps nothing of its
+    # own
     user = creature(CREATURE_USER_ID, CREATURE_NAME + "User", [
         zstr(b"FULL", "Not Shown"), sub(b"TPLT", struct.pack("<I", CREATURE_LIST_ID))],
         template_flags=CREATURE_TEMPLATE_FLAGS)

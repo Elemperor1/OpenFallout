@@ -34,8 +34,12 @@ namespace OFClass
 
     std::uint32_t ESM4Impl::actorSeed(const OFWorld::ConstPtr& ptr, ESM::FormId baseId)
     {
-        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
-        return (refNum.mIndex * 2654435761u + static_cast<std::uint32_t>(refNum.mContentFile))
+        return actorSeed(ptr.getCellRef().getRefNum(), baseId);
+    }
+
+    std::uint32_t ESM4Impl::actorSeed(ESM::FormId reference, ESM::FormId baseId)
+    {
+        return (reference.mIndex * 2654435761u + static_cast<std::uint32_t>(reference.mContentFile))
             ^ (baseId.mIndex * 40503u);
     }
 

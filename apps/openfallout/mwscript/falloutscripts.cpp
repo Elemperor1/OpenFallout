@@ -8,6 +8,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/util.hpp>
+#include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcont.hpp>
@@ -20,6 +21,7 @@
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -29,6 +31,8 @@
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwclass/esm4base.hpp"
+#include "../mwclass/esm4sources.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -714,22 +718,27 @@ namespace OFScript
         ESM::FormId base;
         if (!baseOf(actor, base) || base.isZeroOrUnset())
             return false;
-        // The level is a thing of the stats, which a record that has a template takes from it (its own, when the
-        // template can not be followed)
+        // The level is a thing of the stats, which a record that has a template takes from it. A levelled list in the
+        // place of the template gives one of its characters, the one that the cell shows for this reference: the chain
+        // is followed with the level and the seed that the cell uses (the record's own stats count when the chain ends
+        // without a record that has them)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            const ESM4::Npc* stats = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats);
-            if (stats == nullptr)
-                stats = npc;
-            level = stats->mIsFONV ? ESM4::levelFromConfig(stats->mBaseConfig.fo3, playerLevel) : playerLevel;
+            const OFClass::StoreWornArmorSource source(mStore);
+            const ESM4::Npc* stats
+                = ESM4::templateOwner(ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed),
+                    ESM4::Npc::Template_UseStats);
+            level = ESM4::actorLevel(stats != nullptr ? *stats : *npc, playerLevel);
             return true;
         }
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            const ESM4::Creature* stats = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats);
-            if (stats == nullptr)
-                stats = creature;
-            level = stats->mIsFONV ? ESM4::levelFromConfig(stats->mBaseConfig.fo3, playerLevel) : playerLevel;
+            const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::Creature* stats = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseStats);
+            level = ESM4::creatureLevel(stats != nullptr ? *stats : *creature, playerLevel);
             return true;
         }
         return false;
