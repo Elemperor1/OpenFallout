@@ -146,11 +146,11 @@ namespace OFScript
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
-        mPendingMade.clear();
         mMade.clear();
         mMadeIds.clear();
         {
             const std::lock_guard lock(mMadeMutex);
+            mPendingMade.clear();
             mMadeCount = 0;
         }
         mReferences.clear();
@@ -267,7 +267,10 @@ namespace OFScript
         }
         // The objects that PlaceAtMe asked for, before anything else is done to them
         std::map<FalloutScript::FormId, MadeObject> made;
-        made.swap(mPendingMade);
+        {
+            const std::lock_guard lock(mMadeMutex);
+            made.swap(mPendingMade);
+        }
         for (const auto& [id, request] : made)
             makeObject(id, request);
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
@@ -750,10 +753,13 @@ namespace OFScript
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)
     {
         // An object that PlaceAtMe asked for is next to the object it was asked for, until the world makes it
-        if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
         {
-            result = asked->second.mWhere;
-            return true;
+            const std::lock_guard lock(mMadeMutex);
+            if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+            {
+                result = asked->second.mWhere;
+                return true;
+            }
         }
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty() && ptr.getCell() != nullptr)
@@ -989,28 +995,26 @@ namespace OFScript
             log("PlaceAtMe: " + FalloutScript::hex(reference) + " has no place the game knows");
             return 0;
         }
-        std::vector<std::pair<FalloutScript::FormId, MadeObject>> requests;
+        FalloutScript::FormId first = 0;
         {
             const std::lock_guard lock(mMadeMutex);
             for (int i = 0; i < count && mMadeCount < 0x00ffffff; ++i)
             {
                 // The numbers of objects made while the game runs begin with 0xFF, as in the games
                 const FalloutScript::FormId id = 0xff000000u | ++mMadeCount;
-                requests.emplace_back(id,
-                    MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
-                        static_cast<float>(distance), near });
+                // Asked for at once, so that the rest of the script finds the object it was told the number of (also
+                // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
+                mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
+                    static_cast<float>(distance), near };
+                if (first == 0)
+                    first = id;
             }
         }
-        if (requests.empty())
+        if (first == 0)
         {
             log("PlaceAtMe: no more objects can be made");
             return 0;
         }
-        const FalloutScript::FormId first = requests.front().first;
-        runOnMainThread([this, requests = std::move(requests)] {
-            for (const auto& [id, request] : requests)
-                mPendingMade[id] = request;
-        });
         return first;
     }
 

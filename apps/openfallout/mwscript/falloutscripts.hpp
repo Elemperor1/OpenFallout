@@ -307,7 +307,8 @@ namespace OFScript
         std::map<FalloutScript::FormId, MadeObject> mPendingMade;
         std::map<FalloutScript::FormId, ESM::FormId> mMade;
         std::map<ESM::FormId, FalloutScript::FormId> mMadeIds;
-        /// The counter of the numbers, which a script that Lua starts uses from the thread of Lua
+        /// The counter of the numbers and the objects that are asked for, which a script that Lua starts uses from the
+        /// thread of Lua: the rest of the script has to find the object it was told the number of at once
         std::mutex mMadeMutex;
         FalloutScript::FormId mMadeCount = 0;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
