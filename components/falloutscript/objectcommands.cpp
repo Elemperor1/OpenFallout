@@ -1,5 +1,6 @@
 #include "objectcommands.hpp"
 
+#include <cmath>
 #include <limits>
 
 #include "arguments.hpp"
@@ -113,6 +114,11 @@ namespace FalloutScript
             return global != 0 && call.mHost.getGlobal(global, value) ? value : 0.0;
         });
         interpreter.setHandler("GetCurrentTime", [&world](CallContext&) { return world.gameHour(); });
+        // 0 is Sunday. The game begins on a Monday, as the schedules of the packages take it.
+        interpreter.setHandler("GetDayOfWeek", [&world](CallContext&) {
+            const double days = std::floor(world.gameDaysPassed());
+            return std::isfinite(days) ? static_cast<double>((((static_cast<long long>(days) + 1) % 7) + 7) % 7) : 0.0;
+        });
         interpreter.setHandler(
             "GetSecondsPassed", [&objects](CallContext&) { return static_cast<double>(objects.secondsPassed()); });
         interpreter.setHandler("GetRandomPercent",

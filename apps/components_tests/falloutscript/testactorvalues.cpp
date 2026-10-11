@@ -42,6 +42,7 @@ namespace
     constexpr std::uint16_t OpSetActorValue = 0x100F;
     constexpr std::uint16_t OpModActorValue = 0x1010;
     constexpr std::uint16_t OpGetDead = 0x102E;
+    constexpr std::uint16_t OpGetLevel = 0x1050;
     constexpr std::uint16_t OpKillActor = 0x108B;
     constexpr std::uint16_t OpResurrectActor = 0x108C;
     constexpr std::uint16_t OpGetBaseActorValue = 0x1115;
@@ -60,6 +61,23 @@ namespace
         bool initialFactions(FormId, std::vector<std::pair<FormId, int>>&) override { return true; }
     };
 
+    // Records that give the guard level 7 and everyone next to it a level above the player's
+    class LevelRecords : public FalloutScript::ActorValueRecords
+    {
+    public:
+        bool initialValues(FormId, std::vector<std::pair<int, double>>&) override { return true; }
+        bool levelOf(FormId actor, int playerLevel, int& level) override
+        {
+            if (actor == guard)
+                level = 7;
+            else if (actor == guard + 1)
+                level = playerLevel + 1;
+            else
+                return false;
+            return true;
+        }
+    };
+
     struct Runner
     {
         FalloutScript::CommandTable mCommands = FalloutScript::vanillaCommands(FalloutScript::Game::NewVegas);
@@ -72,7 +90,8 @@ namespace
                                } };
         NoRecords mRecords;
         ActorState mActors{ mRecords };
-        ActorValues mValues;
+        LevelRecords mLevels;
+        ActorValues mValues{ &mLevels };
         PlayerProgress mProgress;
 
         Runner()
@@ -482,5 +501,36 @@ namespace
         setup.run(thePlayer, builder);
 
         EXPECT_EQ(setup.variable(thePlayer, 1), 100);
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest,
+        the_level_of_the_player_follows_its_experience_and_anyone_elses_is_the_records)
+    {
+        Runner setup;
+        setup.mProgress.rewardExperience(250);
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('f', 1), callToken(OpGetLevel, arguments(0))) + end());
+        builder.variable(1, 0, "level");
+
+        setup.run(thePlayer, builder);
+        EXPECT_EQ(setup.variable(thePlayer, 1), 2);
+        setup.run(guard, builder);
+        EXPECT_EQ(setup.variable(guard, 1), 7);
+        // a share of the level of the player is the records' to work out
+        setup.run(guard + 1, builder);
+        EXPECT_EQ(setup.variable(guard + 1, 1), 3);
+        // a reference the records do not know as a character has no level
+        setup.run(guard + 2, builder);
+        EXPECT_EQ(setup.variable(guard + 2, 1), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, without_records_no_one_but_the_player_has_a_level)
+    {
+        ActorValues values;
+
+        EXPECT_FALSE(values.levelOf(guard, 4));
+        EXPECT_FALSE(values.levelOf(0, 4));
     }
 }

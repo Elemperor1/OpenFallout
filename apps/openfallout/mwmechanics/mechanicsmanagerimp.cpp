@@ -858,6 +858,11 @@ namespace OFMechanics
         mFalloutActors.evaluate(actor);
     }
 
+    ESM::FormId MechanicsManager::falloutPackageOf(const OFWorld::Ptr& actor) const
+    {
+        return mFalloutActors.currentPackage(actor);
+    }
+
     bool MechanicsManager::isAIActive()
     {
         return mAI;

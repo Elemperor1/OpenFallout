@@ -22,6 +22,11 @@ namespace FalloutScript
                 world.evaluatePackage(call.mReference);
             return 0.0;
         });
+        // Whether the package is the one the character follows now (it follows none while it is not in a loaded cell)
+        interpreter.setHandler("GetIsCurrentPackage", [&world](CallContext& call) {
+            const FormId package = formArgument(call, 0);
+            return package != 0 && call.mReference != 0 && world.currentPackage(call.mReference) == package ? 1.0 : 0.0;
+        });
         // ResetAI also drops what the character was doing (combat, a conversation); none of that is kept here, so it
         // comes to the character looking at its packages again
         interpreter.setHandler("ResetAI", [&world](CallContext& call) {

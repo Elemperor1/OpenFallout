@@ -146,6 +146,7 @@ namespace OFScript
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
         void removeScriptPackage(FalloutScript::FormId actor) override;
         void evaluatePackage(FalloutScript::FormId actor) override;
+        FalloutScript::FormId currentPackage(FalloutScript::FormId actor) override;
 
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
         void moveTo(FalloutScript::FormId reference, FalloutScript::FormId target,
@@ -160,6 +161,7 @@ namespace OFScript
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
+        bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
@@ -168,6 +170,7 @@ namespace OFScript
         FalloutScript::FormId placeAtMe(FalloutScript::FormId reference, FalloutScript::FormId base, int count,
             double distance, int direction) override;
         double gameHour() override;
+        double gameDaysPassed() override;
 
         /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
         /// content file, or an object that PlaceAtMe made

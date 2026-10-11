@@ -20,10 +20,14 @@ namespace FalloutScript
         virtual void removeScriptPackage(FormId actor) = 0;
         /// The character looks at its packages again, now and not at the next time it does
         virtual void evaluatePackage(FormId actor) = 0;
+
+        /// The package the character follows now (0 for none, and for a character the host does not know or can not
+        /// tell about)
+        virtual FormId currentPackage(FormId /*actor*/) { return 0; }
     };
 
     /// Gives the commands about packages to the interpreter: AddScriptPackage, RemoveScriptPackage,
-    /// EvaluatePackage and ResetAI. Those that the command table does not have are left out.
+    /// EvaluatePackage, GetIsCurrentPackage and ResetAI. Those that the command table does not have are left out.
     void addPackageCommands(Interpreter& interpreter, PackageWorld& world);
 }
 

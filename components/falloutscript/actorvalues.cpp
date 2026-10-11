@@ -168,6 +168,14 @@ namespace FalloutScript
             entry.mModifier = 0;
     }
 
+    std::optional<int> ActorValues::levelOf(FormId actor, int playerLevel) const
+    {
+        int level = 0;
+        if (mRecords != nullptr && actor != 0 && mRecords->levelOf(actor, playerLevel, level))
+            return level;
+        return std::nullopt;
+    }
+
     void addActorValueCommands(
         Interpreter& interpreter, ActorValues& values, ActorState& actors, PlayerProgress& progress)
     {
@@ -282,6 +290,16 @@ namespace FalloutScript
             actors.setDead(call.mReference, false);
             values.heal(call.mReference, ActorValue::health);
             return 0.0;
+        });
+        // The level of the player follows its experience; that of anyone else is the one its record gives (the level of
+        // the player times a share of it, for most of the characters that scale)
+        interpreter.setHandler("GetLevel", [&values, &progress](CallContext& call) {
+            if (call.mReference == 0)
+                return 0.0;
+            if (call.mReference == call.mHost.player())
+                return static_cast<double>(progress.level());
+            const std::optional<int> level = values.levelOf(call.mReference, progress.level());
+            return level ? static_cast<double>(*level) : 0.0;
         });
         // Nothing wears a weapon out yet, so the weapon a character holds is as good as new
         interpreter.setHandler("GetWeaponHealthPerc", [](CallContext&) { return 100.0; });

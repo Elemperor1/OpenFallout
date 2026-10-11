@@ -11,6 +11,8 @@
 #include "../mwworld/customdata.hpp"
 #include "../mwworld/esmstore.hpp"
 
+#include "esm4sources.hpp"
+
 namespace OFClass
 {
     osg::Vec3f creatureBodyHalfExtents(const ESM4::Creature& creature)
@@ -31,32 +33,6 @@ namespace OFClass
             return sUnknown;
         const float radius = std::clamp(width / 2.f, sSmallestRadius, sLargestRadius);
         return osg::Vec3f(radius, radius, std::clamp(height / 2.f, sSmallestHeight, sLargestHeight));
-    }
-
-    namespace
-    {
-        /// The creatures of the store, for the templates of a creature
-        class StoreCreatureSource final : public ESM4::CreatureSource
-        {
-        public:
-            explicit StoreCreatureSource(const OFWorld::ESMStore& store)
-                : mStore(store)
-            {
-            }
-
-            const ESM4::Creature* findCreature(ESM::FormId id) const override
-            {
-                return mStore.get<ESM4::Creature>().search(id);
-            }
-
-            const ESM4::LevelledCreature* findLevelledCreature(ESM::FormId id) const override
-            {
-                return mStore.get<ESM4::LevelledCreature>().search(id);
-            }
-
-        private:
-            const OFWorld::ESMStore& mStore;
-        };
     }
 
     class ESM4CreatureCustomData : public OFWorld::TypedCustomData<ESM4CreatureCustomData>

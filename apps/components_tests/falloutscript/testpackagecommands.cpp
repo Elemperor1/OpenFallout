@@ -29,12 +29,14 @@ namespace
     constexpr std::uint16_t OpEvaluatePackage = 0x105E;
     constexpr std::uint16_t OpAddScriptPackage = 0x1097;
     constexpr std::uint16_t OpRemoveScriptPackage = 0x1098;
+    constexpr std::uint16_t OpGetIsCurrentPackage = 0x10A1;
 
     class FakeActors : public FalloutScript::PackageWorld
     {
     public:
         std::map<FormId, std::vector<FormId>> mPackages;
         std::vector<FormId> mEvaluated;
+        std::map<FormId, FormId> mCurrent;
 
         void addScriptPackage(FormId actor, FormId package) override { mPackages[actor].push_back(package); }
         void removeScriptPackage(FormId actor) override
@@ -43,6 +45,11 @@ namespace
                 packages.pop_back();
         }
         void evaluatePackage(FormId actor) override { mEvaluated.push_back(actor); }
+        FormId currentPackage(FormId actor) override
+        {
+            const auto found = mCurrent.find(actor);
+            return found != mCurrent.end() ? found->second : 0;
+        }
     };
 
     struct Runner
@@ -119,5 +126,32 @@ namespace
         setup.mObjects.trigger(guard, BlockType::OnActivate);
 
         EXPECT_THAT(setup.mActors.mPackages, IsEmpty());
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, get_is_current_package_tells_whether_a_package_is_the_one_followed_now)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t other = builder.form(otherGuard);
+        const std::uint16_t first = builder.form(patrol);
+        const std::uint16_t second = builder.form(rest);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('s', 1), callToken(OpGetIsCurrentPackage, arguments(1).add(refArg(first))))
+            + setTo(var('s', 2), callToken(OpGetIsCurrentPackage, arguments(1).add(refArg(second))))
+            + setTo(var('s', 3), callToken(OpGetIsCurrentPackage, arguments(1).add(refArg(first)), other)) + end());
+        builder.variable(1, 0, "first").variable(2, 0, "second").variable(3, 0, "other");
+        setup.addScript(builder);
+        setup.mObjects.add(guard, scriptOfGuards);
+        setup.mActors.mCurrent[guard] = patrol;
+
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+
+        FalloutScript::Instance* instance = setup.mObjects.instance(guard);
+        ASSERT_NE(instance, nullptr);
+        EXPECT_EQ(instance->variable(1), 1);
+        EXPECT_EQ(instance->variable(2), 0);
+        // someone who follows nothing follows no package
+        EXPECT_EQ(instance->variable(3), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 }

@@ -1,6 +1,7 @@
 #include "playerprogress.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -28,6 +29,24 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         return mExperience;
+    }
+
+    int PlayerProgress::levelFor(int experience)
+    {
+        // The experience that level n needs is the sum of the steps 200, 350, 500, ...: (n - 1) * (75 * n + 50)
+        const auto needed = [](std::int64_t n) { return (n - 1) * (75 * n + 50); };
+        const double points = std::max(experience, 0);
+        std::int64_t level = static_cast<std::int64_t>((25 + std::sqrt(625 + 300 * (50 + points))) / 150);
+        while (level > 1 && needed(level) > experience)
+            --level;
+        while (needed(level + 1) <= experience)
+            ++level;
+        return static_cast<int>(std::max<std::int64_t>(level, 1));
+    }
+
+    int PlayerProgress::level() const
+    {
+        return levelFor(experience());
     }
 
     void PlayerProgress::rewardKarma(int amount)

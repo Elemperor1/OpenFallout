@@ -8,6 +8,8 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/util.hpp>
+#include <components/esm4/creaturemodel.hpp>
+#include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
@@ -19,6 +21,7 @@
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -28,6 +31,8 @@
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwclass/esm4base.hpp"
+#include "../mwclass/esm4sources.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -708,6 +713,37 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::levelOf(FalloutScript::FormId actor, int playerLevel, int& level)
+    {
+        ESM::FormId base;
+        if (!baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        // The level is a thing of the stats, which a record that has a template takes from it. A levelled list in the
+        // place of the template gives one of its characters, the one that the cell shows for this reference: the chain
+        // is followed with the level and the seed that the cell uses (the record's own stats count when the chain ends
+        // without a record that has them)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const OFClass::StoreWornArmorSource source(mStore);
+            const ESM4::Npc* stats
+                = ESM4::templateOwner(ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed),
+                    ESM4::Npc::Template_UseStats);
+            level = ESM4::actorLevel(stats != nullptr ? *stats : *npc, playerLevel);
+            return true;
+        }
+        if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::Creature* stats = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseStats);
+            level = ESM4::creatureLevel(stats != nullptr ? *stats : *creature, playerLevel);
+            return true;
+        }
+        return false;
+    }
+
     bool FalloutScripts::initialLock(FalloutScript::FormId reference, bool& locked, int& level)
     {
         // A lock is a thing of the placed reference, which the records of the content files have
@@ -815,6 +851,17 @@ namespace OFScript
             if (!ptr.isEmpty() && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
                 OFBase::Environment::get().getMechanicsManager()->evaluateFalloutPackages(ptr);
         });
+    }
+
+    FalloutScript::FormId FalloutScripts::currentPackage(FalloutScript::FormId actor)
+    {
+        // The characters make up their minds on the thread of the frame, which is the only one that may look
+        if (std::this_thread::get_id() != mMainThread)
+            return 0;
+        const OFWorld::Ptr ptr = findReference(actor);
+        if (ptr.isEmpty())
+            return 0;
+        return numberOf(OFBase::Environment::get().getMechanicsManager()->falloutPackageOf(ptr));
     }
 
     std::vector<const ESM4::AIPackage*> FalloutScripts::scriptPackages(const OFWorld::Ptr& actor) const
@@ -1241,6 +1288,12 @@ namespace OFScript
     {
         const OFBase::World* world = OFBase::Environment::get().getWorld();
         return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sGameHour) : 0.0;
+    }
+
+    double FalloutScripts::gameDaysPassed()
+    {
+        const OFBase::World* world = OFBase::Environment::get().getWorld();
+        return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sDaysPassed) : 0.0;
     }
 
     bool FalloutScripts::getGlobal(FalloutScript::FormId global, double& value)
