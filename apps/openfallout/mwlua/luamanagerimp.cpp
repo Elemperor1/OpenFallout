@@ -619,8 +619,15 @@ namespace OFLua
 
     void LuaManager::objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
     {
-        // The script of a Fallout object has its say first; the scripts of Lua are told as before
-        OFBase::Environment::get().getFalloutScripts()->activated(object, actor);
+        // The script of a Fallout object has its say first, and with an OnActivate block in it the object does not do
+        // what it does by default, unless the script asks for that (Activate)
+        if (OFBase::Environment::get().getFalloutScripts()->activated(object, actor))
+            return;
+        defaultActivation(object, actor);
+    }
+
+    void LuaManager::defaultActivation(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
         mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 

@@ -12,6 +12,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace
 {
@@ -34,6 +35,7 @@ namespace
 
     // The codes of the commands in the table of the games
     constexpr std::uint16_t OpGetDistance = 0x1001;
+    constexpr std::uint16_t OpActivate = 0x100D;
     constexpr std::uint16_t OpGetSecondsPassed = 0x100C;
     constexpr std::uint16_t OpEnable = 0x1021;
     constexpr std::uint16_t OpDisable = 0x1022;
@@ -52,6 +54,23 @@ namespace
         std::map<FormId, FormId> mCells;
         std::map<std::pair<FormId, FormId>, double> mDistances;
 
+        struct Activation
+        {
+            FormId mTarget;
+            FormId mActivator;
+            bool mRunOnActivate;
+            bool operator==(const Activation& other) const
+            {
+                return mTarget == other.mTarget && mActivator == other.mActivator
+                    && mRunOnActivate == other.mRunOnActivate;
+            }
+        };
+        std::vector<Activation> mActivations;
+
+        void activate(FormId target, FormId activator, bool runOnActivate) override
+        {
+            mActivations.push_back({ target, activator, runOnActivate });
+        }
         bool isDisabled(FormId reference) override { return mDisabled.count(reference) != 0; }
         void setDisabled(FormId reference, bool disabled) override
         {
@@ -390,6 +409,7 @@ namespace
             void setDisabled(FormId, bool) override { mObjects->setLoaded(otherCrate, false); }
             bool distance(FormId, FormId, double&) override { return false; }
             FormId cellOf(FormId) override { return 0; }
+            void activate(FormId, FormId, bool) override {}
         } unloader;
         unloader.mObjects = &setup.mObjects;
         FalloutScript::addObjectCommands(setup.mInterpreter, setup.mObjects, unloader, [] { return 0; });
@@ -407,6 +427,69 @@ namespace
 
         EXPECT_FALSE(setup.mObjects.loaded(otherCrate));
         EXPECT_EQ(setup.variable(otherCrate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, activate_names_the_activator_and_whether_the_block_runs)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t who = builder.form(player);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + command(OpActivate, arguments(2).add(refArg(who)).add(intArg(1))) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_THAT(setup.mWorld.mActivations, ElementsAre(FakeWorld::Activation{ crate, player, true }));
+    }
+
+    TEST(FalloutScriptObjectsTest, activate_without_an_activator_takes_the_one_of_the_event)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpActivate, arguments(0)) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        EXPECT_TRUE(setup.mObjects.trigger(crate, BlockType::OnActivate, otherCrate));
+
+        EXPECT_THAT(setup.mWorld.mActivations, ElementsAre(FakeWorld::Activation{ crate, otherCrate, false }));
+    }
+
+    TEST(FalloutScriptObjectsTest, activate_without_an_activator_and_outside_of_an_event_does_nothing)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnLoad) + command(OpActivate, arguments(0)) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_THAT(setup.mWorld.mActivations, IsEmpty());
+    }
+
+    TEST(FalloutScriptObjectsTest, every_loaded_reference_is_listed_whatever_blocks_its_script_has)
+    {
+        Runner setup;
+        ScriptBuilder onLoadOnly;
+        onLoadOnly.code(scriptName() + begin(BlockType::OnLoad) + end());
+        setup.addScript(scriptOfCrates + 1, onLoadOnly);
+        setup.addCountingScript();
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mObjects.add(otherCrate, scriptOfCrates + 1);
+
+        setup.mObjects.setLoaded(crate, true);
+        setup.mObjects.setLoaded(otherCrate, true);
+
+        EXPECT_THAT(setup.mObjects.loadedReferences(), UnorderedElementsAre(crate, otherCrate));
+        EXPECT_THAT(setup.mObjects.updating(), ElementsAre(crate));
+
+        setup.mObjects.setLoaded(otherCrate, false);
+        EXPECT_THAT(setup.mObjects.loadedReferences(), ElementsAre(crate));
+        setup.mObjects.clear();
+        EXPECT_THAT(setup.mObjects.loadedReferences(), IsEmpty());
     }
 
     TEST(FalloutScriptObjectsTest, clear_forgets_every_reference)

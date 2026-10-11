@@ -475,7 +475,8 @@ def message():
 def object_script(kind):
     """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
     disables the cube next to it and gives the scripted walker its package; every frame it counts the frames, measures its distance to
-    the player and keeps whether the cube is disabled; when activated it counts the activations by the player."""
+    the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
+    second time, lets the object do what it does by default (Activate)."""
     sf = fallout_script
     script = sf.Script(0)
     index = ("interior", "exterior").index(kind)
@@ -501,9 +502,13 @@ def object_script(kind):
             add_one(frames),
             sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
             sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim))])),
+        # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
             add_one(activated),
+            sf.branch(sf.IF, sf.global_target(activated) + sf.number("2") + sf.operator("==")),
+            sf.call_counted(sf.ACTIVATE),
+            sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
     return record(b"SCPT", OBJECT_SCRIPT_IDS[kind], [zstr(b"EDID", "OFTestObjectScript" + kind.title()),
                                                      *fallout_script.sub_records(script)])

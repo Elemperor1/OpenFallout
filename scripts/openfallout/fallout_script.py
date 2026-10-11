@@ -30,6 +30,7 @@ SHOW_MESSAGE = 0x1059
 IS_ACTION_REF = 0x1069
 EVALUATE_PACKAGE = 0x105E
 ADD_SCRIPT_PACKAGE = 0x1097
+ACTIVATE = 0x100D
 START_QUEST = 0x1036
 SET_STAGE = 0x1039
 GET_STAGE = 0x103A
@@ -81,6 +82,11 @@ def call(code, *arguments):
     """A call of a command as a statement. A command with no arguments has no data at all."""
     if not arguments:
         return statement(code)
+    return statement(code, u16(len(arguments)) + b"".join(arguments))
+
+
+def call_counted(code, *arguments):
+    """A call of a command that has parameters, when it gives none of them: the data is the count of arguments (0)."""
     return statement(code, u16(len(arguments)) + b"".join(arguments))
 
 

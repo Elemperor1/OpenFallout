@@ -111,6 +111,7 @@ namespace FalloutScript
     {
     public:
         /// Never throws: a script that can not be taken apart is kept with its problem and does nothing when run.
+        /// The prepared calls point into `commands`, which has to outlive the script.
         static Script prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands);
 
         ScriptProblem problem() const { return mProblem; }

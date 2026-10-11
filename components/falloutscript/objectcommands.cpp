@@ -16,6 +16,15 @@ namespace FalloutScript
     void addObjectCommands(
         Interpreter& interpreter, ObjectScripts& objects, ObjectWorld& world, std::function<int()> random)
     {
+        // The activator is the one the call names, else the one that caused the event that runs now: the OnActivate
+        // block of an object calls Activate with none to let the object do what it would have done without the block
+        interpreter.setHandler("Activate", [&objects, &world](CallContext& call) {
+            const FormId named = formArgument(call, 0);
+            const FormId activator = named != 0 ? named : objects.actionReference();
+            if (call.mReference != 0 && activator != 0)
+                world.activate(call.mReference, activator, intArgument(call, 1) != 0);
+            return 0.0;
+        });
         interpreter.setHandler("Enable", [&world](CallContext& call) {
             if (call.mReference != 0)
                 world.setDisabled(call.mReference, false);

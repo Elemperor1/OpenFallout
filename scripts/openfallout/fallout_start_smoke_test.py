@@ -617,6 +617,7 @@ local util = require('openfallout.util')
 
 local scripted_ids, victim_ids = { @SCRIPTED@ }, { @VICTIM@ }
 local elapsed, step = 0, 0
+local scripted_object, defaults = nil, 0
 
 local function find(ids)
     for _, id in ipairs(ids) do
@@ -627,11 +628,17 @@ end
 
 return {
     engineHandlers = {
+        -- The activations of the scripted object that reach the handlers of Lua: its OnActivate block takes the first
+        -- one and passes the second on with Activate
+        onActivate = function(object)
+            if scripted_object ~= nil and object == scripted_object then defaults = defaults + 1 end
+        end,
         onUpdate = function(dt)
             elapsed = elapsed + dt
             if step == 0 and elapsed >= @FROM@ then
                 step = 1
                 local scripted, victim = find(scripted_ids), find(victim_ids)
+                scripted_object = scripted
                 local player = world.players[1]
                 if not (scripted and victim) then
                     print('OFTEST', 'object missing', tostring(scripted ~= nil), tostring(victim ~= nil))
@@ -661,6 +668,7 @@ return {
                 local victim = find(victim_ids)
                 print('OFTEST', 'object victim again', tostring(victim.enabled),
                     tostring(world.globals.@VICTIM_DISABLED@))
+                print('OFTEST', 'object defaults', tostring(defaults))
             end
         end,
     },
@@ -1047,7 +1055,8 @@ def check_quests(text):
 def check_objects(text):
     """The problems with the script of the scripted object: it must have run its OnLoad block once (it disables the cube
     next to it) and its GameMode block every frame (frames counted, the distance to the player measured, the disabled
-    cube seen), its OnActivate block must count the activation by the player and not the one by a person, and when the
+    cube seen), its OnActivate block must count the activation by the player and not the one by a person, take the
+    activation from the default one except where it calls Activate, and when the
     Lua script enables the cube again the script must see it."""
     problems = []
 
@@ -1087,6 +1096,10 @@ def check_objects(text):
     if found is not None and found != ["true", "0"]:
         problems.append("the cube enabled by Lua should be enabled, and GetDisabled in the script should see it (true, "
                         + "0): " + str(found))
+    found = one("defaults")
+    if found is not None and found != ["1"]:
+        problems.append("of the two activations only the second, which calls Activate, should reach the handlers of "
+                        "Lua (1): " + str(found))
     told = [line for line in text.splitlines() if f"Message: {plugin.MESSAGE_TEXT}" in line]
     if len(told) != 1:
         problems.append(f"ShowMessage in OnLoad should have told the player '{plugin.MESSAGE_TEXT}' once, not "

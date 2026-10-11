@@ -17,6 +17,7 @@
 #include <components/misc/strings/lower.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
@@ -314,7 +315,7 @@ namespace OFScript
         // An object that was moved to a cell that is not loaded is not in a loaded cell to be unloaded with it
         const OFWorld::Scene::CellStoreCollection& active
             = OFBase::Environment::get().getWorldScene()->getActiveCells();
-        for (const FalloutScript::FormId reference : mObjects.updating())
+        for (const FalloutScript::FormId reference : mObjects.loadedReferences())
         {
             const OFWorld::Ptr ptr = findReference(reference);
             if (ptr.isEmpty() || ptr.getCell() == nullptr || reference == mPlayer
@@ -359,22 +360,27 @@ namespace OFScript
 
     void FalloutScripts::addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package)
     {
-        // A package that is among them already is the last again
-        std::vector<FalloutScript::FormId>& packages = mScriptPackages[actor];
-        packages.erase(std::remove(packages.begin(), packages.end(), package), packages.end());
-        packages.push_back(package);
-        evaluatePackage(actor);
+        // The packages are read by the characters on the thread of the frame, so they are changed there
+        runOnMainThread([this, actor, package] {
+            // A package that is among them already is the last again
+            std::vector<FalloutScript::FormId>& packages = mScriptPackages[actor];
+            packages.erase(std::remove(packages.begin(), packages.end(), package), packages.end());
+            packages.push_back(package);
+            evaluatePackage(actor);
+        });
     }
 
     void FalloutScripts::removeScriptPackage(FalloutScript::FormId actor)
     {
-        const auto found = mScriptPackages.find(actor);
-        if (found == mScriptPackages.end())
-            return;
-        found->second.pop_back();
-        if (found->second.empty())
-            mScriptPackages.erase(found);
-        evaluatePackage(actor);
+        runOnMainThread([this, actor] {
+            const auto found = mScriptPackages.find(actor);
+            if (found == mScriptPackages.end())
+                return;
+            found->second.pop_back();
+            if (found->second.empty())
+                mScriptPackages.erase(found);
+            evaluatePackage(actor);
+        });
     }
 
     void FalloutScripts::evaluatePackage(FalloutScript::FormId actor)
@@ -416,6 +422,18 @@ namespace OFScript
             return 0;
         const ESM::FormId* id = ptr.getCell()->getCell()->getId().getIf<ESM::FormId>();
         return id != nullptr ? id->toUint32() : 0;
+    }
+
+    void FalloutScripts::activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate)
+    {
+        runOnMainThread([this, target, activator, runOnActivate] {
+            if (runOnActivate && mObjects.trigger(target, FalloutScript::BlockType::OnActivate, activator))
+                return;
+            const OFWorld::Ptr object = findReference(target);
+            const OFWorld::Ptr actor = findReference(activator);
+            if (!object.isEmpty() && !actor.isEmpty())
+                OFBase::Environment::get().getLuaManager()->defaultActivation(object, actor);
+        });
     }
 
     namespace

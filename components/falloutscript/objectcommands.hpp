@@ -24,11 +24,16 @@ namespace FalloutScript
         virtual bool distance(FormId first, FormId second, double& result) = 0;
         /// The form id of the cell the reference is in, 0 for a reference the host does not know
         virtual FormId cellOf(FormId reference) = 0;
+        /// The activator activates the target: the object does what it does by default, or, when `runOnActivate` is
+        /// set, its script runs its OnActivate block in place of that. Nothing happens for an object or an activator
+        /// the host does not know.
+        virtual void activate(FormId target, FormId activator, bool runOnActivate) = 0;
     };
 
-    /// Gives the commands of objects to the interpreter: Enable, Disable, GetDisabled, GetDistance, GetInCell, GetSelf,
-    /// GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and GetRandomPercent. Those that the command table
-    /// does not have are left out. `random` gives the whole numbers from 0 to 99 for GetRandomPercent.
+    /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, GetDisabled, GetDistance,
+    /// GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and GetRandomPercent. Those that
+    /// the command table does not have are left out. `random` gives the whole numbers from 0 to 99 for
+    /// GetRandomPercent.
     void addObjectCommands(
         Interpreter& interpreter, ObjectScripts& objects, ObjectWorld& world, std::function<int()> random);
 }

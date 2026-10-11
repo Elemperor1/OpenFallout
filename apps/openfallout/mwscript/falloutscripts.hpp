@@ -78,7 +78,8 @@ namespace OFScript
         /// A cell is unloaded: its objects stop running their scripts, which they keep
         void cellUnloaded(OFWorld::CellStore& cell);
         /// An actor activates an object. Runs the OnActivate blocks of the script of the object, with the actor as the
-        /// action reference, and tells whether it has one.
+        /// action reference, and tells whether it has one. An object whose script has one does not do what it does by
+        /// default: its script asks for that with Activate.
         bool activated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
 
         /// The AI packages that scripts gave the character, the last given first (those that no content file has a
@@ -116,6 +117,7 @@ namespace OFScript
         void setDisabled(FalloutScript::FormId reference, bool disabled) override;
         bool distance(FalloutScript::FormId first, FalloutScript::FormId second, double& result) override;
         FalloutScript::FormId cellOf(FalloutScript::FormId reference) override;
+        void activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate) override;
 
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
         void removeScriptPackage(FalloutScript::FormId actor) override;

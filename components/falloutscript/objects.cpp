@@ -80,8 +80,10 @@ namespace FalloutScript
         if (!loaded)
         {
             mUpdating.erase(reference);
+            mLoaded.erase(reference);
             return;
         }
+        mLoaded.insert(reference);
         if (object.mHasGameMode)
             mUpdating.insert(reference);
         trigger(reference, BlockType::OnLoad);
@@ -132,6 +134,7 @@ namespace FalloutScript
     {
         mObjects.clear();
         mUpdating.clear();
+        mLoaded.clear();
         mPrepared.clear();
         mReported.clear();
         mSeconds = 0;

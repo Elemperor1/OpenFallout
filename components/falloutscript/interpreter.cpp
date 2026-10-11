@@ -230,9 +230,7 @@ namespace FalloutScript
                     const double value = evaluate(frame, statement);
                     if (statement.mGlobal != 0)
                     {
-                        const ReferenceSlot& slot = script.references()[statement.mGlobal - 1];
-                        const FormId global
-                            = slot.mIsVariable ? static_cast<FormId>(instance.variable(slot.mVariable)) : slot.mForm;
+                        const FormId global = resolveReference(frame, statement.mGlobal);
                         if (!mHost.setGlobal(global, value))
                             reportOnce(Report_NoGlobal | (global & 0xffff),
                                 "A script sets a global variable that does not exist");

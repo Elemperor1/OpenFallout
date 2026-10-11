@@ -44,6 +44,8 @@ namespace FalloutScript
         /// Nothing happens for a reference that has no script.
         void setLoaded(FormId reference, bool loaded);
         bool loaded(FormId reference) const;
+        /// All the references that are loaded, whatever blocks their scripts have
+        std::vector<FormId> loadedReferences() const { return std::vector<FormId>(mLoaded.begin(), mLoaded.end()); }
 
         /// Runs the blocks of the event on the script of the reference. The action reference is the object that caused
         /// the event (the one that activates), which GetActionRef tells while it runs. Returns whether the script has
@@ -79,6 +81,8 @@ namespace FalloutScript
         std::map<FormId, Object> mObjects;
         /// The references that run GameMode: the loaded ones whose script has such a block
         std::set<FormId> mUpdating;
+        /// The references that are loaded
+        std::set<FormId> mLoaded;
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
         /// The scripts that were reported as not runnable, so that they are reported once
         std::set<FormId> mReported;

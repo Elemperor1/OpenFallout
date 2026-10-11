@@ -28,7 +28,8 @@ namespace ESM4
     void adjustConditionParameters(const Reader& reader, TargetCondition& condition);
 
     /// The comparison value of a condition that has the flag for a global variable is the form id of the global, as a
-    /// float with the bytes of the id. This adjusts it the same way.
+    /// float with the bytes of the id. This adjusts it the same way, but for the files of every game: the global is a
+    /// form in all of them (only the parameters above depend on the types of Fallout's functions).
     void adjustConditionComparison(const Reader& reader, TargetCondition& condition);
 }
 

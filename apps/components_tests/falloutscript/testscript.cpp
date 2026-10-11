@@ -14,9 +14,16 @@ namespace
     using FalloutScript::ScriptProblem;
     using FalloutScript::VariableKind;
 
+    // A script points into the table of commands it was prepared with, so the table has to outlive the script
+    const FalloutScript::CommandTable& commandsOfTests()
+    {
+        static const FalloutScript::CommandTable table = testCommands();
+        return table;
+    }
+
     Script prepareScript(const ScriptBuilder& builder)
     {
-        return Script::prepare(builder.definition(), testCommands());
+        return Script::prepare(builder.definition(), commandsOfTests());
     }
 
     // A statement that does nothing of interest
