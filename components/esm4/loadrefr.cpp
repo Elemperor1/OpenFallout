@@ -268,6 +268,21 @@ void ESM4::Reference::load(ESM4::Reader& reader)
 
                 break;
             }
+            case ESM::fourCC("XLKR"):
+            {
+                // The reference alone (Fallout) or a keyword and the reference (Skyrim); other sizes are not a link
+                LinkedReference link;
+                if (subHdr.dataSize == 8)
+                    reader.getFormId(link.keyword);
+                if (subHdr.dataSize == 4 || subHdr.dataSize == 8)
+                {
+                    reader.getFormId(link.reference);
+                    mLinkedRefs.push_back(link);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
+            }
             case ESM::fourCC("XCNT"):
             {
                 reader.get(mCount);
@@ -302,7 +317,6 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XIS2"):
             case ESM::fourCC("XLCN"):
             case ESM::fourCC("XLIB"):
-            case ESM::fourCC("XLKR"):
             case ESM::fourCC("XLRM"):
             case ESM::fourCC("XLRT"):
             case ESM::fourCC("XLTW"):

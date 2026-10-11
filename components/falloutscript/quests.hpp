@@ -108,6 +108,8 @@ namespace FalloutScript
 
         void setObjectiveDisplayed(FormId quest, int objective, bool displayed);
         void setObjectiveCompleted(FormId quest, int objective, bool completed);
+        /// Completes every objective the quest has by its record, and those a script named
+        void completeAllObjectives(FormId quest);
         bool objectiveDisplayed(FormId quest, int objective) const;
         bool objectiveCompleted(FormId quest, int objective) const;
 
@@ -141,8 +143,8 @@ namespace FalloutScript
     };
 
     /// Gives the commands of quests to the interpreter: GetStage, GetStageDone, SetStage, GetQuestRunning,
-    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest, SetQuestDelay and the commands of objectives. Those
-    /// that the command table does not have are left out.
+    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest, SetQuestDelay, CompleteAllObjectives and the commands
+    /// of objectives. Those that the command table does not have are left out.
     void addQuestCommands(Interpreter& interpreter, QuestManager& quests);
 }
 

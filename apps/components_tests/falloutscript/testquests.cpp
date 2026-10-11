@@ -358,6 +358,33 @@ namespace
         EXPECT_FALSE(setup.mQuests.objectiveDisplayed(questA, 10));
     }
 
+    TEST(FalloutScriptQuestsTest, completing_all_objectives_completes_those_of_the_record_and_those_a_script_named)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        quest.mObjectives.resize(2);
+        quest.mObjectives[0].mIndex = 10;
+        quest.mObjectives[1].mIndex = 20;
+        setup.mRecords.addQuest(questB);
+        ScriptBuilder script;
+        const std::uint16_t self = script.form(questA);
+        script.code(questCall(OpCompleteAllObjectives, self, {}, 1));
+        TestRecords::addEntry(setup.mRecords.addQuest(questC), 5, {}, 0, &script);
+        setup.start();
+        setup.mQuests.setObjectiveDisplayed(questA, 30, true);
+
+        setup.mQuests.setStage(questC, 5);
+
+        EXPECT_TRUE(setup.mQuests.objectiveCompleted(questA, 10));
+        EXPECT_TRUE(setup.mQuests.objectiveCompleted(questA, 20));
+        EXPECT_TRUE(setup.mQuests.objectiveCompleted(questA, 30));
+        EXPECT_FALSE(setup.mQuests.objectiveCompleted(questA, 40));
+        // Completing is not showing, and another quest keeps its objectives
+        EXPECT_FALSE(setup.mQuests.objectiveDisplayed(questA, 10));
+        EXPECT_FALSE(setup.mQuests.objectiveCompleted(questB, 10));
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
     TEST(FalloutScriptQuestsTest, the_commands_of_a_script_drive_the_quests)
     {
         Runner setup;

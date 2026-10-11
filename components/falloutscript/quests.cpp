@@ -176,6 +176,17 @@ namespace FalloutScript
             quest->mObjectives[objective].mCompleted = completed;
     }
 
+    void QuestManager::completeAllObjectives(FormId id)
+    {
+        QuestState* quest = find(id);
+        if (quest == nullptr)
+            return;
+        for (const ESM4::QuestObjective& objective : quest->mRecord->mObjectives)
+            quest->mObjectives[objective.mIndex].mCompleted = true;
+        for (auto& [index, state] : quest->mObjectives)
+            state.mCompleted = true;
+    }
+
     bool QuestManager::objectiveDisplayed(FormId id, int objective) const
     {
         const QuestState* quest = find(id);
@@ -318,6 +329,10 @@ namespace FalloutScript
         });
         interpreter.setHandler("SetObjectiveCompleted", [&quests](CallContext& call) {
             quests.setObjectiveCompleted(formArgument(call, 0), intArgument(call, 1), argument(call, 2) != 0);
+            return 0.0;
+        });
+        interpreter.setHandler("CompleteAllObjectives", [&quests](CallContext& call) {
+            quests.completeAllObjectives(formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("GetObjectiveDisplayed", [&quests](CallContext& call) {

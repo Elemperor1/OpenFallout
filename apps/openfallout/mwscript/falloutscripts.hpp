@@ -156,6 +156,11 @@ namespace OFScript
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
+        FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
+        FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
+
+        /// The script an object runs: that of its record, or of the template that its record takes its script from
+        FalloutScript::FormId scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference);
 
         /// The record that the reference is of, by the records of the content files; a reference that they do not have
         /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when

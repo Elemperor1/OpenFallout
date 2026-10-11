@@ -28,6 +28,7 @@
 #define ESM4_REFR_H
 
 #include <cstdint>
+#include <vector>
 
 #include "reference.hpp" // EnableParent
 
@@ -110,6 +111,8 @@ namespace ESM4
         ESM::FormId mKey;
 
         ESM::FormId mTargetRef;
+
+        std::vector<LinkedReference> mLinkedRefs;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

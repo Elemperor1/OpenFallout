@@ -82,6 +82,21 @@ void ESM4::ActorCharacter::load(ESM4::Reader& reader)
                 reader.getFormId(mEsp.parent);
                 reader.get(mEsp.flags);
                 break;
+            case ESM::fourCC("XLKR"):
+            {
+                // The reference alone (Fallout) or a keyword and the reference (Skyrim); other sizes are not a link
+                LinkedReference link;
+                if (subHdr.dataSize == 8)
+                    reader.getFormId(link.keyword);
+                if (subHdr.dataSize == 4 || subHdr.dataSize == 8)
+                {
+                    reader.getFormId(link.reference);
+                    mLinkedRefs.push_back(link);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
+            }
             case ESM::fourCC("XCNT"):
             {
                 reader.get(mCount);
@@ -98,7 +113,6 @@ void ESM4::ActorCharacter::load(ESM4::Reader& reader)
             case ESM::fourCC("XHOR"):
             case ESM::fourCC("XLCM"): // levelled creature
             case ESM::fourCC("XLCN"): // location
-            case ESM::fourCC("XLKR"): // location route?
             case ESM::fourCC("XLRT"): // location type
             //
             case ESM::fourCC("XPRD"):

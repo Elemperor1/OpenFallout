@@ -206,7 +206,7 @@ namespace OFScript
                 mPendingToggle.emplace_back(reference, state->second);
                 mDisabled.erase(state);
             }
-            const FalloutScript::FormId script = ptr.getClass().getFalloutScript(ptr);
+            const FalloutScript::FormId script = scriptOf(ptr, reference);
             if (script != 0 && mObjects.add(reference, script) != nullptr)
                 mPendingLoad.push_back(reference);
             return true;
@@ -436,6 +436,32 @@ namespace OFScript
         }
     }
 
+    FalloutScript::FormId FalloutScripts::scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
+    {
+        const FalloutScript::FormId own = ptr.getClass().getFalloutScript(ptr);
+        ESM::FormId base;
+        if (!baseOf(reference, base) || base.isZeroOrUnset())
+            return own;
+        const auto scriptIdOf = [](const auto* record) -> FalloutScript::FormId {
+            return record == nullptr || record->mScriptId.isZeroOrUnset() ? 0 : record->mScriptId.toUint32();
+        };
+        // A record that takes its script from a template has the script of the template, and none when the template
+        // can not be followed (it is a levelled list of characters)
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            if (!npc->takesFromTemplate(ESM4::Npc::Template_UseScript))
+                return own;
+            return scriptIdOf(templateOwner(mStore, npc, ESM4::Npc::Template_UseScript));
+        }
+        if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            if (!creature->takesFromTemplate(ESM4::Creature::Template_UseScript))
+                return own;
+            return scriptIdOf(templateOwner(mStore, creature, ESM4::Creature::Template_UseScript));
+        }
+        return own;
+    }
+
     bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
     {
         base = ESM::FormId();
@@ -565,6 +591,43 @@ namespace OFScript
             return false;
         base = form.toUint32();
         return true;
+    }
+
+    FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)
+    {
+        Place place;
+        if (!whereIs(reference, place))
+            return 0;
+        const OFWorld::CellStore* cell = cellAt(place);
+        if (cell == nullptr || !cell->isExterior())
+            return 0;
+        // The cell of a building has the default worldspace, which no record is
+        const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
+        return worldspace != nullptr ? worldspace->toUint32() : 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword)
+    {
+        const ESM::FormId form = ESM::FormId::fromUint32(reference);
+        if (form.isZeroOrUnset())
+            return 0;
+        // The link is in the record of the placed object, whether or not its cell is loaded
+        const auto find = [keyword](const std::vector<ESM4::LinkedReference>& links) -> FalloutScript::FormId {
+            for (const ESM4::LinkedReference& link : links)
+            {
+                const FalloutScript::FormId linkKeyword = link.keyword.isZeroOrUnset() ? 0 : link.keyword.toUint32();
+                if (linkKeyword == keyword && !link.reference.isZeroOrUnset())
+                    return link.reference.toUint32();
+            }
+            return 0;
+        };
+        if (const ESM4::Reference* object = mStore.get<ESM4::Reference>().search(form))
+            return find(object->mLinkedRefs);
+        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
+            return find(character->mLinkedRefs);
+        if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
+            return find(creature->mLinkedRefs);
+        return 0;
     }
 
     bool FalloutScripts::isDead(const OFWorld::Ptr& actor) const

@@ -25,6 +25,9 @@ CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a 
 # The codes of commands the tests use, as the executables of the games number them
 GET_DISTANCE = 0x1001
 GET_IS_ID = 0x1048
+GET_IN_SAME_CELL = 0x1020
+GET_IN_WORLDSPACE = 0x1136
+GET_LINKED_REF = 0x116B
 GET_IN_CELL = 0x1043
 GET_LOCKED = 0x1005
 GET_LOCK_LEVEL = 0x1041
@@ -103,6 +106,11 @@ def operator(text):
 
 def int_argument(value):
     return b"n" + struct.pack("<i", value)
+
+
+def reference_value(reference):
+    """A reference as a value in an expression, named by the index of its entry in the table of references."""
+    return b"Z" + u16(reference)
 
 
 def float_argument(value):

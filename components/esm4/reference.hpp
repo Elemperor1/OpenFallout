@@ -48,6 +48,14 @@ namespace ESM4
         };
     };
 
+    // REFR, ACHR, ACRE: the reference that the record links to (XLKR). Fallout names the reference alone (4 bytes);
+    // Skyrim names a keyword first (8 bytes), which is 0 for the link that has none.
+    struct LinkedReference
+    {
+        ESM::FormId keyword;
+        ESM::FormId reference;
+    };
+
     struct LODReference
     {
         ESM::FormId baseObj;

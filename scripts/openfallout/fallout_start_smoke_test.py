@@ -698,6 +698,9 @@ return {
                 print('OFTEST', 'object progress', tostring(g.@PERK_BEFORE@), tostring(g.@PERK_AFTER@),
                     tostring(g.@PERK_RANK_THREE@), tostring(g.@PERK_REMOVED@), tostring(g.@NOTE_BEFORE@),
                     tostring(g.@NOTE_AFTER@), tostring(g.@IS_ID@), tostring(g.@IS_NOT_ID@))
+                -- The link of the record, the cell and worldspace of the cube, and the loads of the script of the beast
+                print('OFTEST', 'object world', tostring(g.@LINKED@), tostring(g.@LINKED_NONE@),
+                    tostring(g.@SAME_CELL@), tostring(g.@IN_WORLDSPACE@), tostring(g.@TEMPLATE_LOADS@))
                 -- Where the script saw the cube that it moved to a marker, and where the world has put it
                 local mover = find(mover_ids)
                 mover_object, far_object = mover, find(far_ids)
@@ -797,6 +800,11 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@NOTE_AFTER@", plugin.PROGRESS_GLOBALS["note_after"][1])
                  .replace("@IS_ID@", plugin.PROGRESS_GLOBALS["is_id"][1])
                  .replace("@IS_NOT_ID@", plugin.PROGRESS_GLOBALS["is_not_id"][1])
+                 .replace("@LINKED@", plugin.WORLD_QUERY_GLOBALS["linked"][1])
+                 .replace("@LINKED_NONE@", plugin.WORLD_QUERY_GLOBALS["linked_none"][1])
+                 .replace("@SAME_CELL@", plugin.WORLD_QUERY_GLOBALS["same_cell"][1])
+                 .replace("@IN_WORLDSPACE@", plugin.WORLD_QUERY_GLOBALS["in_worldspace"][1])
+                 .replace("@TEMPLATE_LOADS@", plugin.WORLD_QUERY_GLOBALS["template_loads"][1])
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1271,6 +1279,16 @@ def check_objects(text, scenario):
                         "after two AddPerk calls, and not have it after RemovePerk; the note should be there only "
                         "after AddNote; GetIsID should be 1 for the base form of the cube and 0 for another "
                         "(0, 1, 0, 0, 0, 1, 1, 0): " + str(found))
+    found = one("world")
+    # The script of the beast runs for the beast, for the creature that is placed as a levelled list (which stands for
+    # the beast) and for the heir that takes the script from the beast as its template: 3 runs, and 2 without the third
+    expected = ["1", "0", "1", "1" if scenario.exterior else "0", "3"]
+    if found is not None and found != expected:
+        problems.append("GetLinkedRef should tell the cube that the record links the locker to and 0 for the cube "
+                        "that has no link, the two cubes should be in the same cell, GetInWorldspace should be 1 only "
+                        "in the exterior cell, and the script of the beast should have run for the beast, for the "
+                        "creature placed as a list that stands for it and for the creature that takes its script from "
+                        f"it as its template (1, 0, 1, worldspace, 3): {found}")
     # The cube the script moved to the target marker with offsets, as the script saw it and as the world has it, then the
     # cube at the height the script set and the player moved into the other kind of cell
     origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0

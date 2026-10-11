@@ -223,7 +223,19 @@ PROGRESS_GLOBALS = {"perk_before": (0x89F, "OFTestPerkBefore"), "perk_after": (0
                     "is_id": (0x8A5, "OFTestIsId"), "is_not_id": (0x8A6, "OFTestIsNotId")}
 XP_REWARD = 150
 KARMA_REWARD = -20
-LAST_ID = 0x8A6 # the largest form ID of the plugin, which the next object ID of its header follows
+# More of what scripts ask about: the locker cube is linked to the doomed one (XLKR), is in the same cell as it, and is in
+# the worldspace only when the cell is the exterior one. The beast has a script, which adds one to a global when it
+# loads: it runs for the beast, for the creature placed as the levelled list (which stands for the beast) and for the
+# heir, a creature that takes the script from the beast as its template.
+TEMPLATE_SCRIPT_ID = 0x8A7
+HEIR_ID = 0x8A8
+HEIR_REF_IDS = {"interior": 0x8A9, "exterior": 0x8AA}
+HEIR_PLACE = (800.0, 740.0)
+HEIR_TEMPLATE_FLAGS = 0x40 | 0x80 | 0x200 # the model, the name and the script come from the template
+WORLD_QUERY_GLOBALS = {"linked": (0x8AB, "OFTestLinkedRef"), "linked_none": (0x8AC, "OFTestLinkedRefNone"),
+                       "same_cell": (0x8AD, "OFTestInSameCell"), "in_worldspace": (0x8AE, "OFTestInWorldspace"),
+                       "template_loads": (0x8AF, "OFTestTemplateScriptLoads")}
+LAST_ID = 0x8AF # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -467,11 +479,13 @@ def top_group(code, children):
     return group(code, 0, children)
 
 
-def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None):
+def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
     if lock_level is not None:
         # level, 3 unused bytes, the key (none), 4 bytes of flags and 8 more, as Fallout 3 writes the 20 bytes of a lock
         subs.append(sub(b"XLOC", struct.pack("<B3xI4x8x", lock_level, 0)))
+    if linked is not None:
+        subs.append(sub(b"XLKR", struct.pack("<I", linked)))
     if scale is not None:
         subs.append(sub(b"XSCL", struct.pack("<f", scale)))
     subs.append(sub(b"DATA", struct.pack("<6f", *position, *rotation)))
@@ -618,6 +632,8 @@ def object_script(kind):
     perk, note = script.form(PERK_ID), script.form(NOTE_ID)
     progress = {name: script.form(form_id) for name, (form_id, _) in PROGRESS_GLOBALS.items()}
     quest_a = script.form(QUEST_A_ID)
+    queries = {name: script.form(form_id) for name, (form_id, _) in WORLD_QUERY_GLOBALS.items()}
+    world_space = script.form(WORLD_ID)
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
 
@@ -683,7 +699,18 @@ def object_script(kind):
                  + sf.set_to(sf.global_target(progress["is_id"]),
                              sf.call_token(sf.GET_IS_ID, sf.form_argument(cube), reference=locker))
                  + sf.set_to(sf.global_target(progress["is_not_id"]),
-                             sf.call_token(sf.GET_IS_ID, sf.form_argument(perk), reference=locker))),
+                             sf.call_token(sf.GET_IS_ID, sf.form_argument(perk), reference=locker))
+                 # The record links the locker cube to the doomed one and the doomed one to nothing; both are in the
+                 # same cell; the worldspace is the one of the exterior cell and none for the cell of a building
+                 + sf.set_to(sf.global_target(queries["linked"]),
+                             sf.call_token(sf.GET_LINKED_REF, reference=locker) + sf.reference_value(doomed)
+                             + sf.operator("=="))
+                 + sf.set_to(sf.global_target(queries["linked_none"]),
+                             sf.call_token(sf.GET_LINKED_REF, reference=doomed))
+                 + sf.set_to(sf.global_target(queries["same_cell"]),
+                             sf.call_token(sf.GET_IN_SAME_CELL, sf.form_argument(doomed), reference=locker))
+                 + sf.set_to(sf.global_target(queries["in_worldspace"]),
+                             sf.call_token(sf.GET_IN_WORLDSPACE, sf.form_argument(world_space), reference=locker))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
@@ -763,7 +790,8 @@ def object_refs(kind, origin):
             refr(CROSSER_REF_IDS[kind], CUBE_ID, (x + CROSSER_PLACE[0], y + CROSSER_PLACE[1], CUBE / 2)),
             refr(LOCKED_REF_IDS[kind], CUBE_ID, (x + LOCKED_PLACE[0], y + LOCKED_PLACE[1], CUBE / 2),
                  lock_level=LOCK_LEVEL),
-            refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2)),
+            refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2),
+                 linked=DOOMED_REF_IDS[kind]),
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
 
 
@@ -1053,7 +1081,8 @@ def creatures():
     beast = creature(CREATURE_ID, CREATURE_NAME, [
         zstr(b"FULL", "OpenFallout Test Beast"), zstr(b"MODL", CREATURE_SKELETON),
         sub(b"NIFZ", CREATURE_BODY.encode("ascii") + b"\0" + CREATURE_FOOT.encode("ascii") + b"\0"),
-        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS)), sub(b"CNTO", struct.pack("<II", SUIT_ID, CREATURE_ITEMS))])
+        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS)), sub(b"CNTO", struct.pack("<II", SUIT_ID, CREATURE_ITEMS)),
+        sub(b"SCRI", struct.pack("<I", TEMPLATE_SCRIPT_ID))])
     # the record of one that takes its model, and with it its name, from the template and keeps nothing of its own
     user = creature(CREATURE_USER_ID, CREATURE_NAME + "User", [
         zstr(b"FULL", "Not Shown"), sub(b"TPLT", struct.pack("<I", CREATURE_LIST_ID))],
@@ -1063,6 +1092,24 @@ def creatures():
         zstr(b"EDID", CREATURE_NAME + "List"), sub(b"LVLD", b"\x00"), sub(b"LVLF", b"\x00"),
         sub(b"LVLO", struct.pack("<hHIhH", 1, 0, CREATURE_ID, 1, 0))])
     return beast, user, levelled
+
+
+def heir():
+    """A creature that takes its model, its name and its script from the beast, which is its template."""
+    return creature(HEIR_ID, CREATURE_NAME + "Heir", [zstr(b"FULL", "Not Shown"),
+                                                      sub(b"TPLT", struct.pack("<I", CREATURE_ID))],
+                    template_flags=HEIR_TEMPLATE_FLAGS)
+
+
+def template_script():
+    """The script of the beast (an SCPT record): on load it adds one to a global."""
+    sf = fallout_script
+    script = sf.Script(0)
+    loads = script.form(WORLD_QUERY_GLOBALS["template_loads"][0])
+    script.add(sf.statement(sf.SCRIPT_NAME),
+               sf.block(sf.ON_LOAD, sf.set_to(sf.global_target(loads), sf.global_target(loads) + sf.number("1")
+                                              + sf.operator("+"))))
+    return record(b"SCPT", TEMPLATE_SCRIPT_ID, [zstr(b"EDID", "OFTestTemplateScript"), *sf.sub_records(script)])
 
 
 def acre(form_id, base, position):
@@ -1113,6 +1160,7 @@ def worldspace():
         refr(EXTERIOR_WALL_REF_ID, WALL_ID, (half - WALL_DISTANCE, half + NPC_DEPTH, 0.0)),
         *placed_creatures((half, half), {"beast": EXTERIOR_CREATURE_REF_ID, "user": EXTERIOR_CREATURE_USER_REF_ID,
                                          "list": EXTERIOR_CREATURE_LIST_REF_ID}),
+        acre(HEIR_REF_IDS["exterior"], HEIR_ID, (half + HEIR_PLACE[0], half + HEIR_PLACE[1], 0.0)),
         *package_refs(1, (half, half)),
         *object_refs("exterior", (half, half)),
     ])
@@ -1155,6 +1203,7 @@ def plugin():
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
         *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
                                       "list": CREATURE_LIST_REF_ID}),
+        acre(HEIR_REF_IDS["interior"], HEIR_ID, (*HEIR_PLACE, 0.0)),
         *package_refs(0, (0.0, 0.0)),
         *object_refs("interior", (0.0, 0.0)),
     ])
@@ -1166,12 +1215,15 @@ def plugin():
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l")
+                                    for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message()])
-            + top_group(b"SCPT", [quest_script(), object_script("interior"), object_script("exterior")])
+            + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
+                                                 object_script("exterior")])
             + top_group(b"QUST", quests())
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
@@ -1179,7 +1231,7 @@ def plugin():
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", packages()) + top_group(b"NPC_", [person(), *package_people()])
-            + top_group(b"CREA", list(creatures()[:2]))
+            + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
 
