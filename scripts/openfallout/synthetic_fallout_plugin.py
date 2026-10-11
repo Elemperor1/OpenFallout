@@ -240,7 +240,13 @@ WORLD_QUERY_GLOBALS = {"linked": (0x8AB, "OFTestLinkedRef"), "linked_none": (0x8
 # they stand that far on in y) and keeps what the call told, which is the reference of the first one made
 PLACE_COUNT = 2
 PLACE_DISTANCE = 120
-LAST_ID = 0x8B0 # the largest form ID of the plugin, which the next object ID of its header follows
+# The clock: the game has a global GameHour (13 by its record), which follows the clock of the world instead, as do
+# GetCurrentTime and GetGlobalValue of that global. The three readings are the same, and not the 13 of the record.
+GAME_HOUR_ID = 0x8B1
+GAME_HOUR_RECORD_VALUE = 13.0
+CLOCK_GLOBALS = {"hour_command": (0x8B2, "OFTestHourCommand"), "hour_global": (0x8B3, "OFTestHourGlobal"),
+                 "global_value": (0x8B4, "OFTestGlobalValue")}
+LAST_ID = 0x8B4 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -639,6 +645,8 @@ def object_script(kind):
     quest_a = script.form(QUEST_A_ID)
     queries = {name: script.form(form_id) for name, (form_id, _) in WORLD_QUERY_GLOBALS.items()}
     world_space = script.form(WORLD_ID)
+    game_hour = script.form(GAME_HOUR_ID)
+    clock = {name: script.form(form_id) for name, (form_id, _) in CLOCK_GLOBALS.items()}
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
 
@@ -716,6 +724,10 @@ def object_script(kind):
                              sf.call_token(sf.GET_IN_SAME_CELL, sf.form_argument(doomed), reference=locker))
                  + sf.set_to(sf.global_target(queries["in_worldspace"]),
                              sf.call_token(sf.GET_IN_WORLDSPACE, sf.form_argument(world_space), reference=locker))
+                 + sf.set_to(sf.global_target(clock["hour_command"]), sf.call_token(sf.GET_CURRENT_TIME))
+                 + sf.set_to(sf.global_target(clock["hour_global"]), sf.global_target(game_hour))
+                 + sf.set_to(sf.global_target(clock["global_value"]),
+                             sf.call_token(sf.GET_GLOBAL_VALUE, sf.form_argument(game_hour)))
                  + sf.set_to(sf.global_target(queries["placed"]),
                              sf.call_token(sf.PLACE_AT_ME, sf.form_argument(cube), sf.int_argument(PLACE_COUNT),
                                            sf.float_argument(PLACE_DISTANCE), sf.int_argument(0), reference=locker))),
@@ -1225,6 +1237,8 @@ def plugin():
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l")
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
+                                  global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())

@@ -471,6 +471,36 @@ namespace
         EXPECT_EQ(setup.mInterpreter.runResult(instance).mStatus, Interpreter::Status::Failed);
     }
 
+    TEST(FalloutScriptInterpreterTest, anEndIfWithNoIfDoesNothing)
+    {
+        Runner setup;
+        ScriptBuilder builder = block(logCall("a") + endIf() + logCall("b") + ifStatement(number("1")) + logCall("c")
+            + endIf() + endIf() + logCall("d"));
+        Instance instance = setup.instance(builder);
+        EXPECT_EQ(setup.mInterpreter.run(instance, GameMode).mStatus, Interpreter::Status::Done);
+        EXPECT_THAT(setup.mLogged, ElementsAre("a", "b", "c", "d"));
+    }
+
+    TEST(FalloutScriptInterpreterTest, theBodyOfAnElseIfAfterAClosedIfIsSkipped)
+    {
+        Runner setup;
+        ScriptBuilder builder = block(ifStatement(number("0")) + logCall("a") + endIf() + elseIfStatement(number("1"))
+            + logCall("b") + endIf() + logCall("c"));
+        Instance instance = setup.instance(builder);
+        setup.mInterpreter.run(instance, GameMode);
+        EXPECT_THAT(setup.mLogged, ElementsAre("c"));
+    }
+
+    TEST(FalloutScriptInterpreterTest, theBodyOfASecondElseIsSkipped)
+    {
+        Runner setup;
+        ScriptBuilder builder = block(ifStatement(number("0")) + logCall("a") + elseStatement() + logCall("b")
+            + elseStatement() + logCall("c") + endIf() + logCall("d"));
+        Instance instance = setup.instance(builder);
+        setup.mInterpreter.run(instance, GameMode);
+        EXPECT_THAT(setup.mLogged, ElementsAre("b", "d"));
+    }
+
     TEST(FalloutScriptInterpreterTest, aScriptWithBlocksOutOfOrderSaysWhere)
     {
         Runner setup;

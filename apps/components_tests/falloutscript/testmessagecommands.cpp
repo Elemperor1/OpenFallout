@@ -25,6 +25,9 @@ namespace
 
     // The code of the command in the table of the games
     constexpr std::uint16_t OpShowMessage = 0x1059;
+    constexpr std::uint16_t OpGetButtonPressed = 0x101F;
+    constexpr std::uint16_t OpMenuMode = 0x1024;
+    constexpr std::uint32_t integerVariable = 1;
 
     class FakeScreen : public FalloutScript::MessageWorld
     {
@@ -72,6 +75,24 @@ namespace
         setup.mObjects.trigger(crate, BlockType::OnActivate);
 
         EXPECT_THAT(setup.mScreen.mShown, ElementsAre(warning, greeting, warning));
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptMessageCommandsTest, no_button_is_pressed_and_no_menu_is_open)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('s', 1), callToken(OpGetButtonPressed, Bytes()))
+            + setTo(var('s', 2), callToken(OpMenuMode, arguments(0))) + end());
+        builder.variable(1, integerVariable, "button").variable(2, integerVariable, "menu");
+        setup.addScript(builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.trigger(crate, BlockType::OnActivate);
+
+        EXPECT_EQ(setup.mObjects.instance(crate)->variable(1), -1);
+        EXPECT_EQ(setup.mObjects.instance(crate)->variable(2), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

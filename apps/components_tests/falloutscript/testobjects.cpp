@@ -47,6 +47,8 @@ namespace
     constexpr std::uint16_t OpGetIsID = 0x1048;
     constexpr std::uint16_t OpGetInSameCell = 0x1020;
     constexpr std::uint16_t OpPlaceAtMe = 0x1025;
+    constexpr std::uint16_t OpGetCurrentTime = 0x1012;
+    constexpr std::uint16_t OpGetGlobalValue = 0x104A;
     constexpr std::uint16_t OpGetInWorldspace = 0x1136;
     constexpr std::uint16_t OpGetLinkedRef = 0x116B;
     constexpr std::uint16_t OpGetRandomPercent = 0x104D;
@@ -75,6 +77,7 @@ namespace
         };
         std::vector<Placement> mPlacements;
         FormId mMade = 0;
+        double mHour = 0;
 
         struct Activation
         {
@@ -134,6 +137,7 @@ namespace
             const auto found = mLinks.find({ reference, keyword });
             return found != mLinks.end() ? found->second : 0;
         }
+        double gameHour() override { return mHour; }
         FormId placeAtMe(FormId reference, FormId base, int count, double distance, int direction) override
         {
             mPlacements.push_back({ reference, base, count, distance, direction });
@@ -594,6 +598,38 @@ namespace
         ASSERT_EQ(setup.mWorld.mPlacements.size(), 2u);
         EXPECT_EQ(setup.mWorld.mPlacements[0].mCount, 100);
         EXPECT_EQ(setup.mWorld.mPlacements[1].mCount, 1);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_current_time_tells_the_hour_of_the_clock_of_the_game)
+    {
+        Runner setup;
+        setup.addScript(scriptOfCrates, assigns(BlockType::OnLoad, callToken(OpGetCurrentTime, Bytes())));
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mHour = 13.5;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 13.5);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_global_value_tells_the_value_of_a_global_and_0_for_one_that_is_not_there)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t known = builder.form(0x00000500);
+        const std::uint16_t unknown = builder.form(0x00000501);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('f', 1), callToken(OpGetGlobalValue, arguments(1).add(refArg(known))))
+            + setTo(var('f', 2), callToken(OpGetGlobalValue, arguments(1).add(refArg(unknown)))) + end());
+        builder.variable(1, floatVariable, "known").variable(2, floatVariable, "unknown");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mHost.mGlobals[0x00000500] = 2.5;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 2.5);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
     }
 
     TEST(FalloutScriptObjectsTest, get_self_tells_the_reference_and_nothing_for_the_script_of_a_quest)

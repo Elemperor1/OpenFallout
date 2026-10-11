@@ -107,6 +107,12 @@ namespace FalloutScript
                 ? 1.0
                 : 0.0;
         });
+        interpreter.setHandler("GetGlobalValue", [](CallContext& call) {
+            double value = 0;
+            const FormId global = formArgument(call, 0);
+            return global != 0 && call.mHost.getGlobal(global, value) ? value : 0.0;
+        });
+        interpreter.setHandler("GetCurrentTime", [&world](CallContext&) { return world.gameHour(); });
         interpreter.setHandler(
             "GetSecondsPassed", [&objects](CallContext&) { return static_cast<double>(objects.secondsPassed()); });
         interpreter.setHandler("GetRandomPercent",

@@ -93,8 +93,8 @@ namespace FalloutScript
     };
 
     /// Gives the commands about items, deaths and factions to the interpreter: AddItem, RemoveItem, GetItemCount,
-    /// GetDead, KillActor, ResurrectActor, AddToFaction, RemoveFromFaction, SetFactionRank, GetInFaction and
-    /// GetFactionRank. Those that the command table does not have are left out.
+    /// GetDead, GetHealthPercentage, KillActor, ResurrectActor, AddToFaction, RemoveFromFaction, SetFactionRank,
+    /// GetInFaction and GetFactionRank. Those that the command table does not have are left out.
     class Interpreter;
     void addActorCommands(Interpreter& interpreter, ActorState& state);
 }

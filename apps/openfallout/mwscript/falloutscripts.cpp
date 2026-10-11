@@ -33,6 +33,7 @@
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/globals.hpp"
 #include "../mwworld/manualref.hpp"
 #include "../mwworld/player.hpp"
 #include "../mwworld/ptr.hpp"
@@ -539,8 +540,13 @@ namespace OFScript
                 base = ptr.get<ESM4::Creature>()->mBase->mId;
             else if (ptr.getType() == ESM4::Container::sRecordId)
                 base = ptr.get<ESM4::Container>()->mBase->mId;
-            else if (const ESM::FormId* form = ptr.getCellRef().getRefId().getIf<ESM::FormId>())
-                base = *form;
+            else
+            {
+                // getRefId gives a copy: the pointer into it needs the copy to stay alive
+                const ESM::RefId id = ptr.getCellRef().getRefId();
+                if (const ESM::FormId* placed = id.getIf<ESM::FormId>())
+                    base = *placed;
+            }
         }
         return true;
     }
@@ -1109,11 +1115,44 @@ namespace OFScript
         return {};
     }
 
+    namespace
+    {
+        /// The globals of the game that are the clock of the world: GameHour, GameDaysPassed and TimeScale. The world
+        /// keeps them under the names that Morrowind has for them. Null for any other global.
+        const OFWorld::GlobalVariableName* worldClock(std::string_view editorId)
+        {
+            static constexpr OFWorld::GlobalVariableName hour = OFWorld::Globals::sGameHour;
+            static constexpr OFWorld::GlobalVariableName days = OFWorld::Globals::sDaysPassed;
+            static constexpr OFWorld::GlobalVariableName scale = OFWorld::Globals::sTimeScale;
+            if (Misc::StringUtils::ciEqual(editorId, "GameHour"))
+                return &hour;
+            if (Misc::StringUtils::ciEqual(editorId, "GameDaysPassed"))
+                return &days;
+            if (Misc::StringUtils::ciEqual(editorId, "TimeScale"))
+                return &scale;
+            return nullptr;
+        }
+    }
+
+    double FalloutScripts::gameHour()
+    {
+        const OFBase::World* world = OFBase::Environment::get().getWorld();
+        return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sGameHour) : 0.0;
+    }
+
     bool FalloutScripts::getGlobal(FalloutScript::FormId global, double& value)
     {
         const ESM4::GlobalVariable* record = mStore.get<ESM4::GlobalVariable>().search(refId(global));
         if (record == nullptr)
             return false;
+        if (const OFWorld::GlobalVariableName* clock = worldClock(record->mEditorId))
+        {
+            if (const OFBase::World* world = OFBase::Environment::get().getWorld())
+            {
+                value = world->getGlobalFloat(*clock);
+                return true;
+            }
+        }
         const auto found = mGlobals.find(global);
         value = found != mGlobals.end() ? found->second : fitToType(record->mType, record->mValue);
         return true;
@@ -1124,6 +1163,14 @@ namespace OFScript
         const ESM4::GlobalVariable* record = mStore.get<ESM4::GlobalVariable>().search(refId(global));
         if (record == nullptr)
             return false;
+        if (const OFWorld::GlobalVariableName* clock = worldClock(record->mEditorId))
+        {
+            if (OFBase::World* world = OFBase::Environment::get().getWorld())
+            {
+                world->setGlobalFloat(*clock, static_cast<float>(value));
+                return true;
+            }
+        }
         mGlobals[global] = fitToType(record->mType, value);
         return true;
     }

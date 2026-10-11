@@ -161,6 +161,7 @@ namespace OFScript
         FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
         FalloutScript::FormId placeAtMe(FalloutScript::FormId reference, FalloutScript::FormId base, int count,
             double distance, int direction) override;
+        double gameHour() override;
 
         /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
         /// content file, or an object that PlaceAtMe made

@@ -702,6 +702,9 @@ return {
                 -- The link of the record, the cell and worldspace of the cube, and the loads of the script of the beast
                 print('OFTEST', 'object world', tostring(g.@LINKED@), tostring(g.@LINKED_NONE@),
                     tostring(g.@SAME_CELL@), tostring(g.@IN_WORLDSPACE@), tostring(g.@TEMPLATE_LOADS@))
+                -- The clock: GetCurrentTime, the global GameHour and GetGlobalValue of it
+                print('OFTEST', 'object clock', string.format('%.4f', g.@HOUR_COMMAND@),
+                    string.format('%.4f', g.@HOUR_GLOBAL@), string.format('%.4f', g.@GLOBAL_VALUE@))
                 -- The cubes that PlaceAtMe made in front of the locker cube: what the call told, how many stand there
                 -- and how many of them are cubes of the same record
                 local locker = find(locker_ids)
@@ -800,6 +803,9 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@LOCKER@", ", ".join(map(str, plugin.LOCKER_REF_IDS.values())))
                  .replace("@PLACE_DISTANCE@", str(plugin.PLACE_DISTANCE))
                  .replace("@PLACED@", plugin.WORLD_QUERY_GLOBALS["placed"][1])
+                 .replace("@HOUR_COMMAND@", plugin.CLOCK_GLOBALS["hour_command"][1])
+                 .replace("@HOUR_GLOBAL@", plugin.CLOCK_GLOBALS["hour_global"][1])
+                 .replace("@GLOBAL_VALUE@", plugin.CLOCK_GLOBALS["global_value"][1])
                  .replace("@LOCKED@", plugin.STATE_GLOBALS["locked"][1])
                  .replace("@LOCK_LEVEL@", plugin.STATE_GLOBALS["lock_level"][1])
                  .replace("@UNLOCKED@", plugin.STATE_GLOBALS["unlocked"][1])
@@ -1307,6 +1313,14 @@ def check_objects(text, scenario):
                         "in the exterior cell, and the script of the beast should have run for the beast, for the "
                         "creature placed as a list that stands for it and for the creature that takes its script from "
                         f"it as its template (1, 0, 1, worldspace, 3): {found}")
+    found = one("clock")
+    if found is not None:
+        hours = [float(value) for value in found]
+        if (max(hours) - min(hours) > 0.001 or not 0.0 <= hours[0] < 24.0
+                or abs(hours[0] - plugin.GAME_HOUR_RECORD_VALUE) < 1.0):
+            problems.append("GetCurrentTime, the global GameHour and GetGlobalValue of it should all tell the clock of "
+                            f"the world (an hour from 0 to 24), not the {plugin.GAME_HOUR_RECORD_VALUE:g} of the "
+                            f"record: {found}")
     found = one("placed")
     if found is not None and found != ["true", str(plugin.PLACE_COUNT), str(plugin.PLACE_COUNT)]:
         problems.append("PlaceAtMe should have told the reference of the first object it made, and made "

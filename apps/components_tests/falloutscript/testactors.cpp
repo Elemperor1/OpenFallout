@@ -35,6 +35,7 @@ namespace
     // The codes of the commands in the table of the games
     constexpr std::uint16_t OpAddItem = 0x1002;
     constexpr std::uint16_t OpGetDead = 0x102E;
+    constexpr std::uint16_t OpGetHealthPercentage = 0x11AF;
     constexpr std::uint16_t OpGetItemCount = 0x102F;
     constexpr std::uint16_t OpGetInFaction = 0x1047;
     constexpr std::uint16_t OpGetFactionRank = 0x1049;
@@ -321,6 +322,22 @@ namespace
         EXPECT_EQ(setup.variable(1), 0);
         EXPECT_EQ(setup.variable(2), 1);
         EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, a_living_actor_has_all_its_health_and_a_dead_one_none)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('f', 1), callToken(OpGetHealthPercentage, arguments(0))) + command(OpKillActor, arguments(0))
+            + setTo(var('f', 2), callToken(OpGetHealthPercentage, arguments(0))) + end());
+        builder.variable(1, 0, "alive").variable(2, 0, "dead");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 1);
+        EXPECT_EQ(setup.variable(2), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

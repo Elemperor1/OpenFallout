@@ -15,8 +15,9 @@ namespace FalloutScript
         virtual void showMessage(FormId message) = 0;
     };
 
-    /// Gives the commands that show messages to the interpreter: ShowMessage. The command table of a game that does not
-    /// have it is left as it is.
+    /// Gives the commands that show messages to the interpreter: ShowMessage, and GetButtonPressed and MenuMode, which
+    /// tell that no button was pressed and that no menu is open. The command table of a game that does not have a
+    /// command is left as it is.
     void addMessageCommands(Interpreter& interpreter, MessageWorld& world);
 }
 
