@@ -21,6 +21,8 @@ namespace
 
     constexpr std::uint32_t getStage = 58;
     constexpr std::uint32_t getStageDone = 59;
+    constexpr std::uint32_t getIsSex = 70;
+    constexpr std::uint32_t getIsVoiceType = 427;
     constexpr std::uint32_t notInTheTable = 500;
 
     TEST(ESM4ConditionParamsTest, knowsTheTypesOfTheParametersOfAFunction)
@@ -37,6 +39,9 @@ namespace
         const ESM4::ConditionParameterTypes variable = ESM4::conditionParameterTypes(79);
         EXPECT_EQ(variable.mFirst, 14u);
         EXPECT_EQ(variable.mSecond, 22u); // the index of a variable
+
+        // the voice type of GetIsVoiceType, which is a form of the file
+        EXPECT_EQ(ESM4::conditionParameterTypes(getIsVoiceType).mFirst, 46u);
 
         const ESM4::ConditionParameterTypes none = ESM4::conditionParameterTypes(notInTheTable);
         EXPECT_EQ(none.mFirst, ESM4::ConditionParameterTypes::none);
@@ -114,15 +119,19 @@ namespace
             // no form at all
             + condition(0, 0, getStage, 0, 0, 0)
             // a function the table does not have: both parameters stay
-            + condition(0, 0, notInTheTable, 0x00001234, 0x01000100, 0));
+            + condition(0, 0, notInTheTable, 0x00001234, 0x01000100, 0)
+            // a voice type is a form of the master, and the sex a number
+            + condition(0, 0, getIsVoiceType, 0x00001234, 0, 0) + condition(0, 0, getIsSex, 1, 0, 0));
 
-        ASSERT_EQ(conditions.size(), 4u);
+        ASSERT_EQ(conditions.size(), 6u);
         EXPECT_EQ(conditions[0].param1, 0x02001234u);
         EXPECT_EQ(conditions[0].param2, 10u);
         EXPECT_EQ(conditions[1].param1, 0x05000100u);
         EXPECT_EQ(conditions[2].param1, 0u);
         EXPECT_EQ(conditions[3].param1, 0x00001234u);
         EXPECT_EQ(conditions[3].param2, 0x01000100u);
+        EXPECT_EQ(conditions[4].param1, 0x02001234u);
+        EXPECT_EQ(conditions[5].param1, 1u);
     }
 
     TEST(ESM4ConditionParamsTest, givesTheGlobalAndTheReferenceOfAConditionTheIndexToo)

@@ -1,6 +1,7 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/actortraits.hpp>
+#include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -151,5 +152,30 @@ namespace
         EXPECT_EQ(run.ask(OpGetIsCreature, unknown), 0.0);
         // No object at all
         EXPECT_EQ(run.mInterpreter.call(OpGetIsSex, 0, false, { { 0, {}, false } }), 0.0);
+    }
+
+    ESM4::TargetCondition condition(std::uint32_t function, std::uint32_t param1)
+    {
+        ESM4::TargetCondition result{};
+        result.condition = ESM4::CTF_EqualTo;
+        result.comparison = 1;
+        result.functionIndex = function;
+        result.param1 = param1;
+        return result;
+    }
+
+    TEST(FalloutScriptActorTraitsTest, aConditionNamesTheVoiceTypeAndTheSexAsTheRecordHasThem)
+    {
+        Runner run;
+        FalloutScript::ConditionEvaluator evaluator(run.mInterpreter);
+        FalloutScript::ConditionContext context;
+        context.mSubject = clerk;
+
+        EXPECT_TRUE(evaluator.holds(condition(427, voiceClerk), context));
+        EXPECT_FALSE(evaluator.holds(condition(427, voiceOther), context));
+        // The sex of the condition is 0 for male and 1 for female, which the person is
+        EXPECT_TRUE(evaluator.holds(condition(70, 1), context));
+        EXPECT_FALSE(evaluator.holds(condition(70, 0), context));
+        EXPECT_TRUE(evaluator.holds(condition(69, raceHuman), context));
     }
 }

@@ -27,7 +27,6 @@ namespace ESM4::ScriptCode
             classes[0x29] = ParamClass::Short; // miscellaneous statistic
             classes[0x2C] = ParamClass::Double;
             classes[0x2D] = ParamClass::Variable;
-            classes[0x2E] = ParamClass::Other;
             classes[0x33] = ParamClass::Short; // alignment
             classes[0x34] = ParamClass::Short; // equip type
             classes[0x37] = ParamClass::Short; // critical stage
