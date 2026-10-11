@@ -75,6 +75,7 @@ namespace OFScript
 
         FalloutScripts(const FalloutScripts&) = delete;
         FalloutScripts& operator=(const FalloutScripts&) = delete;
+        ~FalloutScripts();
 
         /// Starts over, as for a new game: global variables have the values of their records, quests are at their
         /// beginning. What was loaded of the world is forgotten.
@@ -312,6 +313,11 @@ namespace OFScript
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
         std::mt19937 mRandom;
+        /// Seconds of play since the commands that scripts reached without a handler were last written to the log
+        float mMissingTimer = 0;
+        /// Writes the commands that scripts reached without a handler, with how often, to the log (nothing when there
+        /// were none)
+        void reportMissingCommands();
         /// The values the global variables have now, for those that were set (the others have the value of the record)
         std::map<FalloutScript::FormId, double> mGlobals;
         /// Editor ids in lower case, made when first asked for

@@ -123,8 +123,22 @@ namespace OFScript
         });
     }
 
+    FalloutScripts::~FalloutScripts()
+    {
+        reportMissingCommands();
+    }
+
+    void FalloutScripts::reportMissingCommands()
+    {
+        mMissingTimer = 0;
+        const std::string summary = mInterpreter.takeMissingSummary();
+        if (!summary.empty())
+            log("Commands that scripts reached and that are not implemented, with how often: " + summary);
+    }
+
     void FalloutScripts::reset()
     {
+        reportMissingCommands();
         mGlobals.clear();
         mDisabled.clear();
         mPendingToggle.clear();
@@ -159,6 +173,11 @@ namespace OFScript
         runPending();
         if (paused)
             return;
+        // A game can be left at any time, so what has not been implemented shows up in the log while it is played
+        constexpr float missingReportInterval = 30.f;
+        mMissingTimer += frametime;
+        if (mMissingTimer >= missingReportInterval)
+            reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
         mQuests.update(frametime);

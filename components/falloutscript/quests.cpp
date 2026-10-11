@@ -266,7 +266,8 @@ namespace FalloutScript
         std::shared_ptr<const Script> script = prepared(record->mScript);
         if (!script->usable())
         {
-            log("The script of the quest " + hex(id) + " cannot be run");
+            log("The script " + hex(record->mId.toUint32()) + " of the quest " + hex(id)
+                + " cannot be run: " + script->problemText());
             return;
         }
         quest.mInstance = std::make_shared<Instance>(std::move(script), id, true);
@@ -279,7 +280,7 @@ namespace FalloutScript
         std::shared_ptr<const Script> script = prepared(entry.mScript);
         if (!script->usable())
         {
-            log("A script of the quest " + hex(quest) + " cannot be run");
+            log("A script of the quest " + hex(quest) + " cannot be run: " + script->problemText());
             return;
         }
         Instance instance(std::move(script), quest, true);

@@ -139,6 +139,27 @@ namespace FalloutScript
         mHandlers[opcode] = std::move(handler);
     }
 
+    std::string Interpreter::takeMissingSummary()
+    {
+        std::vector<std::pair<std::uint64_t, std::uint16_t>> hits;
+        hits.reserve(mMissingHits.size());
+        for (const auto& [opcode, count] : mMissingHits)
+            hits.emplace_back(count, opcode);
+        mMissingHits.clear();
+        std::sort(hits.begin(), hits.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+        std::string summary;
+        for (const auto& [count, opcode] : hits)
+        {
+            const CommandInfo* command = mCommands.find(opcode);
+            if (!summary.empty())
+                summary += ", ";
+            summary += (command != nullptr ? command->mName : hex(opcode)) + " " + std::to_string(count);
+        }
+        return summary;
+    }
+
     void Interpreter::reportOnce(std::uint32_t key, std::string_view message)
     {
         if (mReported.insert(key).second)
@@ -368,7 +389,9 @@ namespace FalloutScript
         Instance* target = mHost.findInstance(owner);
         if (target == nullptr)
         {
-            reportOnce(Report_NoInstance | (owner & 0xffff), "A script reads a variable of a script that is not there");
+            reportOnce(Report_NoInstance | (owner & 0xffff),
+                "A script reads a variable of a script that is not there: " + hex(owner) + ", variable "
+                    + std::to_string(ref.mIndex) + ", read by the script of " + hex(frame.mInstance.owner()));
             return 0;
         }
         return target->variable(ref.mIndex);
@@ -382,7 +405,9 @@ namespace FalloutScript
         Instance* target = mHost.findInstance(owner);
         if (target == nullptr)
         {
-            reportOnce(Report_NoInstance | (owner & 0xffff), "A script sets a variable of a script that is not there");
+            reportOnce(Report_NoInstance | (owner & 0xffff),
+                "A script sets a variable of a script that is not there: " + hex(owner) + ", variable "
+                    + std::to_string(ref.mIndex) + ", set by the script of " + hex(frame.mInstance.owner()));
             return false;
         }
         return target->setVariable(ref.mIndex, value);
@@ -400,6 +425,7 @@ namespace FalloutScript
         const auto handler = mHandlers.find(opcode);
         if (handler == mHandlers.end())
         {
+            ++mMissingHits[opcode];
             reportOnce(Report_NoHandler | opcode,
                 "The script command " + command->mName + " (" + hex(opcode) + ") is not implemented");
             return 0;
@@ -431,6 +457,7 @@ namespace FalloutScript
         const auto handler = mHandlers.find(call.mOpcode);
         if (handler == mHandlers.end())
         {
+            ++mMissingHits[call.mOpcode];
             reportOnce(Report_NoHandler | call.mOpcode,
                 "The script command " + prepared.mCommand->mName + " (" + hex(call.mOpcode) + ") is not implemented");
             return 0;

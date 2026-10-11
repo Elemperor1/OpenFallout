@@ -355,6 +355,35 @@ namespace
         EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("Nothing"));
     }
 
+    TEST(FalloutScriptInterpreterTest, countsHowOftenACommandWithoutAHandlerIsReached)
+    {
+        Runner setup;
+        ScriptBuilder builder
+            = block(command(OpNothing, arguments(0)) + logCall("after") + command(OpNothing, arguments(0)));
+        Instance instance = setup.instance(builder);
+        setup.mInterpreter.run(instance, GameMode);
+        setup.mInterpreter.run(instance, GameMode);
+        EXPECT_EQ(setup.mHost.mLog.size(), 1u);
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "Nothing 4");
+        // the count starts again
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "");
+    }
+
+    TEST(FalloutScriptInterpreterTest, namesTheScriptAndTheVariableWhenAScriptIsNotThere)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t questRef = builder.form(0x00002000);
+        builder.variable(1, 1);
+        builder.code(scriptName() + begin(GameMode) + setTo(var('s', 1), remoteVar(questRef, 's', 1)) + end());
+        Instance instance = setup.instance(builder, 0x00003000);
+        setup.mInterpreter.run(instance, GameMode);
+        ASSERT_EQ(setup.mHost.mLog.size(), 1u);
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("0x2000"));
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("variable 1"));
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("0x3000"));
+    }
+
     TEST(FalloutScriptInterpreterTest, aCommandThatIsNotInTheTableIsReportedAndSkipped)
     {
         Runner setup;
@@ -437,8 +466,24 @@ namespace
         Instance instance = setup.instance(builder);
         EXPECT_FALSE(instance.script().usable());
         EXPECT_EQ(instance.script().problem(), FalloutScript::ScriptProblem::DoesNotDecode);
+        EXPECT_THAT(instance.script().problemText(), HasSubstr("does not decode"));
         EXPECT_EQ(setup.mInterpreter.run(instance, GameMode).mStatus, Interpreter::Status::Failed);
         EXPECT_EQ(setup.mInterpreter.runResult(instance).mStatus, Interpreter::Status::Failed);
+    }
+
+    TEST(FalloutScriptInterpreterTest, aScriptWithBlocksOutOfOrderSaysWhere)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(GameMode) + begin(OnActivate) + end());
+        Instance instance = setup.instance(builder);
+        EXPECT_EQ(instance.script().problem(), FalloutScript::ScriptProblem::BadStructure);
+        EXPECT_THAT(instance.script().problemText(), HasSubstr("a Begin inside a block"));
+        EXPECT_THAT(instance.script().problemText(), HasSubstr("statement 2"));
+
+        ScriptBuilder unclosed;
+        unclosed.code(scriptName() + begin(GameMode));
+        EXPECT_THAT(setup.instance(unclosed).script().problemText(), HasSubstr("a Begin with no End"));
     }
 
     TEST(FalloutScriptInterpreterTest, aNameGivenToSetHandlerMustBeInTheTable)
