@@ -33,6 +33,7 @@
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/manualref.hpp"
 #include "../mwworld/player.hpp"
 #include "../mwworld/ptr.hpp"
 #include "../mwworld/scene.hpp"
@@ -130,6 +131,13 @@ namespace OFScript
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        mPendingMade.clear();
+        mMade.clear();
+        mMadeIds.clear();
+        {
+            const std::lock_guard lock(mMadeMutex);
+            mMadeCount = 0;
+        }
         mReferences.clear();
         mScriptPackages.clear();
         mActors.clear();
@@ -168,15 +176,20 @@ namespace OFScript
         mDeferred.push_back(std::move(action));
     }
 
-    namespace
+    FalloutScript::FormId FalloutScripts::referenceOf(const OFWorld::Ptr& ptr) const
     {
-        /// The reference as scripts name it, 0 for an object that has no reference number of a plugin (those that are
-        /// made while the game runs have a generated one, which has no 32 bit form)
-        FalloutScript::FormId referenceOf(const OFWorld::Ptr& ptr)
-        {
-            const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
-            return refNum.hasContentFile() && refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
-        }
+        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
+        if (refNum.hasContentFile())
+            return refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
+        // An object made while the game runs has a number of the world's own; scripts know it by the one it was given
+        const auto made = mMadeIds.find(refNum);
+        return made != mMadeIds.end() ? made->second : 0;
+    }
+
+    ESM::FormId FalloutScripts::worldIdOf(FalloutScript::FormId reference) const
+    {
+        const auto made = mMade.find(reference);
+        return made != mMade.end() ? made->second : ESM::FormId::fromUint32(reference);
     }
 
     void FalloutScripts::cellLoaded(OFWorld::CellStore& cell)
@@ -232,6 +245,11 @@ namespace OFScript
                 mDeferredPlaces.clear();
             }
         }
+        // The objects that PlaceAtMe asked for, before anything else is done to them
+        std::map<FalloutScript::FormId, MadeObject> made;
+        made.swap(mPendingMade);
+        for (const auto& [id, request] : made)
+            makeObject(id, request);
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
         std::map<FalloutScript::FormId, Move> moves;
         moves.swap(mPendingMoves);
@@ -295,14 +313,13 @@ namespace OFScript
         {
             // An object that was moved to another cell has another Ptr, which the world keeps up to date for those
             // that are in the scene
-            const OFWorld::Ptr moved
-                = OFBase::Environment::get().getWorldModel()->getPtr(ESM::FormId::fromUint32(reference));
+            const OFWorld::Ptr moved = OFBase::Environment::get().getWorldModel()->getPtr(worldIdOf(reference));
             if (!moved.isEmpty() && moved.isInCell() && moved.getCell() != found->second.getCell())
                 found->second = moved;
             return found->second;
         }
         // Objects made while the game runs are only known to the world
-        const OFWorld::Ptr ptr = OFBase::Environment::get().getWorldModel()->getPtr(ESM::FormId::fromUint32(reference));
+        const OFWorld::Ptr ptr = OFBase::Environment::get().getWorldModel()->getPtr(worldIdOf(reference));
         return !ptr.isEmpty() && ptr.isInCell() ? ptr : OFWorld::Ptr();
     }
 
@@ -503,6 +520,8 @@ namespace OFScript
                 base = ptr.get<ESM4::Creature>()->mBase->mId;
             else if (ptr.getType() == ESM4::Container::sRecordId)
                 base = ptr.get<ESM4::Container>()->mBase->mId;
+            else if (const ESM::FormId* form = ptr.getCellRef().getRefId().getIf<ESM::FormId>())
+                base = *form;
         }
         return true;
     }
@@ -705,6 +724,12 @@ namespace OFScript
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)
     {
+        // An object that PlaceAtMe asked for is next to the object it was asked for, until the world makes it
+        if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+        {
+            result = asked->second.mWhere;
+            return true;
+        }
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty() && ptr.getCell() != nullptr)
         {
@@ -928,6 +953,71 @@ namespace OFScript
         if (cls.isDoor())
             moved.getCellRef().setPosition(moved.getRefData().getPosition());
         OFBase::Environment::get().getLuaManager()->objectTeleported(moved);
+    }
+
+    FalloutScript::FormId FalloutScripts::placeAtMe(
+        FalloutScript::FormId reference, FalloutScript::FormId base, int count, double distance, int direction)
+    {
+        Place near;
+        if (!whereIs(reference, near))
+        {
+            log("PlaceAtMe: " + FalloutScript::hex(reference) + " has no place the game knows");
+            return 0;
+        }
+        std::vector<std::pair<FalloutScript::FormId, MadeObject>> requests;
+        {
+            const std::lock_guard lock(mMadeMutex);
+            for (int i = 0; i < count && mMadeCount < 0x00ffffff; ++i)
+            {
+                // The numbers of objects made while the game runs begin with 0xFF, as in the games
+                const FalloutScript::FormId id = 0xff000000u | ++mMadeCount;
+                requests.emplace_back(id,
+                    MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
+                        static_cast<float>(distance), near });
+            }
+        }
+        if (requests.empty())
+        {
+            log("PlaceAtMe: no more objects can be made");
+            return 0;
+        }
+        const FalloutScript::FormId first = requests.front().first;
+        runOnMainThread([this, requests = std::move(requests)] {
+            for (const auto& [id, request] : requests)
+                mPendingMade[id] = request;
+        });
+        return first;
+    }
+
+    void FalloutScripts::makeObject(FalloutScript::FormId id, const MadeObject& request)
+    {
+        const OFWorld::Ptr near = findReference(request.mNear);
+        if (near.isEmpty() || !near.isInCell())
+        {
+            log("PlaceAtMe: " + FalloutScript::hex(request.mNear) + " is not in a loaded cell, so nothing is made next "
+                "to it");
+            return;
+        }
+        try
+        {
+            // The same way the Morrowind script command places something next to an actor
+            OFWorld::ManualRef ref(mStore, refId(request.mBase), 1);
+            ref.getPtr().mRef->mData.mPhysicsPostponed = !ref.getPtr().getClass().isActor();
+            const OFWorld::Ptr placed = OFBase::Environment::get().getWorld()->safePlaceObject(
+                ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
+            const ESM::FormId number = placed.getCellRef().getRefNum();
+            mMade[id] = number;
+            mMadeIds[number] = id;
+            mReferences[id] = placed;
+            // It runs its script like any object that is loaded
+            const FalloutScript::FormId script = scriptOf(placed, id);
+            if (script != 0 && mObjects.add(id, script) != nullptr)
+                mPendingLoad.push_back(id);
+        }
+        catch (const std::exception& error)
+        {
+            log("PlaceAtMe: an object of " + FalloutScript::hex(request.mBase) + " can not be made: " + error.what());
+        }
     }
 
     void FalloutScripts::activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate)

@@ -235,8 +235,12 @@ HEIR_PLACE = (800.0, 740.0)
 HEIR_TEMPLATE_FLAGS = 0x40 | 0x80 | 0x200 # the model, the name and the script come from the template
 WORLD_QUERY_GLOBALS = {"linked": (0x8AB, "OFTestLinkedRef"), "linked_none": (0x8AC, "OFTestLinkedRefNone"),
                        "same_cell": (0x8AD, "OFTestInSameCell"), "in_worldspace": (0x8AE, "OFTestInWorldspace"),
-                       "template_loads": (0x8AF, "OFTestTemplateScriptLoads")}
-LAST_ID = 0x8AF # the largest form ID of the plugin, which the next object ID of its header follows
+                       "template_loads": (0x8AF, "OFTestTemplateScriptLoads"), "placed": (0x8B0, "OFTestPlacedRef")}
+# PlaceAtMe: the script makes PLACE_COUNT cubes PLACE_DISTANCE units in front of the locker cube (which faces north, so
+# they stand that far on in y) and keeps what the call told, which is the reference of the first one made
+PLACE_COUNT = 2
+PLACE_DISTANCE = 120
+LAST_ID = 0x8B0 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -711,7 +715,10 @@ def object_script(kind):
                  + sf.set_to(sf.global_target(queries["same_cell"]),
                              sf.call_token(sf.GET_IN_SAME_CELL, sf.form_argument(doomed), reference=locker))
                  + sf.set_to(sf.global_target(queries["in_worldspace"]),
-                             sf.call_token(sf.GET_IN_WORLDSPACE, sf.form_argument(world_space), reference=locker))),
+                             sf.call_token(sf.GET_IN_WORLDSPACE, sf.form_argument(world_space), reference=locker))
+                 + sf.set_to(sf.global_target(queries["placed"]),
+                             sf.call_token(sf.PLACE_AT_ME, sf.form_argument(cube), sf.int_argument(PLACE_COUNT),
+                                           sf.float_argument(PLACE_DISTANCE), sf.int_argument(0), reference=locker))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame

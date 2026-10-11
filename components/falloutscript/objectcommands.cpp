@@ -74,6 +74,18 @@ namespace FalloutScript
             return call.mReference != 0 ? static_cast<double>(world.linkedRef(call.mReference, formArgument(call, 0)))
                                         : 0.0;
         });
+        // The games make the objects at once; a script can not ask for more than this many in a call
+        interpreter.setHandler("PlaceAtMe", [&world](CallContext& call) {
+            constexpr int mostAtOnce = 100;
+            const FormId base = formArgument(call, 0);
+            if (call.mReference == 0 || base == 0)
+                return 0.0;
+            const int count = std::clamp(call.mArguments.size() > 1 ? intArgument(call, 1) : 1, 1, mostAtOnce);
+            const double asked = argument(call, 2);
+            const double distance = std::isnan(asked) ? 0.0 : std::clamp(asked, -1.0e6, 1.0e6);
+            const int direction = intArgument(call, 3);
+            return static_cast<double>(world.placeAtMe(call.mReference, base, count, distance, direction));
+        });
         interpreter.setHandler("GetSelf", [&objects](CallContext& call) {
             const FormId owner = call.mInstance.owner();
             return objects.has(owner) ? static_cast<double>(owner) : 0.0;

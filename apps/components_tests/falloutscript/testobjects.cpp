@@ -46,6 +46,7 @@ namespace
     constexpr std::uint16_t OpGetInCell = 0x1043;
     constexpr std::uint16_t OpGetIsID = 0x1048;
     constexpr std::uint16_t OpGetInSameCell = 0x1020;
+    constexpr std::uint16_t OpPlaceAtMe = 0x1025;
     constexpr std::uint16_t OpGetInWorldspace = 0x1136;
     constexpr std::uint16_t OpGetLinkedRef = 0x116B;
     constexpr std::uint16_t OpGetRandomPercent = 0x104D;
@@ -63,6 +64,17 @@ namespace
         std::map<FormId, FormId> mBases;
         std::map<FormId, FormId> mWorldspaces;
         std::map<std::pair<FormId, FormId>, FormId> mLinks; // by the reference and the keyword
+
+        struct Placement
+        {
+            FormId mReference;
+            FormId mBase;
+            int mCount;
+            double mDistance;
+            int mDirection;
+        };
+        std::vector<Placement> mPlacements;
+        FormId mMade = 0;
 
         struct Activation
         {
@@ -121,6 +133,11 @@ namespace
         {
             const auto found = mLinks.find({ reference, keyword });
             return found != mLinks.end() ? found->second : 0;
+        }
+        FormId placeAtMe(FormId reference, FormId base, int count, double distance, int direction) override
+        {
+            mPlacements.push_back({ reference, base, count, distance, direction });
+            return mMade;
         }
     };
 
@@ -513,6 +530,70 @@ namespace
         setup.mObjects.setLoaded(crate, true);
 
         EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_asks_for_the_objects_next_to_the_reference_and_tells_the_first)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('f', 1),
+                callToken(
+                    OpPlaceAtMe, arguments(4).add(refArg(base)).add(intArg(3)).add(floatArg(120.5)).add(intArg(2))))
+            + end());
+        builder.variable(1, floatVariable, "made");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mMade = 0xFF000100; // a float variable keeps 24 bits of it, which this one fits in
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 1u);
+        const auto& placement = setup.mWorld.mPlacements.front();
+        EXPECT_EQ(placement.mReference, crate);
+        EXPECT_EQ(placement.mBase, otherCrate);
+        EXPECT_EQ(placement.mCount, 3);
+        EXPECT_EQ(placement.mDistance, 120.5);
+        EXPECT_EQ(placement.mDirection, 2);
+        EXPECT_EQ(setup.variable(crate, 1), static_cast<double>(0xFF000100));
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_makes_one_object_in_front_without_the_optional_arguments)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(
+            scriptName() + begin(BlockType::OnLoad) + command(OpPlaceAtMe, arguments(1).add(refArg(base))) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 1u);
+        const auto& placement = setup.mWorld.mPlacements.front();
+        EXPECT_EQ(placement.mCount, 1);
+        EXPECT_EQ(placement.mDistance, 0.0);
+        EXPECT_EQ(placement.mDirection, 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_keeps_the_count_within_what_a_script_may_ask_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + command(OpPlaceAtMe, arguments(2).add(refArg(base)).add(intArg(100000)))
+            + command(OpPlaceAtMe, arguments(2).add(refArg(base)).add(intArg(-4))) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 2u);
+        EXPECT_EQ(setup.mWorld.mPlacements[0].mCount, 100);
+        EXPECT_EQ(setup.mWorld.mPlacements[1].mCount, 1);
     }
 
     TEST(FalloutScriptObjectsTest, get_self_tells_the_reference_and_nothing_for_the_script_of_a_quest)
