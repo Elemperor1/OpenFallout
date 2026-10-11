@@ -17,6 +17,7 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
+#include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
@@ -24,6 +25,7 @@
 #include <components/falloutscript/packagecommands.hpp>
 #include <components/falloutscript/placementcommands.hpp>
 #include <components/falloutscript/quests.hpp>
+#include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <osg/Vec3f>
@@ -60,6 +62,8 @@ namespace OFScript
                                  private FalloutScript::QuestRecords,
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
+                                 private FalloutScript::ReferenceRecords,
+                                 private FalloutScript::FormListRecords,
                                  private FalloutScript::PackageWorld,
                                  private FalloutScript::PlacementWorld,
                                  private FalloutScript::MessageWorld
@@ -148,6 +152,9 @@ namespace OFScript
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
+        bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
+        bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
+        bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
 
         /// The record that the reference is of, by the records of the content files; a reference that they do not have
         /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
@@ -242,6 +249,8 @@ namespace OFScript
         FalloutScript::QuestManager mQuests;
         FalloutScript::ObjectScripts mObjects;
         FalloutScript::ActorState mActors;
+        FalloutScript::ReferenceState mReferenceState;
+        FalloutScript::FormLists mFormLists;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

@@ -22,8 +22,8 @@ namespace FalloutScript
         virtual void evaluatePackage(FormId actor) = 0;
     };
 
-    /// Gives the commands about packages to the interpreter: AddScriptPackage, RemoveScriptPackage and
-    /// EvaluatePackage. Those that the command table does not have are left out.
+    /// Gives the commands about packages to the interpreter: AddScriptPackage, RemoveScriptPackage,
+    /// EvaluatePackage and ResetAI. Those that the command table does not have are left out.
     void addPackageCommands(Interpreter& interpreter, PackageWorld& world);
 }
 

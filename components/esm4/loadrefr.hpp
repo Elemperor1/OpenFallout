@@ -105,8 +105,8 @@ namespace ESM4
         RadioStationData mRadio;
 
         TeleportDest mDoor;
-        bool mIsLocked;
-        std::int8_t mLockLevel;
+        bool mIsLocked = false;
+        std::int8_t mLockLevel = 0;
         ESM::FormId mKey;
 
         ESM::FormId mTargetRef;

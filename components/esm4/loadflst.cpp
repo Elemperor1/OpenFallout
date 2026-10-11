@@ -51,7 +51,9 @@ void ESM4::FormIdList::load(ESM4::Reader& reader)
                 reader.getFormId(mObjects.emplace_back());
                 break;
             default:
-                throw std::runtime_error("ESM4::FLST::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                // A list is its entries; whatever else a file adds to the record is of no use here
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

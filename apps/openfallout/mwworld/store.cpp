@@ -1182,6 +1182,7 @@ template class OFWorld::TypedDynamicStore<ESM4::Container>;
 template class OFWorld::TypedDynamicStore<ESM4::Creature>;
 template class OFWorld::TypedDynamicStore<ESM4::Door>;
 template class OFWorld::TypedDynamicStore<ESM4::Flora>;
+template class OFWorld::TypedDynamicStore<ESM4::FormIdList>;
 template class OFWorld::TypedDynamicStore<ESM4::Furniture>;
 template class OFWorld::TypedDynamicStore<ESM4::Hair>;
 template class OFWorld::TypedDynamicStore<ESM4::HeadPart>;

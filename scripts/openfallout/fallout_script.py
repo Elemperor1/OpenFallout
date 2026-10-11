@@ -25,6 +25,15 @@ CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a 
 # The codes of commands the tests use, as the executables of the games number them
 GET_DISTANCE = 0x1001
 GET_IN_CELL = 0x1043
+GET_LOCKED = 0x1005
+GET_LOCK_LEVEL = 0x1041
+LOCK = 0x1072
+UNLOCK = 0x1073
+GET_DESTROYED = 0x10CB
+SET_DESTROYED = 0x10CC
+IS_IN_LIST = 0x1174
+MARK_FOR_DELETE = 0x11BB
+ADD_FORM_TO_FORM_LIST = 0x1233
 GET_POS = 0x1006
 SET_POS = 0x1007
 GET_ANGLE = 0x1008

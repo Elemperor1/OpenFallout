@@ -30,10 +30,10 @@ namespace FalloutScript
         virtual void activate(FormId target, FormId activator, bool runOnActivate) = 0;
     };
 
-    /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, GetDisabled, GetDistance,
-    /// GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and GetRandomPercent. Those that
-    /// the command table does not have are left out. `random` gives the whole numbers from 0 to 99 for
-    /// GetRandomPercent.
+    /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, MarkForDelete, GetDisabled,
+    /// GetDistance, GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and
+    /// GetRandomPercent. Those that the command table does not have are left out. `random` gives the whole numbers from
+    /// 0 to 99 for GetRandomPercent.
     void addObjectCommands(
         Interpreter& interpreter, ObjectScripts& objects, ObjectWorld& world, std::function<int()> random);
 }
