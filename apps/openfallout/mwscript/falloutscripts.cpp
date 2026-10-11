@@ -374,9 +374,11 @@ namespace OFScript
         template <class Record>
         const Record* templateOwner(const OFWorld::ESMStore& store, const Record* record, std::uint16_t flag)
         {
+            // A chain of templates that is longer is a cycle or a mistake (the limit of the model and the worn armor)
+            constexpr int maxTemplateDepth = 16;
             for (int step = 0; record != nullptr && record->takesFromTemplate(flag); ++step)
             {
-                if (record->mBaseTemplate.isZeroOrUnset() || step >= 8)
+                if (record->mBaseTemplate.isZeroOrUnset() || step >= maxTemplateDepth)
                     return nullptr;
                 record = store.get<Record>().search(record->mBaseTemplate);
             }
