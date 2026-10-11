@@ -24,6 +24,7 @@
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/packagecommands.hpp>
 #include <components/falloutscript/placementcommands.hpp>
+#include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
@@ -74,6 +75,7 @@ namespace OFScript
 
         FalloutScripts(const FalloutScripts&) = delete;
         FalloutScripts& operator=(const FalloutScripts&) = delete;
+        ~FalloutScripts();
 
         /// Starts over, as for a new game: global variables have the values of their records, quests are at their
         /// beginning. What was loaded of the world is forgotten.
@@ -155,6 +157,20 @@ namespace OFScript
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
+        FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
+        FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
+        FalloutScript::FormId placeAtMe(FalloutScript::FormId reference, FalloutScript::FormId base, int count,
+            double distance, int direction) override;
+        double gameHour() override;
+
+        /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
+        /// content file, or an object that PlaceAtMe made
+        FalloutScript::FormId referenceOf(const OFWorld::Ptr& ptr) const;
+        /// The id the world knows the reference by: the same number for those of the content files, and the one that
+        /// the world gave an object that PlaceAtMe made
+        ESM::FormId worldIdOf(FalloutScript::FormId reference) const;
+        /// The script an object runs: that of its record, or of the template that its record takes its script from
+        FalloutScript::FormId scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference);
 
         /// The record that the reference is of, by the records of the content files; a reference that they do not have
         /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
@@ -213,6 +229,17 @@ namespace OFScript
                 mParts |= later.mParts;
             }
         };
+        /// What PlaceAtMe asked for and the world has not made yet
+        struct MadeObject
+        {
+            FalloutScript::FormId mBase = 0;
+            FalloutScript::FormId mNear = 0; // the reference whose place it is made next to
+            int mDirection = 0;
+            float mDistance = 0;
+            Place mWhere; // where that reference was, which is where scripts see the new object until it is made
+        };
+        /// Makes an object that PlaceAtMe asked for, at the start of the next frame
+        void makeObject(FalloutScript::FormId id, const MadeObject& request);
         static void queueMove(
             std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move);
         /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell
@@ -251,6 +278,7 @@ namespace OFScript
         FalloutScript::ActorState mActors;
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
+        FalloutScript::PlayerProgress mProgress;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once
@@ -274,10 +302,24 @@ namespace OFScript
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;
         std::map<FalloutScript::FormId, Move> mRelocations;
+        /// The objects PlaceAtMe made. Scripts name one by a number of its own (0xFF and a counter, as the games do),
+        /// which is not the id the world gave it. An object that is asked for waits for the start of the next frame.
+        std::map<FalloutScript::FormId, MadeObject> mPendingMade;
+        std::map<FalloutScript::FormId, ESM::FormId> mMade;
+        std::map<ESM::FormId, FalloutScript::FormId> mMadeIds;
+        /// The counter of the numbers and the objects that are asked for, which a script that Lua starts uses from the
+        /// thread of Lua: the rest of the script has to find the object it was told the number of at once
+        std::mutex mMadeMutex;
+        FalloutScript::FormId mMadeCount = 0;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
         std::mt19937 mRandom;
+        /// Seconds of play since the commands that scripts reached without a handler were last written to the log
+        float mMissingTimer = 0;
+        /// Writes the commands that scripts reached without a handler, with how often, to the log (nothing when there
+        /// were none)
+        void reportMissingCommands();
         /// The values the global variables have now, for those that were set (the others have the value of the record)
         std::map<FalloutScript::FormId, double> mGlobals;
         /// Editor ids in lower case, made when first asked for

@@ -33,6 +33,8 @@
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/globals.hpp"
+#include "../mwworld/manualref.hpp"
 #include "../mwworld/player.hpp"
 #include "../mwworld/ptr.hpp"
 #include "../mwworld/scene.hpp"
@@ -109,6 +111,7 @@ namespace OFScript
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
+        FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -121,19 +124,41 @@ namespace OFScript
         });
     }
 
+    FalloutScripts::~FalloutScripts()
+    {
+        reportMissingCommands();
+    }
+
+    void FalloutScripts::reportMissingCommands()
+    {
+        mMissingTimer = 0;
+        const std::string summary = mInterpreter.takeMissingSummary();
+        if (!summary.empty())
+            log("Commands that scripts reached and that are not implemented, with how often: " + summary);
+    }
+
     void FalloutScripts::reset()
     {
+        reportMissingCommands();
         mGlobals.clear();
         mDisabled.clear();
         mPendingToggle.clear();
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        mMade.clear();
+        mMadeIds.clear();
+        {
+            const std::lock_guard lock(mMadeMutex);
+            mPendingMade.clear();
+            mMadeCount = 0;
+        }
         mReferences.clear();
         mScriptPackages.clear();
         mActors.clear();
         mReferenceState.clear();
         mFormLists.clear();
+        mProgress.clear();
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -149,6 +174,11 @@ namespace OFScript
         runPending();
         if (paused)
             return;
+        // A game can be left at any time, so what has not been implemented shows up in the log while it is played
+        constexpr float missingReportInterval = 30.f;
+        mMissingTimer += frametime;
+        if (mMissingTimer >= missingReportInterval)
+            reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
         mQuests.update(frametime);
@@ -166,15 +196,20 @@ namespace OFScript
         mDeferred.push_back(std::move(action));
     }
 
-    namespace
+    FalloutScript::FormId FalloutScripts::referenceOf(const OFWorld::Ptr& ptr) const
     {
-        /// The reference as scripts name it, 0 for an object that has no reference number of a plugin (those that are
-        /// made while the game runs have a generated one, which has no 32 bit form)
-        FalloutScript::FormId referenceOf(const OFWorld::Ptr& ptr)
-        {
-            const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
-            return refNum.hasContentFile() && refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
-        }
+        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
+        if (refNum.hasContentFile())
+            return refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
+        // An object made while the game runs has a number of the world's own; scripts know it by the one it was given
+        const auto made = mMadeIds.find(refNum);
+        return made != mMadeIds.end() ? made->second : 0;
+    }
+
+    ESM::FormId FalloutScripts::worldIdOf(FalloutScript::FormId reference) const
+    {
+        const auto made = mMade.find(reference);
+        return made != mMade.end() ? made->second : ESM::FormId::fromUint32(reference);
     }
 
     void FalloutScripts::cellLoaded(OFWorld::CellStore& cell)
@@ -204,7 +239,7 @@ namespace OFScript
                 mPendingToggle.emplace_back(reference, state->second);
                 mDisabled.erase(state);
             }
-            const FalloutScript::FormId script = ptr.getClass().getFalloutScript(ptr);
+            const FalloutScript::FormId script = scriptOf(ptr, reference);
             if (script != 0 && mObjects.add(reference, script) != nullptr)
                 mPendingLoad.push_back(reference);
             return true;
@@ -230,6 +265,14 @@ namespace OFScript
                 mDeferredPlaces.clear();
             }
         }
+        // The objects that PlaceAtMe asked for, before anything else is done to them
+        std::map<FalloutScript::FormId, MadeObject> made;
+        {
+            const std::lock_guard lock(mMadeMutex);
+            made.swap(mPendingMade);
+        }
+        for (const auto& [id, request] : made)
+            makeObject(id, request);
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
         std::map<FalloutScript::FormId, Move> moves;
         moves.swap(mPendingMoves);
@@ -293,14 +336,13 @@ namespace OFScript
         {
             // An object that was moved to another cell has another Ptr, which the world keeps up to date for those
             // that are in the scene
-            const OFWorld::Ptr moved
-                = OFBase::Environment::get().getWorldModel()->getPtr(ESM::FormId::fromUint32(reference));
+            const OFWorld::Ptr moved = OFBase::Environment::get().getWorldModel()->getPtr(worldIdOf(reference));
             if (!moved.isEmpty() && moved.isInCell() && moved.getCell() != found->second.getCell())
                 found->second = moved;
             return found->second;
         }
         // Objects made while the game runs are only known to the world
-        const OFWorld::Ptr ptr = OFBase::Environment::get().getWorldModel()->getPtr(ESM::FormId::fromUint32(reference));
+        const OFWorld::Ptr ptr = OFBase::Environment::get().getWorldModel()->getPtr(worldIdOf(reference));
         return !ptr.isEmpty() && ptr.isInCell() ? ptr : OFWorld::Ptr();
     }
 
@@ -434,9 +476,44 @@ namespace OFScript
         }
     }
 
+    FalloutScript::FormId FalloutScripts::scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
+    {
+        const FalloutScript::FormId own = ptr.getClass().getFalloutScript(ptr);
+        ESM::FormId base;
+        if (!baseOf(reference, base) || base.isZeroOrUnset())
+            return own;
+        const auto scriptIdOf = [](const auto* record) -> FalloutScript::FormId {
+            return record == nullptr || record->mScriptId.isZeroOrUnset() ? 0 : record->mScriptId.toUint32();
+        };
+        // A record that takes its script from a template has the script of the template, and none when the template
+        // can not be followed (it is a levelled list of characters)
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            if (!npc->takesFromTemplate(ESM4::Npc::Template_UseScript))
+                return own;
+            return scriptIdOf(templateOwner(mStore, npc, ESM4::Npc::Template_UseScript));
+        }
+        if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            if (!creature->takesFromTemplate(ESM4::Creature::Template_UseScript))
+                return own;
+            return scriptIdOf(templateOwner(mStore, creature, ESM4::Creature::Template_UseScript));
+        }
+        return own;
+    }
+
     bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
     {
         base = ESM::FormId();
+        // An object that PlaceAtMe asked for is of the base it was asked for, until the world makes it
+        {
+            const std::lock_guard lock(mMadeMutex);
+            if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+            {
+                base = ESM::FormId::fromUint32(asked->second.mBase);
+                return true;
+            }
+        }
         if (reference == mPlayer)
         {
             // The record of PlayerRef names the character that the player is; without it that is form 7 of the same
@@ -475,6 +552,13 @@ namespace OFScript
                 base = ptr.get<ESM4::Creature>()->mBase->mId;
             else if (ptr.getType() == ESM4::Container::sRecordId)
                 base = ptr.get<ESM4::Container>()->mBase->mId;
+            else
+            {
+                // getRefId gives a copy: the pointer into it needs the copy to stay alive
+                const ESM::RefId id = ptr.getCellRef().getRefId();
+                if (const ESM::FormId* placed = id.getIf<ESM::FormId>())
+                    base = *placed;
+            }
         }
         return true;
     }
@@ -565,6 +649,43 @@ namespace OFScript
         return true;
     }
 
+    FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)
+    {
+        Place place;
+        if (!whereIs(reference, place))
+            return 0;
+        const OFWorld::CellStore* cell = cellAt(place);
+        if (cell == nullptr || !cell->isExterior())
+            return 0;
+        // The cell of a building has the default worldspace, which no record is
+        const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
+        return worldspace != nullptr ? worldspace->toUint32() : 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword)
+    {
+        const ESM::FormId form = ESM::FormId::fromUint32(reference);
+        if (form.isZeroOrUnset())
+            return 0;
+        // The link is in the record of the placed object, whether or not its cell is loaded
+        const auto find = [keyword](const std::vector<ESM4::LinkedReference>& links) -> FalloutScript::FormId {
+            for (const ESM4::LinkedReference& link : links)
+            {
+                const FalloutScript::FormId linkKeyword = link.keyword.isZeroOrUnset() ? 0 : link.keyword.toUint32();
+                if (linkKeyword == keyword && !link.reference.isZeroOrUnset())
+                    return link.reference.toUint32();
+            }
+            return 0;
+        };
+        if (const ESM4::Reference* object = mStore.get<ESM4::Reference>().search(form))
+            return find(object->mLinkedRefs);
+        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
+            return find(character->mLinkedRefs);
+        if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
+            return find(creature->mLinkedRefs);
+        return 0;
+    }
+
     bool FalloutScripts::isDead(const OFWorld::Ptr& actor) const
     {
         const FalloutScript::FormId reference = referenceOf(actor);
@@ -640,6 +761,15 @@ namespace OFScript
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)
     {
+        // An object that PlaceAtMe asked for is next to the object it was asked for, until the world makes it
+        {
+            const std::lock_guard lock(mMadeMutex);
+            if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+            {
+                result = asked->second.mWhere;
+                return true;
+            }
+        }
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty() && ptr.getCell() != nullptr)
         {
@@ -865,6 +995,69 @@ namespace OFScript
         OFBase::Environment::get().getLuaManager()->objectTeleported(moved);
     }
 
+    FalloutScript::FormId FalloutScripts::placeAtMe(
+        FalloutScript::FormId reference, FalloutScript::FormId base, int count, double distance, int direction)
+    {
+        Place near;
+        if (!whereIs(reference, near))
+        {
+            log("PlaceAtMe: " + FalloutScript::hex(reference) + " has no place the game knows");
+            return 0;
+        }
+        FalloutScript::FormId first = 0;
+        {
+            const std::lock_guard lock(mMadeMutex);
+            for (int i = 0; i < count && mMadeCount < 0x00ffffff; ++i)
+            {
+                // The numbers of objects made while the game runs begin with 0xFF, as in the games
+                const FalloutScript::FormId id = 0xff000000u | ++mMadeCount;
+                // Asked for at once, so that the rest of the script finds the object it was told the number of (also
+                // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
+                mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
+                    static_cast<float>(distance), near };
+                if (first == 0)
+                    first = id;
+            }
+        }
+        if (first == 0)
+        {
+            log("PlaceAtMe: no more objects can be made");
+            return 0;
+        }
+        return first;
+    }
+
+    void FalloutScripts::makeObject(FalloutScript::FormId id, const MadeObject& request)
+    {
+        const OFWorld::Ptr near = findReference(request.mNear);
+        if (near.isEmpty() || !near.isInCell())
+        {
+            log("PlaceAtMe: " + FalloutScript::hex(request.mNear) + " is not in a loaded cell, so nothing is made next "
+                "to it");
+            return;
+        }
+        try
+        {
+            // The same way the Morrowind script command places something next to an actor
+            OFWorld::ManualRef ref(mStore, refId(request.mBase), 1);
+            ref.getPtr().mRef->mData.mPhysicsPostponed = !ref.getPtr().getClass().isActor();
+            const OFWorld::Ptr placed = OFBase::Environment::get().getWorld()->safePlaceObject(
+                ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
+            const ESM::FormId number = placed.getCellRef().getRefNum();
+            mMade[id] = number;
+            mMadeIds[number] = id;
+            mReferences[id] = placed;
+            // It runs its script like any object that is loaded
+            const FalloutScript::FormId script = scriptOf(placed, id);
+            if (script != 0 && mObjects.add(id, script) != nullptr)
+                mPendingLoad.push_back(id);
+        }
+        catch (const std::exception& error)
+        {
+            log("PlaceAtMe: an object of " + FalloutScript::hex(request.mBase) + " can not be made: " + error.what());
+        }
+    }
+
     void FalloutScripts::activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate)
     {
         runOnMainThread([this, target, activator, runOnActivate] {
@@ -935,11 +1128,44 @@ namespace OFScript
         return {};
     }
 
+    namespace
+    {
+        /// The globals of the game that are the clock of the world: GameHour, GameDaysPassed and TimeScale. The world
+        /// keeps them under the names that Morrowind has for them. Null for any other global.
+        const OFWorld::GlobalVariableName* worldClock(std::string_view editorId)
+        {
+            static constexpr OFWorld::GlobalVariableName hour = OFWorld::Globals::sGameHour;
+            static constexpr OFWorld::GlobalVariableName days = OFWorld::Globals::sDaysPassed;
+            static constexpr OFWorld::GlobalVariableName scale = OFWorld::Globals::sTimeScale;
+            if (Misc::StringUtils::ciEqual(editorId, "GameHour"))
+                return &hour;
+            if (Misc::StringUtils::ciEqual(editorId, "GameDaysPassed"))
+                return &days;
+            if (Misc::StringUtils::ciEqual(editorId, "TimeScale"))
+                return &scale;
+            return nullptr;
+        }
+    }
+
+    double FalloutScripts::gameHour()
+    {
+        const OFBase::World* world = OFBase::Environment::get().getWorld();
+        return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sGameHour) : 0.0;
+    }
+
     bool FalloutScripts::getGlobal(FalloutScript::FormId global, double& value)
     {
         const ESM4::GlobalVariable* record = mStore.get<ESM4::GlobalVariable>().search(refId(global));
         if (record == nullptr)
             return false;
+        if (const OFWorld::GlobalVariableName* clock = worldClock(record->mEditorId))
+        {
+            if (const OFBase::World* world = OFBase::Environment::get().getWorld())
+            {
+                value = world->getGlobalFloat(*clock);
+                return true;
+            }
+        }
         const auto found = mGlobals.find(global);
         value = found != mGlobals.end() ? found->second : fitToType(record->mType, record->mValue);
         return true;
@@ -950,6 +1176,14 @@ namespace OFScript
         const ESM4::GlobalVariable* record = mStore.get<ESM4::GlobalVariable>().search(refId(global));
         if (record == nullptr)
             return false;
+        if (const OFWorld::GlobalVariableName* clock = worldClock(record->mEditorId))
+        {
+            if (OFBase::World* world = OFBase::Environment::get().getWorld())
+            {
+                world->setGlobalFloat(*clock, static_cast<float>(value));
+                return true;
+            }
+        }
         mGlobals[global] = fitToType(record->mType, value);
         return true;
     }

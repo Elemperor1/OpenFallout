@@ -629,6 +629,7 @@ local traveller_ids = { @TRAVELLER@ }
 local crosser_ids = { @CROSSER@ }
 local traveller_object, setter_object = nil, nil
 local doomed_ids = { @DOOMED@ }
+local locker_ids = { @LOCKER@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
@@ -694,6 +695,30 @@ return {
                     tostring(find(doomed_ids).enabled))
                 print('OFTEST', 'object forms', tostring(g.@IN_LIST@), tostring(g.@LIST_BEFORE@),
                     tostring(g.@LIST_AFTER@))
+                -- The perk the script added twice and removed, the note it added, and the base form of a cube
+                print('OFTEST', 'object progress', tostring(g.@PERK_BEFORE@), tostring(g.@PERK_AFTER@),
+                    tostring(g.@PERK_TEAMMATES@), tostring(g.@PERK_REMOVED@), tostring(g.@NOTE_BEFORE@),
+                    tostring(g.@NOTE_AFTER@), tostring(g.@IS_ID@), tostring(g.@IS_NOT_ID@))
+                -- The link of the record, the cell and worldspace of the cube, and the loads of the script of the beast
+                print('OFTEST', 'object world', tostring(g.@LINKED@), tostring(g.@LINKED_NONE@),
+                    tostring(g.@SAME_CELL@), tostring(g.@IN_WORLDSPACE@), tostring(g.@TEMPLATE_LOADS@))
+                -- The clock: GetCurrentTime, the global GameHour and GetGlobalValue of it
+                print('OFTEST', 'object clock', string.format('%.4f', g.@HOUR_COMMAND@),
+                    string.format('%.4f', g.@HOUR_GLOBAL@), string.format('%.4f', g.@GLOBAL_VALUE@))
+                -- The cubes that PlaceAtMe made in front of the locker cube: what the call told, how many stand there
+                -- and how many of them are cubes of the same record
+                local locker = find(locker_ids)
+                if locker ~= nil then
+                    local here, cubes = 0, 0
+                    for _, other in ipairs(locker.cell:getAll()) do
+                        if math.abs(other.position.x - locker.position.x) < 5
+                            and math.abs(other.position.y - locker.position.y - @PLACE_DISTANCE@) < 5 then
+                            here = here + 1
+                            if other.recordId == locker.recordId then cubes = cubes + 1 end
+                        end
+                    end
+                    print('OFTEST', 'object placed', tostring(g.@PLACED@ ~= 0), here, cubes)
+                end
                 -- Where the script saw the cube that it moved to a marker, and where the world has put it
                 local mover = find(mover_ids)
                 mover_object, far_object = mover, find(far_ids)
@@ -775,6 +800,12 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
                  .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
                  .replace("@DOOMED@", ", ".join(map(str, plugin.DOOMED_REF_IDS.values())))
+                 .replace("@LOCKER@", ", ".join(map(str, plugin.LOCKER_REF_IDS.values())))
+                 .replace("@PLACE_DISTANCE@", str(plugin.PLACE_DISTANCE))
+                 .replace("@PLACED@", plugin.WORLD_QUERY_GLOBALS["placed"][1])
+                 .replace("@HOUR_COMMAND@", plugin.CLOCK_GLOBALS["hour_command"][1])
+                 .replace("@HOUR_GLOBAL@", plugin.CLOCK_GLOBALS["hour_global"][1])
+                 .replace("@GLOBAL_VALUE@", plugin.CLOCK_GLOBALS["global_value"][1])
                  .replace("@LOCKED@", plugin.STATE_GLOBALS["locked"][1])
                  .replace("@LOCK_LEVEL@", plugin.STATE_GLOBALS["lock_level"][1])
                  .replace("@UNLOCKED@", plugin.STATE_GLOBALS["unlocked"][1])
@@ -785,6 +816,19 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@IN_LIST@", plugin.STATE_GLOBALS["in_list"][1])
                  .replace("@LIST_BEFORE@", plugin.STATE_GLOBALS["list_before"][1])
                  .replace("@LIST_AFTER@", plugin.STATE_GLOBALS["list_after"][1])
+                 .replace("@PERK_BEFORE@", plugin.PROGRESS_GLOBALS["perk_before"][1])
+                 .replace("@PERK_AFTER@", plugin.PROGRESS_GLOBALS["perk_after"][1])
+                 .replace("@PERK_TEAMMATES@", plugin.PROGRESS_GLOBALS["perk_teammates"][1])
+                 .replace("@PERK_REMOVED@", plugin.PROGRESS_GLOBALS["perk_removed"][1])
+                 .replace("@NOTE_BEFORE@", plugin.PROGRESS_GLOBALS["note_before"][1])
+                 .replace("@NOTE_AFTER@", plugin.PROGRESS_GLOBALS["note_after"][1])
+                 .replace("@IS_ID@", plugin.PROGRESS_GLOBALS["is_id"][1])
+                 .replace("@IS_NOT_ID@", plugin.PROGRESS_GLOBALS["is_not_id"][1])
+                 .replace("@LINKED@", plugin.WORLD_QUERY_GLOBALS["linked"][1])
+                 .replace("@LINKED_NONE@", plugin.WORLD_QUERY_GLOBALS["linked_none"][1])
+                 .replace("@SAME_CELL@", plugin.WORLD_QUERY_GLOBALS["same_cell"][1])
+                 .replace("@IN_WORLDSPACE@", plugin.WORLD_QUERY_GLOBALS["in_worldspace"][1])
+                 .replace("@TEMPLATE_LOADS@", plugin.WORLD_QUERY_GLOBALS["template_loads"][1])
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1253,6 +1297,35 @@ def check_objects(text, scenario):
     if found is not None and found != ["1", "0", "1"]:
         problems.append("IsInList should find the marker by the record of the list, not the cube before the script "
                         "added it and the cube after (1, 0, 1): " + str(found))
+    found = one("progress")
+    if found is not None and found != ["0", "1", "1", "0", "0", "1", "1", "0"]:
+        problems.append("the player should not have the perk before the script adds it, have it after two AddPerk "
+                        "calls (also when HasPerk is asked for the teammates), and not have it after RemovePerk; the "
+                        "note should be there only after AddNote; GetIsID should be 1 for the base form of the cube "
+                        "and 0 for another (0, 1, 1, 0, 0, 1, 1, 0): " + str(found))
+    found = one("world")
+    # The script of the beast runs for the beast, for the creature that is placed as a levelled list (which stands for
+    # the beast) and for the heir that takes the script from the beast as its template: 3 runs, and 2 without the third
+    expected = ["1", "0", "1", "1" if scenario.exterior else "0", "3"]
+    if found is not None and found != expected:
+        problems.append("GetLinkedRef should tell the cube that the record links the locker to and 0 for the cube "
+                        "that has no link, the two cubes should be in the same cell, GetInWorldspace should be 1 only "
+                        "in the exterior cell, and the script of the beast should have run for the beast, for the "
+                        "creature placed as a list that stands for it and for the creature that takes its script from "
+                        f"it as its template (1, 0, 1, worldspace, 3): {found}")
+    found = one("clock")
+    if found is not None:
+        hours = [float(value) for value in found]
+        if (max(hours) - min(hours) > 0.001 or not 0.0 <= hours[0] < 24.0
+                or abs(hours[0] - plugin.GAME_HOUR_RECORD_VALUE) < 1.0):
+            problems.append("GetCurrentTime, the global GameHour and GetGlobalValue of it should all tell the clock of "
+                            f"the world (an hour from 0 to 24), not the {plugin.GAME_HOUR_RECORD_VALUE:g} of the "
+                            f"record: {found}")
+    found = one("placed")
+    if found is not None and found != ["true", str(plugin.PLACE_COUNT), str(plugin.PLACE_COUNT)]:
+        problems.append("PlaceAtMe should have told the reference of the first object it made, and made "
+                        f"{plugin.PLACE_COUNT} cubes of the base form {plugin.PLACE_DISTANCE} units in front of the "
+                        f"cube it was called on (true, {plugin.PLACE_COUNT}, {plugin.PLACE_COUNT}): {found}")
     # The cube the script moved to the target marker with offsets, as the script saw it and as the world has it, then the
     # cube at the height the script set and the player moved into the other kind of cell
     origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0

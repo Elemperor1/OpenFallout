@@ -28,12 +28,32 @@ namespace FalloutScript
         /// set, its script runs its OnActivate block in place of that. Nothing happens for an object or an activator
         /// the host does not know.
         virtual void activate(FormId target, FormId activator, bool runOnActivate) = 0;
+        /// The form that the reference stands for (the character, creature or object it is of). False when the host
+        /// can not tell, which is what a host that has no records says.
+        virtual bool baseFormOf(FormId, FormId&) { return false; }
+        /// The worldspace of the cell the reference is in; 0 for a reference inside a building or one the host does not
+        /// know
+        virtual FormId worldspaceOf(FormId) { return 0; }
+        /// The reference that the record of the reference links to (0 for none). A link with a keyword is only found
+        /// by the same keyword; the one with none is the one that is asked for with 0.
+        virtual FormId linkedRef(FormId, FormId /*keyword*/) { return 0; }
+        /// The hour of the game's clock, from 0 to 24 (what GetCurrentTime tells)
+        virtual double gameHour() { return 0; }
+        /// Makes `count` objects of the base form next to the reference, `distance` units from it in the direction (0
+        /// in front of it, 1 behind, 2 to its left, 3 to its right), and tells the reference of the first. 0 when
+        /// nothing is made.
+        virtual FormId placeAtMe(
+            FormId /*reference*/, FormId /*base*/, int /*count*/, double /*distance*/, int /*direction*/)
+        {
+            return 0;
+        }
     };
 
     /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, MarkForDelete, GetDisabled,
-    /// GetDistance, GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and
-    /// GetRandomPercent. Those that the command table does not have are left out. `random` gives the whole numbers from
-    /// 0 to 99 for GetRandomPercent.
+    /// GetDistance, GetInCell, GetInSameCell, GetInWorldspace, GetLinkedRef, PlaceAtMe, GetSelf, GetActionRef,
+    /// IsActionRef, GetIsReference, GetIsID, GetGlobalValue, GetCurrentTime, GetSecondsPassed and GetRandomPercent.
+    /// Those that the command table does not have are left out. `random` gives the whole numbers from 0 to 99 for
+    /// GetRandomPercent.
     void addObjectCommands(
         Interpreter& interpreter, ObjectScripts& objects, ObjectWorld& world, std::function<int()> random);
 }

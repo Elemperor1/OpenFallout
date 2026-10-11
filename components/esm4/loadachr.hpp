@@ -28,6 +28,7 @@
 #define ESM4_ACHR_H
 
 #include <cstdint>
+#include <vector>
 
 #include <components/esm/defs.hpp>
 #include <components/esm/position.hpp>
@@ -59,6 +60,8 @@ namespace ESM4
         EnableParent mEsp;
 
         std::int32_t mCount = 1;
+
+        std::vector<LinkedReference> mLinkedRefs;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

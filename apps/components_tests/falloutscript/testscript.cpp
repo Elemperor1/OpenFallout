@@ -152,10 +152,7 @@ namespace
             end(), // End with no Begin
             begin(0) + begin(1) + end() + end(), // a block in a block
             ifStatement(number("1")) + logStatement(), // If with no EndIf
-            endIf(), // EndIf with no If
-            elseStatement() + endIf(), // Else with no If
-            ifStatement(number("1")) + elseStatement() + elseStatement() + endIf(), // two Elses
-            ifStatement(number("1")) + elseStatement() + elseIfStatement(number("1")) + endIf(), // ElseIf after Else
+            elseStatement() + logStatement(), // Else with no If and no EndIf
             begin(0) + ifStatement(number("1")) + end() + endIf(), // End inside a condition
             ifStatement(number("1")) + begin(0) + end() + endIf(), // Begin inside a condition
         };
@@ -165,6 +162,37 @@ namespace
             EXPECT_EQ(script.problem(), ScriptProblem::BadStructure) << "case " << i;
             EXPECT_FALSE(script.usable());
         }
+    }
+
+    TEST(FalloutScriptScriptTest, letsThroughTheMistakesTheCompilerOfTheGamesLetsThrough)
+    {
+        const std::vector<Bytes> sloppy{
+            endIf(), // EndIf with no If
+            ifStatement(number("1")) + endIf() + endIf(), // one EndIf too many
+            elseStatement() + endIf(), // Else with no If
+            ifStatement(number("1")) + endIf() + elseIfStatement(number("1")) + endIf(), // ElseIf after the EndIf
+            ifStatement(number("1")) + elseStatement() + elseStatement() + endIf(), // two Elses
+            ifStatement(number("1")) + elseStatement() + elseIfStatement(number("1")) + endIf(), // ElseIf after Else
+        };
+        for (std::size_t i = 0; i < sloppy.size(); ++i)
+        {
+            const Script script = prepareScript(withCode(sloppy[i]));
+            EXPECT_EQ(script.problem(), ScriptProblem::None) << "case " << i;
+            EXPECT_TRUE(script.usable());
+        }
+    }
+
+    TEST(FalloutScriptScriptTest, anEndIfWithNothingToCloseAndTheBranchesOfAnOrphanAreMatched)
+    {
+        // 0 If, 1 EndIf, 2 ElseIf, 3 Else, 4 EndIf, 5 EndIf
+        const Script script = prepareScript(withCode(
+            ifStatement(number("1")) + endIf() + elseIfStatement(number("1")) + elseStatement() + endIf() + endIf()));
+        ASSERT_TRUE(script.usable());
+        EXPECT_EQ(script.branches()[0].mNext, 1u);
+        EXPECT_EQ(script.branches()[0].mEndIf, 1u);
+        EXPECT_EQ(script.branches()[2].mNext, 3u);
+        EXPECT_EQ(script.branches()[2].mEndIf, 4u);
+        EXPECT_EQ(script.branches()[3].mNext, 4u);
     }
 
     TEST(FalloutScriptScriptTest, keepsAScriptThatDoesNotDecodeWithItsError)

@@ -56,6 +56,36 @@ namespace FalloutScript
             const FormId cell = formArgument(call, 0);
             return call.mReference != 0 && cell != 0 && world.cellOf(call.mReference) == cell ? 1.0 : 0.0;
         });
+        interpreter.setHandler("GetInSameCell", [&world](CallContext& call) {
+            const FormId other = formArgument(call, 0);
+            if (call.mReference == 0 || other == 0)
+                return 0.0;
+            const FormId cell = world.cellOf(call.mReference);
+            return cell != 0 && world.cellOf(other) == cell ? 1.0 : 0.0;
+        });
+        interpreter.setHandler("GetInWorldspace", [&world](CallContext& call) {
+            const FormId worldspace = formArgument(call, 0);
+            return call.mReference != 0 && worldspace != 0 && world.worldspaceOf(call.mReference) == worldspace ? 1.0
+                                                                                                                : 0.0;
+        });
+        // The links of the games name a reference alone; Skyrim's keywords are what the argument would be, which the
+        // command of the games does not have
+        interpreter.setHandler("GetLinkedRef", [&world](CallContext& call) {
+            return call.mReference != 0 ? static_cast<double>(world.linkedRef(call.mReference, formArgument(call, 0)))
+                                        : 0.0;
+        });
+        // The games make the objects at once; a script can not ask for more than this many in a call
+        interpreter.setHandler("PlaceAtMe", [&world](CallContext& call) {
+            constexpr int mostAtOnce = 100;
+            const FormId base = formArgument(call, 0);
+            if (call.mReference == 0 || base == 0)
+                return 0.0;
+            const int count = std::clamp(call.mArguments.size() > 1 ? intArgument(call, 1) : 1, 1, mostAtOnce);
+            const double asked = argument(call, 2);
+            const double distance = std::isnan(asked) ? 0.0 : std::clamp(asked, -1.0e6, 1.0e6);
+            const int direction = intArgument(call, 3);
+            return static_cast<double>(world.placeAtMe(call.mReference, base, count, distance, direction));
+        });
         interpreter.setHandler("GetSelf", [&objects](CallContext& call) {
             const FormId owner = call.mInstance.owner();
             return objects.has(owner) ? static_cast<double>(owner) : 0.0;
@@ -70,6 +100,19 @@ namespace FalloutScript
             const FormId other = formArgument(call, 0);
             return other != 0 && call.mReference == other ? 1.0 : 0.0;
         });
+        interpreter.setHandler("GetIsID", [&world](CallContext& call) {
+            const FormId wanted = formArgument(call, 0);
+            FormId base = 0;
+            return wanted != 0 && call.mReference != 0 && world.baseFormOf(call.mReference, base) && base == wanted
+                ? 1.0
+                : 0.0;
+        });
+        interpreter.setHandler("GetGlobalValue", [](CallContext& call) {
+            double value = 0;
+            const FormId global = formArgument(call, 0);
+            return global != 0 && call.mHost.getGlobal(global, value) ? value : 0.0;
+        });
+        interpreter.setHandler("GetCurrentTime", [&world](CallContext&) { return world.gameHour(); });
         interpreter.setHandler(
             "GetSecondsPassed", [&objects](CallContext&) { return static_cast<double>(objects.secondsPassed()); });
         interpreter.setHandler("GetRandomPercent",

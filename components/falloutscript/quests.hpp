@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -54,6 +55,8 @@ namespace FalloutScript
         std::vector<JournalEntry> mJournal;
         /// Seconds since the script of the quest last ran
         float mTimer = 0;
+        /// The delay between runs of the script that SetQuestDelay gave, in place of the one the record has
+        std::optional<float> mDelay;
         /// The script of the quest and its variables, for a quest that has one
         std::shared_ptr<Instance> mInstance;
     };
@@ -105,8 +108,16 @@ namespace FalloutScript
 
         void setObjectiveDisplayed(FormId quest, int objective, bool displayed);
         void setObjectiveCompleted(FormId quest, int objective, bool completed);
+        /// Completes every objective the quest has by its record, and those a script named
+        void completeAllObjectives(FormId quest);
         bool objectiveDisplayed(FormId quest, int objective) const;
         bool objectiveCompleted(FormId quest, int objective) const;
+
+        /// Sets the seconds between runs of the script of the quest, in place of the delay its record has. Nothing
+        /// happens for a quest that is not known; the delay is never less than 0.
+        void setDelay(FormId quest, float seconds);
+        /// The seconds between runs of the script of the quest, 0 for a quest that is not known
+        float delay(FormId quest) const;
 
         /// Lets time pass for the scripts of the quests that are running: each runs its GameMode block once every
         /// delay of the quest (every time when the quest has none).
@@ -132,8 +143,8 @@ namespace FalloutScript
     };
 
     /// Gives the commands of quests to the interpreter: GetStage, GetStageDone, SetStage, GetQuestRunning,
-    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest and the commands of objectives. Those that the command
-    /// table does not have are left out.
+    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest, SetQuestDelay, CompleteAllObjectives and the commands
+    /// of objectives. Those that the command table does not have are left out.
     void addQuestCommands(Interpreter& interpreter, QuestManager& quests);
 }
 

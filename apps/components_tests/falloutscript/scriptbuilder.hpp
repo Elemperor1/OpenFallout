@@ -296,6 +296,8 @@ namespace FalloutScriptTest
     constexpr std::uint16_t OpSetObjectiveCompleted = 0x110E;
     constexpr std::uint16_t OpGetObjectiveDisplayed = 0x110F;
     constexpr std::uint16_t OpGetObjectiveCompleted = 0x1110;
+    constexpr std::uint16_t OpSetQuestDelay = 0x1111;
+    constexpr std::uint16_t OpCompleteAllObjectives = 0x1112;
 
     /// A small table of commands for the tests: Log "text", Twice number, the commands of quests, Touch (anything),
     /// and Nothing, which no handler runs
@@ -328,6 +330,8 @@ namespace FalloutScriptTest
             { { TypeQuest, false }, { TypeInteger, false }, { TypeInteger, false } });
         add(OpGetObjectiveDisplayed, "GetObjectiveDisplayed", { { TypeQuest, false }, { TypeInteger, false } });
         add(OpGetObjectiveCompleted, "GetObjectiveCompleted", { { TypeQuest, false }, { TypeInteger, false } });
+        add(OpSetQuestDelay, "SetQuestDelay", { { TypeQuest, false }, { TypeFloat, false } });
+        add(OpCompleteAllObjectives, "CompleteAllObjectives", { { TypeQuest, false } });
         return table;
     }
 

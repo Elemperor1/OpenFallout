@@ -98,21 +98,29 @@ namespace FalloutScript
         std::vector<Chain> chains;
         bool inBlock = false;
         bool hasBlocks = false;
+        const auto fail = [this](std::string reason, std::size_t statement) {
+            mStructureProblem = std::move(reason) + " (statement " + std::to_string(statement) + ")";
+            return false;
+        };
 
         for (std::size_t i = 0; i < statements.size(); ++i)
         {
             switch (statements[i].mKind)
             {
                 case Kind::Begin:
-                    if (inBlock || !chains.empty())
-                        return false;
+                    if (inBlock)
+                        return fail("a Begin inside a block", i);
+                    if (!chains.empty())
+                        return fail("a Begin inside an If", i);
                     inBlock = true;
                     hasBlocks = true;
                     mBlocks.push_back(Block{ statements[i].mBlockType, i, i });
                     break;
                 case Kind::End:
-                    if (!inBlock || !chains.empty())
-                        return false;
+                    if (!inBlock)
+                        return fail("an End with no Begin", i);
+                    if (!chains.empty())
+                        return fail("an End inside an If", i);
                     inBlock = false;
                     mBlocks.back().mEnd = i;
                     break;
@@ -122,16 +130,23 @@ namespace FalloutScript
                 case Kind::ElseIf:
                 case Kind::Else:
                 {
-                    if (chains.empty() || chains.back().mHasElse)
-                        return false;
-                    chains.back().mHasElse = statements[i].mKind == Kind::Else;
+                    // The compiler of the games lets through an ElseIf or Else that has no If to belong to (it comes
+                    // after the EndIf that closed the If) and one that comes after an Else, and so do the scripts of
+                    // the games. Such a branch is taken as part of the condition it follows, or, when there is none,
+                    // as the first branch of one of its own that the next EndIf closes. The interpreter ends a
+                    // condition when it comes to a branch in turn, so the body of such a branch is never run, which
+                    // is what the games' own interpreter does with the jump of a statement that is reached in turn.
+                    if (chains.empty())
+                        chains.emplace_back();
+                    chains.back().mHasElse = chains.back().mHasElse || statements[i].mKind == Kind::Else;
                     chains.back().mBranches.push_back(i);
                     break;
                 }
                 case Kind::EndIf:
                 {
+                    // An EndIf with no If to close does nothing: it is only the place a jump can land on
                     if (chains.empty())
-                        return false;
+                        break;
                     const Chain& chain = chains.back();
                     for (std::size_t k = 0; k < chain.mBranches.size(); ++k)
                     {
@@ -146,13 +161,30 @@ namespace FalloutScript
                     break;
             }
         }
-        if (inBlock || !chains.empty())
-            return false;
+        if (inBlock)
+            return fail("a Begin with no End", statements.size());
+        if (!chains.empty())
+            return fail("an If with no EndIf", chains.back().mBranches.front());
 
         // A script with no blocks is a list of statements to run, and the one block of it is all of them
         mIsResult = !hasBlocks;
         if (mIsResult)
             mBlocks.push_back(Block{ 0, 0, statements.size() });
         return true;
+    }
+
+    std::string Script::problemText() const
+    {
+        switch (mProblem)
+        {
+            case ScriptProblem::None:
+                return {};
+            case ScriptProblem::DoesNotDecode:
+                return "its code does not decode: " + std::string(ESM4::ScriptCode::errorText(mProgram.mError))
+                    + " at byte " + std::to_string(mProgram.mErrorOffset);
+            case ScriptProblem::BadStructure:
+                return "its blocks or conditions are not in order: " + mStructureProblem;
+        }
+        return {};
     }
 }

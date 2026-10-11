@@ -48,7 +48,8 @@ namespace FalloutScript
         if (!prepared->usable())
         {
             if (mReported.insert(script).second)
-                mInterpreter.host().log("The script " + hex(script) + " of an object cannot be run");
+                mInterpreter.host().log(
+                    "The script " + hex(script) + " of an object cannot be run: " + prepared->problemText());
             return nullptr;
         }
 

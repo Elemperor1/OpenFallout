@@ -117,6 +117,8 @@ namespace FalloutScript
         ScriptProblem problem() const { return mProblem; }
         ESM4::ScriptCode::Error decodeError() const { return mProgram.mError; }
         bool usable() const { return mProblem == ScriptProblem::None; }
+        /// Why the script can not be run, for a log (empty for one that can)
+        std::string problemText() const;
 
         /// 0 for a script of an object, 1 for a quest, 0x100 for a magic effect
         std::uint16_t type() const { return mType; }
@@ -146,6 +148,7 @@ namespace FalloutScript
         std::uint16_t mType = 0;
         bool mIsResult = false;
         ScriptProblem mProblem = ScriptProblem::None;
+        std::string mStructureProblem;
 
         bool matchStructure();
     };

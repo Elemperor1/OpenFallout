@@ -25,6 +25,9 @@ namespace
 
     constexpr FormId crate = 0x01000100;
     constexpr FormId otherCrate = 0x01000101;
+    constexpr FormId crateBase = 0x01000200;
+    constexpr FormId worldspace = 0x01004000;
+    constexpr FormId otherWorldspace = 0x01004001;
     constexpr FormId player = 0x01000014;
     constexpr FormId scriptOfCrates = 0x01002000;
     constexpr FormId cell = 0x01003000;
@@ -41,6 +44,13 @@ namespace
     constexpr std::uint16_t OpDisable = 0x1022;
     constexpr std::uint16_t OpGetDisabled = 0x1023;
     constexpr std::uint16_t OpGetInCell = 0x1043;
+    constexpr std::uint16_t OpGetIsID = 0x1048;
+    constexpr std::uint16_t OpGetInSameCell = 0x1020;
+    constexpr std::uint16_t OpPlaceAtMe = 0x1025;
+    constexpr std::uint16_t OpGetCurrentTime = 0x1012;
+    constexpr std::uint16_t OpGetGlobalValue = 0x104A;
+    constexpr std::uint16_t OpGetInWorldspace = 0x1136;
+    constexpr std::uint16_t OpGetLinkedRef = 0x116B;
     constexpr std::uint16_t OpGetRandomPercent = 0x104D;
     constexpr std::uint16_t OpIsActionRef = 0x1069;
     constexpr std::uint16_t OpGetIsReference = 0x1088;
@@ -53,6 +63,21 @@ namespace
         std::set<FormId> mDisabled;
         std::map<FormId, FormId> mCells;
         std::map<std::pair<FormId, FormId>, double> mDistances;
+        std::map<FormId, FormId> mBases;
+        std::map<FormId, FormId> mWorldspaces;
+        std::map<std::pair<FormId, FormId>, FormId> mLinks; // by the reference and the keyword
+
+        struct Placement
+        {
+            FormId mReference;
+            FormId mBase;
+            int mCount;
+            double mDistance;
+            int mDirection;
+        };
+        std::vector<Placement> mPlacements;
+        FormId mMade = 0;
+        double mHour = 0;
 
         struct Activation
         {
@@ -93,6 +118,30 @@ namespace
         {
             const auto found = mCells.find(reference);
             return found != mCells.end() ? found->second : 0;
+        }
+        bool baseFormOf(FormId reference, FormId& base) override
+        {
+            const auto found = mBases.find(reference);
+            if (found == mBases.end())
+                return false;
+            base = found->second;
+            return true;
+        }
+        FormId worldspaceOf(FormId reference) override
+        {
+            const auto found = mWorldspaces.find(reference);
+            return found != mWorldspaces.end() ? found->second : 0;
+        }
+        FormId linkedRef(FormId reference, FormId keyword) override
+        {
+            const auto found = mLinks.find({ reference, keyword });
+            return found != mLinks.end() ? found->second : 0;
+        }
+        double gameHour() override { return mHour; }
+        FormId placeAtMe(FormId reference, FormId base, int count, double distance, int direction) override
+        {
+            mPlacements.push_back({ reference, base, count, distance, direction });
+            return mMade;
         }
     };
 
@@ -359,6 +408,228 @@ namespace
         EXPECT_EQ(setup.variable(crate, 1), 1);
         EXPECT_EQ(setup.variable(crate, 2), 1);
         EXPECT_EQ(setup.variable(crate, 3), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_is_id_compares_the_form_the_object_stands_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t baseSlot = builder.form(crateBase);
+        const std::uint16_t otherSlot = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetIsID, arguments(1).add(refArg(baseSlot))))
+            + setTo(var('s', 2), callToken(OpGetIsID, arguments(1).add(refArg(otherSlot)))) + end());
+        builder.variable(1, integerVariable, "isBase").variable(2, integerVariable, "isOther");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mBases[crate] = crateBase;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_is_id_is_no_for_an_object_the_world_has_no_form_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t baseSlot = builder.form(crateBase);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetIsID, arguments(1).add(refArg(baseSlot)))) + end());
+        builder.variable(1, integerVariable, "isBase");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_in_same_cell_compares_the_cells_of_two_objects)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t otherSlot = builder.form(otherCrate);
+        const std::uint16_t playerSlot = builder.form(player);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetInSameCell, arguments(1).add(refArg(otherSlot))))
+            + setTo(var('s', 2), callToken(OpGetInSameCell, arguments(1).add(refArg(playerSlot)))) + end());
+        builder.variable(1, integerVariable, "sameCell").variable(2, integerVariable, "otherCell");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mCells[crate] = cell;
+        setup.mWorld.mCells[otherCrate] = cell;
+        setup.mWorld.mCells[player] = cell + 1;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_in_same_cell_is_no_when_the_cell_of_the_object_is_not_known)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t otherSlot = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetInSameCell, arguments(1).add(refArg(otherSlot)))) + end());
+        builder.variable(1, integerVariable, "sameCell");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        // Two objects that are in no known cell are not in the same one
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_in_worldspace_compares_the_worldspace_of_the_object)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t wasteland = builder.form(worldspace);
+        const std::uint16_t other = builder.form(otherWorldspace);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetInWorldspace, arguments(1).add(refArg(wasteland))))
+            + setTo(var('s', 2), callToken(OpGetInWorldspace, arguments(1).add(refArg(other)))) + end());
+        builder.variable(1, integerVariable, "inWasteland").variable(2, integerVariable, "inOther");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mWorldspaces[crate] = worldspace;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_linked_ref_tells_the_reference_the_object_is_linked_to)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetLinkedRef, arguments(0))) + end());
+        builder.variable(1, integerVariable, "link");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mLinks[{ crate, 0 }] = otherCrate;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), static_cast<double>(otherCrate));
+    }
+
+    TEST(FalloutScriptObjectsTest, get_linked_ref_is_0_for_an_object_with_no_link)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetLinkedRef, arguments(0))) + end());
+        builder.variable(1, integerVariable, "link");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_asks_for_the_objects_next_to_the_reference_and_tells_the_first)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('f', 1),
+                callToken(
+                    OpPlaceAtMe, arguments(4).add(refArg(base)).add(intArg(3)).add(floatArg(120.5)).add(intArg(2))))
+            + end());
+        builder.variable(1, floatVariable, "made");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mMade = 0xFF000100; // a float variable keeps 24 bits of it, which this one fits in
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 1u);
+        const auto& placement = setup.mWorld.mPlacements.front();
+        EXPECT_EQ(placement.mReference, crate);
+        EXPECT_EQ(placement.mBase, otherCrate);
+        EXPECT_EQ(placement.mCount, 3);
+        EXPECT_EQ(placement.mDistance, 120.5);
+        EXPECT_EQ(placement.mDirection, 2);
+        EXPECT_EQ(setup.variable(crate, 1), static_cast<double>(0xFF000100));
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_makes_one_object_in_front_without_the_optional_arguments)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(
+            scriptName() + begin(BlockType::OnLoad) + command(OpPlaceAtMe, arguments(1).add(refArg(base))) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 1u);
+        const auto& placement = setup.mWorld.mPlacements.front();
+        EXPECT_EQ(placement.mCount, 1);
+        EXPECT_EQ(placement.mDistance, 0.0);
+        EXPECT_EQ(placement.mDirection, 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, place_at_me_keeps_the_count_within_what_a_script_may_ask_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + command(OpPlaceAtMe, arguments(2).add(refArg(base)).add(intArg(100000)))
+            + command(OpPlaceAtMe, arguments(2).add(refArg(base)).add(intArg(-4))) + end());
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        ASSERT_EQ(setup.mWorld.mPlacements.size(), 2u);
+        EXPECT_EQ(setup.mWorld.mPlacements[0].mCount, 100);
+        EXPECT_EQ(setup.mWorld.mPlacements[1].mCount, 1);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_current_time_tells_the_hour_of_the_clock_of_the_game)
+    {
+        Runner setup;
+        setup.addScript(scriptOfCrates, assigns(BlockType::OnLoad, callToken(OpGetCurrentTime, Bytes())));
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mHour = 13.5;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 13.5);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_global_value_tells_the_value_of_a_global_and_0_for_one_that_is_not_there)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t known = builder.form(0x00000500);
+        const std::uint16_t unknown = builder.form(0x00000501);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('f', 1), callToken(OpGetGlobalValue, arguments(1).add(refArg(known))))
+            + setTo(var('f', 2), callToken(OpGetGlobalValue, arguments(1).add(refArg(unknown)))) + end());
+        builder.variable(1, floatVariable, "known").variable(2, floatVariable, "unknown");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mHost.mGlobals[0x00000500] = 2.5;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 2.5);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
     }
 
     TEST(FalloutScriptObjectsTest, get_self_tells_the_reference_and_nothing_for_the_script_of_a_quest)

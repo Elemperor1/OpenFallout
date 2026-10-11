@@ -176,6 +176,17 @@ namespace FalloutScript
             quest->mObjectives[objective].mCompleted = completed;
     }
 
+    void QuestManager::completeAllObjectives(FormId id)
+    {
+        QuestState* quest = find(id);
+        if (quest == nullptr)
+            return;
+        for (const ESM4::QuestObjective& objective : quest->mRecord->mObjectives)
+            quest->mObjectives[objective.mIndex].mCompleted = true;
+        for (auto& [index, state] : quest->mObjectives)
+            state.mCompleted = true;
+    }
+
     bool QuestManager::objectiveDisplayed(FormId id, int objective) const
     {
         const QuestState* quest = find(id);
@@ -194,6 +205,23 @@ namespace FalloutScript
         return it != quest->mObjectives.end() && it->second.mCompleted;
     }
 
+    void QuestManager::setDelay(FormId id, float seconds)
+    {
+        if (QuestState* quest = find(id))
+            quest->mDelay = std::isnan(seconds) ? 0.f : std::max(seconds, 0.f);
+    }
+
+    float QuestManager::delay(FormId id) const
+    {
+        const QuestState* quest = find(id);
+        if (quest == nullptr)
+            return 0;
+        if (quest->mDelay)
+            return *quest->mDelay;
+        // A quest that stores no delay takes the one the games' settings give
+        return quest->mRecord->mData.questDelay > 0 ? quest->mRecord->mData.questDelay : defaultDelay;
+    }
+
     void QuestManager::update(float seconds)
     {
         for (auto& [id, quest] : mQuests)
@@ -201,9 +229,7 @@ namespace FalloutScript
             if (!quest.mRunning || !quest.mInstance)
                 continue;
             quest.mTimer += seconds;
-            // A quest that stores no delay takes the one the games' settings give
-            const float delay = quest.mRecord->mData.questDelay > 0 ? quest.mRecord->mData.questDelay : defaultDelay;
-            if (quest.mTimer < delay)
+            if (quest.mTimer < delay(id))
                 continue;
             quest.mTimer = 0;
             mInterpreter.run(*quest.mInstance, BlockType::GameMode);
@@ -240,7 +266,8 @@ namespace FalloutScript
         std::shared_ptr<const Script> script = prepared(record->mScript);
         if (!script->usable())
         {
-            log("The script of the quest " + hex(id) + " cannot be run");
+            log("The script " + hex(record->mId.toUint32()) + " of the quest " + hex(id)
+                + " cannot be run: " + script->problemText());
             return;
         }
         quest.mInstance = std::make_shared<Instance>(std::move(script), id, true);
@@ -253,7 +280,7 @@ namespace FalloutScript
         std::shared_ptr<const Script> script = prepared(entry.mScript);
         if (!script->usable())
         {
-            log("A script of the quest " + hex(quest) + " cannot be run");
+            log("A script of the quest " + hex(quest) + " cannot be run: " + script->problemText());
             return;
         }
         Instance instance(std::move(script), quest, true);
@@ -292,12 +319,21 @@ namespace FalloutScript
             quests.complete(formArgument(call, 0));
             return 0.0;
         });
+        interpreter.setHandler("SetQuestDelay", [&quests](CallContext& call) {
+            // A number from a script can be far outside what a float holds
+            quests.setDelay(formArgument(call, 0), static_cast<float>(std::clamp(argument(call, 1), 0.0, 1.0e9)));
+            return 0.0;
+        });
         interpreter.setHandler("SetObjectiveDisplayed", [&quests](CallContext& call) {
             quests.setObjectiveDisplayed(formArgument(call, 0), intArgument(call, 1), argument(call, 2) != 0);
             return 0.0;
         });
         interpreter.setHandler("SetObjectiveCompleted", [&quests](CallContext& call) {
             quests.setObjectiveCompleted(formArgument(call, 0), intArgument(call, 1), argument(call, 2) != 0);
+            return 0.0;
+        });
+        interpreter.setHandler("CompleteAllObjectives", [&quests](CallContext& call) {
+            quests.completeAllObjectives(formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("GetObjectiveDisplayed", [&quests](CallContext& call) {

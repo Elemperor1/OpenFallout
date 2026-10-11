@@ -98,6 +98,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testfacegen.cpp
     esm4/testfaction.cpp
     esm4/testformidlist.cpp
+    esm4/testlinkedreference.cpp
     esm4/testhungerstage.cpp
     esm4/testimagespace.cpp
     esm4/testimagespacemodifier.cpp
@@ -145,6 +146,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testactors.cpp
     falloutscript/testformlists.cpp
     falloutscript/testplacement.cpp
+    falloutscript/testplayerprogress.cpp
     falloutscript/testreferencestate.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp

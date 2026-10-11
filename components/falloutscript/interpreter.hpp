@@ -138,6 +138,10 @@ namespace FalloutScript
         /// that is not in the table or has no handler (that is reported once).
         double call(std::uint16_t opcode, FormId reference, bool onReference, std::vector<Value> arguments);
 
+        /// The commands that scripts reached and that have no handler, with how often each was reached since the last
+        /// call, the most often first ("GetLevel 120, HasPerk 3"). Empty when there were none. Starts the count again.
+        std::string takeMissingSummary();
+
     private:
         struct Frame;
 
@@ -153,6 +157,8 @@ namespace FalloutScript
         const CommandTable& mCommands;
         std::map<std::uint16_t, Handler> mHandlers;
         std::set<std::uint32_t> mReported;
+        /// How often each command without a handler was reached, by its code
+        std::map<std::uint16_t, std::uint64_t> mMissingHits;
         std::size_t mDepth = 0;
         std::size_t mBudget = 0;
         /// The script that a call from outside of a script runs as, which has no code and no variables
