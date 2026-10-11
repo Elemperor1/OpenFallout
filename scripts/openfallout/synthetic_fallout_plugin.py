@@ -246,7 +246,16 @@ GAME_HOUR_ID = 0x8B1
 GAME_HOUR_RECORD_VALUE = 13.0
 CLOCK_GLOBALS = {"hour_command": (0x8B2, "OFTestHourCommand"), "hour_global": (0x8B3, "OFTestHourGlobal"),
                  "global_value": (0x8B4, "OFTestGlobalValue")}
-LAST_ID = 0x8B4 # the largest form ID of the plugin, which the next object ID of its header follows
+# The actor values: the locker cube gets Variable01 (62) set to 7, 3 more and 4 damage, which makes 6; 25 damage to its
+# health (16), which leaves three quarters of it; and 75 more, which kills it. The player has the karma that was rewarded
+# (KARMA_REWARD) when asked for as an actor value (23), and a weapon is as good as new.
+AV_VARIABLE = 62
+AV_HEALTH = 16
+AV_KARMA = 23
+ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
+                       "dead": (0x8B7, "OFTestAvDead"), "karma": (0x8B8, "OFTestAvKarma"),
+                       "weapon": (0x8B9, "OFTestAvWeapon")}
+LAST_ID = 0x8B9 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -647,6 +656,22 @@ def object_script(kind):
     world_space = script.form(WORLD_ID)
     game_hour = script.form(GAME_HOUR_ID)
     clock = {name: script.form(form_id) for name, (form_id, _) in CLOCK_GLOBALS.items()}
+    values = {name: script.form(form_id) for name, (form_id, _) in ACTOR_VALUE_GLOBALS.items()}
+    # The actor values, on the locker cube (the player for karma): a number written bare in two bytes, then the amount
+    actor_values = b"".join([
+        sf.call_on(locker, sf.SET_ACTOR_VALUE, sf.u16(AV_VARIABLE), sf.int_argument(7)),
+        sf.call_on(locker, sf.MOD_ACTOR_VALUE, sf.u16(AV_VARIABLE), sf.int_argument(3)),
+        sf.call_on(locker, sf.DAMAGE_ACTOR_VALUE, sf.u16(AV_VARIABLE), sf.float_argument(4)),
+        sf.set_to(sf.global_target(values["variable"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_VARIABLE), reference=locker)),
+        sf.call_on(locker, sf.DAMAGE_ACTOR_VALUE, sf.u16(AV_HEALTH), sf.float_argument(25)),
+        sf.set_to(sf.global_target(values["share"]), sf.call_token(sf.GET_HEALTH_PERCENTAGE, reference=locker)),
+        sf.call_on(locker, sf.DAMAGE_ACTOR_VALUE, sf.u16(AV_HEALTH), sf.float_argument(75)),
+        sf.set_to(sf.global_target(values["dead"]), sf.call_token(sf.GET_DEAD, reference=locker)),
+        sf.set_to(sf.global_target(values["karma"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_KARMA), reference=player)),
+        sf.set_to(sf.global_target(values["weapon"]), sf.call_token(sf.GET_WEAPON_HEALTH_PERC, reference=player)),
+    ])
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
 
@@ -730,7 +755,8 @@ def object_script(kind):
                              sf.call_token(sf.GET_GLOBAL_VALUE, sf.form_argument(game_hour)))
                  + sf.set_to(sf.global_target(queries["placed"]),
                              sf.call_token(sf.PLACE_AT_ME, sf.form_argument(cube), sf.int_argument(PLACE_COUNT),
-                                           sf.float_argument(PLACE_DISTANCE), sf.int_argument(0), reference=locker))),
+                                           sf.float_argument(PLACE_DISTANCE), sf.int_argument(0), reference=locker))
+                 + actor_values),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
@@ -1239,6 +1265,8 @@ def plugin():
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f")
+                                    for form_id, name in ACTOR_VALUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())

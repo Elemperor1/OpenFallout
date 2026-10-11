@@ -15,6 +15,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/formlists.hpp>
@@ -276,6 +277,7 @@ namespace OFScript
         FalloutScript::QuestManager mQuests;
         FalloutScript::ObjectScripts mObjects;
         FalloutScript::ActorState mActors;
+        FalloutScript::ActorValues mActorValues;
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;

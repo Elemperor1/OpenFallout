@@ -223,15 +223,8 @@ namespace FalloutScript
         });
         interpreter.setHandler("GetDead",
             [&state](CallContext& call) { return call.mReference != 0 && state.isDead(call.mReference) ? 1.0 : 0.0; });
-        // Nothing in the game hurts a character yet, so one that lives has all its health
-        interpreter.setHandler("GetHealthPercentage",
-            [&state](CallContext& call) { return call.mReference != 0 && !state.isDead(call.mReference) ? 1.0 : 0.0; });
         interpreter.setHandler("KillActor", [&state](CallContext& call) {
             state.setDead(call.mReference, true);
-            return 0.0;
-        });
-        interpreter.setHandler("ResurrectActor", [&state](CallContext& call) {
-            state.setDead(call.mReference, false);
             return 0.0;
         });
         interpreter.setHandler("AddToFaction", [&state](CallContext& call) {

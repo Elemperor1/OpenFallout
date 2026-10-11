@@ -1,7 +1,9 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -84,8 +86,15 @@ namespace
                                } };
         FakeRecords mRecords;
         ActorState mState{ mRecords };
+        FalloutScript::ActorValues mValues;
+        FalloutScript::PlayerProgress mProgress;
 
-        Runner() { FalloutScript::addActorCommands(mInterpreter, mState); }
+        Runner()
+        {
+            FalloutScript::addActorCommands(mInterpreter, mState);
+            // The commands about the health of a character
+            FalloutScript::addActorValueCommands(mInterpreter, mValues, mState, mProgress);
+        }
 
         void run(const ScriptBuilder& builder)
         {

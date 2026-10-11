@@ -144,6 +144,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmorcensus.cpp
 
     falloutscript/testactors.cpp
+    falloutscript/testactorvalues.cpp
     falloutscript/testformlists.cpp
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp
