@@ -7,6 +7,32 @@
 
 namespace FalloutScript
 {
+    namespace
+    {
+        constexpr std::int64_t mostItems = std::numeric_limits<int>::max();
+        /// Further than any count can be moved, so that a change that grows without end stays a number
+        constexpr std::int64_t farthest = std::int64_t(1) << 40;
+    }
+
+    std::int64_t ActorState::ItemEdit::apply(std::int64_t start) const
+    {
+        return std::clamp(start + mChange, mLowest, mHighest);
+    }
+
+    void ActorState::ItemEdit::add(std::int64_t count)
+    {
+        mChange = std::min(mChange + count, farthest);
+        mLowest = std::clamp<std::int64_t>(mLowest + count, 0, mostItems);
+        mHighest = std::clamp<std::int64_t>(mHighest + count, 0, mostItems);
+    }
+
+    void ActorState::ItemEdit::remove(std::int64_t count)
+    {
+        mChange = std::max(mChange - count, -farthest);
+        mLowest = std::clamp<std::int64_t>(mLowest - count, 0, mostItems);
+        mHighest = std::clamp<std::int64_t>(mHighest - count, 0, mostItems);
+    }
+
     ActorState::ActorState(ActorRecords& records)
         : mRecords(records)
     {
@@ -32,10 +58,20 @@ namespace FalloutScript
             if (item != 0 && count > 0)
             {
                 int& held = entry.mItems[item];
-                held = static_cast<int>(
-                    std::min<std::int64_t>(std::int64_t(held) + count, std::numeric_limits<int>::max()));
+                held = static_cast<int>(std::min<std::int64_t>(std::int64_t(held) + count, mostItems));
             }
         }
+        // What scripts did before the records could be asked is done to what the records say
+        for (const auto& [item, edit] : entry.mItemEdits)
+        {
+            const auto held = entry.mItems.find(item);
+            const std::int64_t result = edit.apply(held != entry.mItems.end() ? held->second : 0);
+            if (result > 0)
+                entry.mItems[item] = static_cast<int>(result);
+            else if (held != entry.mItems.end())
+                entry.mItems.erase(held);
+        }
+        entry.mItemEdits.clear();
     }
 
     void ActorState::knowFactions(FormId id, Holder& entry)
@@ -46,10 +82,18 @@ namespace FalloutScript
         if (!mRecords.initialFactions(id, factions))
             return;
         entry.mFactionsKnown = true;
-        // What a script did before the records could be asked stays: it is the later word
         for (const auto& [faction, rank] : factions)
             if (faction != 0 && rank >= 0)
                 entry.mFactions.emplace(faction, rank);
+        // What scripts did before the records could be asked is the later word, a removal as much as a rank
+        for (const auto& [faction, rank] : entry.mFactionEdits)
+        {
+            if (rank < 0)
+                entry.mFactions.erase(faction);
+            else
+                entry.mFactions[faction] = rank;
+        }
+        entry.mFactionEdits.clear();
     }
 
     int ActorState::itemCount(FormId id, FormId item)
@@ -57,6 +101,11 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         Holder& entry = holder(id);
         knowItems(id, entry);
+        if (!entry.mItemsKnown)
+        {
+            const auto edit = entry.mItemEdits.find(item);
+            return edit == entry.mItemEdits.end() ? 0 : static_cast<int>(edit->second.apply(0));
+        }
         const auto found = entry.mItems.find(item);
         return found == entry.mItems.end() ? 0 : found->second;
     }
@@ -68,8 +117,13 @@ namespace FalloutScript
             return;
         Holder& entry = holder(id);
         knowItems(id, entry);
+        if (!entry.mItemsKnown)
+        {
+            entry.mItemEdits[item].add(count);
+            return;
+        }
         int& held = entry.mItems[item];
-        held = static_cast<int>(std::min<std::int64_t>(std::int64_t(held) + count, std::numeric_limits<int>::max()));
+        held = static_cast<int>(std::min<std::int64_t>(std::int64_t(held) + count, mostItems));
     }
 
     int ActorState::removeItem(FormId id, FormId item, int count)
@@ -79,6 +133,14 @@ namespace FalloutScript
             return 0;
         Holder& entry = holder(id);
         knowItems(id, entry);
+        if (!entry.mItemsKnown)
+        {
+            // What it had is not known yet; it loses the count that it would have had from nothing
+            ItemEdit& edit = entry.mItemEdits[item];
+            const std::int64_t before = edit.apply(0);
+            edit.remove(count);
+            return static_cast<int>(before - edit.apply(0));
+        }
         const auto found = entry.mItems.find(item);
         if (found == entry.mItems.end())
             return 0;
@@ -111,8 +173,9 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         Holder& entry = holder(actor);
         knowFactions(actor, entry);
-        const auto found = entry.mFactions.find(faction);
-        return found == entry.mFactions.end() ? -1 : found->second;
+        const std::map<FormId, int>& ranks = entry.mFactionsKnown ? entry.mFactions : entry.mFactionEdits;
+        const auto found = ranks.find(faction);
+        return found == ranks.end() ? -1 : std::max(found->second, -1);
     }
 
     void ActorState::setFactionRank(FormId actor, FormId faction, int rank)
@@ -123,18 +186,20 @@ namespace FalloutScript
         Holder& entry = holder(actor);
         knowFactions(actor, entry);
         // A rank below 0 is the way to say that the actor is not in the faction
-        if (rank < 0)
-            entry.mFactions.erase(faction);
+        if (entry.mFactionsKnown)
+        {
+            if (rank < 0)
+                entry.mFactions.erase(faction);
+            else
+                entry.mFactions[faction] = rank;
+        }
         else
-            entry.mFactions[faction] = rank;
+            entry.mFactionEdits[faction] = std::max(rank, -1);
     }
 
     void ActorState::removeFromFaction(FormId actor, FormId faction)
     {
-        const std::lock_guard lock(mMutex);
-        Holder& entry = holder(actor);
-        knowFactions(actor, entry);
-        entry.mFactions.erase(faction);
+        setFactionRank(actor, faction, -1);
     }
 
     void addActorCommands(Interpreter& interpreter, ActorState& state)

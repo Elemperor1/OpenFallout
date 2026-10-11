@@ -174,6 +174,85 @@ namespace
         EXPECT_EQ(records.mItemQuestions, questions);
     }
 
+    TEST(FalloutScriptActorStateTest, a_removal_made_before_the_records_can_be_read_is_made_to_what_they_say)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(guard);
+        records.mItems[guard] = { { caps, 40 }, { stimpak, 2 } };
+        ActorState state(records);
+
+        // Counted from nothing until the records can be read
+        state.addItem(guard, ncr, 3);
+        EXPECT_EQ(state.removeItem(guard, ncr, 2), 2);
+        EXPECT_EQ(state.removeItem(guard, caps, 15), 0);
+        EXPECT_EQ(state.itemCount(guard, ncr), 1);
+        EXPECT_EQ(state.itemCount(guard, caps), 0);
+        state.removeItem(guard, stimpak, 5);
+        state.addItem(guard, stimpak, 1);
+
+        records.mUnknown.clear();
+        EXPECT_EQ(state.itemCount(guard, caps), 25);
+        // Five taken from two leave none, and the one added after that is the only one
+        EXPECT_EQ(state.itemCount(guard, stimpak), 1);
+        EXPECT_EQ(state.itemCount(guard, ncr), 1);
+    }
+
+    TEST(FalloutScriptActorStateTest, changes_made_before_the_records_can_be_read_keep_their_order)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(guard);
+        records.mUnknown.insert(crate);
+        records.mItems[guard] = { { caps, 4 } };
+        records.mItems[crate] = { { caps, 4 } };
+        ActorState state(records);
+
+        state.removeItem(guard, caps, 10);
+        state.addItem(guard, caps, 5);
+        state.addItem(crate, caps, 5);
+        state.removeItem(crate, caps, 3);
+        state.addItem(crate, caps, 10);
+
+        records.mUnknown.clear();
+        // The count does not go below 0 in the middle of the changes: 4 - 10 is 0, and 0 + 5 is 5
+        EXPECT_EQ(state.itemCount(guard, caps), 5);
+        // 4 + 5 - 3 + 10
+        EXPECT_EQ(state.itemCount(crate, caps), 16);
+    }
+
+    TEST(FalloutScriptActorStateTest, changes_that_never_end_are_still_numbers)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(guard);
+        records.mItems[guard] = { { caps, 7 } };
+        ActorState state(records);
+
+        for (int i = 0; i < 100; ++i)
+            state.addItem(guard, caps, 2147483647);
+        state.removeItem(guard, caps, 5);
+
+        records.mUnknown.clear();
+        EXPECT_EQ(state.itemCount(guard, caps), 2147483647 - 5);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_faction_left_before_the_records_can_be_read_stays_left)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(guard);
+        records.mFactions[guard] = { { ncr, 3 }, { legion, 1 } };
+        ActorState state(records);
+
+        state.removeFromFaction(guard, ncr);
+        state.setFactionRank(guard, legion, -1);
+        state.setFactionRank(guard, caps, 2);
+        EXPECT_EQ(state.factionRank(guard, ncr), -1);
+        EXPECT_EQ(state.factionRank(guard, caps), 2);
+
+        records.mUnknown.clear();
+        EXPECT_EQ(state.factionRank(guard, ncr), -1);
+        EXPECT_EQ(state.factionRank(guard, legion), -1);
+        EXPECT_EQ(state.factionRank(guard, caps), 2);
+    }
+
     TEST(FalloutScriptActorStateTest, an_actor_is_dead_until_it_is_brought_back)
     {
         FakeRecords records;
