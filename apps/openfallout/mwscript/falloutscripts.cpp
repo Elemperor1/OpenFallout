@@ -11,6 +11,7 @@
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -93,6 +94,8 @@ namespace OFScript
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
         , mActors(*this)
+        , mReferenceState(*this)
+        , mFormLists(*this)
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
@@ -104,6 +107,8 @@ namespace OFScript
         FalloutScript::addPlacementCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
+        FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
+        FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -127,6 +132,8 @@ namespace OFScript
         mReferences.clear();
         mScriptPackages.clear();
         mActors.clear();
+        mReferenceState.clear();
+        mFormLists.clear();
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -524,6 +531,37 @@ namespace OFScript
             if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
                 take(owner->mFactions);
         }
+        return true;
+    }
+
+    bool FalloutScripts::initialLock(FalloutScript::FormId reference, bool& locked, int& level)
+    {
+        // A lock is a thing of the placed reference, which the records of the content files have
+        const ESM4::Reference* record = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+        if (record == nullptr)
+            return false;
+        locked = record->mIsLocked;
+        // The level is a byte that the games use up to 255 (a key is needed)
+        level = static_cast<std::uint8_t>(record->mLockLevel);
+        return true;
+    }
+
+    bool FalloutScripts::formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries)
+    {
+        const ESM4::FormIdList* record = mStore.get<ESM4::FormIdList>().search(refId(list));
+        if (record == nullptr)
+            return false;
+        for (const ESM::FormId& form : record->mObjects)
+            entries.push_back(form.toUint32());
+        return true;
+    }
+
+    bool FalloutScripts::baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base)
+    {
+        ESM::FormId form;
+        if (!baseOf(reference, form) || form.isZeroOrUnset())
+            return false;
+        base = form.toUint32();
         return true;
     }
 

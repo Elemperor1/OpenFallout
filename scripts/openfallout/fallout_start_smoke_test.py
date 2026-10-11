@@ -628,6 +628,7 @@ local setter_ids = { @SETTER@ }
 local traveller_ids = { @TRAVELLER@ }
 local crosser_ids = { @CROSSER@ }
 local traveller_object, setter_object = nil, nil
+local doomed_ids = { @DOOMED@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
@@ -686,6 +687,13 @@ return {
                     tostring(g.@DEAD@))
                 print('OFTEST', 'object player', tostring(g.@PLAYER_RANK@))
                 print('OFTEST', 'object listed', tostring(g.@LISTED@))
+                -- The locks the script saw and changed, the cube it destroyed and deleted, and the list it added to
+                print('OFTEST', 'object locks', tostring(g.@LOCKED@), tostring(g.@LOCK_LEVEL@), tostring(g.@UNLOCKED@),
+                    tostring(g.@RELOCKED@), tostring(g.@RELOCK_LEVEL@))
+                print('OFTEST', 'object doomed', tostring(g.@DESTROYED@), tostring(g.@DOOMED_DISABLED@),
+                    tostring(find(doomed_ids).enabled))
+                print('OFTEST', 'object forms', tostring(g.@IN_LIST@), tostring(g.@LIST_BEFORE@),
+                    tostring(g.@LIST_AFTER@))
                 -- Where the script saw the cube that it moved to a marker, and where the world has put it
                 local mover = find(mover_ids)
                 mover_object, far_object = mover, find(far_ids)
@@ -766,6 +774,17 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
                  .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
                  .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
+                 .replace("@DOOMED@", ", ".join(map(str, plugin.DOOMED_REF_IDS.values())))
+                 .replace("@LOCKED@", plugin.STATE_GLOBALS["locked"][1])
+                 .replace("@LOCK_LEVEL@", plugin.STATE_GLOBALS["lock_level"][1])
+                 .replace("@UNLOCKED@", plugin.STATE_GLOBALS["unlocked"][1])
+                 .replace("@RELOCKED@", plugin.STATE_GLOBALS["relocked"][1])
+                 .replace("@RELOCK_LEVEL@", plugin.STATE_GLOBALS["relock_level"][1])
+                 .replace("@DESTROYED@", plugin.STATE_GLOBALS["destroyed"][1])
+                 .replace("@DOOMED_DISABLED@", plugin.STATE_GLOBALS["doomed_disabled"][1])
+                 .replace("@IN_LIST@", plugin.STATE_GLOBALS["in_list"][1])
+                 .replace("@LIST_BEFORE@", plugin.STATE_GLOBALS["list_before"][1])
+                 .replace("@LIST_AFTER@", plugin.STATE_GLOBALS["list_after"][1])
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1220,6 +1239,20 @@ def check_objects(text, scenario):
     if found is not None and found != [str(plugin.CREATURE_ITEMS)]:
         problems.append("the script should see the creature that is placed as a levelled list with the suits of the "
                         f"creature that the list gives ({plugin.CREATURE_ITEMS}): " + str(found))
+    found = one("locks")
+    expected = ["1", str(plugin.LOCK_LEVEL), "0", "1", str(plugin.RELOCK_LEVEL)]
+    if found is not None and found != expected:
+        problems.append("the script should see the cube that its record locks as locked at the level of the record, "
+                        "then open after UnLock, and the cube it locked at the level it gave "
+                        f"(locked, level, locked after, locked, level: {expected}): " + str(found))
+    found = one("doomed")
+    if found is not None and found != ["1", "1", "false"]:
+        problems.append("the cube that the script destroyed and marked for deletion should be seen as destroyed and "
+                        "disabled, and Lua should see it disabled (1, 1, false): " + str(found))
+    found = one("forms")
+    if found is not None and found != ["1", "0", "1"]:
+        problems.append("IsInList should find the marker by the record of the list, not the cube before the script "
+                        "added it and the cube after (1, 0, 1): " + str(found))
     # The cube the script moved to the target marker with offsets, as the script saw it and as the world has it, then the
     # cube at the height the script set and the player moved into the other kind of cell
     origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0

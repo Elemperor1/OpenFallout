@@ -193,7 +193,25 @@ HOP_X = 123.0
 CROSSER_REF_IDS = {"interior": 0x888, "exterior": 0x889}
 CROSSER_PLACE = (1800.0, -1400.0)
 CROSS_X = 5000
-LAST_ID = 0x88A # the largest form ID of the plugin, which the next object ID of its header follows
+# Three cubes for the state that scripts keep of references: one is locked by its record (level LOCK_LEVEL) and the script
+# opens it, one has no lock and the script locks it (level RELOCK_LEVEL), one is destroyed and marked for deletion. A
+# list of forms (by its record the marker that the cubes are moved to) gets the cube added by the script, so the locker
+# is in it afterwards and not before.
+LOCKED_REF_IDS = {"interior": 0x88B, "exterior": 0x88C}
+LOCKER_REF_IDS = {"interior": 0x88D, "exterior": 0x88E}
+DOOMED_REF_IDS = {"interior": 0x88F, "exterior": 0x890}
+LIST_IDS = {"interior": 0x891, "exterior": 0x892}
+STATE_GLOBALS = {"locked": (0x893, "OFTestLockedBefore"), "lock_level": (0x894, "OFTestLockLevel"),
+                 "unlocked": (0x895, "OFTestLockedAfter"), "relocked": (0x896, "OFTestRelocked"),
+                 "relock_level": (0x897, "OFTestRelockLevel"), "destroyed": (0x898, "OFTestDestroyed"),
+                 "doomed_disabled": (0x899, "OFTestDoomedDisabled"), "in_list": (0x89A, "OFTestInListByRecord"),
+                 "list_before": (0x89B, "OFTestInListBefore"), "list_after": (0x89C, "OFTestInListAfter")}
+LOCK_LEVEL = 50
+RELOCK_LEVEL = 25
+LOCKED_PLACE = (600.0, -1400.0)
+LOCKER_PLACE = (900.0, -1400.0)
+DOOMED_PLACE = (1200.0, -1400.0)
+LAST_ID = 0x89C # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -436,8 +454,11 @@ def top_group(code, children):
     return group(code, 0, children)
 
 
-def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0)):
+def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if lock_level is not None:
+        # level, 3 unused bytes, the key (none), 4 bytes of flags and 8 more, as Fallout 3 writes the 20 bytes of a lock
+        subs.append(sub(b"XLOC", struct.pack("<B3xI4x8x", lock_level, 0)))
     if scale is not None:
         subs.append(sub(b"XSCL", struct.pack("<f", scale)))
     subs.append(sub(b"DATA", struct.pack("<6f", *position, *rotation)))
@@ -537,6 +558,13 @@ def message():
                                         sub(b"DNAM", struct.pack("<I", 0)), sub(b"TNAM", struct.pack("<f", 2.0))])
 
 
+def form_lists():
+    """A list of forms for each kind of cell (FLST): the marker that the cubes are moved to."""
+    return [record(b"FLST", form_id, [zstr(b"EDID", "OFTestList" + kind.title()),
+                                       sub(b"LNAM", struct.pack("<I", TARGET_MARKER_ID))])
+            for kind, form_id in LIST_IDS.items()]
+
+
 def object_script(kind):
     """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
     disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
@@ -571,6 +599,9 @@ def object_script(kind):
         CROSSER_REF_IDS[kind], DRY_CELL_ID, MOVE_GLOBALS["crossed"][0]))
     other_kind = "exterior" if kind == "interior" else "interior"
     sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
+    locked, locker, doomed = (script.form(ids[kind]) for ids in (LOCKED_REF_IDS, LOCKER_REF_IDS, DOOMED_REF_IDS))
+    form_list, cube = script.form(LIST_IDS[kind]), script.form(CUBE_ID)
+    state = {name: script.form(form_id) for name, (form_id, _) in STATE_GLOBALS.items()}
 
     def add_one(global_index):
         return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
@@ -601,7 +632,18 @@ def object_script(kind):
                               *(sf.int_argument(offset) for offset in FAR_OFFSET))
                  + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
                               *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))
-                 + sf.call_on(sleeper, sf.SET_ANGLE, sf.axis_argument("X"), sf.int_argument(SLEEPER_PITCH))),
+                 + sf.call_on(sleeper, sf.SET_ANGLE, sf.axis_argument("X"), sf.int_argument(SLEEPER_PITCH))
+                 # What the record of the locked cube says, then the script opens it; the other cube is locked
+                 + sf.set_to(sf.global_target(state["locked"]), sf.call_token(sf.GET_LOCKED, reference=locked))
+                 + sf.set_to(sf.global_target(state["lock_level"]), sf.call_token(sf.GET_LOCK_LEVEL, reference=locked))
+                 + sf.call_on(locked, sf.UNLOCK, counted=True)
+                 + sf.call_on(locker, sf.LOCK, sf.int_argument(RELOCK_LEVEL))
+                 + sf.call_on(doomed, sf.SET_DESTROYED, sf.int_argument(1))
+                 + sf.call_on(doomed, sf.MARK_FOR_DELETE)
+                 # The list has the marker by its record and gets the cube from the script
+                 + sf.set_to(sf.global_target(state["list_before"]),
+                             sf.call_token(sf.IS_IN_LIST, sf.form_argument(form_list), reference=locker))
+                 + sf.call(sf.ADD_FORM_TO_FORM_LIST, sf.form_argument(form_list), sf.form_argument(cube))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
@@ -625,6 +667,15 @@ def object_script(kind):
             sf.set_to(sf.global_target(mover_angle),
                       sf.call_token(sf.GET_ANGLE, sf.axis_argument("Z"), reference=mover)),
             sf.set_to(sf.global_target(far_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=far_mover)),
+            sf.set_to(sf.global_target(state["unlocked"]), sf.call_token(sf.GET_LOCKED, reference=locked)),
+            sf.set_to(sf.global_target(state["relocked"]), sf.call_token(sf.GET_LOCKED, reference=locker)),
+            sf.set_to(sf.global_target(state["relock_level"]), sf.call_token(sf.GET_LOCK_LEVEL, reference=locker)),
+            sf.set_to(sf.global_target(state["destroyed"]), sf.call_token(sf.GET_DESTROYED, reference=doomed)),
+            sf.set_to(sf.global_target(state["doomed_disabled"]), sf.call_token(sf.GET_DISABLED, reference=doomed)),
+            sf.set_to(sf.global_target(state["in_list"]),
+                      sf.call_token(sf.IS_IN_LIST, sf.form_argument(form_list), reference=move_target)),
+            sf.set_to(sf.global_target(state["list_after"]),
+                      sf.call_token(sf.IS_IN_LIST, sf.form_argument(form_list), reference=locker)),
             # The test asks for the move of the player with a global; the cell of the start is left behind
             sf.branch(sf.IF, sf.global_target(hop) + sf.number("1") + sf.operator("==")),
             sf.set_to(sf.global_target(hop), sf.number("0")),
@@ -669,7 +720,11 @@ def object_refs(kind, origin):
                  rotation=(0.0, 0.0, TARGET_YAW)),
             refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2)),
             refr(TRAVELLER_REF_IDS[kind], CUBE_ID, (x + TRAVELLER_PLACE[0], y + TRAVELLER_PLACE[1], CUBE / 2)),
-            refr(CROSSER_REF_IDS[kind], CUBE_ID, (x + CROSSER_PLACE[0], y + CROSSER_PLACE[1], CUBE / 2))]
+            refr(CROSSER_REF_IDS[kind], CUBE_ID, (x + CROSSER_PLACE[0], y + CROSSER_PLACE[1], CUBE / 2)),
+            refr(LOCKED_REF_IDS[kind], CUBE_ID, (x + LOCKED_PLACE[0], y + LOCKED_PLACE[1], CUBE / 2),
+                 lock_level=LOCK_LEVEL),
+            refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2)),
+            refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
 
 
 def stage_script(statements, references):
@@ -1068,8 +1123,10 @@ def plugin():
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
+            + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message()])
             + top_group(b"SCPT", [quest_script(), object_script("interior"), object_script("exterior")])

@@ -35,6 +35,13 @@ namespace FalloutScript
                 world.setDisabled(call.mReference, true);
             return 0.0;
         });
+        // A reference that a script marks for deletion is gone for the game: nothing here deletes a reference, so it
+        // is disabled
+        interpreter.setHandler("MarkForDelete", [&world](CallContext& call) {
+            if (call.mReference != 0)
+                world.setDisabled(call.mReference, true);
+            return 0.0;
+        });
         interpreter.setHandler("GetDisabled", [&world](CallContext& call) {
             return call.mReference != 0 && world.isDisabled(call.mReference) ? 1.0 : 0.0;
         });

@@ -22,5 +22,12 @@ namespace FalloutScript
                 world.evaluatePackage(call.mReference);
             return 0.0;
         });
+        // ResetAI also drops what the character was doing (combat, a conversation); none of that is kept here, so it
+        // comes to the character looking at its packages again
+        interpreter.setHandler("ResetAI", [&world](CallContext& call) {
+            if (call.mReference != 0)
+                world.evaluatePackage(call.mReference);
+            return 0.0;
+        });
     }
 }
