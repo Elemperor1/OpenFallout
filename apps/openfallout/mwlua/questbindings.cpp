@@ -95,7 +95,8 @@ namespace OFLua
         // The stage that was set last, 0 when none was
         quest["stage"] = sol::readonly_property([](const QuestRef& ref) { return state(ref).mStage; });
         quest["running"] = sol::readonly_property([](const QuestRef& ref) { return state(ref).mRunning; });
-        quest["completed"] = sol::readonly_property([](const QuestRef& ref) { return state(ref).mCompleted; });
+        quest["completed"]
+            = sol::readonly_property([](const QuestRef& ref) { return state(ref).mCompleted || state(ref).mFailed; });
         quest["failed"] = sol::readonly_property([](const QuestRef& ref) { return state(ref).mFailed; });
         quest["stageDone"] = [](const QuestRef& ref, double stage) {
             return scripts().quests().stageDone(ref.mId, stageNumber(stage));

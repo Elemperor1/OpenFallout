@@ -94,9 +94,12 @@ namespace FalloutScript
         int stage(FormId quest) const;
         bool stageDone(FormId quest, int stage) const;
 
+        /// Whether the quest runs, which is not the same as being completed: a quest that is completed or failed runs
+        /// until a script stops it
         bool running(FormId quest) const;
         void start(FormId quest);
         void stop(FormId quest);
+        /// Whether the quest is completed or has failed (a failed quest counts as completed)
         bool completed(FormId quest) const;
         void complete(FormId quest);
 

@@ -88,8 +88,8 @@
 -- @field #string editorId Editor id of the quest.
 -- @field #string name Name of the quest as the player reads it (can be empty).
 -- @field #number stage The stage that was set last, 0 if none was.
--- @field #boolean running Whether the quest runs: it started with the game or a stage was set, and it is not completed.
--- @field #boolean completed Whether the quest is completed.
+-- @field #boolean running Whether the quest runs: it started with the game or a stage was set, until a script stops it (a quest that is completed or failed can still run).
+-- @field #boolean completed Whether the quest is completed or has failed.
 -- @field #boolean failed Whether the quest failed.
 -- @field #list<#QuestJournalEntry> journal The text of the stages that were reached and had one, in order.
 
@@ -115,7 +115,7 @@
 -- @return #boolean
 
 ---
--- Starts the quest, if it is not completed.
+-- Starts the quest.
 -- @function [parent=#Quest] start
 -- @param self
 

@@ -10,6 +10,10 @@ namespace FalloutScript
 {
     namespace
     {
+        /// The seconds between runs of the script of a quest that has no delay of its own (the setting fQuestDelayTime
+        /// of the games)
+        constexpr float defaultDelay = 5.f;
+
         const ESM4::QuestStage* findStage(const ESM4::Quest& quest, int index)
         {
             for (const ESM4::QuestStage& stage : quest.mStages)
@@ -86,8 +90,7 @@ namespace FalloutScript
         quest->mStage = index;
         if (!done)
             quest->mStagesDone.push_back(index);
-        if (!quest->mCompleted)
-            quest->mRunning = true;
+        quest->mRunning = true;
 
         // Every entry whose conditions are met has its script run, and the first of them tells the player. How the
         // games treat a stage with several entries is not known, but the conditions of such entries exclude each other
@@ -104,16 +107,11 @@ namespace FalloutScript
                 if (mJournalListener)
                     mJournalListener(id, quest->mJournal.back());
             }
+            // A quest that is completed or failed can still be running: its scripts stop it when they should
             if ((entry.mFlags & ESM4::QuestLogEntry::Flag_CompleteQuest) != 0)
-            {
                 quest->mCompleted = true;
-                quest->mRunning = false;
-            }
             if ((entry.mFlags & ESM4::QuestLogEntry::Flag_FailQuest) != 0)
-            {
                 quest->mFailed = true;
-                quest->mRunning = false;
-            }
             runEntry(id, entry);
             if (!entry.mNextQuest.isZeroOrUnset())
                 start(entry.mNextQuest.toUint32());
@@ -143,7 +141,7 @@ namespace FalloutScript
     void QuestManager::start(FormId id)
     {
         QuestState* quest = find(id);
-        if (quest != nullptr && !quest->mCompleted)
+        if (quest != nullptr)
             quest->mRunning = true;
     }
 
@@ -156,16 +154,14 @@ namespace FalloutScript
     bool QuestManager::completed(FormId quest) const
     {
         const QuestState* state = find(quest);
-        return state != nullptr && state->mCompleted;
+        // A quest that failed counts as completed, GetFailed tells them apart
+        return state != nullptr && (state->mCompleted || state->mFailed);
     }
 
     void QuestManager::complete(FormId id)
     {
         if (QuestState* quest = find(id))
-        {
             quest->mCompleted = true;
-            quest->mRunning = false;
-        }
     }
 
     void QuestManager::setObjectiveDisplayed(FormId id, int objective, bool displayed)
@@ -205,8 +201,9 @@ namespace FalloutScript
             if (!quest.mRunning || !quest.mInstance)
                 continue;
             quest.mTimer += seconds;
-            const float delay = quest.mRecord->mData.questDelay;
-            if (delay > 0 && quest.mTimer < delay)
+            // A quest that stores no delay takes the one the games' settings give
+            const float delay = quest.mRecord->mData.questDelay > 0 ? quest.mRecord->mData.questDelay : defaultDelay;
+            if (quest.mTimer < delay)
                 continue;
             quest.mTimer = 0;
             mInterpreter.run(*quest.mInstance, BlockType::GameMode);

@@ -301,17 +301,20 @@ namespace
         EXPECT_TRUE(setup.mQuests.running(questB));
         EXPECT_FALSE(setup.mQuests.completed(questA));
 
+        // a quest that failed counts as completed too, and goes on running until a script stops it
         setup.mQuests.setStage(questA, 30);
         EXPECT_TRUE(setup.mQuests.state(questA)->mFailed);
-        EXPECT_FALSE(setup.mQuests.running(questA));
+        EXPECT_FALSE(setup.mQuests.state(questA)->mCompleted);
+        EXPECT_TRUE(setup.mQuests.completed(questA));
+        EXPECT_TRUE(setup.mQuests.running(questA));
 
         setup.mQuests.setStage(questA, 10);
-        EXPECT_TRUE(setup.mQuests.completed(questA));
-        EXPECT_FALSE(setup.mQuests.running(questA));
+        EXPECT_TRUE(setup.mQuests.state(questA)->mCompleted);
+        EXPECT_TRUE(setup.mQuests.running(questA));
 
-        // a quest that is done is not started again by a later stage, but its stages are still set
-        setup.mQuests.setStage(questA, 20);
+        setup.mQuests.stop(questA);
         EXPECT_FALSE(setup.mQuests.running(questA));
+        EXPECT_TRUE(setup.mQuests.completed(questA));
     }
 
     TEST(FalloutScriptQuestsTest, starting_and_stopping_a_quest)
@@ -324,10 +327,14 @@ namespace
         EXPECT_TRUE(setup.mQuests.running(questA));
         setup.mQuests.stop(questA);
         EXPECT_FALSE(setup.mQuests.running(questA));
+        // completing a quest does not stop it, and a quest that is completed can be started again
+        setup.mQuests.start(questA);
         setup.mQuests.complete(questA);
         EXPECT_TRUE(setup.mQuests.completed(questA));
+        EXPECT_TRUE(setup.mQuests.running(questA));
+        setup.mQuests.stop(questA);
         setup.mQuests.start(questA);
-        EXPECT_FALSE(setup.mQuests.running(questA));
+        EXPECT_TRUE(setup.mQuests.running(questA));
 
         // quests the game does not have are left alone
         setup.mQuests.start(questC);
@@ -417,7 +424,7 @@ namespace
         EXPECT_EQ(instance->variable(1), 3);
     }
 
-    TEST(FalloutScriptQuestsTest, a_quest_without_a_delay_runs_its_script_every_time)
+    TEST(FalloutScriptQuestsTest, a_quest_without_a_delay_runs_its_script_on_the_default_delay)
     {
         Runner setup;
         ScriptBuilder questScript;
@@ -431,9 +438,12 @@ namespace
             = ESM::FormId::fromUint32(scriptOfA);
         setup.start();
 
-        setup.mQuests.update(0.01f);
-        setup.mQuests.update(0.01f);
-
+        setup.mQuests.update(1.f);
+        setup.mQuests.update(3.f);
+        EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 0);
+        setup.mQuests.update(1.f);
+        EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 1);
+        setup.mQuests.update(5.f);
         EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 2);
     }
 

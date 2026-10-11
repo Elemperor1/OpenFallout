@@ -1007,7 +1007,7 @@ def check_quests(text):
             ("a", plugin.QUEST_A_NAME, "OpenFallout Test Quest A", plugin.QUEST_A_STAGE,
              journal_of(plugin.QUEST_A_STAGE, plugin.QUEST_A_TEXT), "true", "false"),
             ("b", plugin.QUEST_B_NAME, "OpenFallout Test Quest B", plugin.QUEST_B_STAGE,
-             journal_of(plugin.QUEST_B_STAGE, plugin.QUEST_B_TEXT), "false", "true")):
+             journal_of(plugin.QUEST_B_STAGE, plugin.QUEST_B_TEXT), "true", "true")):
         found = one(kind)
         if found is None:
             continue
