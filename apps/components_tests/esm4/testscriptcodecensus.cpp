@@ -389,6 +389,23 @@ namespace
         EXPECT_THAT(out.str(), Not(HasSubstr("    QUST 0x00001001\n    QUST 0x00001001\n")));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, listsARecordOnceWhenALaterPluginOverridesIt)
+    {
+        const std::string call = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58 });
+        // the plugins come one after the other, and another caller comes between the record and its override
+        collect(census, scriptRecord(0x1001, call));
+        collect(census, scriptRecord(0x1002, call));
+        collect(census, scriptRecord(0x1001, call));
+
+        EXPECT_EQ(census.getCommands().at(0x1000 + 58).mScripts, 3u);
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("    SCPT 0x00001001\n    SCPT 0x00001002\n"));
+        EXPECT_THAT(out.str(), Not(HasSubstr("SCPT 0x00001002\n    SCPT 0x00001001\n")));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, listsNoCallersWhenNoneAreAskedFor)
     {
         ESM4::ScriptCodeCensus census;

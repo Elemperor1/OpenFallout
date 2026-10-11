@@ -638,10 +638,12 @@ namespace ESM4
             ++use.mByHolder[holder];
             if (mWatched.count(opcode) != 0)
             {
-                // The scripts of a record come one after the other, and the record is what is listed
+                // The record is what is listed: once, whether several of its scripts call the command or a later
+                // plugin overrides it (the list is short, so it is searched whole)
                 std::vector<std::string>& callers = mCallers[opcode];
                 const std::string caller = holder + " " + hex(record.toUint32(), 8);
-                if (callers.size() < maxCallersPerCommand && (callers.empty() || callers.back() != caller))
+                if (callers.size() < maxCallersPerCommand
+                    && std::find(callers.begin(), callers.end(), caller) == callers.end())
                     callers.push_back(caller);
             }
         }
