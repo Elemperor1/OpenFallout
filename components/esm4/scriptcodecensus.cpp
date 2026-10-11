@@ -638,9 +638,11 @@ namespace ESM4
             ++use.mByHolder[holder];
             if (mWatched.count(opcode) != 0)
             {
+                // The scripts of a record come one after the other, and the record is what is listed
                 std::vector<std::string>& callers = mCallers[opcode];
-                if (callers.size() < maxCallersPerCommand)
-                    callers.push_back(holder + " " + hex(record.toUint32(), 8));
+                const std::string caller = holder + " " + hex(record.toUint32(), 8);
+                if (callers.size() < maxCallersPerCommand && (callers.empty() || callers.back() != caller))
+                    callers.push_back(caller);
             }
         }
 

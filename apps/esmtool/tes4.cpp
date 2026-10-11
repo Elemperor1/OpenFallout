@@ -958,6 +958,11 @@ namespace EsmTool
 
     int scriptCodeTes4(const Arguments& info)
     {
+        if (!info.findCommands.empty() && info.commandsFile.empty())
+        {
+            std::cout << "--find needs the commands file (--commands)\n";
+            return -1;
+        }
         FalloutScript::CommandTable commands;
         if (!readCommands(info, commands))
             return -1;

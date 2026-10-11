@@ -71,8 +71,14 @@ void ESM4::DialogInfo::loadFallout(ESM4::Reader& reader)
                 in.formId(mQuest);
                 break;
             case ESM::fourCC("TPIC"):
-                in.formId(mTopic);
+            {
+                // The group the response is in says which topic it is for; TPIC is for a record outside of one
+                ESM::FormId topic;
+                in.formId(topic);
+                if (mTopic.isZeroOrUnset())
+                    mTopic = topic;
                 break;
+            }
             case ESM::fourCC("PNAM"):
                 in.formId(mPreviousInfo);
                 break;

@@ -189,8 +189,8 @@ namespace
         EXPECT_EQ(info.mNextSpeaker, ESM4::DialogInfo::Speaker_Self);
         EXPECT_EQ(info.mInfoFlags, 0x0105u);
         EXPECT_EQ(info.mQuest.toUint32(), 0x00010002u);
-        // TPIC is the topic when the record is not in a group, but the group is what says it
-        EXPECT_EQ(info.mTopic.toUint32(), 0x00010003u);
+        // The group the record is in says the topic (TPIC, 0x00010003, is read for a record outside of one)
+        EXPECT_EQ(info.mTopic.toUint32(), 0x123u);
         EXPECT_EQ(info.mPreviousInfo.toUint32(), 0x00010004u);
         ASSERT_EQ(info.mAddTopics.size(), 2u);
         EXPECT_EQ(info.mAddTopics[1].toUint32(), 0x00010006u);
@@ -245,6 +245,16 @@ namespace
         EXPECT_EQ(infos[0].mTopic.toUint32(), 0x123u);
         EXPECT_EQ(infos[1].mTopic.toUint32(), 0x123u);
         EXPECT_EQ(infos[1].mId.toUint32(), 0x11u);
+    }
+
+    TEST(ESM4DialogInfoFalloutTest, theGroupIsTheTopicAndNotTheTopicSubrecord)
+    {
+        // The TPIC of the record names another topic than the group it is in
+        const std::vector<ESM4::DialogInfo> infos = loadInfos(
+            fallout("INFO", 0x10, infoData(0, 0, 0) + valueSubRecord<std::uint32_t>("TPIC", 0x00010003)), 0x00000123);
+
+        ASSERT_EQ(infos.size(), 1u);
+        EXPECT_EQ(infos[0].mTopic.toUint32(), 0x123u);
     }
 
     TEST(ESM4DialogInfoFalloutTest, readsAResponseOfTwentyBytes)

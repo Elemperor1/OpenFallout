@@ -370,6 +370,25 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("0x103B: 0 scripts\n"));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, listsARecordOnceWhenSeveralOfItsScriptsCallTheCommand)
+    {
+        // a quest whose two log entries run a script each, and both call the command
+        const std::string calls = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        const std::string script = scriptHeader(0, static_cast<std::uint32_t>(calls.size()), 1)
+            + subRecord("SCDA", calls) + localVariable(1);
+        const std::string data = zString("EDID", "OFTestQuest") + subRecord("INDX", std::string("\x0a\0", 2))
+            + subRecord("QSDT", std::string(1, '\0')) + script + subRecord("QSDT", std::string(1, '\0')) + script;
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58 });
+        collect(census, record("QUST", 0x1001, data), "QUST");
+
+        EXPECT_EQ(census.getCommands().at(0x1000 + 58).mScripts, 2u);
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("0x103A: 2 scripts, QUST 2\n    QUST 0x00001001\n"));
+        EXPECT_THAT(out.str(), Not(HasSubstr("    QUST 0x00001001\n    QUST 0x00001001\n")));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, listsNoCallersWhenNoneAreAskedFor)
     {
         ESM4::ScriptCodeCensus census;
