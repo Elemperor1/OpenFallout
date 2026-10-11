@@ -142,6 +142,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmorcensus.cpp
 
     falloutscript/testactors.cpp
+    falloutscript/testplacement.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
     falloutscript/testmessagecommands.cpp

@@ -116,7 +116,8 @@ OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTe
                   "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
                   "victim": (0x854, "OFTestObjectVictimDisabled"), "items": (0x86D, "OFTestIdlerItems"),
                   "rank": (0x86E, "OFTestIdlerRank"), "joined": (0x86F, "OFTestIdlerJoined"),
-                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank"), "listed": (0x872, "OFTestListedItems")}
+                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x880, "OFTestPlayerRank"),
+                  "listed": (0x881, "OFTestListedItems")}
 # Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
 # first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
 # stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
@@ -146,7 +147,32 @@ PLAYER_RANK = 2
 # the script sees the same suits there
 CREATURE_ITEMS = 6
 LISTED_REF_IDS = {"interior": CREATURE_LIST_REF_ID, "exterior": EXTERIOR_CREATURE_LIST_REF_ID}
-LAST_ID = 0x872 # the largest form ID of the plugin, which the next object ID of its header follows
+# The mover is a cube. The script of the scripted object puts it next to the target (MoveToMarker with offsets, so it
+# turns the way the target does), keeps where it sees it, and, when the test sets MOVE_GLOBALS["now"] to 1, sets its
+# height and moves the player to the marker of the other kind of cell (the exterior for the interior start, the
+# interior for the exterior one), which the cell of the start has no record of in memory.
+MOVER_REF_IDS = {"interior": 0x871, "exterior": 0x872}
+MOVE_TARGET_REF_IDS = {"interior": 0x873, "exterior": 0x874}
+MOVE_GLOBALS = {"x": (0x875, "OFTestMoverX"), "y": (0x876, "OFTestMoverY"), "angle": (0x877, "OFTestMoverAngle"),
+                "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX")}
+# A second cube is sent to the marker of the other kind of cell, which is not loaded: the world keeps it there, and the
+# script reads where it is from the cell that is
+FAR_MOVER_REF_IDS = {"interior": 0x879, "exterior": 0x87A}
+FAR_MOVER_PLACE = (1500.0, -800.0)
+FAR_OFFSET = (5, 6, 0)
+# The script of each kind of cell also moves a cube of the other kind of cell, which is not loaded, to a marker next to
+# it: the cube is put there when its cell is loaded (when the test moves the player into it)
+SLEEPER_REF_IDS = {"interior": 0x87C, "exterior": 0x87D}
+SLEEPER_TARGET_REF_IDS = {"interior": 0x87E, "exterior": 0x87F}
+SLEEPER_PLACE = (1800.0, -800.0)
+SLEEPER_TARGET_PLACE = (1800.0, -1100.0)
+SLEEPER_OFFSET = (7, 8, 0)
+MOVER_PLACE = (1200.0, -800.0)
+MOVE_TARGET_PLACE = (1200.0, -1100.0)
+MOVE_OFFSET = (10, 20, 0)
+MOVE_HEIGHT = 321
+FAR_MARKER_REF_IDS = {"interior": EXTERIOR_MARKER_REF_ID, "exterior": MARKER_REF_ID}
+LAST_ID = 0x881 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -512,6 +538,13 @@ def object_script(kind):
     idler = script.form(PACKAGE_REF_IDS["idler"][index])
     suit = script.form(SUIT_ID)
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
+    mover, move_target, far_marker = (script.form(form_id) for form_id in (
+        MOVER_REF_IDS[kind], MOVE_TARGET_REF_IDS[kind], FAR_MARKER_REF_IDS[kind]))
+    mover_x, mover_y, mover_angle, move_now, far_x = (script.form(MOVE_GLOBALS[name][0])
+                                                      for name in ("x", "y", "angle", "now", "far"))
+    far_mover = script.form(FAR_MOVER_REF_IDS[kind])
+    other_kind = "exterior" if kind == "interior" else "interior"
+    sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
 
     def add_one(global_index):
         return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
@@ -526,7 +559,13 @@ def object_script(kind):
                  + sf.call_on(idler, sf.ADD_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_ADDS))
                  + sf.call_on(idler, sf.REMOVE_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_TAKES))
                  + sf.call_on(idler, sf.REMOVE_FROM_FACTION, sf.form_argument(second_faction))
-                 + sf.call_on(idler, sf.KILL_ACTOR, counted=True)),
+                 + sf.call_on(idler, sf.KILL_ACTOR, counted=True)
+                 + sf.call_on(mover, sf.MOVE_TO_MARKER, sf.form_argument(move_target),
+                              *(sf.int_argument(offset) for offset in MOVE_OFFSET))
+                 + sf.call_on(far_mover, sf.MOVE_TO_MARKER, sf.form_argument(far_marker),
+                              *(sf.int_argument(offset) for offset in FAR_OFFSET))
+                 + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
+                              *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
@@ -541,7 +580,18 @@ def object_script(kind):
             sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
                                                                    reference=player)),
             sf.set_to(sf.global_target(listed_items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
-                                                                    reference=listed))])),
+                                                                    reference=listed)),
+            sf.set_to(sf.global_target(mover_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=mover)),
+            sf.set_to(sf.global_target(mover_y), sf.call_token(sf.GET_POS, sf.axis_argument("Y"), reference=mover)),
+            sf.set_to(sf.global_target(mover_angle),
+                      sf.call_token(sf.GET_ANGLE, sf.axis_argument("Z"), reference=mover)),
+            sf.set_to(sf.global_target(far_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=far_mover)),
+            # The test asks for the move of the player with a global; the cell of the start is left behind
+            sf.branch(sf.IF, sf.global_target(move_now) + sf.number("1") + sf.operator("==")),
+            sf.set_to(sf.global_target(move_now), sf.number("0")),
+            sf.call_on(mover, sf.SET_POS, sf.axis_argument("Z"), sf.int_argument(MOVE_HEIGHT)),
+            sf.call_on(player, sf.MOVE_TO_MARKER, sf.form_argument(far_marker)),
+            sf.statement(sf.END_IF)])),
         # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
@@ -564,7 +614,14 @@ def object_refs(kind, origin):
     """The references of the scripted object and of the cube its script disables, around the origin of the cell."""
     x, y = origin
     return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
-            refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2))]
+            refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
+            refr(MOVER_REF_IDS[kind], CUBE_ID, (x + MOVER_PLACE[0], y + MOVER_PLACE[1], CUBE / 2)),
+            refr(FAR_MOVER_REF_IDS[kind], CUBE_ID, (x + FAR_MOVER_PLACE[0], y + FAR_MOVER_PLACE[1], CUBE / 2)),
+            refr(SLEEPER_REF_IDS[kind], CUBE_ID, (x + SLEEPER_PLACE[0], y + SLEEPER_PLACE[1], CUBE / 2)),
+            refr(SLEEPER_TARGET_REF_IDS[kind], TARGET_MARKER_ID,
+                 (x + SLEEPER_TARGET_PLACE[0], y + SLEEPER_TARGET_PLACE[1], 0.0)),
+            refr(MOVE_TARGET_REF_IDS[kind], TARGET_MARKER_ID, (x + MOVE_TARGET_PLACE[0], y + MOVE_TARGET_PLACE[1], 0.0),
+                 rotation=(0.0, 0.0, TARGET_YAW))]
 
 
 def stage_script(statements, references):
@@ -955,7 +1012,9 @@ def plugin():
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
-                                  *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values())])
+                                  *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l" if key == "now" else b"f")
+                                    for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message()])
             + top_group(b"SCPT", [quest_script(), object_script("interior"), object_script("exterior")])

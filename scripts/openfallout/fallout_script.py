@@ -24,6 +24,10 @@ CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a 
 
 # The codes of commands the tests use, as the executables of the games number them
 GET_DISTANCE = 0x1001
+GET_POS = 0x1006
+SET_POS = 0x1007
+GET_ANGLE = 0x1008
+MOVE_TO_MARKER = 0x109E
 ADD_ITEM = 0x1002
 DISABLE = 0x1022
 GET_DISABLED = 0x1023
@@ -79,6 +83,11 @@ def operator(text):
 
 def int_argument(value):
     return b"n" + struct.pack("<i", value)
+
+
+def axis_argument(letter):
+    """An axis (X, Y or Z), written as the bare byte of its letter."""
+    return letter.encode()
 
 
 def form_argument(reference):

@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_SCRIPT_FALLOUTSCRIPTS_H
 #define OPENFALLOUT_SCRIPT_FALLOUTSCRIPTS_H
 
+#include <array>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -12,6 +13,7 @@
 #include <vector>
 
 #include <components/esm/formid.hpp>
+#include <components/esm/refid.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
@@ -20,8 +22,11 @@
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/packagecommands.hpp>
+#include <components/falloutscript/placementcommands.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
+
+#include <osg/Vec3f>
 
 #include "../mwworld/ptr.hpp"
 
@@ -56,6 +61,7 @@ namespace OFScript
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
                                  private FalloutScript::PackageWorld,
+                                 private FalloutScript::PlacementWorld,
                                  private FalloutScript::MessageWorld
     {
     public:
@@ -130,6 +136,11 @@ namespace OFScript
         void removeScriptPackage(FalloutScript::FormId actor) override;
         void evaluatePackage(FalloutScript::FormId actor) override;
 
+        bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
+        void moveTo(FalloutScript::FormId reference, FalloutScript::FormId target,
+            const std::array<double, 3>& offset) override;
+        void place(FalloutScript::FormId reference, const FalloutScript::Placement& where) override;
+
         void showMessage(FalloutScript::FormId message) override;
 
         bool initialItems(
@@ -146,6 +157,20 @@ namespace OFScript
         void runPending();
         /// Objects that were moved to cells that are not loaded stop running their scripts
         void dropObjectsThatLeft();
+
+        /// A place in the world: the cell by its id, and the position and angles in it (radians)
+        struct Place
+        {
+            ESM::RefId mCell;
+            osg::Vec3f mPosition;
+            osg::Vec3f mAngle;
+        };
+        /// Where the reference is: what a script has put it at and the world has not done yet, else where it is in a
+        /// loaded cell, else where a script put it while its cell was not loaded, else where its record puts it.
+        /// False for a reference nobody knows.
+        bool whereIs(FalloutScript::FormId reference, Place& result);
+        /// Moves the object now. An object that is not in a loaded cell is moved when its cell is loaded.
+        void applyMove(FalloutScript::FormId reference, const Place& where);
 
         /// What changes the world (the scene, the interface, the characters) is for the thread that runs the frame:
         /// a script that Lua starts runs on the thread of Lua, which is busy at the same time as the scene is drawn.
@@ -178,6 +203,10 @@ namespace OFScript
         /// whose scripts run OnLoad
         std::vector<std::pair<FalloutScript::FormId, bool>> mPendingToggle;
         std::vector<FalloutScript::FormId> mPendingLoad;
+        /// Where scripts put objects: those that are waiting for the start of the next frame (the world is not changed
+        /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
+        std::map<FalloutScript::FormId, Place> mPendingMoves;
+        std::map<FalloutScript::FormId, Place> mRelocations;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;

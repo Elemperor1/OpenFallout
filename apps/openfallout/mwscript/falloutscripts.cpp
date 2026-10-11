@@ -7,6 +7,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm/util.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
@@ -26,10 +27,12 @@
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/player.hpp"
 #include "../mwworld/ptr.hpp"
 #include "../mwworld/scene.hpp"
 #include "../mwworld/worldmodel.hpp"
@@ -98,6 +101,7 @@ namespace OFScript
         FalloutScript::addObjectCommands(
             mInterpreter, mObjects, *this, [this] { return std::uniform_int_distribution<int>(0, 99)(mRandom); });
         FalloutScript::addPackageCommands(mInterpreter, *this);
+        FalloutScript::addPlacementCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addConditionFunctions(mConditions);
@@ -118,6 +122,8 @@ namespace OFScript
         mDisabled.clear();
         mPendingToggle.clear();
         mPendingLoad.clear();
+        mPendingMoves.clear();
+        mRelocations.clear();
         mReferences.clear();
         mScriptPackages.clear();
         mActors.clear();
@@ -172,6 +178,12 @@ namespace OFScript
             if (reference == 0)
                 return true;
             mReferences[reference] = ptr;
+            // An object that scripts moved while its cell was not loaded is put where they wanted it
+            if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
+            {
+                mPendingMoves[reference] = moved->second;
+                mRelocations.erase(moved);
+            }
             // An object that scripts enabled or disabled while its cell was not loaded is so now, whatever its record
             // says; from here on the state is that of the object
             if (const auto state = mDisabled.find(reference); state != mDisabled.end())
@@ -202,6 +214,11 @@ namespace OFScript
             if (mDeferred.empty())
                 mDeferredDisabled.clear();
         }
+        // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
+        std::map<FalloutScript::FormId, Place> moves;
+        moves.swap(mPendingMoves);
+        for (const auto& [reference, where] : moves)
+            applyMove(reference, where);
         // Every object has its script before any of them runs OnLoad, so that they can reach each other
         std::vector<std::pair<FalloutScript::FormId, bool>> toggle;
         toggle.swap(mPendingToggle);
@@ -556,6 +573,140 @@ namespace OFScript
             return 0;
         const ESM::FormId* id = ptr.getCell()->getCell()->getId().getIf<ESM::FormId>();
         return id != nullptr ? id->toUint32() : 0;
+    }
+
+    bool FalloutScripts::whereIs(FalloutScript::FormId reference, Place& result)
+    {
+        if (const auto planned = mPendingMoves.find(reference); planned != mPendingMoves.end())
+        {
+            result = planned->second;
+            return true;
+        }
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (!ptr.isEmpty() && ptr.getCell() != nullptr)
+        {
+            const ESM::Position& position = ptr.getRefData().getPosition();
+            result = { ptr.getCell()->getCell()->getId(), position.asVec3(), position.asRotationVec3() };
+            return true;
+        }
+        if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
+        {
+            result = moved->second;
+            return true;
+        }
+        // Not in a loaded cell: where the record of the reference puts it
+        const ESM::FormId id = ESM::FormId::fromUint32(reference);
+        if (id.isZeroOrUnset())
+            return false;
+        const auto fromRecord = [&](const auto& record) {
+            result = { record.mParent, record.mPos.asVec3(), record.mPos.asRotationVec3() };
+            return true;
+        };
+        if (const ESM4::Reference* record = mStore.get<ESM4::Reference>().search(id))
+            return fromRecord(*record);
+        if (const ESM4::ActorCharacter* record = mStore.get<ESM4::ActorCharacter>().search(id))
+            return fromRecord(*record);
+        if (const ESM4::ActorCreature* record = mStore.get<ESM4::ActorCreature>().search(id))
+            return fromRecord(*record);
+        return false;
+    }
+
+    bool FalloutScripts::placement(FalloutScript::FormId reference, FalloutScript::Placement& result)
+    {
+        Place place;
+        if (!whereIs(reference, place))
+            return false;
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            result.mPosition[axis] = place.mPosition[axis];
+            result.mAngle[axis] = place.mAngle[axis];
+        }
+        return true;
+    }
+
+    void FalloutScripts::moveTo(
+        FalloutScript::FormId reference, FalloutScript::FormId target, const std::array<double, 3>& offset)
+    {
+        Place from;
+        Place to;
+        if (!whereIs(reference, from) || !whereIs(target, to))
+        {
+            log("MoveToMarker: " + FalloutScript::hex(reference) + " or " + FalloutScript::hex(target)
+                + " has no place the game knows");
+            return;
+        }
+        // Markers point somewhere, and what stands on them turns that way; a tilted marker does not tilt it
+        to.mPosition
+            += osg::Vec3f(static_cast<float>(offset[0]), static_cast<float>(offset[1]), static_cast<float>(offset[2]));
+        to.mAngle = osg::Vec3f(from.mAngle.x(), from.mAngle.y(), to.mAngle.z());
+        // The world is not changed while scripts run
+        runOnMainThread([this, reference, to] { mPendingMoves[reference] = to; });
+    }
+
+    void FalloutScripts::place(FalloutScript::FormId reference, const FalloutScript::Placement& where)
+    {
+        Place place;
+        if (!whereIs(reference, place))
+            return;
+        place.mPosition = osg::Vec3f(static_cast<float>(where.mPosition[0]), static_cast<float>(where.mPosition[1]),
+            static_cast<float>(where.mPosition[2]));
+        place.mAngle = osg::Vec3f(static_cast<float>(where.mAngle[0]), static_cast<float>(where.mAngle[1]),
+            static_cast<float>(where.mAngle[2]));
+        runOnMainThread([this, reference, place] { mPendingMoves[reference] = place; });
+    }
+
+    void FalloutScripts::applyMove(FalloutScript::FormId reference, const Place& where)
+    {
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (ptr.isEmpty())
+        {
+            // It is put there when its cell is loaded
+            mRelocations[reference] = where;
+            return;
+        }
+        OFWorld::CellStore* destination = model->findCell(where.mCell);
+        if (destination == nullptr)
+        {
+            log("MoveToMarker: the cell " + where.mCell.toDebugString() + " of " + FalloutScript::hex(reference)
+                + " is not known");
+            return;
+        }
+        // A position outside the square of an exterior cell belongs to the one next to it
+        if (destination->isExterior())
+            destination = &model->getExterior(ESM::positionToExteriorCellLocation(
+                where.mPosition.x(), where.mPosition.y(), destination->getCell()->getWorldSpace()));
+        const OFWorld::Class& cls = ptr.getClass();
+        if (ptr == world->getPlayerPtr())
+        {
+            OFMechanics::CreatureStats& stats = cls.getCreatureStats(ptr);
+            stats.land(true);
+            stats.setTeleported(true);
+            world->getPlayer().setTeleported(true);
+            ESM::Position position;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                position.pos[axis] = where.mPosition[axis];
+                position.rot[axis] = where.mAngle[axis];
+            }
+            const bool differentCell = ptr.getCell() != destination;
+            world->changeToCell(destination->getCell()->getId(), position, false, differentCell);
+            const OFWorld::Ptr player = world->getPlayerPtr();
+            world->moveObject(player, where.mPosition);
+            world->rotateObject(player, where.mAngle);
+            OFBase::Environment::get().getLuaManager()->objectTeleported(player);
+            return;
+        }
+        if (cls.isActor())
+        {
+            OFMechanics::CreatureStats& stats = cls.getCreatureStats(ptr);
+            stats.land(false);
+            stats.setTeleported(true);
+        }
+        const OFWorld::Ptr moved = world->moveObject(ptr, destination, where.mPosition);
+        world->rotateObject(moved, where.mAngle, OFBase::RotationFlag_none);
+        OFBase::Environment::get().getLuaManager()->objectTeleported(moved);
     }
 
     void FalloutScripts::activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate)
