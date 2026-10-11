@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -393,6 +394,22 @@ namespace
         EXPECT_THAT(setup.mLogged, ElementsAre("after"));
         ASSERT_EQ(setup.mHost.mLog.size(), 1u);
         EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("0x1fff"));
+    }
+
+    TEST(FalloutScriptInterpreterTest, aCommandThatThrowsIsReportedOnceAndTheScriptGoesOn)
+    {
+        Runner setup;
+        setup.mInterpreter.setHandler(
+            "Nothing", [](FalloutScript::CallContext&) -> double { throw std::runtime_error("the world said no"); });
+        ScriptBuilder builder
+            = block(command(OpNothing, arguments(0)) + logCall("after") + command(OpNothing, arguments(0)));
+        Instance instance = setup.instance(builder);
+        EXPECT_EQ(setup.mInterpreter.run(instance, GameMode).mStatus, Interpreter::Status::Done);
+        EXPECT_THAT(setup.mLogged, ElementsAre("after"));
+        ASSERT_EQ(setup.mHost.mLog.size(), 1u);
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("Nothing"));
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("failed"));
+        EXPECT_THAT(setup.mHost.mLog[0], HasSubstr("the world said no"));
     }
 
     TEST(FalloutScriptInterpreterTest, aCallWithArgumentsThatDoNotFitIsReportedAndSkipped)

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <sstream>
 
@@ -88,6 +89,7 @@ namespace FalloutScript
             Report_BadScript = 0x60000,
             Report_TooDeep = 0x70000,
             Report_TooLong = 0x80000,
+            Report_Failed = 0x90000,
         };
     }
 
@@ -433,7 +435,22 @@ namespace FalloutScript
         if (!mOutside)
             mOutside = std::make_unique<Instance>(std::make_shared<const Script>(), 0);
         CallContext context{ *this, mHost, *mOutside, *command, reference, onReference, std::move(arguments) };
-        return handler->second(context);
+        return invoke(handler->second, context);
+    }
+
+    double Interpreter::invoke(const Handler& handler, CallContext& context)
+    {
+        try
+        {
+            return handler(context);
+        }
+        catch (const std::exception& error)
+        {
+            reportOnce(Report_Failed | context.mCommand.mOpcode,
+                "The script command " + context.mCommand.mName + " (" + hex(context.mCommand.mOpcode)
+                    + ") failed: " + error.what());
+            return 0;
+        }
     }
 
     double Interpreter::callCommand(Frame& frame, std::size_t callIndex)
@@ -502,6 +519,6 @@ namespace FalloutScript
             }
             context.mArguments.push_back(std::move(value));
         }
-        return handler->second(context);
+        return invoke(handler->second, context);
     }
 }

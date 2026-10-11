@@ -54,6 +54,16 @@ namespace OFScript
             return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
         }
 
+        /// The number a script knows a form by. A form that has none (it is not set, it is one the world made for
+        /// itself or its plugin is out of the range of the games) is 0, which names nothing, where converting it would
+        /// throw and end the frame of every script after it.
+        FalloutScript::FormId numberOf(const ESM::FormId& form)
+        {
+            if (form.isZeroOrUnset() || !form.hasContentFile() || form.mContentFile > 0xfe)
+                return 0;
+            return form.toUint32();
+        }
+
         /// The value a global variable has: a short or a long is a whole number, the types are 's', 'l' and 'f'
         double fitToType(std::uint8_t type, double value)
         {
@@ -202,7 +212,7 @@ namespace OFScript
     {
         const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
         if (refNum.hasContentFile())
-            return refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
+            return numberOf(refNum);
         // An object made while the game runs has a number of the world's own; scripts know it by the one it was given
         const auto made = mMadeIds.find(refNum);
         return made != mMadeIds.end() ? made->second : 0;
@@ -485,7 +495,7 @@ namespace OFScript
         if (!baseOf(reference, base) || base.isZeroOrUnset())
             return own;
         const auto scriptIdOf = [](const auto* record) -> FalloutScript::FormId {
-            return record == nullptr || record->mScriptId.isZeroOrUnset() ? 0 : record->mScriptId.toUint32();
+            return record == nullptr ? 0 : numberOf(record->mScriptId);
         };
         // A record that takes its script from a template has the script of the template, and none when the template
         // can not be followed (it is a levelled list of characters)
@@ -638,7 +648,7 @@ namespace OFScript
         if (record == nullptr)
             return false;
         for (const ESM::FormId& form : record->mObjects)
-            entries.push_back(form.toUint32());
+            entries.push_back(numberOf(form));
         return true;
     }
 
@@ -647,8 +657,8 @@ namespace OFScript
         ESM::FormId form;
         if (!baseOf(reference, form) || form.isZeroOrUnset())
             return false;
-        base = form.toUint32();
-        return true;
+        base = numberOf(form);
+        return base != 0;
     }
 
     FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)
@@ -661,7 +671,7 @@ namespace OFScript
             return 0;
         // The cell of a building has the default worldspace, which no record is
         const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
-        return worldspace != nullptr ? worldspace->toUint32() : 0;
+        return worldspace != nullptr ? numberOf(*worldspace) : 0;
     }
 
     FalloutScript::FormId FalloutScripts::linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword)
@@ -673,9 +683,9 @@ namespace OFScript
         const auto find = [keyword](const std::vector<ESM4::LinkedReference>& links) -> FalloutScript::FormId {
             for (const ESM4::LinkedReference& link : links)
             {
-                const FalloutScript::FormId linkKeyword = link.keyword.isZeroOrUnset() ? 0 : link.keyword.toUint32();
+                const FalloutScript::FormId linkKeyword = numberOf(link.keyword);
                 if (linkKeyword == keyword && !link.reference.isZeroOrUnset())
-                    return link.reference.toUint32();
+                    return numberOf(link.reference);
             }
             return 0;
         };
@@ -758,7 +768,7 @@ namespace OFScript
         if (!whereIs(reference, place))
             return 0;
         const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
-        return id != nullptr ? id->toUint32() : 0;
+        return id != nullptr ? numberOf(*id) : 0;
     }
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)

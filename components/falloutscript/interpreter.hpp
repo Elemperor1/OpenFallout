@@ -152,6 +152,9 @@ namespace FalloutScript
         bool writeVariable(Frame& frame, const ESM4::ScriptCode::VariableRef& ref, double value);
         FormId resolveReference(Frame& frame, std::uint16_t slot);
         void reportOnce(std::uint32_t key, std::string_view message);
+        /// Runs the handler of a command. One that throws (the world refused something) is reported once and has the
+        /// value 0, so that the rest of the script, and the scripts that run after it in the frame, still run.
+        double invoke(const Handler& handler, CallContext& context);
 
         Host& mHost;
         const CommandTable& mCommands;
