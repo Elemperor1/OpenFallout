@@ -7,6 +7,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadglob.hpp>
@@ -14,6 +15,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadqust.hpp>
+#include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/misc/strings/algorithm.hpp>
@@ -382,59 +384,100 @@ namespace OFScript
         }
     }
 
+    bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
+    {
+        base = ESM::FormId();
+        if (reference == mPlayer)
+        {
+            // The record of PlayerRef names the character that the player is; without it that is form 7 of the same
+            // plugin, which is where the games keep it
+            if (const ESM4::ActorCharacter* record
+                = mStore.get<ESM4::ActorCharacter>().search(ESM::FormId::fromUint32(reference)))
+                base = record->mBaseObj;
+            else
+                base = ESM::FormId::fromUint32((reference & 0xFF000000u) | 0x7u);
+            return true;
+        }
+        // The records of the content files say what a reference is, whether or not its cell is loaded and from any
+        // thread: the objects of the loaded cells are for the thread of the frame
+        const ESM::FormId form = ESM::FormId::fromUint32(reference);
+        if (form.isZeroOrUnset())
+            return true;
+        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
+            base = character->mBaseObj;
+        else if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
+            base = creature->mBaseObj;
+        else if (const ESM4::Reference* object = mStore.get<ESM4::Reference>().search(form))
+            base = object->mBaseObj;
+        else
+        {
+            // Made while the game runs: only the world knows it, and only the thread of the frame may ask
+            if (std::this_thread::get_id() != mMainThread)
+                return false;
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (ptr.isEmpty())
+                return false;
+            if (ptr.getType() == ESM4::Npc::sRecordId)
+                base = ptr.get<ESM4::Npc>()->mBase->mId;
+            else if (ptr.getType() == ESM4::Creature::sRecordId)
+                base = ptr.get<ESM4::Creature>()->mBase->mId;
+            else if (ptr.getType() == ESM4::Container::sRecordId)
+                base = ptr.get<ESM4::Container>()->mBase->mId;
+        }
+        return true;
+    }
+
     bool FalloutScripts::initialItems(
         FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items)
     {
         // The player starts with nothing; what the player carries is for the inventory of the game
         if (holder == mPlayer)
             return true;
-        const OFWorld::Ptr ptr = findReference(holder);
-        if (ptr.isEmpty())
+        ESM::FormId base;
+        if (!baseOf(holder, base))
             return false;
         const auto take = [&items](const std::vector<ESM4::InventoryItem>& inventory) {
             for (const ESM4::InventoryItem& item : inventory)
                 items.emplace_back(item.item, static_cast<std::int32_t>(item.count));
         };
-        if (ptr.getType() == ESM4::Npc::sRecordId)
+        if (base.isZeroOrUnset())
+            return true;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            if (const ESM4::Npc* npc
-                = templateOwner(mStore, ptr.get<ESM4::Npc>()->mBase, ESM4::Npc::Template_UseInventory))
-                take(npc->mInventory);
+            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
+                take(owner->mInventory);
         }
-        else if (ptr.getType() == ESM4::Creature::sRecordId)
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            if (const ESM4::Creature* creature
-                = templateOwner(mStore, ptr.get<ESM4::Creature>()->mBase, ESM4::Creature::Template_UseInventory))
-                take(creature->mInventory);
+            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseInventory))
+                take(owner->mInventory);
         }
-        else if (ptr.getType() == ESM4::Container::sRecordId)
-            take(ptr.get<ESM4::Container>()->mBase->mInventory);
+        else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
+            take(container->mInventory);
         return true;
     }
 
     bool FalloutScripts::initialFactions(
         FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions)
     {
-        if (actor == mPlayer)
-            return true;
-        const OFWorld::Ptr ptr = findReference(actor);
-        if (ptr.isEmpty())
+        ESM::FormId base;
+        if (!baseOf(actor, base))
             return false;
         const auto take = [&factions](const std::vector<ESM4::ActorFaction>& list) {
             for (const ESM4::ActorFaction& faction : list)
                 factions.emplace_back(faction.faction, faction.rank);
         };
-        if (ptr.getType() == ESM4::Npc::sRecordId)
+        if (base.isZeroOrUnset())
+            return true;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            if (const ESM4::Npc* npc
-                = templateOwner(mStore, ptr.get<ESM4::Npc>()->mBase, ESM4::Npc::Template_UseFactions))
-                take(npc->mFactions);
+            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseFactions))
+                take(owner->mFactions);
         }
-        else if (ptr.getType() == ESM4::Creature::sRecordId)
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            if (const ESM4::Creature* creature
-                = templateOwner(mStore, ptr.get<ESM4::Creature>()->mBase, ESM4::Creature::Template_UseFactions))
-                take(creature->mFactions);
+            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
+                take(owner->mFactions);
         }
         return true;
     }

@@ -672,6 +672,7 @@ return {
                 local g = world.globals
                 print('OFTEST', 'object idler', tostring(g.@ITEMS@), tostring(g.@RANK@), tostring(g.@JOINED@),
                     tostring(g.@DEAD@))
+                print('OFTEST', 'object player', tostring(g.@PLAYER_RANK@))
             end
         end,
     },
@@ -691,7 +692,8 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@ITEMS@", plugin.OBJECT_GLOBALS["items"][1])
                  .replace("@RANK@", plugin.OBJECT_GLOBALS["rank"][1])
                  .replace("@JOINED@", plugin.OBJECT_GLOBALS["joined"][1])
-                 .replace("@DEAD@", plugin.OBJECT_GLOBALS["dead"][1]))
+                 .replace("@DEAD@", plugin.OBJECT_GLOBALS["dead"][1])
+                 .replace("@PLAYER_RANK@", plugin.OBJECT_GLOBALS["player_rank"][1]))
 
 # Where the three characters start relative to the player, and where the walker should end
 PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler", "roamer")}
@@ -1113,6 +1115,10 @@ def check_objects(text):
         problems.append("the script should see the idler with the suits of its record changed by its own calls, the "
                         f"rank its record gives in the first faction, out of the second and dead ({expected}): "
                         + str(found))
+    found = one("player")
+    if found is not None and found != [str(plugin.PLAYER_RANK)]:
+        problems.append("the script should see the player in the first faction with the rank that the record of the "
+                        f"player gives ({plugin.PLAYER_RANK}): " + str(found))
     told = [line for line in text.splitlines() if f"Message: {plugin.MESSAGE_TEXT}" in line]
     if len(told) != 1:
         problems.append(f"ShowMessage in OnLoad should have told the player '{plugin.MESSAGE_TEXT}' once, not "

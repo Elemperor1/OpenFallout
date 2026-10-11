@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <components/esm/formid.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
@@ -136,6 +137,10 @@ namespace OFScript
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
 
+        /// The record that the reference is of, by the records of the content files; a reference that they do not have
+        /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
+        /// it is not known (yet); the base is empty for a reference that has none.
+        bool baseOf(FalloutScript::FormId reference, ESM::FormId& base);
         /// The object of the reference when it is in a cell that is loaded, else an empty one
         OFWorld::Ptr findReference(FalloutScript::FormId reference);
         void runPending();

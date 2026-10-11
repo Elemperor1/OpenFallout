@@ -116,7 +116,7 @@ OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTe
                   "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
                   "victim": (0x854, "OFTestObjectVictimDisabled"), "items": (0x86D, "OFTestIdlerItems"),
                   "rank": (0x86E, "OFTestIdlerRank"), "joined": (0x86F, "OFTestIdlerJoined"),
-                  "dead": (0x870, "OFTestIdlerDead")}
+                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank")}
 # Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
 # first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
 # stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
@@ -138,7 +138,11 @@ IDLER_RANKS = (3, 1)
 IDLER_ITEMS = 4
 IDLER_ADDS = 3
 IDLER_TAKES = 2
-LAST_ID = 0x870 # the largest form ID of the plugin, which the next object ID of its header follows
+# The player is the character of form 7 (what PlayerRef names in the games) and is in the first faction by that record;
+# the script reads the rank back
+PLAYER_BASE_ID = 0x7
+PLAYER_RANK = 2
+LAST_ID = 0x871 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -485,7 +489,7 @@ def message():
 def object_script(kind):
     """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
     disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
-    and kills it; every frame it counts the frames, measures its distance to
+    and kills it, and reads the rank of the player in a faction; every frame it counts the frames, measures its distance to
     the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
     second time, lets the object do what it does by default (Activate)."""
     sf = fallout_script
@@ -498,7 +502,8 @@ def object_script(kind):
     greeting = script.form(MESSAGE_ID)
     loads, frames, activated, distance, disabled = (script.form(OBJECT_GLOBALS[name][0])
                                                     for name in ("loads", "frames", "activated", "distance", "victim"))
-    items, rank, joined, dead = (script.form(OBJECT_GLOBALS[name][0]) for name in ("items", "rank", "joined", "dead"))
+    items, rank, joined, dead, player_rank = (script.form(OBJECT_GLOBALS[name][0])
+                                              for name in ("items", "rank", "joined", "dead", "player_rank"))
     idler = script.form(PACKAGE_REF_IDS["idler"][index])
     suit = script.form(SUIT_ID)
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
@@ -527,7 +532,9 @@ def object_script(kind):
                                                             reference=idler)),
             sf.set_to(sf.global_target(joined), sf.call_token(sf.GET_IN_FACTION, sf.form_argument(second_faction),
                                                               reference=idler)),
-            sf.set_to(sf.global_target(dead), sf.call_token(sf.GET_DEAD, reference=idler))])),
+            sf.set_to(sf.global_target(dead), sf.call_token(sf.GET_DEAD, reference=idler)),
+            sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
+                                                                   reference=player))])),
         # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
@@ -762,6 +769,7 @@ def package_people():
               for kind in ("interior", "exterior")]
     people.append(person(IDLER_ID, "OFTestIdler", dressed=False, items=[(SUIT_ID, IDLER_ITEMS)],
                          factions=list(zip(FACTION_IDS, IDLER_RANKS))))
+    people.append(person(PLAYER_BASE_ID, "OFTestPlayer", dressed=False, factions=[(FACTION_IDS[0], PLAYER_RANK)]))
     people.append(person(ROAMER_ID, "OFTestRoamer", [ROAM_PACKAGE_ID], dressed=False))
     people.append(person(FOLLOWER_ID, "OFTestFollower", [FOLLOW_PACKAGE_ID], dressed=False))
     people.append(person(COMPANION_ID, "OFTestCompanion", dressed=False))
