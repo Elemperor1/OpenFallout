@@ -70,6 +70,13 @@ namespace FalloutScript
             const FormId other = formArgument(call, 0);
             return other != 0 && call.mReference == other ? 1.0 : 0.0;
         });
+        interpreter.setHandler("GetIsID", [&world](CallContext& call) {
+            const FormId wanted = formArgument(call, 0);
+            FormId base = 0;
+            return wanted != 0 && call.mReference != 0 && world.baseFormOf(call.mReference, base) && base == wanted
+                ? 1.0
+                : 0.0;
+        });
         interpreter.setHandler(
             "GetSecondsPassed", [&objects](CallContext&) { return static_cast<double>(objects.secondsPassed()); });
         interpreter.setHandler("GetRandomPercent",

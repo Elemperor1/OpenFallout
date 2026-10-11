@@ -25,6 +25,7 @@ namespace
 
     constexpr FormId crate = 0x01000100;
     constexpr FormId otherCrate = 0x01000101;
+    constexpr FormId crateBase = 0x01000200;
     constexpr FormId player = 0x01000014;
     constexpr FormId scriptOfCrates = 0x01002000;
     constexpr FormId cell = 0x01003000;
@@ -41,6 +42,7 @@ namespace
     constexpr std::uint16_t OpDisable = 0x1022;
     constexpr std::uint16_t OpGetDisabled = 0x1023;
     constexpr std::uint16_t OpGetInCell = 0x1043;
+    constexpr std::uint16_t OpGetIsID = 0x1048;
     constexpr std::uint16_t OpGetRandomPercent = 0x104D;
     constexpr std::uint16_t OpIsActionRef = 0x1069;
     constexpr std::uint16_t OpGetIsReference = 0x1088;
@@ -53,6 +55,7 @@ namespace
         std::set<FormId> mDisabled;
         std::map<FormId, FormId> mCells;
         std::map<std::pair<FormId, FormId>, double> mDistances;
+        std::map<FormId, FormId> mBases;
 
         struct Activation
         {
@@ -93,6 +96,14 @@ namespace
         {
             const auto found = mCells.find(reference);
             return found != mCells.end() ? found->second : 0;
+        }
+        bool baseFormOf(FormId reference, FormId& base) override
+        {
+            const auto found = mBases.find(reference);
+            if (found == mBases.end())
+                return false;
+            base = found->second;
+            return true;
         }
     };
 
@@ -359,6 +370,42 @@ namespace
         EXPECT_EQ(setup.variable(crate, 1), 1);
         EXPECT_EQ(setup.variable(crate, 2), 1);
         EXPECT_EQ(setup.variable(crate, 3), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_is_id_compares_the_form_the_object_stands_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t baseSlot = builder.form(crateBase);
+        const std::uint16_t otherSlot = builder.form(otherCrate);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetIsID, arguments(1).add(refArg(baseSlot))))
+            + setTo(var('s', 2), callToken(OpGetIsID, arguments(1).add(refArg(otherSlot)))) + end());
+        builder.variable(1, integerVariable, "isBase").variable(2, integerVariable, "isOther");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mBases[crate] = crateBase;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_is_id_is_no_for_an_object_the_world_has_no_form_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t baseSlot = builder.form(crateBase);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpGetIsID, arguments(1).add(refArg(baseSlot)))) + end());
+        builder.variable(1, integerVariable, "isBase");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 0);
     }
 
     TEST(FalloutScriptObjectsTest, get_self_tells_the_reference_and_nothing_for_the_script_of_a_quest)

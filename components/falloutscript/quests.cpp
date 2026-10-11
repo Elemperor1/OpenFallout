@@ -194,6 +194,23 @@ namespace FalloutScript
         return it != quest->mObjectives.end() && it->second.mCompleted;
     }
 
+    void QuestManager::setDelay(FormId id, float seconds)
+    {
+        if (QuestState* quest = find(id))
+            quest->mDelay = std::isnan(seconds) ? 0.f : std::max(seconds, 0.f);
+    }
+
+    float QuestManager::delay(FormId id) const
+    {
+        const QuestState* quest = find(id);
+        if (quest == nullptr)
+            return 0;
+        if (quest->mDelay)
+            return *quest->mDelay;
+        // A quest that stores no delay takes the one the games' settings give
+        return quest->mRecord->mData.questDelay > 0 ? quest->mRecord->mData.questDelay : defaultDelay;
+    }
+
     void QuestManager::update(float seconds)
     {
         for (auto& [id, quest] : mQuests)
@@ -201,9 +218,7 @@ namespace FalloutScript
             if (!quest.mRunning || !quest.mInstance)
                 continue;
             quest.mTimer += seconds;
-            // A quest that stores no delay takes the one the games' settings give
-            const float delay = quest.mRecord->mData.questDelay > 0 ? quest.mRecord->mData.questDelay : defaultDelay;
-            if (quest.mTimer < delay)
+            if (quest.mTimer < delay(id))
                 continue;
             quest.mTimer = 0;
             mInterpreter.run(*quest.mInstance, BlockType::GameMode);
@@ -290,6 +305,11 @@ namespace FalloutScript
             [&quests](CallContext& call) { return quests.completed(formArgument(call, 0)) ? 1.0 : 0.0; });
         interpreter.setHandler("CompleteQuest", [&quests](CallContext& call) {
             quests.complete(formArgument(call, 0));
+            return 0.0;
+        });
+        interpreter.setHandler("SetQuestDelay", [&quests](CallContext& call) {
+            // A number from a script can be far outside what a float holds
+            quests.setDelay(formArgument(call, 0), static_cast<float>(std::clamp(argument(call, 1), 0.0, 1.0e9)));
             return 0.0;
         });
         interpreter.setHandler("SetObjectiveDisplayed", [&quests](CallContext& call) {

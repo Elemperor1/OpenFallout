@@ -694,6 +694,10 @@ return {
                     tostring(find(doomed_ids).enabled))
                 print('OFTEST', 'object forms', tostring(g.@IN_LIST@), tostring(g.@LIST_BEFORE@),
                     tostring(g.@LIST_AFTER@))
+                -- The perk the script added twice and removed, the note it added, and the base form of a cube
+                print('OFTEST', 'object progress', tostring(g.@PERK_BEFORE@), tostring(g.@PERK_AFTER@),
+                    tostring(g.@PERK_RANK_THREE@), tostring(g.@PERK_REMOVED@), tostring(g.@NOTE_BEFORE@),
+                    tostring(g.@NOTE_AFTER@), tostring(g.@IS_ID@), tostring(g.@IS_NOT_ID@))
                 -- Where the script saw the cube that it moved to a marker, and where the world has put it
                 local mover = find(mover_ids)
                 mover_object, far_object = mover, find(far_ids)
@@ -785,6 +789,14 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@IN_LIST@", plugin.STATE_GLOBALS["in_list"][1])
                  .replace("@LIST_BEFORE@", plugin.STATE_GLOBALS["list_before"][1])
                  .replace("@LIST_AFTER@", plugin.STATE_GLOBALS["list_after"][1])
+                 .replace("@PERK_BEFORE@", plugin.PROGRESS_GLOBALS["perk_before"][1])
+                 .replace("@PERK_AFTER@", plugin.PROGRESS_GLOBALS["perk_after"][1])
+                 .replace("@PERK_RANK_THREE@", plugin.PROGRESS_GLOBALS["perk_rank_three"][1])
+                 .replace("@PERK_REMOVED@", plugin.PROGRESS_GLOBALS["perk_removed"][1])
+                 .replace("@NOTE_BEFORE@", plugin.PROGRESS_GLOBALS["note_before"][1])
+                 .replace("@NOTE_AFTER@", plugin.PROGRESS_GLOBALS["note_after"][1])
+                 .replace("@IS_ID@", plugin.PROGRESS_GLOBALS["is_id"][1])
+                 .replace("@IS_NOT_ID@", plugin.PROGRESS_GLOBALS["is_not_id"][1])
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1253,6 +1265,12 @@ def check_objects(text, scenario):
     if found is not None and found != ["1", "0", "1"]:
         problems.append("IsInList should find the marker by the record of the list, not the cube before the script "
                         "added it and the cube after (1, 0, 1): " + str(found))
+    found = one("progress")
+    if found is not None and found != ["0", "1", "0", "0", "0", "1", "1", "0"]:
+        problems.append("the player should not have the perk before the script adds it, have it at rank 2 but not 3 "
+                        "after two AddPerk calls, and not have it after RemovePerk; the note should be there only "
+                        "after AddNote; GetIsID should be 1 for the base form of the cube and 0 for another "
+                        "(0, 1, 0, 0, 0, 1, 1, 0): " + str(found))
     # The cube the script moved to the target marker with offsets, as the script saw it and as the world has it, then the
     # cube at the height the script set and the player moved into the other kind of cell
     origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0

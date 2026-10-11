@@ -28,10 +28,13 @@ namespace FalloutScript
         /// set, its script runs its OnActivate block in place of that. Nothing happens for an object or an activator
         /// the host does not know.
         virtual void activate(FormId target, FormId activator, bool runOnActivate) = 0;
+        /// The form that the reference stands for (the character, creature or object it is of). False when the host
+        /// can not tell, which is what a host that has no records says.
+        virtual bool baseFormOf(FormId, FormId&) { return false; }
     };
 
     /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, MarkForDelete, GetDisabled,
-    /// GetDistance, GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetSecondsPassed and
+    /// GetDistance, GetInCell, GetSelf, GetActionRef, IsActionRef, GetIsReference, GetIsID, GetSecondsPassed and
     /// GetRandomPercent. Those that the command table does not have are left out. `random` gives the whole numbers from
     /// 0 to 99 for GetRandomPercent.
     void addObjectCommands(

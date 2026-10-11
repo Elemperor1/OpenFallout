@@ -24,6 +24,7 @@
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/packagecommands.hpp>
 #include <components/falloutscript/placementcommands.hpp>
+#include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
@@ -251,6 +252,7 @@ namespace OFScript
         FalloutScript::ActorState mActors;
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
+        FalloutScript::PlayerProgress mProgress;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

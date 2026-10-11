@@ -24,6 +24,7 @@ CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a 
 
 # The codes of commands the tests use, as the executables of the games number them
 GET_DISTANCE = 0x1001
+GET_IS_ID = 0x1048
 GET_IN_CELL = 0x1043
 GET_LOCKED = 0x1005
 GET_LOCK_LEVEL = 0x1041
@@ -60,6 +61,14 @@ GET_STAGE = 0x103A
 COMPLETE_QUEST = 0x1071
 SET_OBJECTIVE_COMPLETED = 0x11A2
 SET_OBJECTIVE_DISPLAYED = 0x11A3
+SET_QUEST_DELAY = 0x11DC
+ADD_PERK = 0x1176
+REMOVE_PERK = 0x11A8
+HAS_PERK = 0x11C1
+ADD_NOTE = 0x117C
+GET_HAS_NOTE = 0x117E
+REWARD_XP = 0x1177
+REWARD_KARMA = 0x1204
 
 
 def u16(value):
@@ -94,6 +103,11 @@ def operator(text):
 
 def int_argument(value):
     return b"n" + struct.pack("<i", value)
+
+
+def float_argument(value):
+    """A number with a fraction, as the compiler writes a literal for a parameter that is a float."""
+    return b"z" + struct.pack("<d", value)
 
 
 def axis_argument(letter):

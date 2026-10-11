@@ -109,6 +109,7 @@ namespace OFScript
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
+        FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -134,6 +135,7 @@ namespace OFScript
         mActors.clear();
         mReferenceState.clear();
         mFormLists.clear();
+        mProgress.clear();
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);

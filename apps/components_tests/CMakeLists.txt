@@ -145,6 +145,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testactors.cpp
     falloutscript/testformlists.cpp
     falloutscript/testplacement.cpp
+    falloutscript/testplayerprogress.cpp
     falloutscript/testreferencestate.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp

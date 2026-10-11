@@ -447,6 +447,44 @@ namespace
         EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 2);
     }
 
+    TEST(FalloutScriptQuestsTest, a_script_sets_the_delay_of_the_script_of_a_quest)
+    {
+        Runner setup;
+        ScriptBuilder questScript;
+        questScript.mType = 1;
+        questScript.variable(1, TypeInteger, "count");
+        questScript.code(
+            scriptName() + begin(GameMode) + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end());
+        ESM4::Script& record = setup.mRecords.mScripts[scriptOfA];
+        record.mScript = questScript.definition();
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA, ESM4::Quest::Flag_StartGameEnabled, 5.f);
+        quest.mQuestScript = ESM::FormId::fromUint32(scriptOfA);
+        ScriptBuilder stageScript;
+        const std::uint16_t self = stageScript.form(questA);
+        stageScript.code(questCall(OpSetQuestDelay, self, floatArg(1.5), 2));
+        TestRecords::addEntry(setup.mRecords.addQuest(questB), 10, {}, 0, &stageScript);
+        setup.start();
+        EXPECT_EQ(setup.mQuests.delay(questA), 5.f);
+
+        // A stage of another quest sets the delay of the quest with the script
+        setup.mQuests.setStage(questB, 10);
+
+        EXPECT_EQ(setup.mQuests.delay(questA), 1.5f);
+        setup.mQuests.update(1.f);
+        EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 0);
+        setup.mQuests.update(1.f);
+        EXPECT_EQ(setup.mQuests.instance(questA)->variable(1), 1);
+        // The delay never goes below 0, and a quest the manager does not know has none
+        setup.mQuests.setDelay(questA, -3.f);
+        EXPECT_EQ(setup.mQuests.delay(questA), 0.f);
+        setup.mQuests.setDelay(questC, 2.f);
+        EXPECT_EQ(setup.mQuests.delay(questC), 0.f);
+        // Starting the game again gives the quests their own delays back
+        setup.start();
+        EXPECT_EQ(setup.mQuests.delay(questA), 5.f);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
     TEST(FalloutScriptQuestsTest, a_stage_can_set_the_variables_of_a_quest)
     {
         Runner setup;

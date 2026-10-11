@@ -211,7 +211,19 @@ RELOCK_LEVEL = 25
 LOCKED_PLACE = (600.0, -1400.0)
 LOCKER_PLACE = (900.0, -1400.0)
 DOOMED_PLACE = (1200.0, -1400.0)
-LAST_ID = 0x89C # the largest form ID of the plugin, which the next object ID of its header follows
+# What the story gives the player: the script of the object adds a perk twice to the player, removes it, adds a note, asks
+# for the base form of the locker cube and sets the delay of quest A (whose record has the longer QUEST_RECORD_DELAY, so
+# that the quest only gets to its stage in time if SetQuestDelay worked). The perk and the note have no record: scripts
+# only name them.
+PERK_ID = 0x89D
+NOTE_ID = 0x89E
+PROGRESS_GLOBALS = {"perk_before": (0x89F, "OFTestPerkBefore"), "perk_after": (0x8A0, "OFTestPerkAfter"),
+                    "perk_rank_three": (0x8A1, "OFTestPerkRankThree"), "perk_removed": (0x8A2, "OFTestPerkRemoved"),
+                    "note_before": (0x8A3, "OFTestNoteBefore"), "note_after": (0x8A4, "OFTestNoteAfter"),
+                    "is_id": (0x8A5, "OFTestIsId"), "is_not_id": (0x8A6, "OFTestIsNotId")}
+XP_REWARD = 150
+KARMA_REWARD = -20
+LAST_ID = 0x8A6 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -302,6 +314,7 @@ QUEST_A_NAME = "OFTestQuestA"
 QUEST_B_NAME = "OFTestQuestB"
 COUNTER_NAME = "OFTestCounter"
 QUEST_DELAY = 0.1
+QUEST_RECORD_DELAY = 1.0 # the delay quest A has by its record, which the script of the object makes QUEST_DELAY
 QUEST_TICKS = 3
 COUNTER_ADDS = 7
 QUEST_A_STAGE = 10
@@ -602,6 +615,11 @@ def object_script(kind):
     locked, locker, doomed = (script.form(ids[kind]) for ids in (LOCKED_REF_IDS, LOCKER_REF_IDS, DOOMED_REF_IDS))
     form_list, cube = script.form(LIST_IDS[kind]), script.form(CUBE_ID)
     state = {name: script.form(form_id) for name, (form_id, _) in STATE_GLOBALS.items()}
+    perk, note = script.form(PERK_ID), script.form(NOTE_ID)
+    progress = {name: script.form(form_id) for name, (form_id, _) in PROGRESS_GLOBALS.items()}
+    quest_a = script.form(QUEST_A_ID)
+    has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
+    has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
 
     def add_one(global_index):
         return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
@@ -643,7 +661,29 @@ def object_script(kind):
                  # The list has the marker by its record and gets the cube from the script
                  + sf.set_to(sf.global_target(state["list_before"]),
                              sf.call_token(sf.IS_IN_LIST, sf.form_argument(form_list), reference=locker))
-                 + sf.call(sf.ADD_FORM_TO_FORM_LIST, sf.form_argument(form_list), sf.form_argument(cube))),
+                 + sf.call(sf.ADD_FORM_TO_FORM_LIST, sf.form_argument(form_list), sf.form_argument(cube))
+                 # The quest script runs on the shorter delay from now on
+                 + sf.call(sf.SET_QUEST_DELAY, sf.form_argument(quest_a), sf.float_argument(QUEST_DELAY))
+                 + sf.call(sf.REWARD_XP, sf.int_argument(XP_REWARD))
+                 + sf.call(sf.REWARD_KARMA, sf.int_argument(KARMA_REWARD))
+                 # A perk is added twice (a rank 2 is there, a rank 3 is not) and removed; a note is added; the locker cube
+                 # is of the base form CUBE_ID and not of the base form PERK_ID
+                 + sf.set_to(sf.global_target(progress["perk_before"]), has_perk)
+                 + sf.call_on(player, sf.ADD_PERK, sf.form_argument(perk))
+                 + sf.call_on(player, sf.ADD_PERK, sf.form_argument(perk))
+                 + sf.set_to(sf.global_target(progress["perk_after"]),
+                             sf.call_token(sf.HAS_PERK, sf.form_argument(perk), sf.int_argument(2), reference=player))
+                 + sf.set_to(sf.global_target(progress["perk_rank_three"]),
+                             sf.call_token(sf.HAS_PERK, sf.form_argument(perk), sf.int_argument(3), reference=player))
+                 + sf.call_on(player, sf.REMOVE_PERK, sf.form_argument(perk))
+                 + sf.set_to(sf.global_target(progress["perk_removed"]), has_perk)
+                 + sf.set_to(sf.global_target(progress["note_before"]), has_note)
+                 + sf.call(sf.ADD_NOTE, sf.form_argument(note))
+                 + sf.set_to(sf.global_target(progress["note_after"]), has_note)
+                 + sf.set_to(sf.global_target(progress["is_id"]),
+                             sf.call_token(sf.GET_IS_ID, sf.form_argument(cube), reference=locker))
+                 + sf.set_to(sf.global_target(progress["is_not_id"]),
+                             sf.call_token(sf.GET_IS_ID, sf.form_argument(perk), reference=locker))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
@@ -743,13 +783,13 @@ def condition(function, param1=0, param2=0, compare=0x00, value=0.0, flags=0):
     return sub(b"CTDA", struct.pack("<BxxxfIIIII", compare | flags, value, function, param1, param2, 0, 0))
 
 
-def quest(form_id, name, title, flags, entries, script=None, objective=None):
+def quest(form_id, name, title, flags, entries, script=None, objective=None, delay=QUEST_DELAY):
     """A QUST record. Each entry is (stage, text, stage flags, conditions, result script statements, forms the result
     script names): the log entries of a stage follow each other, and the conditions say which of them applies."""
     subs = [zstr(b"EDID", name), zstr(b"FULL", title)]
     if script is not None:
         subs.append(sub(b"SCRI", struct.pack("<I", script)))
-    subs.append(sub(b"DATA", struct.pack("<BBHf", flags, 0, 0, QUEST_DELAY)))
+    subs.append(sub(b"DATA", struct.pack("<BBHf", flags, 0, 0, delay)))
     stage = None
     for index, text, stage_flags, conditions, result, references in entries:
         if index != stage:
@@ -790,7 +830,8 @@ def quests():
                      sf.call_on(index, sf.SET_POS, sf.axis_argument("Y"), sf.int_argument(int(origin + SETTER_SET[1])))]
     return [
         quest(QUEST_A_ID, QUEST_A_NAME, "OpenFallout Test Quest A", QUEST_FLAG_START_GAME,
-              [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID),
+              [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID,
+              delay=QUEST_RECORD_DELAY),
         quest(QUEST_B_ID, QUEST_B_NAME, "OpenFallout Test Quest B", 0,
               [(QUEST_B_STAGE, QUEST_B_TEXT, STAGE_FLAG_COMPLETE_QUEST, [a_at_ten], b_result, [QUEST_B_ID]),
                (QUEST_B_STAGE, QUEST_NEVER_TEXT, 0, [a_at_ninety_nine], never_result, [COUNTER_ID])],
@@ -1124,6 +1165,7 @@ def plugin():
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
