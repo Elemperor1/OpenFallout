@@ -26,6 +26,7 @@
 */
 #include "loadcrea.hpp"
 
+#include <array>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -100,7 +101,19 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("DATA"):
                 if (subHdr.dataSize == 17) // FO3
-                    reader.skipSubRecordData();
+                {
+                    // type, combat, magic and stealth skills, health, unused, damage and the attributes
+                    std::array<std::uint8_t, 17> bytes{};
+                    if (reader.get(bytes.data(), bytes.size()))
+                    {
+                        std::uint16_t health = 0;
+                        std::memcpy(&health, bytes.data() + 4, sizeof(health));
+                        mFalloutStats.mHealth = health;
+                        std::memcpy(
+                            mFalloutStats.mAttributes.data(), bytes.data() + 10, mFalloutStats.mAttributes.size());
+                        mFalloutStats.mKnown = true;
+                    }
+                }
                 else
                     reader.get(mData);
                 break;

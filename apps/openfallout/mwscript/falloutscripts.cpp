@@ -54,6 +54,21 @@ namespace OFScript
             return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
         }
 
+        /// A name of a content file as IsDLCInstalled compares it: lower case, without the spaces and the extension
+        std::string pluginKey(std::string_view name)
+        {
+            std::string key;
+            for (const char c : name)
+                if (c != ' ')
+                    key += Misc::StringUtils::toLower(c);
+            const std::size_t dot = key.find_last_of('.');
+            if (dot != std::string::npos
+                && (key.compare(dot, std::string::npos, ".esm") == 0
+                    || key.compare(dot, std::string::npos, ".esp") == 0))
+                key.resize(dot);
+            return key;
+        }
+
         /// The number a script knows a form by. A form that has none (it is not set, it is one the world made for
         /// itself or its plugin is out of the range of the games) is 0, which names nothing, where converting it would
         /// throw and end the frame of every script after it.
@@ -106,6 +121,7 @@ namespace OFScript
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
         , mActors(*this)
+        , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
         , mPlayer(player)
@@ -123,6 +139,17 @@ namespace OFScript
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
+        // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
+        mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
+            if (call.mArguments.empty() || !call.mArguments[0].mIsText)
+                return 0.0;
+            const std::string wanted = pluginKey(call.mArguments[0].mText);
+            return !wanted.empty()
+                    && std::any_of(mContentFiles.begin(), mContentFiles.end(),
+                        [&wanted](const std::string& file) { return pluginKey(file) == wanted; })
+                ? 1.0
+                : 0.0;
+        });
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -146,6 +173,11 @@ namespace OFScript
         const std::string summary = mInterpreter.takeMissingSummary();
         if (!summary.empty())
             log("Commands that scripts reached and that are not implemented, with how often: " + summary);
+    }
+
+    void FalloutScripts::setContentFiles(std::vector<std::string> files)
+    {
+        mContentFiles = std::move(files);
     }
 
     void FalloutScripts::reset()
@@ -486,6 +518,21 @@ namespace OFScript
             }
             return record;
         }
+
+        /// The attributes of DATA, which are the actor values from strength to luck
+        void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
+        {
+            for (std::size_t i = 0; i < stats.mAttributes.size(); ++i)
+                values.emplace_back(FalloutScript::ActorValue::strength + static_cast<int>(i), stats.mAttributes[i]);
+        }
+
+        /// What ACBS says: the speed and the karma
+        void addConfig(std::vector<std::pair<int, double>>& values, const ESM4::ActorBaseConfig& config)
+        {
+            if (config.fo3.speedMultiplier > 0)
+                values.emplace_back(FalloutScript::ActorValue::speedMult, config.fo3.speedMultiplier);
+            values.emplace_back(FalloutScript::ActorValue::karma, config.fo3.karma);
+        }
     }
 
     FalloutScript::FormId FalloutScripts::scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
@@ -626,6 +673,37 @@ namespace OFScript
         {
             if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
                 take(owner->mFactions);
+        }
+        return true;
+    }
+
+    bool FalloutScripts::initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values)
+    {
+        ESM::FormId base;
+        if (!baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        // The attributes, the speed and the karma are the values of the record. Its health, fatigue and skills look
+        // like the base of a sum (most characters have 50 or 10 health, 50 fatigue and 5 in barter there), which the
+        // games add to by formulas that are not known here, so those keep the starting values.
+        // A record that takes its stats from a template has those of the template, and the starting values when the
+        // template can not be followed (it is a levelled list of characters).
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const ESM4::Npc* stats = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats);
+            if (stats == nullptr || !stats->mIsFONV)
+                return true;
+            if (stats->mFalloutStats.mKnown)
+                addAttributes(values, stats->mFalloutStats);
+            addConfig(values, stats->mBaseConfig);
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const ESM4::Creature* stats = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats);
+            if (stats == nullptr || !stats->mIsFONV)
+                return true;
+            if (stats->mFalloutStats.mKnown)
+                addAttributes(values, stats->mFalloutStats);
+            addConfig(values, stats->mBaseConfig);
         }
         return true;
     }

@@ -39,29 +39,58 @@ namespace FalloutScript
         return 0;
     }
 
-    double ActorValues::baseOf(const Entry& entry, int value)
+    double ActorValues::startOf(FormId actor, int value) const
     {
-        return entry.mBase ? *entry.mBase : startingValue(value);
+        if (mRecords != nullptr)
+        {
+            auto known = mFromRecords.find(actor);
+            if (known == mFromRecords.end())
+            {
+                std::vector<std::pair<int, double>> values;
+                if (mRecords->initialValues(actor, values))
+                {
+                    std::map<int, double>& own = mFromRecords[actor];
+                    for (const auto& [number, amount] : values)
+                        if (isValid(number))
+                            own[number] = bounded(amount);
+                    known = mFromRecords.find(actor);
+                }
+            }
+            if (known != mFromRecords.end())
+            {
+                const auto found = known->second.find(value);
+                if (found != known->second.end())
+                    return found->second;
+            }
+        }
+        return startingValue(value);
+    }
+
+    double ActorValues::baseOf(FormId actor, const Entry& entry, int value) const
+    {
+        return entry.mBase ? *entry.mBase : startOf(actor, value);
     }
 
     void ActorValues::clear()
     {
         const std::lock_guard lock(mMutex);
         mEntries.clear();
+        mFromRecords.clear();
     }
 
     double ActorValues::base(FormId actor, int value) const
     {
         const std::lock_guard lock(mMutex);
         const auto found = mEntries.find({ actor, value });
-        return found == mEntries.end() ? startingValue(value) : baseOf(found->second, value);
+        return found == mEntries.end() ? startOf(actor, value) : baseOf(actor, found->second, value);
     }
 
     double ActorValues::permanent(FormId actor, int value) const
     {
         const std::lock_guard lock(mMutex);
         const auto found = mEntries.find({ actor, value });
-        return found == mEntries.end() ? startingValue(value) : baseOf(found->second, value) + found->second.mModifier;
+        return found == mEntries.end() ? startOf(actor, value)
+                                       : baseOf(actor, found->second, value) + found->second.mModifier;
     }
 
     double ActorValues::current(FormId actor, int value) const
@@ -69,9 +98,9 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         const auto found = mEntries.find({ actor, value });
         if (found == mEntries.end())
-            return startingValue(value);
+            return startOf(actor, value);
         const Entry& entry = found->second;
-        return baseOf(entry, value) + entry.mModifier - entry.mDamage;
+        return baseOf(actor, entry, value) + entry.mModifier - entry.mDamage;
     }
 
     void ActorValues::setBase(FormId actor, int value, double amount)

@@ -27,6 +27,7 @@
 #ifndef ESM4_NPC__H
 #define ESM4_NPC__H
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -210,6 +211,12 @@ namespace ESM4
         ActorFaction mFaction; // the last SNAM, mFactions has them all
         std::vector<ActorFaction> mFactions; // every SNAM in the order of the record
         Data mData;
+        // Fallout 3 and New Vegas keep the health and the attributes in DATA, and in DNAM the values of the 14 skills
+        // and their offsets, in the order of the actor values from 32 on (barter first, unarmed last)
+        FalloutStats mFalloutStats;
+        bool mHasFalloutSkills = false;
+        std::array<std::uint8_t, 14> mFalloutSkills{};
+        std::array<std::uint8_t, 14> mFalloutSkillOffsets{};
         ESM::FormId mCombatStyle;
         ESM::FormId mSoundBase;
         ESM::FormId mSound;

@@ -27,6 +27,7 @@
 #ifndef ESM4_ACTOR_H
 #define ESM4_ACTOR_H
 
+#include <array>
 #include <cstdint>
 
 #include <components/esm/formid.hpp>
@@ -130,6 +131,15 @@ namespace ESM4
         std::uint8_t unknown3;
     };
 #pragma pack(pop)
+
+    /// What DATA says of a character or creature of Fallout 3 and New Vegas: the base health and the seven attributes
+    /// (strength, perception, endurance, charisma, intelligence, agility, luck)
+    struct FalloutStats
+    {
+        bool mKnown = false;
+        std::int32_t mHealth = 0;
+        std::array<std::uint8_t, 7> mAttributes{};
+    };
 
     struct BodyTemplate // TES5
     {

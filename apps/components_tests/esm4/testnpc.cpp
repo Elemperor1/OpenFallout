@@ -196,4 +196,45 @@ namespace
         EXPECT_EQ(loadFailure(coefficients("FGGA", 31)), "ESM4::NPC_::load - FGGA has an unexpected size");
         EXPECT_EQ(loadFailure(coefficients("FGTS", 51)), "ESM4::NPC_::load - FGTS has an unexpected size");
     }
+
+    TEST(ESM4NpcTest, readsTheHealthAttributesAndSkillsOfACharacterOfFallout)
+    {
+        // DATA: the base health and strength to luck, with a byte more as older records have
+        std::string stats;
+        append<std::int32_t>(stats, 150);
+        for (std::uint8_t value = 1; value <= 7; ++value)
+            append<std::uint8_t>(stats, value);
+        append<std::uint8_t>(stats, 0);
+        // DNAM: the 14 skills, then their offsets
+        std::string skills;
+        for (std::uint8_t value = 0; value < 28; ++value)
+            append<std::uint8_t>(skills, value < 14 ? 20 + value : 100 + value);
+        const std::string data = zString("EDID", "Npc") + subRecord("DATA", stats) + subRecord("DNAM", skills)
+            + valueSubRecord<float>("WNAM", 1.5f);
+
+        for (const float headerVersion : { 0.94f, 1.34f })
+        {
+            const ESM4::Npc npc = loadVersioned(headerVersion, 15, data);
+
+            EXPECT_TRUE(npc.mFalloutStats.mKnown);
+            EXPECT_EQ(npc.mFalloutStats.mHealth, 150);
+            EXPECT_THAT(npc.mFalloutStats.mAttributes, ElementsAre(1, 2, 3, 4, 5, 6, 7));
+            ASSERT_TRUE(npc.mHasFalloutSkills);
+            EXPECT_EQ(npc.mFalloutSkills[0], 20);
+            EXPECT_EQ(npc.mFalloutSkills[13], 33);
+            EXPECT_EQ(npc.mFalloutSkillOffsets[0], 114);
+            EXPECT_EQ(npc.mFalloutSkillOffsets[13], 127);
+            // what follows them is still read
+            EXPECT_EQ(npc.mFootWeight, 1.5f);
+        }
+    }
+
+    TEST(ESM4NpcTest, aCharacterWithoutDataOrSkillsHasNoneKnown)
+    {
+        const ESM4::Npc npc
+            = loadVersioned(1.34f, 15, zString("EDID", "Npc") + subRecord("DNAM", std::string(10, 'x')));
+
+        EXPECT_FALSE(npc.mFalloutStats.mKnown);
+        EXPECT_FALSE(npc.mHasFalloutSkills);
+    }
 }

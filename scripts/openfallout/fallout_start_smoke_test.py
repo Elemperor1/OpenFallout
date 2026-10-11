@@ -709,7 +709,10 @@ return {
                 -- karma of the player as an actor value and the health of a weapon
                 print('OFTEST', 'object values', string.format('%.4f', g.@AV_VARIABLE@),
                     string.format('%.4f', g.@AV_SHARE@), string.format('%.4f', g.@AV_DEAD@),
-                    string.format('%.4f', g.@AV_KARMA@), string.format('%.4f', g.@AV_WEAPON@))
+                    string.format('%.4f', g.@AV_KARMA@), string.format('%.4f', g.@AV_WEAPON@),
+                    string.format('%.4f', g.@AV_STRENGTH@), string.format('%.4f', g.@AV_LUCK@),
+                    string.format('%.4f', g.@AV_SPEED@), string.format('%.4f', g.@AV_PERSON_KARMA@),
+                    string.format('%.4f', g.@AV_DLC_THERE@), string.format('%.4f', g.@AV_DLC_MISSING@))
                 -- The cubes that PlaceAtMe made in front of the locker cube: what the call told, how many stand there
                 -- and how many of them are cubes of the same record
                 local locker = find(locker_ids)
@@ -816,6 +819,12 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@AV_DEAD@", plugin.ACTOR_VALUE_GLOBALS["dead"][1])
                  .replace("@AV_KARMA@", plugin.ACTOR_VALUE_GLOBALS["karma"][1])
                  .replace("@AV_WEAPON@", plugin.ACTOR_VALUE_GLOBALS["weapon"][1])
+                 .replace("@AV_STRENGTH@", plugin.ACTOR_VALUE_GLOBALS["strength"][1])
+                 .replace("@AV_LUCK@", plugin.ACTOR_VALUE_GLOBALS["luck"][1])
+                 .replace("@AV_SPEED@", plugin.ACTOR_VALUE_GLOBALS["speed"][1])
+                 .replace("@AV_PERSON_KARMA@", plugin.ACTOR_VALUE_GLOBALS["person_karma"][1])
+                 .replace("@AV_DLC_THERE@", plugin.ACTOR_VALUE_GLOBALS["dlc_there"][1])
+                 .replace("@AV_DLC_MISSING@", plugin.ACTOR_VALUE_GLOBALS["dlc_missing"][1])
                  .replace("@LOCKED@", plugin.STATE_GLOBALS["locked"][1])
                  .replace("@LOCK_LEVEL@", plugin.STATE_GLOBALS["lock_level"][1])
                  .replace("@UNLOCKED@", plugin.STATE_GLOBALS["unlocked"][1])
@@ -1333,11 +1342,14 @@ def check_objects(text, scenario):
                             f"record: {found}")
     found = one("values")
     if found is not None:
-        expected = [6.0, 0.75, 1.0, float(plugin.KARMA_REWARD), 100.0]
+        expected = [6.0, 0.75, 1.0, float(plugin.KARMA_REWARD), 100.0, float(plugin.PERSON_ATTRIBUTES[0]),
+                    float(plugin.PERSON_ATTRIBUTES[6]), float(plugin.PERSON_SPEED), plugin.PERSON_KARMA, 1.0, 0.0]
         if len(found) != len(expected) or any(abs(float(a) - b) > 0.001 for a, b in zip(found, expected)):
             problems.append("The actor values should be 6 for the one that was set, changed and hurt, three quarters "
-                            "of the health after 25 damage, dead after 100, the karma that was rewarded for the player "
-                            f"and 100 for the health of a weapon: {found}")
+                            "of the health after 25 damage, dead after 100, the karma that was rewarded for the player, "
+                            "100 for the health of a weapon, the strength, luck, speed and karma that the record "
+                            "of the test person gives it, and a plugin that is loaded is installed and one that is "
+                            f"not is not: {found}")
     found = one("placed")
     if found is not None and found != ["true", str(plugin.PLACE_COUNT), str(plugin.PLACE_COUNT)]:
         problems.append("PlaceAtMe should have told the reference of the first object it made, and made "

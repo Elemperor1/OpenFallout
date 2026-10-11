@@ -36,6 +36,7 @@ MOD_ACTOR_VALUE = 0x1010
 DAMAGE_ACTOR_VALUE = 0x1181
 GET_HEALTH_PERCENTAGE = 0x11AF
 GET_WEAPON_HEALTH_PERC = 0x11F4
+IS_DLC_INSTALLED = 0x126F
 GET_GLOBAL_VALUE = 0x104A
 GET_IN_CELL = 0x1043
 GET_LOCKED = 0x1005
@@ -120,6 +121,11 @@ def int_argument(value):
 def reference_value(reference):
     """A reference as a value in an expression, named by the index of its entry in the table of references."""
     return b"Z" + u16(reference)
+
+
+def string_argument(text):
+    """A text, as a parameter that is a string holds it: its length in two bytes, then the characters."""
+    return u16(len(text)) + text.encode()
 
 
 def float_argument(value):

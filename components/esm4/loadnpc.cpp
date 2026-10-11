@@ -174,7 +174,35 @@ void ESM4::Npc::load(ESM4::Reader& reader)
 
                 if (subHdr.dataSize == 33)
                     reader.get(&mData, 33); // FIXME: check packing
-                else // FIXME FO3
+                else if (mIsFONV && subHdr.dataSize >= 11)
+                {
+                    // The health and the attributes; records of older versions have more bytes after them
+                    std::vector<std::uint8_t> bytes(subHdr.dataSize);
+                    if (reader.get(bytes.data(), bytes.size()))
+                    {
+                        std::memcpy(&mFalloutStats.mHealth, bytes.data(), sizeof(std::int32_t));
+                        std::memcpy(
+                            mFalloutStats.mAttributes.data(), bytes.data() + 4, mFalloutStats.mAttributes.size());
+                        mFalloutStats.mKnown = true;
+                    }
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
+            }
+            case ESM::fourCC("DNAM"):
+            {
+                if (mIsFONV && subHdr.dataSize >= 28)
+                {
+                    std::vector<std::uint8_t> bytes(subHdr.dataSize);
+                    if (reader.get(bytes.data(), bytes.size()))
+                    {
+                        std::memcpy(mFalloutSkills.data(), bytes.data(), mFalloutSkills.size());
+                        std::memcpy(mFalloutSkillOffsets.data(), bytes.data() + 14, mFalloutSkillOffsets.size());
+                        mHasFalloutSkills = true;
+                    }
+                }
+                else
                     reader.skipSubRecordData();
                 break;
             }
@@ -287,7 +315,6 @@ void ESM4::Npc::load(ESM4::Reader& reader)
             case ESM::fourCC("ATKR"):
             case ESM::fourCC("CRIF"):
             case ESM::fourCC("CSDT"):
-            case ESM::fourCC("DNAM"):
             case ESM::fourCC("ECOR"):
             case ESM::fourCC("ANAM"):
             case ESM::fourCC("ATKD"):

@@ -129,6 +129,75 @@ namespace
         EXPECT_EQ(values.current(guard, ActorValue::karma), 0);
     }
 
+    // Records that give the guard stronger arms and a stronger heart, and count how often they are asked
+    class GuardRecords : public FalloutScript::ActorValueRecords
+    {
+    public:
+        bool initialValues(FormId actor, std::vector<std::pair<int, double>>& values) override
+        {
+            ++mAsked;
+            if (!mKnown || actor != guard)
+                return mKnown;
+            values = { { ActorValue::strength, 8 }, { ActorValue::health, 250 }, { barter, 60 }, { 4000, 1 } };
+            return true;
+        }
+
+        bool mKnown = true;
+        int mAsked = 0;
+    };
+
+    TEST(FalloutScriptActorValuesTest, an_actor_value_nobody_set_starts_at_what_the_record_says)
+    {
+        GuardRecords records;
+        ActorValues values(&records);
+
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 8);
+        EXPECT_EQ(values.base(guard, ActorValue::health), 250);
+        EXPECT_EQ(values.permanent(guard, barter), 60);
+        // what the record does not say is a fresh character's
+        EXPECT_EQ(values.current(guard, ActorValue::luck), 5);
+        EXPECT_EQ(values.current(guard, variable01), 0);
+        // a character with no values in its record, and a number that is not an actor value
+        EXPECT_EQ(values.current(guard + 1, ActorValue::strength), 5);
+        EXPECT_EQ(values.current(guard, 4000), 0);
+    }
+
+    TEST(FalloutScriptActorValuesTest, the_record_is_asked_once_and_what_scripts_did_goes_on_top_of_it)
+    {
+        GuardRecords records;
+        ActorValues values(&records);
+
+        values.damage(guard, ActorValue::health, 50);
+        values.modify(guard, ActorValue::strength, 2);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 200);
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 10);
+        values.setBase(guard, ActorValue::strength, 3);
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 5);
+        EXPECT_EQ(values.base(guard, barter), 60);
+        EXPECT_EQ(records.mAsked, 1);
+
+        // a new game asks again
+        values.clear();
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 8);
+        EXPECT_EQ(records.mAsked, 2);
+    }
+
+    TEST(FalloutScriptActorValuesTest, a_reference_the_host_can_not_tell_is_asked_again)
+    {
+        GuardRecords records;
+        records.mKnown = false;
+        ActorValues values(&records);
+
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 5);
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 5);
+        EXPECT_EQ(records.mAsked, 2);
+
+        records.mKnown = true;
+        EXPECT_EQ(values.current(guard, ActorValue::strength), 8);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 250);
+        EXPECT_EQ(records.mAsked, 3);
+    }
+
     TEST(FalloutScriptActorValuesTest, the_value_is_the_base_and_the_modifier_less_the_damage)
     {
         ActorValues values;

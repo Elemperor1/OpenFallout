@@ -4,7 +4,9 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <utility>
+#include <vector>
 
 #include "script.hpp"
 
@@ -29,20 +31,40 @@ namespace FalloutScript
         constexpr int firstCondition = 25;
         constexpr int lastCondition = 31;
         constexpr int firstSkill = 32;
-        constexpr int lastSkill = 43;
+        /// Barter first, unarmed last: the 14 skills of the records (the one in the middle of the end is survival in
+        /// New Vegas and the unused throwing in Fallout 3)
+        constexpr int lastSkill = 45;
         /// The numbers from here are not actor values
         constexpr int count = 128;
     }
 
+    /// What the records of the game say about the actor values of a character or creature before a script changes
+    /// anything
+    class ActorValueRecords
+    {
+    public:
+        virtual ~ActorValueRecords() = default;
+
+        /// The actor values that the record of the reference gives it, by their numbers. False when the host can not
+        /// tell what the reference is: it is asked again by the next command that needs it. True with none when the
+        /// reference has no record of an actor.
+        virtual bool initialValues(FormId actor, std::vector<std::pair<int, double>>& values) = 0;
+    };
+
     /// The actor values of characters and creatures, as far as nothing else in the game keeps them yet. An actor value
     /// of a reference is its base value (what SetActorValue sets), a modifier that stays (ModActorValue) and the damage
     /// that scripts did to it (DamageActorValue, which RestoreActorValue takes back): the value the reference has now
-    /// is the base plus the modifier minus the damage. Nothing reads the records of the character yet, so an actor
-    /// value that no script has set starts at a value that stands for a fresh character, which is what the conditions
-    /// of the games ask for most (nothing crippled, nothing hurt). It can be used from any thread.
+    /// is the base plus the modifier minus the damage. A base that no script has set is the one its record gives,
+    /// when the host knows one, and else a value that stands for a fresh character, which is what the conditions of
+    /// the games ask for most (nothing crippled, nothing hurt). It can be used from any thread.
     class ActorValues
     {
     public:
+        explicit ActorValues(ActorValueRecords* records = nullptr)
+            : mRecords(records)
+        {
+        }
+
         static bool isValid(int value) { return value >= 0 && value < ActorValue::count; }
 
         /// What a reference has of an actor value until a script sets it: 5 for each of the SPECIAL attributes, a full
@@ -78,11 +100,17 @@ namespace FalloutScript
             double mDamage = 0;
         };
 
+        /// What the actor has of the value until a script sets it: the record's, or else the starting value. The caller
+        /// holds the lock.
+        double startOf(FormId actor, int value) const;
         /// An entry with its base filled in, for the actor value of that number
-        static double baseOf(const Entry& entry, int value);
+        double baseOf(FormId actor, const Entry& entry, int value) const;
 
+        ActorValueRecords* mRecords;
         mutable std::mutex mMutex;
         std::map<std::pair<FormId, int>, Entry> mEntries;
+        /// What the records said, once they could: by actor, then by actor value
+        mutable std::map<FormId, std::map<int, double>> mFromRecords;
     };
 
     /// Gives the commands about actor values to the interpreter: GetActorValue, GetBaseActorValue,

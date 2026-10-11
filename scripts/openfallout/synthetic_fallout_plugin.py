@@ -252,10 +252,25 @@ CLOCK_GLOBALS = {"hour_command": (0x8B2, "OFTestHourCommand"), "hour_global": (0
 AV_VARIABLE = 62
 AV_HEALTH = 16
 AV_KARMA = 23
+AV_STRENGTH = 5
+AV_LUCK = 11
+AV_SPEED = 21
+# What the record of the test person says (person()): the attributes of its DATA (its health and its skills in DNAM are
+# written too, and are not what the actor values start at), and the speed and karma of its ACBS
+PERSON_HEALTH = 150
+PERSON_ATTRIBUTES = (4, 5, 6, 7, 8, 9, 10)
+PERSON_SKILLS = tuple(range(20, 34))
+PERSON_SPEED = 120
+PERSON_KARMA = 25.0
+DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
+DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
                        "dead": (0x8B7, "OFTestAvDead"), "karma": (0x8B8, "OFTestAvKarma"),
-                       "weapon": (0x8B9, "OFTestAvWeapon")}
-LAST_ID = 0x8B9 # the largest form ID of the plugin, which the next object ID of its header follows
+                       "weapon": (0x8B9, "OFTestAvWeapon"), "strength": (0x8BA, "OFTestAvStrength"),
+                       "luck": (0x8BB, "OFTestAvLuck"), "speed": (0x8BC, "OFTestAvSpeed"),
+                       "person_karma": (0x8BD, "OFTestAvPersonKarma"),
+                       "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing")}
+LAST_ID = 0x8BF # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -657,6 +672,7 @@ def object_script(kind):
     game_hour = script.form(GAME_HOUR_ID)
     clock = {name: script.form(form_id) for name, (form_id, _) in CLOCK_GLOBALS.items()}
     values = {name: script.form(form_id) for name, (form_id, _) in ACTOR_VALUE_GLOBALS.items()}
+    person_ref = script.form(NPC_REF_ID if kind == "interior" else EXTERIOR_NPC_REF_ID)
     # The actor values, on the locker cube (the player for karma): a number written bare in two bytes, then the amount
     actor_values = b"".join([
         sf.call_on(locker, sf.SET_ACTOR_VALUE, sf.u16(AV_VARIABLE), sf.int_argument(7)),
@@ -671,6 +687,20 @@ def object_script(kind):
         sf.set_to(sf.global_target(values["karma"]),
                   sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_KARMA), reference=player)),
         sf.set_to(sf.global_target(values["weapon"]), sf.call_token(sf.GET_WEAPON_HEALTH_PERC, reference=player)),
+        # The test person starts with what its record says
+        sf.set_to(sf.global_target(values["strength"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_STRENGTH), reference=person_ref)),
+        sf.set_to(sf.global_target(values["luck"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_LUCK), reference=person_ref)),
+        sf.set_to(sf.global_target(values["speed"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_SPEED), reference=person_ref)),
+        sf.set_to(sf.global_target(values["person_karma"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_KARMA), reference=person_ref)),
+        # IsDLCInstalled takes the name of a plugin, with or without the spaces and the extension
+        sf.set_to(sf.global_target(values["dlc_there"]),
+                  sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_THERE))),
+        sf.set_to(sf.global_target(values["dlc_missing"]),
+                  sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_MISSING))),
     ])
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
@@ -999,9 +1029,11 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
     # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
-    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, 100, 0.0, 0, 0)
+    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
     subs = [zstr(b"EDID", name), zstr(b"FULL", "OpenFallout Test Person"), zstr(b"MODL", SKELETON),
-            sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID))]
+            sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID)),
+            sub(b"DATA", struct.pack("<i7B", PERSON_HEALTH, *PERSON_ATTRIBUTES)),
+            sub(b"DNAM", struct.pack("<14B14B", *PERSON_SKILLS, *([0] * 14)))]
     if dressed:
         subs += [sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)), sub(b"HNAM", struct.pack("<I", HAIR_ID)),
                  sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))]

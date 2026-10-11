@@ -169,4 +169,23 @@ namespace
         EXPECT_FALSE(list.calcAllLvlLessThanPlayer());
         EXPECT_EQ(list.mChanceNone, 30);
     }
+
+    TEST(ESM4CreatureTest, readsTheHealthAndAttributesOfACreatureOfFallout)
+    {
+        // DATA: type, combat, magic and stealth skills, health, unused, damage, then strength to luck
+        std::string stats;
+        for (const std::uint8_t value : { 4, 30, 0, 40 })
+            append<std::uint8_t>(stats, value);
+        append<std::uint16_t>(stats, 70);
+        append<std::uint16_t>(stats, 0);
+        append<std::uint16_t>(stats, 12);
+        for (std::uint8_t value = 1; value <= 7; ++value)
+            append<std::uint8_t>(stats, value + 2);
+        const std::string data = zString("EDID", "Gecko") + subRecord("DATA", stats);
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        EXPECT_TRUE(creature.mFalloutStats.mKnown);
+        EXPECT_EQ(creature.mFalloutStats.mHealth, 70);
+        EXPECT_THAT(creature.mFalloutStats.mAttributes, ElementsAre(3, 4, 5, 6, 7, 8, 9));
+    }
 }
