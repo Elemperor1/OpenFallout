@@ -154,7 +154,8 @@ LISTED_REF_IDS = {"interior": CREATURE_LIST_REF_ID, "exterior": EXTERIOR_CREATUR
 MOVER_REF_IDS = {"interior": 0x871, "exterior": 0x872}
 MOVE_TARGET_REF_IDS = {"interior": 0x873, "exterior": 0x874}
 MOVE_GLOBALS = {"x": (0x875, "OFTestMoverX"), "y": (0x876, "OFTestMoverY"), "angle": (0x877, "OFTestMoverAngle"),
-                "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX")}
+                "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX"),
+                "hop": (0x886, "OFTestHopNow")}
 # A second cube is sent to the marker of the other kind of cell, which is not loaded: the world keeps it there, and the
 # script reads where it is from the cell that is
 FAR_MOVER_REF_IDS = {"interior": 0x879, "exterior": 0x87A}
@@ -177,7 +178,14 @@ FAR_MARKER_REF_IDS = {"interior": EXTERIOR_MARKER_REF_ID, "exterior": MARKER_REF
 SETTER_REF_IDS = {"interior": 0x882, "exterior": 0x883}
 SETTER_PLACE = (300.0, -1400.0)
 SETTER_SET = (700.0, -1700.0) # from the origin of the cell
-LAST_ID = 0x883 # the largest form ID of the plugin, which the next object ID of its header follows
+# A cube that the script sends to the marker of the other kind of cell in the same frame as the player, before the
+# player: the player's cell change must not leave it behind
+TRAVELLER_REF_IDS = {"interior": 0x884, "exterior": 0x885}
+TRAVELLER_PLACE = (1500.0, -2000.0)
+# The test asks for a move of the player inside the cell it is in with a global (SetPos on x): the player is moved, not
+# taken to the cell again (which fades the screen out and in)
+HOP_X = 123.0
+LAST_ID = 0x886 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -545,9 +553,11 @@ def object_script(kind):
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
     mover, move_target, far_marker = (script.form(form_id) for form_id in (
         MOVER_REF_IDS[kind], MOVE_TARGET_REF_IDS[kind], FAR_MARKER_REF_IDS[kind]))
-    mover_x, mover_y, mover_angle, move_now, far_x = (script.form(MOVE_GLOBALS[name][0])
-                                                      for name in ("x", "y", "angle", "now", "far"))
+    mover_x, mover_y, mover_angle, move_now, far_x, hop = (script.form(MOVE_GLOBALS[name][0])
+                                                           for name in ("x", "y", "angle", "now", "far", "hop"))
+    hop_x = int((EXTERIOR_CELL_SIZE / 2 if kind == "exterior" else 0.0) + HOP_X)
     far_mover = script.form(FAR_MOVER_REF_IDS[kind])
+    traveller = script.form(TRAVELLER_REF_IDS[kind])
     other_kind = "exterior" if kind == "interior" else "interior"
     sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
 
@@ -592,9 +602,14 @@ def object_script(kind):
                       sf.call_token(sf.GET_ANGLE, sf.axis_argument("Z"), reference=mover)),
             sf.set_to(sf.global_target(far_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=far_mover)),
             # The test asks for the move of the player with a global; the cell of the start is left behind
+            sf.branch(sf.IF, sf.global_target(hop) + sf.number("1") + sf.operator("==")),
+            sf.set_to(sf.global_target(hop), sf.number("0")),
+            sf.call_on(player, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(hop_x)),
+            sf.statement(sf.END_IF),
             sf.branch(sf.IF, sf.global_target(move_now) + sf.number("1") + sf.operator("==")),
             sf.set_to(sf.global_target(move_now), sf.number("0")),
             sf.call_on(mover, sf.SET_POS, sf.axis_argument("Z"), sf.int_argument(MOVE_HEIGHT)),
+            sf.call_on(traveller, sf.MOVE_TO_MARKER, sf.form_argument(far_marker)),
             sf.call_on(player, sf.MOVE_TO_MARKER, sf.form_argument(far_marker)),
             sf.statement(sf.END_IF)])),
         # The block replaces what the object does when it is activated; the second activation asks for that
@@ -627,7 +642,8 @@ def object_refs(kind, origin):
                  (x + SLEEPER_TARGET_PLACE[0], y + SLEEPER_TARGET_PLACE[1], 0.0)),
             refr(MOVE_TARGET_REF_IDS[kind], TARGET_MARKER_ID, (x + MOVE_TARGET_PLACE[0], y + MOVE_TARGET_PLACE[1], 0.0),
                  rotation=(0.0, 0.0, TARGET_YAW)),
-            refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2))]
+            refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2)),
+            refr(TRAVELLER_REF_IDS[kind], CUBE_ID, (x + TRAVELLER_PLACE[0], y + TRAVELLER_PLACE[1], CUBE / 2))]
 
 
 def stage_script(statements, references):
@@ -1026,7 +1042,7 @@ def plugin():
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
-                                  *(global_variable(form_id, name, b"l" if key == "now" else b"f")
+                                  *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message()])

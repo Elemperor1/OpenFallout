@@ -167,7 +167,9 @@ namespace OFScript
         };
         /// Where the reference is: what a script has put it at and the world has not done yet, else where it is in a
         /// loaded cell, else where a script put it while its cell was not loaded, else where its record puts it.
-        /// False for a reference nobody knows.
+        /// False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua, which runs only
+        /// while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the maps and objects
+        /// that this reads are changed by the frame before that, never at the same time.
         bool whereIs(FalloutScript::FormId reference, Place& result);
         /// Moves the object now. An object that is not in a loaded cell is moved when its cell is loaded.
         void applyMove(FalloutScript::FormId reference, const Place& where);

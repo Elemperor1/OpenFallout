@@ -147,10 +147,10 @@ SCENARIOS = [
 WALK_SECONDS = 24
 # The scripted object moves the player to a marker in the other kind of cell after the walk, and the run goes on for as
 # long as it takes the player to get there and be looked at
-MOVE_SECONDS = 5
+MOVE_SECONDS = 6
 PLAYER_MOVES = "OFTEST\tplayer moves now"
 MOVE_FROM = WALK_SECONDS + 1
-MOVE_LOOK = WALK_SECONDS + 3
+MOVE_LOOK = WALK_SECONDS + 3.5
 # The player stands still from the fifteenth second, where the walk west ends, and turns to face east, to the person,
 # for half a second, so that the person is seen: the body of a model that is skinned is only brought up to date when it
 # is seen, and a ray at what is drawn finds it where it was when it was last seen. A second later a ray looks at its foot.
@@ -625,6 +625,8 @@ local util = require('openfallout.util')
 local scripted_ids, victim_ids, mover_ids, far_ids = { @SCRIPTED@ }, { @VICTIM@ }, { @MOVER@ }, { @FAR@ }
 local sleeper_ids = { @SLEEPER@ }
 local setter_ids = { @SETTER@ }
+local traveller_ids = { @TRAVELLER@ }
+local traveller_object = nil
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
@@ -701,9 +703,17 @@ return {
                 -- What the script sees of the far cube before the player is in the other cell, where the script of
                 -- that cell moves its own cube and keeps the same global
                 far_seen = world.globals.@FAR_X@
-                world.globals.@MOVE_NOW@ = 1
-            elseif step == 4 and elapsed >= @MOVE_LOOK@ then
+                traveller_object = find(traveller_ids)
+                -- The script sets the x of the player first, in the cell the player is in
+                world.globals.@HOP@ = 1
+            elseif step == 4 and elapsed >= @MOVE_FROM@ + 0.5 then
                 step = 5
+                local player = world.players[1]
+                print('OFTEST', 'object hopped', tostring(player.cell.isExterior), tostring(player.cell.name),
+                    string.format('%.1f', player.position.x), tostring(world.globals.@HOP@))
+                world.globals.@MOVE_NOW@ = 1
+            elseif step == 5 and elapsed >= @MOVE_LOOK@ then
+                step = 6
                 local mover, player = mover_object, world.players[1]
                 print('OFTEST', 'object moved', string.format('%.1f', mover.position.z),
                     tostring(player.cell.isExterior), tostring(player.cell.name),
@@ -717,6 +727,11 @@ return {
                             string.format('%.1f %.1f', sleeper.position.x, sleeper.position.y))
                     end
                 end
+                -- The cube that the script sent to the marker before it moved the player: it goes first, so it is in
+                -- the cell that the player is in now
+                local travelled = traveller_object.position
+                print('OFTEST', 'object traveller', tostring(traveller_object.cell.isExterior),
+                    string.format('%.1f %.1f', travelled.x, travelled.y))
                 local far = far_object.position
                 print('OFTEST', 'object far mover', tostring(far_object.cell.isExterior), tostring(far_object.cell.name),
                     string.format('%.1f %.1f', far.x, far.y), string.format('%.1f', far_seen))
@@ -733,10 +748,12 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@FAR@", ", ".join(map(str, plugin.FAR_MOVER_REF_IDS.values())))
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
                  .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
+                 .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
                  .replace("@MOVE_NOW@", plugin.MOVE_GLOBALS["now"][1])
+                 .replace("@HOP@", plugin.MOVE_GLOBALS["hop"][1])
                  .replace("@MOVE_FROM@", str(MOVE_FROM)).replace("@MOVE_LOOK@", str(MOVE_LOOK))
                  .replace("@CUBE@", str(plugin.CUBE_ID))
                  .replace("@FROM@", str(OBJECT_FROM))
@@ -1237,6 +1254,23 @@ def check_objects(text, scenario):
             problems.append("a stage of a quest set from Lua runs its script on the thread of Lua, and the second "
                             "SetPos on the cube must start from the place the first left it (both coordinates set: "
                             f"{origin + plugin.SETTER_SET[0]:g}, {origin + plugin.SETTER_SET[1]:g}): {found}")
+    found = one("hopped")
+    if found is not None:
+        exterior, name, x, asked = found
+        origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if (exterior != str(scenario.exterior).lower() or (not scenario.exterior and name != plugin.CELL_NAME)
+                or abs(float(x) - origin - plugin.HOP_X) > MOVE_SLACK or asked != "0"):
+            problems.append("SetPos on the player should have moved it to the new x in the cell it was in "
+                            f"({origin + plugin.HOP_X:g}) and the script should have taken back the request: "
+                            + str(found))
+    found = one("traveller")
+    if found is not None:
+        exterior, where = found
+        x, y = (float(number) for number in where.split())
+        other = plugin.EXTERIOR_CELL_SIZE / 2 if not scenario.exterior else 0.0
+        if exterior != str(not scenario.exterior).lower() or abs(x - other) > MOVE_SLACK or abs(y - other) > MOVE_SLACK:
+            problems.append("the cube that a script sent to the marker of the other kind of cell before it moved the "
+                            f"player should be at that marker ({other:g}, {other:g}) in that cell: {found}")
     found = one("far mover")
     if found is not None:
         exterior, name, where, seen = found

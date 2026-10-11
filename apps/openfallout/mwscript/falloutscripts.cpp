@@ -717,14 +717,23 @@ namespace OFScript
             stats.land(true);
             stats.setTeleported(true);
             world->getPlayer().setTeleported(true);
-            ESM::Position position;
-            for (int axis = 0; axis < 3; ++axis)
+            // Inside the cell the player is in, and between the exterior cells of one worldspace, the player is only
+            // moved (the world takes it from cell to cell): changing to a cell fades the screen out and in again, which
+            // a script that sets the position of the player every frame must not do
+            const OFWorld::CellStore* current = ptr.getCell();
+            const bool sameSpace = current == destination
+                || (current->isExterior() && destination->isExterior()
+                    && current->getCell()->getWorldSpace() == destination->getCell()->getWorldSpace());
+            if (!sameSpace)
             {
-                position.pos[axis] = where.mPosition[axis];
-                position.rot[axis] = where.mAngle[axis];
+                ESM::Position position;
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    position.pos[axis] = where.mPosition[axis];
+                    position.rot[axis] = where.mAngle[axis];
+                }
+                world->changeToCell(destination->getCell()->getId(), position, false, true);
             }
-            const bool differentCell = ptr.getCell() != destination;
-            world->changeToCell(destination->getCell()->getId(), position, false, differentCell);
             const OFWorld::Ptr player = world->getPlayerPtr();
             world->moveObject(player, where.mPosition);
             // The player is turned in the order that the engine turns it in everywhere else (changeToCell does the
