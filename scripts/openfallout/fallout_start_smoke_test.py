@@ -624,6 +624,7 @@ local util = require('openfallout.util')
 
 local scripted_ids, victim_ids, mover_ids, far_ids = { @SCRIPTED@ }, { @VICTIM@ }, { @MOVER@ }, { @FAR@ }
 local sleeper_ids = { @SLEEPER@ }
+local setter_ids = { @SETTER@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
@@ -691,6 +692,12 @@ return {
             elseif step == 3 and elapsed >= @MOVE_FROM@ then
                 step = 4
                 print('OFTEST', 'player moves now')
+                -- The cube that the result script of quest C (set from Lua, so it runs on the thread of Lua) gave an x
+                -- and then a y
+                local setter = find(setter_ids)
+                if setter ~= nil then
+                    print('OFTEST', 'object setter', string.format('%.1f %.1f', setter.position.x, setter.position.y))
+                end
                 -- What the script sees of the far cube before the player is in the other cell, where the script of
                 -- that cell moves its own cube and keeps the same global
                 far_seen = world.globals.@FAR_X@
@@ -725,6 +732,7 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@MOVER@", ", ".join(map(str, plugin.MOVER_REF_IDS.values())))
                  .replace("@FAR@", ", ".join(map(str, plugin.FAR_MOVER_REF_IDS.values())))
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
+                 .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1221,6 +1229,14 @@ def check_objects(text, scenario):
         if abs(x - want[0]) > MOVE_SLACK or abs(y - want[1]) > MOVE_SLACK:
             problems.append(f"the cube a script sent to a marker while its cell was not loaded should be at "
                             f"{want} when the cell is loaded: {sleepers[0]}")
+    found = one("setter")
+    if found is not None:
+        x, y = (float(number) for number in found[0].split())
+        origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if abs(x - origin - plugin.SETTER_SET[0]) > MOVE_SLACK or abs(y - origin - plugin.SETTER_SET[1]) > MOVE_SLACK:
+            problems.append("a stage of a quest set from Lua runs its script on the thread of Lua, and the second "
+                            "SetPos on the cube must start from the place the first left it (both coordinates set: "
+                            f"{origin + plugin.SETTER_SET[0]:g}, {origin + plugin.SETTER_SET[1]:g}): {found}")
     found = one("far mover")
     if found is not None:
         exterior, name, where, seen = found

@@ -132,6 +132,7 @@ namespace OFScript
             const std::lock_guard lock(mDeferredMutex);
             mDeferred.clear();
             mDeferredDisabled.clear();
+            mDeferredPlaces.clear();
         }
         mQuests.reset();
     }
@@ -210,9 +211,12 @@ namespace OFScript
         if (!deferred.empty())
         {
             const std::lock_guard lock(mDeferredMutex);
-            // Every toggle that was asked for has been made now, and the state of the objects is theirs again
+            // Every toggle and move that was asked for has been made now, and the state of the objects is theirs again
             if (mDeferred.empty())
+            {
                 mDeferredDisabled.clear();
+                mDeferredPlaces.clear();
+            }
         }
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
         std::map<FalloutScript::FormId, Place> moves;
@@ -236,8 +240,12 @@ namespace OFScript
         load.swap(mPendingLoad);
         for (const FalloutScript::FormId reference : load)
         {
-            // Not if the cell has been unloaded since
-            if (mReferences.count(reference) != 0)
+            // Not if the cell has been unloaded since, or the object has been moved out of the loaded cells
+            if (mReferences.count(reference) == 0)
+                continue;
+            if (leftLoadedCells(reference))
+                mReferences.erase(reference);
+            else
                 mObjects.setLoaded(reference, true);
         }
     }
@@ -335,16 +343,22 @@ namespace OFScript
         runOnMainThread([text] { OFBase::Environment::get().getWindowManager()->messageBox(text); });
     }
 
+    bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
+    {
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (ptr.isEmpty() || ptr.getCell() == nullptr || reference == mPlayer)
+            return false;
+        const OFWorld::Scene::CellStoreCollection& active
+            = OFBase::Environment::get().getWorldScene()->getActiveCells();
+        return active.find(const_cast<OFWorld::CellStore*>(ptr.getCell())) == active.end();
+    }
+
     void FalloutScripts::dropObjectsThatLeft()
     {
         // An object that was moved to a cell that is not loaded is not in a loaded cell to be unloaded with it
-        const OFWorld::Scene::CellStoreCollection& active
-            = OFBase::Environment::get().getWorldScene()->getActiveCells();
         for (const FalloutScript::FormId reference : mObjects.loadedReferences())
         {
-            const OFWorld::Ptr ptr = findReference(reference);
-            if (ptr.isEmpty() || ptr.getCell() == nullptr || reference == mPlayer
-                || active.find(const_cast<OFWorld::CellStore*>(ptr.getCell())) != active.end())
+            if (!leftLoadedCells(reference))
                 continue;
             mObjects.setLoaded(reference, false);
             mReferences.erase(reference);
@@ -577,6 +591,15 @@ namespace OFScript
 
     bool FalloutScripts::whereIs(FalloutScript::FormId reference, Place& result)
     {
+        {
+            // What another thread asked for is not done yet, but it is what the script sees
+            const std::lock_guard lock(mDeferredMutex);
+            if (const auto asked = mDeferredPlaces.find(reference); asked != mDeferredPlaces.end())
+            {
+                result = asked->second;
+                return true;
+            }
+        }
         if (const auto planned = mPendingMoves.find(reference); planned != mPendingMoves.end())
         {
             result = planned->second;
@@ -640,7 +663,7 @@ namespace OFScript
             += osg::Vec3f(static_cast<float>(offset[0]), static_cast<float>(offset[1]), static_cast<float>(offset[2]));
         to.mAngle = osg::Vec3f(from.mAngle.x(), from.mAngle.y(), to.mAngle.z());
         // The world is not changed while scripts run
-        runOnMainThread([this, reference, to] { mPendingMoves[reference] = to; });
+        askForMove(reference, to);
     }
 
     void FalloutScripts::place(FalloutScript::FormId reference, const FalloutScript::Placement& where)
@@ -652,7 +675,17 @@ namespace OFScript
             static_cast<float>(where.mPosition[2]));
         place.mAngle = osg::Vec3f(static_cast<float>(where.mAngle[0]), static_cast<float>(where.mAngle[1]),
             static_cast<float>(where.mAngle[2]));
-        runOnMainThread([this, reference, place] { mPendingMoves[reference] = place; });
+        askForMove(reference, place);
+    }
+
+    void FalloutScripts::askForMove(FalloutScript::FormId reference, const Place& where)
+    {
+        if (std::this_thread::get_id() != mMainThread)
+        {
+            const std::lock_guard lock(mDeferredMutex);
+            mDeferredPlaces[reference] = where;
+        }
+        runOnMainThread([this, reference, where] { mPendingMoves[reference] = where; });
     }
 
     void FalloutScripts::applyMove(FalloutScript::FormId reference, const Place& where)
@@ -694,6 +727,8 @@ namespace OFScript
             world->changeToCell(destination->getCell()->getId(), position, false, differentCell);
             const OFWorld::Ptr player = world->getPlayerPtr();
             world->moveObject(player, where.mPosition);
+            // The player is turned in the order that the engine turns it in everywhere else (changeToCell does the
+            // same), while the references of the cells are turned in the order that the cell loader uses for them
             world->rotateObject(player, where.mAngle);
             OFBase::Environment::get().getLuaManager()->objectTeleported(player);
             return;

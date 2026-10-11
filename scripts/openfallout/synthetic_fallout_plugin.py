@@ -172,7 +172,12 @@ MOVE_TARGET_PLACE = (1200.0, -1100.0)
 MOVE_OFFSET = (10, 20, 0)
 MOVE_HEIGHT = 321
 FAR_MARKER_REF_IDS = {"interior": EXTERIOR_MARKER_REF_ID, "exterior": MARKER_REF_ID}
-LAST_ID = 0x881 # the largest form ID of the plugin, which the next object ID of its header follows
+# A cube that the result script of quest C moves, which the test sets from Lua (so the script runs on the thread of Lua):
+# it sets its x and then its y, and each must start from where the one before left it
+SETTER_REF_IDS = {"interior": 0x882, "exterior": 0x883}
+SETTER_PLACE = (300.0, -1400.0)
+SETTER_SET = (700.0, -1700.0) # from the origin of the cell
+LAST_ID = 0x883 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -621,7 +626,8 @@ def object_refs(kind, origin):
             refr(SLEEPER_TARGET_REF_IDS[kind], TARGET_MARKER_ID,
                  (x + SLEEPER_TARGET_PLACE[0], y + SLEEPER_TARGET_PLACE[1], 0.0)),
             refr(MOVE_TARGET_REF_IDS[kind], TARGET_MARKER_ID, (x + MOVE_TARGET_PLACE[0], y + MOVE_TARGET_PLACE[1], 0.0),
-                 rotation=(0.0, 0.0, TARGET_YAW))]
+                 rotation=(0.0, 0.0, TARGET_YAW)),
+            refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2))]
 
 
 def stage_script(statements, references):
@@ -678,6 +684,13 @@ def quests():
                               + sf.operator("+"))]
     a_at_ten = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=float(QUEST_A_STAGE))
     a_at_ninety_nine = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=99.0)
+    # Stage of C: SetPos on x and then on y of the cube of each kind of cell (the one in the cell that is not loaded is
+    # sent where its cell will put it when it is loaded)
+    c_result = []
+    for index, kind in enumerate(("interior", "exterior"), 1):
+        origin = EXTERIOR_CELL_SIZE / 2 if kind == "exterior" else 0.0
+        c_result += [sf.call_on(index, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(int(origin + SETTER_SET[0]))),
+                     sf.call_on(index, sf.SET_POS, sf.axis_argument("Y"), sf.int_argument(int(origin + SETTER_SET[1])))]
     return [
         quest(QUEST_A_ID, QUEST_A_NAME, "OpenFallout Test Quest A", QUEST_FLAG_START_GAME,
               [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID),
@@ -687,7 +700,7 @@ def quests():
               objective=(QUEST_OBJECTIVE, QUEST_OBJECTIVE_TEXT)),
         # The quest that opens the gate of the packages: it has the one stage, which the test sets from Lua
         quest(QUEST_C_ID, QUEST_C_NAME, "OpenFallout Test Quest C", 0,
-              [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], [], [])]),
+              [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], c_result, [SETTER_REF_IDS["interior"], SETTER_REF_IDS["exterior"]])]),
     ]
 def climate():
     """A CLMT record that lists the weather and one that needs a global that is 0, with the times of sunrise and

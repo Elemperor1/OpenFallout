@@ -171,6 +171,11 @@ namespace OFScript
         bool whereIs(FalloutScript::FormId reference, Place& result);
         /// Moves the object now. An object that is not in a loaded cell is moved when its cell is loaded.
         void applyMove(FalloutScript::FormId reference, const Place& where);
+        /// Puts the object at the place at the start of the next frame, and until then the script that asked sees it
+        /// there even if it runs on another thread
+        void askForMove(FalloutScript::FormId reference, const Place& where);
+        /// Whether the object is in a cell that is not loaded (it was moved out of the loaded ones)
+        bool leftLoadedCells(FalloutScript::FormId reference);
 
         /// What changes the world (the scene, the interface, the characters) is for the thread that runs the frame:
         /// a script that Lua starts runs on the thread of Lua, which is busy at the same time as the scene is drawn.
@@ -193,6 +198,9 @@ namespace OFScript
         std::mutex mDeferredMutex;
         std::vector<std::function<void()>> mDeferred;
         std::map<FalloutScript::FormId, bool> mDeferredDisabled;
+        /// Where other threads asked to put objects, for the same reason: the next command of the script starts from
+        /// there
+        std::map<FalloutScript::FormId, Place> mDeferredPlaces;
         /// Whether scripts disabled (true) or enabled (false) objects in cells that were not loaded at the time, which
         /// holds until the cell is loaded
         std::map<FalloutScript::FormId, bool> mDisabled;
