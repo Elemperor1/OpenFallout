@@ -126,7 +126,8 @@ namespace FalloutScript
             return;
         const std::lock_guard lock(mMutex);
         Entry& entry = mEntries[{ actor, value }];
-        entry.mBase = bounded(bounded(amount) - entry.mModifier + entry.mDamage);
+        // The base stays: the permanent modifier moves by what the current value is short of the amount
+        entry.mModifier = bounded(bounded(amount) - baseOf(actor, entry, value) + entry.mDamage);
     }
 
     void ActorValues::damage(FormId actor, int value, double amount)
@@ -135,7 +136,8 @@ namespace FalloutScript
             return;
         const std::lock_guard lock(mMutex);
         Entry& entry = mEntries[{ actor, value }];
-        entry.mDamage = bounded(entry.mDamage + bounded(amount));
+        // Damage is never below nothing: a negative amount takes damage back, up to what there is
+        entry.mDamage = std::max(bounded(entry.mDamage + bounded(amount)), 0.0);
     }
 
     void ActorValues::restore(FormId actor, int value, double amount)
@@ -147,7 +149,7 @@ namespace FalloutScript
         if (found == mEntries.end())
             return;
         Entry& entry = found->second;
-        entry.mDamage = std::max(entry.mDamage - bounded(amount), std::min(entry.mDamage, 0.0));
+        entry.mDamage = std::max(entry.mDamage - bounded(amount), 0.0);
     }
 
     void ActorValues::heal(FormId actor, int value)

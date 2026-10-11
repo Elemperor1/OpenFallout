@@ -238,8 +238,26 @@ namespace
         values.setCurrent(guard, variable01, 50);
 
         EXPECT_EQ(values.current(guard, variable01), 50);
-        // The modifier and the damage stay, the base moved
+        // The base and the damage stay, the permanent modifier moved
+        EXPECT_EQ(values.base(guard, variable01), 10);
         EXPECT_EQ(values.permanent(guard, variable01), 54);
+        // Forcing a value nobody set moves the modifier from the starting value
+        values.setCurrent(guard, ActorValue::health, 30);
+        EXPECT_EQ(values.base(guard, ActorValue::health), 100);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 30);
+    }
+
+    TEST(FalloutScriptActorValuesTest, damage_is_never_less_than_none)
+    {
+        ActorValues values;
+        values.damage(guard, ActorValue::health, 10);
+
+        values.damage(guard, ActorValue::health, -20);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 100);
+        values.damage(guard, ActorValue::health, 5);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 95);
+        values.restore(guard, ActorValue::health, 50);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 100);
     }
 
     TEST(FalloutScriptActorValuesTest, healing_takes_all_the_damage_back)

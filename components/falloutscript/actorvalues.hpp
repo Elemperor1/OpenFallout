@@ -83,9 +83,9 @@ namespace FalloutScript
 
         void setBase(FormId actor, int value, double amount);
         void modify(FormId actor, int value, double amount);
-        /// Changes the base so that the current value is the amount, whatever the modifier and the damage are
+        /// Changes the permanent modifier so that the current value is the amount, whatever the base and the damage are
         void setCurrent(FormId actor, int value, double amount);
-        /// Hurts the actor value (a negative amount takes damage back)
+        /// Hurts the actor value (a negative amount takes damage back, down to none)
         void damage(FormId actor, int value, double amount);
         /// Takes damage back, up to what there is
         void restore(FormId actor, int value, double amount);
