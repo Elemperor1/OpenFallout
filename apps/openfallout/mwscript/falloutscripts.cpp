@@ -821,6 +821,9 @@ namespace OFScript
         }
         const OFWorld::Ptr moved = world->moveObject(ptr, destination, where.mPosition);
         world->rotateObject(moved, where.mAngle, OFBase::RotationFlag_none);
+        // As the teleport of Lua does: the place a door is moved to is the one it opens and closes from
+        if (cls.isDoor())
+            moved.getCellRef().setPosition(moved.getRefData().getPosition());
         OFBase::Environment::get().getLuaManager()->objectTeleported(moved);
     }
 
