@@ -7,6 +7,7 @@
 #include <components/falloutscript/script.hpp>
 
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <string>
@@ -42,6 +43,14 @@ namespace FalloutScriptTest
         {
             u16(static_cast<std::uint16_t>(value & 0xFFFF));
             return u16(static_cast<std::uint16_t>(value >> 16));
+        }
+
+        Bytes& f64(double value)
+        {
+            std::uint64_t bits;
+            std::memcpy(&bits, &value, sizeof(bits));
+            u32(static_cast<std::uint32_t>(bits & 0xFFFFFFFFu));
+            return u32(static_cast<std::uint32_t>(bits >> 32));
         }
 
         Bytes& add(const Bytes& other)
@@ -111,6 +120,10 @@ namespace FalloutScriptTest
     inline Bytes intArg(std::int32_t value)
     {
         return Bytes().u8('n').u32(static_cast<std::uint32_t>(value));
+    }
+    inline Bytes floatArg(double value)
+    {
+        return Bytes().u8('z').f64(value);
     }
     inline Bytes refArg(std::uint16_t reference)
     {

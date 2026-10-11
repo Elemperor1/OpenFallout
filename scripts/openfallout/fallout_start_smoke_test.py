@@ -145,6 +145,12 @@ SCENARIOS = [
 ]
 
 WALK_SECONDS = 24
+# The scripted object moves the player to a marker in the other kind of cell after the walk, and the run goes on for as
+# long as it takes the player to get there and be looked at
+MOVE_SECONDS = 6
+PLAYER_MOVES = "OFTEST\tplayer moves now"
+MOVE_FROM = WALK_SECONDS + 1
+MOVE_LOOK = WALK_SECONDS + 3.5
 # The player stands still from the fifteenth second, where the walk west ends, and turns to face east, to the person,
 # for half a second, so that the person is seen: the body of a model that is skinned is only brought up to date when it
 # is seen, and a ray at what is drawn finds it where it was when it was last seen. A second later a ray looks at its foot.
@@ -427,7 +433,7 @@ return {
        TURN_FROM, TURN_FROM, *WATER_CENTRE, *WATER_CENTRE, *WATER_SIDE_RAY, BODY_RAY_LUA, int(WEST_FROM) + 4,
        FOOT_RAY_FROM, FOOT_RAY_LUA, PERSON_MOVE_FROM, PERSON_MOVE_FROM + WALK_RAY_AFTER,
        PERSON_MOVE_FROM + RUN_RAY_AFTER, PERSON_MOVE_FROM + STAND_RAY_AFTER, CREATURE_RAYS_FROM,
-       CREATURE_BODY_HEIGHT, FOOT_RAY_FROM, FOOT_HEIGHT, FOOT_HEIGHT, WALK_SECONDS)
+       CREATURE_BODY_HEIGHT, FOOT_RAY_FROM, FOOT_HEIGHT, FOOT_HEIGHT, WALK_SECONDS + MOVE_SECONDS)
 
 # Moves the person that the player script names, east, in steps of a frame: teleporting it to where it would be at the
 # speed of walking and then of running (the speeds of the animation files, which the engine compares the speed of the
@@ -479,7 +485,8 @@ return {
     engineHandlers = {
         onUpdate = function(dt)
             elapsed = elapsed + dt
-            if elapsed < nextLog then return end
+            -- the walk ends at @UNTIL@ seconds, and the player is somewhere else after it
+            if elapsed < nextLog or elapsed > @UNTIL@ then return end
             nextLog = nextLog + 1
             for _, actor in ipairs(actors) do
                 for _, id in ipairs(actor[2]) do
@@ -495,7 +502,7 @@ return {
         end,
     },
 }
-""".replace("@ACTORS@", ", ".join("{ '%s', { %d, %d } }" % (name, *plugin.PACKAGE_REF_IDS[name])
+""".replace("@UNTIL@", str(WALK_SECONDS)).replace("@ACTORS@", ", ".join("{ '%s', { %d, %d } }" % (name, *plugin.PACKAGE_REF_IDS[name])
                                   for name in ("walker", "idler", "roamer")) + ", " + ", ".join(
                                       "{ '%s', { %d, %d } }" % (name, *plugin.FOLLOW_REF_IDS[name])
                                       for name in ("follower", "companion")) + ", " + ", ".join(
@@ -615,9 +622,14 @@ local world = require('openfallout.world')
 local core = require('openfallout.core')
 local util = require('openfallout.util')
 
-local scripted_ids, victim_ids = { @SCRIPTED@ }, { @VICTIM@ }
+local scripted_ids, victim_ids, mover_ids, far_ids = { @SCRIPTED@ }, { @VICTIM@ }, { @MOVER@ }, { @FAR@ }
+local sleeper_ids = { @SLEEPER@ }
+local setter_ids = { @SETTER@ }
+local traveller_ids = { @TRAVELLER@ }
+local crosser_ids = { @CROSSER@ }
+local traveller_object, setter_object = nil, nil
 local elapsed, step = 0, 0
-local scripted_object, defaults = nil, 0
+local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
 local function find(ids)
     for _, id in ipairs(ids) do
@@ -674,6 +686,70 @@ return {
                     tostring(g.@DEAD@))
                 print('OFTEST', 'object player', tostring(g.@PLAYER_RANK@))
                 print('OFTEST', 'object listed', tostring(g.@LISTED@))
+                -- Where the script saw the cube that it moved to a marker, and where the world has put it
+                local mover = find(mover_ids)
+                mover_object, far_object = mover, find(far_ids)
+                local at = mover.position
+                print('OFTEST', 'object mover', string.format('%.1f %.1f %.1f', g.@MOVER_X@, g.@MOVER_Y@, g.@MOVER_ANGLE@),
+                    string.format('%.1f %.1f %.1f', at.x, at.y, math.deg(mover.rotation:getYaw())),
+                    string.format('%.1f', g.@MOVER_NEAR@))
+                -- The cube that the script gave an x in the next cell: whether the script saw it in that cell at once,
+                -- and where the world has put it
+                local crosser = find(crosser_ids)
+                if crosser ~= nil then
+                    local cell = crosser.cell
+                    print('OFTEST', 'object crosser', string.format('%.1f', g.@CROSSED@), tostring(cell.isExterior),
+                        cell.isExterior and string.format('%d %d', cell.gridX, cell.gridY) or 'none',
+                        string.format('%.1f', crosser.position.x))
+                end
+            elseif step == 3 and elapsed >= @MOVE_FROM@ then
+                step = 4
+                print('OFTEST', 'player moves now')
+                -- The cube that the result script of quest C (set from Lua, so it runs on the thread of Lua) gave an x
+                -- and then a y
+                local setter = find(setter_ids)
+                setter_object = setter
+                if setter ~= nil then
+                    print('OFTEST', 'object setter', string.format('%.1f %.1f', setter.position.x, setter.position.y))
+                end
+                -- What the script sees of the far cube before the player is in the other cell, where the script of
+                -- that cell moves its own cube and keeps the same global
+                far_seen = world.globals.@FAR_X@
+                traveller_object = find(traveller_ids)
+                -- The script sets the x of the player first, in the cell the player is in
+                world.globals.@HOP@ = 1
+            elseif step == 4 and elapsed >= @MOVE_FROM@ + 0.5 then
+                step = 5
+                local player = world.players[1]
+                print('OFTEST', 'object hopped', tostring(player.cell.isExterior), tostring(player.cell.name),
+                    string.format('%.1f', player.position.x), tostring(world.globals.@HOP@),
+                    string.format('%.1f %.1f %.1f', setter_object.position.x, setter_object.position.y,
+                        math.deg(setter_object.rotation:getYaw())))
+                world.globals.@MOVE_NOW@ = 1
+            elseif step == 5 and elapsed >= @MOVE_LOOK@ then
+                step = 6
+                local mover, player = mover_object, world.players[1]
+                print('OFTEST', 'object moved', string.format('%.1f', mover.position.z),
+                    tostring(player.cell.isExterior), tostring(player.cell.name),
+                    string.format('%.1f %.1f', player.position.x, player.position.y), tostring(world.globals.@MOVE_NOW@))
+                -- The cube of each kind of cell that a script sent to a marker while its cell was not loaded: the one in
+                -- the cell the player is in now has been put there
+                for _, id in ipairs(sleeper_ids) do
+                    local ok, sleeper = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+                    if ok and sleeper:isValid() then
+                        print('OFTEST', 'object sleeper', tostring(sleeper.cell.isExterior),
+                            string.format('%.1f %.1f', sleeper.position.x, sleeper.position.y),
+                            string.format('%.1f', math.deg(sleeper.rotation:getPitch())))
+                    end
+                end
+                -- The cube that the script sent to the marker before it moved the player: it goes first, so it is in
+                -- the cell that the player is in now
+                local travelled = traveller_object.position
+                print('OFTEST', 'object traveller', tostring(traveller_object.cell.isExterior),
+                    string.format('%.1f %.1f', travelled.x, travelled.y))
+                local far = far_object.position
+                print('OFTEST', 'object far mover', tostring(far_object.cell.isExterior), tostring(far_object.cell.name),
+                    string.format('%.1f %.1f', far.x, far.y), string.format('%.1f', far_seen))
             end
         end,
     },
@@ -683,6 +759,20 @@ OBJECT_FROM = 4.0  # game seconds before the Lua script looks, enough for the ce
 OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SCRIPTED@", ", ".join(map(str, plugin.SCRIPTED_REF_IDS.values())))
                  .replace("@VICTIM@", ", ".join(map(str, plugin.VICTIM_REF_IDS.values())))
+                 .replace("@MOVER@", ", ".join(map(str, plugin.MOVER_REF_IDS.values())))
+                 .replace("@FAR@", ", ".join(map(str, plugin.FAR_MOVER_REF_IDS.values())))
+                 .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
+                 .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
+                 .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
+                 .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
+                 .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
+                 .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
+                 .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
+                 .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
+                 .replace("@MOVER_NEAR@", plugin.MOVE_GLOBALS["near"][1])
+                 .replace("@MOVE_NOW@", plugin.MOVE_GLOBALS["now"][1])
+                 .replace("@HOP@", plugin.MOVE_GLOBALS["hop"][1])
+                 .replace("@MOVE_FROM@", str(MOVE_FROM)).replace("@MOVE_LOOK@", str(MOVE_LOOK))
                  .replace("@CUBE@", str(plugin.CUBE_ID))
                  .replace("@FROM@", str(OBJECT_FROM))
                  .replace("@LOADS@", plugin.OBJECT_GLOBALS["loads"][1])
@@ -702,6 +792,7 @@ PACKAGE_START = {name: plugin.PACKAGE_PLACES[name] for name in ("walker", "idler
 # and the two characters whose packages depend on scripts
 GATE_START = {name: plugin.GATE_PLACES[name] for name in ("conditional", "scripted")}
 GATE_MARGIN = 1.0  # seconds either side of GATE_FROM that the two Lua scripts' clocks may differ by
+MOVE_SLACK = 2.0  # units, and degrees, that a moved cube or player may be off
 OBJECT_DISTANCE_SLACK = 60  # how far the distance a script measures may be from the one Lua sees (the player walks)
 ARRIVAL_RANGE = 30.0  # how close to the marker of a package for the night the walker may come, units
 TRAVEL_SLACK = 20.0  # how far from the radius of its package the walker may have stopped (it stops at the edge of it)
@@ -794,8 +885,11 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels):
 
 
 def check(text, scenario, colours, animated=True):
-    """The problems the log shows, as a list of sentences; empty when the run did what it should."""
+    """The problems the log shows, as a list of sentences; empty when the run did what it should. The player is moved to
+    the other kind of cell at the end (see MOVE_FROM), so the checks of the start look at the log up to there."""
     problems = []
+    whole = text
+    text = text.split(PLAYER_MOVES, 1)[0]
     for line in text.splitlines():
         if re.search(r"Can't start|Failed to start|Lua error|Fatal error|Failed to load Lua", line, re.I):
             problems.append(line)
@@ -864,7 +958,8 @@ def check(text, scenario, colours, animated=True):
     if missing:
         problems.append(f"the log reports files of the sky of Morrowind as missing: {missing[:3]}")
     samples = [(float(m.group(1)), m.group(2), m.group(3), tuple(float(m.group(i)) for i in (4, 5, 6)),
-                tuple(float(m.group(i)) for i in (7, 8, 9))) for m in map(SAMPLE.search, text.splitlines()) if m]
+                tuple(float(m.group(i)) for i in (7, 8, 9))) for m in map(SAMPLE.search, text.splitlines())
+               if m and float(m.group(1)) <= WALK_SECONDS]
     if len(samples) < WALK_SECONDS:
         problems.append(f"the walk script logged {len(samples)} positions, expected at least {WALK_SECONDS}")
         return problems
@@ -986,8 +1081,8 @@ def check(text, scenario, colours, animated=True):
                         "the water should have no sides")
     problems += check_packages(text, scenario, animated)
     problems += check_quests(text)
-    problems += check_objects(text)
-    if "Quitting peacefully" not in text:
+    problems += check_objects(whole, scenario)
+    if "Quitting peacefully" not in whole:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems
 
@@ -1063,7 +1158,7 @@ def check_quests(text):
     return problems
 
 
-def check_objects(text):
+def check_objects(text, scenario):
     """The problems with the script of the scripted object: it must have run its OnLoad block once (it disables the cube
     next to it) and its GameMode block every frame (frames counted, the distance to the player measured, the disabled
     cube seen), its OnActivate block must count the activation by the player and not the one by a person, take the
@@ -1125,10 +1220,123 @@ def check_objects(text):
     if found is not None and found != [str(plugin.CREATURE_ITEMS)]:
         problems.append("the script should see the creature that is placed as a levelled list with the suits of the "
                         f"creature that the list gives ({plugin.CREATURE_ITEMS}): " + str(found))
+    # The cube the script moved to the target marker with offsets, as the script saw it and as the world has it, then the
+    # cube at the height the script set and the player moved into the other kind of cell
+    origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+    want_x = origin + plugin.MOVE_TARGET_PLACE[0] + plugin.MOVE_OFFSET[0]
+    want_y = origin + plugin.MOVE_TARGET_PLACE[1] + plugin.MOVE_OFFSET[1]
+    want_angle = math.degrees(plugin.TARGET_YAW)
+    found = one("mover")
+    if found is not None:
+        seen, placed = ([float(number) for number in part.split()] for part in found[:2])
+        near = float(found[2])
+        want_near = math.hypot(plugin.MOVE_OFFSET[0], plugin.MOVE_OFFSET[1])
+        if abs(near - want_near) > MOVE_SLACK:
+            problems.append("GetDistance right after MoveToMarker should see the cube at the marker with the offsets "
+                            f"({want_near:.1f} units from it, the move is not made yet): {found}")
+        for what, values in (("saw", seen), ("was put", placed)):
+            if (abs(values[0] - want_x) > MOVE_SLACK or abs(values[1] - want_y) > MOVE_SLACK
+                    or angle_difference(math.radians(values[2]), math.radians(want_angle)) > math.radians(MOVE_SLACK)):
+                problems.append(f"the cube the script moved to the marker should be where the script {what} it "
+                                f"({want_x:g}, {want_y:g}, facing {want_angle:g} degrees): {found}")
+    found = one("moved")
+    if found is not None:
+        height, exterior, name, where, asked = found
+        x, y = (float(number) for number in where.split())
+        other = plugin.EXTERIOR_CELL_SIZE / 2 if not scenario.exterior else 0.0
+        if abs(float(height) - plugin.MOVE_HEIGHT) > MOVE_SLACK:
+            problems.append(f"SetPos should have put the cube at height {plugin.MOVE_HEIGHT}: {found}")
+        if exterior != str(not scenario.exterior).lower() or (scenario.exterior and name != plugin.CELL_NAME):
+            problems.append("MoveToMarker should have moved the player to the other kind of cell "
+                            f"(exterior={str(not scenario.exterior).lower()}, the interior {plugin.CELL_NAME}): "
+                            + str(found))
+        if abs(x - other) > MOVE_SLACK or abs(y - other) > MOVE_SLACK:
+            problems.append(f"the player should stand at the marker of the other cell ({other:g}, {other:g}): "
+                            + str(found))
+        if asked != "0":
+            problems.append("the script should have taken back the request of the move: " + str(found))
+    # The cube that the script of the other cell sent to a marker while that cell was not loaded stands there now that it
+    # is; the one of the cell the run started in was not sent anywhere by a script that ran
+    other_cell = str(not scenario.exterior).lower()
+    sleepers = [line for line in lines("sleeper") if line[0] == other_cell]
+    if len(sleepers) != 1:
+        problems.append(f"expected one 'object sleeper' line for the cube in the other cell, found {sleepers}")
+    else:
+        x, y = (float(number) for number in sleepers[0][1].split())
+        other = plugin.EXTERIOR_CELL_SIZE / 2 if not scenario.exterior else 0.0
+        want = (other + plugin.SLEEPER_TARGET_PLACE[0] + plugin.SLEEPER_OFFSET[0],
+                other + plugin.SLEEPER_TARGET_PLACE[1] + plugin.SLEEPER_OFFSET[1])
+        if abs(x - want[0]) > MOVE_SLACK or abs(y - want[1]) > MOVE_SLACK:
+            problems.append(f"the cube a script sent to a marker while its cell was not loaded should be at "
+                            f"{want} when the cell is loaded: {sleepers[0]}")
+        if abs(float(sleepers[0][2]) - plugin.SLEEPER_PITCH) > MOVE_SLACK:
+            problems.append("SetAngle on x after the move, while the cell was not loaded, should have turned the cube "
+                            f"{plugin.SLEEPER_PITCH} degrees when the cell is loaded: {sleepers[0]}")
+    found = one("setter")
+    if found is not None:
+        x, y = (float(number) for number in found[0].split())
+        origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if abs(x - origin - plugin.SETTER_SET[0]) > MOVE_SLACK or abs(y - origin - plugin.SETTER_SET[1]) > MOVE_SLACK:
+            problems.append("a stage of a quest set from Lua runs its script on the thread of Lua, and the second "
+                            "SetPos on the cube must start from the place the first left it (both coordinates set: "
+                            f"{origin + plugin.SETTER_SET[0]:g}, {origin + plugin.SETTER_SET[1]:g}): {found}")
+    found = one("hopped")
+    if found is not None:
+        exterior, name, x, asked, setter_at = found
+        setter_x, setter_y, setter_yaw = (float(number) for number in setter_at.split())
+        origin_set = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if (abs(setter_x - origin_set - plugin.SETTER_SET[0]) > MOVE_SLACK
+                or abs(setter_y - origin_set - plugin.SETTER_SET[1]) > MOVE_SLACK
+                or angle_difference(math.radians(setter_yaw), math.radians(plugin.SETTER_TURN)) > math.radians(MOVE_SLACK)):
+            problems.append("SetAngle alone should turn the cube and leave it where the result script of quest C put it "
+                            f"({origin_set + plugin.SETTER_SET[0]:g}, {origin_set + plugin.SETTER_SET[1]:g}, facing "
+                            f"{plugin.SETTER_TURN} degrees): {found}")
+        origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if (exterior != str(scenario.exterior).lower() or (not scenario.exterior and name != plugin.CELL_NAME)
+                or abs(float(x) - origin - plugin.HOP_X) > MOVE_SLACK or asked != "0"):
+            problems.append("SetPos on the player should have moved it to the new x in the cell it was in "
+                            f"({origin + plugin.HOP_X:g}) and the script should have taken back the request: "
+                            + str(found))
+    found = one("crosser")
+    if found is not None:
+        saw, exterior, grid, x = found
+        # An x in the next cell puts the cube in the cell next to the one it is in: the script sees that at once (the
+        # world makes the move at the start of the next frame), and the world then puts it there. The interior cell has
+        # no cell next to it.
+        want_grid = f"{plugin.DRY_CELL[0]} {plugin.DRY_CELL[1]}" if scenario.exterior else "none"
+        if (float(saw) != (1.0 if scenario.exterior else 0.0) or exterior != str(scenario.exterior).lower()
+                or grid != want_grid or abs(float(x) - plugin.CROSS_X) > MOVE_SLACK):
+            problems.append("SetPos on x into the next exterior cell should put the cube in that cell for GetInCell "
+                            f"right away ({'1' if scenario.exterior else '0'}) and the world should put it there "
+                            f"(grid {want_grid}, x {plugin.CROSS_X}): {found}")
+    found = one("traveller")
+    if found is not None:
+        exterior, where = found
+        x, y = (float(number) for number in where.split())
+        other = plugin.EXTERIOR_CELL_SIZE / 2 if not scenario.exterior else 0.0
+        if exterior != str(not scenario.exterior).lower() or abs(x - other) > MOVE_SLACK or abs(y - other) > MOVE_SLACK:
+            problems.append("the cube that a script sent to the marker of the other kind of cell before it moved the "
+                            f"player should be at that marker ({other:g}, {other:g}) in that cell: {found}")
+    found = one("far mover")
+    if found is not None:
+        exterior, name, where, seen = found
+        x, y = (float(number) for number in where.split())
+        other = plugin.EXTERIOR_CELL_SIZE / 2 if not scenario.exterior else 0.0
+        if exterior != str(not scenario.exterior).lower() or (scenario.exterior and name != plugin.CELL_NAME):
+            problems.append("the cube sent to the marker of the other kind of cell should be in that cell "
+                            f"(exterior={str(not scenario.exterior).lower()}): " + str(found))
+        if abs(x - other - plugin.FAR_OFFSET[0]) > MOVE_SLACK or abs(y - other - plugin.FAR_OFFSET[1]) > MOVE_SLACK:
+            problems.append(f"the cube should be at the marker of the other cell with the offsets "
+                            f"({other + plugin.FAR_OFFSET[0]:g}, {other + plugin.FAR_OFFSET[1]:g}): " + str(found))
+        if abs(float(seen) - other - plugin.FAR_OFFSET[0]) > MOVE_SLACK:
+            problems.append("GetPos in the script should have seen the cube at its new place, in the other cell: "
+                            + str(found))
     told = [line for line in text.splitlines() if f"Message: {plugin.MESSAGE_TEXT}" in line]
-    if len(told) != 1:
-        problems.append(f"ShowMessage in OnLoad should have told the player '{plugin.MESSAGE_TEXT}' once, not "
-                        f"{len(told)} times")
+    # once when the cell of the start is loaded, and once more when MoveToMarker takes the player to the other cell, whose
+    # scripted object has the same script
+    if len(told) != 2:
+        problems.append(f"ShowMessage in OnLoad should have told the player '{plugin.MESSAGE_TEXT}' in each of the two "
+                        f"cells, not {len(told)} times")
     for line in text.splitlines():
         if re.search(r"The script 0x[0-9a-f]+ of an object|The script command .* is not implemented", line):
             problems.append("a script of an object could not run: " + line)

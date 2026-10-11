@@ -116,7 +116,8 @@ OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTe
                   "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
                   "victim": (0x854, "OFTestObjectVictimDisabled"), "items": (0x86D, "OFTestIdlerItems"),
                   "rank": (0x86E, "OFTestIdlerRank"), "joined": (0x86F, "OFTestIdlerJoined"),
-                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank"), "listed": (0x872, "OFTestListedItems")}
+                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x880, "OFTestPlayerRank"),
+                  "listed": (0x881, "OFTestListedItems")}
 # Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
 # first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
 # stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
@@ -146,7 +147,53 @@ PLAYER_RANK = 2
 # the script sees the same suits there
 CREATURE_ITEMS = 6
 LISTED_REF_IDS = {"interior": CREATURE_LIST_REF_ID, "exterior": EXTERIOR_CREATURE_LIST_REF_ID}
-LAST_ID = 0x872 # the largest form ID of the plugin, which the next object ID of its header follows
+# The mover is a cube. The script of the scripted object puts it next to the target (MoveToMarker with offsets, so it
+# turns the way the target does), keeps where it sees it, and, when the test sets MOVE_GLOBALS["now"] to 1, sets its
+# height and moves the player to the marker of the other kind of cell (the exterior for the interior start, the
+# interior for the exterior one), which the cell of the start has no record of in memory.
+MOVER_REF_IDS = {"interior": 0x871, "exterior": 0x872}
+MOVE_TARGET_REF_IDS = {"interior": 0x873, "exterior": 0x874}
+MOVE_GLOBALS = {"x": (0x875, "OFTestMoverX"), "y": (0x876, "OFTestMoverY"), "angle": (0x877, "OFTestMoverAngle"),
+                "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX"),
+                "hop": (0x886, "OFTestHopNow"), "near": (0x887, "OFTestMoverNear"),
+                "crossed": (0x88A, "OFTestCrossedCell")}
+# A second cube is sent to the marker of the other kind of cell, which is not loaded: the world keeps it there, and the
+# script reads where it is from the cell that is
+FAR_MOVER_REF_IDS = {"interior": 0x879, "exterior": 0x87A}
+FAR_MOVER_PLACE = (1500.0, -800.0)
+FAR_OFFSET = (5, 6, 0)
+# The script of each kind of cell also moves a cube of the other kind of cell, which is not loaded, to a marker next to
+# it: the cube is put there when its cell is loaded (when the test moves the player into it)
+SLEEPER_REF_IDS = {"interior": 0x87C, "exterior": 0x87D}
+SLEEPER_TARGET_REF_IDS = {"interior": 0x87E, "exterior": 0x87F}
+SLEEPER_PLACE = (1800.0, -800.0)
+SLEEPER_TARGET_PLACE = (1800.0, -1100.0)
+SLEEPER_OFFSET = (7, 8, 0)
+SLEEPER_PITCH = 30  # degrees: a turn of the x angle that comes after the move, while the cell is not loaded
+MOVER_PLACE = (1200.0, -800.0)
+MOVE_TARGET_PLACE = (1200.0, -1100.0)
+MOVE_OFFSET = (10, 20, 0)
+MOVE_HEIGHT = 321
+FAR_MARKER_REF_IDS = {"interior": EXTERIOR_MARKER_REF_ID, "exterior": MARKER_REF_ID}
+# A cube that the result script of quest C moves, which the test sets from Lua (so the script runs on the thread of Lua):
+# it sets its x and then its y, and each must start from where the one before left it
+SETTER_REF_IDS = {"interior": 0x882, "exterior": 0x883}
+SETTER_PLACE = (300.0, -1400.0)
+SETTER_SET = (700.0, -1700.0) # from the origin of the cell
+SETTER_TURN = 180 # degrees: the script of the scripted object only turns it, in the frame of the hop of the player
+# A cube that the script sends to the marker of the other kind of cell in the same frame as the player, before the
+# player: the player's cell change must not leave it behind
+TRAVELLER_REF_IDS = {"interior": 0x884, "exterior": 0x885}
+TRAVELLER_PLACE = (1500.0, -2000.0)
+# The test asks for a move of the player inside the cell it is in with a global (SetPos on x): the player is moved, not
+# taken to the cell again (which fades the screen out and in)
+HOP_X = 123.0
+# A cube that the script gives an x in the cell next to the one it is in (the dry cell, 1,0) and asks right after whether
+# it is in that cell: it is when the cell is an exterior one, and the interior cell has no cell next to it
+CROSSER_REF_IDS = {"interior": 0x888, "exterior": 0x889}
+CROSSER_PLACE = (1800.0, -1400.0)
+CROSS_X = 5000
+LAST_ID = 0x88A # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -512,6 +559,18 @@ def object_script(kind):
     idler = script.form(PACKAGE_REF_IDS["idler"][index])
     suit = script.form(SUIT_ID)
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
+    mover, move_target, far_marker = (script.form(form_id) for form_id in (
+        MOVER_REF_IDS[kind], MOVE_TARGET_REF_IDS[kind], FAR_MARKER_REF_IDS[kind]))
+    mover_x, mover_y, mover_angle, move_now, far_x, hop, mover_near = (
+        script.form(MOVE_GLOBALS[name][0]) for name in ("x", "y", "angle", "now", "far", "hop", "near"))
+    hop_x = int((EXTERIOR_CELL_SIZE / 2 if kind == "exterior" else 0.0) + HOP_X)
+    far_mover = script.form(FAR_MOVER_REF_IDS[kind])
+    traveller = script.form(TRAVELLER_REF_IDS[kind])
+    setter = script.form(SETTER_REF_IDS[kind])
+    crosser, dry_cell, crossed = (script.form(form_id) for form_id in (
+        CROSSER_REF_IDS[kind], DRY_CELL_ID, MOVE_GLOBALS["crossed"][0]))
+    other_kind = "exterior" if kind == "interior" else "interior"
+    sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
 
     def add_one(global_index):
         return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
@@ -526,9 +585,28 @@ def object_script(kind):
                  + sf.call_on(idler, sf.ADD_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_ADDS))
                  + sf.call_on(idler, sf.REMOVE_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_TAKES))
                  + sf.call_on(idler, sf.REMOVE_FROM_FACTION, sf.form_argument(second_faction))
-                 + sf.call_on(idler, sf.KILL_ACTOR, counted=True)),
+                 + sf.call_on(idler, sf.KILL_ACTOR, counted=True)
+                 + sf.call_on(mover, sf.MOVE_TO_MARKER, sf.form_argument(move_target),
+                              *(sf.int_argument(offset) for offset in MOVE_OFFSET))
+                 # Right after the move, which the world makes at the start of the next frame: the script sees the
+                 # cube at the marker already (the offsets are in the x and y)
+                 + sf.set_to(sf.global_target(mover_near),
+                             sf.call_token(sf.GET_DISTANCE, sf.form_argument(move_target), reference=mover))
+                 # An x in the cell next to this one (the world has not made the move yet): the cube is in that cell
+                 # for the script already, when the cell is an exterior one
+                 + sf.call_on(crosser, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(CROSS_X))
+                 + sf.set_to(sf.global_target(crossed),
+                             sf.call_token(sf.GET_IN_CELL, sf.form_argument(dry_cell), reference=crosser))
+                 + sf.call_on(far_mover, sf.MOVE_TO_MARKER, sf.form_argument(far_marker),
+                              *(sf.int_argument(offset) for offset in FAR_OFFSET))
+                 + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
+                              *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))
+                 + sf.call_on(sleeper, sf.SET_ANGLE, sf.axis_argument("X"), sf.int_argument(SLEEPER_PITCH))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
+            # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
+            # must leave what it does in between alone: it walks on to the marker
+            sf.call_on(walker, sf.SET_POS, sf.axis_argument("Z"), sf.int_argument(0)),
             sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
             sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim)),
             sf.set_to(sf.global_target(items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
@@ -541,7 +619,24 @@ def object_script(kind):
             sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
                                                                    reference=player)),
             sf.set_to(sf.global_target(listed_items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
-                                                                    reference=listed))])),
+                                                                    reference=listed)),
+            sf.set_to(sf.global_target(mover_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=mover)),
+            sf.set_to(sf.global_target(mover_y), sf.call_token(sf.GET_POS, sf.axis_argument("Y"), reference=mover)),
+            sf.set_to(sf.global_target(mover_angle),
+                      sf.call_token(sf.GET_ANGLE, sf.axis_argument("Z"), reference=mover)),
+            sf.set_to(sf.global_target(far_x), sf.call_token(sf.GET_POS, sf.axis_argument("X"), reference=far_mover)),
+            # The test asks for the move of the player with a global; the cell of the start is left behind
+            sf.branch(sf.IF, sf.global_target(hop) + sf.number("1") + sf.operator("==")),
+            sf.set_to(sf.global_target(hop), sf.number("0")),
+            sf.call_on(player, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(hop_x)),
+            sf.call_on(setter, sf.SET_ANGLE, sf.axis_argument("Z"), sf.int_argument(SETTER_TURN)),
+            sf.statement(sf.END_IF),
+            sf.branch(sf.IF, sf.global_target(move_now) + sf.number("1") + sf.operator("==")),
+            sf.set_to(sf.global_target(move_now), sf.number("0")),
+            sf.call_on(mover, sf.SET_POS, sf.axis_argument("Z"), sf.int_argument(MOVE_HEIGHT)),
+            sf.call_on(traveller, sf.MOVE_TO_MARKER, sf.form_argument(far_marker)),
+            sf.call_on(player, sf.MOVE_TO_MARKER, sf.form_argument(far_marker)),
+            sf.statement(sf.END_IF)])),
         # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
@@ -564,7 +659,17 @@ def object_refs(kind, origin):
     """The references of the scripted object and of the cube its script disables, around the origin of the cell."""
     x, y = origin
     return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
-            refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2))]
+            refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
+            refr(MOVER_REF_IDS[kind], CUBE_ID, (x + MOVER_PLACE[0], y + MOVER_PLACE[1], CUBE / 2)),
+            refr(FAR_MOVER_REF_IDS[kind], CUBE_ID, (x + FAR_MOVER_PLACE[0], y + FAR_MOVER_PLACE[1], CUBE / 2)),
+            refr(SLEEPER_REF_IDS[kind], CUBE_ID, (x + SLEEPER_PLACE[0], y + SLEEPER_PLACE[1], CUBE / 2)),
+            refr(SLEEPER_TARGET_REF_IDS[kind], TARGET_MARKER_ID,
+                 (x + SLEEPER_TARGET_PLACE[0], y + SLEEPER_TARGET_PLACE[1], 0.0)),
+            refr(MOVE_TARGET_REF_IDS[kind], TARGET_MARKER_ID, (x + MOVE_TARGET_PLACE[0], y + MOVE_TARGET_PLACE[1], 0.0),
+                 rotation=(0.0, 0.0, TARGET_YAW)),
+            refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2)),
+            refr(TRAVELLER_REF_IDS[kind], CUBE_ID, (x + TRAVELLER_PLACE[0], y + TRAVELLER_PLACE[1], CUBE / 2)),
+            refr(CROSSER_REF_IDS[kind], CUBE_ID, (x + CROSSER_PLACE[0], y + CROSSER_PLACE[1], CUBE / 2))]
 
 
 def stage_script(statements, references):
@@ -621,6 +726,13 @@ def quests():
                               + sf.operator("+"))]
     a_at_ten = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=float(QUEST_A_STAGE))
     a_at_ninety_nine = condition(GET_STAGE_FUNCTION, QUEST_A_ID, compare=0x00, value=99.0)
+    # Stage of C: SetPos on x and then on y of the cube of each kind of cell (the one in the cell that is not loaded is
+    # sent where its cell will put it when it is loaded)
+    c_result = []
+    for index, kind in enumerate(("interior", "exterior"), 1):
+        origin = EXTERIOR_CELL_SIZE / 2 if kind == "exterior" else 0.0
+        c_result += [sf.call_on(index, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(int(origin + SETTER_SET[0]))),
+                     sf.call_on(index, sf.SET_POS, sf.axis_argument("Y"), sf.int_argument(int(origin + SETTER_SET[1])))]
     return [
         quest(QUEST_A_ID, QUEST_A_NAME, "OpenFallout Test Quest A", QUEST_FLAG_START_GAME,
               [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID),
@@ -630,7 +742,7 @@ def quests():
               objective=(QUEST_OBJECTIVE, QUEST_OBJECTIVE_TEXT)),
         # The quest that opens the gate of the packages: it has the one stage, which the test sets from Lua
         quest(QUEST_C_ID, QUEST_C_NAME, "OpenFallout Test Quest C", 0,
-              [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], [], [])]),
+              [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], c_result, [SETTER_REF_IDS["interior"], SETTER_REF_IDS["exterior"]])]),
     ]
 def climate():
     """A CLMT record that lists the weather and one that needs a global that is 0, with the times of sunrise and
@@ -955,7 +1067,9 @@ def plugin():
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
-                                  *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values())])
+                                  *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
+                                    for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message()])
             + top_group(b"SCPT", [quest_script(), object_script("interior"), object_script("exterior")])
