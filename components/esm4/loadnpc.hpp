@@ -207,7 +207,8 @@ namespace ESM4
         AIData mAIData;
         std::vector<ESM::FormId> mAIPackages; // seems to be in priority order, 0 = highest priority
         ActorBaseConfig mBaseConfig; // union
-        ActorFaction mFaction;
+        ActorFaction mFaction; // the last SNAM, mFactions has them all
+        std::vector<ActorFaction> mFactions; // every SNAM in the order of the record
         Data mData;
         ESM::FormId mCombatStyle;
         ESM::FormId mSoundBase;

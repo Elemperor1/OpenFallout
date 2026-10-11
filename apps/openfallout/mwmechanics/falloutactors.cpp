@@ -750,6 +750,13 @@ namespace OFMechanics
             if (distanceAcross(mind.position(), frame.mPlayer) > range)
                 continue;
 
+            // A script killed it, and nothing else in the game does yet: it does nothing more
+            if (frame.mScripts != nullptr && frame.mScripts->isDead(mind.mPtr))
+            {
+                stopWalking(mind);
+                continue;
+            }
+
             mind.mReview -= duration;
             if (mind.mReview <= 0.f)
             {

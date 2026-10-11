@@ -24,8 +24,16 @@ CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a 
 
 # The codes of commands the tests use, as the executables of the games number them
 GET_DISTANCE = 0x1001
+ADD_ITEM = 0x1002
 DISABLE = 0x1022
 GET_DISABLED = 0x1023
+GET_DEAD = 0x102E
+GET_ITEM_COUNT = 0x102F
+GET_IN_FACTION = 0x1047
+GET_FACTION_RANK = 0x1049
+REMOVE_ITEM = 0x1052
+KILL_ACTOR = 0x108B
+REMOVE_FROM_FACTION = 0x1180
 SHOW_MESSAGE = 0x1059
 IS_ACTION_REF = 0x1069
 EVALUATE_PACKAGE = 0x105E
@@ -90,10 +98,11 @@ def call_counted(code, *arguments):
     return statement(code, u16(len(arguments)) + b"".join(arguments))
 
 
-def call_on(reference, code, *arguments):
+def call_on(reference, code, *arguments, counted=False):
     """A call of a command on a reference (ref.Command) as a statement: the 0x1C statement holds the index of the
-    reference in its length field, then the call."""
-    data = u16(len(arguments)) + b"".join(arguments) if arguments else b""
+    reference in its length field, then the call. A command that has parameters, all of them optional, still has the
+    count of arguments (`counted`) when it is given none."""
+    data = u16(len(arguments)) + b"".join(arguments) if arguments or counted else b""
     return u16(CALL_ON_REFERENCE) + u16(reference) + u16(code) + u16(len(data)) + data
 
 

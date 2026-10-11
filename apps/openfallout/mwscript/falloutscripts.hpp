@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <components/esm/formid.hpp>
+#include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -52,6 +54,7 @@ namespace OFScript
     class FalloutScripts final : private FalloutScript::Host,
                                  private FalloutScript::QuestRecords,
                                  private FalloutScript::ObjectWorld,
+                                 private FalloutScript::ActorRecords,
                                  private FalloutScript::PackageWorld,
                                  private FalloutScript::MessageWorld
     {
@@ -81,6 +84,10 @@ namespace OFScript
         /// action reference, and tells whether it has one. An object whose script has one does not do what it does by
         /// default: its script asks for that with Activate.
         bool activated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+
+        /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
+        /// yet.
+        bool isDead(const OFWorld::Ptr& actor) const;
 
         /// The AI packages that scripts gave the character, the last given first (those that no content file has a
         /// record of are left out)
@@ -125,6 +132,15 @@ namespace OFScript
 
         void showMessage(FalloutScript::FormId message) override;
 
+        bool initialItems(
+            FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
+        bool initialFactions(
+            FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
+
+        /// The record that the reference is of, by the records of the content files; a reference that they do not have
+        /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
+        /// it is not known (yet); the base is empty for a reference that has none.
+        bool baseOf(FalloutScript::FormId reference, ESM::FormId& base);
         /// The object of the reference when it is in a cell that is loaded, else an empty one
         OFWorld::Ptr findReference(FalloutScript::FormId reference);
         void runPending();
@@ -145,6 +161,7 @@ namespace OFScript
         FalloutScript::ConditionEvaluator mConditions;
         FalloutScript::QuestManager mQuests;
         FalloutScript::ObjectScripts mObjects;
+        FalloutScript::ActorState mActors;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

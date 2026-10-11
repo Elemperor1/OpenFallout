@@ -431,6 +431,10 @@ namespace OFWorld
         ///
     };
 
+    /// The creature or character that a placed actor stands for: its own base, or the one that a levelled list in the
+    /// place of its base gives (by the dice of the reference, so that it is the same each time, and the one that the
+    /// cell loads). Zero when a list gives nothing, so that no actor stands there.
+    ESM::FormId placedActorBaseOf(const ESMStore& store, const ESM4::ActorCharacter& ref);
 }
 
 #endif

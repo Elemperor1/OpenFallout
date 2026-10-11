@@ -152,6 +152,28 @@ namespace
         EXPECT_EQ(npcs[0].mSymTextureModeCoefficients[1], 1.5f);
     }
 
+    TEST(ESM4NpcTest, keepsEveryFactionOfACharacter)
+    {
+        // SNAM: the faction, its rank and three bytes
+        const auto faction = [](std::uint32_t id, std::int8_t rank) {
+            std::string data;
+            append<std::uint32_t>(data, id);
+            append<std::int8_t>(data, rank);
+            data.append(3, '\0');
+            return subRecord("SNAM", data);
+        };
+        const std::string data = zString("EDID", "Npc") + faction(0x00000801, 0) + faction(0x00000802, 2);
+
+        const ESM4::Npc npc = loadVersioned(0.94f, 15, data);
+
+        ASSERT_EQ(npc.mFactions.size(), 2u);
+        EXPECT_EQ(npc.mFactions[0].faction, 0x00000801u);
+        EXPECT_EQ(npc.mFactions[0].rank, 0);
+        EXPECT_EQ(npc.mFactions[1].faction, 0x00000802u);
+        EXPECT_EQ(npc.mFactions[1].rank, 2);
+        EXPECT_EQ(npc.mFaction.faction, 0x00000802u);
+    }
+
     TEST(ESM4NpcTest, readsFaceGenerationCoefficientsThatHaveNoData)
     {
         // These records are in the Tale of Two Wastelands plugins. The sub-records that follow must not be eaten.

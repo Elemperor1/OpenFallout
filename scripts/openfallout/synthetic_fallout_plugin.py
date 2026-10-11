@@ -114,7 +114,9 @@ SCRIPTED_REF_IDS = {"interior": 0x84C, "exterior": 0x84D}
 VICTIM_REF_IDS = {"interior": 0x84E, "exterior": 0x84F}
 OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTestObjectFrames"),
                   "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
-                  "victim": (0x854, "OFTestObjectVictimDisabled")}
+                  "victim": (0x854, "OFTestObjectVictimDisabled"), "items": (0x86D, "OFTestIdlerItems"),
+                  "rank": (0x86E, "OFTestIdlerRank"), "joined": (0x86F, "OFTestIdlerJoined"),
+                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank"), "listed": (0x872, "OFTestListedItems")}
 # Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
 # first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
 # stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
@@ -128,7 +130,23 @@ GATE_REF_IDS = {"conditional": (0x85F, 0x860), "gated": (0x861, 0x862), "blocked
                 "scripted": (0x865, 0x866), "scripted_marker": (0x867, 0x868)}
 QUEST_C_ID = 0x869
 MESSAGE_ID = 0x86A # the message that the script of the scripted object shows when its cell is loaded
-LAST_ID = 0x86A # the largest form ID of the plugin, which the next object ID of its header follows
+# The idler (a character with no packages) is in two factions and holds IDLER_ITEMS suits, by its record. The script of
+# the scripted object adds IDLER_ADDS suits, takes IDLER_TAKES, takes the idler out of the second faction and kills it,
+# and keeps what it sees of that in globals.
+FACTION_IDS = (0x86B, 0x86C)
+IDLER_RANKS = (3, 1)
+IDLER_ITEMS = 4
+IDLER_ADDS = 3
+IDLER_TAKES = 2
+# The player is the character of form 7 (what PlayerRef names in the games) and is in the first faction by that record;
+# the script reads the rank back
+PLAYER_BASE_ID = 0x7
+PLAYER_RANK = 2
+# The beast holds CREATURE_ITEMS suits by its record. The creature that is placed as a levelled list stands for it, so
+# the script sees the same suits there
+CREATURE_ITEMS = 6
+LISTED_REF_IDS = {"interior": CREATURE_LIST_REF_ID, "exterior": EXTERIOR_CREATURE_LIST_REF_ID}
+LAST_ID = 0x872 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -474,8 +492,9 @@ def message():
 
 def object_script(kind):
     """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
-    disables the cube next to it and gives the scripted walker its package; every frame it counts the frames, measures its distance to
-    the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
+    disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
+    and kills it, reads the rank of the player in a faction and the suits of a creature placed as a levelled list; every
+    frame it counts the frames, measures its distance to the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
     second time, lets the object do what it does by default (Activate)."""
     sf = fallout_script
     script = sf.Script(0)
@@ -487,6 +506,12 @@ def object_script(kind):
     greeting = script.form(MESSAGE_ID)
     loads, frames, activated, distance, disabled = (script.form(OBJECT_GLOBALS[name][0])
                                                     for name in ("loads", "frames", "activated", "distance", "victim"))
+    items, rank, joined, dead, player_rank, listed_items = (
+        script.form(OBJECT_GLOBALS[name][0]) for name in ("items", "rank", "joined", "dead", "player_rank", "listed"))
+    listed = script.form(LISTED_REF_IDS[kind])
+    idler = script.form(PACKAGE_REF_IDS["idler"][index])
+    suit = script.form(SUIT_ID)
+    first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
 
     def add_one(global_index):
         return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
@@ -497,11 +522,26 @@ def object_script(kind):
         sf.block(sf.ON_LOAD, add_one(loads) + sf.call(sf.SHOW_MESSAGE, sf.form_argument(greeting))
                  + sf.call_on(victim, sf.DISABLE)
                  + sf.call_on(walker, sf.ADD_SCRIPT_PACKAGE, sf.form_argument(walker_package))
-                 + sf.call_on(walker, sf.EVALUATE_PACKAGE)),
+                 + sf.call_on(walker, sf.EVALUATE_PACKAGE)
+                 + sf.call_on(idler, sf.ADD_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_ADDS))
+                 + sf.call_on(idler, sf.REMOVE_ITEM, sf.form_argument(suit), sf.int_argument(IDLER_TAKES))
+                 + sf.call_on(idler, sf.REMOVE_FROM_FACTION, sf.form_argument(second_faction))
+                 + sf.call_on(idler, sf.KILL_ACTOR, counted=True)),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
-            sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim))])),
+            sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim)),
+            sf.set_to(sf.global_target(items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
+                                                             reference=idler)),
+            sf.set_to(sf.global_target(rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
+                                                            reference=idler)),
+            sf.set_to(sf.global_target(joined), sf.call_token(sf.GET_IN_FACTION, sf.form_argument(second_faction),
+                                                              reference=idler)),
+            sf.set_to(sf.global_target(dead), sf.call_token(sf.GET_DEAD, reference=idler)),
+            sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
+                                                                   reference=player)),
+            sf.set_to(sf.global_target(listed_items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
+                                                                    reference=listed))])),
         # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
@@ -667,7 +707,12 @@ def suit():
                                      sub(b"DATA", struct.pack("<IIf", 1, 1, 1.0))])
 
 
-def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True):
+def faction(form_id, name):
+    """A FACT record: a name and nothing else."""
+    return record(b"FACT", form_id, [zstr(b"EDID", name), zstr(b"FULL", name)])
+
+
+def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=()):
     """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
@@ -678,6 +723,8 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True):
     if dressed:
         subs += [sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)), sub(b"HNAM", struct.pack("<I", HAIR_ID)),
                  sub(b"FGGS", struct.pack("<50f", PERSON_FACE, *([0.0] * 49)))]
+    subs += [sub(b"CNTO", struct.pack("<II", item, count)) for item, count in items]
+    subs += [sub(b"SNAM", struct.pack("<IBxxx", faction_id, rank)) for faction_id, rank in factions]
     subs += [sub(b"PKID", struct.pack("<I", package)) for package in packages]
     return record(b"NPC_", form_id, subs)
 
@@ -727,7 +774,9 @@ def package_people():
     people = [person(WALKER_IDS[kind], "OFTestWalker" + kind.capitalize(),
                      [NIGHT_PACKAGE_IDS[kind], TRAVEL_PACKAGE_IDS[kind]], dressed=False)
               for kind in ("interior", "exterior")]
-    people.append(person(IDLER_ID, "OFTestIdler", dressed=False))
+    people.append(person(IDLER_ID, "OFTestIdler", dressed=False, items=[(SUIT_ID, IDLER_ITEMS)],
+                         factions=list(zip(FACTION_IDS, IDLER_RANKS))))
+    people.append(person(PLAYER_BASE_ID, "OFTestPlayer", dressed=False, factions=[(FACTION_IDS[0], PLAYER_RANK)]))
     people.append(person(ROAMER_ID, "OFTestRoamer", [ROAM_PACKAGE_ID], dressed=False))
     people.append(person(FOLLOWER_ID, "OFTestFollower", [FOLLOW_PACKAGE_ID], dressed=False))
     people.append(person(COMPANION_ID, "OFTestCompanion", dressed=False))
@@ -796,7 +845,7 @@ def creatures():
     beast = creature(CREATURE_ID, CREATURE_NAME, [
         zstr(b"FULL", "OpenFallout Test Beast"), zstr(b"MODL", CREATURE_SKELETON),
         sub(b"NIFZ", CREATURE_BODY.encode("ascii") + b"\0" + CREATURE_FOOT.encode("ascii") + b"\0"),
-        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS))])
+        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS)), sub(b"CNTO", struct.pack("<II", SUIT_ID, CREATURE_ITEMS))])
     # the record of one that takes its model, and with it its name, from the template and keeps nothing of its own
     user = creature(CREATURE_USER_ID, CREATURE_NAME + "User", [
         zstr(b"FULL", "Not Shown"), sub(b"TPLT", struct.pack("<I", CREATURE_LIST_ID))],
@@ -915,6 +964,7 @@ def plugin():
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
+            + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", packages()) + top_group(b"NPC_", [person(), *package_people()])
             + top_group(b"CREA", list(creatures()[:2]))
             + top_group(b"LVLC", [creatures()[2]])

@@ -7,10 +7,15 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadcont.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadqust.hpp>
+#include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/misc/strings/algorithm.hpp>
@@ -84,6 +89,7 @@ namespace OFScript
         , mConditions(mInterpreter)
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
+        , mActors(*this)
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
@@ -93,6 +99,7 @@ namespace OFScript
             mInterpreter, mObjects, *this, [this] { return std::uniform_int_distribution<int>(0, 99)(mRandom); });
         FalloutScript::addPackageCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
+        FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -113,6 +120,7 @@ namespace OFScript
         mPendingLoad.clear();
         mReferences.clear();
         mScriptPackages.clear();
+        mActors.clear();
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -356,6 +364,132 @@ namespace OFScript
         // Buttons make a message a question to the player, which the game can not ask yet: the text is shown alone
         Log(Debug::Info) << "Message: " << record->mDescription;
         tellPlayer(record->mDescription);
+    }
+
+    namespace
+    {
+        /// The record that a character or creature takes something from, which is the first of its templates that does
+        /// not: the flag says what is taken. Null when a template is not a record of the same kind (a levelled list
+        /// of characters), which can not be followed here.
+        template <class Record>
+        const Record* templateOwner(const OFWorld::ESMStore& store, const Record* record, std::uint16_t flag)
+        {
+            // A chain of templates that is longer is a cycle or a mistake (the limit of the model and the worn armor)
+            constexpr int maxTemplateDepth = 16;
+            for (int step = 0; record != nullptr && record->takesFromTemplate(flag); ++step)
+            {
+                if (record->mBaseTemplate.isZeroOrUnset() || step >= maxTemplateDepth)
+                    return nullptr;
+                record = store.get<Record>().search(record->mBaseTemplate);
+            }
+            return record;
+        }
+    }
+
+    bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
+    {
+        base = ESM::FormId();
+        if (reference == mPlayer)
+        {
+            // The record of PlayerRef names the character that the player is; without it that is form 7 of the same
+            // plugin, which is where the games keep it
+            if (const ESM4::ActorCharacter* record
+                = mStore.get<ESM4::ActorCharacter>().search(ESM::FormId::fromUint32(reference)))
+                base = OFWorld::placedActorBaseOf(mStore, *record);
+            else
+                base = ESM::FormId::fromUint32((reference & 0xFF000000u) | 0x7u);
+            return true;
+        }
+        // The records of the content files say what a reference is, whether or not its cell is loaded and from any
+        // thread: the objects of the loaded cells are for the thread of the frame
+        const ESM::FormId form = ESM::FormId::fromUint32(reference);
+        if (form.isZeroOrUnset())
+            return true;
+        // A levelled list in the place of the base of a character or creature stands for the one it gives, as in the
+        // cell
+        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
+            base = OFWorld::placedActorBaseOf(mStore, *character);
+        else if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
+            base = OFWorld::placedActorBaseOf(mStore, *creature);
+        else if (const ESM4::Reference* object = mStore.get<ESM4::Reference>().search(form))
+            base = object->mBaseObj;
+        else
+        {
+            // Made while the game runs: only the world knows it, and only the thread of the frame may ask
+            if (std::this_thread::get_id() != mMainThread)
+                return false;
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (ptr.isEmpty())
+                return false;
+            if (ptr.getType() == ESM4::Npc::sRecordId)
+                base = ptr.get<ESM4::Npc>()->mBase->mId;
+            else if (ptr.getType() == ESM4::Creature::sRecordId)
+                base = ptr.get<ESM4::Creature>()->mBase->mId;
+            else if (ptr.getType() == ESM4::Container::sRecordId)
+                base = ptr.get<ESM4::Container>()->mBase->mId;
+        }
+        return true;
+    }
+
+    bool FalloutScripts::initialItems(
+        FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items)
+    {
+        // The player starts with nothing; what the player carries is for the inventory of the game
+        if (holder == mPlayer)
+            return true;
+        ESM::FormId base;
+        if (!baseOf(holder, base))
+            return false;
+        const auto take = [&items](const std::vector<ESM4::InventoryItem>& inventory) {
+            for (const ESM4::InventoryItem& item : inventory)
+                items.emplace_back(item.item, static_cast<std::int32_t>(item.count));
+        };
+        if (base.isZeroOrUnset())
+            return true;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
+                take(owner->mInventory);
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseInventory))
+                take(owner->mInventory);
+        }
+        else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
+            take(container->mInventory);
+        return true;
+    }
+
+    bool FalloutScripts::initialFactions(
+        FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions)
+    {
+        ESM::FormId base;
+        if (!baseOf(actor, base))
+            return false;
+        const auto take = [&factions](const std::vector<ESM4::ActorFaction>& list) {
+            for (const ESM4::ActorFaction& faction : list)
+                factions.emplace_back(faction.faction, faction.rank);
+        };
+        if (base.isZeroOrUnset())
+            return true;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseFactions))
+                take(owner->mFactions);
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
+                take(owner->mFactions);
+        }
+        return true;
+    }
+
+    bool FalloutScripts::isDead(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId reference = referenceOf(actor);
+        return reference != 0 && mActors.isDead(reference);
     }
 
     void FalloutScripts::addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package)
