@@ -361,7 +361,7 @@ add_component_dir (esm4
 )
 
 add_component_dir (falloutscript
-    actors actorvalues commandtable conditions formlists messagecommands objectcommands objects packagecommands placementcommands playerprogress referencestate script interpreter quests vanillacommands
+    actors actorvalues commandtable conditions dialogue formlists messagecommands objectcommands objects packagecommands placementcommands playerprogress referencestate script interpreter quests vanillacommands
     )
 
 add_component_dir (misc
