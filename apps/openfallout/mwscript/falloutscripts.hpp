@@ -211,6 +211,9 @@ namespace OFScript
         /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell
         /// was not loaded, else where its record puts it. False for a reference nobody knows.
         bool currentPlace(FalloutScript::FormId reference, Place& result);
+        /// The cell that the place is in: the one it names, or for an exterior cell the one that the position is in.
+        /// Null for a cell that is not known.
+        OFWorld::CellStore* cellAt(const Place& place);
         /// Where the reference is: the place of the world with the moves that scripts have asked for and the world has
         /// not made yet. False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua,
         /// which runs only while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the

@@ -626,6 +626,7 @@ local scripted_ids, victim_ids, mover_ids, far_ids = { @SCRIPTED@ }, { @VICTIM@ 
 local sleeper_ids = { @SLEEPER@ }
 local setter_ids = { @SETTER@ }
 local traveller_ids = { @TRAVELLER@ }
+local crosser_ids = { @CROSSER@ }
 local traveller_object, setter_object = nil, nil
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
@@ -692,6 +693,15 @@ return {
                 print('OFTEST', 'object mover', string.format('%.1f %.1f %.1f', g.@MOVER_X@, g.@MOVER_Y@, g.@MOVER_ANGLE@),
                     string.format('%.1f %.1f %.1f', at.x, at.y, math.deg(mover.rotation:getYaw())),
                     string.format('%.1f', g.@MOVER_NEAR@))
+                -- The cube that the script gave an x in the next cell: whether the script saw it in that cell at once,
+                -- and where the world has put it
+                local crosser = find(crosser_ids)
+                if crosser ~= nil then
+                    local cell = crosser.cell
+                    print('OFTEST', 'object crosser', string.format('%.1f', g.@CROSSED@), tostring(cell.isExterior),
+                        cell.isExterior and string.format('%d %d', cell.gridX, cell.gridY) or 'none',
+                        string.format('%.1f', crosser.position.x))
+                end
             elseif step == 3 and elapsed >= @MOVE_FROM@ then
                 step = 4
                 print('OFTEST', 'player moves now')
@@ -753,6 +763,8 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
                  .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
                  .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
+                 .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
+                 .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
@@ -1281,6 +1293,18 @@ def check_objects(text, scenario):
             problems.append("SetPos on the player should have moved it to the new x in the cell it was in "
                             f"({origin + plugin.HOP_X:g}) and the script should have taken back the request: "
                             + str(found))
+    found = one("crosser")
+    if found is not None:
+        saw, exterior, grid, x = found
+        # An x in the next cell puts the cube in the cell next to the one it is in: the script sees that at once (the
+        # world makes the move at the start of the next frame), and the world then puts it there. The interior cell has
+        # no cell next to it.
+        want_grid = f"{plugin.DRY_CELL[0]} {plugin.DRY_CELL[1]}" if scenario.exterior else "none"
+        if (float(saw) != (1.0 if scenario.exterior else 0.0) or exterior != str(scenario.exterior).lower()
+                or grid != want_grid or abs(float(x) - plugin.CROSS_X) > MOVE_SLACK):
+            problems.append("SetPos on x into the next exterior cell should put the cube in that cell for GetInCell "
+                            f"right away ({'1' if scenario.exterior else '0'}) and the world should put it there "
+                            f"(grid {want_grid}, x {plugin.CROSS_X}): {found}")
     found = one("traveller")
     if found is not None:
         exterior, where = found

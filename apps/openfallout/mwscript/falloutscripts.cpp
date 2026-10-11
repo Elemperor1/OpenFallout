@@ -632,19 +632,41 @@ namespace OFScript
         return false;
     }
 
+    OFWorld::CellStore* FalloutScripts::cellAt(const Place& place)
+    {
+        OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        OFWorld::CellStore* cell = model->findCell(place.mCell);
+        // A position outside the square of an exterior cell belongs to the one next to it
+        if (cell != nullptr && cell->isExterior())
+            cell = &model->getExterior(ESM::positionToExteriorCellLocation(
+                place.mPosition.x(), place.mPosition.y(), cell->getCell()->getWorldSpace()));
+        return cell;
+    }
+
     bool FalloutScripts::whereIs(FalloutScript::FormId reference, Place& result)
     {
         if (!currentPlace(reference, result))
             return false;
         // What scripts asked for and the world has not done yet is where the object is for them
+        unsigned moved = 0;
         if (const auto planned = mPendingMoves.find(reference); planned != mPendingMoves.end())
+        {
             result = planned->second.applyTo(result);
+            moved |= planned->second.mParts;
+        }
         {
             // What another thread asked for is newer still
             const std::lock_guard lock(mDeferredMutex);
             if (const auto asked = mDeferredPlaces.find(reference); asked != mDeferredPlaces.end())
+            {
                 result = asked->second.applyTo(result);
+                moved |= asked->second.mParts;
+            }
         }
+        // A position outside the square of an exterior cell is in the cell next to it, as the world will have it
+        if ((moved & (Move::Cell | Move::PositionX | Move::PositionY)) != 0)
+            if (const OFWorld::CellStore* cell = cellAt(result))
+                result.mCell = cell->getCell()->getId();
         return true;
     }
 
@@ -727,7 +749,6 @@ namespace OFScript
     void FalloutScripts::applyMove(FalloutScript::FormId reference, const Move& move)
     {
         OFBase::World* world = OFBase::Environment::get().getWorld();
-        OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
         // The parts that the script named are put on the place the object has now, not on the one it had when the
         // script asked
         Place where;
@@ -752,17 +773,13 @@ namespace OFScript
                 ptr == world->getPlayerPtr() ? OFBase::RotationFlag_inverseOrder : OFBase::RotationFlag_none);
             return;
         }
-        OFWorld::CellStore* destination = model->findCell(where.mCell);
+        OFWorld::CellStore* destination = cellAt(where);
         if (destination == nullptr)
         {
             log("MoveToMarker: the cell " + where.mCell.toDebugString() + " of " + FalloutScript::hex(reference)
                 + " is not known");
             return;
         }
-        // A position outside the square of an exterior cell belongs to the one next to it
-        if (destination->isExterior())
-            destination = &model->getExterior(ESM::positionToExteriorCellLocation(
-                where.mPosition.x(), where.mPosition.y(), destination->getCell()->getWorldSpace()));
         const OFWorld::Class& cls = ptr.getClass();
         if (ptr == world->getPlayerPtr())
         {

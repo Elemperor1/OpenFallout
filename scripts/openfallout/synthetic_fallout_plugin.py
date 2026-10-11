@@ -155,7 +155,8 @@ MOVER_REF_IDS = {"interior": 0x871, "exterior": 0x872}
 MOVE_TARGET_REF_IDS = {"interior": 0x873, "exterior": 0x874}
 MOVE_GLOBALS = {"x": (0x875, "OFTestMoverX"), "y": (0x876, "OFTestMoverY"), "angle": (0x877, "OFTestMoverAngle"),
                 "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX"),
-                "hop": (0x886, "OFTestHopNow"), "near": (0x887, "OFTestMoverNear")}
+                "hop": (0x886, "OFTestHopNow"), "near": (0x887, "OFTestMoverNear"),
+                "crossed": (0x88A, "OFTestCrossedCell")}
 # A second cube is sent to the marker of the other kind of cell, which is not loaded: the world keeps it there, and the
 # script reads where it is from the cell that is
 FAR_MOVER_REF_IDS = {"interior": 0x879, "exterior": 0x87A}
@@ -186,7 +187,12 @@ TRAVELLER_PLACE = (1500.0, -2000.0)
 # The test asks for a move of the player inside the cell it is in with a global (SetPos on x): the player is moved, not
 # taken to the cell again (which fades the screen out and in)
 HOP_X = 123.0
-LAST_ID = 0x887 # the largest form ID of the plugin, which the next object ID of its header follows
+# A cube that the script gives an x in the cell next to the one it is in (the dry cell, 1,0) and asks right after whether
+# it is in that cell: it is when the cell is an exterior one, and the interior cell has no cell next to it
+CROSSER_REF_IDS = {"interior": 0x888, "exterior": 0x889}
+CROSSER_PLACE = (1800.0, -1400.0)
+CROSS_X = 5000
+LAST_ID = 0x88A # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -560,6 +566,8 @@ def object_script(kind):
     far_mover = script.form(FAR_MOVER_REF_IDS[kind])
     traveller = script.form(TRAVELLER_REF_IDS[kind])
     setter = script.form(SETTER_REF_IDS[kind])
+    crosser, dry_cell, crossed = (script.form(form_id) for form_id in (
+        CROSSER_REF_IDS[kind], DRY_CELL_ID, MOVE_GLOBALS["crossed"][0]))
     other_kind = "exterior" if kind == "interior" else "interior"
     sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
 
@@ -583,6 +591,11 @@ def object_script(kind):
                  # cube at the marker already (the offsets are in the x and y)
                  + sf.set_to(sf.global_target(mover_near),
                              sf.call_token(sf.GET_DISTANCE, sf.form_argument(move_target), reference=mover))
+                 # An x in the cell next to this one (the world has not made the move yet): the cube is in that cell
+                 # for the script already, when the cell is an exterior one
+                 + sf.call_on(crosser, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(CROSS_X))
+                 + sf.set_to(sf.global_target(crossed),
+                             sf.call_token(sf.GET_IN_CELL, sf.form_argument(dry_cell), reference=crosser))
                  + sf.call_on(far_mover, sf.MOVE_TO_MARKER, sf.form_argument(far_marker),
                               *(sf.int_argument(offset) for offset in FAR_OFFSET))
                  + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
@@ -653,7 +666,8 @@ def object_refs(kind, origin):
             refr(MOVE_TARGET_REF_IDS[kind], TARGET_MARKER_ID, (x + MOVE_TARGET_PLACE[0], y + MOVE_TARGET_PLACE[1], 0.0),
                  rotation=(0.0, 0.0, TARGET_YAW)),
             refr(SETTER_REF_IDS[kind], CUBE_ID, (x + SETTER_PLACE[0], y + SETTER_PLACE[1], CUBE / 2)),
-            refr(TRAVELLER_REF_IDS[kind], CUBE_ID, (x + TRAVELLER_PLACE[0], y + TRAVELLER_PLACE[1], CUBE / 2))]
+            refr(TRAVELLER_REF_IDS[kind], CUBE_ID, (x + TRAVELLER_PLACE[0], y + TRAVELLER_PLACE[1], CUBE / 2)),
+            refr(CROSSER_REF_IDS[kind], CUBE_ID, (x + CROSSER_PLACE[0], y + CROSSER_PLACE[1], CUBE / 2))]
 
 
 def stage_script(statements, references):
