@@ -33,10 +33,10 @@ namespace FalloutScript
 
     int PlayerProgress::levelFor(int experience)
     {
-        // The experience that level n needs is 100 * n * (n - 1)
-        const double steps = std::max(experience, 0) / 100.0;
-        std::int64_t level = static_cast<std::int64_t>((1 + std::sqrt(1 + 4 * steps)) / 2);
-        const auto needed = [](std::int64_t n) { return 100 * n * (n - 1); };
+        // The experience that level n needs is the sum of the steps 200, 350, 500, ...: (n - 1) * (75 * n + 50)
+        const auto needed = [](std::int64_t n) { return (n - 1) * (75 * n + 50); };
+        const double points = std::max(experience, 0);
+        std::int64_t level = static_cast<std::int64_t>((25 + std::sqrt(625 + 300 * (50 + points))) / 150);
         while (level > 1 && needed(level) > experience)
             --level;
         while (needed(level + 1) <= experience)

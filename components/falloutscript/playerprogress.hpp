@@ -28,9 +28,11 @@ namespace FalloutScript
         /// Gives experience (or takes it away, down to 0)
         void rewardExperience(int amount);
         int experience() const;
-        /// The level that an amount of experience is: 1 for the first 200, and one more for each next step, which is
-        /// 200 more than the last (the number of points the games ask for each level is not in their files, so this is
-        /// the one the players of the games know, which is assumed to hold for both). There is no highest level.
+        /// The level that an amount of experience is: 1 for the first 200 points, and one more for each next step,
+        /// which is 150 points longer than the one before (200, 350, 500, ...: levels 2, 3, 4 and 5 start at 200, 550,
+        /// 1,050 and 1,700). The 150 is the setting iXPBumpBase of both games' files, and the 200 the default of the
+        /// GECK's experience settings; the games' own formula is not in their files, so the first step is an
+        /// assumption. There is no highest level.
         static int levelFor(int experience);
         int level() const;
 

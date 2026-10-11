@@ -91,23 +91,26 @@ namespace
         EXPECT_EQ(progress.experience(), std::numeric_limits<int>::max());
     }
 
-    TEST(FalloutScriptPlayerProgressTest, the_level_follows_the_experience_in_steps_that_grow_by_200)
+    TEST(FalloutScriptPlayerProgressTest, the_level_follows_the_experience_in_steps_that_grow_by_150)
     {
         EXPECT_EQ(PlayerProgress::levelFor(-5), 1);
         EXPECT_EQ(PlayerProgress::levelFor(0), 1);
         EXPECT_EQ(PlayerProgress::levelFor(199), 1);
         EXPECT_EQ(PlayerProgress::levelFor(200), 2);
-        EXPECT_EQ(PlayerProgress::levelFor(599), 2);
-        EXPECT_EQ(PlayerProgress::levelFor(600), 3);
-        EXPECT_EQ(PlayerProgress::levelFor(1200), 4);
-        EXPECT_EQ(PlayerProgress::levelFor(37999), 19);
-        EXPECT_EQ(PlayerProgress::levelFor(38000), 20);
+        EXPECT_EQ(PlayerProgress::levelFor(549), 2);
+        EXPECT_EQ(PlayerProgress::levelFor(550), 3);
+        EXPECT_EQ(PlayerProgress::levelFor(1049), 3);
+        EXPECT_EQ(PlayerProgress::levelFor(1050), 4);
+        EXPECT_EQ(PlayerProgress::levelFor(1699), 4);
+        EXPECT_EQ(PlayerProgress::levelFor(1700), 5);
+        EXPECT_EQ(PlayerProgress::levelFor(29449), 19);
+        EXPECT_EQ(PlayerProgress::levelFor(29450), 20);
         // The largest number of experience is a level, not an overflow
-        const int highest = PlayerProgress::levelFor(std::numeric_limits<int>::max());
+        const long long highest = PlayerProgress::levelFor(std::numeric_limits<int>::max());
         EXPECT_GT(highest, 4000);
-        EXPECT_LT(highest, 5000);
-        EXPECT_LE(100LL * highest * (highest - 1), std::numeric_limits<int>::max());
-        EXPECT_GT(100LL * (highest + 1) * highest, std::numeric_limits<int>::max());
+        EXPECT_LT(highest, 7000);
+        EXPECT_LE((highest - 1) * (75 * highest + 50), std::numeric_limits<int>::max());
+        EXPECT_GT(highest * (75 * (highest + 1) + 50), std::numeric_limits<int>::max());
     }
 
     TEST(FalloutScriptPlayerProgressTest, the_level_of_the_player_is_told_from_its_experience)
@@ -117,7 +120,7 @@ namespace
 
         progress.rewardExperience(650);
         EXPECT_EQ(progress.level(), 3);
-        progress.rewardExperience(-100);
+        progress.rewardExperience(-200);
         EXPECT_EQ(progress.level(), 2);
     }
 
