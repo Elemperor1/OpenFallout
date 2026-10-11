@@ -51,9 +51,17 @@ namespace
             }
         };
 
+        struct Set
+        {
+            FormId mReference;
+            bool mAngle;
+            int mAxis;
+            double mValue;
+        };
+
         std::map<FormId, Placement> mPlaces;
         std::vector<Move> mMoves;
-        std::vector<std::pair<FormId, Placement>> mPlaced;
+        std::vector<Set> mSets;
 
         bool placement(FormId reference, Placement& result) override
         {
@@ -67,7 +75,16 @@ namespace
         {
             mMoves.push_back({ reference, target, offset });
         }
-        void place(FormId reference, const Placement& where) override { mPlaced.emplace_back(reference, where); }
+        void setPosition(FormId reference, int axis, double value) override
+        {
+            if (mPlaces.count(reference) != 0)
+                mSets.push_back({ reference, false, axis, value });
+        }
+        void setAngle(FormId reference, int axis, double radians) override
+        {
+            if (mPlaces.count(reference) != 0)
+                mSets.push_back({ reference, true, axis, radians });
+        }
     };
 
     struct Runner
@@ -182,10 +199,10 @@ namespace
         setup.run(builder);
 
         EXPECT_EQ(setup.variable(1), 0);
-        EXPECT_THAT(setup.mWorld.mPlaced, IsEmpty());
+        EXPECT_THAT(setup.mWorld.mSets, IsEmpty());
     }
 
-    TEST(FalloutScriptPlacementTest, setting_one_axis_keeps_the_others)
+    TEST(FalloutScriptPlacementTest, setting_one_axis_asks_for_that_axis_only)
     {
         Runner setup;
         Placement where;
@@ -198,16 +215,17 @@ namespace
 
         setup.run(builder);
 
-        ASSERT_EQ(setup.mWorld.mPlaced.size(), 2u);
-        const Placement& first = setup.mWorld.mPlaced[0].second;
-        EXPECT_EQ(setup.mWorld.mPlaced[0].first, guard);
-        EXPECT_EQ(first.mPosition, (std::array<double, 3>{ 1, 42.5, 3 }));
-        EXPECT_EQ(first.mAngle, (std::array<double, 3>{ 0.25, 0.5, 0.75 }));
-        const Placement& second = setup.mWorld.mPlaced[1].second;
-        EXPECT_EQ(second.mPosition, (std::array<double, 3>{ 1, 2, 3 }));
-        EXPECT_DOUBLE_EQ(second.mAngle[0], 0.25);
-        EXPECT_DOUBLE_EQ(second.mAngle[1], 0.5);
-        EXPECT_NEAR(second.mAngle[2], pi, 1e-9);
+        // The world keeps the rest as it finds it when it makes the move, so nothing else is asked for
+        ASSERT_EQ(setup.mWorld.mSets.size(), 2u);
+        const auto& first = setup.mWorld.mSets[0];
+        EXPECT_EQ(first.mReference, guard);
+        EXPECT_FALSE(first.mAngle);
+        EXPECT_EQ(first.mAxis, 1);
+        EXPECT_DOUBLE_EQ(first.mValue, 42.5);
+        const auto& second = setup.mWorld.mSets[1];
+        EXPECT_TRUE(second.mAngle);
+        EXPECT_EQ(second.mAxis, 2);
+        EXPECT_NEAR(second.mValue, pi, 1e-9);
     }
 
     TEST(FalloutScriptPlacementTest, an_axis_that_is_none_changes_nothing)
@@ -221,7 +239,7 @@ namespace
 
         setup.run(builder);
 
-        EXPECT_THAT(setup.mWorld.mPlaced, IsEmpty());
+        EXPECT_THAT(setup.mWorld.mSets, IsEmpty());
         EXPECT_EQ(setup.variable(1), 0);
     }
 
@@ -235,7 +253,7 @@ namespace
 
         setup.run(builder);
 
-        ASSERT_EQ(setup.mWorld.mPlaced.size(), 1u);
-        EXPECT_EQ(setup.mWorld.mPlaced[0].second.mPosition[0], 0);
+        ASSERT_EQ(setup.mWorld.mSets.size(), 1u);
+        EXPECT_EQ(setup.mWorld.mSets[0].mValue, 0);
     }
 }

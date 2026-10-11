@@ -583,6 +583,9 @@ def object_script(kind):
                               *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
+            # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame
+            # must leave what it does in between alone: it walks on to the marker
+            sf.call_on(walker, sf.SET_POS, sf.axis_argument("Z"), sf.int_argument(0)),
             sf.set_to(sf.global_target(distance), sf.call_token(sf.GET_DISTANCE, sf.form_argument(player))),
             sf.set_to(sf.global_target(disabled), sf.call_token(sf.GET_DISABLED, reference=victim)),
             sf.set_to(sf.global_target(items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),

@@ -182,7 +182,13 @@ namespace OFScript
             // An object that scripts moved while its cell was not loaded is put where they wanted it
             if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
             {
-                mPendingMoves[reference] = moved->second;
+                Move move;
+                move.mWhere = moved->second;
+                move.mParts = Move::All;
+                // Whatever a script asked for since then comes after it
+                if (const auto asked = mPendingMoves.find(reference); asked != mPendingMoves.end())
+                    move.add(asked->second);
+                mPendingMoves[reference] = move;
                 mRelocations.erase(moved);
             }
             // An object that scripts enabled or disabled while its cell was not loaded is so now, whatever its record
@@ -219,10 +225,10 @@ namespace OFScript
             }
         }
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
-        std::map<FalloutScript::FormId, Place> moves;
+        std::map<FalloutScript::FormId, Move> moves;
         moves.swap(mPendingMoves);
-        for (const auto& [reference, where] : moves)
-            applyMove(reference, where);
+        for (const auto& [reference, move] : moves)
+            applyMove(reference, move);
         // Every object has its script before any of them runs OnLoad, so that they can reach each other
         std::vector<std::pair<FalloutScript::FormId, bool>> toggle;
         toggle.swap(mPendingToggle);
@@ -589,22 +595,8 @@ namespace OFScript
         return id != nullptr ? id->toUint32() : 0;
     }
 
-    bool FalloutScripts::whereIs(FalloutScript::FormId reference, Place& result)
+    bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)
     {
-        {
-            // What another thread asked for is not done yet, but it is what the script sees
-            const std::lock_guard lock(mDeferredMutex);
-            if (const auto asked = mDeferredPlaces.find(reference); asked != mDeferredPlaces.end())
-            {
-                result = asked->second;
-                return true;
-            }
-        }
-        if (const auto planned = mPendingMoves.find(reference); planned != mPendingMoves.end())
-        {
-            result = planned->second;
-            return true;
-        }
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty() && ptr.getCell() != nullptr)
         {
@@ -634,6 +626,22 @@ namespace OFScript
         return false;
     }
 
+    bool FalloutScripts::whereIs(FalloutScript::FormId reference, Place& result)
+    {
+        if (!currentPlace(reference, result))
+            return false;
+        // What scripts asked for and the world has not done yet is where the object is for them
+        if (const auto planned = mPendingMoves.find(reference); planned != mPendingMoves.end())
+            result = planned->second.applyTo(result);
+        {
+            // What another thread asked for is newer still
+            const std::lock_guard lock(mDeferredMutex);
+            if (const auto asked = mDeferredPlaces.find(reference); asked != mDeferredPlaces.end())
+                result = asked->second.applyTo(result);
+        }
+        return true;
+    }
+
     bool FalloutScripts::placement(FalloutScript::FormId reference, FalloutScript::Placement& result)
     {
         Place place;
@@ -659,39 +667,70 @@ namespace OFScript
             return;
         }
         // Markers point somewhere, and what stands on them turns that way; a tilted marker does not tilt it
-        to.mPosition
+        Move move;
+        move.mWhere = to;
+        move.mWhere.mPosition
             += osg::Vec3f(static_cast<float>(offset[0]), static_cast<float>(offset[1]), static_cast<float>(offset[2]));
-        to.mAngle = osg::Vec3f(from.mAngle.x(), from.mAngle.y(), to.mAngle.z());
+        move.mParts = Move::Cell | Move::PositionX | Move::PositionY | Move::PositionZ | Move::AngleZ;
         // The world is not changed while scripts run
-        askForMove(reference, to);
+        askForMove(reference, move);
     }
 
-    void FalloutScripts::place(FalloutScript::FormId reference, const FalloutScript::Placement& where)
+    void FalloutScripts::setPosition(FalloutScript::FormId reference, int axis, double value)
     {
         Place place;
-        if (!whereIs(reference, place))
+        if (axis < 0 || axis > 2 || !whereIs(reference, place))
             return;
-        place.mPosition = osg::Vec3f(static_cast<float>(where.mPosition[0]), static_cast<float>(where.mPosition[1]),
-            static_cast<float>(where.mPosition[2]));
-        place.mAngle = osg::Vec3f(static_cast<float>(where.mAngle[0]), static_cast<float>(where.mAngle[1]),
-            static_cast<float>(where.mAngle[2]));
-        askForMove(reference, place);
+        Move move;
+        move.mWhere = place;
+        move.mWhere.mPosition[axis] = static_cast<float>(value);
+        move.mParts = Move::PositionX << axis;
+        askForMove(reference, move);
     }
 
-    void FalloutScripts::askForMove(FalloutScript::FormId reference, const Place& where)
+    void FalloutScripts::setAngle(FalloutScript::FormId reference, int axis, double radians)
+    {
+        Place place;
+        if (axis < 0 || axis > 2 || !whereIs(reference, place))
+            return;
+        Move move;
+        move.mWhere = place;
+        move.mWhere.mAngle[axis] = static_cast<float>(radians);
+        move.mParts = Move::AngleX << axis;
+        askForMove(reference, move);
+    }
+
+    void FalloutScripts::queueMove(
+        std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move)
+    {
+        const auto [found, added] = moves.try_emplace(reference, move);
+        if (!added)
+            found->second.add(move);
+    }
+
+    void FalloutScripts::askForMove(FalloutScript::FormId reference, const Move& move)
     {
         if (std::this_thread::get_id() != mMainThread)
         {
             const std::lock_guard lock(mDeferredMutex);
-            mDeferredPlaces[reference] = where;
+            queueMove(mDeferredPlaces, reference, move);
         }
-        runOnMainThread([this, reference, where] { mPendingMoves[reference] = where; });
+        runOnMainThread([this, reference, move] { queueMove(mPendingMoves, reference, move); });
     }
 
-    void FalloutScripts::applyMove(FalloutScript::FormId reference, const Place& where)
+    void FalloutScripts::applyMove(FalloutScript::FormId reference, const Move& move)
     {
         OFBase::World* world = OFBase::Environment::get().getWorld();
         OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        // The parts that the script named are put on the place the object has now, not on the one it had when the
+        // script asked
+        Place where;
+        if (!currentPlace(reference, where))
+        {
+            log("MoveToMarker: " + FalloutScript::hex(reference) + " has no place the game knows");
+            return;
+        }
+        where = move.applyTo(where);
         const OFWorld::Ptr ptr = findReference(reference);
         if (ptr.isEmpty())
         {

@@ -92,20 +92,14 @@ namespace FalloutScript
         });
         interpreter.setHandler("SetPos", [&world](CallContext& call) {
             const int axis = axisOf(call, 0);
-            Placement where;
-            if (call.mReference == 0 || axis < 0 || !world.placement(call.mReference, where))
-                return 0.0;
-            where.mPosition[axis] = finite(argument(call, 1));
-            world.place(call.mReference, where);
+            if (call.mReference != 0 && axis >= 0)
+                world.setPosition(call.mReference, axis, finite(argument(call, 1)));
             return 0.0;
         });
         interpreter.setHandler("SetAngle", [&world](CallContext& call) {
             const int axis = axisOf(call, 0);
-            Placement where;
-            if (call.mReference == 0 || axis < 0 || !world.placement(call.mReference, where))
-                return 0.0;
-            where.mAngle[axis] = toRadians(finite(argument(call, 1)));
-            world.place(call.mReference, where);
+            if (call.mReference != 0 && axis >= 0)
+                world.setAngle(call.mReference, axis, toRadians(finite(argument(call, 1))));
             return 0.0;
         });
     }

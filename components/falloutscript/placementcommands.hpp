@@ -26,9 +26,12 @@ namespace FalloutScript
         /// Moves the reference to the place of the target, in the cell of the target, with the offsets added to the
         /// position. The reference turns to face as the target does.
         virtual void moveTo(FormId reference, FormId target, const std::array<double, 3>& offset) = 0;
-        /// Puts the reference at the placement, in the cell it is in (or the exterior cell that the position belongs
-        /// to, for a reference that stands outside)
-        virtual void place(FormId reference, const Placement& where) = 0;
+        /// Puts one coordinate of the reference (axis 0, 1 and 2 for x, y and z) at the value, in the cell it is in (or
+        /// the exterior cell that the position belongs to, for a reference that stands outside). The rest of where the
+        /// reference stands is left as the world has it when this is done, which is later than the script.
+        virtual void setPosition(FormId reference, int axis, double value) = 0;
+        /// The same for an angle around the axis, in radians
+        virtual void setAngle(FormId reference, int axis, double radians) = 0;
     };
 
     /// Gives the commands that move things to the interpreter: MoveToMarker (also written MoveTo),

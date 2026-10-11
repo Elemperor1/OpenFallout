@@ -139,7 +139,8 @@ namespace OFScript
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
         void moveTo(FalloutScript::FormId reference, FalloutScript::FormId target,
             const std::array<double, 3>& offset) override;
-        void place(FalloutScript::FormId reference, const FalloutScript::Placement& where) override;
+        void setPosition(FalloutScript::FormId reference, int axis, double value) override;
+        void setAngle(FalloutScript::FormId reference, int axis, double radians) override;
 
         void showMessage(FalloutScript::FormId message) override;
 
@@ -165,17 +166,61 @@ namespace OFScript
             osg::Vec3f mPosition;
             osg::Vec3f mAngle;
         };
-        /// Where the reference is: what a script has put it at and the world has not done yet, else where it is in a
-        /// loaded cell, else where a script put it while its cell was not loaded, else where its record puts it.
-        /// False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua, which runs only
-        /// while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the maps and objects
-        /// that this reads are changed by the frame before that, never at the same time.
+        /// A change of place that a script asked for. Only the parts it names are made when the world gets to it, so
+        /// what the world does with the object in the meantime (a character walks on, turns) is not undone by a script
+        /// that sets its heading.
+        struct Move
+        {
+            enum Part : unsigned
+            {
+                PositionX = 1,
+                PositionY = 2,
+                PositionZ = 4,
+                AngleX = 8,
+                AngleY = 16,
+                AngleZ = 32,
+                Cell = 64,
+                All = 127
+            };
+            Place mWhere;
+            unsigned mParts = 0;
+
+            /// The place with the parts of the move made
+            Place applyTo(Place place) const
+            {
+                if ((mParts & Cell) != 0)
+                    place.mCell = mWhere.mCell;
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    if ((mParts & (PositionX << axis)) != 0)
+                        place.mPosition[axis] = mWhere.mPosition[axis];
+                    if ((mParts & (AngleX << axis)) != 0)
+                        place.mAngle[axis] = mWhere.mAngle[axis];
+                }
+                return place;
+            }
+            /// A move that comes after this one: the parts of both, the later one where both name a part
+            void add(const Move& later)
+            {
+                mWhere = later.applyTo(mWhere);
+                mParts |= later.mParts;
+            }
+        };
+        static void queueMove(
+            std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move);
+        /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell
+        /// was not loaded, else where its record puts it. False for a reference nobody knows.
+        bool currentPlace(FalloutScript::FormId reference, Place& result);
+        /// Where the reference is: the place of the world with the moves that scripts have asked for and the world has
+        /// not made yet. False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua,
+        /// which runs only while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the
+        /// maps and objects that this reads are changed by the frame before that, never at the same time.
         bool whereIs(FalloutScript::FormId reference, Place& result);
         /// Moves the object now. An object that is not in a loaded cell is moved when its cell is loaded.
-        void applyMove(FalloutScript::FormId reference, const Place& where);
+        void applyMove(FalloutScript::FormId reference, const Move& move);
         /// Puts the object at the place at the start of the next frame, and until then the script that asked sees it
         /// there even if it runs on another thread
-        void askForMove(FalloutScript::FormId reference, const Place& where);
+        void askForMove(FalloutScript::FormId reference, const Move& move);
         /// Whether the object is in a cell that is not loaded (it was moved out of the loaded ones)
         bool leftLoadedCells(FalloutScript::FormId reference);
 
@@ -202,7 +247,7 @@ namespace OFScript
         std::map<FalloutScript::FormId, bool> mDeferredDisabled;
         /// Where other threads asked to put objects, for the same reason: the next command of the script starts from
         /// there
-        std::map<FalloutScript::FormId, Place> mDeferredPlaces;
+        std::map<FalloutScript::FormId, Move> mDeferredPlaces;
         /// Whether scripts disabled (true) or enabled (false) objects in cells that were not loaded at the time, which
         /// holds until the cell is loaded
         std::map<FalloutScript::FormId, bool> mDisabled;
@@ -215,7 +260,7 @@ namespace OFScript
         std::vector<FalloutScript::FormId> mPendingLoad;
         /// Where scripts put objects: those that are waiting for the start of the next frame (the world is not changed
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
-        std::map<FalloutScript::FormId, Place> mPendingMoves;
+        std::map<FalloutScript::FormId, Move> mPendingMoves;
         std::map<FalloutScript::FormId, Place> mRelocations;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
