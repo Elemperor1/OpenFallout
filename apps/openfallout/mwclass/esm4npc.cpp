@@ -307,6 +307,14 @@ namespace OFClass
         physics.addActorBody(ptr, npcBodyHalfExtents(raceHeight), rotation);
     }
 
+    std::unique_ptr<OFWorld::Action> ESM4Npc::activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const
+    {
+        if (ptr.get<ESM4::Npc>()->mBase->mIsFONV)
+            if (std::unique_ptr<OFWorld::Action> talk = ESM4Impl::talkAction(ptr, actor))
+                return talk;
+        return Class::activate(ptr, actor);
+    }
+
     std::string_view ESM4Npc::getName(const OFWorld::ConstPtr& ptr) const
     {
         const ESM4::Npc* const baseData = getCustomData(ptr).mBaseData;

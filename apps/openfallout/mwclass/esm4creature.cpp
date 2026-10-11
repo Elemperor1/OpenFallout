@@ -111,6 +111,14 @@ namespace OFClass
         return data.mModel.mOwner->mModel.getNormalized();
     }
 
+    std::unique_ptr<OFWorld::Action> ESM4Creature::activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const
+    {
+        if (ptr.get<ESM4::Creature>()->mBase->mIsFONV)
+            if (std::unique_ptr<OFWorld::Action> talk = ESM4Impl::talkAction(ptr, actor))
+                return talk;
+        return Class::activate(ptr, actor);
+    }
+
     std::string_view ESM4Creature::getName(const OFWorld::ConstPtr& ptr) const
     {
         if (!isFalloutCreature(ptr))

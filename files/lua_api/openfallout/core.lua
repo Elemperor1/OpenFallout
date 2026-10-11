@@ -1117,6 +1117,77 @@
 -- @usage local record = core.dialogue.voice.records["flee"]
 
 ---
+-- @{#Conversation}: the conversation of the player with a character of Fallout 3 or New Vegas. Not available in load
+-- scripts. A conversation starts when the player activates a character who has something to say (or a script of the
+-- game starts one); the interface that shows it is the window `Dialogue` that `I.UI.registerWindow` replaces.
+-- @field [parent=#core] #Conversation conversation
+
+---
+-- Functions of the conversation. The conversation is a state that every function returns, as @{#ConversationState}.
+-- @type Conversation
+
+---
+-- Whether the loaded content has the dialogue of Fallout 3 or New Vegas (topics and responses).
+-- @function [parent=#Conversation] available
+-- @return #boolean
+
+---
+-- The conversation as it is now.
+-- @function [parent=#Conversation] get
+-- @return #ConversationState
+
+---
+-- The player picks a topic of `options`: the character says the response that the topic gives now. Does nothing when
+-- no conversation is open, a response is being said or the topic is not among the options.
+-- @function [parent=#Conversation] choose
+-- @param #string topic The `topic` of an option, as `get` returns it
+-- @return #ConversationState
+
+---
+-- The response that is being said is over (the player has read it or it was played): what its end script does is done,
+-- and the topics the player can pick next are worked out. A response flagged as the end of the conversation ends it.
+-- Does nothing when no response is being said.
+-- @function [parent=#Conversation] finish
+-- @return #ConversationState
+
+---
+-- Ends the conversation, also in the middle of a response.
+-- @function [parent=#Conversation] close
+-- @return #ConversationState
+
+---
+-- What the player is shown of a conversation.
+-- @type ConversationState
+-- @field #boolean active A conversation is open.
+-- @field #boolean speaking A response is being said; `options` is empty until `finish` is called.
+-- @field #boolean ended The conversation is over (it was closed or a response ended it).
+-- @field #number duration The seconds that the lines being said take to read.
+-- @field #string speakerId Form id of the reference of the character who talks, as `core.getFormId` writes it.
+-- @field #string speakerName Name of the character who talks.
+-- @field #string topic Form id of the topic of the response that is said (empty when none is).
+-- @field #string response Form id of the response that is said (empty when none is).
+-- @field #list<#ConversationLine> lines The lines of the response that is said, in order.
+-- @field #list<#ConversationOption> options The topics the player can pick from.
+-- @usage
+-- local state = core.conversation.get()
+-- if state.active and not state.speaking then
+--     for _, option in ipairs(state.options) do print(option.text) end
+-- end
+
+---
+-- One thing the character says.
+-- @type ConversationLine
+-- @field #string text The words.
+-- @field #number emotion 0 neutral, 1 anger, 2 disgust, 3 fear, 4 sad, 5 happy, 6 surprise, 7 pained.
+-- @field #number emotionValue How strong the emotion is.
+
+---
+-- A topic the player can pick.
+-- @type ConversationOption
+-- @field #string topic Form id of the topic, which `choose` takes.
+-- @field #string text What the list shows: the prompt of the response the topic gives, or else the name of the topic.
+
+---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
 -- @type DialogueRecord
 -- @field #string id Record identifier

@@ -19,6 +19,7 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "context.hpp"
+#include "conversationbindings.hpp"
 #include "coremwscriptbindings.hpp"
 #include "dialoguebindings.hpp"
 #include "factionbindings.hpp"
@@ -116,6 +117,8 @@ namespace OFLua
                 "openfallout_core_regions", [context]() { return initCoreRegionBindings(context); });
             api["dialogue"] = context.cachePackage(
                 "openfallout_core_dialogue", [context]() { return initCoreDialogueBindings(context); });
+            api["conversation"] = context.cachePackage(
+                "openfallout_core_conversation", [context]() { return initCoreConversationBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

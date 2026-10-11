@@ -130,6 +130,8 @@ namespace OFScript
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
+        , mDialogue(mInterpreter, mConditions, mQuests, *this)
+        , mDialogueRandom(std::random_device()())
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
@@ -146,6 +148,39 @@ namespace OFScript
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
+        FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
+        mDialogue.setGameHours([this] { return std::floor(gameDaysPassed()) * 24.0 + gameHour(); });
+        mDialogue.setRandom([this](std::size_t count) {
+            return std::uniform_int_distribution<std::size_t>(0, count - 1)(mDialogueRandom);
+        });
+        // The speaker is the object the command is called on. A conversation with the player opens the interface,
+        // which is for the thread of the frame; one with another character only runs what the response does.
+        mInterpreter.setHandler("StartConversation", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId speaker = call.mReference;
+            const FalloutScript::FormId target = FalloutScript::formArgument(call, 0);
+            const FalloutScript::FormId topic = FalloutScript::formArgument(call, 1);
+            if (speaker == 0 || speaker == mPlayer)
+                return 0.0;
+            if (target == 0 || target == mPlayer)
+            {
+                runOnMainThread([this, speaker, topic] {
+                    const OFWorld::Ptr ptr = findReference(speaker);
+                    if (!ptr.isEmpty())
+                        talkTo(ptr, topic);
+                });
+            }
+            else if (topic != 0)
+                sayTopic(speaker, topic);
+            return 0.0;
+        });
+        mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
+            sayTopic(call.mReference, FalloutScript::formArgument(call, 0));
+            return 0.0;
+        });
+        mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
+            sayTopic(call.mReference, FalloutScript::formArgument(call, 1));
+            return 0.0;
+        });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
         mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
             if (call.mArguments.empty() || !call.mArguments[0].mIsText)
@@ -218,6 +253,11 @@ namespace OFScript
             mDeferredPlaces.clear();
         }
         mQuests.reset();
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            mDialogue.reset();
+            mSpeakerName.clear();
+        }
     }
 
     void FalloutScripts::update(float frametime, bool paused)
@@ -713,6 +753,95 @@ namespace OFScript
             addConfig(values, stats->mBaseConfig);
         }
         return true;
+    }
+
+    void FalloutScripts::forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const
+    {
+        for (const ESM4::Dialogue& topic : mStore.get<ESM4::Dialogue>())
+            function(topic);
+    }
+
+    void FalloutScripts::forEachInfo(const std::function<void(const ESM4::DialogInfo&)>& function) const
+    {
+        for (const ESM4::DialogInfo& info : mStore.get<ESM4::DialogInfo>())
+            function(info);
+    }
+
+    bool FalloutScripts::hasDialogue() const
+    {
+        return mStore.get<ESM4::Dialogue>().getSize() > 0;
+    }
+
+    bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic)
+    {
+        ESM::FormId base;
+        if (reference == 0 || topic == 0 || !baseOf(reference, base))
+            return false;
+        const std::lock_guard lock(mDialogueMutex);
+        return !mDialogue.say({ reference, numberOf(base) }, topic).mLines.empty();
+    }
+
+    bool FalloutScripts::startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic)
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        ESM::FormId base;
+        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+            return false;
+        const std::lock_guard lock(mDialogueMutex);
+        if (mDialogue.active())
+            return mDialogue.speaker().mReference == reference;
+        const FalloutScript::DialogueView& view = mDialogue.start({ reference, numberOf(base) }, topic);
+        // A character with nothing to say and nothing to pick from does not talk
+        if (view.mLines.empty() && view.mOptions.empty())
+        {
+            mDialogue.end();
+            return false;
+        }
+        mSpeakerName = std::string(speaker.getClass().getName(speaker));
+        return true;
+    }
+
+    bool FalloutScripts::talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic)
+    {
+        if (!startConversation(speaker, topic))
+            return false;
+        OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, speaker);
+        return true;
+    }
+
+    FalloutScripts::Conversation FalloutScripts::conversation() const
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        Conversation result;
+        result.mActive = mDialogue.active();
+        result.mView = mDialogue.view();
+        result.mSpeakerName = mSpeakerName;
+        // How long the lines take to read: the time a response stays before the next thing happens
+        constexpr float secondsPerCharacter = 0.055f;
+        constexpr float shortest = 1.5f;
+        constexpr float longest = 12.f;
+        for (const FalloutScript::DialogueLine& line : result.mView.mLines)
+            result.mDuration
+                += std::clamp(static_cast<float>(line.mText.size()) * secondsPerCharacter, shortest, longest);
+        return result;
+    }
+
+    void FalloutScripts::chooseOption(FalloutScript::FormId topic)
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.choose(topic);
+    }
+
+    void FalloutScripts::finishResponse()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.finish();
+    }
+
+    void FalloutScripts::endConversation()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.end();
     }
 
     bool FalloutScripts::traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)

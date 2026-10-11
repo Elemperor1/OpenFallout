@@ -404,7 +404,9 @@ namespace FalloutScript
         }
 
         // A response that goes on is followed by the first of its follow-ups that can be said, before the player has a
-        // say. None is said twice in the exchange, so follow-ups that name each other in a circle end.
+        // say. None is said twice in the exchange, so follow-ups that name each other in a circle end. The character
+        // says them all: the next speaker of a response is Target in every record of the files that has follow-ups
+        // (its default), and the followers are voiced by characters, never by the player.
         for (const ESM::FormId followUp : info.mFollowUps)
         {
             const auto next = mInfoIndex.find(toId(followUp));

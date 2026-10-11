@@ -19,6 +19,7 @@
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
+#include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/messagecommands.hpp>
@@ -66,6 +67,7 @@ namespace OFScript
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
                                  private FalloutScript::ActorTraitRecords,
+                                 private FalloutScript::DialogueRecords,
                                  private FalloutScript::ActorValueRecords,
                                  private FalloutScript::ReferenceRecords,
                                  private FalloutScript::FormListRecords,
@@ -114,6 +116,34 @@ namespace OFScript
         /// Whether the conditions of the package hold for the character. A package that has none holds.
         bool packageConditionsHold(const ESM4::AIPackage& package, const OFWorld::Ptr& actor);
 
+        /// What the player is shown of the conversation that is open, with the name of the character who talks
+        struct Conversation
+        {
+            bool mActive = false;
+            FalloutScript::DialogueView mView;
+            std::string mSpeakerName;
+            /// The seconds that the response that is said takes to read, which is how long it stays before the next
+            /// thing happens
+            float mDuration = 0;
+        };
+
+        /// Whether the loaded content has dialogue (topics of Fallout 3 or New Vegas)
+        bool hasDialogue() const;
+        /// The character talks to the player. The greeting is said (a topic given takes its place) and the conversation
+        /// goes on from there, which the interface shows. False, with no conversation open, when the character has
+        /// nothing to say and the player nothing to pick. A conversation that is open stays.
+        bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// startConversation and the interface that shows it. For the thread of the frame.
+        bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// The conversation as it is now (nothing active when none is open)
+        Conversation conversation() const;
+        /// The player picks the topic (one of the options the conversation offers); the response is said
+        void chooseOption(FalloutScript::FormId topic);
+        /// The response that is said is over: its end script runs and the options are worked out
+        void finishResponse();
+        /// The conversation ends, also in the middle of a response
+        void endConversation();
+
         FalloutScript::QuestManager& quests() { return mQuests; }
         const FalloutScript::QuestManager& quests() const { return mQuests; }
         FalloutScript::ObjectScripts& objects() { return mObjects; }
@@ -159,6 +189,12 @@ namespace OFScript
         void showMessage(FalloutScript::FormId message) override;
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
+
+        /// The character says a response of the topic outside of a conversation: what the response does is done
+        bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic);
+
+        void forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const override;
+        void forEachInfo(const std::function<void(const ESM4::DialogInfo&)>& function) const override;
 
         bool initialItems(
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
@@ -293,6 +329,12 @@ namespace OFScript
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
+        /// What the player has been told and what was said. Scripts that Lua starts, the interface and the frame all
+        /// reach it, so one at a time.
+        mutable std::recursive_mutex mDialogueMutex;
+        FalloutScript::DialogueManager mDialogue;
+        std::mt19937 mDialogueRandom;
+        std::string mSpeakerName;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

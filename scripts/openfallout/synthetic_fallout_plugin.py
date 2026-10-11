@@ -274,7 +274,35 @@ ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6,
                        "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing"),
                        "person_level": (0x8C0, "OFTestAvPersonLevel"), "day_of_week": (0x8C1, "OFTestAvDayOfWeek"),
                        "current_package": (0x8C2, "OFTestAvCurrentPackage"), "user_level": (0x8C3, "OFTestAvUserLevel")}
-LAST_ID = 0x8C3 # the largest form ID of the plugin, which the next object ID of its header follows
+# A conversation: a character with a voice type (and a second voice type that nobody has), the topics of the games (the
+# greeting that opens it, the goodbye that closes it, a topic at the top of the list and one that a response adds) and
+# their responses, with the globals that the scripts of the responses set
+VOICE_ID = 0x8C4
+OTHER_VOICE_ID = 0x8C5
+TALKER_ID = 0x8C6
+TALKER_REF_ID = 0x8C7
+GREETING_TOPIC_ID = 0x8C8
+GOODBYE_TOPIC_ID = 0x8C9
+ASK_TOPIC_ID = 0x8CA
+SECRET_TOPIC_ID = 0x8CB
+WRONG_GREETING_ID = 0x8CC
+GREETING_INFO_ID = 0x8CD
+ASK_INFO_ID = 0x8CE
+SECRET_INFO_ID = 0x8CF
+GOODBYE_INFO_ID = 0x8D0
+DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd")}
+TALKER_NAME = "OFTestTalker"
+TALKER_TITLE = "OpenFallout Test Talker"
+TALKER_PLACE = (-300.0, 300.0)
+ASK_TOPIC_NAME = "Ask about the test"
+ASK_PROMPT = "Tell me about the test."
+SECRET_TOPIC_NAME = "The secret"
+GREETING_TEXT = "Welcome to the test."
+WRONG_GREETING_TEXT = "This greeting is for another voice."
+ASK_TEXT = "The test goes well."
+SECRET_TEXT = "The secret is that there is none."
+GOODBYE_TEXT = "Farewell."
+LAST_ID = 0x8D2 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -377,6 +405,8 @@ MESSAGE_TEXT = "The object script was here"
 QUEST_NEVER_TEXT = "Never told"
 COUNTER_NEVER_ADDS = 1000
 GET_STAGE_FUNCTION = 58 # the number the games give GetStage in a condition
+GET_IS_SEX_FUNCTION = 70
+GET_IS_VOICE_TYPE_FUNCTION = 427
 CONDITION_AT_LEAST = 0x60 # the comparison "greater than or equal to" of a condition
 QUEST_OBJECTIVE_TEXT = "Do the thing"
 QUEST_FLAG_START_GAME = 0x01
@@ -1038,13 +1068,14 @@ def faction(form_id, name):
     return record(b"FACT", form_id, [zstr(b"EDID", name), zstr(b"FULL", name)])
 
 
-def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=()):
+def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=(), voice=None,
+           title="OpenFallout Test Person"):
     """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
     # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
     acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, PERSON_LEVEL, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
-    subs = [zstr(b"EDID", name), zstr(b"FULL", "OpenFallout Test Person"), zstr(b"MODL", SKELETON),
+    subs = [zstr(b"EDID", name), zstr(b"FULL", title), zstr(b"MODL", SKELETON),
             sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID)),
             sub(b"DATA", struct.pack("<i7B", PERSON_HEALTH, *PERSON_ATTRIBUTES)),
             sub(b"DNAM", struct.pack("<14B14B", *PERSON_SKILLS, *([0] * 14)))]
@@ -1054,7 +1085,72 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
     subs += [sub(b"CNTO", struct.pack("<II", item, count)) for item, count in items]
     subs += [sub(b"SNAM", struct.pack("<IBxxx", faction_id, rank)) for faction_id, rank in factions]
     subs += [sub(b"PKID", struct.pack("<I", package)) for package in packages]
+    if voice is not None:
+        subs.append(sub(b"VTCK", struct.pack("<I", voice)))
     return record(b"NPC_", form_id, subs)
+
+
+def voice_type(form_id, name):
+    """A VTYP record: the voice a character speaks with (the folder of its voice files is named by the editor id)."""
+    return record(b"VTYP", form_id, [zstr(b"EDID", name), sub(b"DNAM", b"\x00")])
+
+
+def topic(form_id, name, title, kind, flags, priority=50.0):
+    """A DIAL record of Fallout: the editor id, the words the player sees, the priority and the type and flags."""
+    return record(b"DIAL", form_id, [zstr(b"EDID", name), zstr(b"FULL", title), sub(b"QSTI", struct.pack("<I", QUEST_A_ID)),
+                                     sub(b"PNAM", struct.pack("<f", priority)), sub(b"DATA", bytes([kind, flags]))])
+
+
+def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None):
+    """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
+    when the response starts and the one that runs when it is over."""
+    subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
+    subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
+    subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, 0, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
+    subs += list(conditions)
+    if prompt is not None:
+        subs.append(zstr(b"RNAM", prompt))
+    if begin is not None:
+        subs += stage_script([fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))],
+                             [begin])
+    if end is not None:
+        subs += [sub(b"NEXT")]
+        subs += stage_script([fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))],
+                             [end])
+    return record(b"INFO", form_id, subs)
+
+
+def topic_group(form_id, responses):
+    return group(struct.pack("<I", form_id), 7, responses)
+
+
+def dialogue():
+    """The topics and their responses, as the children of the top group of DIAL. The greeting has two responses: the
+    first is for a voice that nobody has and must not be said, the second is said to a man with the voice of the talker
+    and runs a script when it starts. The topic at the top of the list has one response that adds the secret topic and
+    runs a script when it starts and one when it ends; the secret and the goodbye end the conversation."""
+    sf = fallout_script
+    is_voice = condition(GET_IS_VOICE_TYPE_FUNCTION, VOICE_ID, compare=0x00, value=1.0)
+    is_other_voice = condition(GET_IS_VOICE_TYPE_FUNCTION, OTHER_VOICE_ID, compare=0x00, value=1.0)
+    is_man = condition(GET_IS_SEX_FUNCTION, 0, compare=0x00, value=1.0)
+    begin, end = DIALOGUE_GLOBALS["begin"][0], DIALOGUE_GLOBALS["end"][0]
+    return [
+        topic(GREETING_TOPIC_ID, "GREETING", "", 0, 0, 0.0),
+        topic_group(GREETING_TOPIC_ID, [
+            response(WRONG_GREETING_ID, WRONG_GREETING_TEXT, [is_other_voice]),
+            response(GREETING_INFO_ID, GREETING_TEXT, [is_voice, is_man], begin=begin)]),
+        topic(GOODBYE_TOPIC_ID, "GOODBYE", "Goodbye.", 1, 0x02, 0.0),
+        topic_group(GOODBYE_TOPIC_ID, [response(GOODBYE_INFO_ID, GOODBYE_TEXT, flags=0x0001)]),
+        topic(ASK_TOPIC_ID, "OFTestAsk", ASK_TOPIC_NAME, 0, 0x02, 90.0),
+        topic_group(ASK_TOPIC_ID, [
+            response(ASK_INFO_ID, ASK_TEXT, adds=[SECRET_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end)]),
+        topic(SECRET_TOPIC_ID, "OFTestSecret", SECRET_TOPIC_NAME, 0, 0),
+        topic_group(SECRET_TOPIC_ID, [response(SECRET_INFO_ID, SECRET_TEXT, flags=0x0001)]),
+    ]
+
+
+def talker_reference():
+    return achr(TALKER_REF_ID, (*TALKER_PLACE, 0.0), base=TALKER_ID)
 
 
 def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0,
@@ -1293,6 +1389,7 @@ def plugin():
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
         refr(MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
+        talker_reference(),
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
         *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
                                       "list": CREATURE_LIST_REF_ID}),
@@ -1306,6 +1403,7 @@ def plugin():
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in DIALOGUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l")
@@ -1327,7 +1425,11 @@ def plugin():
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", packages()) + top_group(b"NPC_", [person(), *package_people()])
+            + top_group(b"PACK", packages())
+            + top_group(b"NPC_", [person(), *package_people(),
+                                  person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE)])
+            + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
+            + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
             + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
