@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 
+#include <components/esm/formid.hpp>
 #include <components/esm3/refnum.hpp>
 
 namespace OFWorld
@@ -59,6 +60,10 @@ namespace OFMechanics
         /// Looks at the packages again at the next update: the packages that scripts gave the actor are read anew, and
         /// so are the conditions of its own
         void evaluate(const OFWorld::Ptr& ptr);
+
+        /// The package the actor follows now: the id of the record, unset for an actor that follows none (or has no
+        /// mind)
+        ESM::FormId currentPackage(const OFWorld::Ptr& ptr) const;
 
         void update(float duration);
 

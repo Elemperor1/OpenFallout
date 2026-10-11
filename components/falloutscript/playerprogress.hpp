@@ -14,7 +14,8 @@ namespace FalloutScript
 
     /// What the story gives the player and the characters that nothing else in the game keeps yet: experience and
     /// karma, the perks of each character and the notes of the Pip-Boy. It can be used from any thread. Nothing here
-    /// shows them or changes the level of the player, and a perk has no effect yet.
+    /// shows them, and a perk has no effect yet. The level of the player is told from the experience; nothing gives
+    /// the player the points of a new level.
     class PlayerProgress
     {
     public:
@@ -27,6 +28,11 @@ namespace FalloutScript
         /// Gives experience (or takes it away, down to 0)
         void rewardExperience(int amount);
         int experience() const;
+        /// The level that an amount of experience is: 1 for the first 200, and one more for each next step, which is
+        /// 200 more than the last (the number of points the games ask for each level is not in their files, so this is
+        /// the one the players of the games know, which is assumed to hold for both). There is no highest level.
+        static int levelFor(int experience);
+        int level() const;
 
         /// Changes the karma, which stays within the limits
         void rewardKarma(int amount);

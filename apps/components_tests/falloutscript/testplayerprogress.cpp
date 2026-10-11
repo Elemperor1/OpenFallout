@@ -91,6 +91,36 @@ namespace
         EXPECT_EQ(progress.experience(), std::numeric_limits<int>::max());
     }
 
+    TEST(FalloutScriptPlayerProgressTest, the_level_follows_the_experience_in_steps_that_grow_by_200)
+    {
+        EXPECT_EQ(PlayerProgress::levelFor(-5), 1);
+        EXPECT_EQ(PlayerProgress::levelFor(0), 1);
+        EXPECT_EQ(PlayerProgress::levelFor(199), 1);
+        EXPECT_EQ(PlayerProgress::levelFor(200), 2);
+        EXPECT_EQ(PlayerProgress::levelFor(599), 2);
+        EXPECT_EQ(PlayerProgress::levelFor(600), 3);
+        EXPECT_EQ(PlayerProgress::levelFor(1200), 4);
+        EXPECT_EQ(PlayerProgress::levelFor(37999), 19);
+        EXPECT_EQ(PlayerProgress::levelFor(38000), 20);
+        // The largest number of experience is a level, not an overflow
+        const int highest = PlayerProgress::levelFor(std::numeric_limits<int>::max());
+        EXPECT_GT(highest, 4000);
+        EXPECT_LT(highest, 5000);
+        EXPECT_LE(100LL * highest * (highest - 1), std::numeric_limits<int>::max());
+        EXPECT_GT(100LL * (highest + 1) * highest, std::numeric_limits<int>::max());
+    }
+
+    TEST(FalloutScriptPlayerProgressTest, the_level_of_the_player_is_told_from_its_experience)
+    {
+        PlayerProgress progress;
+        EXPECT_EQ(progress.level(), 1);
+
+        progress.rewardExperience(650);
+        EXPECT_EQ(progress.level(), 3);
+        progress.rewardExperience(-100);
+        EXPECT_EQ(progress.level(), 2);
+    }
+
     TEST(FalloutScriptPlayerProgressTest, karma_moves_both_ways_within_its_limits)
     {
         PlayerProgress progress;

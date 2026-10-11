@@ -39,6 +39,9 @@ namespace FalloutScript
         virtual FormId linkedRef(FormId, FormId /*keyword*/) { return 0; }
         /// The hour of the game's clock, from 0 to 24 (what GetCurrentTime tells)
         virtual double gameHour() { return 0; }
+
+        /// The days that have passed since the game began (the global GameDaysPassed, which counts a part of a day too)
+        virtual double gameDaysPassed() { return 0; }
         /// Makes `count` objects of the base form next to the reference, `distance` units from it in the direction (0
         /// in front of it, 1 behind, 2 to its left, 3 to its right), and tells the reference of the first. 0 when
         /// nothing is made.
@@ -51,9 +54,9 @@ namespace FalloutScript
 
     /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, MarkForDelete, GetDisabled,
     /// GetDistance, GetInCell, GetInSameCell, GetInWorldspace, GetLinkedRef, PlaceAtMe, GetSelf, GetActionRef,
-    /// IsActionRef, GetIsReference, GetIsID, GetGlobalValue, GetCurrentTime, GetSecondsPassed and GetRandomPercent.
-    /// Those that the command table does not have are left out. `random` gives the whole numbers from 0 to 99 for
-    /// GetRandomPercent.
+    /// IsActionRef, GetIsReference, GetIsID, GetGlobalValue, GetCurrentTime, GetDayOfWeek, GetSecondsPassed and
+    /// GetRandomPercent. Those that the command table does not have are left out. `random` gives the whole numbers from
+    /// 0 to 99 for GetRandomPercent.
     void addObjectCommands(
         Interpreter& interpreter, ObjectScripts& objects, ObjectWorld& world, std::function<int()> random);
 }

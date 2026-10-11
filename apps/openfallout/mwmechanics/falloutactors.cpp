@@ -366,6 +366,14 @@ namespace OFMechanics
         found->second->mReview = 0.f;
     }
 
+    ESM::FormId FalloutActors::currentPackage(const OFWorld::Ptr& ptr) const
+    {
+        const auto found = mMinds.find(ptr.mRef);
+        if (found == mMinds.end() || found->second->mPackage == nullptr)
+            return ESM::FormId();
+        return found->second->mPackage->mId;
+    }
+
     void FalloutActors::follow(const OFWorld::Ptr& ptr, const OFWorld::Ptr& target, float distance)
     {
         if (!handles(ptr) || target.isEmpty() || target == ptr)

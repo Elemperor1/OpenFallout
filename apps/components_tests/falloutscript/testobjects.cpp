@@ -48,6 +48,7 @@ namespace
     constexpr std::uint16_t OpGetInSameCell = 0x1020;
     constexpr std::uint16_t OpPlaceAtMe = 0x1025;
     constexpr std::uint16_t OpGetCurrentTime = 0x1012;
+    constexpr std::uint16_t OpGetDayOfWeek = 0x10AA;
     constexpr std::uint16_t OpGetGlobalValue = 0x104A;
     constexpr std::uint16_t OpGetInWorldspace = 0x1136;
     constexpr std::uint16_t OpGetLinkedRef = 0x116B;
@@ -78,6 +79,7 @@ namespace
         std::vector<Placement> mPlacements;
         FormId mMade = 0;
         double mHour = 0;
+        double mDays = 0;
 
         struct Activation
         {
@@ -138,6 +140,7 @@ namespace
             return found != mLinks.end() ? found->second : 0;
         }
         double gameHour() override { return mHour; }
+        double gameDaysPassed() override { return mDays; }
         FormId placeAtMe(FormId reference, FormId base, int count, double distance, int direction) override
         {
             mPlacements.push_back({ reference, base, count, distance, direction });
@@ -610,6 +613,23 @@ namespace
         setup.mObjects.setLoaded(crate, true);
 
         EXPECT_EQ(setup.variable(crate, 1), 13.5);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_day_of_week_counts_from_a_sunday_and_the_game_begins_on_a_monday)
+    {
+        Runner setup;
+        setup.addScript(scriptOfCrates, assigns(BlockType::OnLoad, callToken(OpGetDayOfWeek, Bytes())));
+        setup.mObjects.add(crate, scriptOfCrates);
+        const std::vector<std::pair<double, double>> daysAndWeekdays
+            = { { 0, 1 }, { 0.9, 1 }, { 1, 2 }, { 5, 6 }, { 6, 0 }, { 7, 1 }, { 13.5, 0 }, { -1, 0 } };
+
+        for (const auto& [days, weekday] : daysAndWeekdays)
+        {
+            setup.mWorld.mDays = days;
+            setup.mObjects.setLoaded(crate, false);
+            setup.mObjects.setLoaded(crate, true);
+            EXPECT_EQ(setup.variable(crate, 1), weekday) << days << " days";
+        }
     }
 
     TEST(FalloutScriptObjectsTest, get_global_value_tells_the_value_of_a_global_and_0_for_one_that_is_not_there)

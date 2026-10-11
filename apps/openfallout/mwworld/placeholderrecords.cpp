@@ -38,7 +38,7 @@ namespace OFWorld
         const std::array<GlobalDefault, 15> sGlobals = { {
             { "gamehour", ESM::Variant(9.f) },
             { "timescale", ESM::Variant(30.f) },
-            { "dayspassed", ESM::Variant(1) },
+            { "dayspassed", ESM::Variant(0) }, // the games of Fallout count from 0
             { "day", ESM::Variant(1) },
             { "month", ESM::Variant(0) },
             { "year", ESM::Variant(1) },

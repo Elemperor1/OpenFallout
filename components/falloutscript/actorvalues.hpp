@@ -49,6 +49,10 @@ namespace FalloutScript
         /// tell what the reference is: it is asked again by the next command that needs it. True with none when the
         /// reference has no record of an actor.
         virtual bool initialValues(FormId actor, std::vector<std::pair<int, double>>& values) = 0;
+
+        /// The level that the record of the reference gives it for a player of that level (a record can take a share
+        /// of it). False when the host can not tell what the reference is or it is not a character or creature.
+        virtual bool levelOf(FormId /*actor*/, int /*playerLevel*/, int& /*level*/) { return false; }
     };
 
     /// The actor values of characters and creatures, as far as nothing else in the game keeps them yet. An actor value
@@ -91,6 +95,9 @@ namespace FalloutScript
         void restore(FormId actor, int value, double amount);
         /// Takes all the damage back, and the modifier that left nothing of the value
         void heal(FormId actor, int value);
+        /// The level of a character or creature that its record gives for a player of that level, none when the
+        /// records do not tell
+        std::optional<int> levelOf(FormId actor, int playerLevel) const;
 
     private:
         struct Entry
@@ -116,9 +123,9 @@ namespace FalloutScript
     /// Gives the commands about actor values to the interpreter: GetActorValue, GetBaseActorValue,
     /// GetPermanentActorValue, SetActorValue, ModActorValue, ForceActorValue, DamageActorValue and RestoreActorValue,
     /// and those that depend on the health of a character: GetHealthPercentage and ResurrectActor (a character that
-    /// comes back has all its health), and GetWeaponHealthPerc. Karma and experience of the player are the ones that
-    /// PlayerProgress keeps, and a character whose health is damaged to nothing is dead for ActorState. Those that the
-    /// command table does not have are left out.
+    /// comes back has all its health), GetWeaponHealthPerc, and GetLevel. Karma and experience of the player are the
+    /// ones that PlayerProgress keeps, and a character whose health is damaged to nothing is dead for ActorState. Those
+    /// that the command table does not have are left out.
     void addActorValueCommands(
         Interpreter& interpreter, ActorValues& values, ActorState& actors, PlayerProgress& progress);
 }

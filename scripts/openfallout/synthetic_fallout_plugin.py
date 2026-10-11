@@ -262,6 +262,7 @@ PERSON_ATTRIBUTES = (4, 5, 6, 7, 8, 9, 10)
 PERSON_SKILLS = tuple(range(20, 34))
 PERSON_SPEED = 120
 PERSON_KARMA = 25.0
+PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -269,8 +270,10 @@ ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6,
                        "weapon": (0x8B9, "OFTestAvWeapon"), "strength": (0x8BA, "OFTestAvStrength"),
                        "luck": (0x8BB, "OFTestAvLuck"), "speed": (0x8BC, "OFTestAvSpeed"),
                        "person_karma": (0x8BD, "OFTestAvPersonKarma"),
-                       "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing")}
-LAST_ID = 0x8BF # the largest form ID of the plugin, which the next object ID of its header follows
+                       "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing"),
+                       "person_level": (0x8C0, "OFTestAvPersonLevel"), "day_of_week": (0x8C1, "OFTestAvDayOfWeek"),
+                       "current_package": (0x8C2, "OFTestAvCurrentPackage")}
+LAST_ID = 0x8C2 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -701,6 +704,10 @@ def object_script(kind):
                   sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_THERE))),
         sf.set_to(sf.global_target(values["dlc_missing"]),
                   sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_MISSING))),
+        # The level of the test person is the one of its record; the game begins on a Monday (the 1 of a week that
+        # begins on a Sunday)
+        sf.set_to(sf.global_target(values["person_level"]), sf.call_token(sf.GET_LEVEL, reference=person_ref)),
+        sf.set_to(sf.global_target(values["day_of_week"]), sf.call_token(sf.GET_DAY_OF_WEEK)),
     ])
     has_perk = sf.call_token(sf.HAS_PERK, sf.form_argument(perk), reference=player)
     has_note = sf.call_token(sf.GET_HAS_NOTE, sf.form_argument(note))
@@ -801,6 +808,9 @@ def object_script(kind):
             sf.set_to(sf.global_target(joined), sf.call_token(sf.GET_IN_FACTION, sf.form_argument(second_faction),
                                                               reference=idler)),
             sf.set_to(sf.global_target(dead), sf.call_token(sf.GET_DEAD, reference=idler)),
+            # The walker follows the package that the script gave it, once it has looked at its packages
+            sf.set_to(sf.global_target(values["current_package"]),
+                      sf.call_token(sf.GET_IS_CURRENT_PACKAGE, sf.form_argument(walker_package), reference=walker)),
             sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
                                                                    reference=player)),
             sf.set_to(sf.global_target(listed_items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
@@ -1029,7 +1039,7 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
     # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
-    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, 1, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
+    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, PERSON_LEVEL, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
     subs = [zstr(b"EDID", name), zstr(b"FULL", "OpenFallout Test Person"), zstr(b"MODL", SKELETON),
             sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID)),
             sub(b"DATA", struct.pack("<i7B", PERSON_HEALTH, *PERSON_ATTRIBUTES)),
