@@ -106,6 +106,7 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                     std::array<std::uint8_t, 17> bytes{};
                     if (reader.get(bytes.data(), bytes.size()))
                     {
+                        mCreatureType = bytes[0];
                         std::uint16_t health = 0;
                         std::memcpy(&health, bytes.data() + 4, sizeof(health));
                         mFalloutStats.mHealth = health;
@@ -186,11 +187,13 @@ void ESM4::Creature::load(ESM4::Reader& reader)
             case ESM::fourCC("PNAM"): // FO3/FONV/TES5
                 reader.getFormId(mBodyParts.emplace_back());
                 break;
+            case ESM::fourCC("VTCK"): // FO3
+                reader.getFormId(mVoice);
+                break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("RNAM"):
             case ESM::fourCC("CSDT"):
             case ESM::fourCC("EAMT"): // FO3
-            case ESM::fourCC("VTCK"): // FO3
             case ESM::fourCC("NAM4"): // FO3
             case ESM::fourCC("NAM5"): // FO3
             case ESM::fourCC("CNAM"): // FO3

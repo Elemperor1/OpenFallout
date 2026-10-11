@@ -77,6 +77,21 @@ namespace
         EXPECT_FALSE(creature.mHasBounds);
     }
 
+    TEST(ESM4CreatureTest, readsTheVoiceTypeAndTheKindOfACreatureOfFallout)
+    {
+        std::string stats(17, '\0');
+        stats[0] = 3; // the kind of creature
+        stats[4] = 50; // health
+        const std::string data = zString("EDID", "Beast") + subRecord("ACBS", actorConfig(0x1, 2, 0))
+            + subRecord("VTCK", formIdData(0x00ABCDEF)) + subRecord("DATA", stats);
+
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        EXPECT_EQ(creature.mVoice.toUint32(), 0x00ABCDEFu);
+        EXPECT_EQ(creature.mCreatureType, 3);
+        EXPECT_EQ(creature.mFalloutStats.mHealth, 50);
+    }
+
     TEST(ESM4CreatureTest, readsTheTemplateAndWhatARecordTakesFromIt)
     {
         const std::uint16_t flags = ESM4::Creature::Template_UseModel | ESM4::Creature::Template_UseBaseData;
