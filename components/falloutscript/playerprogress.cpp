@@ -102,15 +102,15 @@ namespace FalloutScript
             progress.addPerk(call.mReference, formArgument(call, 0));
             return 0.0;
         });
+        // RemovePerk takes the same second argument as AddPerk, and the perk with it, whatever its rank
         interpreter.setHandler("RemovePerk", [&progress](CallContext& call) {
             progress.removePerk(call.mReference, formArgument(call, 0));
             return 0.0;
         });
-        // With a rank (the second argument), the character has the perk at that rank or higher; without one, at any
+        // The second argument of HasPerk says whether to ask about the companions of the player instead, which has no
+        // companions to ask about
         interpreter.setHandler("HasPerk", [&progress](CallContext& call) {
-            const int wanted = std::max(intArgument(call, 1), 1);
-            return call.mReference != 0 && progress.perkRank(call.mReference, formArgument(call, 0)) >= wanted ? 1.0
-                                                                                                               : 0.0;
+            return call.mReference != 0 && progress.perkRank(call.mReference, formArgument(call, 0)) > 0 ? 1.0 : 0.0;
         });
         interpreter.setHandler("AddNote", [&progress](CallContext& call) {
             progress.addNote(formArgument(call, 0));

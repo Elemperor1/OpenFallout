@@ -211,14 +211,15 @@ RELOCK_LEVEL = 25
 LOCKED_PLACE = (600.0, -1400.0)
 LOCKER_PLACE = (900.0, -1400.0)
 DOOMED_PLACE = (1200.0, -1400.0)
-# What the story gives the player: the script of the object adds a perk twice to the player, removes it, adds a note, asks
+# What the story gives the player: the script of the object adds a perk twice to the player, asks for it for the
+# teammates (the second argument of HasPerk, not a rank), removes it, adds a note, asks
 # for the base form of the locker cube and sets the delay of quest A (whose record has the longer QUEST_RECORD_DELAY, so
 # that the quest only gets to its stage in time if SetQuestDelay worked). The perk and the note have no record: scripts
 # only name them.
 PERK_ID = 0x89D
 NOTE_ID = 0x89E
 PROGRESS_GLOBALS = {"perk_before": (0x89F, "OFTestPerkBefore"), "perk_after": (0x8A0, "OFTestPerkAfter"),
-                    "perk_rank_three": (0x8A1, "OFTestPerkRankThree"), "perk_removed": (0x8A2, "OFTestPerkRemoved"),
+                    "perk_teammates": (0x8A1, "OFTestPerkTeammates"), "perk_removed": (0x8A2, "OFTestPerkRemoved"),
                     "note_before": (0x8A3, "OFTestNoteBefore"), "note_after": (0x8A4, "OFTestNoteAfter"),
                     "is_id": (0x8A5, "OFTestIsId"), "is_not_id": (0x8A6, "OFTestIsNotId")}
 XP_REWARD = 150
@@ -682,15 +683,15 @@ def object_script(kind):
                  + sf.call(sf.SET_QUEST_DELAY, sf.form_argument(quest_a), sf.float_argument(QUEST_DELAY))
                  + sf.call(sf.REWARD_XP, sf.int_argument(XP_REWARD))
                  + sf.call(sf.REWARD_KARMA, sf.int_argument(KARMA_REWARD))
-                 # A perk is added twice (a rank 2 is there, a rank 3 is not) and removed; a note is added; the locker cube
-                 # is of the base form CUBE_ID and not of the base form PERK_ID
+                 # A perk is added twice and removed (the second argument of HasPerk is not a rank: asked for the
+                 # teammates it says yes as well); a note is added; the locker cube is of the base form CUBE_ID and not
+                 # of the base form PERK_ID
                  + sf.set_to(sf.global_target(progress["perk_before"]), has_perk)
                  + sf.call_on(player, sf.ADD_PERK, sf.form_argument(perk))
                  + sf.call_on(player, sf.ADD_PERK, sf.form_argument(perk))
-                 + sf.set_to(sf.global_target(progress["perk_after"]),
-                             sf.call_token(sf.HAS_PERK, sf.form_argument(perk), sf.int_argument(2), reference=player))
-                 + sf.set_to(sf.global_target(progress["perk_rank_three"]),
-                             sf.call_token(sf.HAS_PERK, sf.form_argument(perk), sf.int_argument(3), reference=player))
+                 + sf.set_to(sf.global_target(progress["perk_after"]), has_perk)
+                 + sf.set_to(sf.global_target(progress["perk_teammates"]),
+                             sf.call_token(sf.HAS_PERK, sf.form_argument(perk), sf.int_argument(1), reference=player))
                  + sf.call_on(player, sf.REMOVE_PERK, sf.form_argument(perk))
                  + sf.set_to(sf.global_target(progress["perk_removed"]), has_perk)
                  + sf.set_to(sf.global_target(progress["note_before"]), has_note)

@@ -188,15 +188,15 @@ namespace
         builder.code(scriptName() + begin(BlockType::OnActivate) + setTo(var('s', 1), hasPerk)
             + command(OpAddPerk, arguments(1).add(refArg(perk))) + setTo(var('s', 2), hasPerk)
             + command(OpAddPerk, arguments(1).add(refArg(perk)))
-            // The rank asked for is the lowest rank that counts
-            + setTo(var('s', 3), callToken(OpHasPerk, arguments(2).add(refArg(perk)).add(intArg(2))))
-            + setTo(var('s', 4), callToken(OpHasPerk, arguments(2).add(refArg(perk)).add(intArg(3))))
+            // The second argument asks about the companions of the player, not about a rank
+            + setTo(var('s', 3), callToken(OpHasPerk, arguments(2).add(refArg(perk)).add(intArg(1))))
+            + setTo(var('s', 4), callToken(OpHasPerk, arguments(2).add(refArg(perk)).add(intArg(0))))
             + setTo(var('s', 5), callToken(OpHasPerk, arguments(1).add(refArg(other))))
             + command(OpRemovePerk, arguments(1).add(refArg(perk))) + setTo(var('s', 6), hasPerk) + end());
         builder.variable(1, integerVariable, "before")
             .variable(2, integerVariable, "once")
-            .variable(3, integerVariable, "atRankTwo")
-            .variable(4, integerVariable, "atRankThree")
+            .variable(3, integerVariable, "forTeammates")
+            .variable(4, integerVariable, "notForTeammates")
             .variable(5, integerVariable, "other")
             .variable(6, integerVariable, "removed");
 
@@ -205,9 +205,10 @@ namespace
         EXPECT_EQ(setup.variable(player, 1), 0);
         EXPECT_EQ(setup.variable(player, 2), 1);
         EXPECT_EQ(setup.variable(player, 3), 1);
-        EXPECT_EQ(setup.variable(player, 4), 0);
+        EXPECT_EQ(setup.variable(player, 4), 1);
         EXPECT_EQ(setup.variable(player, 5), 0);
         EXPECT_EQ(setup.variable(player, 6), 0);
+        // The two ranks went with the perk
         EXPECT_EQ(setup.mProgress.perkRank(player, toughness), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }

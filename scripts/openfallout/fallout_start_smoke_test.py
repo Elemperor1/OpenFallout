@@ -696,7 +696,7 @@ return {
                     tostring(g.@LIST_AFTER@))
                 -- The perk the script added twice and removed, the note it added, and the base form of a cube
                 print('OFTEST', 'object progress', tostring(g.@PERK_BEFORE@), tostring(g.@PERK_AFTER@),
-                    tostring(g.@PERK_RANK_THREE@), tostring(g.@PERK_REMOVED@), tostring(g.@NOTE_BEFORE@),
+                    tostring(g.@PERK_TEAMMATES@), tostring(g.@PERK_REMOVED@), tostring(g.@NOTE_BEFORE@),
                     tostring(g.@NOTE_AFTER@), tostring(g.@IS_ID@), tostring(g.@IS_NOT_ID@))
                 -- The link of the record, the cell and worldspace of the cube, and the loads of the script of the beast
                 print('OFTEST', 'object world', tostring(g.@LINKED@), tostring(g.@LINKED_NONE@),
@@ -794,7 +794,7 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@LIST_AFTER@", plugin.STATE_GLOBALS["list_after"][1])
                  .replace("@PERK_BEFORE@", plugin.PROGRESS_GLOBALS["perk_before"][1])
                  .replace("@PERK_AFTER@", plugin.PROGRESS_GLOBALS["perk_after"][1])
-                 .replace("@PERK_RANK_THREE@", plugin.PROGRESS_GLOBALS["perk_rank_three"][1])
+                 .replace("@PERK_TEAMMATES@", plugin.PROGRESS_GLOBALS["perk_teammates"][1])
                  .replace("@PERK_REMOVED@", plugin.PROGRESS_GLOBALS["perk_removed"][1])
                  .replace("@NOTE_BEFORE@", plugin.PROGRESS_GLOBALS["note_before"][1])
                  .replace("@NOTE_AFTER@", plugin.PROGRESS_GLOBALS["note_after"][1])
@@ -1274,11 +1274,11 @@ def check_objects(text, scenario):
         problems.append("IsInList should find the marker by the record of the list, not the cube before the script "
                         "added it and the cube after (1, 0, 1): " + str(found))
     found = one("progress")
-    if found is not None and found != ["0", "1", "0", "0", "0", "1", "1", "0"]:
-        problems.append("the player should not have the perk before the script adds it, have it at rank 2 but not 3 "
-                        "after two AddPerk calls, and not have it after RemovePerk; the note should be there only "
-                        "after AddNote; GetIsID should be 1 for the base form of the cube and 0 for another "
-                        "(0, 1, 0, 0, 0, 1, 1, 0): " + str(found))
+    if found is not None and found != ["0", "1", "1", "0", "0", "1", "1", "0"]:
+        problems.append("the player should not have the perk before the script adds it, have it after two AddPerk "
+                        "calls (also when HasPerk is asked for the teammates), and not have it after RemovePerk; the "
+                        "note should be there only after AddNote; GetIsID should be 1 for the base form of the cube "
+                        "and 0 for another (0, 1, 1, 0, 0, 1, 1, 0): " + str(found))
     found = one("world")
     # The script of the beast runs for the beast, for the creature that is placed as a levelled list (which stands for
     # the beast) and for the heir that takes the script from the beast as its template: 3 runs, and 2 without the third
