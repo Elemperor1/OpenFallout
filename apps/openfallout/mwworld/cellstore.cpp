@@ -844,6 +844,13 @@ namespace OFWorld
         }
     }
 
+    ESM::FormId placedActorBaseOf(const ESMStore& store, const ESM4::ActorCharacter& ref)
+    {
+        ESM::FormId base;
+        ESM::RecNameInts type;
+        return placedActorBase(store, ref, base, type) ? base : ESM::FormId();
+    }
+
     template <typename ReferenceInvocable>
     static void visitCell4References(
         const ESM4::Cell& cell, const ESMStore& esmStore, ESM::ReadersCache& readers, ReferenceInvocable&& invocable)

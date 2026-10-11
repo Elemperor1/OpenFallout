@@ -393,7 +393,7 @@ namespace OFScript
             // plugin, which is where the games keep it
             if (const ESM4::ActorCharacter* record
                 = mStore.get<ESM4::ActorCharacter>().search(ESM::FormId::fromUint32(reference)))
-                base = record->mBaseObj;
+                base = OFWorld::placedActorBaseOf(mStore, *record);
             else
                 base = ESM::FormId::fromUint32((reference & 0xFF000000u) | 0x7u);
             return true;
@@ -403,10 +403,12 @@ namespace OFScript
         const ESM::FormId form = ESM::FormId::fromUint32(reference);
         if (form.isZeroOrUnset())
             return true;
+        // A levelled list in the place of the base of a character or creature stands for the one it gives, as in the
+        // cell
         if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
-            base = character->mBaseObj;
+            base = OFWorld::placedActorBaseOf(mStore, *character);
         else if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
-            base = creature->mBaseObj;
+            base = OFWorld::placedActorBaseOf(mStore, *creature);
         else if (const ESM4::Reference* object = mStore.get<ESM4::Reference>().search(form))
             base = object->mBaseObj;
         else

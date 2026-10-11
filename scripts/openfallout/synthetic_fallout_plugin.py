@@ -116,7 +116,7 @@ OBJECT_GLOBALS = {"loads": (0x850, "OFTestObjectLoads"), "frames": (0x851, "OFTe
                   "activated": (0x852, "OFTestObjectActivated"), "distance": (0x853, "OFTestObjectDistance"),
                   "victim": (0x854, "OFTestObjectVictimDisabled"), "items": (0x86D, "OFTestIdlerItems"),
                   "rank": (0x86E, "OFTestIdlerRank"), "joined": (0x86F, "OFTestIdlerJoined"),
-                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank")}
+                  "dead": (0x870, "OFTestIdlerDead"), "player_rank": (0x871, "OFTestPlayerRank"), "listed": (0x872, "OFTestListedItems")}
 # Characters whose packages depend on scripts. The conditional one has two packages, each with a condition on quest C: the
 # first needs a stage that the quest never reaches, the second the stage that the test sets at GATE_FROM seconds, so it
 # stays where it is put until then and goes to the marker of the second. The scripted one has no package: the script of
@@ -142,7 +142,11 @@ IDLER_TAKES = 2
 # the script reads the rank back
 PLAYER_BASE_ID = 0x7
 PLAYER_RANK = 2
-LAST_ID = 0x871 # the largest form ID of the plugin, which the next object ID of its header follows
+# The beast holds CREATURE_ITEMS suits by its record. The creature that is placed as a levelled list stands for it, so
+# the script sees the same suits there
+CREATURE_ITEMS = 6
+LISTED_REF_IDS = {"interior": CREATURE_LIST_REF_ID, "exterior": EXTERIOR_CREATURE_LIST_REF_ID}
+LAST_ID = 0x872 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -489,8 +493,8 @@ def message():
 def object_script(kind):
     """The script of the scripted object (an SCPT record of type 0): on load it counts the loads, shows the message,
     disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
-    and kills it, and reads the rank of the player in a faction; every frame it counts the frames, measures its distance to
-    the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
+    and kills it, reads the rank of the player in a faction and the suits of a creature placed as a levelled list; every
+    frame it counts the frames, measures its distance to the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
     second time, lets the object do what it does by default (Activate)."""
     sf = fallout_script
     script = sf.Script(0)
@@ -502,8 +506,9 @@ def object_script(kind):
     greeting = script.form(MESSAGE_ID)
     loads, frames, activated, distance, disabled = (script.form(OBJECT_GLOBALS[name][0])
                                                     for name in ("loads", "frames", "activated", "distance", "victim"))
-    items, rank, joined, dead, player_rank = (script.form(OBJECT_GLOBALS[name][0])
-                                              for name in ("items", "rank", "joined", "dead", "player_rank"))
+    items, rank, joined, dead, player_rank, listed_items = (
+        script.form(OBJECT_GLOBALS[name][0]) for name in ("items", "rank", "joined", "dead", "player_rank", "listed"))
+    listed = script.form(LISTED_REF_IDS[kind])
     idler = script.form(PACKAGE_REF_IDS["idler"][index])
     suit = script.form(SUIT_ID)
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
@@ -534,7 +539,9 @@ def object_script(kind):
                                                               reference=idler)),
             sf.set_to(sf.global_target(dead), sf.call_token(sf.GET_DEAD, reference=idler)),
             sf.set_to(sf.global_target(player_rank), sf.call_token(sf.GET_FACTION_RANK, sf.form_argument(first_faction),
-                                                                   reference=player))])),
+                                                                   reference=player)),
+            sf.set_to(sf.global_target(listed_items), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(suit),
+                                                                    reference=listed))])),
         # The block replaces what the object does when it is activated; the second activation asks for that
         sf.block(sf.ON_ACTIVATE, b"".join([
             sf.branch(sf.IF, sf.call_token(sf.IS_ACTION_REF, sf.form_argument(player))),
@@ -838,7 +845,7 @@ def creatures():
     beast = creature(CREATURE_ID, CREATURE_NAME, [
         zstr(b"FULL", "OpenFallout Test Beast"), zstr(b"MODL", CREATURE_SKELETON),
         sub(b"NIFZ", CREATURE_BODY.encode("ascii") + b"\0" + CREATURE_FOOT.encode("ascii") + b"\0"),
-        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS))])
+        sub(b"OBND", struct.pack("<6h", *CREATURE_BOUNDS)), sub(b"CNTO", struct.pack("<II", SUIT_ID, CREATURE_ITEMS))])
     # the record of one that takes its model, and with it its name, from the template and keeps nothing of its own
     user = creature(CREATURE_USER_ID, CREATURE_NAME + "User", [
         zstr(b"FULL", "Not Shown"), sub(b"TPLT", struct.pack("<I", CREATURE_LIST_ID))],
