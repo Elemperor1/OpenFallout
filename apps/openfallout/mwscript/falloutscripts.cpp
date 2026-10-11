@@ -22,14 +22,20 @@
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/settings/values.hpp>
+#include <components/vfs/manager.hpp>
+#include <components/vfs/recursivedirectoryiterator.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/soundmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4base.hpp"
@@ -263,6 +269,7 @@ namespace OFScript
     void FalloutScripts::update(float frametime, bool paused)
     {
         runPending();
+        updateVoices(frametime);
         if (paused)
             return;
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
@@ -777,8 +784,202 @@ namespace OFScript
         ESM::FormId base;
         if (reference == 0 || topic == 0 || !baseOf(reference, base))
             return false;
+        std::vector<SaidLine> lines;
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic);
+            for (const FalloutScript::DialogueLine& line : view.mLines)
+                lines.push_back({ voiceFile(reference, line), line.mText, lineSeconds(line.mText) });
+        }
+        if (lines.empty())
+            return false;
+        runOnMainThread(
+            [this, reference, lines = std::move(lines)]() mutable { startSaying(reference, std::move(lines)); });
+        return true;
+    }
+
+    float FalloutScripts::lineSeconds(const std::string& text)
+    {
+        // How long a line takes to read: the time that a response stays when there is no voice to wait for
+        constexpr float secondsPerCharacter = 0.055f;
+        constexpr float shortest = 1.5f;
+        constexpr float longest = 12.f;
+        return std::clamp(static_cast<float>(text.size()) * secondsPerCharacter, shortest, longest);
+    }
+
+    const FalloutScript::VoiceIndex& FalloutScripts::voices()
+    {
+        const std::lock_guard lock(mVoiceMutex);
+        if (!mVoiceIndexBuilt)
+        {
+            mVoiceIndexBuilt = true;
+            if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                for (const VFS::Path::Normalized& path :
+                    resources->getVFS()->getRecursiveDirectoryIterator("sound/voice/"))
+                    mVoiceIndex.add(path.value());
+            Log(Debug::Info) << "Voice files: " << mVoiceIndex.size();
+        }
+        return mVoiceIndex;
+    }
+
+    std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)
+    {
+        const FalloutScript::VoiceIndex& index = voices();
+        if (index.size() == 0 || line.mInfo == 0)
+            return {};
+        // The folder of a response is that of the plugin that has it: the one that its id names, or one that is loaded
+        // after it and overrides it. The plugin has the files of the lines it records, the id counting from its 24
+        // bits.
+        std::vector<std::string> plugins;
+        const std::size_t own = line.mInfo >> 24;
+        for (std::size_t i = own; i < mContentFiles.size(); ++i)
+        {
+            // A plugin that has a response of its own with the same lower digits has the file of that one (the ids of
+            // different plugins count from the same numbers)
+            if (i != own
+                && mStore.get<ESM4::DialogInfo>().search(
+                    refId((static_cast<FalloutScript::FormId>(i) << 24) | (line.mInfo & 0xFFFFFF))))
+                continue;
+            plugins.push_back(Misc::StringUtils::lowerCase(mContentFiles[i]));
+        }
+        std::string voiceType;
+        FalloutScript::ActorTraits traits;
+        if (traitsOf(speaker, traits) && traits.mVoice != 0)
+            if (const ESM4::VoiceType* type = mStore.get<ESM4::VoiceType>().search(refId(traits.mVoice)))
+                voiceType = type->mEditorId;
+        return index.find(plugins, voiceType, line.mInfo, line.mNumber);
+    }
+
+    void FalloutScripts::startSaying(FalloutScript::FormId reference, std::vector<SaidLine> lines)
+    {
+        // A character that says a line is not interrupted by the next: they come one after the other
+        Saying saying;
+        saying.mReference = reference;
+        saying.mLines = std::move(lines);
+        for (Saying& other : mSayings)
+            if (other.mReference == reference)
+            {
+                for (SaidLine& line : saying.mLines)
+                    other.mLines.push_back(std::move(line));
+                return;
+            }
+        mSayings.push_back(std::move(saying));
+    }
+
+    void FalloutScripts::updateVoices(float frametime)
+    {
+        // Nothing to look after in most frames, and the sound is not there before the game is
+        const auto conversationState = static_cast<VoiceState>(mConversationVoice.load());
+        if (mSayings.empty() && conversationState != VoiceState::Pending && conversationState != VoiceState::Playing)
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (sound == nullptr || world == nullptr)
+            return;
+
+        // The voice of the conversation
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            const auto state = static_cast<VoiceState>(mConversationVoice.load());
+            if (state == VoiceState::Pending || state == VoiceState::Playing)
+            {
+                const OFWorld::Ptr speaker = findReference(mConversationVoiceSpeaker);
+                if (speaker.isEmpty())
+                    mConversationVoice = static_cast<int>(VoiceState::Done);
+                else if (state == VoiceState::Pending)
+                {
+                    sound->say(speaker, VFS::Path::Normalized(mConversationVoiceFile));
+                    // Without an output to play on (or a file that does not decode) nothing is said and the lines wait
+                    // as long as they take to read
+                    mConversationVoice
+                        = static_cast<int>(sound->sayActive(speaker) ? VoiceState::Playing : VoiceState::None);
+                }
+                else if (!sound->sayActive(speaker))
+                    mConversationVoice = static_cast<int>(VoiceState::Done);
+            }
+        }
+
+        // The lines that characters say outside of a conversation
+        const OFWorld::Ptr player = world->getPlayerPtr();
+        for (auto saying = mSayings.begin(); saying != mSayings.end();)
+        {
+            const OFWorld::Ptr speaker = findReference(saying->mReference);
+            if (speaker.isEmpty() || saying->mNext >= saying->mLines.size())
+            {
+                saying = mSayings.erase(saying);
+                continue;
+            }
+            const SaidLine& line = saying->mLines[saying->mNext];
+            if (!saying->mStarted)
+            {
+                saying->mStarted = true;
+                saying->mWait = line.mSeconds;
+                bool voiced = false;
+                if (!line.mVoice.empty())
+                {
+                    sound->say(speaker, VFS::Path::Normalized(line.mVoice));
+                    voiced = sound->sayActive(speaker);
+                }
+                saying->mWait = voiced ? 0.f : line.mSeconds;
+                // What is said can be read when it is far enough to hear it, if subtitles are on or when there is
+                // no voice to hear
+                constexpr float hearingDistance = 1500.f;
+                const bool near = !player.isEmpty() && speaker.getCell() == player.getCell()
+                    && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
+                            .length()
+                        <= hearingDistance;
+                if (near && (!voiced || Settings::gui().mSubtitles))
+                {
+                    const std::string name(speaker.getClass().getName(speaker));
+                    OFBase::Environment::get().getWindowManager()->messageBox(
+                        name.empty() ? line.mText : name + ": " + line.mText, OFGui::ShowInDialogueMode_Never);
+                }
+            }
+            else
+            {
+                saying->mWait -= frametime;
+                // A voice that plays is waited for; a line without one stays as long as it takes to read
+                if (!sound->sayActive(speaker) && saying->mWait <= 0)
+                {
+                    ++saying->mNext;
+                    saying->mStarted = false;
+                }
+            }
+            ++saying;
+        }
+    }
+
+    bool FalloutScripts::sayConversationLine(std::size_t index)
+    {
         const std::lock_guard lock(mDialogueMutex);
-        return !mDialogue.say({ reference, numberOf(base) }, topic).mLines.empty();
+        const FalloutScript::DialogueView& view = mDialogue.view();
+        if (!mDialogue.active() || index >= view.mLines.size())
+            return false;
+        mConversationVoiceFile = voiceFile(mDialogue.speaker().mReference, view.mLines[index]);
+        mConversationVoiceSpeaker = mDialogue.speaker().mReference;
+        if (mConversationVoiceFile.empty())
+        {
+            mConversationVoice = static_cast<int>(VoiceState::None);
+            return false;
+        }
+        Log(Debug::Info) << "Voice: " << mConversationVoiceFile;
+        mConversationVoice = static_cast<int>(VoiceState::Pending);
+        return true;
+    }
+
+    void FalloutScripts::stopConversationVoice()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        if (mConversationVoice.load() == static_cast<int>(VoiceState::None))
+            return;
+        const FalloutScript::FormId speaker = mConversationVoiceSpeaker;
+        mConversationVoice = static_cast<int>(VoiceState::None);
+        // The sound is the business of the thread of the frame
+        runOnMainThread([this, speaker] {
+            const OFWorld::Ptr ptr = findReference(speaker);
+            if (!ptr.isEmpty())
+                OFBase::Environment::get().getSoundManager()->stopSay(ptr);
+        });
     }
 
     bool FalloutScripts::startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic)
@@ -816,13 +1017,11 @@ namespace OFScript
         result.mActive = mDialogue.active();
         result.mView = mDialogue.view();
         result.mSpeakerName = mSpeakerName;
-        // How long the lines take to read: the time a response stays before the next thing happens
-        constexpr float secondsPerCharacter = 0.055f;
-        constexpr float shortest = 1.5f;
-        constexpr float longest = 12.f;
         for (const FalloutScript::DialogueLine& line : result.mView.mLines)
-            result.mDuration
-                += std::clamp(static_cast<float>(line.mText.size()) * secondsPerCharacter, shortest, longest);
+        {
+            result.mLineDurations.push_back(lineSeconds(line.mText));
+            result.mDuration += result.mLineDurations.back();
+        }
         return result;
     }
 

@@ -2,6 +2,7 @@
 #define OPENFALLOUT_SCRIPT_FALLOUTSCRIPTS_H
 
 #include <array>
+#include <atomic>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -31,6 +32,7 @@
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
+#include <components/falloutscript/voicefiles.hpp>
 
 #include <osg/Vec3f>
 
@@ -122,9 +124,19 @@ namespace OFScript
             bool mActive = false;
             FalloutScript::DialogueView mView;
             std::string mSpeakerName;
-            /// The seconds that the response that is said takes to read, which is how long it stays before the next
-            /// thing happens
+            /// The seconds that each line of the response takes to read, and their sum, which is how long the response
+            /// stays before the next thing happens when there is no voice to wait for
+            std::vector<float> mLineDurations;
             float mDuration = 0;
+        };
+
+        /// How the voice of a line of the conversation is doing
+        enum class VoiceState
+        {
+            None, // no voice is asked for, there is none for the line, or the sound could not be played
+            Pending, // asked for, the frame that plays it has not come
+            Playing,
+            Done, // played to the end, or stopped
         };
 
         /// Whether the loaded content has dialogue (topics of Fallout 3 or New Vegas)
@@ -137,6 +149,12 @@ namespace OFScript
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// The conversation as it is now (nothing active when none is open)
         Conversation conversation() const;
+        /// The speaker says the line of the response that is said, with the voice of the data. False when the line has
+        /// no voice file. The sound starts with the next frame.
+        bool sayConversationLine(std::size_t index);
+        VoiceState conversationVoice() const { return static_cast<VoiceState>(mConversationVoice.load()); }
+        /// The voice of the conversation stops
+        void stopConversationVoice();
         /// The player picks the topic (one of the options the conversation offers); the response is said
         void chooseOption(FalloutScript::FormId topic);
         /// The response that is said is over: its end script runs and the options are worked out
@@ -190,8 +208,30 @@ namespace OFScript
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
 
-        /// The character says a response of the topic outside of a conversation: what the response does is done
+        /// The character says a response of the topic outside of a conversation: what the response does is done, and
+        /// the lines are told to the player: the voice of the data and, when subtitles are on, the text
         bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic);
+        /// The voice file of the line that the speaker says, empty when the data has none
+        std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
+        const FalloutScript::VoiceIndex& voices();
+        static float lineSeconds(const std::string& text);
+        /// A line said to the player outside of a conversation, one after the other for a character
+        struct SaidLine
+        {
+            std::string mVoice;
+            std::string mText;
+            float mSeconds = 0;
+        };
+        struct Saying
+        {
+            FalloutScript::FormId mReference = 0;
+            std::vector<SaidLine> mLines;
+            std::size_t mNext = 0;
+            float mWait = 0;
+            bool mStarted = false;
+        };
+        void startSaying(FalloutScript::FormId reference, std::vector<SaidLine> lines);
+        void updateVoices(float frametime);
 
         void forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const override;
         void forEachInfo(const std::function<void(const ESM4::DialogInfo&)>& function) const override;
@@ -335,6 +375,17 @@ namespace OFScript
         FalloutScript::DialogueManager mDialogue;
         std::mt19937 mDialogueRandom;
         std::string mSpeakerName;
+        /// The voice files of the data, listed when the first line is said (a long list: 240 thousand for a game)
+        std::mutex mVoiceMutex;
+        FalloutScript::VoiceIndex mVoiceIndex;
+        bool mVoiceIndexBuilt = false;
+        /// The voice of the conversation: the file asked for, the speaker, and how it goes (the frame of the game
+        /// plays it and reports here, the interface reads)
+        std::string mConversationVoiceFile;
+        FalloutScript::FormId mConversationVoiceSpeaker = 0;
+        std::atomic<int> mConversationVoice{ 0 };
+        /// The characters that say lines outside of a conversation (the thread of the frame only)
+        std::vector<Saying> mSayings;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

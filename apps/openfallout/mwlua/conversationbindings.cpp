@@ -60,6 +60,9 @@ namespace OFLua
                 row["text"] = line.mText;
                 row["emotion"] = line.mEmotion;
                 row["emotionValue"] = line.mEmotionValue;
+                row["duration"] = index <= static_cast<int>(conversation.mLineDurations.size())
+                    ? conversation.mLineDurations[index - 1]
+                    : 0.f;
                 lines[index++] = row;
             }
             result["lines"] = lines;
@@ -90,11 +93,33 @@ namespace OFLua
             scripts().chooseOption(parseId(topic));
             return view(lua);
         };
+        // The voice of a line of the response that is said (1 is the first). False when the data has no voice file for
+        // it.
+        api["say"]
+            = [](int line) { return line >= 1 && scripts().sayConversationLine(static_cast<std::size_t>(line - 1)); };
+        // How the voice that was asked for goes: "none" (no voice, or it can not be played), "pending", "playing",
+        // "done"
+        api["voice"] = []() -> std::string {
+            switch (scripts().conversationVoice())
+            {
+                case OFScript::FalloutScripts::VoiceState::Pending:
+                    return "pending";
+                case OFScript::FalloutScripts::VoiceState::Playing:
+                    return "playing";
+                case OFScript::FalloutScripts::VoiceState::Done:
+                    return "done";
+                case OFScript::FalloutScripts::VoiceState::None:
+                    break;
+            }
+            return "none";
+        };
+        api["stopVoice"] = []() { scripts().stopConversationVoice(); };
         api["finish"] = [lua]() {
             scripts().finishResponse();
             return view(lua);
         };
         api["close"] = [lua]() {
+            scripts().stopConversationVoice();
             scripts().endConversation();
             return view(lua);
         };

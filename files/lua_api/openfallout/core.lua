@@ -1144,6 +1144,25 @@
 -- @return #ConversationState
 
 ---
+-- The speaker says a line of the response that is said with the voice that the data has for it (the file of the line
+-- under `sound/voice`, found by the plugin that has the response, the form id of the response and the number of the
+-- line). The sound starts with the next frame; follow it with `voice`.
+-- @function [parent=#Conversation] say
+-- @param #number line The position of the line in `lines`, from 1.
+-- @return #boolean False when the data has no voice file for the line.
+
+---
+-- How the voice that `say` started goes: `"pending"` (asked for, the frame that plays it has not come), `"playing"`,
+-- `"done"` (played to the end or stopped), or `"none"` (nothing was asked for, the line has no voice file, or the sound
+-- could not be played: with no sound output a line stays as long as it takes to read, `ConversationLine.duration`).
+-- @function [parent=#Conversation] voice
+-- @return #string
+
+---
+-- Stops the voice that is playing.
+-- @function [parent=#Conversation] stopVoice
+
+---
 -- The response that is being said is over (the player has read it or it was played): what its end script does is done,
 -- and the topics the player can pick next are worked out. A response flagged as the end of the conversation ends it.
 -- Does nothing when no response is being said.
@@ -1180,6 +1199,7 @@
 -- @field #string text The words.
 -- @field #number emotion 0 neutral, 1 anger, 2 disgust, 3 fear, 4 sad, 5 happy, 6 surprise, 7 pained.
 -- @field #number emotionValue How strong the emotion is.
+-- @field #number duration The seconds that the line takes to read, which is how long it stays when no voice plays.
 
 ---
 -- A topic the player can pick.

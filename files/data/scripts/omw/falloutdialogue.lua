@@ -21,8 +21,14 @@ local gap = v2(0, 6)
 
 local element = nil
 local visible = false
--- How long the response has been on the screen, until the player has had the time to read it
-local elapsed = 0
+-- The response that is said, the line of it that is being said, how long it has been (until the player has had the
+-- time to read it, or the voice is over) and how long since its voice ended
+local playedResponse = nil
+local lineIndex, lineElapsed, voiceOverFor = 0, 0, 0
+-- A voice was asked for the line
+local lineVoiced = false
+-- The time between a voice that is over and the next line
+local pause = 0.25
 
 local function destroyElement()
     if element then
@@ -37,11 +43,25 @@ end
 
 local advance, render
 
+local function startLine(index)
+    lineIndex, lineElapsed, voiceOverFor = index, 0, 0
+    lineVoiced = conversation.say(index)
+end
+
+-- A response that is new: its first line is said
+local function startResponse(view)
+    if view.speaking and view.response ~= playedResponse then
+        playedResponse = view.response
+        startLine(1)
+    end
+end
+
 -- Picks the topic and shows the response to it
 local function pick(topic)
     local view = conversation.choose(topic)
-    elapsed = 0
+    playedResponse = nil
     render(view)
+    startResponse(view)
 end
 
 -- The words of a text in lines that fit the width. Text widgets do not wrap to a width and then grow in height (they
@@ -173,8 +193,9 @@ end
 
 -- The response has been read: what it does is done and the options appear, or the conversation is over
 function advance()
+    conversation.stopVoice()
     local view = conversation.finish()
-    elapsed = 0
+    playedResponse = nil
     if view.ended then
         destroyElement()
         closeWindow()
@@ -185,8 +206,9 @@ end
 
 local function show()
     visible = true
-    elapsed = 0
-    render(conversation.get())
+    local view = conversation.get()
+    render(view)
+    startResponse(view)
 end
 
 local function hide()
@@ -210,9 +232,32 @@ return {
             if not view.speaking then
                 return
             end
-            elapsed = elapsed + core.getRealFrameDuration()
-            if elapsed >= view.duration then
+            startResponse(view)
+            local dt = core.getRealFrameDuration()
+            lineElapsed = lineElapsed + dt
+            local line = view.lines[lineIndex]
+            if not line then
                 advance()
+                return
+            end
+            -- A voice is waited for (a line of the data that has no file, or a game with no sound to play it on, stays
+            -- as long as it takes to read)
+            local voice = lineVoiced and conversation.voice() or 'none'
+            local over
+            if voice == 'pending' or voice == 'playing' then
+                over = lineElapsed > line.duration * 4 + 10
+            elseif voice == 'done' then
+                voiceOverFor = voiceOverFor + dt
+                over = voiceOverFor >= pause
+            else
+                over = lineElapsed >= line.duration
+            end
+            if over then
+                if lineIndex >= #view.lines then
+                    advance()
+                else
+                    startLine(lineIndex + 1)
+                end
             end
         end,
         onKeyPress = function(key)
@@ -233,10 +278,20 @@ return {
         end,
     },
     eventHandlers = {
-        -- However the window is left (Escape, the main menu, a script), the conversation is over
+        -- However the window is left (Escape, the main menu, a script), the conversation is over. A screen that opens on
+        -- top of it (the making of a character, from the end script of a response) leaves it where it is.
         UiModeChanged = function(data)
             if data.oldMode == 'Dialogue' and data.newMode ~= 'Dialogue' then
+                for _, mode in ipairs(ui._getUiModeStack()) do
+                    if mode == 'Dialogue' then
+                        return
+                    end
+                end
                 conversation.close()
+                -- Nothing of the conversation stays for the next one (the same response may be its first)
+                conversation.stopVoice()
+                playedResponse = nil
+                lineIndex, lineElapsed, voiceOverFor, lineVoiced = 0, 0, 0, false
             end
         end,
     },

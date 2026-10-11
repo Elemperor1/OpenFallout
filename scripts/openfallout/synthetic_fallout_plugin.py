@@ -302,6 +302,21 @@ WRONG_GREETING_TEXT = "This greeting is for another voice."
 ASK_TEXT = "The test goes well."
 SECRET_TEXT = "The secret is that there is none."
 GOODBYE_TEXT = "Farewell."
+# The voice files of the lines: sound/voice/<plugin>/<voice type>/<text>_<form id of the response, 8 hex digits>_<n>.ogg.
+# The greeting has a file in the folder of the voice of the talker and one in the folder of another voice (the talker's
+# must be the one that is looked up), the question has one only in the other folder (better than silence), and the other
+# responses have none. The bytes are not a sound: what is under test is which file is looked up.
+VOICE_FILES = (
+    ("OFTestVoice", "oftest_oftestgreeting", GREETING_INFO_ID),
+    ("OFTestOtherVoice", "oftest_oftestgreeting", GREETING_INFO_ID),
+    ("OFTestOtherVoice", "oftest_oftestask", ASK_INFO_ID),
+)
+
+
+def voice_path(voice, text, response, number=1):
+    return f"sound/voice/oftest.esm/{voice.lower()}/{text}_{response:08x}_{number}.ogg"
+
+
 LAST_ID = 0x8D2 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
@@ -1475,6 +1490,10 @@ def write(out, animation=True, spline=True):
     out = Path(out)
     mesh = out / "meshes" / "openfallout" / "cube.osgt"
     mesh.parent.mkdir(parents=True, exist_ok=True)
+    for voice, text, response in VOICE_FILES:
+        voice_file = out / voice_path(voice, text, response)
+        voice_file.parent.mkdir(parents=True, exist_ok=True)
+        voice_file.write_bytes(b"OggS not a sound")
     mesh.write_text(box_mesh(), encoding="ascii")
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),
