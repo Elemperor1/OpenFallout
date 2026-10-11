@@ -505,6 +505,15 @@ namespace OFScript
     bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
     {
         base = ESM::FormId();
+        // An object that PlaceAtMe asked for is of the base it was asked for, until the world makes it
+        {
+            const std::lock_guard lock(mMadeMutex);
+            if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+            {
+                base = ESM::FormId::fromUint32(asked->second.mBase);
+                return true;
+            }
+        }
         if (reference == mPlayer)
         {
             // The record of PlayerRef names the character that the player is; without it that is form 7 of the same
