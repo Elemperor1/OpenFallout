@@ -16,6 +16,7 @@
 #include <components/esm/typetraits.hpp>
 #include <components/esm4/census.hpp>
 #include <components/esm4/creaturecensus.hpp>
+#include <components/esm4/dialoguecensus.hpp>
 #include <components/esm4/equipmentcensus.hpp>
 #include <components/esm4/packagecensus.hpp>
 #include <components/esm4/reader.hpp>
@@ -914,33 +915,72 @@ namespace EsmTool
         return countTes4<ESM4::WornArmorCensus>(info, "Worn", "armour that the characters wear");
     }
 
+    // Reads the commands file of the arguments, if there is one, and says what it found. False when it cannot be used.
+    static bool readCommands(const Arguments& info, FalloutScript::CommandTable& commands)
+    {
+        if (info.commandsFile.empty())
+            return true;
+        std::ifstream stream(info.commandsFile);
+        if (!stream)
+        {
+            std::cout << "Failed to open the commands file " << Files::pathToUnicodeString(info.commandsFile) << '\n';
+            return false;
+        }
+        const FalloutScript::CommandCsvResult read = FalloutScript::readCommandTableCsv(stream, commands);
+        std::cout << "Read " << read.mCommands << " script commands from the commands file (" << read.mRows << " rows, "
+                  << read.mOther << " block types and console commands left out)\n";
+        for (const std::string& problem : read.mProblems)
+            std::cout << "  " << problem << '\n';
+        if (commands.size() == 0)
+        {
+            std::cout << "The commands file has no script commands\n";
+            return false;
+        }
+        return true;
+    }
+
+    int dialogueTes4(const Arguments& info)
+    {
+        FalloutScript::CommandTable commands;
+        if (!readCommands(info, commands))
+            return -1;
+        return countTes4<ESM4::DialogueCensus>(
+            info, "Dialogue", "topics and responses", [&commands, &info](ESM4::DialogueCensus& census) {
+                if (info.commandsFile.empty())
+                    return;
+                census.setFunctionNames([&commands](std::uint32_t function) -> std::string {
+                    const FalloutScript::CommandInfo* command
+                        = commands.find(static_cast<std::uint16_t>(ESM4::ScriptCode::firstCommand + function));
+                    return command != nullptr ? std::string(command->mName) : std::string();
+                });
+            });
+    }
+
     int scriptCodeTes4(const Arguments& info)
     {
         FalloutScript::CommandTable commands;
-        if (!info.commandsFile.empty())
+        if (!readCommands(info, commands))
+            return -1;
+        std::set<std::uint16_t> watched;
+        for (std::size_t start = 0; start < info.findCommands.size();)
         {
-            std::ifstream stream(info.commandsFile);
-            if (!stream)
-            {
-                std::cout << "Failed to open the commands file " << Files::pathToUnicodeString(info.commandsFile)
-                          << '\n';
-                return -1;
-            }
-            const FalloutScript::CommandCsvResult read = FalloutScript::readCommandTableCsv(stream, commands);
-            std::cout << "Read " << read.mCommands << " script commands from the commands file (" << read.mRows
-                      << " rows, " << read.mOther << " block types and console commands left out)\n";
-            for (const std::string& problem : read.mProblems)
-                std::cout << "  " << problem << '\n';
-            if (commands.size() == 0)
-            {
-                std::cout << "The commands file has no script commands\n";
-                return -1;
-            }
+            std::size_t end = info.findCommands.find(',', start);
+            if (end == std::string::npos)
+                end = info.findCommands.size();
+            const std::string name = info.findCommands.substr(start, end - start);
+            start = end + 1;
+            if (name.empty())
+                continue;
+            if (const FalloutScript::CommandInfo* command = commands.find(std::string_view(name)))
+                watched.insert(command->mOpcode);
+            else
+                std::cout << "The commands file has no command named " << name << '\n';
         }
         return countTes4<ESM4::ScriptCodeCensus>(
-            info, "Script code", "compiled scripts", [&commands, &info](ESM4::ScriptCodeCensus& census) {
+            info, "Script code", "compiled scripts", [&commands, &info, &watched](ESM4::ScriptCodeCensus& census) {
                 if (info.commandsFile.empty())
                     return;
+                census.setWatchedCommands(watched);
                 census.setCommandLookup([&commands](std::uint16_t opcode) {
                     ESM4::ScriptCodeCensus::CommandSignature signature;
                     if (const FalloutScript::CommandInfo* command = commands.find(opcode))

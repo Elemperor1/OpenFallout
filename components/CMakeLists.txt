@@ -209,6 +209,7 @@ add_component_dir (esm4
     creaturecensus
     destruction
     dialogue
+    dialoguecensus
     effect
     effectlist
     equipmentcensus

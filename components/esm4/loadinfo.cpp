@@ -31,8 +31,137 @@
 
 #include <components/esm/refid.hpp>
 
+#include "grouptype.hpp"
 #include "reader.hpp"
-//#include "writer.hpp"
+#include "recordreader.hpp"
+// #include "writer.hpp"
+
+namespace
+{
+    // TRDT of Fallout 3 and New Vegas: the emotion and its value, four unused bytes, the number of the response and
+    // three unused bytes, then the sound (not in 2230 of the 38023 responses of Fallout 3, which keep the form of
+    // Oblivion), and in New Vegas and most Fallout 3 records the flags with three unused bytes.
+    constexpr std::size_t responseSoundOffset = 16;
+    constexpr std::uint32_t responseSizeWithoutSound = 16;
+    constexpr std::uint32_t responseSizeWithoutFlags = 20;
+    constexpr std::uint32_t responseSizeWithFlags = 24;
+}
+
+void ESM4::DialogInfo::loadFallout(ESM4::Reader& reader)
+{
+    // A NEXT sub-record ends the first script and starts the second one.
+    bool inEndScript = false;
+
+    RecordReader in(reader, "INFO");
+    while (in.next())
+    {
+        if ((inEndScript ? mEndScript : mScript).loadSubRecord(reader))
+            continue;
+
+        // The sub-records of a response follow its TRDT; one that comes before any is the first response's
+        const auto currentResponse = [this]() -> DialogResponse& {
+            if (mResponses.empty())
+                mResponses.emplace_back();
+            return mResponses.back();
+        };
+
+        switch (in.type())
+        {
+            case ESM::fourCC("QSTI"):
+                in.formId(mQuest);
+                break;
+            case ESM::fourCC("TPIC"):
+                in.formId(mTopic);
+                break;
+            case ESM::fourCC("PNAM"):
+                in.formId(mPreviousInfo);
+                break;
+            case ESM::fourCC("NAME"):
+                in.formId(mAddTopics.emplace_back());
+                break;
+            case ESM::fourCC("SNDD"):
+                in.formId(mSound);
+                break;
+            case ESM::fourCC("TRDT"):
+            {
+                std::vector<std::uint8_t> data;
+                in.bytes(data, { responseSizeWithoutSound, responseSizeWithoutFlags, responseSizeWithFlags });
+                DialogResponse& response = mResponses.emplace_back();
+                std::memcpy(&response.mEmotionType, data.data(), sizeof(response.mEmotionType));
+                std::memcpy(&response.mEmotionValue, data.data() + 4, sizeof(response.mEmotionValue));
+                response.mNumber = data[12];
+                if (data.size() >= responseSizeWithoutFlags)
+                {
+                    in.adjustFormIds(data, { responseSoundOffset });
+                    std::uint32_t sound = 0;
+                    std::memcpy(&sound, data.data() + responseSoundOffset, sizeof(sound));
+                    response.mSound = ESM::FormId::fromUint32(sound);
+                }
+                if (data.size() >= responseSizeWithFlags)
+                    response.mFlags = data[20];
+                break;
+            }
+            case ESM::fourCC("NAM1"):
+                in.string(currentResponse().mText);
+                break;
+            case ESM::fourCC("NAM2"):
+                in.string(currentResponse().mNotes);
+                break;
+            case ESM::fourCC("NAM3"):
+                in.string(currentResponse().mEdits);
+                break;
+            case ESM::fourCC("SNAM"):
+                in.formId(currentResponse().mSpeakerAnimation);
+                break;
+            case ESM::fourCC("LNAM"):
+                in.formId(currentResponse().mListenerAnimation);
+                break;
+            case ESM::fourCC("CTDA"):
+                in.condition(mConditions.emplace_back());
+                break;
+            case ESM::fourCC("TCLT"):
+                in.formId(mChoices.emplace_back());
+                break;
+            case ESM::fourCC("TCLF"):
+                in.formId(mLinkedFrom.emplace_back());
+                break;
+            case ESM::fourCC("TCFU"):
+                in.formId(mFollowUps.emplace_back());
+                break;
+            case ESM::fourCC("NEXT"):
+                in.expectSize(0);
+                inEndScript = true;
+                break;
+            case ESM::fourCC("RNAM"):
+                in.string(mPrompt);
+                break;
+            case ESM::fourCC("ANAM"):
+                in.formId(mSpeaker);
+                break;
+            case ESM::fourCC("KNAM"):
+                in.formId(mChallengeStat);
+                break;
+            case ESM::fourCC("DNAM"):
+                in.value(mChallenge);
+                break;
+            case ESM::fourCC("DATA"):
+            {
+                std::vector<std::uint8_t> data;
+                // Some Fallout 3 responses have one byte of flags, the others two
+                in.bytes(data, { 3, 4 });
+                mDialType = data[0];
+                mNextSpeaker = data[1];
+                mInfoFlags = data[2];
+                if (data.size() > 3)
+                    mInfoFlags = static_cast<std::uint16_t>(mInfoFlags | (data[3] << 8));
+                break;
+            }
+            default:
+                in.unknown();
+        }
+    }
+    in.finish();
+}
 
 /// Load the current INFO record, retaining separate response begin and end scripts.
 /// Throws on unknown subrecords or script loading errors.
@@ -42,6 +171,31 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
     mFlags = reader.hdr().record.flags;
 
     mEditorId = ESM::RefId(mId).serializeText(); // FIXME: quick workaround to use existing code
+
+    // The topic is the one whose group the response is in
+    if (reader.stackSize() > 0 && reader.grp().type == Grp_TopicChild)
+    {
+        ESM::FormId topic = ESM::FormId::fromUint32(reader.grp().label.value);
+        mTopic = topic;
+    }
+
+    if (reader.isFalloutFile())
+    {
+        loadFallout(reader);
+        if (!mResponses.empty())
+        {
+            const DialogResponse& first = mResponses.front();
+            mResponse = first.mText;
+            mNotes = first.mNotes;
+            mEdits = first.mEdits;
+            mResponseData.emoType = first.mEmotionType;
+            mResponseData.emoValue = first.mEmotionValue;
+            mResponseData.responseNo = first.mNumber;
+            mResponseData.sound = first.mSound.toUint32();
+            mResponseData.flags = first.mFlags;
+        }
+        return;
+    }
 
     // A NEXT sub-record ends the first script and starts the second one.
     bool inEndScript = false;
@@ -86,25 +240,26 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
                 break; // not in TES4
             case ESM::fourCC("CTDA"): // FIXME: how to detect if 1st/2nd param is a formid?
             {
+                TargetCondition& condition = mConditions.emplace_back();
                 if (subHdr.dataSize == 24) // TES4
-                    reader.get(&mTargetCondition, 24);
+                    reader.get(&condition, 24);
                 else if (subHdr.dataSize == 20) // FO3
-                    reader.get(&mTargetCondition, 20);
+                    reader.get(&condition, 20);
                 else if (subHdr.dataSize == 28)
                 {
-                    reader.get(mTargetCondition); // FO3/FONV
-                    if (mTargetCondition.reference)
-                        reader.adjustFormId(mTargetCondition.reference);
+                    reader.get(condition); // FO3/FONV
+                    if (condition.reference)
+                        reader.adjustFormId(condition.reference);
                 }
                 else // TES5
                 {
-                    reader.get(&mTargetCondition, 20);
+                    reader.get(&condition, 20);
                     if (subHdr.dataSize == 36)
                         reader.getFormId(mParam3);
-                    reader.get(mTargetCondition.runOn);
-                    reader.get(mTargetCondition.reference);
-                    if (mTargetCondition.reference)
-                        reader.adjustFormId(mTargetCondition.reference);
+                    reader.get(condition.runOn);
+                    reader.get(condition.reference);
+                    if (condition.reference)
+                        reader.adjustFormId(condition.reference);
                     reader.skipSubRecordData(4); // unknown
                 }
 
@@ -175,6 +330,20 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
             default:
                 throw std::runtime_error("ESM4::INFO::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
         }
+    }
+
+    // A record of another game says one thing
+    if (!mResponse.empty())
+    {
+        DialogResponse& response = mResponses.emplace_back();
+        response.mEmotionType = mResponseData.emoType;
+        response.mEmotionValue = mResponseData.emoValue;
+        response.mNumber = static_cast<std::uint8_t>(mResponseData.responseNo);
+        response.mSound = ESM::FormId::fromUint32(mResponseData.sound);
+        response.mFlags = static_cast<std::uint8_t>(mResponseData.flags);
+        response.mText = mResponse;
+        response.mNotes = mNotes;
+        response.mEdits = mEdits;
     }
 }
 

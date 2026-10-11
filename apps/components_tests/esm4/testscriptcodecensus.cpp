@@ -353,6 +353,33 @@ namespace
         EXPECT_EQ(use.mTotalArgumentBytes, 6u);
     }
 
+    TEST(ESM4ScriptCodeCensusTest, listsTheCallersOfTheCommandsAskedFor)
+    {
+        const std::string calls = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58, 0x1000 + 59 });
+        collect(
+            census, scriptRecord(0x1001, calls) + scriptRecord(0x1002, statement(0x1D)) + scriptRecord(0x1003, calls));
+
+        EXPECT_THAT(census.getCommands().at(0x1000 + 58).mByHolder, ElementsAre(Pair("SCPT", 2u)));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("--find"));
+        EXPECT_THAT(out.str(), HasSubstr("0x103A: 2 scripts, SCPT 2\n    SCPT 0x00001001\n    SCPT 0x00001003\n"));
+        EXPECT_THAT(out.str(), HasSubstr("0x103B: 0 scripts\n"));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, listsNoCallersWhenNoneAreAskedFor)
+    {
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'))));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), Not(HasSubstr("--find")));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, skipsRecordsThatAreDeleted)
     {
         ESM4::ScriptCodeCensus census;

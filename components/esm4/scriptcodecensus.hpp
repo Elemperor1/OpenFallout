@@ -7,6 +7,7 @@
 #include <functional>
 #include <iosfwd>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -74,6 +75,7 @@ namespace ESM4
             std::size_t mExpressions = 0; // called in an expression
             std::size_t mOnReference = 0; // called on a reference (ref.Command)
             std::size_t mScripts = 0; // scripts that call it
+            std::map<std::string, std::size_t> mByHolder; // scripts that call it, by the record type that holds them
             std::size_t mTotalArgumentBytes = 0;
             std::uint16_t mMaxArgumentBytes = 0;
         };
@@ -138,6 +140,11 @@ namespace ESM4
 
         void setCommandLookup(CommandLookup lookup) { mLookup = std::move(lookup); }
 
+        /// The commands whose callers are listed: the record type and form id of the first few scripts that call each,
+        /// and how many scripts of each type call it.
+        static constexpr std::size_t maxCallersPerCommand = 40;
+        void setWatchedCommands(std::set<std::uint16_t> opcodes) { mWatched = std::move(opcodes); }
+
         void collect(Reader& reader);
 
         const std::vector<std::string>& getFatalErrors() const { return mFatalErrors; }
@@ -186,6 +193,8 @@ namespace ESM4
         std::map<std::pair<std::uint16_t, std::uint16_t>, std::size_t> mBlocks;
         std::map<std::uint16_t, std::size_t> mBlockArguments; // blocks with bytes after the block length, by type
         std::map<std::uint16_t, CommandUse> mCommands;
+        std::set<std::uint16_t> mWatched;
+        std::map<std::uint16_t, std::vector<std::string>> mCallers;
         std::map<std::string, std::size_t> mTokens;
         std::map<std::string, std::size_t> mOperators;
         std::map<std::string, std::size_t> mStructure; // problems with the nesting of blocks and conditions
