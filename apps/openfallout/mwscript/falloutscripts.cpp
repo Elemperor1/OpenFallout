@@ -373,18 +373,23 @@ namespace OFScript
 
     bool FalloutScripts::distance(FalloutScript::FormId first, FalloutScript::FormId second, double& result)
     {
-        const OFWorld::Ptr a = findReference(first);
-        const OFWorld::Ptr b = findReference(second);
-        if (a.isEmpty() || b.isEmpty())
+        // Where the script has put the references counts, though the world has not done it yet
+        Place a;
+        Place b;
+        if (!whereIs(first, a) || !whereIs(second, b))
             return false;
         // In the same cell, or in exterior cells of one worldspace
-        const OFWorld::CellStore* cellA = a.getCell();
-        const OFWorld::CellStore* cellB = b.getCell();
-        if (cellA != cellB
-            && !(cellA->isExterior() && cellB->isExterior()
-                && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace()))
-            return false;
-        result = (a.getRefData().getPosition().asVec3() - b.getRefData().getPosition().asVec3()).length();
+        if (a.mCell != b.mCell)
+        {
+            const OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+            const OFWorld::CellStore* cellA = model->findCell(a.mCell);
+            const OFWorld::CellStore* cellB = model->findCell(b.mCell);
+            if (cellA == nullptr || cellB == nullptr
+                || !(cellA->isExterior() && cellB->isExterior()
+                    && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace()))
+                return false;
+        }
+        result = (a.mPosition - b.mPosition).length();
         return true;
     }
 
@@ -588,10 +593,11 @@ namespace OFScript
 
     FalloutScript::FormId FalloutScripts::cellOf(FalloutScript::FormId reference)
     {
-        const OFWorld::Ptr ptr = findReference(reference);
-        if (ptr.isEmpty())
+        // Where the script has put the reference counts, though the world has not done it yet
+        Place place;
+        if (!whereIs(reference, place))
             return 0;
-        const ESM::FormId* id = ptr.getCell()->getCell()->getId().getIf<ESM::FormId>();
+        const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
         return id != nullptr ? id->toUint32() : 0;
     }
 
@@ -736,6 +742,14 @@ namespace OFScript
         {
             // It is put there when its cell is loaded
             mRelocations[reference] = where;
+            return;
+        }
+        if ((move.mParts & (Move::Cell | Move::PositionX | Move::PositionY | Move::PositionZ)) == 0)
+        {
+            // Only turned: that is not a teleport, so what a teleport resets (the fall, the movement of the character,
+            // the Lua event) is left alone. The player is turned in the order the engine turns it in everywhere else.
+            world->rotateObject(ptr, where.mAngle,
+                ptr == world->getPlayerPtr() ? OFBase::RotationFlag_inverseOrder : OFBase::RotationFlag_none);
             return;
         }
         OFWorld::CellStore* destination = model->findCell(where.mCell);

@@ -155,7 +155,7 @@ MOVER_REF_IDS = {"interior": 0x871, "exterior": 0x872}
 MOVE_TARGET_REF_IDS = {"interior": 0x873, "exterior": 0x874}
 MOVE_GLOBALS = {"x": (0x875, "OFTestMoverX"), "y": (0x876, "OFTestMoverY"), "angle": (0x877, "OFTestMoverAngle"),
                 "now": (0x878, "OFTestMoveNow"), "far": (0x87B, "OFTestFarMoverX"),
-                "hop": (0x886, "OFTestHopNow")}
+                "hop": (0x886, "OFTestHopNow"), "near": (0x887, "OFTestMoverNear")}
 # A second cube is sent to the marker of the other kind of cell, which is not loaded: the world keeps it there, and the
 # script reads where it is from the cell that is
 FAR_MOVER_REF_IDS = {"interior": 0x879, "exterior": 0x87A}
@@ -178,6 +178,7 @@ FAR_MARKER_REF_IDS = {"interior": EXTERIOR_MARKER_REF_ID, "exterior": MARKER_REF
 SETTER_REF_IDS = {"interior": 0x882, "exterior": 0x883}
 SETTER_PLACE = (300.0, -1400.0)
 SETTER_SET = (700.0, -1700.0) # from the origin of the cell
+SETTER_TURN = 180 # degrees: the script of the scripted object only turns it, in the frame of the hop of the player
 # A cube that the script sends to the marker of the other kind of cell in the same frame as the player, before the
 # player: the player's cell change must not leave it behind
 TRAVELLER_REF_IDS = {"interior": 0x884, "exterior": 0x885}
@@ -185,7 +186,7 @@ TRAVELLER_PLACE = (1500.0, -2000.0)
 # The test asks for a move of the player inside the cell it is in with a global (SetPos on x): the player is moved, not
 # taken to the cell again (which fades the screen out and in)
 HOP_X = 123.0
-LAST_ID = 0x886 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x887 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -553,11 +554,12 @@ def object_script(kind):
     first_faction, second_faction = (script.form(form_id) for form_id in FACTION_IDS)
     mover, move_target, far_marker = (script.form(form_id) for form_id in (
         MOVER_REF_IDS[kind], MOVE_TARGET_REF_IDS[kind], FAR_MARKER_REF_IDS[kind]))
-    mover_x, mover_y, mover_angle, move_now, far_x, hop = (script.form(MOVE_GLOBALS[name][0])
-                                                           for name in ("x", "y", "angle", "now", "far", "hop"))
+    mover_x, mover_y, mover_angle, move_now, far_x, hop, mover_near = (
+        script.form(MOVE_GLOBALS[name][0]) for name in ("x", "y", "angle", "now", "far", "hop", "near"))
     hop_x = int((EXTERIOR_CELL_SIZE / 2 if kind == "exterior" else 0.0) + HOP_X)
     far_mover = script.form(FAR_MOVER_REF_IDS[kind])
     traveller = script.form(TRAVELLER_REF_IDS[kind])
+    setter = script.form(SETTER_REF_IDS[kind])
     other_kind = "exterior" if kind == "interior" else "interior"
     sleeper, sleeper_target = (script.form(SLEEPER_REF_IDS[other_kind]), script.form(SLEEPER_TARGET_REF_IDS[other_kind]))
 
@@ -577,6 +579,10 @@ def object_script(kind):
                  + sf.call_on(idler, sf.KILL_ACTOR, counted=True)
                  + sf.call_on(mover, sf.MOVE_TO_MARKER, sf.form_argument(move_target),
                               *(sf.int_argument(offset) for offset in MOVE_OFFSET))
+                 # Right after the move, which the world makes at the start of the next frame: the script sees the
+                 # cube at the marker already (the offsets are in the x and y)
+                 + sf.set_to(sf.global_target(mover_near),
+                             sf.call_token(sf.GET_DISTANCE, sf.form_argument(move_target), reference=mover))
                  + sf.call_on(far_mover, sf.MOVE_TO_MARKER, sf.form_argument(far_marker),
                               *(sf.int_argument(offset) for offset in FAR_OFFSET))
                  + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
@@ -608,6 +614,7 @@ def object_script(kind):
             sf.branch(sf.IF, sf.global_target(hop) + sf.number("1") + sf.operator("==")),
             sf.set_to(sf.global_target(hop), sf.number("0")),
             sf.call_on(player, sf.SET_POS, sf.axis_argument("X"), sf.int_argument(hop_x)),
+            sf.call_on(setter, sf.SET_ANGLE, sf.axis_argument("Z"), sf.int_argument(SETTER_TURN)),
             sf.statement(sf.END_IF),
             sf.branch(sf.IF, sf.global_target(move_now) + sf.number("1") + sf.operator("==")),
             sf.set_to(sf.global_target(move_now), sf.number("0")),

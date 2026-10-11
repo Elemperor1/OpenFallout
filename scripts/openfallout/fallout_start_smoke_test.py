@@ -626,7 +626,7 @@ local scripted_ids, victim_ids, mover_ids, far_ids = { @SCRIPTED@ }, { @VICTIM@ 
 local sleeper_ids = { @SLEEPER@ }
 local setter_ids = { @SETTER@ }
 local traveller_ids = { @TRAVELLER@ }
-local traveller_object = nil
+local traveller_object, setter_object = nil, nil
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
 
@@ -690,13 +690,15 @@ return {
                 mover_object, far_object = mover, find(far_ids)
                 local at = mover.position
                 print('OFTEST', 'object mover', string.format('%.1f %.1f %.1f', g.@MOVER_X@, g.@MOVER_Y@, g.@MOVER_ANGLE@),
-                    string.format('%.1f %.1f %.1f', at.x, at.y, math.deg(mover.rotation:getYaw())))
+                    string.format('%.1f %.1f %.1f', at.x, at.y, math.deg(mover.rotation:getYaw())),
+                    string.format('%.1f', g.@MOVER_NEAR@))
             elseif step == 3 and elapsed >= @MOVE_FROM@ then
                 step = 4
                 print('OFTEST', 'player moves now')
                 -- The cube that the result script of quest C (set from Lua, so it runs on the thread of Lua) gave an x
                 -- and then a y
                 local setter = find(setter_ids)
+                setter_object = setter
                 if setter ~= nil then
                     print('OFTEST', 'object setter', string.format('%.1f %.1f', setter.position.x, setter.position.y))
                 end
@@ -710,7 +712,9 @@ return {
                 step = 5
                 local player = world.players[1]
                 print('OFTEST', 'object hopped', tostring(player.cell.isExterior), tostring(player.cell.name),
-                    string.format('%.1f', player.position.x), tostring(world.globals.@HOP@))
+                    string.format('%.1f', player.position.x), tostring(world.globals.@HOP@),
+                    string.format('%.1f %.1f %.1f', setter_object.position.x, setter_object.position.y,
+                        math.deg(setter_object.rotation:getYaw())))
                 world.globals.@MOVE_NOW@ = 1
             elseif step == 5 and elapsed >= @MOVE_LOOK@ then
                 step = 6
@@ -752,6 +756,7 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@FAR_X@", plugin.MOVE_GLOBALS["far"][1])
                  .replace("@MOVER_X@", plugin.MOVE_GLOBALS["x"][1]).replace("@MOVER_Y@", plugin.MOVE_GLOBALS["y"][1])
                  .replace("@MOVER_ANGLE@", plugin.MOVE_GLOBALS["angle"][1])
+                 .replace("@MOVER_NEAR@", plugin.MOVE_GLOBALS["near"][1])
                  .replace("@MOVE_NOW@", plugin.MOVE_GLOBALS["now"][1])
                  .replace("@HOP@", plugin.MOVE_GLOBALS["hop"][1])
                  .replace("@MOVE_FROM@", str(MOVE_FROM)).replace("@MOVE_LOOK@", str(MOVE_LOOK))
@@ -1210,7 +1215,12 @@ def check_objects(text, scenario):
     want_angle = math.degrees(plugin.TARGET_YAW)
     found = one("mover")
     if found is not None:
-        seen, placed = ([float(number) for number in part.split()] for part in found)
+        seen, placed = ([float(number) for number in part.split()] for part in found[:2])
+        near = float(found[2])
+        want_near = math.hypot(plugin.MOVE_OFFSET[0], plugin.MOVE_OFFSET[1])
+        if abs(near - want_near) > MOVE_SLACK:
+            problems.append("GetDistance right after MoveToMarker should see the cube at the marker with the offsets "
+                            f"({want_near:.1f} units from it, the move is not made yet): {found}")
         for what, values in (("saw", seen), ("was put", placed)):
             if (abs(values[0] - want_x) > MOVE_SLACK or abs(values[1] - want_y) > MOVE_SLACK
                     or angle_difference(math.radians(values[2]), math.radians(want_angle)) > math.radians(MOVE_SLACK)):
@@ -1256,7 +1266,15 @@ def check_objects(text, scenario):
                             f"{origin + plugin.SETTER_SET[0]:g}, {origin + plugin.SETTER_SET[1]:g}): {found}")
     found = one("hopped")
     if found is not None:
-        exterior, name, x, asked = found
+        exterior, name, x, asked, setter_at = found
+        setter_x, setter_y, setter_yaw = (float(number) for number in setter_at.split())
+        origin_set = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
+        if (abs(setter_x - origin_set - plugin.SETTER_SET[0]) > MOVE_SLACK
+                or abs(setter_y - origin_set - plugin.SETTER_SET[1]) > MOVE_SLACK
+                or angle_difference(math.radians(setter_yaw), math.radians(plugin.SETTER_TURN)) > math.radians(MOVE_SLACK)):
+            problems.append("SetAngle alone should turn the cube and leave it where the result script of quest C put it "
+                            f"({origin_set + plugin.SETTER_SET[0]:g}, {origin_set + plugin.SETTER_SET[1]:g}, facing "
+                            f"{plugin.SETTER_TURN} degrees): {found}")
         origin = plugin.EXTERIOR_CELL_SIZE / 2 if scenario.exterior else 0.0
         if (exterior != str(scenario.exterior).lower() or (not scenario.exterior and name != plugin.CELL_NAME)
                 or abs(float(x) - origin - plugin.HOP_X) > MOVE_SLACK or asked != "0"):
