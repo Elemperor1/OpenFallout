@@ -30,6 +30,13 @@ GET_IN_WORLDSPACE = 0x1136
 GET_LINKED_REF = 0x116B
 PLACE_AT_ME = 0x1025
 GET_CURRENT_TIME = 0x1012
+GET_ACTOR_VALUE = 0x100E
+SET_ACTOR_VALUE = 0x100F
+MOD_ACTOR_VALUE = 0x1010
+DAMAGE_ACTOR_VALUE = 0x1181
+GET_HEALTH_PERCENTAGE = 0x11AF
+GET_WEAPON_HEALTH_PERC = 0x11F4
+IS_DLC_INSTALLED = 0x126F
 GET_GLOBAL_VALUE = 0x104A
 GET_IN_CELL = 0x1043
 GET_LOCKED = 0x1005
@@ -114,6 +121,12 @@ def int_argument(value):
 def reference_value(reference):
     """A reference as a value in an expression, named by the index of its entry in the table of references."""
     return b"Z" + u16(reference)
+
+
+def string_argument(text):
+    """A text, as a parameter that is a string holds it: its length in two bytes, then the characters."""
+    data = text.encode()
+    return u16(len(data)) + data
 
 
 def float_argument(value):

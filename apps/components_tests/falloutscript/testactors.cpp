@@ -1,7 +1,9 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -35,6 +37,7 @@ namespace
     // The codes of the commands in the table of the games
     constexpr std::uint16_t OpAddItem = 0x1002;
     constexpr std::uint16_t OpGetDead = 0x102E;
+    constexpr std::uint16_t OpGetDeadCount = 0x1054;
     constexpr std::uint16_t OpGetHealthPercentage = 0x11AF;
     constexpr std::uint16_t OpGetItemCount = 0x102F;
     constexpr std::uint16_t OpGetInFaction = 0x1047;
@@ -52,7 +55,17 @@ namespace
         std::map<FormId, std::vector<std::pair<FormId, int>>> mItems;
         std::map<FormId, std::vector<std::pair<FormId, int>>> mFactions;
         std::set<FormId> mUnknown;
+        std::map<FormId, FormId> mBases;
         int mItemQuestions = 0;
+
+        bool baseFormOf(FormId reference, FormId& base) override
+        {
+            const auto found = mBases.find(reference);
+            if (found == mBases.end())
+                return false;
+            base = found->second;
+            return true;
+        }
 
         bool initialItems(FormId holder, std::vector<std::pair<FormId, int>>& items) override
         {
@@ -84,8 +97,15 @@ namespace
                                } };
         FakeRecords mRecords;
         ActorState mState{ mRecords };
+        FalloutScript::ActorValues mValues;
+        FalloutScript::PlayerProgress mProgress;
 
-        Runner() { FalloutScript::addActorCommands(mInterpreter, mState); }
+        Runner()
+        {
+            FalloutScript::addActorCommands(mInterpreter, mState);
+            // The commands about the health of a character
+            FalloutScript::addActorValueCommands(mInterpreter, mValues, mState, mProgress);
+        }
 
         void run(const ScriptBuilder& builder)
         {
@@ -268,6 +288,27 @@ namespace
         EXPECT_FALSE(state.isDead(0));
     }
 
+    TEST(FalloutScriptActorStateTest, the_dead_are_counted_by_the_form_they_were_made_from)
+    {
+        FakeRecords records;
+        constexpr FormId raider = 0x0100A000;
+        constexpr FormId other = 0x0100A001;
+        records.mBases
+            = { { 0x01000201, raider }, { 0x01000202, raider }, { 0x01000203, raider }, { 0x01000204, other } };
+        ActorState state(records);
+
+        EXPECT_EQ(state.deadCount(raider), 0);
+        state.setDead(0x01000201, true);
+        state.setDead(0x01000202, true);
+        state.setDead(0x01000204, true);
+        // a reference the records can not tell is not counted
+        state.setDead(0x01000299, true);
+        EXPECT_EQ(state.deadCount(raider), 2);
+        EXPECT_EQ(state.deadCount(other), 1);
+        state.setDead(0x01000201, false);
+        EXPECT_EQ(state.deadCount(raider), 1);
+    }
+
     TEST(FalloutScriptActorStateTest, factions_come_from_the_record_and_scripts_change_them)
     {
         FakeRecords records;
@@ -322,6 +363,27 @@ namespace
         EXPECT_EQ(setup.variable(1), 0);
         EXPECT_EQ(setup.variable(2), 1);
         EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, a_script_counts_the_dead_of_a_base_form)
+    {
+        Runner setup;
+        constexpr FormId raider = 0x0100A000;
+        setup.mRecords.mBases = { { guard, raider }, { crate, raider } };
+        ScriptBuilder builder;
+        const std::uint16_t base = builder.form(raider);
+        const std::uint16_t other = builder.form(crate);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('s', 1), callToken(OpGetDeadCount, arguments(1).add(refArg(base))))
+            + command(OpKillActor, arguments(0)) + command(OpKillActor, arguments(0), other)
+            + setTo(var('s', 2), callToken(OpGetDeadCount, arguments(1).add(refArg(base)))) + end());
+        builder.variable(1, integerVariable, "before").variable(2, integerVariable, "after");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_EQ(setup.variable(2), 2);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

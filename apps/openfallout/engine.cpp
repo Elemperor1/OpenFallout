@@ -924,6 +924,7 @@ void OF::Engine::prepareEngine()
 
     mFalloutScripts = std::make_unique<OFScript::FalloutScripts>(
         mWorld->getStore(), OFScript::chooseGame(mContentFiles), OFScript::playerReferenceOf(mContentFiles));
+    mFalloutScripts->setContentFiles(mContentFiles);
     mEnvironment.setFalloutScripts(*mFalloutScripts);
 
     mWorld->init(mMaxRecastLogLevel, mViewer, std::move(rootNode), mWorkQueue, *mUnrefQueue);

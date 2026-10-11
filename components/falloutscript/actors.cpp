@@ -168,6 +168,19 @@ namespace FalloutScript
             mDead.erase(actor);
     }
 
+    int ActorState::deadCount(FormId base) const
+    {
+        const std::lock_guard lock(mMutex);
+        int count = 0;
+        for (const FormId actor : mDead)
+        {
+            FormId actorBase = 0;
+            if (mRecords.baseFormOf(actor, actorBase) && actorBase == base)
+                ++count;
+        }
+        return count;
+    }
+
     int ActorState::factionRank(FormId actor, FormId faction)
     {
         const std::lock_guard lock(mMutex);
@@ -223,15 +236,12 @@ namespace FalloutScript
         });
         interpreter.setHandler("GetDead",
             [&state](CallContext& call) { return call.mReference != 0 && state.isDead(call.mReference) ? 1.0 : 0.0; });
-        // Nothing in the game hurts a character yet, so one that lives has all its health
-        interpreter.setHandler("GetHealthPercentage",
-            [&state](CallContext& call) { return call.mReference != 0 && !state.isDead(call.mReference) ? 1.0 : 0.0; });
+        interpreter.setHandler("GetDeadCount", [&state](CallContext& call) {
+            const FormId base = formArgument(call, 0);
+            return base != 0 ? static_cast<double>(state.deadCount(base)) : 0.0;
+        });
         interpreter.setHandler("KillActor", [&state](CallContext& call) {
             state.setDead(call.mReference, true);
-            return 0.0;
-        });
-        interpreter.setHandler("ResurrectActor", [&state](CallContext& call) {
-            state.setDead(call.mReference, false);
             return 0.0;
         });
         interpreter.setHandler("AddToFaction", [&state](CallContext& call) {

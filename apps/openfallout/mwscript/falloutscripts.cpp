@@ -54,6 +54,31 @@ namespace OFScript
             return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
         }
 
+        /// A name of a content file as IsDLCInstalled compares it: lower case, without the spaces and the extension
+        std::string pluginKey(std::string_view name)
+        {
+            std::string key;
+            for (const char c : name)
+                if (c != ' ')
+                    key += Misc::StringUtils::toLower(c);
+            const std::size_t dot = key.find_last_of('.');
+            if (dot != std::string::npos
+                && (key.compare(dot, std::string::npos, ".esm") == 0
+                    || key.compare(dot, std::string::npos, ".esp") == 0))
+                key.resize(dot);
+            return key;
+        }
+
+        /// The number a script knows a form by. A form that has none (it is not set, it is one the world made for
+        /// itself or its plugin is out of the range of the games) is 0, which names nothing, where converting it would
+        /// throw and end the frame of every script after it.
+        FalloutScript::FormId numberOf(const ESM::FormId& form)
+        {
+            if (form.isZeroOrUnset() || !form.hasContentFile() || form.mContentFile > 0xfe)
+                return 0;
+            return form.toUint32();
+        }
+
         /// The value a global variable has: a short or a long is a whole number, the types are 's', 'l' and 'f'
         double fitToType(std::uint8_t type, double value)
         {
@@ -96,6 +121,7 @@ namespace OFScript
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
         , mActors(*this)
+        , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
         , mPlayer(player)
@@ -112,6 +138,18 @@ namespace OFScript
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
+        FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
+        // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
+        mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
+            if (call.mArguments.empty() || !call.mArguments[0].mIsText)
+                return 0.0;
+            const std::string wanted = pluginKey(call.mArguments[0].mText);
+            return !wanted.empty()
+                    && std::any_of(mContentFiles.begin(), mContentFiles.end(),
+                        [&wanted](const std::string& file) { return pluginKey(file) == wanted; })
+                ? 1.0
+                : 0.0;
+        });
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -137,6 +175,11 @@ namespace OFScript
             log("Commands that scripts reached and that are not implemented, with how often: " + summary);
     }
 
+    void FalloutScripts::setContentFiles(std::vector<std::string> files)
+    {
+        mContentFiles = std::move(files);
+    }
+
     void FalloutScripts::reset()
     {
         reportMissingCommands();
@@ -156,6 +199,7 @@ namespace OFScript
         mReferences.clear();
         mScriptPackages.clear();
         mActors.clear();
+        mActorValues.clear();
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
@@ -200,7 +244,7 @@ namespace OFScript
     {
         const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
         if (refNum.hasContentFile())
-            return refNum.mContentFile <= 0xfe ? refNum.toUint32() : 0;
+            return numberOf(refNum);
         // An object made while the game runs has a number of the world's own; scripts know it by the one it was given
         const auto made = mMadeIds.find(refNum);
         return made != mMadeIds.end() ? made->second : 0;
@@ -474,6 +518,21 @@ namespace OFScript
             }
             return record;
         }
+
+        /// The attributes of DATA, which are the actor values from strength to luck
+        void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
+        {
+            for (std::size_t i = 0; i < stats.mAttributes.size(); ++i)
+                values.emplace_back(FalloutScript::ActorValue::strength + static_cast<int>(i), stats.mAttributes[i]);
+        }
+
+        /// What ACBS says: the speed and the karma
+        void addConfig(std::vector<std::pair<int, double>>& values, const ESM4::ActorBaseConfig& config)
+        {
+            if (config.fo3.speedMultiplier > 0)
+                values.emplace_back(FalloutScript::ActorValue::speedMult, config.fo3.speedMultiplier);
+            values.emplace_back(FalloutScript::ActorValue::karma, config.fo3.karma);
+        }
     }
 
     FalloutScript::FormId FalloutScripts::scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
@@ -483,7 +542,7 @@ namespace OFScript
         if (!baseOf(reference, base) || base.isZeroOrUnset())
             return own;
         const auto scriptIdOf = [](const auto* record) -> FalloutScript::FormId {
-            return record == nullptr || record->mScriptId.isZeroOrUnset() ? 0 : record->mScriptId.toUint32();
+            return record == nullptr ? 0 : numberOf(record->mScriptId);
         };
         // A record that takes its script from a template has the script of the template, and none when the template
         // can not be followed (it is a levelled list of characters)
@@ -618,6 +677,37 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values)
+    {
+        ESM::FormId base;
+        if (!baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        // The attributes, the speed and the karma are the values of the record. Its health, fatigue and skills look
+        // like the base of a sum (most characters have 50 or 10 health, 50 fatigue and 5 in barter there), which the
+        // games add to by formulas that are not known here, so those keep the starting values.
+        // A record that takes its stats from a template has those of the template, and the starting values when the
+        // template can not be followed (it is a levelled list of characters).
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const ESM4::Npc* stats = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats);
+            if (stats == nullptr || !stats->mIsFONV)
+                return true;
+            if (stats->mFalloutStats.mKnown)
+                addAttributes(values, stats->mFalloutStats);
+            addConfig(values, stats->mBaseConfig);
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const ESM4::Creature* stats = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats);
+            if (stats == nullptr || !stats->mIsFONV)
+                return true;
+            if (stats->mFalloutStats.mKnown)
+                addAttributes(values, stats->mFalloutStats);
+            addConfig(values, stats->mBaseConfig);
+        }
+        return true;
+    }
+
     bool FalloutScripts::initialLock(FalloutScript::FormId reference, bool& locked, int& level)
     {
         // A lock is a thing of the placed reference, which the records of the content files have
@@ -636,7 +726,7 @@ namespace OFScript
         if (record == nullptr)
             return false;
         for (const ESM::FormId& form : record->mObjects)
-            entries.push_back(form.toUint32());
+            entries.push_back(numberOf(form));
         return true;
     }
 
@@ -645,8 +735,8 @@ namespace OFScript
         ESM::FormId form;
         if (!baseOf(reference, form) || form.isZeroOrUnset())
             return false;
-        base = form.toUint32();
-        return true;
+        base = numberOf(form);
+        return base != 0;
     }
 
     FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)
@@ -659,7 +749,7 @@ namespace OFScript
             return 0;
         // The cell of a building has the default worldspace, which no record is
         const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
-        return worldspace != nullptr ? worldspace->toUint32() : 0;
+        return worldspace != nullptr ? numberOf(*worldspace) : 0;
     }
 
     FalloutScript::FormId FalloutScripts::linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword)
@@ -671,9 +761,9 @@ namespace OFScript
         const auto find = [keyword](const std::vector<ESM4::LinkedReference>& links) -> FalloutScript::FormId {
             for (const ESM4::LinkedReference& link : links)
             {
-                const FalloutScript::FormId linkKeyword = link.keyword.isZeroOrUnset() ? 0 : link.keyword.toUint32();
+                const FalloutScript::FormId linkKeyword = numberOf(link.keyword);
                 if (linkKeyword == keyword && !link.reference.isZeroOrUnset())
-                    return link.reference.toUint32();
+                    return numberOf(link.reference);
             }
             return 0;
         };
@@ -756,7 +846,7 @@ namespace OFScript
         if (!whereIs(reference, place))
             return 0;
         const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
-        return id != nullptr ? id->toUint32() : 0;
+        return id != nullptr ? numberOf(*id) : 0;
     }
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)

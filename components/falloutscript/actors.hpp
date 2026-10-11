@@ -24,6 +24,9 @@ namespace FalloutScript
         virtual bool initialItems(FormId holder, std::vector<std::pair<FormId, int>>& items) = 0;
         /// The factions the reference is in (the form of the faction and the rank). False when the host can not tell.
         virtual bool initialFactions(FormId actor, std::vector<std::pair<FormId, int>>& factions) = 0;
+        /// The form the reference was made from (the base of a character or creature). False when the host can not
+        /// tell, which counts the reference as nothing.
+        virtual bool baseFormOf(FormId, FormId&) { return false; }
     };
 
     /// What scripts do to characters, creatures and containers, as far as nothing else in the game does it yet: the
@@ -48,6 +51,8 @@ namespace FalloutScript
 
         bool isDead(FormId actor) const;
         void setDead(FormId actor, bool dead);
+        /// How many of the characters or creatures made from the base form are dead
+        int deadCount(FormId base) const;
 
         /// The rank of the actor in the faction, -1 when it is not in it
         int factionRank(FormId actor, FormId faction);
@@ -93,8 +98,9 @@ namespace FalloutScript
     };
 
     /// Gives the commands about items, deaths and factions to the interpreter: AddItem, RemoveItem, GetItemCount,
-    /// GetDead, GetHealthPercentage, KillActor, ResurrectActor, AddToFaction, RemoveFromFaction, SetFactionRank,
-    /// GetInFaction and GetFactionRank. Those that the command table does not have are left out.
+    /// GetDead, GetDeadCount, KillActor, AddToFaction, RemoveFromFaction, SetFactionRank, GetInFaction and
+    /// GetFactionRank (the commands about the health of a character are with the actor values). Those that the command
+    /// table does not have are left out.
     class Interpreter;
     void addActorCommands(Interpreter& interpreter, ActorState& state);
 }

@@ -15,6 +15,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/formlists.hpp>
@@ -63,6 +64,7 @@ namespace OFScript
                                  private FalloutScript::QuestRecords,
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
+                                 private FalloutScript::ActorValueRecords,
                                  private FalloutScript::ReferenceRecords,
                                  private FalloutScript::FormListRecords,
                                  private FalloutScript::PackageWorld,
@@ -80,6 +82,9 @@ namespace OFScript
         /// Starts over, as for a new game: global variables have the values of their records, quests are at their
         /// beginning. What was loaded of the world is forgotten.
         void reset();
+
+        /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
+        void setContentFiles(std::vector<std::string> files);
 
         /// Lets a frame pass: what scripts asked of the world from another thread is done, and the scripts of the
         /// quests that run get their turn, and so do the scripts of the objects in the loaded cells. A game that is
@@ -154,6 +159,7 @@ namespace OFScript
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
+        bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
@@ -276,6 +282,7 @@ namespace OFScript
         FalloutScript::QuestManager mQuests;
         FalloutScript::ObjectScripts mObjects;
         FalloutScript::ActorState mActors;
+        FalloutScript::ActorValues mActorValues;
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
@@ -315,6 +322,7 @@ namespace OFScript
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
         std::mt19937 mRandom;
+        std::vector<std::string> mContentFiles;
         /// Seconds of play since the commands that scripts reached without a handler were last written to the log
         float mMissingTimer = 0;
         /// Writes the commands that scripts reached without a handler, with how often, to the log (nothing when there
