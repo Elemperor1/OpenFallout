@@ -209,19 +209,26 @@ namespace FalloutScript
             ~Leave() { --mDepth; }
         } leave{ mDepth };
 
+        // Each statement that is looked at costs one, the conditions of the ElseIf that are passed over included
+        const auto spend = [&]() {
+            if (mBudget == 0)
+            {
+                reportOnce(Report_TooLong, "A script ran for too many statements, so it was stopped");
+                result.mStatus = Status::Failed;
+                return false;
+            }
+            --mBudget;
+            ++result.mStatements;
+            return true;
+        };
+
         Frame frame{ instance, script, {} };
         std::size_t pc = script.isResult() ? block.mBegin : block.mBegin + 1;
         const std::size_t end = block.mEnd;
         while (pc < end)
         {
-            if (mBudget == 0)
-            {
-                reportOnce(Report_TooLong, "A script ran for too many statements, so it was stopped");
-                result.mStatus = Status::Failed;
+            if (!spend())
                 return result;
-            }
-            --mBudget;
-            ++result.mStatements;
             const Statement& statement = statements[pc];
             switch (statement.mKind)
             {
@@ -261,7 +268,8 @@ namespace FalloutScript
                         const Statement& next = statements[target];
                         if (next.mKind == Statement::Kind::ElseIf)
                         {
-                            ++result.mStatements;
+                            if (!spend())
+                                return result;
                             if (evaluate(frame, next) != 0)
                                 break;
                             target = branches[target].mNext;

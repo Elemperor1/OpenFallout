@@ -413,6 +413,22 @@ namespace
         EXPECT_EQ(setup.mHost.mLog.size(), 1u);
     }
 
+    TEST(FalloutScriptInterpreterTest, stopsAScriptWhoseElseIfsRunOutTheBudget)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        Bytes code = ifStatement(number("0"));
+        for (std::size_t i = 0; i < Interpreter::maxStatements + 10; ++i)
+            code.add(elseIfStatement(number("0")));
+        code.add(endIf());
+        builder.code(code);
+        Instance instance = setup.instance(builder);
+        const Interpreter::Result result = setup.mInterpreter.runResult(instance);
+        EXPECT_EQ(result.mStatus, Interpreter::Status::Failed);
+        EXPECT_EQ(result.mStatements, Interpreter::maxStatements);
+        EXPECT_EQ(setup.mHost.mLog.size(), 1u);
+    }
+
     TEST(FalloutScriptInterpreterTest, aScriptThatDoesNotDecodeDoesNothing)
     {
         Runner setup;
