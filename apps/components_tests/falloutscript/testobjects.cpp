@@ -259,6 +259,31 @@ namespace
         EXPECT_TRUE(setup.mObjects.hasBlock(crate, BlockType::SayToDone));
     }
 
+    TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_menu_mode_while_a_menu_is_open)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::GameMode) + setTo(var('s', 1), var('s', 1) + number("1") + op("+"))
+            + end() + begin(BlockType::MenuMode) + setTo(var('s', 2), var('s', 2) + number("1") + op("+")) + end());
+        builder.variable(1, integerVariable, "game").variable(2, integerVariable, "menu");
+        setup.addScript(scriptOfCrates, builder);
+        ASSERT_NE(setup.mObjects.add(crate, scriptOfCrates), nullptr);
+
+        setup.mObjects.updateMenu();
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+
+        setup.mObjects.setLoaded(crate, true);
+        setup.mObjects.update();
+        setup.mObjects.updateMenu();
+        setup.mObjects.updateMenu();
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 2);
+
+        setup.mObjects.setLoaded(crate, false);
+        setup.mObjects.updateMenu();
+        EXPECT_EQ(setup.variable(crate, 2), 2);
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_game_mode_every_frame)
     {
         Runner setup;

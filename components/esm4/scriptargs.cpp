@@ -36,14 +36,36 @@ namespace ESM4::ScriptCode
         class ArgumentReader
         {
         public:
-            ArgumentReader(
-                const std::vector<std::uint8_t>& code, const Call& call, const Limits& limits, Arguments& out)
+            ArgumentReader(const std::vector<std::uint8_t>& code, const Call& call, const Limits& limits,
+                Arguments& out, std::size_t start)
                 : mCode(code)
                 , mLimits(limits)
                 , mOut(out)
-                , mPosition(call.mOffset)
+                , mPosition(start)
                 , mEnd(static_cast<std::size_t>(call.mOffset) + call.mLength)
             {
+            }
+
+            // The values after the arguments of a message: a count, then that many numbers. What is left after them is
+            // not looked at.
+            void runValues()
+            {
+                if (left() == 0)
+                    return;
+                if (left() < 2)
+                {
+                    fail(ArgumentError::Truncated);
+                    return;
+                }
+                mOut.mCount = u16(mPosition);
+                mPosition += 2;
+                if (mOut.mCount > maxMessageValues)
+                {
+                    fail(ArgumentError::TooMany);
+                    return;
+                }
+                for (std::size_t i = 0; i < mOut.mCount && mOut.mError == ArgumentError::None; ++i)
+                    value();
             }
 
             void run(const std::vector<Parameter>& parameters)
@@ -104,6 +126,36 @@ namespace ESM4::ScriptCode
             bool fail(ArgumentError error) { return fail(error, mPosition); }
 
             bool referenceInRange(std::uint16_t index) const { return index >= 1 && index <= mLimits.mReferences; }
+
+            // A number, or 'Z' and a reference, which is the form as a number
+            void value()
+            {
+                Argument argument;
+                argument.mClass = ParamClass::Integer;
+                argument.mOffset = static_cast<std::uint32_t>(mPosition);
+                bool ok = false;
+                if (left() >= 1 && mCode[mPosition] == 'Z')
+                {
+                    if (left() < 3)
+                        fail(ArgumentError::Truncated);
+                    else
+                    {
+                        argument.mKind = Argument::Kind::Reference;
+                        argument.mIndex = u16(mPosition + 1);
+                        if (referenceInRange(argument.mIndex))
+                        {
+                            mPosition += 3;
+                            ok = true;
+                        }
+                        else
+                            fail(ArgumentError::BadReference);
+                    }
+                }
+                else
+                    ok = number(argument);
+                if (ok)
+                    mOut.mValues.push_back(std::move(argument));
+            }
 
             void argument(ParamClass kind)
             {
@@ -280,7 +332,22 @@ namespace ESM4::ScriptCode
             result.mErrorOffset = call.mOffset;
             return result;
         }
-        ArgumentReader(code, call, limits, result).run(parameters);
+        ArgumentReader(code, call, limits, result, call.mOffset).run(parameters);
+        return result;
+    }
+
+    Arguments decodeMessageValues(
+        const std::vector<std::uint8_t>& code, const Call& call, const Arguments& arguments, const Limits& limits)
+    {
+        Arguments result;
+        const std::size_t end = static_cast<std::size_t>(call.mOffset) + call.mLength;
+        if (end > code.size() || arguments.mError != ArgumentError::None || arguments.mTrailing > call.mLength)
+        {
+            result.mError = ArgumentError::Truncated;
+            result.mErrorOffset = call.mOffset;
+            return result;
+        }
+        ArgumentReader(code, call, limits, result, end - arguments.mTrailing).runValues();
         return result;
     }
 

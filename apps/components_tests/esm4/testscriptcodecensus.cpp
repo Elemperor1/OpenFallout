@@ -463,6 +463,55 @@ namespace
         return result;
     }
 
+    TEST(ESM4ScriptCodeCensusTest, countsTheMessagesWhoseValuesDecode)
+    {
+        const std::vector<ESM4::ScriptCode::Parameter> form{ { 14, false } };
+        const auto lookup = [&form](std::uint16_t opcode) {
+            ESM4::ScriptCodeCensus::CommandSignature signature;
+            if (opcode == 0x1059)
+            {
+                signature.mName = "ShowMessage";
+                signature.mParameters = &form;
+            }
+            return signature;
+        };
+        const auto message = [](std::uint16_t count, const std::string& values) {
+            std::string call;
+            put16(call, 1);
+            call += 'r';
+            put16(call, 1);
+            put16(call, count);
+            call += values;
+            call += std::string(4, '\0');
+            return call;
+        };
+        std::string valueSecond;
+        valueSecond += integerArgument(5);
+        valueSecond += integerArgument(6);
+        const std::string code = statement(0x1D) + statement(0x1059, message(0, ""))
+            + statement(0x1059, message(2, valueSecond)) + statement(0x1059, message(2, integerArgument(5)))
+            + statement(0x1059, message(11, ""));
+        // a script that names two forms
+        std::string forms;
+        append<std::uint32_t>(forms, 0x2001);
+        std::string second;
+        append<std::uint32_t>(second, 0x2002);
+        const std::string data = scriptHeader(2, static_cast<std::uint32_t>(code.size()), 1) + subRecord("SCDA", code)
+            + localVariable(1) + subRecord("SCRO", forms) + subRecord("SCRO", second);
+        ESM4::ScriptCodeCensus census;
+        census.setCommandLookup(lookup);
+        collect(census, record("SCPT", 0x1001, data));
+
+        const auto& tally = census.getArguments().at(0x1059);
+        EXPECT_EQ(tally.mCalls, 4u);
+        EXPECT_EQ(tally.mValues, 1u);
+        EXPECT_EQ(tally.mValuesFailed, 2u);
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(
+            out.str(), HasSubstr("messages with values for their text: 1, messages whose values do not decode: 2"));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, readsTheArgumentsOfCallsByTheParametersOfTheirCommands)
     {
         const std::vector<ESM4::ScriptCode::Parameter> integers{ { 1, false }, { 1, true } };

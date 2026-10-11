@@ -290,7 +290,17 @@ GREETING_INFO_ID = 0x8CD
 ASK_INFO_ID = 0x8CE
 ADDED_INFO_ID = 0x8CF
 GOODBYE_INFO_ID = 0x8D0
-DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd")}
+# The button of a message box with buttons that the end of the conversation shows: the response that ends it shows the
+# message, and the script of the talker reads the button into the third global (the number of the button, plus one)
+BUTTON_MESSAGE_ID = 0x8D4
+BUTTON_SCRIPT_ID = 0x8D5
+BUTTON_MESSAGE_TITLE = "OpenFallout Test Message"
+BUTTON_MESSAGE_TEXT = "Pick one of the buttons."
+# the second button has a condition that the player does not meet (it is not shown); the third is picked by the test
+BUTTON_TEXTS = ("First choice", "Hidden choice", "Third choice")
+BUTTON_PICKED = 2
+DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd"),
+                    "button": (0x8D3, "OFTestDialogueButton")}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
 TALKER_PLACE = (-300.0, 300.0)
@@ -675,6 +685,34 @@ def message():
     """The MESG record that the scripted object shows: a text and no buttons."""
     return record(b"MESG", MESSAGE_ID, [zstr(b"EDID", "OFTestMessage"), zstr(b"DESC", MESSAGE_TEXT),
                                         sub(b"DNAM", struct.pack("<I", 0)), sub(b"TNAM", struct.pack("<f", 2.0))])
+
+
+def button_message():
+    """The MESG record of a message box with three buttons, the second of which has a condition that nobody meets. The
+    flag 1 of DNAM makes it a box and not a note on the screen."""
+    subs = [zstr(b"EDID", "OFTestButtonMessage"), zstr(b"DESC", BUTTON_MESSAGE_TEXT), zstr(b"FULL", BUTTON_MESSAGE_TITLE),
+            sub(b"DNAM", struct.pack("<I", 1)), sub(b"TNAM", struct.pack("<I", 0))]
+    for index, text in enumerate(BUTTON_TEXTS):
+        subs.append(zstr(b"ITXT", text))
+        if index == 1:
+            subs.append(condition(GET_IS_VOICE_TYPE_FUNCTION, OTHER_VOICE_ID, compare=0x00, value=1.0))
+    return record(b"MESG", BUTTON_MESSAGE_ID, subs)
+
+
+def button_script():
+    """The script of the talker (an SCPT record of type 0): every frame, until a button has been read, it sets the
+    global to the number of the button plus one (GetButtonPressed tells -1 for none, and a button is told once)."""
+    sf = fallout_script
+    script = sf.Script(0)
+    button = script.form(DIALOGUE_GLOBALS["button"][0])
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.GAME_MODE, b"".join([
+            sf.branch(sf.IF, sf.global_target(button) + sf.number("0") + sf.operator("==")),
+            sf.set_to(sf.global_target(button),
+                      sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
+            sf.statement(sf.END_IF)])))
+    return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
 
 
 def form_lists():
@@ -1092,7 +1130,7 @@ def faction(form_id, name):
 
 
 def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=(), voice=None,
-           title="OpenFallout Test Person"):
+           title="OpenFallout Test Person", script=None):
     """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
@@ -1110,6 +1148,8 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
     subs += [sub(b"PKID", struct.pack("<I", package)) for package in packages]
     if voice is not None:
         subs.append(sub(b"VTCK", struct.pack("<I", voice)))
+    if script is not None:
+        subs.append(sub(b"SCRI", struct.pack("<I", script)))
     return record(b"NPC_", form_id, subs)
 
 
@@ -1124,9 +1164,10 @@ def topic(form_id, name, title, kind, flags, priority=50.0):
                                      sub(b"PNAM", struct.pack("<f", priority)), sub(b"DATA", bytes([kind, flags]))])
 
 
-def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, sound=0):
+def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, show=None, sound=0):
     """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
-    when the response starts and the one that runs when it is over. `sound` is the sound record the response names."""
+    when the response starts and the one that runs when it is over, which shows the message `show` when it is given.
+    `sound` is the sound record the response names."""
     subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
     subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
     subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, sound, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
@@ -1140,6 +1181,10 @@ def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=
         subs += [sub(b"NEXT")]
         subs += stage_script([fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))],
                              [end])
+    elif show is not None:
+        subs += [sub(b"NEXT")]
+        subs += stage_script([fallout_script.call(fallout_script.SHOW_MESSAGE, fallout_script.form_argument(1))],
+                             [show])
     return record(b"INFO", form_id, subs)
 
 
@@ -1168,7 +1213,8 @@ def dialogue():
         topic_group(ASK_TOPIC_ID, [
             response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
-        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, sound=SOUND_ID)]),
+        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
+                                              sound=SOUND_ID)]),
     ]
 
 
@@ -1439,9 +1485,9 @@ def plugin():
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
-            + top_group(b"MESG", [message()])
+            + top_group(b"MESG", [message(), button_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
-                                                 object_script("exterior")])
+                                                 object_script("exterior"), button_script()])
             + top_group(b"QUST", quests())
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
@@ -1450,7 +1496,8 @@ def plugin():
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", packages())
             + top_group(b"NPC_", [person(), *package_people(),
-                                  person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE)])
+                                  person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
+                                         script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
             + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)])])
             + top_group(b"DIAL", dialogue())

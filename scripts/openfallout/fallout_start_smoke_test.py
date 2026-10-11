@@ -50,6 +50,7 @@ The exit status is 0 when every check holds. It also checks that files/data/mesh
 placeholder_skeleton.py writes.
 """
 import argparse
+import ctypes
 import math
 import os
 import pty
@@ -59,6 +60,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -620,13 +622,15 @@ QUEST_SCRIPT = (QUEST_SCRIPT.replace("@FROM@", str(plugin.QUEST_DELAY * (plugin.
 # them, which adds a topic and runs a script when it ends, then the topic it added, whose response ends the conversation.
 DIALOGUE_FROM = 3.0
 DIALOGUE_TIMEOUT = 15.0
+# How long after the conversation the message box that its last response shows may wait for the harness to pick a button
+DIALOGUE_BUTTON_TIMEOUT = 20.0
 DIALOGUE_SCRIPT = """\
 local core = require('openfallout.core')
 local I = require('openfallout.interfaces')
 
 local conversation = core.conversation
-local elapsed, step, since = 0, 0, 0
-local ask, added
+local elapsed, step, since, poll = 0, 0, 0, 0
+local ask, added, buttonValue
 
 local function log(...) print('OFTEST', 'dialogue', ...) end
 
@@ -691,17 +695,36 @@ return {
                 log('closed', describe(conversation.get()))
                 core.sendGlobalEvent('OFTestReport', 'closed')
                 go(6)
-            elseif step == 6 and since >= 0.5 then
+            elseif step == 6 then
+                -- The last response showed a message box with buttons; the harness picks one with the keyboard, and the
+                -- script of the talker reads which (the script of the world tells what it read)
+                poll = poll + dt
+                if poll >= 0.5 then
+                    poll = 0
+                    core.sendGlobalEvent('OFTestReport', 'button')
+                end
+                if buttonValue and buttonValue > 0 then
+                    log('button', tostring(buttonValue))
+                    go(7)
+                elseif since >= @BUTTON_TIMEOUT@ then
+                    log('button timeout')
+                    go(7)
+                end
+            elseif step == 7 and since >= 0.5 then
                 core.quit()
             end
-            if step ~= 0 and step ~= 6 and since >= @TIMEOUT@ then
+            if step ~= 0 and step < 6 and since >= @TIMEOUT@ then
                 log('timeout at step', tostring(step), describe(view))
                 core.quit()
             end
         end,
     },
+    eventHandlers = {
+        OFTestButtonValue = function(value) buttonValue = value end,
+    },
 }
 """.replace("@FROM@", str(DIALOGUE_FROM)).replace("@TIMEOUT@", str(DIALOGUE_TIMEOUT)).replace(
+    "@BUTTON_TIMEOUT@", str(DIALOGUE_BUTTON_TIMEOUT)).replace(
     "@ASK_PROMPT@", plugin.ASK_PROMPT).replace("@ADDED@", plugin.ADDED_TOPIC_NAME)
 
 DIALOGUE_HOST_SCRIPT = """\
@@ -721,11 +744,14 @@ return {
         end,
         OFTestReport = function(tag)
             print('OFTEST', 'dialogue globals', tag, tostring(world.globals.@BEGIN@), tostring(world.globals.@END@))
+            if tag == 'button' then
+                world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
+            end
         end,
     },
 }
 """.replace("@TALKER_REF@", str(plugin.TALKER_REF_ID)).replace("@BEGIN@", plugin.DIALOGUE_GLOBALS["begin"][1]).replace(
-    "@END@", plugin.DIALOGUE_GLOBALS["end"][1])
+    "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1])
 
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
@@ -1061,7 +1087,51 @@ def wait_for_pixels(process, log, seconds, pixels):
     return colours
 
 
-def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts"):
+KEY_TAB = 0xFF09
+KEY_RETURN = 0xFF0D
+
+
+def press_keys(keysyms, pause=0.4):
+    """Presses the keys on the virtual display (the X test extension), one after the other. False when the libraries
+    or the display are not there."""
+    try:
+        x11 = ctypes.CDLL("libX11.so.6")
+        xtst = ctypes.CDLL("libXtst.so.6")
+    except OSError:
+        return False
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XKeysymToKeycode.restype = ctypes.c_ubyte
+    display = ctypes.c_void_p(x11.XOpenDisplay(os.environ.get("DISPLAY", "").encode()))
+    if not display.value:
+        return False
+    for keysym in keysyms:
+        code = x11.XKeysymToKeycode(display, ctypes.c_ulong(keysym))
+        for down in (1, 0):
+            xtst.XTestFakeKeyEvent(display, code, down, 0)
+            x11.XFlush(display)
+            time.sleep(0.1)
+        time.sleep(pause)
+    x11.XCloseDisplay(display)
+    return True
+
+
+def press_keys_when_logged(log, pattern, keysyms, delay, stop):
+    """Waits for the line of the log and presses the keys `delay` seconds after it (a message box takes the keys when it
+    is on the screen, which it is a moment after the line)."""
+    while not stop.is_set():
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        if re.search(pattern, text):
+            stop.wait(delay)
+            if not stop.is_set():
+                press_keys(keysyms)
+            return
+        stop.wait(0.2)
+
+
+def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
+               keys=None):
+    """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
+    pressed after the log has a line that matches."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
@@ -1072,6 +1142,12 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     os.close(slave)
     colours = {}
+    stop = threading.Event()
+    presser = None
+    if keys is not None:
+        presser = threading.Thread(target=press_keys_when_logged, daemon=True, args=(
+            home / ".config" / "openfallout" / "openfallout.log", keys[0], keys[1], keys[2], stop))
+        presser.start()
     try:
         colours = wait_for_pixels(process, home / ".config" / "openfallout" / "openfallout.log", seconds, pixels)
         process.wait(timeout=seconds)
@@ -1084,6 +1160,9 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
             process.kill()
             process.wait()
     os.close(master)
+    stop.set()
+    if presser is not None:
+        presser.join()
     return process.returncode, colours
 
 
@@ -1358,6 +1437,26 @@ def check_dialogue(text):
     closed = one("closed")
     if not has(closed, "active=false", "mode=nil"):
         problems.append(f"the window should be gone when the conversation is over: {closed}")
+    # The message box with buttons that the response ending the conversation shows: the third button is picked (the
+    # second has a condition the player does not meet), the host reports the number it has in the record, and the script of
+    # the talker reads it once (the number plus one)
+    shown = re.findall(r"Message: " + re.escape(plugin.BUTTON_MESSAGE_TEXT) + r"\s*$", text, re.M)
+    if len(shown) != 1:
+        problems.append(f"the response that ends the conversation should show the message with buttons once: {len(shown)}")
+    buttons = re.findall(r"Message buttons: (\d+)", text)
+    if buttons != [str(len(plugin.BUTTON_TEXTS) - 1)]:
+        problems.append(f"the button whose condition fails should not be shown, so two of three: {buttons}")
+    picked = re.findall(r"Message button: (-?\d+)", text)
+    if picked != [str(plugin.BUTTON_PICKED)]:
+        problems.append(f"the third button should be picked with Tab and Return, as number {plugin.BUTTON_PICKED} of the "
+                        f"record: {picked}")
+    if "OFTEST\tdialogue button timeout" in text:
+        problems.append("no button was picked in the message box (the keys did not reach it, or the script did not read it)")
+    else:
+        read = lines("button")
+        if read != [str(plugin.BUTTON_PICKED + 1)]:
+            problems.append(f"the script of the talker should read the button once, as {plugin.BUTTON_PICKED + 1}: {read}")
+
     globals_ = {line.split("\t")[0]: line.split("\t")[1:] for line in lines("globals")}
     for tag, want in (("greeting", ["1", "0"]), ("options", ["1", "0"]), ("asked", ["1", "1"]), ("closed", ["1", "1"])):
         if globals_.get(tag) != want:
@@ -1960,8 +2059,11 @@ def main():
         runtime = work / "dialogue" / "runtime"
         runtime.mkdir(mode=0o700)
         print("== dialogue: --start", plugin.CELL_NAME)
+        # The response that ends the conversation shows a message box with buttons: Tab goes to the next button, which is
+        # the third (the second is not shown), and Return picks it
         status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
-                               "dialoguetest.omwscripts")
+                               "dialoguetest.omwscripts",
+                               keys=(r"Message: " + re.escape(plugin.BUTTON_MESSAGE_TEXT), [KEY_TAB, KEY_RETURN], 1.5))
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         print(f"log: {log}")

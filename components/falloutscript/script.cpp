@@ -115,6 +115,14 @@ namespace FalloutScript
                 = ESM4::ScriptCode::decodeArguments(script.mCode, call, prepared.mCommand->mParameters, limits);
             if (prepared.mArguments.mError != ESM4::ScriptCode::ArgumentError::None)
                 prepared.mProblem = CallProblem::BadArguments;
+            else if (prepared.mCommand->mName == "ShowMessage")
+            {
+                // The games do not show a message whose values they can not read
+                prepared.mValues
+                    = ESM4::ScriptCode::decodeMessageValues(script.mCode, call, prepared.mArguments, limits);
+                if (prepared.mValues.mError != ESM4::ScriptCode::ArgumentError::None)
+                    prepared.mProblem = CallProblem::BadArguments;
+            }
         }
 
         if (!script.matchStructure())

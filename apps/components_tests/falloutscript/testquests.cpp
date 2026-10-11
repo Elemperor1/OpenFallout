@@ -414,6 +414,36 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptQuestsTest, the_script_of_a_quest_runs_its_menu_mode_in_place_of_game_mode_while_a_menu_is_open)
+    {
+        Runner setup;
+        ScriptBuilder questScript;
+        questScript.mType = 1;
+        questScript.variable(1, TypeInteger, "game");
+        questScript.variable(2, TypeInteger, "menu");
+        questScript.code(scriptName() + begin(GameMode) + setTo(var('s', 1), var('s', 1) + number("1") + op("+"))
+            + end() + begin(1) + setTo(var('s', 2), var('s', 2) + number("1") + op("+")) + end());
+        ESM4::Script& record = setup.mRecords.mScripts[scriptOfA];
+        record.mId = ESM::FormId::fromUint32(scriptOfA);
+        record.mScript = questScript.definition();
+        setup.mRecords.addQuest(questA, ESM4::Quest::Flag_StartGameEnabled, 5.f).mQuestScript
+            = ESM::FormId::fromUint32(scriptOfA);
+        setup.start();
+
+        FalloutScript::Instance* instance = setup.mQuests.instance(questA);
+        ASSERT_NE(instance, nullptr);
+        setup.mQuests.updateMenu(2.f);
+        setup.mQuests.updateMenu(3.f);
+        EXPECT_EQ(instance->variable(1), 0);
+        EXPECT_EQ(instance->variable(2), 1);
+        // the delay of the quest is the same in both, and the time that passed in a menu counts
+        setup.mQuests.update(4.f);
+        EXPECT_EQ(instance->variable(1), 0);
+        setup.mQuests.update(1.f);
+        EXPECT_EQ(instance->variable(1), 1);
+        EXPECT_EQ(instance->variable(2), 1);
+    }
+
     TEST(FalloutScriptQuestsTest, the_script_of_a_quest_runs_on_the_delay_of_the_quest_while_it_is_running)
     {
         Runner setup;

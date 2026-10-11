@@ -162,6 +162,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testquests.cpp
     falloutscript/testscript.cpp
     falloutscript/testvanillacommands.cpp
+    falloutscript/testmessagetext.cpp
     falloutscript/testvoicefiles.cpp
     fx/lexer.cpp
     fx/technique.cpp

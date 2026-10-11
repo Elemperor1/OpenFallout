@@ -26,6 +26,7 @@
 #include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/falloutscript/messagetext.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -273,6 +274,11 @@ namespace OFScript
             mDeferredPlaces.clear();
         }
         mQuests.reset();
+        mMessageQueue.clear();
+        mMessageOpen = false;
+        mOpenNumbers.clear();
+        mMessageBoxCount = 0;
+        mAnswer.clear();
         {
             const std::lock_guard lock(mDialogueMutex);
             mDialogue.reset();
@@ -289,9 +295,17 @@ namespace OFScript
     void FalloutScripts::update(float frametime, bool paused)
     {
         runPending();
+        updateMessageBoxes();
         updateVoices(frametime);
         if (paused)
+        {
+            // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
+            // blocks run in place of GameMode
+            mObjects.setSecondsPassed(frametime);
+            mQuests.updateMenu(frametime);
+            mObjects.updateMenu();
             return;
+        }
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
         constexpr float missingReportInterval = 30.f;
         mMissingTimer += frametime;
@@ -512,7 +526,11 @@ namespace OFScript
 
     void FalloutScripts::tellPlayer(const std::string& text)
     {
-        runOnMainThread([text] { OFBase::Environment::get().getWindowManager()->messageBox(text); });
+        // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
+        // notes during a conversation of Morrowind is hidden
+        runOnMainThread([text] {
+            OFBase::Environment::get().getWindowManager()->messageBox(text, OFGui::ShowInDialogueMode_Never);
+        });
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -559,7 +577,30 @@ namespace OFScript
         return true;
     }
 
-    void FalloutScripts::showMessage(FalloutScript::FormId message)
+    namespace
+    {
+        constexpr int messageBoxMenu = 1001;
+        constexpr int dialogueMenu = 1009;
+        // The flag of a message that is a box with buttons and not a note on the screen
+        constexpr std::uint32_t messageBoxFlag = 0x1;
+
+        /// The text of the interface shows `#` as the start of a colour, and a message can have it in its words
+        std::string escapeTags(const std::string& text)
+        {
+            std::string result;
+            result.reserve(text.size());
+            for (const char c : text)
+            {
+                result += c;
+                if (c == '#')
+                    result += c;
+            }
+            return result;
+        }
+    }
+
+    void FalloutScripts::showMessage(
+        FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner)
     {
         const ESM4::Message* record = mStore.get<ESM4::Message>().search(refId(message));
         if (record == nullptr)
@@ -567,11 +608,111 @@ namespace OFScript
             log("ShowMessage: the message " + FalloutScript::hex(message) + " is not known");
             return;
         }
-        if (record->mDescription.empty())
+        // The answer to the message before is gone as soon as another is shown, and the answer to this one is its
+        // owner's to read
+        mAnswer.shown(owner);
+        // The conditions before the first button are those of the message, and the ones after a button are its own;
+        // they are about the player
+        if (!mConditions.holds(record->mConditions, FalloutScript::ConditionContext()))
             return;
-        // Buttons make a message a question to the player, which the game can not ask yet: the text is shown alone
-        Log(Debug::Info) << "Message: " << record->mDescription;
-        tellPlayer(record->mDescription);
+        std::string text = FalloutScript::formatMessage(record->mDescription, values);
+        const bool isBox = (record->mMessageFlags & messageBoxFlag) != 0;
+        if (text.empty() && !isBox)
+            return;
+        Log(Debug::Info) << "Message: " << text;
+
+        MessageBox box;
+        for (std::size_t i = 0; i < record->mButtons.size(); ++i)
+        {
+            const ESM4::Message::Button& button = record->mButtons[i];
+            if (!mConditions.holds(button.mConditions, FalloutScript::ConditionContext()))
+                continue;
+            box.mButtons.push_back(escapeTags(FalloutScript::formatMessage(button.mText, values)));
+            box.mNumbers.push_back(static_cast<int>(i));
+        }
+        // A message with buttons is a question to the player, and one that is a box is shown as one even when there is
+        // nothing to pick: it has the button that closes it
+        if (box.mButtons.empty() && !isBox)
+        {
+            tellPlayer(escapeTags(text));
+            return;
+        }
+        Log(Debug::Info) << "Message buttons: " << box.mButtons.size();
+        box.mText = escapeTags(text);
+        if (!record->mFullName.empty())
+            box.mText = escapeTags(record->mFullName) + "\n\n" + box.mText;
+        runOnMainThread([this, box = std::move(box)]() mutable {
+            mMessageQueue.push_back(std::move(box));
+            ++mMessageBoxCount;
+            updateMessageBoxes();
+        });
+    }
+
+    void FalloutScripts::updateMessageBoxes()
+    {
+        OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+        if (windows == nullptr)
+            return;
+        if (mMessageOpen)
+        {
+            // The window tells the button once it is closed; a box that went away without one (the game was loaded)
+            // picked nothing
+            const int pressed = windows->readPressedButton();
+            if (pressed < 0 && windows->isInteractiveMessageBoxActive())
+                return;
+            mMessageOpen = false;
+            --mMessageBoxCount;
+            if (pressed >= 0 && static_cast<std::size_t>(pressed) < mOpenNumbers.size())
+            {
+                const int number = mOpenNumbers[static_cast<std::size_t>(pressed)];
+                mAnswer.picked(number);
+                Log(Debug::Info) << "Message button: " << number;
+            }
+            mOpenNumbers.clear();
+        }
+        // Another box (the main menu asking something) is not ours to replace
+        if (mMessageQueue.empty() || windows->isInteractiveMessageBoxActive())
+            return;
+        MessageBox box = std::move(mMessageQueue.front());
+        mMessageQueue.pop_front();
+        // A box with nothing to pick has the button that closes it, and that is the button 0
+        if (box.mButtons.empty())
+        {
+            box.mButtons.emplace_back(windows->getGameSettingString("sOK", "OK"));
+            box.mNumbers.push_back(0);
+        }
+        mOpenNumbers = box.mNumbers;
+        // The first button has the focus, so that Enter picks it
+        windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
+        mMessageOpen = true;
+    }
+
+    int FalloutScripts::takeButtonPressed(FalloutScript::FormId owner)
+    {
+        return mAnswer.take(owner);
+    }
+
+    bool FalloutScripts::menuOpen(int menu)
+    {
+        const bool message = mMessageBoxCount.load() > 0;
+        const bool dialogue = [this] {
+            const std::lock_guard lock(mDialogueMutex);
+            return mDialogue.active();
+        }();
+        switch (menu)
+        {
+            case 0:
+            {
+                OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+                return message || dialogue || (windows != nullptr && windows->isGuiMode());
+            }
+            case messageBoxMenu:
+                return message;
+            case dialogueMenu:
+                return dialogue;
+            default:
+                return false;
+        }
     }
 
     namespace

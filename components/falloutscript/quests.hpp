@@ -122,6 +122,9 @@ namespace FalloutScript
         /// Lets time pass for the scripts of the quests that are running: each runs its GameMode block once every
         /// delay of the quest (every time when the quest has none).
         void update(float seconds);
+        /// The same while a menu is open, when the MenuMode block of the script runs in place of the GameMode block
+        /// (the scripts of the games use it to go on with a quest that waits for a menu to open or to close)
+        void updateMenu(float seconds);
 
     private:
         QuestState* find(FormId quest);
@@ -129,6 +132,7 @@ namespace FalloutScript
 
         std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
         void makeInstance(FormId id, QuestState& quest);
+        void advance(float seconds, std::uint16_t blockType);
         void runEntry(FormId quest, const ESM4::QuestLogEntry& entry);
         void log(const std::string& message);
 

@@ -264,6 +264,115 @@ namespace
         EXPECT_EQ(arguments.mTrailing, 3u);
     }
 
+    // The call of a command with one form and the values of a message after it, decoded in the two steps the engine
+    // takes
+    Arguments decodeValues(const Bytes& bytes, std::size_t references = 4, std::size_t variables = 3)
+    {
+        Call command;
+        command.mOpcode = firstCommand;
+        command.mOffset = 0;
+        command.mLength = static_cast<std::uint16_t>(bytes.data().size());
+        Limits limits;
+        limits.mReferences = references;
+        limits.mVariables = variables;
+        const Arguments arguments = decodeArguments(bytes.data(), command, { { TypeQuest, false } }, limits);
+        EXPECT_EQ(arguments.mError, ArgumentError::None);
+        return decodeMessageValues(bytes.data(), command, arguments, limits);
+    }
+
+    TEST(ESM4ScriptArgsTest, theValuesOfAMessageFollowItsArguments)
+    {
+        Bytes bytes = call(1);
+        bytes.reference(1).u16(5);
+        bytes.variable('s', 1).variable('f', 2).global(3).integer(-7).real(2.5);
+        bytes.i32(0);
+        const Arguments values = decodeValues(bytes);
+        ASSERT_EQ(values.mError, ArgumentError::None);
+        EXPECT_EQ(values.mCount, 5);
+        ASSERT_EQ(values.mValues.size(), 5u);
+        EXPECT_EQ(values.mValues[0].mKind, Argument::Kind::Variable);
+        EXPECT_EQ(values.mValues[0].mVariable.mType, 's');
+        EXPECT_EQ(values.mValues[0].mVariable.mIndex, 1);
+        EXPECT_EQ(values.mValues[1].mVariable.mType, 'f');
+        EXPECT_EQ(values.mValues[2].mKind, Argument::Kind::Global);
+        EXPECT_EQ(values.mValues[2].mIndex, 3);
+        EXPECT_EQ(values.mValues[3].mKind, Argument::Kind::Number);
+        EXPECT_EQ(values.mValues[3].mNumber, -7);
+        EXPECT_EQ(values.mValues[4].mNumber, 2.5);
+    }
+
+    TEST(ESM4ScriptArgsTest, aValueOfAMessageCanBeAVariableOfAnotherScriptOrAFormAsANumber)
+    {
+        Bytes bytes = call(1);
+        bytes.reference(1).u16(2);
+        bytes.reference(2).variable('s', 4).u8('Z').u16(3);
+        bytes.i32(0);
+        const Arguments values = decodeValues(bytes);
+        ASSERT_EQ(values.mError, ArgumentError::None);
+        ASSERT_EQ(values.mValues.size(), 2u);
+        EXPECT_EQ(values.mValues[0].mKind, Argument::Kind::Variable);
+        EXPECT_EQ(values.mValues[0].mVariable.mRemote, 2);
+        EXPECT_EQ(values.mValues[0].mVariable.mIndex, 4);
+        EXPECT_EQ(values.mValues[1].mKind, Argument::Kind::Reference);
+        EXPECT_EQ(values.mValues[1].mIndex, 3);
+    }
+
+    TEST(ESM4ScriptArgsTest, aMessageWithNoValuesHasTheCountOnly)
+    {
+        Bytes bytes = call(1);
+        bytes.reference(1).u16(0).i32(0);
+        const Arguments values = decodeValues(bytes);
+        EXPECT_EQ(values.mError, ArgumentError::None);
+        EXPECT_THAT(values.mValues, IsEmpty());
+        // and a call that stops after its arguments has none either
+        Bytes plain = call(1);
+        plain.reference(1);
+        EXPECT_EQ(decodeValues(plain).mError, ArgumentError::None);
+        EXPECT_THAT(decodeValues(plain).mValues, IsEmpty());
+    }
+
+    TEST(ESM4ScriptArgsTest, theValuesOfAMessageAreNoMoreThanTheGamesKeep)
+    {
+        Bytes bytes = call(1);
+        bytes.reference(1).u16(11);
+        for (int i = 0; i < 11; ++i)
+            bytes.integer(i);
+        bytes.i32(0);
+        EXPECT_EQ(decodeValues(bytes).mError, ArgumentError::TooMany);
+
+        Bytes ten = call(1);
+        ten.reference(1).u16(10);
+        for (int i = 0; i < 10; ++i)
+            ten.integer(i);
+        ten.i32(0);
+        const Arguments values = decodeValues(ten);
+        EXPECT_EQ(values.mError, ArgumentError::None);
+        EXPECT_EQ(values.mValues.size(), 10u);
+    }
+
+    TEST(ESM4ScriptArgsTest, theValuesOfAMessageMustBeInTheData)
+    {
+        Bytes cut = call(1);
+        cut.reference(1).u16(2).integer(1);
+        EXPECT_EQ(decodeValues(cut).mError, ArgumentError::Truncated);
+
+        Bytes noCount = call(1);
+        noCount.reference(1).u8(0);
+        EXPECT_EQ(decodeValues(noCount).mError, ArgumentError::Truncated);
+
+        Bytes badReference = call(1);
+        badReference.reference(1).u16(1).u8('Z').u16(9);
+        EXPECT_EQ(decodeValues(badReference).mError, ArgumentError::BadReference);
+
+        Bytes badVariable = call(1);
+        badVariable.reference(1).u16(1).variable('s', 9);
+        EXPECT_EQ(decodeValues(badVariable).mError, ArgumentError::BadVariable);
+
+        Bytes badTag = call(1);
+        badTag.reference(1).u16(1).u8('q').u16(1);
+        EXPECT_EQ(decodeValues(badTag).mError, ArgumentError::BadVariable);
+    }
+
     TEST(ESM4ScriptArgsTest, rejectsMoreArgumentsThanTheCommandHasParameters)
     {
         Bytes bytes = call(2);

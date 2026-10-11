@@ -56,6 +56,8 @@ namespace FalloutScript
 
         /// Lets a frame pass: the GameMode blocks of the loaded references run, in the order of their form ids
         void update();
+        /// Lets a frame pass while a menu is open: the MenuMode blocks of the loaded references run instead
+        void updateMenu();
         /// The references that run GameMode now
         std::vector<FormId> updating() const { return std::vector<FormId>(mUpdating.begin(), mUpdating.end()); }
 
@@ -74,15 +76,19 @@ namespace FalloutScript
             std::shared_ptr<Instance> mInstance;
             bool mLoaded = false;
             bool mHasGameMode = false;
+            bool mHasMenuMode = false;
         };
 
         std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
+        void run(const std::set<FormId>& references, std::uint16_t blockType);
 
         Interpreter& mInterpreter;
         ScriptFinder mFinder;
         std::map<FormId, Object> mObjects;
         /// The references that run GameMode: the loaded ones whose script has such a block
         std::set<FormId> mUpdating;
+        /// The references that run MenuMode while a menu is open: the loaded ones whose script has such a block
+        std::set<FormId> mMenuUpdating;
         /// The references that are loaded
         std::set<FormId> mLoaded;
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;

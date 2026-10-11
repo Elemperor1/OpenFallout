@@ -3,6 +3,7 @@
 
 #include <array>
 #include <atomic>
+#include <deque>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -204,7 +205,10 @@ namespace OFScript
         void setPosition(FalloutScript::FormId reference, int axis, double value) override;
         void setAngle(FalloutScript::FormId reference, int axis, double radians) override;
 
-        void showMessage(FalloutScript::FormId message) override;
+        void showMessage(
+            FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner) override;
+        int takeButtonPressed(FalloutScript::FormId owner) override;
+        bool menuOpen(int menu) override;
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
 
@@ -365,6 +369,18 @@ namespace OFScript
         void runOnMainThread(std::function<void()> action);
         void applyDisabled(FalloutScript::FormId reference, bool disabled);
         void tellPlayer(const std::string& text);
+
+        /// A message with buttons that waits to be shown, or is on the screen. The buttons are the ones whose
+        /// conditions hold, with the number each has in the record.
+        struct MessageBox
+        {
+            std::string mText;
+            std::vector<std::string> mButtons;
+            std::vector<int> mNumbers;
+        };
+        /// Shows the next message box when none is open and takes what the player picked in the one that was (the
+        /// thread of the frame only)
+        void updateMessageBoxes();
         void buildNames() const;
 
         const OFWorld::ESMStore& mStore;
@@ -400,6 +416,14 @@ namespace OFScript
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once
         std::mutex mDeferredMutex;
         std::vector<std::function<void()>> mDeferred;
+        /// The messages with buttons that wait their turn, and the numbers of the buttons of the one that is open
+        std::deque<MessageBox> mMessageQueue;
+        bool mMessageOpen = false;
+        std::vector<int> mOpenNumbers;
+        /// How many boxes wait or are open (scripts ask from their own thread)
+        std::atomic<int> mMessageBoxCount{ 0 };
+        /// The answer to the last message that was shown, and who may read it
+        FalloutScript::MessageAnswer mAnswer;
         std::map<FalloutScript::FormId, bool> mDeferredDisabled;
         /// Where other threads asked to put objects, for the same reason: the next command of the script starts from
         /// there

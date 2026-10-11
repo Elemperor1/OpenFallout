@@ -224,6 +224,16 @@ namespace FalloutScript
 
     void QuestManager::update(float seconds)
     {
+        advance(seconds, BlockType::GameMode);
+    }
+
+    void QuestManager::updateMenu(float seconds)
+    {
+        advance(seconds, BlockType::MenuMode);
+    }
+
+    void QuestManager::advance(float seconds, std::uint16_t blockType)
+    {
         for (auto& [id, quest] : mQuests)
         {
             if (!quest.mRunning || !quest.mInstance)
@@ -232,7 +242,7 @@ namespace FalloutScript
             if (quest.mTimer < delay(id))
                 continue;
             quest.mTimer = 0;
-            mInterpreter.run(*quest.mInstance, BlockType::GameMode);
+            mInterpreter.run(*quest.mInstance, blockType);
         }
     }
 
