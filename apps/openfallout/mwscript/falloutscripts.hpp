@@ -264,7 +264,7 @@ namespace OFScript
         /// Where scripts put objects: those that are waiting for the start of the next frame (the world is not changed
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;
-        std::map<FalloutScript::FormId, Place> mRelocations;
+        std::map<FalloutScript::FormId, Move> mRelocations;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;

@@ -182,9 +182,8 @@ namespace OFScript
             // An object that scripts moved while its cell was not loaded is put where they wanted it
             if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
             {
-                Move move;
-                move.mWhere = moved->second;
-                move.mParts = Move::All;
+                // The place is the whole place the object was given, of which scripts named the parts in the mask
+                Move move = moved->second;
                 // Whatever a script asked for since then comes after it
                 if (const auto asked = mPendingMoves.find(reference); asked != mPendingMoves.end())
                     move.add(asked->second);
@@ -612,7 +611,7 @@ namespace OFScript
         }
         if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
         {
-            result = moved->second;
+            result = moved->second.mWhere;
             return true;
         }
         // Not in a loaded cell: where the record of the reference puts it
@@ -762,7 +761,9 @@ namespace OFScript
         if (ptr.isEmpty())
         {
             // It is put there when its cell is loaded
-            mRelocations[reference] = where;
+            Move& relocation = mRelocations[reference];
+            relocation.mWhere = where;
+            relocation.mParts |= move.mParts;
             return;
         }
         if ((move.mParts & (Move::Cell | Move::PositionX | Move::PositionY | Move::PositionZ)) == 0)

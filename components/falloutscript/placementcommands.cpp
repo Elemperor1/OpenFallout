@@ -1,5 +1,6 @@
 #include "placementcommands.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "arguments.hpp"
@@ -48,10 +49,15 @@ namespace FalloutScript
             return degrees * pi / 180.0;
         }
 
+        /// The largest coordinate or angle (units, degrees) that a script can give: a unit is about a centimetre and a
+        /// half, so this is a world of ten thousand kilometres, far outside any map, and still a number that a float
+        /// holds with room for the sum of two of them and for the index of an exterior cell that fits an int
+        constexpr double largest = 1.0e9;
+
         /// A number that a script computed can be anything; a place is not
         double finite(double value)
         {
-            return std::isfinite(value) ? value : 0.0;
+            return std::isfinite(value) ? std::clamp(value, -largest, largest) : 0.0;
         }
 
         void moveToMarker(PlacementWorld& world, CallContext& call)

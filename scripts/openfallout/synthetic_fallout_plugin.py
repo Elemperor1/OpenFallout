@@ -169,6 +169,7 @@ SLEEPER_TARGET_REF_IDS = {"interior": 0x87E, "exterior": 0x87F}
 SLEEPER_PLACE = (1800.0, -800.0)
 SLEEPER_TARGET_PLACE = (1800.0, -1100.0)
 SLEEPER_OFFSET = (7, 8, 0)
+SLEEPER_PITCH = 30  # degrees: a turn of the x angle that comes after the move, while the cell is not loaded
 MOVER_PLACE = (1200.0, -800.0)
 MOVE_TARGET_PLACE = (1200.0, -1100.0)
 MOVE_OFFSET = (10, 20, 0)
@@ -599,7 +600,8 @@ def object_script(kind):
                  + sf.call_on(far_mover, sf.MOVE_TO_MARKER, sf.form_argument(far_marker),
                               *(sf.int_argument(offset) for offset in FAR_OFFSET))
                  + sf.call_on(sleeper, sf.MOVE_TO_MARKER, sf.form_argument(sleeper_target),
-                              *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))),
+                              *(sf.int_argument(offset) for offset in SLEEPER_OFFSET))
+                 + sf.call_on(sleeper, sf.SET_ANGLE, sf.axis_argument("X"), sf.int_argument(SLEEPER_PITCH))),
         sf.block(sf.GAME_MODE, b"".join([
             add_one(frames),
             # The scripted walker is on its way to its marker. Setting its height (where it already is) every frame

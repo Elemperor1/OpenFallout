@@ -738,7 +738,8 @@ return {
                     local ok, sleeper = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
                     if ok and sleeper:isValid() then
                         print('OFTEST', 'object sleeper', tostring(sleeper.cell.isExterior),
-                            string.format('%.1f %.1f', sleeper.position.x, sleeper.position.y))
+                            string.format('%.1f %.1f', sleeper.position.x, sleeper.position.y),
+                            string.format('%.1f', math.deg(sleeper.rotation:getPitch())))
                     end
                 end
                 -- The cube that the script sent to the marker before it moved the player: it goes first, so it is in
@@ -1268,6 +1269,9 @@ def check_objects(text, scenario):
         if abs(x - want[0]) > MOVE_SLACK or abs(y - want[1]) > MOVE_SLACK:
             problems.append(f"the cube a script sent to a marker while its cell was not loaded should be at "
                             f"{want} when the cell is loaded: {sleepers[0]}")
+        if abs(float(sleepers[0][2]) - plugin.SLEEPER_PITCH) > MOVE_SLACK:
+            problems.append("SetAngle on x after the move, while the cell was not loaded, should have turned the cube "
+                            f"{plugin.SLEEPER_PITCH} degrees when the cell is loaded: {sleepers[0]}")
     found = one("setter")
     if found is not None:
         x, y = (float(number) for number in found[0].split())

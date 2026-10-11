@@ -256,4 +256,20 @@ namespace
         ASSERT_EQ(setup.mWorld.mSets.size(), 1u);
         EXPECT_EQ(setup.mWorld.mSets[0].mValue, 0);
     }
+
+    TEST(FalloutScriptPlacementTest, a_number_too_big_for_a_place_is_cut_to_the_largest_one)
+    {
+        Runner setup;
+        setup.mWorld.mPlaces[guard] = Placement();
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpSetPos, axisAndValue('X', 1e300))
+            + command(OpSetPos, axisAndValue('Y', -1e300)) + command(OpSetAngle, axisAndValue('Z', 1e300)) + end());
+
+        setup.run(builder);
+
+        ASSERT_EQ(setup.mWorld.mSets.size(), 3u);
+        EXPECT_EQ(setup.mWorld.mSets[0].mValue, 1e9);
+        EXPECT_EQ(setup.mWorld.mSets[1].mValue, -1e9);
+        EXPECT_NEAR(setup.mWorld.mSets[2].mValue, 1e9 * pi / 180.0, 1.0);
+    }
 }
