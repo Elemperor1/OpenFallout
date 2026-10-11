@@ -29,11 +29,12 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "conditionparams.hpp"
 #include "reader.hpp"
 // #include "writer.hpp"
 
-/// Load the current QUST record with stages and log entries, keeping their conditions separate.
-/// Objective data and scripts outside stage log entries are skipped.
+/// Load the current QUST record with stages and log entries, and the objectives of Fallout 3 and New Vegas, keeping
+/// their conditions separate. Scripts outside stage log entries are skipped.
 /// Throws on unknown subrecords or script loading errors.
 void ESM4::Quest::load(ESM4::Reader& reader)
 {
@@ -41,8 +42,8 @@ void ESM4::Quest::load(ESM4::Reader& reader)
     mFlags = reader.hdr().record.flags;
 
     // The sub-records of a quest do not say which part of it they belong to: INDX starts a stage, QSDT starts a log
-    // entry in it, and the conditions, text and script that follow belong to that entry. QOBJ starts the objectives,
-    // whose conditions are not read yet.
+    // entry in it, and the conditions, text and script that follow belong to that entry. QOBJ starts an objective,
+    // and QSTA a target in it, which the conditions that follow belong to.
     enum class Section
     {
         Header,
@@ -58,6 +59,22 @@ void ESM4::Quest::load(ESM4::Reader& reader)
         if (!inLogEntry || section != Section::Stage || mStages.empty() || mStages.back().mLogEntries.empty())
             return nullptr;
         return &mStages.back().mLogEntries.back();
+    };
+
+    // The objective and the target that are being read, if there are any. A QOBJ or QSTA that is not in the form of
+    // Fallout 3 and New Vegas (Skyrim has others of the same names) does not start one.
+    bool inObjective = false;
+    bool inTarget = false;
+    auto currentObjective = [&]() -> QuestObjective* {
+        if (!inObjective || section != Section::Objective || mObjectives.empty())
+            return nullptr;
+        return &mObjectives.back();
+    };
+    auto currentTarget = [&]() -> QuestTarget* {
+        QuestObjective* objective = currentObjective();
+        if (objective == nullptr || !inTarget || objective->mTargets.empty())
+            return nullptr;
+        return &objective->mTargets.back();
     };
 
     while (reader.getSubRecordHeader())
@@ -102,7 +119,10 @@ void ESM4::Quest::load(ESM4::Reader& reader)
                 if (section == Section::Stage)
                     conditions = logEntry != nullptr ? &logEntry->mTargetConditions : nullptr;
                 else if (section == Section::Objective)
-                    conditions = nullptr; // FIXME: the conditions of an objective target
+                {
+                    QuestTarget* target = currentTarget();
+                    conditions = target != nullptr ? &target->mTargetConditions : nullptr;
+                }
 
                 if (conditions == nullptr)
                     reader.skipSubRecordData();
@@ -119,6 +139,8 @@ void ESM4::Quest::load(ESM4::Reader& reader)
                     reader.get(cond); // FO3/FONV
                     if (cond.reference)
                         reader.adjustFormId(cond.reference);
+                    adjustConditionParameters(reader, cond);
+                    adjustConditionComparison(reader, cond);
                     conditions->push_back(cond);
                 }
                 else
@@ -171,9 +193,43 @@ void ESM4::Quest::load(ESM4::Reader& reader)
 
                 break;
             case ESM::fourCC("QOBJ"):
+            {
                 section = Section::Objective;
-                reader.skipSubRecordData();
+                inTarget = false;
+                inObjective = subHdr.dataSize == sizeof(QuestObjective::mIndex);
+                if (inObjective)
+                    reader.get(mObjectives.emplace_back().mIndex);
+                else
+                    reader.skipSubRecordData();
+
                 break;
+            }
+            case ESM::fourCC("NNAM"): // FO3
+            {
+                QuestObjective* objective = currentObjective();
+                if (objective != nullptr)
+                    reader.getLocalizedString(objective->mText);
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            }
+            case ESM::fourCC("QSTA"):
+            {
+                QuestObjective* objective = currentObjective();
+                inTarget = objective != nullptr && subHdr.dataSize == sizeof(ESM::FormId32) + 4;
+                if (inTarget)
+                {
+                    QuestTarget& target = objective->mTargets.emplace_back();
+                    reader.getFormId(target.mTarget);
+                    reader.get(target.mFlags);
+                    reader.skipSubRecordData(3); // unused
+                }
+                else
+                    reader.skipSubRecordData();
+
+                break;
+            }
             // The script of a stage is read above. Any other script sub-record has no log entry to go to.
             case ESM::fourCC("SCHR"):
             case ESM::fourCC("SCDA"):
@@ -182,8 +238,7 @@ void ESM4::Quest::load(ESM4::Reader& reader)
             case ESM::fourCC("SLSD"):
             case ESM::fourCC("SCVR"):
             case ESM::fourCC("SCRV"):
-            case ESM::fourCC("QSTA"):
-            case ESM::fourCC("NNAM"): // FO3
+            case ESM::fourCC("MICO"):
             case ESM::fourCC("ANAM"): // TES5
             case ESM::fourCC("DNAM"): // TES5
             case ESM::fourCC("ENAM"): // TES5

@@ -87,13 +87,14 @@ namespace ESM4
     {
         None, // it is followed
         Schedule, // it is not the time for it
-        Conditions, // it has conditions, and the game cannot tell yet whether they hold
+        Conditions, // it has conditions, which the caller has to tell whether they hold
         Behaviour, // the game does nothing for this kind of package
     };
 
-    // The conditions of a package (CTDA) are about the state of the world and of the quests, which the game does not
-    // keep yet: a package that has any is not followed (the data has them on 2,242 of 4,885 packages of New Vegas, most
-    // of them to switch a quest's behaviour on, which a game that has not started the quest has off).
+    // The conditions of a package (CTDA) are about the state of the world and of the quests (the data has them on
+    // 2,242 of 4,885 packages of New Vegas, most of them to switch a quest's behaviour on), which this does not know:
+    // a package that has any is reported as such once the time and the kind are right, and whoever runs the scripts
+    // tells whether they hold.
     PackageSkip packageSkip(const AIPackage& package, const PackageClock& clock);
     PackageSkip packageSkip(
         int packageType, const AIPackage::PSDT& schedule, bool hasConditions, const PackageClock& clock);

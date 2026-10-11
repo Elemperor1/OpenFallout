@@ -125,32 +125,32 @@ namespace FalloutScript
             const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
             return error == std::errc() && end == text.data() + text.size();
         }
+    }
 
-        bool parseParameters(const std::string& text, std::vector<ESM4::ScriptCode::Parameter>& parameters)
+    bool parseParameterTypes(std::string_view text, std::vector<ESM4::ScriptCode::Parameter>& parameters)
+    {
+        std::size_t at = 0;
+        while (at < text.size())
         {
-            std::size_t at = 0;
-            while (at < text.size())
+            if (text[at] == ' ')
             {
-                if (text[at] == ' ')
-                {
-                    ++at;
-                    continue;
-                }
-                const std::size_t end = std::min(text.find(' ', at), text.size());
-                std::string_view token(text.data() + at, end - at);
-                ESM4::ScriptCode::Parameter parameter;
-                if (token.back() == '?')
-                {
-                    parameter.mOptional = true;
-                    token.remove_suffix(1);
-                }
-                if (!parseNumber(token, parameter.mType))
-                    return false;
-                parameters.push_back(parameter);
-                at = end;
+                ++at;
+                continue;
             }
-            return true;
+            const std::size_t end = std::min(text.find(' ', at), text.size());
+            std::string_view token = text.substr(at, end - at);
+            ESM4::ScriptCode::Parameter parameter;
+            if (token.back() == '?')
+            {
+                parameter.mOptional = true;
+                token.remove_suffix(1);
+            }
+            if (!parseNumber(token, parameter.mType))
+                return false;
+            parameters.push_back(parameter);
+            at = end;
         }
+        return true;
     }
 
     CommandCsvResult readCommandTableCsv(std::istream& stream, CommandTable& table)
@@ -171,7 +171,7 @@ namespace FalloutScript
             std::uint32_t needsParent = 0;
             const bool readable = fields.size() >= 7 && parseNumber(fields[0], tableNumber)
                 && parseNumber(fields[1], opcode) && opcode <= 0xFFFF && !fields[2].empty()
-                && parseNumber(fields[4], needsParent) && parseParameters(fields[5], info.mParameters)
+                && parseNumber(fields[4], needsParent) && parseParameterTypes(fields[5], info.mParameters)
                 && parseNumber(fields[6], info.mFlags) && (fields.size() == 7 || parseNumber(fields[7], info.mParse));
             if (!readable)
             {

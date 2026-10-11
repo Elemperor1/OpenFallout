@@ -511,6 +511,19 @@ namespace ESM4
             ++tally.mFewer;
     }
 
+    void ScriptCodeCensus::addConditions(const std::vector<TargetCondition>& conditions)
+    {
+        for (const TargetCondition& condition : conditions)
+        {
+            ++mConditions;
+            ConditionUse& use = mConditionFunctions[condition.functionIndex];
+            ++use.mUses;
+            use.mFirstParameter += condition.param1 != 0;
+            use.mSecondParameter += condition.param2 != 0;
+            use.mOnReference += condition.reference != 0;
+        }
+    }
+
     void ScriptCodeCensus::addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script)
     {
         const bool holdsScript = !script.compiledScript.empty() || script.scriptHeader.compiledSize != 0
@@ -662,17 +675,28 @@ namespace ESM4
                         {
                             Quest record;
                             record.load(r);
+                            addConditions(record.mTargetConditions);
                             for (const QuestStage& stage : record.mStages)
                                 for (const QuestLogEntry& entry : stage.mLogEntries)
+                                {
                                     addScript("QUST", record.mId, entry.mScript);
+                                    addConditions(entry.mTargetConditions);
+                                }
+                            for (const QuestObjective& objective : record.mObjectives)
+                                for (const QuestTarget& target : objective.mTargets)
+                                    addConditions(target.mTargetConditions);
                             break;
                         }
                         case REC_TERM:
                         {
                             Terminal record;
                             record.load(r);
+                            addConditions(record.mConditions);
                             for (const Terminal::MenuItem& item : record.mMenuItems)
+                            {
                                 addScript("TERM", record.mId, item.mScript);
+                                addConditions(item.mConditions);
+                            }
                             break;
                         }
                         case REC_PACK:
@@ -682,6 +706,7 @@ namespace ESM4
                             addScript("PACK", record.mId, record.mBegin.mScript);
                             addScript("PACK", record.mId, record.mEnd.mScript);
                             addScript("PACK", record.mId, record.mChange.mScript);
+                            addConditions(record.mTargetConditions);
                             break;
                         }
                         default:
@@ -689,8 +714,13 @@ namespace ESM4
                             Perk record;
                             record.load(r);
                             addScript("PERK", record.mId, record.mScript);
+                            addConditions(record.mConditions);
                             for (const Perk::Entry& entry : record.mEntries)
+                            {
                                 addScript("PERK", record.mId, entry.mScript);
+                                for (const Perk::ConditionGroup& group : entry.mConditionGroups)
+                                    addConditions(group.mConditions);
+                            }
                             break;
                         }
                     }
@@ -846,6 +876,52 @@ namespace ESM4
         }
     }
 
+    void ScriptCodeCensus::writeConditions(std::ostream& stream) const
+    {
+        constexpr std::size_t countWidth = 9;
+        constexpr std::size_t listed = 80;
+        std::size_t notInTable = 0;
+        std::size_t usesNotInTable = 0;
+        std::vector<std::pair<std::size_t, std::uint32_t>> rows;
+        for (const auto& [function, use] : mConditionFunctions)
+        {
+            rows.emplace_back(use.mUses, function);
+            if (mLookup
+                && mLookup(static_cast<std::uint16_t>(ScriptCode::firstCommand + function)).mParameters == nullptr)
+            {
+                ++notInTable;
+                usesNotInTable += use.mUses;
+            }
+        }
+        std::sort(rows.begin(), rows.end(), [](const auto& left, const auto& right) {
+            return left.first != right.first ? left.first > right.first : left.second < right.second;
+        });
+
+        stream << "\nConditions of quests, terminals, packages and perks: " << mConditions << " naming "
+               << mConditionFunctions.size() << " functions\n";
+        if (mLookup)
+            stream << "  functions the table of commands does not have: " << notInTable << " (" << usesNotInTable
+                   << " conditions)\n";
+        stream << "  function, code, name, conditions, with a first parameter, with a second, with a reference\n";
+        for (std::size_t i = 0; i < rows.size() && i < listed; ++i)
+        {
+            const std::uint32_t function = rows[i].second;
+            const ConditionUse& use = mConditionFunctions.at(function);
+            const std::uint16_t code = static_cast<std::uint16_t>(ScriptCode::firstCommand + function);
+            std::string name = "?";
+            if (mLookup)
+            {
+                const CommandSignature signature = mLookup(code);
+                name = signature.mParameters != nullptr ? std::string(signature.mName) : "(not in the table)";
+            }
+            stream << "  " << std::setw(6) << function << ' ' << hex(code, 4) << ' ' << name << std::setw(countWidth)
+                   << use.mUses << std::setw(countWidth) << use.mFirstParameter << std::setw(countWidth)
+                   << use.mSecondParameter << std::setw(countWidth) << use.mOnReference << '\n';
+        }
+        if (rows.size() > listed)
+            stream << "  and " << rows.size() - listed << " more functions\n";
+    }
+
     void ScriptCodeCensus::write(std::ostream& stream) const
     {
         constexpr int countWidth = 9;
@@ -980,6 +1056,7 @@ namespace ESM4
                << nvseCommands << " (script, command) pairs\n";
 
         writeArguments(stream);
+        writeConditions(stream);
 
         for (const std::string& error : mFatalErrors)
             stream << "\nFATAL ERROR: " << error << '\n';

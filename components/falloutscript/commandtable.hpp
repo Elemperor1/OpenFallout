@@ -56,6 +56,10 @@ namespace FalloutScript
 
     std::string lowerCase(std::string_view text);
 
+    /// Reads parameter types written as numbers separated by spaces, with a ? after the type of an optional one ("50 1
+    /// 1?"). Returns false when a type is not a number.
+    bool parseParameterTypes(std::string_view text, std::vector<ESM4::ScriptCode::Parameter>& parameters);
+
     /// What reading a table of commands from a CSV file found
     struct CommandCsvResult
     {

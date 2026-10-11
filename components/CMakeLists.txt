@@ -205,6 +205,7 @@ add_component_dir (esm4
     census
     censusreading
     common
+    conditionparams
     creaturecensus
     destruction
     dialogue
@@ -359,7 +360,7 @@ add_component_dir (esm4
 )
 
 add_component_dir (falloutscript
-    commandtable
+    commandtable conditions messagecommands objectcommands objects packagecommands script interpreter quests vanillacommands
     )
 
 add_component_dir (misc

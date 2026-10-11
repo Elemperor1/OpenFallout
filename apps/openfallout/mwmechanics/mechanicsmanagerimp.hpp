@@ -181,6 +181,7 @@ namespace OFMechanics
 
         void startFalloutFollowing(const OFWorld::Ptr& actor, const OFWorld::Ptr& target, float distance) override;
         void stopFalloutFollowing(const OFWorld::Ptr& actor) override;
+        void evaluateFalloutPackages(const OFWorld::Ptr& actor) override;
 
         void playerLoaded() override;
 

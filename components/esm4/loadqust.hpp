@@ -43,10 +43,10 @@ namespace ESM4
 #pragma pack(push, 1)
     struct QuestData
     {
-        std::uint8_t flags; // Quest_Flags
-        std::uint8_t priority;
-        std::uint16_t padding; // FO3
-        float questDelay; // FO3
+        std::uint8_t flags = 0; // Quest_Flags
+        std::uint8_t priority = 0;
+        std::uint16_t padding = 0; // FO3
+        float questDelay = 0; // FO3
     };
 #pragma pack(pop)
 
@@ -73,6 +73,27 @@ namespace ESM4
         std::vector<QuestLogEntry> mLogEntries;
     };
 
+    // Where the player is sent for an objective: a reference that the compass shows while the conditions hold.
+    struct QuestTarget
+    {
+        enum TargetFlags
+        {
+            Flag_IgnoresLocks = 0x01
+        };
+
+        ESM::FormId mTarget; // QSTA, a reference
+        std::uint8_t mFlags = 0; // QSTA, see TargetFlags
+        std::vector<TargetCondition> mTargetConditions; // CTDA that follow QSTA
+    };
+
+    // A line of the Pip-Boy list of the quest: the player is told what to do and where to go.
+    struct QuestObjective
+    {
+        std::int32_t mIndex = 0; // QOBJ
+        std::string mText; // NNAM
+        std::vector<QuestTarget> mTargets;
+    };
+
     struct Quest
     {
         // NOTE: these values are for TES4
@@ -96,6 +117,8 @@ namespace ESM4
         std::vector<TargetCondition> mTargetConditions; // the conditions before the first stage
 
         std::vector<QuestStage> mStages;
+
+        std::vector<QuestObjective> mObjectives; // Fallout 3 and New Vegas
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

@@ -29,6 +29,11 @@ namespace ESM4
     // that fail to decode: for each it names the record and keeps a few bytes around the place where the decoder
     // stopped, which is what it takes to see why.
     //
+    // The records that hold scripts also hold the conditions that say when they apply (the stages of a quest, the items
+    // of a terminal, the entries of a perk), and the census counts the functions those conditions name, so that the
+    // table of commands can be checked for the functions that conditions use. A dialogue record keeps one condition
+    // only, so the census does not count those.
+    //
     // With a table of the commands (setCommandLookup) it also decodes the arguments of every call by the parameters of
     // the command, and counts the calls whose arguments do not decode, per command and per kind of problem, with the
     // bytes of the first few calls of each.
@@ -71,6 +76,16 @@ namespace ESM4
             std::size_t mScripts = 0; // scripts that call it
             std::size_t mTotalArgumentBytes = 0;
             std::uint16_t mMaxArgumentBytes = 0;
+        };
+
+        // How a function was named by the conditions of the records, which name functions by their number (the code of
+        // the command less 0x1000)
+        struct ConditionUse
+        {
+            std::size_t mUses = 0;
+            std::size_t mFirstParameter = 0; // with a first parameter that is not 0
+            std::size_t mSecondParameter = 0;
+            std::size_t mOnReference = 0; // with a reference (the run on the reference)
         };
 
         struct HolderTotals
@@ -137,6 +152,7 @@ namespace ESM4
         std::size_t getStructureScripts() const { return mStructureScripts; }
         const std::map<std::string, std::vector<Failure>>& getStructureExamples() const { return mStructureExamples; }
         const std::map<std::uint16_t, ArgumentTally>& getArguments() const { return mArguments; }
+        const std::map<std::uint32_t, ConditionUse>& getConditionFunctions() const { return mConditionFunctions; }
         const std::map<std::uint16_t, std::size_t>& getUnknownCommands() const { return mUnknownCommands; }
         const std::map<std::pair<std::uint16_t, ScriptCode::ArgumentError>, std::vector<Failure>>&
         getArgumentExamples() const
@@ -156,7 +172,9 @@ namespace ESM4
             const ScriptDefinition& script);
         void checkArguments(const ScriptCode::Call& call, const std::string& holder, ESM::FormId record,
             const ScriptDefinition& script, const ScriptCode::Limits& limits);
+        void addConditions(const std::vector<TargetCondition>& conditions);
         void writeArguments(std::ostream& stream) const;
+        void writeConditions(std::ostream& stream) const;
 
         std::map<std::string, HolderTotals> mHolders;
         std::map<std::string, std::size_t> mRecordsFailed;
@@ -175,6 +193,8 @@ namespace ESM4
         std::map<std::string, std::vector<Failure>> mStructureExamples; // the first scripts of each problem
         CommandLookup mLookup;
         std::map<std::uint16_t, ArgumentTally> mArguments;
+        std::map<std::uint32_t, ConditionUse> mConditionFunctions;
+        std::size_t mConditions = 0;
         std::map<std::uint16_t, std::size_t> mUnknownCommands; // calls of commands the table does not have, by code
         std::map<std::pair<std::uint16_t, ScriptCode::ArgumentError>, std::vector<Failure>> mArgumentExamples;
         JumpTally mBeginJumps;

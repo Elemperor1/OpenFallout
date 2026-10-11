@@ -170,6 +170,11 @@ namespace OFWorld
         return ESM::RefId();
     }
 
+    std::uint32_t Class::getFalloutScript(const ConstPtr& ptr) const
+    {
+        return 0;
+    }
+
     float Class::getMaxSpeed(const Ptr& ptr) const
     {
         return 0;

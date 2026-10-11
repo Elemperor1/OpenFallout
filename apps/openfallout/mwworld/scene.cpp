@@ -48,6 +48,8 @@
 #include "../mwphysics/object.hpp"
 #include "../mwphysics/physicssystem.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "../mwworld/actionteleport.hpp"
 
 #include "cellpreloader.hpp"
@@ -449,6 +451,7 @@ namespace OFWorld
         OFBase::Environment::get().getWindowManager()->removeCell(cell);
 
         mWorld.getLocalScripts().clearCell(cell);
+        OFBase::Environment::get().getFalloutScripts()->cellUnloaded(*cell);
 
         OFBase::Environment::get().getSoundManager()->stopSound(cell);
         mActiveCells.erase(cell);
@@ -600,6 +603,9 @@ namespace OFWorld
                                             + std::to_string(mood.mFogFar)
                                                     : ", fog density " + std::to_string(mood.mFogDensity));
         }
+
+        // The scripts of the objects of Fallout run once the cell is in the scene
+        OFBase::Environment::get().getFalloutScripts()->cellLoaded(cell);
 
         mPreloader->notifyLoaded(&cell);
     }

@@ -62,6 +62,7 @@
 #include "mwlua/luamanagerimp.hpp"
 #include "mwlua/worker.hpp"
 
+#include "mwscript/falloutscripts.hpp"
 #include "mwscript/interpretercontext.hpp"
 #include "mwscript/scriptmanagerimp.hpp"
 
@@ -258,6 +259,9 @@ bool OF::Engine::frame(unsigned frameNumber, float frametime)
 
                         // global scripts
                         mScriptManager->getGlobalScripts().run();
+
+                        // the compiled scripts of the quests of Fallout
+                        mFalloutScripts->update(frametime, paused);
                     }
 
                     mWorld->getWorldScene().markCellAsUnchanged();
@@ -417,6 +421,7 @@ OF::Engine::~Engine()
     mDialogueManager = nullptr;
     mJournal = nullptr;
     mWindowManager = nullptr;
+    mFalloutScripts = nullptr;
     mScriptManager = nullptr;
     mWorld = nullptr;
     mStereoManager = nullptr;
@@ -916,6 +921,10 @@ void OF::Engine::prepareEngine()
     }
     mSoundManager->warmStoreSounds();
     listener->loadingOff();
+
+    mFalloutScripts = std::make_unique<OFScript::FalloutScripts>(
+        mWorld->getStore(), OFScript::chooseGame(mContentFiles), OFScript::playerReferenceOf(mContentFiles));
+    mEnvironment.setFalloutScripts(*mFalloutScripts);
 
     mWorld->init(mMaxRecastLogLevel, mViewer, std::move(rootNode), mWorkQueue, *mUnrefQueue);
     mEnvironment.setWorldScene(mWorld->getWorldScene());

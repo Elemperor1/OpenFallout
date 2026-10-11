@@ -105,13 +105,16 @@ namespace ESM4
     struct LevelledNpc;
     struct Light;
     struct LightingTemplate;
+    struct Message;
     struct MiscItem;
     struct MovableStatic;
     struct Npc;
     struct Outfit;
     struct Potion;
+    struct Quest;
     struct Race;
     struct Reference;
+    struct Script;
     struct Sound;
     struct SoundReference;
     struct Static;
@@ -157,11 +160,12 @@ namespace OFWorld
             Store<ESM4::Door>, Store<ESM4::Furniture>, Store<ESM4::Flora>, Store<ESM4::GlobalVariable>,
             Store<ESM4::Hair>, Store<ESM4::HeadPart>, Store<ESM4::Ingredient>, Store<ESM4::ItemMod>, Store<ESM4::Land>,
             Store<ESM4::LandTexture>, Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>,
-            Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>, Store<ESM4::MiscItem>,
-            Store<ESM4::MovableStatic>, Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Potion>, Store<ESM4::Race>,
-            Store<ESM4::Reference>, Store<ESM4::Sound>, Store<ESM4::SoundReference>, Store<ESM4::Static>,
-            Store<ESM4::StaticCollection>, Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>,
-            Store<ESM4::Water>, Store<ESM4::Weapon>, Store<ESM4::Weather>, Store<ESM4::World>>;
+            Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>, Store<ESM4::Message>,
+            Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>, Store<ESM4::Npc>, Store<ESM4::Outfit>,
+            Store<ESM4::Potion>, Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Reference>, Store<ESM4::Script>,
+            Store<ESM4::Sound>, Store<ESM4::SoundReference>, Store<ESM4::Static>, Store<ESM4::StaticCollection>,
+            Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::Water>, Store<ESM4::Weapon>,
+            Store<ESM4::Weather>, Store<ESM4::World>>;
 
     private:
         template <typename T>

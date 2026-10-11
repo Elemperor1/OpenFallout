@@ -26,8 +26,11 @@
 #include <components/lua_ui/registerscriptsettings.hpp>
 #include <components/lua_ui/util.hpp>
 
+#include "../mwbase/environment.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+
+#include "../mwscript/falloutscripts.hpp"
 
 #include "../mwrender/bonegroup.hpp"
 #include "../mwrender/postprocessor.hpp"
@@ -612,6 +615,20 @@ namespace OFLua
 
             mGlobalScripts.onProjectileHit(projectile, hitResult);
         });
+    }
+
+    void LuaManager::objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
+        // The script of a Fallout object has its say first, and with an OnActivate block in it the object does not do
+        // what it does by default, unless the script asks for that (Activate)
+        if (OFBase::Environment::get().getFalloutScripts()->activated(object, actor))
+            return;
+        defaultActivation(object, actor);
+    }
+
+    void LuaManager::defaultActivation(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
+        mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 
     void LuaManager::useItem(const OFWorld::Ptr& object, const OFWorld::Ptr& actor, bool force)

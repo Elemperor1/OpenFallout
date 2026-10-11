@@ -23,6 +23,7 @@
 #include "../mwclass/esm4creature.hpp"
 #include "../mwclass/esm4npc.hpp"
 #include "../mwrender/falloutactoranimation.hpp"
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -110,6 +111,9 @@ namespace OFMechanics
     {
         OFWorld::Ptr mPtr;
         std::vector<const ESM4::AIPackage*> mPackages;
+        /// The packages that scripts gave it, the last first, which come before its own whatever the time and the
+        /// conditions say
+        std::vector<const ESM4::AIPackage*> mScripted;
         ESM4::LevelledRandom mRandom;
 
         /// Whom it follows: the player, or a reference
@@ -165,6 +169,8 @@ namespace OFMechanics
             ESM4::PackageClock mClock;
             osg::Vec3f mPlayer;
             bool mNavigator = false;
+            /// What decides the conditions of the packages: null when there are no scripts
+            OFScript::FalloutScripts* mScripts = nullptr;
         };
 
         const std::vector<const ESM4::AIPackage*>& packagesOf(const OFWorld::Ptr& ptr)
@@ -172,6 +178,13 @@ namespace OFMechanics
             if (ptr.getType() == ESM4::Creature::sRecordId)
                 return OFClass::ESM4Creature::getPackages(ptr);
             return OFClass::ESM4Npc::getPackages(ptr);
+        }
+
+        /// The packages that scripts gave the actor, the last first, as records
+        std::vector<const ESM4::AIPackage*> scriptPackagesOf(const OFWorld::Ptr& ptr)
+        {
+            OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            return scripts != nullptr ? scripts->scriptPackages(ptr) : std::vector<const ESM4::AIPackage*>();
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -318,7 +331,7 @@ namespace OFMechanics
             return;
         // A command from a script outlives the cell: the character takes it up again when the cell is loaded
         const auto command = mCommands.find(ptr.getCellRef().getRefNum());
-        if (command == mCommands.end() && packagesOf(ptr).empty())
+        if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty())
             return;
         Mind& mind = makeMind(ptr);
         if (command != mCommands.end())
@@ -331,8 +344,26 @@ namespace OFMechanics
         const std::uint64_t seed = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(refNum.mContentFile)) << 32)
             ^ refNum.mIndex ^ 0x9E3779B97F4A7C15ull;
         Mind& mind = *mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packagesOf(ptr), seed)).first->second;
+        mind.mScripted = scriptPackagesOf(ptr);
         registerAgent(mind);
         return mind;
+    }
+
+    void FalloutActors::evaluate(const OFWorld::Ptr& ptr)
+    {
+        if (!handles(ptr))
+            return;
+        const auto found = mMinds.find(ptr.mRef);
+        if (found == mMinds.end())
+        {
+            // A character with no packages of its own has no mind until a script gives it one
+            if (scriptPackagesOf(ptr).empty())
+                return;
+            makeMind(ptr).mReview = 0.f;
+            return;
+        }
+        found->second->mScripted = scriptPackagesOf(ptr);
+        found->second->mReview = 0.f;
     }
 
     void FalloutActors::follow(const OFWorld::Ptr& ptr, const OFWorld::Ptr& target, float distance)
@@ -627,14 +658,31 @@ namespace OFMechanics
             FalloutActors::Mind::Following following;
             bool hasFacing = false;
             float facing = 0.f;
+            // What a script gave it comes first, whatever the time and the conditions are
+            for (const ESM4::AIPackage* package : mind.mScripted)
+            {
+                if (package == nullptr || ESM4::packageBehaviour(package->mData.type) == ESM4::PackageBehaviour::None
+                    || !makeGoal(frame, mind, *package, goal, hasFacing, facing, following))
+                    continue;
+                chosen = package;
+                break;
+            }
             for (const ESM4::AIPackage* package : mind.mPackages)
             {
-                if (package == nullptr || ESM4::packageSkip(*package, frame.mClock) != ESM4::PackageSkip::None)
+                if (chosen != nullptr)
+                    break;
+                if (package == nullptr)
+                    continue;
+                ESM4::PackageSkip skip = ESM4::packageSkip(*package, frame.mClock);
+                // The time and the kind are right: it is on if its conditions hold
+                if (skip == ESM4::PackageSkip::Conditions && frame.mScripts != nullptr
+                    && frame.mScripts->packageConditionsHold(*package, mind.mPtr))
+                    skip = ESM4::PackageSkip::None;
+                if (skip != ESM4::PackageSkip::None)
                     continue;
                 if (!makeGoal(frame, mind, *package, goal, hasFacing, facing, following))
                     continue;
                 chosen = package;
-                break;
             }
             if (chosen == mind.mPackage)
             {
@@ -683,7 +731,7 @@ namespace OFMechanics
 
         const OFWorld::TimeStamp now = world.getTimeStamp();
         Frame frame{ world, falloutClock(now.getHour(), now.getDay()), player.getRefData().getPosition().asVec3(),
-            Settings::navigator().mEnable };
+            Settings::navigator().mEnable, OFBase::Environment::get().getFalloutScripts() };
         duration = std::min(duration, longestStep);
         const float range = static_cast<float>(Settings::game().mActorsProcessingRange);
 

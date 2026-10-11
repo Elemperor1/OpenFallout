@@ -25,8 +25,10 @@ namespace OFMechanics
     /// What it does for a package is in ESM4::packageBehaviour: a character goes to the place (Travel, Guard, Eat,
     /// Sleep: it stands near the reference the package names), goes about around it, stopping now and then (Sandbox,
     /// Wander, Patrol) or keeps near another character, walking after it when it goes and running when far behind
-    /// (Follow, Accompany: the target is a reference, the player among them). Packages with conditions, the other
-    /// kinds of package and places and targets in a cell that is not loaded are left for the next package in the list.
+    /// (Follow, Accompany: the target is a reference, the player among them). A package with conditions is followed
+    /// when the scripts say that they hold (FalloutScripts::packageConditionsHold); the other kinds of package and
+    /// places and targets in a cell that is not loaded are left for the next package in the list. The packages that a
+    /// script gave the character (AddScriptPackage) come before all of them.
     ///
     /// A script can also tell a character to follow another one, as a companion does (follow): that takes the place
     /// of the packages until it is told to stop: that lasts while its cell is unloaded and loaded again, but is not
@@ -53,6 +55,10 @@ namespace OFMechanics
         /// the usual distance). Whatever the packages say, until stopFollowing.
         void follow(const OFWorld::Ptr& ptr, const OFWorld::Ptr& target, float distance);
         void stopFollowing(const OFWorld::Ptr& ptr);
+
+        /// Looks at the packages again at the next update: the packages that scripts gave the actor are read anew, and
+        /// so are the conditions of its own
+        void evaluate(const OFWorld::Ptr& ptr);
 
         void update(float duration);
 

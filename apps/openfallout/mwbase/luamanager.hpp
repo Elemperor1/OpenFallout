@@ -83,6 +83,9 @@ namespace OFBase
             const osg::Quat& rotation)
             = 0;
         virtual void objectActivated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor) = 0;
+        /// The object does what it does when it is activated, with no script of Fallout in the way (the script of an
+        /// object with an OnActivate block calls this with Activate)
+        virtual void defaultActivation(const OFWorld::Ptr& object, const OFWorld::Ptr& actor) = 0;
         virtual void useItem(const OFWorld::Ptr& object, const OFWorld::Ptr& actor, bool force) = 0;
         virtual void animationTextKey(const OFWorld::Ptr& actor, const std::string& key) = 0;
         virtual void playAnimation(const OFWorld::Ptr& object, const std::string& groupname,
