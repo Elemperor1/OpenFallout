@@ -90,6 +90,25 @@ namespace
         EXPECT_FALSE(creature.takesFromTemplate(ESM4::Creature::Template_UseInventory));
     }
 
+    TEST(ESM4CreatureTest, keepsEveryFactionOfACreature)
+    {
+        // SNAM: the faction, its rank and three bytes
+        const auto faction = [](std::uint32_t id, std::int8_t rank) {
+            std::string data = formIdData(id);
+            append<std::int8_t>(data, rank);
+            data.append(3, '\0');
+            return subRecord("SNAM", data);
+        };
+        const std::string data = zString("EDID", "Gecko") + faction(0x00010001, 0) + faction(0x00010002, 3);
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        ASSERT_EQ(creature.mFactions.size(), 2u);
+        EXPECT_EQ(creature.mFactions[0].faction, 0x00010001u);
+        EXPECT_EQ(creature.mFactions[0].rank, 0);
+        EXPECT_EQ(creature.mFactions[1].faction, 0x00010002u);
+        EXPECT_EQ(creature.mFactions[1].rank, 3);
+    }
+
     TEST(ESM4CreatureTest, readsTheBoxOfACreature)
     {
         std::string box;

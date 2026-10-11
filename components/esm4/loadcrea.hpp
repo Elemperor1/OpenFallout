@@ -122,7 +122,8 @@ namespace ESM4
         AIData mAIData;
         std::vector<ESM::FormId> mAIPackages;
         ActorBaseConfig mBaseConfig{};
-        ActorFaction mFaction;
+        ActorFaction mFaction; // the last SNAM, mFactions has them all
+        std::vector<ActorFaction> mFactions; // every SNAM in the order of the record
         Data mData;
         ESM::FormId mCombatStyle;
         ESM::FormId mSoundBase;

@@ -7,8 +7,11 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm4/loadcont.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadscpt.hpp>
@@ -84,6 +87,7 @@ namespace OFScript
         , mConditions(mInterpreter)
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
+        , mActors(*this)
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
@@ -93,6 +97,7 @@ namespace OFScript
             mInterpreter, mObjects, *this, [this] { return std::uniform_int_distribution<int>(0, 99)(mRandom); });
         FalloutScript::addPackageCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
+        FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addConditionFunctions(mConditions);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -113,6 +118,7 @@ namespace OFScript
         mPendingLoad.clear();
         mReferences.clear();
         mScriptPackages.clear();
+        mActors.clear();
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -356,6 +362,87 @@ namespace OFScript
         // Buttons make a message a question to the player, which the game can not ask yet: the text is shown alone
         Log(Debug::Info) << "Message: " << record->mDescription;
         tellPlayer(record->mDescription);
+    }
+
+    namespace
+    {
+        /// The record that a character or creature takes something from, which is the first of its templates that does
+        /// not: the flag says what is taken. Null when a template is not a record of the same kind (a levelled list
+        /// of characters), which can not be followed here.
+        template <class Record>
+        const Record* templateOwner(const OFWorld::ESMStore& store, const Record* record, std::uint16_t flag)
+        {
+            for (int step = 0; record != nullptr && record->takesFromTemplate(flag); ++step)
+            {
+                if (record->mBaseTemplate.isZeroOrUnset() || step >= 8)
+                    return nullptr;
+                record = store.get<Record>().search(record->mBaseTemplate);
+            }
+            return record;
+        }
+    }
+
+    bool FalloutScripts::initialItems(
+        FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items)
+    {
+        // The player starts with nothing; what the player carries is for the inventory of the game
+        if (holder == mPlayer)
+            return true;
+        const OFWorld::Ptr ptr = findReference(holder);
+        if (ptr.isEmpty())
+            return false;
+        const auto take = [&items](const std::vector<ESM4::InventoryItem>& inventory) {
+            for (const ESM4::InventoryItem& item : inventory)
+                items.emplace_back(item.item, static_cast<std::int32_t>(item.count));
+        };
+        if (ptr.getType() == ESM4::Npc::sRecordId)
+        {
+            if (const ESM4::Npc* npc
+                = templateOwner(mStore, ptr.get<ESM4::Npc>()->mBase, ESM4::Npc::Template_UseInventory))
+                take(npc->mInventory);
+        }
+        else if (ptr.getType() == ESM4::Creature::sRecordId)
+        {
+            if (const ESM4::Creature* creature
+                = templateOwner(mStore, ptr.get<ESM4::Creature>()->mBase, ESM4::Creature::Template_UseInventory))
+                take(creature->mInventory);
+        }
+        else if (ptr.getType() == ESM4::Container::sRecordId)
+            take(ptr.get<ESM4::Container>()->mBase->mInventory);
+        return true;
+    }
+
+    bool FalloutScripts::initialFactions(
+        FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions)
+    {
+        if (actor == mPlayer)
+            return true;
+        const OFWorld::Ptr ptr = findReference(actor);
+        if (ptr.isEmpty())
+            return false;
+        const auto take = [&factions](const std::vector<ESM4::ActorFaction>& list) {
+            for (const ESM4::ActorFaction& faction : list)
+                factions.emplace_back(faction.faction, faction.rank);
+        };
+        if (ptr.getType() == ESM4::Npc::sRecordId)
+        {
+            if (const ESM4::Npc* npc
+                = templateOwner(mStore, ptr.get<ESM4::Npc>()->mBase, ESM4::Npc::Template_UseFactions))
+                take(npc->mFactions);
+        }
+        else if (ptr.getType() == ESM4::Creature::sRecordId)
+        {
+            if (const ESM4::Creature* creature
+                = templateOwner(mStore, ptr.get<ESM4::Creature>()->mBase, ESM4::Creature::Template_UseFactions))
+                take(creature->mFactions);
+        }
+        return true;
+    }
+
+    bool FalloutScripts::isDead(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId reference = referenceOf(actor);
+        return reference != 0 && mActors.isDead(reference);
     }
 
     void FalloutScripts::addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package)
