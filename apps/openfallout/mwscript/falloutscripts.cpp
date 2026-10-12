@@ -177,8 +177,18 @@ namespace OFScript
                         talkTo(ptr, topic);
                 });
             }
-            else if (topic != 0)
-                sayTopic(speaker, topic, target);
+            else
+            {
+                // With no topic the exchange starts with the greeting, as it does with the player
+                FalloutScript::FormId first = topic;
+                if (first == 0)
+                {
+                    const std::lock_guard lock(mDialogueMutex);
+                    first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
+                }
+                if (first != 0)
+                    sayTopic(speaker, first, target);
+            }
             return 0.0;
         });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
@@ -954,7 +964,16 @@ namespace OFScript
                 // What is said can be read when it is far enough to hear it, if subtitles are on or when there is
                 // no voice to hear
                 constexpr float hearingDistance = 1500.f;
-                const bool near = !player.isEmpty() && speaker.getCell() == player.getCell()
+                // The cells of an exterior worldspace are one place, an interior is the cell
+                const auto sameplace = [&] {
+                    const auto* at = speaker.getCell();
+                    const auto* with = player.getCell();
+                    if (at == with)
+                        return true;
+                    return at != nullptr && with != nullptr && at->isExterior() && with->isExterior()
+                        && at->getCell()->getWorldSpace() == with->getCell()->getWorldSpace();
+                };
+                const bool near = !player.isEmpty() && sameplace()
                     && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
                             .length()
                         <= hearingDistance;
