@@ -160,6 +160,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testinterpreter.cpp
     falloutscript/testobjects.cpp
     falloutscript/testpackagecommands.cpp
+    falloutscript/testplayercontrols.cpp
     falloutscript/testquests.cpp
     falloutscript/testscript.cpp
     falloutscript/testvanillacommands.cpp

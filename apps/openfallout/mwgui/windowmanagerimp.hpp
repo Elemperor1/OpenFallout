@@ -166,6 +166,7 @@ namespace OFGui
         bool isPostProcessorHudVisible() const override;
         bool isSettingsWindowVisible() const override;
         bool isInteractiveMessageBoxActive() const override;
+        std::uint64_t interactiveMessageBoxId() const override;
 
         void toggleVisible(GuiWindow wnd) override;
 
@@ -277,6 +278,7 @@ namespace OFGui
 
         int readPressedButton() override; ///< returns the index of the pressed button or -1 if no button was pressed
                                           ///< (->MessageBoxmanager->InteractiveMessageBox)
+        bool pressInteractiveMessageBoxButton(std::size_t button) override;
 
         void update(float duration);
 

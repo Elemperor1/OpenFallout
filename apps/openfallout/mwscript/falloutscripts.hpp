@@ -7,6 +7,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <string>
 #include <string_view>
@@ -30,6 +31,7 @@
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/packagecommands.hpp>
 #include <components/falloutscript/placementcommands.hpp>
+#include <components/falloutscript/playercontrols.hpp>
 #include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
@@ -77,7 +79,8 @@ namespace OFScript
                                  private FalloutScript::FormListRecords,
                                  private FalloutScript::PackageWorld,
                                  private FalloutScript::PlacementWorld,
-                                 private FalloutScript::MessageWorld
+                                 private FalloutScript::MessageWorld,
+                                 private FalloutScript::ControlsWorld
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -173,6 +176,21 @@ namespace OFScript
         /// The conversation ends, also in the middle of a response
         void endConversation();
 
+        /// The message box that is on the screen, as the player sees it: the text (the name of the message and its
+        /// words), the buttons the player can pick from, and a number that is another for each box that opens
+        struct OpenMessage
+        {
+            std::uint32_t mSerial = 0;
+            std::string mText;
+            std::vector<std::string> mButtons;
+        };
+        /// The box that is open, if any (any thread)
+        std::optional<OpenMessage> openMessage() const;
+        /// Picks a button of the box that is open, as a click on it would (counted from 0 in the order the box lists
+        /// them). False when no box is open or it has no such button. The box closes in the next frame, and the script
+        /// that showed it reads the button then.
+        bool pressMessageButton(std::size_t button);
+
         /// The screens of the making of the character: name, sex and race, SPECIAL, tagged skills and traits. The
         /// commands that script call open them, and the interface (core.chargen) shows the one that is open and tells
         /// when the player is done with it.
@@ -252,6 +270,8 @@ namespace OFScript
             FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner) override;
         int takeButtonPressed(FalloutScript::FormId owner) override;
         bool menuOpen(int menu) override;
+
+        void setPlayerControl(FalloutScript::PlayerControl control, bool enabled) override;
         /// Whether a MenuMode block runs now: one that names a menu this game has (the message box, the conversation,
         /// the screens of making a character) runs while that menu is open; one that names nothing, or a menu that
         /// the game does not have by that number, runs while any menu is
@@ -427,8 +447,11 @@ namespace OFScript
         /// conditions hold, with the number each has in the record.
         struct MessageBox
         {
+            /// What the interface shows (with the colour tags of its text escaped) and what Lua is told
             std::string mText;
+            std::string mPlainText;
             std::vector<std::string> mButtons;
+            std::vector<std::string> mPlainButtons;
             std::vector<int> mNumbers;
             /// The one who showed it, who gets the button that is picked
             FalloutScript::FormId mOwner = 0;
@@ -477,8 +500,16 @@ namespace OFScript
         /// The messages with buttons that wait their turn, and the numbers of the buttons of the one that is open
         std::deque<MessageBox> mMessageQueue;
         bool mMessageOpen = false;
+        std::uint64_t mOpenBoxId
+            = 0; // the box of the window manager that shows it, to tell it from one that replaced it
         std::vector<int> mOpenNumbers;
         FalloutScript::FormId mOpenOwner = 0;
+        /// The box on the screen, for Lua to see and answer
+        mutable std::mutex mOpenMessageMutex;
+        std::optional<OpenMessage> mOpenMessage;
+        std::uint32_t mMessageSerial = 0;
+        /// The controls the player has been refused (bit i for the control i of FalloutScript::PlayerControl)
+        std::atomic<unsigned> mControlsOff{ 0 };
         /// How many boxes wait or are open (scripts ask from their own thread)
         std::atomic<int> mMessageBoxCount{ 0 };
         /// The answer to the last message that was shown, and who may read it

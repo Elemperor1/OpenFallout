@@ -1,0 +1,2 @@
+PLAYER: scripts/autoplay.lua
+GLOBAL: scripts/autoplayworld.lua

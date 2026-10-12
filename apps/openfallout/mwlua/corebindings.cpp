@@ -27,6 +27,7 @@
 #include "landbindings.hpp"
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
+#include "messagebindings.hpp"
 #include "regionbindings.hpp"
 #include "soundbindings.hpp"
 #include "stats.hpp"
@@ -122,6 +123,8 @@ namespace OFLua
                 "openfallout_core_conversation", [context]() { return initCoreConversationBindings(context); });
             api["chargen"] = context.cachePackage(
                 "openfallout_core_chargen", [context]() { return initCoreChargenBindings(context); });
+            api["messageBox"] = context.cachePackage(
+                "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();
