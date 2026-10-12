@@ -187,7 +187,7 @@ namespace OFScript
                     first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
                 }
                 if (first != 0)
-                    sayTopic(speaker, first, target);
+                    sayTopic(speaker, first, target, false, true);
             }
             return 0.0;
         });
@@ -800,7 +800,7 @@ namespace OFScript
     }
 
     bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic,
-        FalloutScript::FormId listener, bool forceSubtitles)
+        FalloutScript::FormId listener, bool forceSubtitles, bool followUps)
     {
         ESM::FormId base;
         if (reference == 0 || topic == 0 || !baseOf(reference, base))
@@ -810,10 +810,10 @@ namespace OFScript
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
             const FalloutScript::DialogueView view
-                = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener);
+                = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps);
             for (const FalloutScript::DialogueLine& line : view.mLines)
                 lines.push_back(
-                    { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, forceSubtitles });
+                    { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, topic, forceSubtitles });
         }
         if (lines.empty())
             return false;
@@ -943,7 +943,7 @@ namespace OFScript
 
         // The lines that characters say outside of a conversation
         const OFWorld::Ptr player = world->getPlayerPtr();
-        std::vector<FalloutScript::FormId> finished;
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> finished; // the speaker and the topic
         for (auto saying = mSayings.begin(); saying != mSayings.end();)
         {
             const OFWorld::Ptr speaker = findReference(saying->mReference);
@@ -994,17 +994,21 @@ namespace OFScript
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
                     if (line.mEnd)
-                        finished.push_back(saying->mReference);
+                        finished.emplace_back(saying->mReference, line.mTopic);
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
             }
             ++saying;
         }
-        // The script of a character that has said what it was told to goes on (Begin SayToDone). It can say more, so
-        // this waits until the lines are no longer being walked.
-        for (const FalloutScript::FormId speaker : finished)
-            mObjects.trigger(speaker, FalloutScript::BlockType::SayToDone);
+        // The script of a character that has said what it was told to goes on (Begin SayToDone Topic): the blocks that
+        // name the topic that was said, and those that name none. It can say more, so this waits until the lines are
+        // no longer being walked.
+        for (const auto& [speaker, topic] : finished)
+            mObjects.trigger(
+                speaker, FalloutScript::BlockType::SayToDone, 0, [topic = topic](const FalloutScript::Block& block) {
+                    return FalloutScript::blockIsForForm(block, topic);
+                });
     }
 
     bool FalloutScripts::sayConversationLine(std::size_t index)

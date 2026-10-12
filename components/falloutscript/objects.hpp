@@ -37,8 +37,8 @@ namespace FalloutScript
         bool has(FormId reference) const { return mObjects.count(reference) != 0; }
         std::size_t size() const { return mObjects.size(); }
 
-        /// Whether the script of the reference has a block for the event
-        bool hasBlock(FormId reference, std::uint16_t blockType) const;
+        /// Whether the script of the reference has a block for the event (one the filter accepts, when it is given)
+        bool hasBlock(FormId reference, std::uint16_t blockType, const BlockFilter& filter = {}) const;
 
         /// A reference is loaded or not loaded. Loading it runs its OnLoad blocks, unless it was loaded already.
         /// Nothing happens for a reference that has no script.
@@ -49,8 +49,10 @@ namespace FalloutScript
 
         /// Runs the blocks of the event on the script of the reference. The action reference is the object that caused
         /// the event (the one that activates), which GetActionRef tells while it runs. Returns whether the script has
-        /// such a block.
-        bool trigger(FormId reference, std::uint16_t blockType, FormId actionReference = 0);
+        /// such a block. The filter picks among the blocks of the event by what they name (a SayToDone block names the
+        /// topic that was said): the blocks it refuses are not run, and do not count as blocks of the script.
+        bool trigger(
+            FormId reference, std::uint16_t blockType, FormId actionReference = 0, const BlockFilter& filter = {});
 
         /// Lets a frame pass: the GameMode blocks of the loaded references run, in the order of their form ids
         void update();

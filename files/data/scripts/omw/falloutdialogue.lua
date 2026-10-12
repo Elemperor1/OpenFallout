@@ -134,12 +134,30 @@ local function wrap(text, width)
     return lines
 end
 
--- The text as a column of lines, which takes the events of the widget it is in (those that no line handles go to it)
-local function paragraph(text, color, width, events)
+-- The text as a column of lines, which takes the events of the widget it is in (those that no line handles go to it).
+-- A text with more lines than `maxLines` (a response longer than the screen) is cut: it keeps the first lines and ends
+-- with an ellipsis, or with `fromEnd` the last ones and starts with one.
+local function paragraph(text, color, width, events, maxLines, fromEnd)
     local lines = {}
     -- the first of the content gives the whole width, so that the empty part of a line takes the clicks too
     local content = { { props = { size = v2(width, 0) } } }
-    for _, line in ipairs(wrap(text, width)) do
+    local wrapped = wrap(text, width)
+    if maxLines and #wrapped > maxLines then
+        local kept = {}
+        if fromEnd then
+            for i = #wrapped - maxLines + 1, #wrapped do
+                kept[#kept + 1] = wrapped[i]
+            end
+            kept[1] = '... ' .. kept[1]
+        else
+            for i = 1, maxLines do
+                kept[i] = wrapped[i]
+            end
+            kept[#kept] = kept[#kept] .. ' ...'
+        end
+        wrapped = kept
+    end
+    for _, line in ipairs(wrapped) do
         lines[#lines + 1] = {
             type = ui.TYPE.Text,
             props = { text = line, textSize = textSize, textColor = color },
@@ -228,6 +246,12 @@ function render(view)
                 taken = taken + heightOf(layouts[first])
             end
         end
+    end
+    -- One line of the response that is taller than what is left of the screen is cut
+    if first == last and heightOf(layouts[first]) > room then
+        local maxLines = math.max(1, math.floor((room - gap.y) / lineHeight))
+        layouts[first] = paragraph(view.lines[first].text, focusColor, inner, nil, maxLines, not view.speaking)
+        responseWindowed = true
     end
     for index = first, last do
         add(layouts[index], #layouts[index].lines)

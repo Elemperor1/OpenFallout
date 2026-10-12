@@ -200,6 +200,65 @@ namespace
         return builder;
     }
 
+    TEST(FalloutScriptObjectsTest, a_say_to_done_block_that_names_a_topic_runs_for_that_topic_only)
+    {
+        constexpr FormId topic = 0x01000800;
+        constexpr FormId otherTopic = 0x01000801;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t first = builder.form(topic);
+        const std::uint16_t second = builder.form(otherTopic);
+        const auto count = [](std::uint16_t variable) {
+            return setTo(var('s', variable), var('s', variable) + number("1") + op("+"));
+        };
+        builder.code(scriptName() + beginNaming(BlockType::SayToDone, refArg(first)) + count(1) + end()
+            + beginNaming(BlockType::SayToDone, refArg(second)) + count(2) + end()
+            + beginNamingNothing(BlockType::SayToDone) + count(3) + end());
+        builder.variable(1, integerVariable, "first")
+            .variable(2, integerVariable, "second")
+            .variable(3, integerVariable, "any");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        const auto saidTopic = [&setup](FormId said) {
+            return setup.mObjects.trigger(crate, BlockType::SayToDone, 0,
+                [said](const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, said); });
+        };
+        EXPECT_TRUE(saidTopic(topic));
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+        EXPECT_EQ(setup.variable(crate, 3), 1);
+
+        EXPECT_TRUE(saidTopic(otherTopic));
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+        EXPECT_EQ(setup.variable(crate, 3), 2);
+
+        // A topic that no block names leaves the block that names none
+        EXPECT_TRUE(saidTopic(0x01000802));
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 3), 3);
+    }
+
+    TEST(FalloutScriptObjectsTest, an_event_whose_blocks_the_filter_refuses_is_not_an_event_of_the_script)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t topic = builder.form(0x01000800);
+        builder.code(scriptName() + beginNaming(BlockType::SayToDone, refArg(topic))
+            + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end());
+        builder.variable(1, integerVariable, "count");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        const FalloutScript::BlockFilter refuses
+            = [](const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, 0x01000801); };
+        EXPECT_FALSE(setup.mObjects.hasBlock(crate, BlockType::SayToDone, refuses));
+        EXPECT_FALSE(setup.mObjects.trigger(crate, BlockType::SayToDone, 0, refuses));
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+        EXPECT_TRUE(setup.mObjects.hasBlock(crate, BlockType::SayToDone));
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_game_mode_every_frame)
     {
         Runner setup;

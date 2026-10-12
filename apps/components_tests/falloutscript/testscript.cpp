@@ -99,6 +99,58 @@ namespace
         EXPECT_EQ(script.blocks()[1].mEnd, 5u);
     }
 
+    TEST(FalloutScriptScriptTest, aBlockKeepsTheFormOrNumberItNames)
+    {
+        ScriptBuilder builder;
+        const std::uint16_t topic = builder.form(0x01000800);
+        builder.code(scriptName() + beginNaming(FalloutScript::BlockType::SayToDone, refArg(topic)) + end()
+            + beginNaming(FalloutScript::BlockType::MenuMode, intArg(1001)) + end()
+            + beginNamingNothing(FalloutScript::BlockType::SayToDone) + end()
+            + begin(FalloutScript::BlockType::GameMode) + end());
+        const Script script = prepareScript(builder);
+
+        ASSERT_TRUE(script.usable());
+        ASSERT_EQ(script.blocks().size(), 4u);
+        EXPECT_EQ(script.blocks()[0].mNames, FalloutScript::BlockNames::Form);
+        EXPECT_EQ(script.blocks()[0].mForm, 0x01000800u);
+        EXPECT_EQ(script.blocks()[1].mNames, FalloutScript::BlockNames::Number);
+        EXPECT_EQ(script.blocks()[1].mNumber, 1001);
+        EXPECT_EQ(script.blocks()[2].mNames, FalloutScript::BlockNames::Nothing);
+        EXPECT_EQ(script.blocks()[3].mNames, FalloutScript::BlockNames::Nothing);
+    }
+
+    TEST(FalloutScriptScriptTest, aBlockNamesNothingWhenItsArgumentIsNotOfAShapeThatIsRead)
+    {
+        ScriptBuilder builder;
+        const std::uint16_t variable = builder.formVariable(1);
+        // A form that a variable holds, a form that the table does not have, a form with a missing byte, and a kind
+        // of argument that is not read
+        builder.code(scriptName() + beginNaming(FalloutScript::BlockType::SayToDone, refArg(variable)) + end()
+            + beginNaming(FalloutScript::BlockType::SayToDone, refArg(9)) + end()
+            + statement(0x10, Bytes().u16(FalloutScript::BlockType::SayToDone).u32(0).u16(1).u8('r').u8(1)) + end()
+            + beginNaming(FalloutScript::BlockType::SayToDone, floatArg(1)) + end());
+        builder.variable(1, 1, "holder");
+        const Script script = prepareScript(builder);
+
+        ASSERT_TRUE(script.usable());
+        ASSERT_EQ(script.blocks().size(), 4u);
+        for (const FalloutScript::Block& block : script.blocks())
+            EXPECT_EQ(block.mNames, FalloutScript::BlockNames::Nothing);
+    }
+
+    TEST(FalloutScriptScriptTest, aBlockThatNamesAFormIsForThatFormOnly)
+    {
+        FalloutScript::Block block;
+        EXPECT_TRUE(FalloutScript::blockIsForForm(block, 0x01000800));
+        block.mNames = FalloutScript::BlockNames::Number;
+        block.mNumber = 1001;
+        EXPECT_TRUE(FalloutScript::blockIsForForm(block, 0x01000800));
+        block.mNames = FalloutScript::BlockNames::Form;
+        block.mForm = 0x01000800;
+        EXPECT_TRUE(FalloutScript::blockIsForForm(block, 0x01000800));
+        EXPECT_FALSE(FalloutScript::blockIsForForm(block, 0x01000801));
+    }
+
     TEST(FalloutScriptScriptTest, aScriptWithoutBlocksIsOneBlockOfAllItsStatements)
     {
         const Script script = prepareScript(withCode(logStatement() + logStatement()));

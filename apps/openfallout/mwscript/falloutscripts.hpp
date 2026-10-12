@@ -210,9 +210,10 @@ namespace OFScript
 
         /// The character says a response of the topic outside of a conversation: what the response does is done, and
         /// the lines are told to the player: the voice of the data and, when subtitles are on, the text
-        /// (the script can force the subtitles on whatever the setting says)
+        /// (the script can force the subtitles on whatever the setting says). With `followUps` the response is
+        /// followed by its follow-ups, as in a conversation (StartConversation between two characters).
         bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener = 0,
-            bool forceSubtitles = false);
+            bool forceSubtitles = false, bool followUps = false);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -225,6 +226,8 @@ namespace OFScript
             float mSeconds = 0;
             /// The last line of what one Say or SayTo said: the script of the speaker is told when it is over
             bool mEnd = false;
+            /// The topic that was said, which the script of the speaker is told of (Begin SayToDone Topic)
+            FalloutScript::FormId mTopic = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };

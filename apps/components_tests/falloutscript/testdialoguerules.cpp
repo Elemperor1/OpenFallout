@@ -333,6 +333,33 @@ namespace
         EXPECT_THAT(setup.mTouched, ElementsAre(listener));
     }
 
+    TEST(FalloutScriptDialogueTest, aResponseSaidInAConversationBetweenCharactersGoesOnWithItsFollowUps)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        setup.mRecords.addInfo(0x3001, topicA, "first").mEndScript = logScript("end first").definition();
+        setup.mRecords.addInfo(0x3002, topicA, "asleep", 0x3001).mQuest = id(sleepingQuest);
+        ESM4::DialogInfo& second = setup.mRecords.addInfo(0x3003, topicA, "second", 0x3001);
+        second.mScript = logScript("begin second").definition();
+        second.mEndScript = logScript("end second").definition();
+        setup.mRecords.addInfo(0x3004, topicA, "third", 0x3003);
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3999), id(0x3002), id(0x3003) };
+        setup.mRecords.mInfos[2].mFollowUps = { id(0x3004), id(0x3001) };
+        setup.start();
+
+        // Said as a single response (Say, SayTo) it stops at the first
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("first"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first"));
+
+        // Said in a conversation it goes on: the follow-ups that are not there or can not be said are passed over,
+        // the scripts of each response run, and the one that was said already is not said again
+        setup.mLogged.clear();
+        EXPECT_THAT(
+            setup.texts(setup.mDialogue.say(speaker, topicA, 0, true)), ElementsAre("first", "second", "third"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first", "begin second", "end second"));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3004, speaker.mReference));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseNeedsItsQuestToRun)
     {
         Harness setup;

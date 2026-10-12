@@ -442,25 +442,56 @@ namespace FalloutScript
         mView.mOptions.clear();
     }
 
-    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener)
+    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps)
     {
-        // The listener matters for the choice of the response (its conditions) and for nothing after it
+        // The listener matters for the choice of the responses (their conditions) and for nothing after it
         const FormId outerListener = mListener;
         mListener = listener;
+        struct Restore
+        {
+            FormId& mTarget;
+            FormId mValue;
+            ~Restore() { mTarget = mValue; }
+        } restore{ mListener, outerListener };
+
         const ESM4::DialogInfo* info = responseFor(topic, speaker);
-        mListener = outerListener;
         if (info == nullptr)
             return DialogueView();
         DialogueView view = speak(*info, speaker, topic);
-        markSaid(*info, speaker);
         view.mSpeaking = false;
-        // As in finish(), the end script sees the response that was said
-        const DialogueView outer = mView;
-        mView = view;
-        runScript(info->mEndScript, speaker);
-        mView = outer;
-        for (const ESM::FormId added : info->mAddTopics)
-            addTopic(toId(added));
+        DialogueView current = view; // the response that was said last
+        std::set<FormId> chain;
+        while (info != nullptr)
+        {
+            chain.insert(toId(info->mId));
+            markSaid(*info, speaker);
+            // As in finish(), the end script sees the response that was said
+            const DialogueView outer = mView;
+            mView = current;
+            runScript(info->mEndScript, speaker);
+            mView = outer;
+            for (const ESM::FormId added : info->mAddTopics)
+                addTopic(toId(added));
+
+            // The first follow-up that can be said goes on, none is said twice, and a goodbye is the end
+            const ESM4::DialogInfo* next = nullptr;
+            for (const ESM::FormId followUp : info->mFollowUps)
+            {
+                const auto found = mInfoIndex.find(toId(followUp));
+                if (!followUps || hasFlag(*info, ESM4::INFO_Goodbye) || found == mInfoIndex.end()
+                    || chain.count(found->first) != 0 || !canSay(*found->second, speaker))
+                    continue;
+                next = found->second;
+                break;
+            }
+            info = next;
+            if (info != nullptr)
+            {
+                current = speak(*info, speaker, topic);
+                current.mSpeaking = false;
+                view.mLines.insert(view.mLines.end(), current.mLines.begin(), current.mLines.end());
+            }
+        }
         return view;
     }
 

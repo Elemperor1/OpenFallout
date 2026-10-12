@@ -144,8 +144,9 @@ namespace FalloutScript
         /// A response of the topic is said by the speaker outside of a conversation, and finished at once (the Say
         /// and SayTo commands). The listener is the character it is said to, whom the conditions that run on the
         /// target are about (the player when it is 0). Returns the lines, which are empty when no response can be
-        /// said.
-        DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0);
+        /// said. With `followUps` the response goes on as it does in a conversation (StartConversation between two
+        /// characters): the first follow-up that can be said comes after it, and so on, and the lines are all of them.
+        DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0, bool followUps = false);
 
         // Looking
 

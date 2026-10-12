@@ -168,7 +168,7 @@ namespace FalloutScript
             mHost.log(message);
     }
 
-    Interpreter::Result Interpreter::run(Instance& instance, std::uint16_t blockType)
+    Interpreter::Result Interpreter::run(Instance& instance, std::uint16_t blockType, const BlockFilter& filter)
     {
         if (mDepth == 0)
             mBudget = maxStatements;
@@ -182,7 +182,7 @@ namespace FalloutScript
         }
         for (const Block& block : script.blocks())
         {
-            if (block.mType != blockType)
+            if (block.mType != blockType || (filter && !filter(block)))
                 continue;
             const Result result = runBlock(instance, block);
             total.mStatements += result.mStatements;
@@ -486,9 +486,7 @@ namespace FalloutScript
             context.mReference = resolveReference(frame, call.mReference);
         else
             context.mReference = frame.mInstance.forQuest() ? 0 : frame.mInstance.owner();
-        context.mArguments.reserve(prepared.mArguments.mValues.size());
-        for (const ESM4::ScriptCode::Argument& argument : prepared.mArguments.mValues)
-        {
+        const auto evaluate = [&](const ESM4::ScriptCode::Argument& argument) {
             Value value;
             switch (argument.mKind)
             {
@@ -517,8 +515,14 @@ namespace FalloutScript
                     value.mNumber = resolveReference(frame, argument.mIndex);
                     break;
             }
-            context.mArguments.push_back(std::move(value));
-        }
+            return value;
+        };
+        context.mArguments.reserve(prepared.mArguments.mValues.size());
+        for (const ESM4::ScriptCode::Argument& argument : prepared.mArguments.mValues)
+            context.mArguments.push_back(evaluate(argument));
+        context.mValues.reserve(prepared.mValues.mValues.size());
+        for (const ESM4::ScriptCode::Argument& argument : prepared.mValues.mValues)
+            context.mValues.push_back(evaluate(argument));
         return invoke(handler->second, context);
     }
 }

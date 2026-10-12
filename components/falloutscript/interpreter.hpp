@@ -84,6 +84,8 @@ namespace FalloutScript
         FormId mReference = 0;
         bool mOnReference = false; // the script names the object
         std::vector<Value> mArguments; // as many as the call has (the last optional ones can be missing)
+        /// What a message is given for the tokens of its text, after its arguments (ShowMessage)
+        std::vector<Value> mValues;
     };
 
     /// A command of the engine. Its result is the value of the command when a script uses it in an expression.
@@ -127,8 +129,9 @@ namespace FalloutScript
         const CommandTable& commands() const { return mCommands; }
         Host& host() { return mHost; }
 
-        /// Runs the blocks of the instance's script that are of this type, in the order they are written.
-        Result run(Instance& instance, std::uint16_t blockType);
+        /// Runs the blocks of the instance's script that are of this type, in the order they are written. A filter
+        /// can pick among them by what they name (Begin SayToDone Topic): the blocks it refuses are not run.
+        Result run(Instance& instance, std::uint16_t blockType, const BlockFilter& filter = {});
 
         /// Runs all the statements of a script that is a list of statements, such as a result script.
         Result runResult(Instance& instance);
