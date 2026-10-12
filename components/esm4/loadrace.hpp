@@ -128,7 +128,7 @@ namespace ESM4
         float mHeightFemale = 1.0f;
         float mWeightMale = 1.0f;
         float mWeightFemale = 1.0f;
-        std::uint32_t mRaceFlags; // 0x0001 = playable?
+        std::uint32_t mRaceFlags = 0; // 0x0001 = playable?
 
         std::vector<BodyPart> mHeadParts; // see HeadPartIndex
         std::vector<BodyPart> mHeadPartsFemale; // see HeadPartIndex

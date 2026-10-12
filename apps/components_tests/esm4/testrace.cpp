@@ -50,6 +50,15 @@ namespace
         }
     }
 
+    TEST(ESM4RaceTest, hasNoFlagsWhenTheRecordHasNoData)
+    {
+        const std::vector<ESM4::Race> races
+            = loadRecords<ESM4::Race>("RACE", record("RACE", 1, zString("EDID", "Minimal")));
+
+        ASSERT_EQ(races.size(), 1u);
+        EXPECT_EQ(races[0].mRaceFlags, 0u);
+    }
+
     TEST(ESM4RaceTest, hasNoVoiceTypesWhenTheRecordGivesNone)
     {
         const std::vector<ESM4::Race> races
