@@ -1324,11 +1324,12 @@ def check_dialogue(text):
         return line is not None and all(part in line for part in parts)
 
     voiced = re.findall(r"Voice: (\S+)", text)
-    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID)]
+    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH]
     if voiced != wanted:
         problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
-                        "talker, and a line whose only file is another voice's (the ask line) and the lines with none "
-                        f"should be silent: {voiced}, wanted {wanted}")
+                        "talker, a line whose only file is another voice's (the ask line) and the lines with none "
+                        "should be silent, and a response that names a sound record (the added topic) should be said "
+                        f"with the file of the record: {voiced}, wanted {wanted}")
 
     greeting = one("greeting")
     if not has(greeting, "active=true speaking=true ended=false", f"speaker={plugin.TALKER_TITLE}",

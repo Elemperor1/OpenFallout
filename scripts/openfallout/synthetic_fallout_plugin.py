@@ -301,11 +301,18 @@ GREETING_TEXT = "Welcome to the test."
 WRONG_GREETING_TEXT = "This greeting is for another voice."
 ASK_TEXT = "The test goes well."
 ADDED_TEXT = "This topic came with the answer before."
+# The response of the added topic names a sound record (the sound field of its TRDT) in place of a voice file: the
+# record has a file under sound/ that no voice folder holds, and that is the file that is looked up
+SOUND_ID = 0x8DE
+SOUND_NAME = "OFTestAddedSound"
+SOUND_FILE = "fx\\oftest\\added.ogg"
+SOUND_PATH = "sound/fx/oftest/added.ogg"
 GOODBYE_TEXT = "Farewell."
 # The voice files of the lines: sound/voice/<plugin>/<voice type>/<text>_<form id of the response, 8 hex digits>_<n>.ogg.
 # The greeting has a file in the folder of the voice of the talker and one in the folder of another voice (the talker's
 # must be the one that is looked up), the question has one only in the other folder (another person's voice, so the
-# line must be silent), and the other responses have none. The bytes are not a sound: what is under test is which file is looked up.
+# line must be silent), the added topic's response names a sound record whose file is SOUND_PATH, and the other
+# responses have none. The bytes are not a sound: what is under test is which file is looked up.
 VOICE_FILES = (
     ("OFTestVoice", "oftest_oftestgreeting", GREETING_INFO_ID),
     ("OFTestOtherVoice", "oftest_oftestgreeting", GREETING_INFO_ID),
@@ -317,7 +324,7 @@ def voice_path(voice, text, response, number=1):
     return f"sound/voice/oftest.esm/{voice.lower()}/{text}_{response:08x}_{number}.ogg"
 
 
-LAST_ID = 0x8D2 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8DE # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -1116,12 +1123,12 @@ def topic(form_id, name, title, kind, flags, priority=50.0):
                                      sub(b"PNAM", struct.pack("<f", priority)), sub(b"DATA", bytes([kind, flags]))])
 
 
-def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None):
+def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, sound=0):
     """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
-    when the response starts and the one that runs when it is over."""
+    when the response starts and the one that runs when it is over. `sound` is the sound record the response names."""
     subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
     subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
-    subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, 0, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
+    subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, sound, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
     subs += list(conditions)
     if prompt is not None:
         subs.append(zstr(b"RNAM", prompt))
@@ -1160,7 +1167,7 @@ def dialogue():
         topic_group(ASK_TOPIC_ID, [
             response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
-        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001)]),
+        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, sound=SOUND_ID)]),
     ]
 
 
@@ -1444,6 +1451,7 @@ def plugin():
             + top_group(b"NPC_", [person(), *package_people(),
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
+            + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)])])
             + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
@@ -1494,6 +1502,9 @@ def write(out, animation=True, spline=True):
         voice_file = out / voice_path(voice, text, response)
         voice_file.parent.mkdir(parents=True, exist_ok=True)
         voice_file.write_bytes(b"OggS not a sound")
+    sound_file = out / SOUND_PATH
+    sound_file.parent.mkdir(parents=True, exist_ok=True)
+    sound_file.write_bytes(b"OggS not a sound")
     mesh.write_text(box_mesh(), encoding="ascii")
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),

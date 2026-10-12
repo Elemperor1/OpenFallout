@@ -22,9 +22,11 @@
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -830,6 +832,20 @@ namespace OFScript
 
     std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)
     {
+        // A response can name a sound record (TRDT) to be said in place of a voice file; when its file is there that is
+        // what is said, and when it is not the voice files are looked for as for any other response
+        if (line.mSound != 0)
+            if (const ESM4::Sound* sound = mStore.get<ESM4::Sound>().search(refId(line.mSound)))
+                if (!sound->mSoundFile.empty())
+                    if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                    {
+                        constexpr VFS::Path::NormalizedView soundDir("sound");
+                        const VFS::Manager& vfs = *resources->getVFS();
+                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs);
+                        if (vfs.exists(path))
+                            return path.value();
+                    }
         const FalloutScript::VoiceIndex& index = voices();
         if (index.size() == 0 || line.mInfo == 0)
             return {};
