@@ -302,11 +302,12 @@ WRONG_GREETING_TEXT = "This greeting is for another voice."
 ASK_TEXT = "The test goes well."
 ADDED_TEXT = "This topic came with the answer before."
 # The response of the added topic names a sound record (the sound field of its TRDT) in place of a voice file: the
-# record has a file under sound/ that no voice folder holds, and that is the file that is looked up
+# record has a file under sound/ that no voice folder holds, and that is the file that is looked up. The record names a
+# wav and the data has the mp3 that it was converted to, as the sounds of the games do.
 SOUND_ID = 0x8DE
 SOUND_NAME = "OFTestAddedSound"
-SOUND_FILE = "fx\\oftest\\added.ogg"
-SOUND_PATH = "sound/fx/oftest/added.ogg"
+SOUND_FILE = "fx\\oftest\\added.wav"
+SOUND_PATH = "sound/fx/oftest/added.mp3"
 GOODBYE_TEXT = "Farewell."
 # The voice files of the lines: sound/voice/<plugin>/<voice type>/<text>_<form id of the response, 8 hex digits>_<n>.ogg.
 # The greeting has a file in the folder of the voice of the talker and one in the folder of another voice (the talker's

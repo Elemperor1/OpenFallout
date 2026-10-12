@@ -839,10 +839,12 @@ namespace OFScript
                 if (!sound->mSoundFile.empty())
                     if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
                     {
+                        // As for every sound record: the mp3 that a wav was converted to, when that is what there is
                         constexpr VFS::Path::NormalizedView soundDir("sound");
+                        constexpr VFS::Path::ExtensionView mp3("mp3");
                         const VFS::Manager& vfs = *resources->getVFS();
                         const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs);
+                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
                         if (vfs.exists(path))
                             return path.value();
                     }
