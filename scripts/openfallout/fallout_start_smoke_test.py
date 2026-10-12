@@ -919,15 +919,25 @@ NEW_GAME_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
 local input = require('openfallout.input')
 local self = require('openfallout.self')
+local types = require('openfallout.types')
 
-local seen = nil
+local seen, drawn, reported = nil, false, false
 
 return {
     engineHandlers = {
         onFrame = function()
+            -- the player draws a weapon while the box is open; the quest takes fighting away on its own at the end,
+            -- which has to put the weapon away
+            if drawn and not reported and input.getControlSwitch('playercontrols') then
+                reported = true
+                print('OFTEST', 'newgame stance', 'after', tostring(types.Actor.getStance(self) == types.Actor.STANCE.Nothing))
+            end
             local box = core.messageBox.current()
             if not box or box.serial == seen then return end
             seen = box.serial
+            types.Actor.setStance(self, types.Actor.STANCE.Weapon)
+            drawn = true
+            print('OFTEST', 'newgame stance', 'drawn', tostring(types.Actor.getStance(self) == types.Actor.STANCE.Weapon))
             local row = {}
             for _, key in ipairs({ @KEYS@ }) do table.insert(row, key .. '=' .. tostring(input.getControlSwitch(key))) end
             print('OFTEST', 'newgame box', string.format('buttons=%d first=%s second=%s', #box.buttons, box.buttons[1],
@@ -1831,6 +1841,11 @@ def check_new_game(text):
             problems.append(f"while the box is open the player should have lost movement, fighting, looking and the view "
                             f"(DisablePlayerControls 1 1 1 1 1), still face the way of the marker, and the box should take "
                             f"no button it does not have: {boxes[0]!r} should end with {wanted!r}")
+    stances = [match.group(1).strip() for match in
+               (re.search(r"OFTEST\tnewgame[\t ]stance\t(.*)$", line) for line in text.splitlines()) if match]
+    if stances != ["drawn\ttrue", "after\ttrue"]:
+        problems.append("the player draws a weapon while the box is open, and DisablePlayerControls 0 0 1 (fighting alone) "
+                        f"must put it away: {stances}")
     found = [re.search(r"OFTEST\tnewgame[\t ]controls\t(.*)$", line) for line in text.splitlines()]
     controls = [match.group(1).strip() for match in found if match]
     if controls != ["playercontrols=true playerfighting=true playerlooking=true playerviewswitch=true"]:

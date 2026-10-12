@@ -798,8 +798,10 @@ namespace OFScript
             Log(Debug::Info) << "Player controls: " << names[static_cast<std::size_t>(control)]
                              << (enabled ? " on" : " off");
         }
-        // The switches of the engine are those of Morrowind: movement is also what lets the player activate things, and
-        // the controls that no switch stands for (the Pip-Boy, rollover, sneaking) have nothing to turn yet
+        // The switches of the engine are those of Morrowind: movement is the one that gates every control of the player
+        // (it lets the player activate things, fight and open the inventory too, so a call that takes movement alone
+        // takes those as well; the scripts of the games always take it with fighting and the Pip-Boy), and the
+        // controls that no switch stands for (the Pip-Boy, rollover, sneaking) have nothing to turn yet
         std::vector<std::string_view> switches;
         switch (control)
         {
@@ -837,6 +839,14 @@ namespace OFScript
                 input->toggleControlSwitch(name, enabled);
             if (!player.isEmpty())
                 world->rotateObject(player, facing);
+            // The switches only keep the player from drawing a weapon or readying a spell: one that is already out
+            // would go on attacking, so taking fighting away puts it away
+            if (control == FalloutScript::PlayerControl::Fighting && !enabled && world != nullptr)
+            {
+                const OFWorld::Ptr self = world->getPlayerPtr();
+                if (!self.isEmpty())
+                    self.getClass().getCreatureStats(self).setDrawState(OFMechanics::DrawState::Nothing);
+            }
         });
     }
 

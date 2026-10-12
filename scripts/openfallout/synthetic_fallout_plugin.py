@@ -902,14 +902,16 @@ def new_game_message():
 
 def new_game_quest():
     """CG00: stage 0 takes five of the controls of the player (movement, the Pip-Boy, fighting, the view and looking),
-    moves the player to the marker and sets stage 5; stage 10 gives all the controls back and opens the screen for the
-    name (the quest is not Start Game Enabled, so only a new game starts it)."""
+    moves the player to the marker and sets stage 5; stage 10 takes fighting on its own, then gives all the controls back
+    and opens the screen for the name (the quest is not Start Game Enabled, so only a new game starts it)."""
     sf = fallout_script
     # the references of the result script, in the order of their entries: the player, the marker, the quest
     first = [sf.call(sf.DISABLE_PLAYER_CONTROLS, *[sf.int_argument(1)] * 5),
              sf.call_on(1, sf.MOVE_TO_MARKER, sf.form_argument(2)),
              sf.call(sf.SET_STAGE, sf.form_argument(3), sf.int_argument(NEW_GAME_BOX_STAGE))]
-    last = [sf.call_counted(sf.ENABLE_PLAYER_CONTROLS), sf.call(sf.GET_PLAYER_NAME)]
+    # taking fighting alone puts away a weapon that the player has drawn, then everything is given back
+    last = [sf.call(sf.DISABLE_PLAYER_CONTROLS, sf.int_argument(0), sf.int_argument(0), sf.int_argument(1)),
+            sf.call_counted(sf.ENABLE_PLAYER_CONTROLS), sf.call(sf.GET_PLAYER_NAME)]
     return quest(NEW_GAME_QUEST_ID, NEW_GAME_QUEST_NAME, "OpenFallout Test New Game", 0,
                  [(NEW_GAME_FIRST_STAGE, "The game starts", 0, [], first,
                    [PLAYER_REFERENCE, NEW_GAME_PLACE_REF_ID, NEW_GAME_QUEST_ID]),
