@@ -304,7 +304,7 @@ ADDED_TEXT = "This topic came with the answer before."
 # The response of the added topic names a sound record (the sound field of its TRDT) in place of a voice file: the
 # record has a file under sound/ that no voice folder holds, and that is the file that is looked up. The record names a
 # wav and the data has the mp3 that it was converted to, as the sounds of the games do.
-SOUND_ID = 0x8DE
+SOUND_ID = 0x8F1
 SOUND_NAME = "OFTestAddedSound"
 SOUND_FILE = "fx\\oftest\\added.wav"
 SOUND_PATH = "sound/fx/oftest/added.mp3"
@@ -325,7 +325,7 @@ def voice_path(voice, text, response, number=1):
     return f"sound/voice/oftest.esm/{voice.lower()}/{text}_{response:08x}_{number}.ogg"
 
 
-LAST_ID = 0x8DE # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8F1 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"

@@ -202,6 +202,7 @@ namespace FalloutScript
             return false;
         ConditionContext context;
         context.mSubject = speaker.mReference;
+        context.mTarget = mListener;
         return mConditions.holds(info.mConditions, context);
     }
 
@@ -437,9 +438,13 @@ namespace FalloutScript
         mView.mOptions.clear();
     }
 
-    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic)
+    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener)
     {
+        // The listener matters for the choice of the response (its conditions) and for nothing after it
+        const FormId outerListener = mListener;
+        mListener = listener;
         const ESM4::DialogInfo* info = responseFor(topic, speaker);
+        mListener = outerListener;
         if (info == nullptr)
             return DialogueView();
         DialogueView view = speak(*info, speaker, topic);

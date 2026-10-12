@@ -210,7 +210,7 @@ namespace OFScript
 
         /// The character says a response of the topic outside of a conversation: what the response does is done, and
         /// the lines are told to the player: the voice of the data and, when subtitles are on, the text
-        bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic);
+        bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener = 0);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -221,6 +221,8 @@ namespace OFScript
             std::string mVoice;
             std::string mText;
             float mSeconds = 0;
+            /// The last line of what one Say or SayTo said: the script of the speaker is told when it is over
+            bool mEnd = false;
         };
         struct Saying
         {

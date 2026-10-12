@@ -311,6 +311,28 @@ namespace
         EXPECT_NE(setup.mDialogue.responseFor(topicA, speaker), nullptr);
     }
 
+    TEST(FalloutScriptDialogueTest, aResponseSaidToACharacterAsksTheConditionsOnTheTargetAboutIt)
+    {
+        constexpr FormId listener = 0x00ff0005;
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A");
+        ESM4::TargetCondition touch{};
+        touch.condition = static_cast<std::uint32_t>(ESM4::CTF_GreaterThan | ESM4::CTF_RunOnTarget);
+        touch.comparison = 0;
+        touch.functionIndex = functionTouch;
+        setup.mRecords.addInfo(0x3001, topicA, "yes").mConditions.push_back(touch);
+        setup.start();
+        setup.mTouchValue[listener] = 1;
+
+        // said to the player, the condition on the target is about the player, who does not meet it
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre());
+        EXPECT_THAT(setup.mTouched, ElementsAre(FalloutScript::playerReference));
+        // said to another character, it is about that one
+        setup.mTouched.clear();
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, listener)), ElementsAre("yes"));
+        EXPECT_THAT(setup.mTouched, ElementsAre(listener));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseNeedsItsQuestToRun)
     {
         Harness setup;

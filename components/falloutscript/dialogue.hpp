@@ -142,8 +142,10 @@ namespace FalloutScript
         const DialogueSpeaker& speaker() const { return mSpeaker; }
 
         /// A response of the topic is said by the speaker outside of a conversation, and finished at once (the Say
-        /// command). Returns the lines, which are empty when no response can be said.
-        DialogueView say(const DialogueSpeaker& speaker, FormId topic);
+        /// and SayTo commands). The listener is the character it is said to, whom the conditions that run on the
+        /// target are about (the player when it is 0). Returns the lines, which are empty when no response can be
+        /// said.
+        DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0);
 
         // Looking
 
@@ -184,6 +186,8 @@ namespace FalloutScript
         double mDailyInterval = 12.0;
         std::function<std::size_t(std::size_t)> mRandom;
         std::function<bool(const ESM4::DialogInfo&)> mChallenge;
+        /// The character that the response being looked for is said to, when it is not the player
+        FormId mListener = 0;
 
         std::unordered_map<FormId, TopicEntry> mEntries;
         std::unordered_map<FormId, const ESM4::DialogInfo*> mInfoIndex;

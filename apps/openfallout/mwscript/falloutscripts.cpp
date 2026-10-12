@@ -178,7 +178,7 @@ namespace OFScript
                 });
             }
             else if (topic != 0)
-                sayTopic(speaker, topic);
+                sayTopic(speaker, topic, target);
             return 0.0;
         });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
@@ -186,7 +186,7 @@ namespace OFScript
             return 0.0;
         });
         mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
-            sayTopic(call.mReference, FalloutScript::formArgument(call, 1));
+            sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0));
             return 0.0;
         });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
@@ -787,7 +787,8 @@ namespace OFScript
         return mStore.get<ESM4::Dialogue>().getSize() > 0;
     }
 
-    bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic)
+    bool FalloutScripts::sayTopic(
+        FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener)
     {
         ESM::FormId base;
         if (reference == 0 || topic == 0 || !baseOf(reference, base))
@@ -795,12 +796,15 @@ namespace OFScript
         std::vector<SaidLine> lines;
         {
             const std::lock_guard lock(mDialogueMutex);
-            const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic);
+            // The player is the listener when none is named (and is the one conditions on the target are about then)
+            const FalloutScript::DialogueView view
+                = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener);
             for (const FalloutScript::DialogueLine& line : view.mLines)
                 lines.push_back({ voiceFile(reference, line), line.mText, lineSeconds(line.mText) });
         }
         if (lines.empty())
             return false;
+        lines.back().mEnd = true;
         runOnMainThread(
             [this, reference, lines = std::move(lines)]() mutable { startSaying(reference, std::move(lines)); });
         return true;
@@ -926,6 +930,7 @@ namespace OFScript
 
         // The lines that characters say outside of a conversation
         const OFWorld::Ptr player = world->getPlayerPtr();
+        std::vector<FalloutScript::FormId> finished;
         for (auto saying = mSayings.begin(); saying != mSayings.end();)
         {
             const OFWorld::Ptr speaker = findReference(saying->mReference);
@@ -966,12 +971,18 @@ namespace OFScript
                 // A voice that plays is waited for; a line without one stays as long as it takes to read
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
+                    if (line.mEnd)
+                        finished.push_back(saying->mReference);
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
             }
             ++saying;
         }
+        // The script of a character that has said what it was told to goes on (Begin SayToDone). It can say more, so
+        // this waits until the lines are no longer being walked.
+        for (const FalloutScript::FormId speaker : finished)
+            mObjects.trigger(speaker, FalloutScript::BlockType::SayToDone);
     }
 
     bool FalloutScripts::sayConversationLine(std::size_t index)
