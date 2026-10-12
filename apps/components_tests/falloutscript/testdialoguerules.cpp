@@ -222,6 +222,35 @@ namespace
         EXPECT_EQ(setup.mDialogue.responseFor(topicB, speaker), nullptr);
     }
 
+    TEST(FalloutScriptDialogueTest, aTopicTriesTheResponsesOfOtherTopicsItShowsAfterItsOwn)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addTopic(topicB, "B", "TopicB", true);
+        setup.mRecords.addTopic(topicC, "C");
+        setup.mRecords.addInfo(0x3001, topicA, "shared one");
+        setup.mRecords.addInfo(0x3002, topicA, "shared two", 0x3001);
+        setup.mRecords.addInfo(0x3003, topicA, "shared but deleted", 0x3002).mFlags = ESM4::Rec_Deleted;
+        ESM4::DialogInfo& own = setup.mRecords.addInfo(0x3004, topicB, "own");
+        own.mQuest = id(sleepingQuest);
+        // B shows two responses of A (the later one first), one that is deleted, one that is not there at all, and one
+        // of its own that it lists again
+        ESM4::Dialogue& shower = setup.mRecords.mTopics[1];
+        shower.mSharedInfos
+            = { { id(0x3002), 1 }, { id(0x3003), 2 }, { id(0x3999), 3 }, { id(0x3004), 4 }, { id(0x3001), 5 } };
+        setup.start();
+
+        EXPECT_THAT(ids(setup.mDialogue.responses(topicA)), ElementsAre(0x3001, 0x3002));
+        EXPECT_THAT(ids(setup.mDialogue.responses(topicB)), ElementsAre(0x3004, 0x3002, 0x3001));
+        // The own response is not said (its quest sleeps), so the first that is shown is
+        const ESM4::DialogInfo* given = setup.mDialogue.responseFor(topicB, speaker);
+        ASSERT_NE(given, nullptr);
+        EXPECT_EQ(given->mId.toUint32(), 0x3002u);
+        // and it is said under the topic that was picked
+        setup.mDialogue.start(speaker);
+        EXPECT_EQ(setup.mDialogue.choose(topicB).mTopic, topicB);
+    }
+
     TEST(FalloutScriptDialogueTest, keepsTheFileOrderWhereThereIsNoChain)
     {
         Harness setup;
@@ -581,6 +610,71 @@ namespace
         EXPECT_TRUE(setup.mDialogue.start(speaker).mOptions.size() == 1);
     }
 
+    TEST(FalloutScriptDialogueTest, aResponseThatGoesOnIsFollowedByTheFirstFollowUpThatCanBeSaid)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        setup.mRecords.addInfo(0x3001, topicA, "first").mEndScript = logScript("end first").definition();
+        ESM4::DialogInfo& asleep = setup.mRecords.addInfo(0x3002, topicA, "asleep", 0x3001);
+        asleep.mQuest = id(sleepingQuest);
+        setup.mRecords.addInfo(0x3003, topicA, "second", 0x3002);
+        setup.mRecords.addInfo(0x3004, topicA, "third", 0x3003);
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3999), id(0x3002), id(0x3003) };
+        setup.mRecords.mInfos[2].mFollowUps = { id(0x3004) };
+        setup.start();
+        setup.mDialogue.start(speaker);
+
+        EXPECT_THAT(setup.texts(setup.mDialogue.choose(topicA)), ElementsAre("first"));
+        // Not there and not running are passed over; the player has no say in between
+        const FalloutScript::DialogueView& second = setup.mDialogue.finish();
+        EXPECT_THAT(setup.texts(second), ElementsAre("second"));
+        EXPECT_TRUE(second.mSpeaking);
+        EXPECT_THAT(second.mOptions, IsEmpty());
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first"));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_THAT(setup.texts(setup.mDialogue.finish()), ElementsAre("third"));
+
+        // The last one gives the player the topics again
+        const FalloutScript::DialogueView& over = setup.mDialogue.finish();
+        EXPECT_FALSE(over.mSpeaking);
+        EXPECT_THAT(setup.topics(over), ElementsAre(topicA));
+    }
+
+    TEST(FalloutScriptDialogueTest, followUpsThatNameEachOtherInACircleEndWithTheExchange)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        setup.mRecords.addInfo(0x3001, topicA, "ping");
+        setup.mRecords.addInfo(0x3002, topicA, "pong", 0x3001);
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3002) };
+        setup.mRecords.mInfos[1].mFollowUps = { id(0x3001), id(0x3002) };
+        setup.start();
+        setup.mDialogue.start(speaker);
+
+        setup.mDialogue.choose(topicA);
+        EXPECT_THAT(setup.texts(setup.mDialogue.finish()), ElementsAre("pong"));
+        EXPECT_THAT(setup.topics(setup.mDialogue.finish()), ElementsAre(topicA));
+
+        // The next time the player picks the topic the exchange starts again
+        EXPECT_THAT(setup.texts(setup.mDialogue.choose(topicA)), ElementsAre("ping"));
+        EXPECT_THAT(setup.texts(setup.mDialogue.finish()), ElementsAre("pong"));
+    }
+
+    TEST(FalloutScriptDialogueTest, aGoodbyeResponseIsNotFollowedUp)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(goodbye, "Goodbye", "GOODBYE", true);
+        setup.mRecords.addInfo(0x3001, goodbye, "Farewell").mInfoFlags = ESM4::INFO_Goodbye;
+        setup.mRecords.addInfo(0x3002, goodbye, "more", 0x3001);
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3002) };
+        setup.start();
+        setup.mDialogue.start(speaker);
+
+        setup.mDialogue.choose(goodbye);
+
+        EXPECT_TRUE(setup.mDialogue.finish().mEnded);
+    }
+
     TEST(FalloutScriptDialogueTest, theScriptsOfAResponseRunWhenItStartsAndWhenItIsFinished)
     {
         Harness setup;
@@ -639,6 +733,31 @@ namespace
         EXPECT_TRUE(setup.mDialogue.hasTopic(topicB));
         EXPECT_FALSE(setup.mDialogue.active());
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicC)), IsEmpty());
+    }
+
+    TEST(FalloutScriptDialogueTest, theEndScriptOfAResponseSaidOutsideAConversationSeesWhatWasSaid)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", false);
+        ESM4::DialogInfo& info = setup.mRecords.addInfo(0x3001, topicA, "a line");
+        info.mResponses[0].mEmotionType = 3;
+        info.mResponses[0].mEmotionValue = 60;
+        ScriptBuilder script;
+        script.code(command(OpTouch, arguments(0)));
+        info.mEndScript = script.definition();
+        std::vector<double> seen;
+        setup.mInterpreter.setHandler("Touch", [&](FalloutScript::CallContext&) {
+            seen.push_back(setup.mInterpreter.call(OpGetDialogueEmotion, 0, false, {}));
+            seen.push_back(setup.mInterpreter.call(OpGetDialogueEmotionValue, 0, false, {}));
+            return 0.0;
+        });
+        setup.start();
+
+        setup.mDialogue.say(speaker, topicA);
+
+        EXPECT_THAT(seen, ElementsAre(3.0, 60.0));
+        // and what it saw is not left behind
+        EXPECT_THAT(setup.texts(setup.mDialogue.view()), IsEmpty());
     }
 
     TEST(FalloutScriptDialogueTest, aLineKeepsWhatTheRecordSaysAboutHowItIsSaid)

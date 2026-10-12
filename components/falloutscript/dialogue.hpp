@@ -125,7 +125,9 @@ namespace FalloutScript
         /// said or the topic is not among the options.
         const DialogueView& choose(FormId topic);
         /// The response that was being said is over: its end script runs, it gives the player the topics it names,
-        /// and the options are worked out. Does nothing when no response is being said.
+        /// and then the conversation ends (a response flagged Goodbye), or the first of its follow-ups that can be
+        /// said is the response being said now, or the options are worked out. Does nothing when no response is being
+        /// said.
         const DialogueView& finish();
         /// Ends the conversation, also when a response is being said (its end script then does not run)
         void end();
@@ -161,7 +163,9 @@ namespace FalloutScript
 
         std::vector<DialogueOption> options(const DialogueSpeaker& speaker, const std::vector<ESM::FormId>* choices);
         bool addOption(std::vector<DialogueOption>& options, FormId topic, const DialogueSpeaker& speaker);
-        DialogueView speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker);
+        /// The view of the response being said, after its start script ran. The topic is the one it was picked under,
+        /// or 0 for the topic of the record.
+        DialogueView speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic = 0);
         /// The response has been said to its end: it is not said again if it is for once (or for a day)
         void markSaid(const ESM4::DialogInfo& info);
         void runScript(const ESM4::ScriptDefinition& definition, const DialogueSpeaker& speaker);
@@ -186,6 +190,7 @@ namespace FalloutScript
         std::set<FormId> mSaid; // the responses that were said
         std::map<FormId, int> mSaidOnDay;
         std::set<FormId> mTalkedTo;
+        std::set<FormId> mChain; // the responses said one after the other since the player picked the topic
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
 
         bool mActive = false;

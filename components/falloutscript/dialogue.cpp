@@ -106,6 +106,7 @@ namespace FalloutScript
         mSaid.clear();
         mSaidOnDay.clear();
         mTalkedTo.clear();
+        mChain.clear();
         mPrepared.clear();
         mGreeting = 0;
         mActive = false;
@@ -132,6 +133,15 @@ namespace FalloutScript
                 entry.mInfos = chainOrder(found->second);
             if (entry.mRecord == nullptr)
                 continue;
+            // The responses of other topics that the topic shows (New Vegas) are tried after its own, in the order they
+            // are listed in. A response that is not there, or that a later file deletes, is left out.
+            for (const ESM4::Dialogue::SharedInfo& shared : entry.mRecord->mSharedInfos)
+            {
+                const auto info = mInfoIndex.find(toId(shared.mInfo));
+                if (info != mInfoIndex.end()
+                    && std::find(entry.mInfos.begin(), entry.mInfos.end(), info->second) == entry.mInfos.end())
+                    entry.mInfos.push_back(info->second);
+            }
             if ((entry.mRecord->mDialFlags & ESM4::Dialogue::Flag_TopLevel) != 0)
                 mTopLevel.push_back(id);
             if (sameText(entry.mRecord->mEditorId, greetingTopic))
@@ -279,12 +289,13 @@ namespace FalloutScript
         mInterpreter.runResult(instance);
     }
 
-    DialogueView DialogueManager::speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker)
+    DialogueView DialogueManager::speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic)
     {
         const FormId id = toId(info.mId);
         DialogueView view;
         view.mSpeaker = speaker.mReference;
-        view.mTopic = toId(info.mTopic);
+        // A response that a topic shows for another one is said under the topic that was picked
+        view.mTopic = topic != 0 ? topic : toId(info.mTopic);
         view.mInfo = id;
         view.mSpeaking = true;
         for (const ESM4::DialogResponse& response : info.mResponses)
@@ -322,6 +333,7 @@ namespace FalloutScript
         mActive = true;
         mSpeaker = speaker;
         mSpeaking = nullptr;
+        mChain.clear();
         mView = DialogueView();
         mView.mSpeaker = speaker.mReference;
 
@@ -332,8 +344,9 @@ namespace FalloutScript
         mTalkedTo.insert(speaker.mReference);
         if (greeting != nullptr)
         {
-            mView = speak(*greeting, speaker);
+            mView = speak(*greeting, speaker, first);
             mSpeaking = greeting;
+            mChain.insert(toId(greeting->mId));
         }
         else
             mView.mOptions = options(speaker, nullptr);
@@ -359,7 +372,8 @@ namespace FalloutScript
         if (info == nullptr)
             return mView;
 
-        mView = speak(*info, mSpeaker);
+        mChain = { toId(info->mId) };
+        mView = speak(*info, mSpeaker, topic);
         mSpeaking = info;
         return mView;
     }
@@ -382,6 +396,19 @@ namespace FalloutScript
             mActive = false;
             mView.mEnded = true;
             mView.mOptions.clear();
+            return mView;
+        }
+
+        // A response that goes on is followed by the first of its follow-ups that can be said, before the player has a
+        // say. None is said twice in the exchange, so follow-ups that name each other in a circle end.
+        for (const ESM::FormId followUp : info.mFollowUps)
+        {
+            const auto next = mInfoIndex.find(toId(followUp));
+            if (next == mInfoIndex.end() || mChain.count(next->first) != 0 || !canSay(*next->second, mSpeaker))
+                continue;
+            mChain.insert(next->first);
+            mView = speak(*next->second, mSpeaker);
+            mSpeaking = next->second;
             return mView;
         }
 
@@ -409,12 +436,16 @@ namespace FalloutScript
         const ESM4::DialogInfo* info = responseFor(topic, speaker);
         if (info == nullptr)
             return DialogueView();
-        DialogueView view = speak(*info, speaker);
+        DialogueView view = speak(*info, speaker, topic);
         markSaid(*info);
+        view.mSpeaking = false;
+        // As in finish(), the end script sees the response that was said
+        const DialogueView outer = mView;
+        mView = view;
         runScript(info->mEndScript, speaker);
+        mView = outer;
         for (const ESM::FormId added : info->mAddTopics)
             addTopic(toId(added));
-        view.mSpeaking = false;
         return view;
     }
 
