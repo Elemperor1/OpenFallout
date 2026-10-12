@@ -746,12 +746,14 @@ return {
             print('OFTEST', 'dialogue globals', tag, tostring(world.globals.@BEGIN@), tostring(world.globals.@END@))
             if tag == 'button' then
                 world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
+                print('OFTEST', 'dialogue said', tostring(world.globals.@SAID@))
             end
         end,
     },
 }
 """.replace("@TALKER_REF@", str(plugin.TALKER_REF_ID)).replace("@BEGIN@", plugin.DIALOGUE_GLOBALS["begin"][1]).replace(
-    "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1])
+    "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1]).replace(
+    "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1])
 
 # The making of the character, in an engine of its own because its screens pause the game. A script of the world sets the
 # global that the script of a quest waits for, the script opens the menus (the race, then the name, SPECIAL with the
@@ -1595,12 +1597,19 @@ def check_dialogue(text):
     if picked != [str(plugin.BUTTON_PICKED)]:
         problems.append(f"the third button should be picked with Tab and Return, as number {plugin.BUTTON_PICKED} of the "
                         f"record: {picked}")
-    if "OFTEST\tdialogue button timeout" in text:
+    if "OFTEST\tdialogue\tbutton timeout" in text:
         problems.append("no button was picked in the message box (the keys did not reach it, or the script did not read it)")
     else:
         read = lines("button")
         if read != [str(plugin.BUTTON_PICKED + 1)]:
             problems.append(f"the script of the talker should read the button once, as {plugin.BUTTON_PICKED + 1}: {read}")
+
+    # The end script of the question made the talker say a topic outside of the conversation (Say), and when it had said
+    # it the Begin SayToDone block of the script of the talker ran: once
+    said = lines("said")
+    if not said or said[-1] != "1" or any(value not in ("0", "1") for value in said):
+        problems.append("the talker was made to say a topic once, so the Begin SayToDone block of its script should have "
+                        f"run once by the time the button was read: {said}")
 
     globals_ = {line.split("\t")[0]: line.split("\t")[1:] for line in lines("globals")}
     for tag, want in (("greeting", ["1", "0"]), ("options", ["1", "0"]), ("asked", ["1", "1"]), ("closed", ["1", "1"])):

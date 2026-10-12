@@ -299,8 +299,13 @@ BUTTON_MESSAGE_TEXT = "Pick one of the buttons."
 # the second button has a condition that the player does not meet (it is not shown); the third is picked by the test
 BUTTON_TEXTS = ("First choice", "Hidden choice", "Third choice")
 BUTTON_PICKED = 2
+# The end script of the question makes the talker say a topic outside of the conversation (Say), and when the talker has
+# said it the Begin SayToDone block of its script adds one to a global
+SAID_TOPIC_ID = 0x8F3
+SAID_INFO_ID = 0x8F4
+SAID_TEXT = "Said aloud."
 DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd"),
-                    "button": (0x8D3, "OFTestDialogueButton")}
+                    "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid")}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
 TALKER_PLACE = (-300.0, 300.0)
@@ -358,7 +363,7 @@ AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test s
 AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
 AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 
-LAST_ID = 0x8F1 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8F4 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -724,17 +729,21 @@ def button_message():
 
 def button_script():
     """The script of the talker (an SCPT record of type 0): every frame, until a button has been read, it sets the
-    global to the number of the button plus one (GetButtonPressed tells -1 for none, and a button is told once)."""
+    global to the number of the button plus one (GetButtonPressed tells -1 for none, and a button is told once), and
+    each time the talker has said what it was told to say it adds one to another global (Begin SayToDone)."""
     sf = fallout_script
     script = sf.Script(0)
     button = script.form(DIALOGUE_GLOBALS["button"][0])
+    said = script.form(DIALOGUE_GLOBALS["said"][0])
     script.add(
         sf.statement(sf.SCRIPT_NAME),
         sf.block(sf.GAME_MODE, b"".join([
             sf.branch(sf.IF, sf.global_target(button) + sf.number("0") + sf.operator("==")),
             sf.set_to(sf.global_target(button),
                       sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
-            sf.statement(sf.END_IF)])))
+            sf.statement(sf.END_IF)])),
+        sf.block(sf.SAY_TO_DONE, sf.set_to(sf.global_target(said),
+                                           sf.global_target(said) + sf.number("1") + sf.operator("+"))))
     return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
 
 
@@ -1255,10 +1264,11 @@ def topic(form_id, name, title, kind, flags, priority=50.0):
                                      sub(b"PNAM", struct.pack("<f", priority)), sub(b"DATA", bytes([kind, flags]))])
 
 
-def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, show=None, sound=0):
+def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, show=None, sound=0,
+             say=None):
     """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
-    when the response starts and the one that runs when it is over, which shows the message `show` when it is given.
-    `sound` is the sound record the response names."""
+    when the response starts and the one that runs when it is over, which shows the message `show` when it is given
+    and makes the talker say the topic `say` when that is given. `sound` is the sound record the response names."""
     subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
     subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
     subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, sound, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
@@ -1270,8 +1280,12 @@ def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=
                              [begin])
     if end is not None:
         subs += [sub(b"NEXT")]
-        subs += stage_script([fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))],
-                             [end])
+        statements = [fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))]
+        references = [end]
+        if say is not None:
+            statements.append(fallout_script.call_on(2, fallout_script.SAY, fallout_script.form_argument(3)))
+            references += [TALKER_REF_ID, say]
+        subs += stage_script(statements, references)
     elif show is not None:
         subs += [sub(b"NEXT")]
         subs += stage_script([fallout_script.call(fallout_script.SHOW_MESSAGE, fallout_script.form_argument(1))],
@@ -1302,7 +1316,10 @@ def dialogue():
         topic_group(GOODBYE_TOPIC_ID, [response(GOODBYE_INFO_ID, GOODBYE_TEXT, flags=0x0001)]),
         topic(ASK_TOPIC_ID, "OFTestAsk", ASK_TOPIC_NAME, 0, 0x02, 90.0),
         topic_group(ASK_TOPIC_ID, [
-            response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end)]),
+            response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end,
+                     say=SAID_TOPIC_ID)]),
+        topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
+        topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
                                               sound=SOUND_ID)]),

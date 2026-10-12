@@ -19,6 +19,7 @@ END_IF = 0x19
 
 GAME_MODE = 0  # the type of block that runs every frame (or every delay of a quest)
 ON_ACTIVATE = 2  # the types of the blocks of events of objects
+SAY_TO_DONE = 7
 ON_LOAD = 21
 CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a reference: ref.Command
 
@@ -68,6 +69,7 @@ KILL_ACTOR = 0x108B
 REMOVE_FROM_FACTION = 0x1180
 SHOW_MESSAGE = 0x1059
 GET_BUTTON_PRESSED = 0x101F
+SAY = 0x1033
 IS_ACTION_REF = 0x1069
 EVALUATE_PACKAGE = 0x105E
 ADD_SCRIPT_PACKAGE = 0x1097
