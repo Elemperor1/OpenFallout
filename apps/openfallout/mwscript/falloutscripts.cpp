@@ -68,6 +68,14 @@ namespace OFScript
         constexpr std::string_view newVegasMaster = "falloutnv.esm";
         constexpr std::string_view fallout3Master = "fallout3.esm";
 
+        /// A character or creature of Fallout (their classes are not those of Morrowind's actors, so isActor does not
+        /// tell them)
+        bool isCharacterOrCreature(const OFWorld::Ptr& ptr)
+        {
+            return !ptr.isEmpty()
+                && (ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId);
+        }
+
         /// The id of the record as the store keys it, empty for ids that no record can have
         ESM::RefId refId(FalloutScript::FormId id)
         {
@@ -427,7 +435,7 @@ namespace OFScript
                 mPendingToggle.emplace_back(reference, state->second);
                 mDisabled.erase(state);
             }
-            if (ptr.getClass().isActor())
+            if (isCharacterOrCreature(ptr))
                 mTriggerActors.insert(reference);
             const FalloutScript::FormId script = scriptOf(ptr, reference);
             if (script != 0 && mObjects.add(reference, script) != nullptr)
@@ -513,7 +521,9 @@ namespace OFScript
         const auto addBody = [&](const OFWorld::Ptr& ptr, FalloutScript::FormId reference) {
             if (ptr.isEmpty() || !ptr.getRefData().isEnabled() || ptr.mRef->isDeleted())
                 return;
-            if (ptr.getClass().getCreatureStats(ptr).isDead())
+            // The player is an actor of the engine, whose death the stats tell; the others are told by the host
+            if (mActors.isDead(reference)
+                || (ptr.getClass().isActor() && ptr.getClass().getCreatureStats(ptr).isDead()))
                 return;
             const ESM::Position& position = ptr.getRefData().getPosition();
             osg::Vec3f half = world->getHalfExtents(ptr);
@@ -529,7 +539,8 @@ namespace OFScript
         for (const FalloutScript::FormId reference : mTriggerActors)
         {
             const auto found = mReferences.find(reference);
-            if (found != mReferences.end() && reference != mPlayer)
+            // An actor that was made or moved to a cell that is not loaded is not in a volume of the loaded cells
+            if (found != mReferences.end() && reference != mPlayer && !leftLoadedCells(reference))
                 addBody(found->second, reference);
         }
 
@@ -2132,6 +2143,10 @@ namespace OFScript
             mMade[id] = number;
             mMadeIds[number] = id;
             mReferences[id] = placed;
+            // An actor that is made sets triggers off like those of the cells (when its cell is loaded again, the cell
+            // tells of it)
+            if (isCharacterOrCreature(placed))
+                mTriggerActors.insert(id);
             // It runs its script like any object that is loaded
             const FalloutScript::FormId script = scriptOf(placed, id);
             if (script != 0 && mObjects.add(id, script) != nullptr)

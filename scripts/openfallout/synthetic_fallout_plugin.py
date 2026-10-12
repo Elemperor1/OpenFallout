@@ -399,7 +399,8 @@ NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
 LAST_ID = 0x904 # the largest form ID of the plugin, which the next object ID of its header follows
 # The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
-# OnTriggerEnter and OnTrigger blocks for the player, OnTriggerEnter for anyone, and OnTriggerLeave for the player)
+# OnTriggerEnter and OnTrigger blocks for the player, OnTriggerEnter for anyone, and OnTriggerLeave for the player; when
+# the player comes in it also makes a person at the middle of the box with PlaceAtMe)
 TRIGGER_GLOBALS = {"enters": (0x8FE, "OFTestTriggerEnters"), "stays": (0x8FF, "OFTestTriggerStays"),
                    "leaves": (0x900, "OFTestTriggerLeaves"), "any": (0x901, "OFTestTriggerAnyEnters")}
 TRIGGER_SCRIPT_ID = 0x902
@@ -1199,12 +1200,14 @@ def object_refs(kind, origin):
 
 def trigger_script():
     """The script of the trigger (an SCPT record of type 0): OnTriggerEnter for the player counts the times the player
-    comes in, OnTriggerEnter for anyone counts everybody that does, OnTrigger for the player counts the passes while the
-    player is in (not the one in which the player came in), OnTriggerLeave for the player counts the times the player
-    goes out."""
+    comes in (and makes a person at the middle of the box, who comes in too, a pass later), OnTriggerEnter for anyone
+    counts everybody that does, OnTrigger for the player counts the passes while the player is in (not the one in which
+    the player came in), OnTriggerLeave for the player counts the times the player goes out."""
     sf = fallout_script
     script = sf.Script(0)
     player = script.form(PLAYER_REFERENCE)
+    trigger = script.form(TRIGGER_REF_ID)
+    person_base = script.form(NPC_ID)
     counts = {name: script.form(form_id) for name, (form_id, _) in TRIGGER_GLOBALS.items()}
 
     def add_one(global_index):
@@ -1213,7 +1216,11 @@ def trigger_script():
 
     script.add(
         sf.statement(sf.SCRIPT_NAME),
-        sf.block(sf.ON_TRIGGER_ENTER, add_one(counts["enters"]), names=sf.form_argument(player)),
+        sf.block(sf.ON_TRIGGER_ENTER,
+                 add_one(counts["enters"])
+                 + sf.call_on(trigger, sf.PLACE_AT_ME, sf.form_argument(person_base), sf.int_argument(1),
+                              sf.float_argument(0.0), sf.int_argument(0)),
+                 names=sf.form_argument(player)),
         sf.block(sf.ON_TRIGGER_ENTER, add_one(counts["any"])),
         sf.block(sf.ON_TRIGGER, add_one(counts["stays"]), names=sf.form_argument(player)),
         sf.block(sf.ON_TRIGGER_LEAVE, add_one(counts["leaves"]), names=sf.form_argument(player)))

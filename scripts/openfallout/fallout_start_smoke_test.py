@@ -1856,8 +1856,10 @@ def check_chargen(text):
 
 def check_triggers(text):
     """The problems with the trigger volume: the player is not in the box at first; the box, turned a quarter, takes a
-    point along y and not one along x; coming in runs OnTriggerEnter for the player and for anyone once, staying runs
-    OnTrigger, going out runs OnTriggerLeave, and coming in again runs the enters again."""
+    point along y and not one along x; coming in runs OnTriggerEnter for the player and for anyone once, and the person
+    that the script makes at the middle of the box (an actor that did not come with the cell) comes in a pass later,
+    which runs it for anyone once more; staying runs OnTrigger, going out runs OnTriggerLeave, and coming in again runs
+    the enters again (and for the second person that is made)."""
     problems = []
     for line in text.splitlines():
         if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
@@ -1875,16 +1877,18 @@ def check_triggers(text):
     if found["before"] != (0, 0, 0, 0):
         problems.append(f"nothing should have run while the player is far from the box: {found['before']}")
     enters, any_enters, stays, leaves = found["inside"]
-    if (enters, any_enters, leaves) != (1, 1, 0) or stays < 1:
+    if (enters, any_enters, leaves) != (1, 2, 0) or stays < 1:
         problems.append("a player that came into the box (a point along its long side, which is the turned y) should have "
-                        f"run OnTriggerEnter once for the player and for anyone, then OnTrigger: {found['inside']}")
+                        "run OnTriggerEnter once for the player and twice for anyone (the player, and the person that "
+                        f"the script made at the middle of the box), then OnTrigger: {found['inside']}")
     enters, any_enters, stays_out, leaves = found["outside"]
-    if (enters, any_enters, leaves) != (1, 1, 1) or stays_out < stays:
+    if (enters, any_enters, leaves) != (1, 2, 1) or stays_out < stays:
         problems.append("a player 100 along x is outside the turned box, which should have run OnTriggerLeave once and no "
                         f"enter: {found['outside']}")
     enters, any_enters, _, leaves = found["again"]
-    if (enters, any_enters, leaves) != (2, 2, 1):
-        problems.append(f"coming in again should have run the enters a second time and no leave: {found['again']}")
+    if (enters, any_enters, leaves) != (2, 4, 1):
+        problems.append("coming in again should have run the enters a second time (for anyone twice more: the player and "
+                        f"the second person that is made, while the first stays) and no leave: {found['again']}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems
