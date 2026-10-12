@@ -935,6 +935,7 @@ return {
     },
 }
 """
+NEW_GAME_START_ELSEWHERE = f"{plugin.WORLD_NAME}:0,0" # the exterior cell the engine logs as OFTestWorldCell (0, 0)
 NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME))
 
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
@@ -1313,15 +1314,15 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
 
 
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
-               keys=None):
+               keys=None, new_game=False):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
-    pressed after the log has a line that matches. A `start` of None is a new game: `--new-game` with no `--start`."""
+    pressed after the log has a line that matches. `new_game` adds `--new-game`; a `start` of None leaves `--start` out."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data), "--content", "OFTest.esm",
-               "--content", scripts, "--skip-menu", *(["--new-game"] if start is None else ["--start", start]),
-               "--no-grab"]
+               "--content", scripts, "--skip-menu", *(["--new-game"] if new_game else []),
+               *([] if start is None else ["--start", start]), "--no-grab"]
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, so give it one.
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
@@ -1772,6 +1773,9 @@ def check_new_game(text):
             problems.append(line)
     if f"New game: the quest of character creation is {plugin.NEW_GAME_QUEST_NAME}" not in text:
         problems.append(f"the engine did not log the quest {plugin.NEW_GAME_QUEST_NAME} as the quest of character creation")
+    if f"Loading cell {plugin.WORLD_NAME}Cell (0, 0)" in text:
+        problems.append("--start named the exterior cell, which a new game of Fallout must not load: the quest takes the "
+                        "player where the game begins")
     found = [re.search(r"OFTEST\tnewgame[\t ]quest\t(.*)$", line) for line in text.splitlines()]
     quests = [match.group(1).strip() for match in found if match]
     if quests != [f"stage={plugin.NEW_GAME_LAST_STAGE} running=true"]:
@@ -1789,6 +1793,8 @@ def check_new_game(text):
                 or abs(float(y) - wanted[1]) > MOVE_SLACK:
             problems.append(f"the player should stand at the marker {wanted[:2]} of {plugin.CELL_NAME} (interior), the "
                             f"result script of stage 0 moved them there: {players[0]}")
+    if "Quitting peacefully" not in text:
+        problems.append("the log does not end with 'Quitting peacefully'")
     return problems
 
 
@@ -2437,9 +2443,10 @@ def main():
         home.mkdir(parents=True)
         runtime = work / "newgame" / "runtime"
         runtime.mkdir(mode=0o700)
-        print("== newgame: --new-game, no --start")
-        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, None, [],
-                               "newgametest.omwscripts")
+        print(f"== newgame: --new-game --start {NEW_GAME_START_ELSEWHERE}")
+        # --start names another cell, which a new game must not go to: the quest takes the player where the game begins
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, NEW_GAME_START_ELSEWHERE,
+                               [], "newgametest.omwscripts", new_game=True)
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         print(f"log: {log}")

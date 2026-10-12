@@ -271,7 +271,7 @@ namespace OFWorld
         mTimeManager->setup(mGlobalVariables);
     }
 
-    void World::startNewGame(bool bypass)
+    void World::startNewGame(bool bypass, bool useStartCell)
     {
         mGoToJail = false;
         mLevitationEnabled = true;
@@ -302,7 +302,7 @@ namespace OFWorld
 
         OFBase::Environment::get().getLuaManager()->newGameStarted();
 
-        if (bypass && !mStartCell.empty())
+        if (bypass && useStartCell && !mStartCell.empty())
         {
             ESM::Position pos;
             ESM::RefId cellId = findExteriorPosition(mStartCell, pos);

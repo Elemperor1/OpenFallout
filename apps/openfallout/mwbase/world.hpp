@@ -128,8 +128,10 @@ namespace OFBase
         virtual void setRandomSeed(uint32_t seed) = 0;
         ///< \param seed The seed used when starting a new game.
 
-        virtual void startNewGame(bool bypass) = 0;
+        virtual void startNewGame(bool bypass, bool useStartCell) = 0;
         ///< \param bypass Bypass regular game start.
+        ///< \param useStartCell A bypassed start goes to the cell that --start names, when there is one. The start of
+        ///< Fallout (a quest takes the player where the game begins) bypasses without it.
 
         virtual void clear() = 0;
 

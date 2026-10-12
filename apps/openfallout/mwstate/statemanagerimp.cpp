@@ -179,7 +179,7 @@ void OFState::StateManager::newGame(bool bypass)
         const bool falloutStart = !bypass && falloutScripts->newGameQuest() != 0;
         if (!bypass && !falloutStart)
             OFBase::Environment::get().getWindowManager()->setNewGame(true);
-        OFBase::Environment::get().getWorld()->startNewGame(bypass || falloutStart);
+        OFBase::Environment::get().getWorld()->startNewGame(bypass || falloutStart, !falloutStart);
         if (falloutStart)
             falloutScripts->startNewGame();
 
