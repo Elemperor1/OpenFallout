@@ -29,6 +29,8 @@ namespace
     constexpr std::uint16_t OpGetIsClass = 0x1044;
     constexpr std::uint16_t OpGetIsRace = 0x1045;
     constexpr std::uint16_t OpGetIsSex = 0x1046;
+    constexpr std::uint16_t OpGetPCIsClass = 0x1081;
+    constexpr std::uint16_t OpGetPCIsRace = 0x1082;
     constexpr std::uint16_t OpGetPCIsSex = 0x1083;
     constexpr std::uint16_t OpIsChild = 0x116D;
     constexpr std::uint16_t OpGetIsVoiceType = 0x11AB;
@@ -115,6 +117,19 @@ namespace
         EXPECT_EQ(run.ask(OpGetIsClass, clerk, classMerchant), 1.0);
         EXPECT_EQ(run.ask(OpGetIsClass, wolf, classMerchant), 0.0);
         EXPECT_EQ(run.ask(OpGetIsRace, FalloutScript::playerReference, raceGhoul), 1.0);
+    }
+
+    TEST(FalloutScriptActorTraitsTest, theRaceAndClassOfThePlayerAreAskedWhoeverTheCommandRunsOn)
+    {
+        Runner run;
+        run.mRecords.mTraits[FalloutScript::playerReference].mClass = classMerchant;
+
+        EXPECT_EQ(run.mInterpreter.call(OpGetPCIsRace, clerk, true, { { raceGhoul, {}, false } }), 1.0);
+        EXPECT_EQ(run.mInterpreter.call(OpGetPCIsRace, 0, false, { { raceHuman, {}, false } }), 0.0);
+        EXPECT_EQ(run.mInterpreter.call(OpGetPCIsClass, wolf, true, { { classMerchant, {}, false } }), 1.0);
+        EXPECT_EQ(run.mInterpreter.call(OpGetPCIsClass, 0, false, {}), 0.0);
+        run.mRecords.mTraits[FalloutScript::playerReference].mRace = raceHuman;
+        EXPECT_EQ(run.mInterpreter.call(OpGetPCIsRace, 0, false, { { raceHuman, {}, false } }), 1.0);
     }
 
     TEST(FalloutScriptActorTraitsTest, aFormThatIsNotGivenNeverMatches)

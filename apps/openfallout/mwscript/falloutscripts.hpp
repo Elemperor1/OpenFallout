@@ -19,6 +19,7 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/dialogue.hpp>
@@ -163,6 +164,39 @@ namespace OFScript
         /// The conversation ends, also in the middle of a response
         void endConversation();
 
+        /// The screens of the making of the character: name, sex and race, SPECIAL, tagged skills and traits. The
+        /// commands that script call open them, and the interface (core.chargen) shows the one that is open and tells
+        /// when the player is done with it.
+        FalloutScript::Chargen& chargen() { return mChargen; }
+        /// The player is done with the screen: what it picked becomes the character (the attributes and skills the
+        /// player has, the traits as perks) and the next screen of the menu opens
+        void finishChargenPage();
+        /// The name and the description that the data has for an actor value (an attribute or a skill) by its editor
+        /// id; the name given when it has none
+        struct ActorValueText
+        {
+            std::string mName;
+            std::string mDescription;
+        };
+        ActorValueText actorValueText(std::string_view editorId, std::string_view fallback) const;
+        /// The races the player can be (playable and not children), by their form ids
+        struct ChargenRace
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+        };
+        std::vector<ChargenRace> playableRaces() const;
+        /// The traits of the data (New Vegas), by name
+        struct ChargenTrait
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            std::string mDescription;
+        };
+        std::vector<ChargenTrait> chargenTraits() const;
+        /// What the player is now: the sex and race the player picked or else those of its record
+        bool playerTraits(FalloutScript::ActorTraits& traits);
+
         FalloutScript::QuestManager& quests() { return mQuests; }
         const FalloutScript::QuestManager& quests() const { return mQuests; }
         FalloutScript::ObjectScripts& objects() { return mObjects; }
@@ -211,6 +245,12 @@ namespace OFScript
         bool menuOpen(int menu) override;
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
+        /// What the record of the reference says it is, which is all that anyone but the player has to go by
+        bool traitsOfRecord(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits);
+        /// A screen of the making of the character begins: the attributes it starts from are those the player has
+        void beginChargenPage();
+        /// The skills the player has, from the attributes and the tags that the making of the character gave
+        void applyChargenSkills();
 
         /// The character says a response of the topic outside of a conversation: what the response does is done, and
         /// the lines are told to the player: the voice of the data and, when subtitles are on, the text
@@ -394,6 +434,9 @@ namespace OFScript
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
+        FalloutScript::Chargen mChargen;
+        /// The screen the attributes were last started for
+        std::uint32_t mChargenSeeded = 0;
         /// What the player has been told and what was said. Scripts that Lua starts, the interface and the frame all
         /// reach it, so one at a time.
         mutable std::recursive_mutex mDialogueMutex;
@@ -467,6 +510,9 @@ namespace OFScript
         mutable bool mNamesBuilt = false;
         mutable std::map<std::string, FalloutScript::FormId> mQuestNames;
         mutable std::map<std::string, FalloutScript::FormId> mGlobalNames;
+        /// The names and descriptions of the actor values by their editor ids in lower case, made when first asked for
+        mutable bool mActorValueTextBuilt = false;
+        mutable std::map<std::string, ActorValueText> mActorValueText;
     };
 }
 

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -11,6 +12,7 @@
 #include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadavif.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadflst.hpp>
@@ -18,6 +20,7 @@
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
+#include <components/esm4/loadperk.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
@@ -139,6 +142,7 @@ namespace OFScript
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
+        , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
         , mPlayer(player)
@@ -158,6 +162,7 @@ namespace OFScript
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
+        FalloutScript::addChargenCommands(mInterpreter, mChargen, [this] { beginChargenPage(); });
         mDialogue.setGameHours([this] { return std::floor(gameDaysPassed()) * 24.0 + gameHour(); });
         mDialogue.setRandom([this](std::size_t count) {
             return std::uniform_int_distribution<std::size_t>(0, count - 1)(mDialogueRandom);
@@ -266,6 +271,8 @@ namespace OFScript
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
+        mChargen.clear();
+        mChargenSeeded = 0;
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -704,14 +711,15 @@ namespace OFScript
             case 0:
             {
                 OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
-                return message || dialogue || (windows != nullptr && windows->isGuiMode());
+                return message || dialogue || mChargen.menuOpen() || (windows != nullptr && windows->isGuiMode());
             }
             case messageBoxMenu:
                 return message;
             case dialogueMenu:
                 return dialogue;
             default:
-                return false;
+                // The screens of making a character have the numbers of the menus they stand for
+                return menu != 0 && mChargen.menu() == menu;
         }
     }
 
@@ -1247,6 +1255,38 @@ namespace OFScript
     }
 
     bool FalloutScripts::traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)
+    {
+        FalloutScript::ActorTraits found;
+        const bool known = traitsOfRecord(reference, found);
+        if (reference != mPlayer)
+        {
+            traits = found;
+            return known;
+        }
+        // The player is who the making of the character made it, and the record only says where it began. A sex or race
+        // that was picked takes the voice of the race with it.
+        const std::optional<bool> female = mChargen.female();
+        const FalloutScript::FormId race = mChargen.race();
+        if (!female && race == 0)
+        {
+            traits = found;
+            return known;
+        }
+        if (female)
+            found.mFemale = *female;
+        if (race != 0)
+            found.mRace = race;
+        if (const ESM4::Race* record = mStore.get<ESM4::Race>().search(refId(found.mRace)))
+        {
+            if (const FalloutScript::FormId voice = numberOf(record->mDefaultVoice[found.mFemale ? 1 : 0]))
+                found.mVoice = voice;
+            found.mChild = (record->mRaceFlags & 0x4) != 0;
+        }
+        traits = found;
+        return true;
+    }
+
+    bool FalloutScripts::traitsOfRecord(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)
     {
         ESM::FormId base;
         if (!baseOf(reference, base) || base.isZeroOrUnset())
@@ -1849,6 +1889,131 @@ namespace OFScript
         if (const ESM4::GlobalVariable* global = mStore.get<ESM4::GlobalVariable>().search(refId(id)))
             return global->mEditorId;
         return {};
+    }
+
+    FalloutScripts::ActorValueText FalloutScripts::actorValueText(
+        std::string_view editorId, std::string_view fallback) const
+    {
+        if (!mActorValueTextBuilt)
+        {
+            mActorValueTextBuilt = true;
+            for (const ESM4::ActorValueInfo& info : mStore.get<ESM4::ActorValueInfo>())
+                mActorValueText.emplace(
+                    Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+        }
+        ActorValueText text;
+        const auto found = mActorValueText.find(Misc::StringUtils::lowerCase(editorId));
+        if (found != mActorValueText.end())
+            text = found->second;
+        if (text.mName.empty())
+            text.mName = fallback;
+        return text;
+    }
+
+    std::vector<FalloutScripts::ChargenRace> FalloutScripts::playableRaces() const
+    {
+        constexpr std::uint32_t playableFlag = 0x1;
+        constexpr std::uint32_t childFlag = 0x4;
+        std::vector<ChargenRace> races;
+        for (const ESM4::Race& race : mStore.get<ESM4::Race>())
+        {
+            if ((race.mRaceFlags & playableFlag) == 0 || (race.mRaceFlags & childFlag) != 0)
+                continue;
+            races.push_back({ numberOf(race.mId), race.mFullName.empty() ? race.mEditorId : race.mFullName });
+        }
+        return races;
+    }
+
+    std::vector<FalloutScripts::ChargenTrait> FalloutScripts::chargenTraits() const
+    {
+        std::vector<ChargenTrait> traits;
+        if (!mChargen.hasTraits())
+            return traits;
+        for (const ESM4::Perk& perk : mStore.get<ESM4::Perk>())
+            if (perk.mData.mTrait != 0 && !perk.mFullName.empty())
+                traits.push_back({ numberOf(perk.mId), perk.mFullName, perk.mDescription });
+        std::sort(traits.begin(), traits.end(), [](const ChargenTrait& left, const ChargenTrait& right) {
+            return left.mName != right.mName ? left.mName < right.mName : left.mId < right.mId;
+        });
+        return traits;
+    }
+
+    bool FalloutScripts::playerTraits(FalloutScript::ActorTraits& traits)
+    {
+        return traitsOf(mPlayer, traits);
+    }
+
+    void FalloutScripts::beginChargenPage()
+    {
+        // A new character starts at 5 in each attribute, whatever its record says; one that has been through the screen
+        // starts from what it has now (which scripts may have changed since)
+        if (mChargen.page() != FalloutScript::ChargenPage::Special || mChargen.serial() == mChargenSeeded)
+            return;
+        mChargenSeeded = mChargen.serial();
+        std::array<int, FalloutScript::Chargen::attributeCount> attributes;
+        const bool made = mChargen.specialMade();
+        for (int i = 0; i < FalloutScript::Chargen::attributeCount; ++i)
+            attributes[static_cast<std::size_t>(i)] = made
+                ? static_cast<int>(std::lround(mActorValues.base(mPlayer, FalloutScript::Chargen::firstAttribute + i)))
+                : 5;
+        mChargen.setAttributes(attributes);
+    }
+
+    void FalloutScripts::applyChargenSkills()
+    {
+        for (const FalloutScript::ChargenSkill& skill : mChargen.skills())
+            mActorValues.setBase(mPlayer, skill.mNumber, mChargen.skillValue(skill.mNumber));
+    }
+
+    void FalloutScripts::finishChargenPage()
+    {
+        const std::optional<FalloutScript::ChargenPage> done = mChargen.finishPage();
+        if (!done)
+            return;
+        switch (*done)
+        {
+            case FalloutScript::ChargenPage::Special:
+                for (int i = 0; i < FalloutScript::Chargen::attributeCount; ++i)
+                    mActorValues.setBase(mPlayer, FalloutScript::Chargen::firstAttribute + i,
+                        mChargen.attribute(FalloutScript::Chargen::firstAttribute + i));
+                // The skills of a character that is made come from the attributes. A screen that gives more points to
+                // a character that has been made (a perk) leaves the skills as they are.
+                if (!mChargen.lastFinishAdded())
+                    applyChargenSkills();
+                break;
+            case FalloutScript::ChargenPage::Skills:
+                if (!mChargen.lastFinishAdded())
+                    applyChargenSkills();
+                else
+                {
+                    // Only the skills the player tagged or let go of change, by the bonus of a tag
+                    for (const int skill : mChargen.lastTagged())
+                        mActorValues.setBase(
+                            mPlayer, skill, mActorValues.base(mPlayer, skill) + FalloutScript::Chargen::tagBonus);
+                    for (const int skill : mChargen.lastUntagged())
+                        mActorValues.setBase(
+                            mPlayer, skill, mActorValues.base(mPlayer, skill) - FalloutScript::Chargen::tagBonus);
+                }
+                break;
+            case FalloutScript::ChargenPage::Traits:
+            {
+                // A trait is a perk the player has: the ones that were let go are taken back
+                const std::vector<FalloutScript::FormId> picked = mChargen.traits();
+                for (const FalloutScript::FormId trait : mChargen.givenTraits())
+                    if (std::find(picked.begin(), picked.end(), trait) == picked.end())
+                        mProgress.removePerk(mPlayer, trait);
+                for (const FalloutScript::FormId trait : picked)
+                    if (mProgress.perkRank(mPlayer, trait) == 0)
+                        mProgress.addPerk(mPlayer, trait);
+                mChargen.setGivenTraits(picked);
+                break;
+            }
+            case FalloutScript::ChargenPage::Name:
+            case FalloutScript::ChargenPage::Race:
+                // They are kept by the making of the character, and everything that asks reads them there
+                break;
+        }
+        beginChargenPage();
     }
 
     namespace

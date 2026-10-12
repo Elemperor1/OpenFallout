@@ -34,8 +34,8 @@ namespace FalloutScript
     };
 
     /// Gives the interpreter the commands that ask what a character is, which conditions of dialogue use most of all:
-    /// GetIsSex, GetPCIsSex (the sex of the player), GetIsVoiceType, GetIsRace, GetIsClass, IsChild, GetIsCreature and
-    /// GetIsCreatureType. Those that the command table does not have are left out.
+    /// GetIsSex, GetPCIsSex (the sex of the player), GetIsVoiceType, GetIsRace, GetPCIsRace, GetIsClass, GetPCIsClass,
+    /// IsChild, GetIsCreature and GetIsCreatureType. Those that the command table does not have are left out.
     void addActorTraitCommands(Interpreter& interpreter, ActorTraitRecords& records);
 }
 

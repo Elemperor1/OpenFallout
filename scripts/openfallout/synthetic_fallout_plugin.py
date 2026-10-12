@@ -335,6 +335,29 @@ def voice_path(voice, text, response, number=1):
     return f"sound/voice/oftest.esm/{voice.lower()}/{text}_{response:08x}_{number}.ogg"
 
 
+# The making of the character: two traits and a perk that is none (PERK), a second playable race, the texts of two
+# actor values (AVIF) and a quest whose script opens the menus when the test asks for it, waits until the player is done
+# with all of their screens and then reads what the player made into globals
+TRAIT_A_ID = 0x8D6
+TRAIT_B_ID = 0x8D7
+NOT_A_TRAIT_ID = 0x8D8
+RACE_TWO_ID = 0x8D9
+AVIF_STRENGTH_ID = 0x8DA
+AVIF_BARTER_ID = 0x8DB
+CHARGEN_QUEST_ID = 0x8DC
+CHARGEN_SCRIPT_ID = 0x8DD
+CHARGEN_GLOBAL_NAMES = ("go", "state", "during", "after", "female", "race_two", "strength", "perception", "endurance",
+                        "charisma", "intelligence", "agility", "luck", "barter", "guns", "survival", "trait_a",
+                        "trait_b", "other")
+CHARGEN_GLOBALS = {name: (0x8DE + index, "OFTestCg" + name.title().replace("_", ""))
+                   for index, name in enumerate(CHARGEN_GLOBAL_NAMES)}
+TRAIT_A_NAME, TRAIT_B_NAME, NOT_A_TRAIT_NAME = "Test Trait Alpha", "Test Trait Beta", "Test Perk"
+RACE_TWO_NAME = "OFTestRaceTwo"
+AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test strength description."),
+              AVIF_BARTER_ID: ("Barter", "Barter of the test", "The test barter description.")}
+AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
+AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
+
 LAST_ID = 0x8F1 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
@@ -713,6 +736,74 @@ def button_script():
                       sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
             sf.statement(sf.END_IF)])))
     return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
+
+
+def trait_perk(form_id, name, title, description, trait):
+    """A PERK record with no entries: the flag of a trait (and a name and a text to show) or of a perk that is none."""
+    return record(b"PERK", form_id, [zstr(b"EDID", name), zstr(b"FULL", title), zstr(b"DESC", description),
+                                     sub(b"DATA", bytes([1 if trait else 0, 0, 1, 1, 0]))])
+
+
+def actor_value_info(form_id, editor_id, title, description):
+    return record(b"AVIF", form_id, [zstr(b"EDID", editor_id), zstr(b"FULL", title), zstr(b"DESC", description)])
+
+
+def chargen_script():
+    """The script of the quest that makes the character (an SCPT record of type 1): when the test sets `go` it opens the
+    menus for the race, the name (as the scripts of the games do, one after the other), SPECIAL with the tagged skills
+    and the traits; once no menu is open (the game
+    stands still while one is, so this only happens after the player is done with all of them) it reads what the player
+    made into the globals."""
+    sf = fallout_script
+    script = sf.Script(1)
+    player = script.form(PLAYER_REFERENCE)
+    race_two, trait_a, trait_b, other = (script.form(form_id) for form_id in (
+        RACE_TWO_ID, TRAIT_A_ID, TRAIT_B_ID, NOT_A_TRAIT_ID))
+    names = {name: script.form(form_id) for name, (form_id, _) in CHARGEN_GLOBALS.items()}
+
+    def target(name):
+        return sf.global_target(names[name])
+
+    def read(name, code, *arguments, reference=0):
+        return sf.set_to(target(name), sf.call_token(code, *arguments, reference=reference))
+
+    attributes = {"strength": AV_STRENGTH, "perception": AV_PERCEPTION, "endurance": AV_ENDURANCE,
+                  "charisma": AV_CHARISMA, "intelligence": AV_INTELLIGENCE, "agility": AV_AGILITY, "luck": AV_LUCK,
+                  "barter": AV_BARTER, "guns": AV_GUNS, "survival": AV_SURVIVAL}
+    start = (
+        sf.global_target(names["go"]) + sf.number("1") + sf.operator("==")
+        + sf.global_target(names["state"]) + sf.number("0") + sf.operator("==") + sf.operator("&&"))
+    done = (sf.global_target(names["state"]) + sf.number("1") + sf.operator("==")
+            + sf.call_token(sf.MENU_MODE) + sf.number("0") + sf.operator("==") + sf.operator("&&"))
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.GAME_MODE, b"".join([
+            sf.branch(sf.IF, start),
+            sf.call(sf.SET_IN_CHARGEN, sf.int_argument(1)),
+            sf.call(sf.SHOW_RACE_MENU),
+            sf.call(sf.GET_PLAYER_NAME),
+            sf.call(sf.SET_SPECIAL_POINTS, sf.int_argument(40)),
+            sf.call(sf.SET_TAG_SKILLS, sf.int_argument(3)),
+            sf.call(sf.SHOW_TRAIT_MENU),
+            sf.set_to(target("state"), sf.number("1")),
+            sf.statement(sf.END_IF),
+            sf.branch(sf.IF, done),
+            read("during", sf.GET_IN_CHARGEN),
+            sf.call(sf.SET_IN_CHARGEN, sf.int_argument(0)),
+            read("after", sf.GET_IN_CHARGEN),
+            read("female", sf.GET_PC_IS_SEX, sf.int_argument(1)),
+            read("race_two", sf.GET_PC_IS_RACE, sf.form_argument(race_two)),
+            *(read(name, sf.GET_ACTOR_VALUE, sf.u16(number), reference=player) for name, number in attributes.items()),
+            read("trait_a", sf.HAS_PERK, sf.form_argument(trait_a), reference=player),
+            read("trait_b", sf.HAS_PERK, sf.form_argument(trait_b), reference=player),
+            read("other", sf.HAS_PERK, sf.form_argument(other), reference=player),
+            sf.set_to(target("state"), sf.number("2")),
+            sf.statement(sf.END_IF)])))
+    return record(b"SCPT", CHARGEN_SCRIPT_ID, [zstr(b"EDID", "OFTestChargenScript"), *sf.sub_records(script)])
+
+
+def chargen_quest():
+    return quest(CHARGEN_QUEST_ID, "OFTestChargenQuest", "OpenFallout Test Chargen", QUEST_FLAG_START_GAME, [], script=CHARGEN_SCRIPT_ID)
 
 
 def form_lists():
@@ -1096,13 +1187,13 @@ def part(index, name, path=None):
     return [sub(b"INDX", struct.pack("<I", index)), zstr(b"MODL", path or part_path(name))]
 
 
-def race():
+def race(form_id=RACE_ID, name=RACE_NAME):
     """A race with the data that the loader needs of one and the parts of a body that Fallout 3 gives it: the head (part
     0 of the 8 of the head data) and the upper body and the two hands (parts 0 to 2 of the 4 of the body data), for men.
     The skeleton is in the NPC_ record."""
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
-    return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
+    return record(b"RACE", form_id, [zstr(b"EDID", name), sub(b"DATA", data),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
                                      sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
@@ -1473,6 +1564,7 @@ def plugin():
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in DIALOGUE_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in CHARGEN_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l")
@@ -1487,12 +1579,17 @@ def plugin():
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
             + top_group(b"MESG", [message(), button_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
-                                                 object_script("exterior"), button_script()])
-            + top_group(b"QUST", quests())
+                                                 object_script("exterior"), button_script(), chargen_script()])
+            + top_group(b"QUST", [*quests(), chargen_quest()])
+            + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
+                                  trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),
+                                  trait_perk(NOT_A_TRAIT_ID, "OFTestPerkNotTrait", NOT_A_TRAIT_NAME, "No trait.", False)])
+            + top_group(b"AVIF", [actor_value_info(form_id, *texts[:1], *texts[1:])
+                                  for form_id, texts in AVIF_TEXTS.items()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
-            + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
+            + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", packages())
             + top_group(b"NPC_", [person(), *package_people(),

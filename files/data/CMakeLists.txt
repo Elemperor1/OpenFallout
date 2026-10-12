@@ -160,6 +160,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/mwui/init.lua
     scripts/omw/skillhandlers.lua
     scripts/omw/crimes.lua
+    scripts/omw/falloutchargen.lua
     scripts/omw/falloutdialogue.lua
     scripts/omw/ui.lua
     scripts/omw/usehandlers.lua
