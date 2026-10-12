@@ -397,7 +397,17 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x8FD # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x904 # the largest form ID of the plugin, which the next object ID of its header follows
+# The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
+# OnTriggerEnter and OnTrigger blocks for the player, OnTriggerEnter for anyone, and OnTriggerLeave for the player)
+TRIGGER_GLOBALS = {"enters": (0x8FE, "OFTestTriggerEnters"), "stays": (0x8FF, "OFTestTriggerStays"),
+                   "leaves": (0x900, "OFTestTriggerLeaves"), "any": (0x901, "OFTestTriggerAnyEnters")}
+TRIGGER_SCRIPT_ID = 0x902
+TRIGGER_BASE_ID = 0x903
+TRIGGER_REF_ID = 0x904
+TRIGGER_PLACE = (-1500.0, -1200.0) # in the interior cell, where the box stands on the floor
+TRIGGER_YAW = math.pi / 2 # a quarter turn about z: the long side of the box runs along y
+TRIGGER_HALF = (150.0, 20.0, 50.0) # the half sizes the record gives (x, y, z) before the turn
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -643,8 +653,13 @@ def top_group(code, children):
     return group(code, 0, children)
 
 
-def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None):
+def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
+         primitive=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if primitive is not None:
+        # XPRM, 32 bytes: the bounds, the colour, a float for the way the editor draws it and the type (1 a box)
+        bounds, kind = primitive
+        subs.append(sub(b"XPRM", struct.pack("<3f3ffI", *bounds, 0.0, 0.5, 1.0, 0.1, kind)))
     if lock_level is not None:
         # level, 3 unused bytes, the key (none), 4 bytes of flags and 8 more, as Fallout 3 writes the 20 bytes of a lock
         subs.append(sub(b"XLOC", struct.pack("<B3xI4x8x", lock_level, 0)))
@@ -1182,6 +1197,43 @@ def object_refs(kind, origin):
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
 
 
+def trigger_script():
+    """The script of the trigger (an SCPT record of type 0): OnTriggerEnter for the player counts the times the player
+    comes in, OnTriggerEnter for anyone counts everybody that does, OnTrigger for the player counts the passes while the
+    player is in (not the one in which the player came in), OnTriggerLeave for the player counts the times the player
+    goes out."""
+    sf = fallout_script
+    script = sf.Script(0)
+    player = script.form(PLAYER_REFERENCE)
+    counts = {name: script.form(form_id) for name, (form_id, _) in TRIGGER_GLOBALS.items()}
+
+    def add_one(global_index):
+        return sf.set_to(sf.global_target(global_index), sf.global_target(global_index) + sf.number("1")
+                         + sf.operator("+"))
+
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.ON_TRIGGER_ENTER, add_one(counts["enters"]), names=sf.form_argument(player)),
+        sf.block(sf.ON_TRIGGER_ENTER, add_one(counts["any"])),
+        sf.block(sf.ON_TRIGGER, add_one(counts["stays"]), names=sf.form_argument(player)),
+        sf.block(sf.ON_TRIGGER_LEAVE, add_one(counts["leaves"]), names=sf.form_argument(player)))
+    return record(b"SCPT", TRIGGER_SCRIPT_ID, [zstr(b"EDID", "OFTestTriggerScript"), *sf.sub_records(script)])
+
+
+def trigger_base():
+    """The activator of the trigger: no model, the script above."""
+    return record(b"ACTI", TRIGGER_BASE_ID, [zstr(b"EDID", "OFTestTrigger"),
+                                             sub(b"SCRI", struct.pack("<I", TRIGGER_SCRIPT_ID))])
+
+
+def trigger_reference():
+    """The reference of the trigger: a box on the floor (the reference is at the middle of it, one half height up),
+    turned a quarter about z."""
+    x, y = TRIGGER_PLACE
+    return refr(TRIGGER_REF_ID, TRIGGER_BASE_ID, (x, y, TRIGGER_HALF[2]), rotation=(0.0, 0.0, TRIGGER_YAW),
+                primitive=(TRIGGER_HALF, 1))
+
+
 def stage_script(statements, references):
     """The sub-records of the script that runs when a stage is set: a list of statements with no block."""
     script = fallout_script.Script(1)
@@ -1684,6 +1736,7 @@ def plugin():
         acre(HEIR_REF_IDS["interior"], HEIR_ID, (*HEIR_PLACE, 0.0)),
         *package_refs(0, (0.0, 0.0)),
         *object_refs("interior", (0.0, 0.0)),
+        trigger_reference(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -1691,6 +1744,7 @@ def plugin():
     return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in TRIGGER_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in DIALOGUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in CHARGEN_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
@@ -1704,11 +1758,11 @@ def plugin():
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
-            + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
+            + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
-                                                 new_game_script()])
+                                                 new_game_script(), trigger_script()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest()])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
                                   trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),

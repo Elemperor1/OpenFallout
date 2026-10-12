@@ -62,6 +62,9 @@ namespace FalloutScript
         constexpr std::uint16_t OnPackageDone = 16;
         constexpr std::uint16_t OnPackageChange = 20;
         constexpr std::uint16_t OnLoad = 21;
+        constexpr std::uint16_t OnTrigger = 24; // an actor is inside a volume: every pass
+        constexpr std::uint16_t OnTriggerEnter = 26;
+        constexpr std::uint16_t OnTriggerLeave = 27;
         constexpr std::uint16_t OnReset = 30;
         constexpr std::uint16_t OnOpen = 31;
         constexpr std::uint16_t OnClose = 32;

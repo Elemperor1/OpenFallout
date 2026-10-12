@@ -121,6 +121,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testpackageschedule.cpp
     esm4/testperk.cpp
     esm4/testpokerchip.cpp
+    esm4/testprimitive.cpp
     esm4/testprojectile.cpp
     esm4/testradiationstage.cpp
     esm4/testragdoll.cpp
@@ -161,6 +162,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testobjects.cpp
     falloutscript/testpackagecommands.cpp
     falloutscript/testplayercontrols.cpp
+    falloutscript/testtriggervolumes.cpp
     falloutscript/testquests.cpp
     falloutscript/testscript.cpp
     falloutscript/testvanillacommands.cpp

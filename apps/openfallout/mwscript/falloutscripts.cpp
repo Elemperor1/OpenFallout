@@ -31,6 +31,7 @@
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/falloutscript/playercontrols.hpp>
+#include <components/misc/convert.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -293,6 +294,9 @@ namespace OFScript
             mMadeCount = 0;
         }
         mReferences.clear();
+        mTriggerShapes.clear();
+        mTriggers.clear();
+        mTriggerActors.clear();
         mScriptPackages.clear();
         mActors.clear();
         mActorValues.clear();
@@ -362,6 +366,8 @@ namespace OFScript
             reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
+        // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
+        updateTriggers();
         mQuests.update(frametime);
         mObjects.update();
     }
@@ -420,11 +426,125 @@ namespace OFScript
                 mPendingToggle.emplace_back(reference, state->second);
                 mDisabled.erase(state);
             }
+            if (ptr.getClass().isActor())
+                mTriggerActors.insert(reference);
             const FalloutScript::FormId script = scriptOf(ptr, reference);
             if (script != 0 && mObjects.add(reference, script) != nullptr)
+            {
                 mPendingLoad.push_back(reference);
+                registerTrigger(ptr, reference);
+            }
             return true;
         });
+    }
+
+    void FalloutScripts::registerTrigger(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
+    {
+        // Only the objects whose scripts have a block that a volume runs, and whose record has a volume (the others are
+        // markers, or have no volume in the plugin)
+        namespace BlockType = FalloutScript::BlockType;
+        if (!mObjects.hasBlock(reference, BlockType::OnTrigger)
+            && !mObjects.hasBlock(reference, BlockType::OnTriggerEnter)
+            && !mObjects.hasBlock(reference, BlockType::OnTriggerLeave))
+            return;
+        const ESM4::Reference* record = mStore.get<ESM4::Reference>().search(worldIdOf(reference));
+        if (record == nullptr || !record->mPrimitive || record->mPrimitive->mType == ESM4::Primitive::None)
+            return;
+        FalloutScript::Volume volume;
+        switch (record->mPrimitive->mType)
+        {
+            case ESM4::Primitive::Sphere:
+                volume.mShape = FalloutScript::VolumeShape::Sphere;
+                break;
+            case ESM4::Primitive::Plane:
+                volume.mShape = FalloutScript::VolumeShape::Plane;
+                break;
+            default:
+                volume.mShape = FalloutScript::VolumeShape::Box;
+                break;
+        }
+        const float scale = ptr.getCellRef().getScale();
+        volume.mExtents = { record->mPrimitive->mBounds[0] * scale, record->mPrimitive->mBounds[1] * scale,
+            record->mPrimitive->mBounds[2] * scale };
+        mTriggerShapes[reference] = volume;
+    }
+
+    void FalloutScripts::updateTriggers()
+    {
+        if (mTriggerShapes.empty())
+            return;
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr)
+            return;
+        // Where the triggers stand now, in case a script moved one
+        std::vector<FalloutScript::FormId> gone;
+        for (auto& [reference, volume] : mTriggerShapes)
+        {
+            const auto found = mReferences.find(reference);
+            if (found == mReferences.end() || found->second.isEmpty())
+            {
+                gone.push_back(reference);
+                continue;
+            }
+            const ESM::Position& position = found->second.getRefData().getPosition();
+            const osg::Quat rotation = Misc::Convert::makeOsgQuat(position);
+            const osg::Vec3f x = rotation * osg::Vec3f(1, 0, 0);
+            const osg::Vec3f y = rotation * osg::Vec3f(0, 1, 0);
+            const osg::Vec3f z = rotation * osg::Vec3f(0, 0, 1);
+            volume.mCenter = { position.pos[0], position.pos[1], position.pos[2] };
+            volume.mAxisX = { x.x(), x.y(), x.z() };
+            volume.mAxisY = { y.x(), y.y(), y.z() };
+            volume.mAxisZ = { z.x(), z.y(), z.z() };
+            mTriggers.set(reference, volume);
+        }
+        for (const FalloutScript::FormId reference : gone)
+        {
+            mTriggers.remove(reference);
+            mTriggerShapes.erase(reference);
+        }
+
+        // The actors that can set a trigger off: the player and the characters and creatures of the loaded cells that
+        // are there and alive
+        std::vector<FalloutScript::TriggerBody> bodies;
+        const auto addBody = [&](const OFWorld::Ptr& ptr, FalloutScript::FormId reference) {
+            if (ptr.isEmpty() || !ptr.getRefData().isEnabled() || ptr.mRef->isDeleted())
+                return;
+            if (ptr.getClass().getCreatureStats(ptr).isDead())
+                return;
+            const ESM::Position& position = ptr.getRefData().getPosition();
+            osg::Vec3f half = world->getHalfExtents(ptr);
+            // An actor the physics has no body for yet stands about as tall as a person
+            FalloutScript::TriggerBody body;
+            body.mReference = reference;
+            body.mFeet = { position.pos[0], position.pos[1], position.pos[2] };
+            body.mHeight = half.z() > 0 ? 2 * half.z() : 128.f;
+            body.mRadius = std::max(half.x(), half.y()) > 0 ? std::max(half.x(), half.y()) : 20.f;
+            bodies.push_back(body);
+        };
+        addBody(world->getPlayerPtr(), mPlayer);
+        for (const FalloutScript::FormId reference : mTriggerActors)
+        {
+            const auto found = mReferences.find(reference);
+            if (found != mReferences.end() && reference != mPlayer)
+                addBody(found->second, reference);
+        }
+
+        const auto active = [this](FalloutScript::FormId reference) {
+            if (!mObjects.loaded(reference))
+                return false;
+            const auto found = mReferences.find(reference);
+            return found != mReferences.end() && !found->second.isEmpty() && found->second.getRefData().isEnabled()
+                && !found->second.mRef->isDeleted();
+        };
+        const FalloutScript::TriggerVolumes::Raise raise
+            = [this](FalloutScript::FormId trigger, std::uint16_t blockType, FalloutScript::FormId actor) {
+                  // A block that names a form is for that actor only; one that names nothing is for any
+                  const FalloutScript::BlockFilter filter = [actor](const FalloutScript::Block& block) {
+                      return FalloutScript::blockIsForForm(block, actor);
+                  };
+                  mObjects.trigger(trigger, blockType, actor, filter);
+              };
+        mTriggers.update(bodies, active, raise);
     }
 
     void FalloutScripts::runPending()
@@ -493,6 +613,9 @@ namespace OFScript
             {
                 mObjects.setLoaded(reference, false);
                 mReferences.erase(reference);
+                mTriggerShapes.erase(reference);
+                mTriggers.remove(reference);
+                mTriggerActors.erase(reference);
             }
             return true;
         });
@@ -601,6 +724,9 @@ namespace OFScript
                 continue;
             mObjects.setLoaded(reference, false);
             mReferences.erase(reference);
+            mTriggerShapes.erase(reference);
+            mTriggers.remove(reference);
+            mTriggerActors.erase(reference);
         }
     }
 

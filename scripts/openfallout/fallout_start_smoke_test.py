@@ -983,6 +983,51 @@ NEW_GAME_START_ELSEWHERE = f"{plugin.WORLD_NAME}:0,0" # the exterior cell the en
 NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME)
                    .replace("@KEYS@", CONTROL_KEYS))
 
+# Walks the player into the trigger of the plugin and out of it again, and logs what the script of the trigger counted.
+# The box is turned a quarter about z, so that its long side runs along y: a point 100 to the side along y is inside it,
+# and one 100 along x is not (the box is 40 across).
+TRIGGER_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
+
+local x, y = @X@, @Y@
+local elapsed, step = 0, 0
+local function put(dx, dy)
+    local player = world.players[1]
+    player:teleport(player.cell, util.vector3(x + dx, y + dy, 0))
+end
+local function report(tag)
+    local g = world.globals
+    print('OFTEST', 'trigger', tag, string.format('enters=%.0f any=%.0f stays=%.0f leaves=%.0f', g.@ENTERS@, g.@ANY@,
+        g.@STAYS@, g.@LEAVES@))
+end
+
+local steps = {
+    { 1.5, function() report('before') put(0, 100) end },
+    { 3.0, function() report('inside') put(100, 0) end },
+    { 4.5, function() report('outside') put(0, -100) end },
+    { 6.0, function() report('again') core.quit() end },
+}
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            local next = steps[step + 1]
+            if next and elapsed >= next[1] then
+                step = step + 1
+                next[2]()
+            end
+        end,
+    },
+}
+"""
+TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).replace("@Y@", str(plugin.TRIGGER_PLACE[1]))
+                  .replace("@ENTERS@", plugin.TRIGGER_GLOBALS["enters"][1]).replace("@ANY@", plugin.TRIGGER_GLOBALS["any"][1])
+                  .replace("@STAYS@", plugin.TRIGGER_GLOBALS["stays"][1])
+                  .replace("@LEAVES@", plugin.TRIGGER_GLOBALS["leaves"][1]))
+
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
 # script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
@@ -1809,6 +1854,42 @@ def check_chargen(text):
     return problems
 
 
+def check_triggers(text):
+    """The problems with the trigger volume: the player is not in the box at first; the box, turned a quarter, takes a
+    point along y and not one along x; coming in runs OnTriggerEnter for the player and for anyone once, staying runs
+    OnTrigger, going out runs OnTriggerLeave, and coming in again runs the enters again."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
+            problems.append(line)
+    found = {}
+    for line in text.splitlines():
+        match = re.search(r"OFTEST\ttrigger\t(\w+)\tenters=(\d+) any=(\d+) stays=(\d+) leaves=(\d+)$", line)
+        if match:
+            found[match.group(1)] = tuple(int(group) for group in match.groups()[1:])
+    for tag in ("before", "inside", "outside", "again"):
+        if tag not in found:
+            problems.append(f"no 'trigger {tag}' line in the log")
+    if problems:
+        return problems
+    if found["before"] != (0, 0, 0, 0):
+        problems.append(f"nothing should have run while the player is far from the box: {found['before']}")
+    enters, any_enters, stays, leaves = found["inside"]
+    if (enters, any_enters, leaves) != (1, 1, 0) or stays < 1:
+        problems.append("a player that came into the box (a point along its long side, which is the turned y) should have "
+                        f"run OnTriggerEnter once for the player and for anyone, then OnTrigger: {found['inside']}")
+    enters, any_enters, stays_out, leaves = found["outside"]
+    if (enters, any_enters, leaves) != (1, 1, 1) or stays_out < stays:
+        problems.append("a player 100 along x is outside the turned box, which should have run OnTriggerLeave once and no "
+                        f"enter: {found['outside']}")
+    enters, any_enters, _, leaves = found["again"]
+    if (enters, any_enters, leaves) != (2, 2, 1):
+        problems.append(f"coming in again should have run the enters a second time and no leave: {found['again']}")
+    if "Quitting peacefully" not in text:
+        problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
 def check_new_game(text):
     """The problems with the new game: the engine found the quest CG00, started it, its MenuMode block set stage 0, the
     result script of the stage took the controls of the player and moved them to the marker of the interior cell (facing the
@@ -2405,7 +2486,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -2435,6 +2516,8 @@ def main():
     (data / "scripts" / "dialoguehost.lua").write_text(DIALOGUE_HOST_SCRIPT, encoding="ascii")
     (data / "dialoguetest.omwscripts").write_text(
         "PLAYER: scripts/dialoguetest.lua\nGLOBAL: scripts/dialoguehost.lua\n", encoding="ascii")
+    (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
+    (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
     (data / "scripts" / "chargenhost.lua").write_text(CHARGEN_HOST_SCRIPT, encoding="ascii")
     (data / "chargentest.omwscripts").write_text(
@@ -2520,6 +2603,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (chargen):", problem)
+        problems += found
+    if args.only in (None, "triggers"):
+        home = work / "triggers" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "triggers" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== triggers: --start", plugin.CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                               "triggertest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_triggers(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (triggers):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

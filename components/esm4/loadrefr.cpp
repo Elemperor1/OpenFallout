@@ -283,6 +283,24 @@ void ESM4::Reference::load(ESM4::Reader& reader)
                     reader.skipSubRecordData();
                 break;
             }
+            case ESM::fourCC("XPRM"):
+            {
+                // Fallout 3 and New Vegas have 32 bytes; the other sizes (the games after them put more in) are skipped
+                if (subHdr.dataSize != 32)
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                Primitive primitive;
+                for (float& bound : primitive.mBounds)
+                    reader.get(bound);
+                for (float& color : primitive.mColor)
+                    reader.get(color);
+                reader.get(primitive.mAlpha);
+                reader.get(primitive.mType);
+                mPrimitive = primitive;
+                break;
+            }
             case ESM::fourCC("XCNT"):
             {
                 reader.get(mCount);
@@ -301,7 +319,6 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XLCM"):
             case ESM::fourCC("ONAM"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("XPRM"):
             case ESM::fourCC("INAM"):
             case ESM::fourCC("PDTO"):
             case ESM::fourCC("SCHR"):

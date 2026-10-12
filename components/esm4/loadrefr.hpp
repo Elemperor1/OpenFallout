@@ -28,6 +28,7 @@
 #define ESM4_REFR_H
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "reference.hpp" // EnableParent
@@ -75,6 +76,25 @@ namespace ESM4
         ESM::FormId posReference; // only used if broadcastRange == 0
     };
 
+    /// The volume of a trigger, a marker or a portal (XPRM, 32 bytes in Fallout 3 and New Vegas): the half extents of a
+    /// box (the reference is at the centre, so a box on the floor has its z one half height above it), the radius of
+    /// a sphere (the same number three times) or the sides of a plane (the y is its thickness, 1 at most)
+    struct Primitive
+    {
+        enum Type : std::uint32_t
+        {
+            None = 0,
+            Box = 1,
+            Sphere = 2,
+            Plane = 3,
+        };
+
+        float mBounds[3] = { 0, 0, 0 };
+        float mColor[3] = { 0, 0, 0 };
+        float mAlpha = 0; // how the editor draws it
+        std::uint32_t mType = None;
+    };
+
     struct Reference
     {
         ESM::FormId mId; // from the header
@@ -113,6 +133,8 @@ namespace ESM4
         ESM::FormId mTargetRef;
 
         std::vector<LinkedReference> mLinkedRefs;
+
+        std::optional<Primitive> mPrimitive;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
