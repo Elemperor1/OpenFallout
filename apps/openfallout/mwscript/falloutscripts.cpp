@@ -764,12 +764,21 @@ namespace OFScript
 
     bool FalloutScripts::pressMessageButton(std::size_t button)
     {
+        std::uint32_t serial = 0;
         {
             const std::lock_guard lock(mOpenMessageMutex);
             if (!mOpenMessage || button >= mOpenMessage->mButtons.size())
                 return false;
+            serial = mOpenMessage->mSerial;
         }
-        runOnMainThread([button] {
+        runOnMainThread([this, button, serial] {
+            {
+                // A press that waited for the frame is for the box that was open when it was asked for: that box may
+                // have been answered since, and another one opened
+                const std::lock_guard lock(mOpenMessageMutex);
+                if (!mOpenMessage || mOpenMessage->mSerial != serial)
+                    return;
+            }
             if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
                 windows->pressInteractiveMessageBoxButton(button);
         });
@@ -780,12 +789,15 @@ namespace OFScript
     {
         const unsigned bit = 1u << static_cast<std::size_t>(control);
         const unsigned before = enabled ? mControlsOff.fetch_and(~bit) : mControlsOff.fetch_or(bit);
-        if (((before & bit) == 0) == enabled)
-            return;
-        static constexpr const char* names[]
-            = { "movement", "pipboy", "fighting", "point of view", "looking", "rollover", "sneaking" };
-        Log(Debug::Info) << "Player controls: " << names[static_cast<std::size_t>(control)]
-                         << (enabled ? " on" : " off");
+        // The log tells what the scripts changed. The switches are set in any case: a Lua script or a loaded save can
+        // have turned one since, and the script asks for the state it names.
+        if (((before & bit) == 0) != enabled)
+        {
+            static constexpr const char* names[]
+                = { "movement", "pipboy", "fighting", "point of view", "looking", "rollover", "sneaking" };
+            Log(Debug::Info) << "Player controls: " << names[static_cast<std::size_t>(control)]
+                             << (enabled ? " on" : " off");
+        }
         // The switches of the engine are those of Morrowind: movement is also what lets the player activate things, and
         // the controls that no switch stands for (the Pip-Boy, rollover, sneaking) have nothing to turn yet
         std::vector<std::string_view> switches;
