@@ -99,8 +99,11 @@ namespace FalloutScript
         /// Reads the records again and forgets what was said, what the player was told and who talked to the player
         void reset();
 
-        /// The number of the day in the game, for the responses that are said once a day
-        void setDay(std::function<int()> day) { mDay = std::move(day); }
+        /// The time in the game in hours, for the responses that are said once a day
+        void setGameHours(std::function<double()> hours) { mHours = std::move(hours); }
+        /// The hours that pass before a response that is said once a day can be said again by the same character
+        /// (fSayOncePerDayInfoTimer, 12 in the games)
+        void setDailyInterval(double hours) { mDailyInterval = hours; }
         /// A number below the count given to it, for choosing among random responses
         void setRandom(std::function<std::size_t(std::size_t count)> random) { mRandom = std::move(random); }
         /// Whether a speech challenge is passed. Without one every challenge is.
@@ -113,7 +116,9 @@ namespace FalloutScript
         bool hasTopic(FormId topic) const { return mTopics.count(topic) != 0; }
         /// Whether the character with the reference has talked to the player
         bool talkedToPlayer(FormId reference) const { return mTalkedTo.count(reference) != 0; }
-        bool wasSaid(FormId info) const { return mSaid.count(info) != 0; }
+        /// Whether the character with the reference said the response to its end (Say Once and Say Once a Day are
+        /// kept for each character)
+        bool wasSaid(FormId info, FormId speaker) const { return mSaid.count({ speaker, info }) != 0; }
 
         // Conversations
 
@@ -167,15 +172,16 @@ namespace FalloutScript
         /// or 0 for the topic of the record.
         DialogueView speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic = 0);
         /// The response has been said to its end: it is not said again if it is for once (or for a day)
-        void markSaid(const ESM4::DialogInfo& info);
+        void markSaid(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker);
         void runScript(const ESM4::ScriptDefinition& definition, const DialogueSpeaker& speaker);
-        int day() const { return mDay ? mDay() : 0; }
+        double hours() const { return mHours ? mHours() : 0.0; }
 
         Interpreter& mInterpreter;
         ConditionEvaluator& mConditions;
         QuestManager& mQuests;
         const DialogueRecords& mRecords;
-        std::function<int()> mDay;
+        std::function<double()> mHours;
+        double mDailyInterval = 12.0;
         std::function<std::size_t(std::size_t)> mRandom;
         std::function<bool(const ESM4::DialogInfo&)> mChallenge;
 
@@ -187,8 +193,9 @@ namespace FalloutScript
         /// The topics the player was given, in the order they were
         std::vector<FormId> mGiven;
         std::set<FormId> mTopics; // the same, to look up
-        std::set<FormId> mSaid; // the responses that were said
-        std::map<FormId, int> mSaidOnDay;
+        /// The responses that were said, by the reference of the character that said them and the response
+        std::set<std::pair<FormId, FormId>> mSaid;
+        std::map<std::pair<FormId, FormId>, double> mSaidAt; // the same for those said once a day: the hour
         std::set<FormId> mTalkedTo;
         std::set<FormId> mChain; // the responses said one after the other since the player picked the topic
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;

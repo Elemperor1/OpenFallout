@@ -104,7 +104,7 @@ namespace FalloutScript
         mGiven.clear();
         mTopics.clear();
         mSaid.clear();
-        mSaidOnDay.clear();
+        mSaidAt.clear();
         mTalkedTo.clear();
         mChain.clear();
         mPrepared.clear();
@@ -186,12 +186,14 @@ namespace FalloutScript
         const FormId id = toId(info.mId);
         if (const FormId quest = toId(info.mQuest); quest != 0 && !mQuests.running(quest))
             return false;
-        if (hasFlag(info, ESM4::INFO_SayOnce) && mSaid.count(id) != 0)
+        // What a character said is kept for that character: another can still say it
+        const std::pair<FormId, FormId> key{ speaker.mReference, id };
+        if (hasFlag(info, ESM4::INFO_SayOnce) && mSaid.count(key) != 0)
             return false;
         if (hasFlag(info, ESM4::INFO_SayOnceADay))
         {
-            const auto said = mSaidOnDay.find(id);
-            if (said != mSaidOnDay.end() && said->second == day())
+            const auto said = mSaidAt.find(key);
+            if (said != mSaidAt.end() && hours() - said->second < mDailyInterval)
                 return false;
         }
         if (const FormId only = toId(info.mSpeaker); only != 0 && only != speaker.mBase)
@@ -318,12 +320,12 @@ namespace FalloutScript
         return view;
     }
 
-    void DialogueManager::markSaid(const ESM4::DialogInfo& info)
+    void DialogueManager::markSaid(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker)
     {
-        const FormId id = toId(info.mId);
-        mSaid.insert(id);
+        const std::pair<FormId, FormId> key{ speaker.mReference, toId(info.mId) };
+        mSaid.insert(key);
         if (hasFlag(info, ESM4::INFO_SayOnceADay))
-            mSaidOnDay[id] = day();
+            mSaidAt[key] = hours();
     }
 
     const DialogueView& DialogueManager::start(const DialogueSpeaker& speaker, FormId topic)
@@ -386,7 +388,7 @@ namespace FalloutScript
         mSpeaking = nullptr;
         mView.mSpeaking = false;
 
-        markSaid(info);
+        markSaid(info, mSpeaker);
         runScript(info.mEndScript, mSpeaker);
         for (const ESM::FormId added : info.mAddTopics)
             addTopic(toId(added));
@@ -437,7 +439,7 @@ namespace FalloutScript
         if (info == nullptr)
             return DialogueView();
         DialogueView view = speak(*info, speaker, topic);
-        markSaid(*info);
+        markSaid(*info, speaker);
         view.mSpeaking = false;
         // As in finish(), the end script sees the response that was said
         const DialogueView outer = mView;

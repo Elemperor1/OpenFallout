@@ -128,7 +128,7 @@ namespace
         std::vector<std::string> mLogged;
         std::vector<FormId> mTouched; // the objects that conditions with Touch ran on
         std::map<FormId, double> mTouchValue;
-        int mDay = 1;
+        double mHours = 34; // the second day, ten o'clock
         std::size_t mRandomPick = 0;
         std::vector<std::size_t> mRandomCounts;
 
@@ -147,7 +147,7 @@ namespace
             FalloutScript::addQuestCommands(mInterpreter, mQuests);
             FalloutScript::addConditionFunctions(mConditions);
             FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
-            mDialogue.setDay([this] { return mDay; });
+            mDialogue.setGameHours([this] { return mHours; });
             mDialogue.setRandom([this](std::size_t count) {
                 mRandomCounts.push_back(count);
                 return std::min(mRandomPick, count - 1);
@@ -346,18 +346,20 @@ namespace
         setup.start();
 
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("once"));
-        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("always"));
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("always"));
-        // Whoever else says it
+        // Another character has not said it
+        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3001, 0x00ff0002));
+        EXPECT_THAT(setup.texts(setup.mDialogue.say({ 0x00ff0002, 0x00004000 }, topicA)), ElementsAre("once"));
         EXPECT_THAT(setup.texts(setup.mDialogue.say({ 0x00ff0002, 0x00004000 }, topicA)), ElementsAre("always"));
 
         setup.start();
-        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("once"));
     }
 
-    TEST(FalloutScriptDialogueTest, aResponseSaidOnceADayIsSaidAgainTheNextDay)
+    TEST(FalloutScriptDialogueTest, aResponseSaidOnceADayIsSaidAgainAfterTheIntervalHasPassed)
     {
         Harness setup;
         setup.mRecords.addTopic(topicA, "A");
@@ -367,8 +369,41 @@ namespace
 
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("daily"));
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("otherwise"));
-        setup.mDay = 2;
+        // Not before the 12 hours are over, and then at once, though it is the same day (midnight is 14 hours on)
+        setup.mHours += 11.5;
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("otherwise"));
+        setup.mHours += 0.5;
         EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("daily"));
+        // The 12 hours start again from the time it was said
+        setup.mHours += 11;
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("otherwise"));
+    }
+
+    TEST(FalloutScriptDialogueTest, theIntervalOfAResponseSaidOnceADayCanBeSet)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "daily").mInfoFlags = ESM4::INFO_SayOnceADay;
+        setup.start();
+        setup.mDialogue.setDailyInterval(24);
+
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("daily"));
+        setup.mHours += 23;
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), IsEmpty());
+        setup.mHours += 1;
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("daily"));
+    }
+
+    TEST(FalloutScriptDialogueTest, aResponseSaidOnceADayIsKeptForEachCharacter)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "daily").mInfoFlags = ESM4::INFO_SayOnceADay;
+        setup.start();
+
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("daily"));
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), IsEmpty());
+        EXPECT_THAT(setup.texts(setup.mDialogue.say({ 0x00ff0002, 0x00004000 }, topicA)), ElementsAre("daily"));
     }
 
     TEST(FalloutScriptDialogueTest, aRunOfRandomResponsesGivesOneOfThoseThatCanBeSaid)
@@ -487,13 +522,13 @@ namespace
         // Nothing of it was done: not its end script, and it was not said for good
         setup.mDialogue.end();
         EXPECT_THAT(setup.mLogged, IsEmpty());
-        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
 
         setup.mDialogue.start(speaker);
         setup.mDialogue.choose(topicA);
         setup.mDialogue.finish();
         EXPECT_THAT(setup.mLogged, ElementsAre("end"));
-        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
     }
 
     TEST(FalloutScriptDialogueTest, aConversationWithoutAGreetingGoesStraightToTheTopics)
@@ -631,7 +666,7 @@ namespace
         EXPECT_TRUE(second.mSpeaking);
         EXPECT_THAT(second.mOptions, IsEmpty());
         EXPECT_THAT(setup.mLogged, ElementsAre("end first"));
-        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
         EXPECT_THAT(setup.texts(setup.mDialogue.finish()), ElementsAre("third"));
 
         // The last one gives the player the topics again
