@@ -427,6 +427,24 @@ namespace
         EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
     }
 
+    TEST(FalloutScriptDialogueTest, aRunOfRandomResponsesStaysInTheQuestItStartedIn)
+    {
+        Harness setup;
+        constexpr FormId highQuest = 0x00001002;
+        setup.mRecords.addQuest(highQuest, true);
+        setup.mRecords.mQuests.back().mData.priority = 50;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "of the quest of priority 0").mInfoFlags = ESM4::INFO_Random;
+        setup.mRecords.addInfo(0x3002, topicA, "of the quest of priority 50").mQuest = id(highQuest);
+        setup.mRecords.mInfos.back().mInfoFlags = ESM4::INFO_Random;
+        setup.start();
+        setup.mRandomPick = 5;
+
+        // The order is now 0x3002, 0x3001: the run that starts at the first is not joined by the one of the other quest
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
+        EXPECT_THAT(setup.mRandomCounts, IsEmpty());
+    }
+
     TEST(FalloutScriptDialogueTest, aQuestOfHigherPriorityThatCannotBeSaidLeavesTheTopicToTheNext)
     {
         Harness setup;
