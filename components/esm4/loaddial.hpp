@@ -51,15 +51,35 @@ namespace ESM4
 
         std::string mTextDumb; // FIXME: temp name
 
-        bool mDoAllBeforeRepeat; // TES5 only
-        std::uint8_t mDialType; // DialType
-        std::uint8_t mDialFlags; // FO3/FONV: 0x1 rumours, 0x2 top-level
+        bool mDoAllBeforeRepeat = false; // TES5 only
+        std::uint8_t mDialType = 0; // DialType
+        std::uint8_t mDialFlags = 0; // FO3/FONV: 0x1 rumours, 0x2 top-level
 
-        float mPriority;
+        float mPriority = 0;
+
+        /// An INFO of another topic that this one shows too (INFC, with the index INFX that goes with it): New Vegas
+        struct SharedInfo
+        {
+            ESM::FormId mInfo;
+            std::int32_t mIndex = 0;
+        };
+        std::vector<SharedInfo> mSharedInfos;
+
+        enum DialFlag : std::uint8_t
+        {
+            Flag_Rumors = 0x01,
+            Flag_TopLevel = 0x02
+        };
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
 
+    private:
+        /// The topics of Fallout 3 and New Vegas, read strictly: an unknown sub-record, a size no game uses and bytes
+        /// that no sub-record accounts for throw.
+        void loadFallout(ESM4::Reader& reader);
+
+    public:
         // void blank();
         static constexpr ESM::RecNameInts sRecordId = ESM::RecNameInts::REC_DIAL4;
     };

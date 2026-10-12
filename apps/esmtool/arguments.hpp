@@ -28,6 +28,9 @@ namespace EsmTool
         std::string name;
         // The CSV of the script commands of a game, for the scriptcode mode
         std::filesystem::path commandsFile;
+        // The names of script commands whose callers the scriptcode mode lists, separated by commas (needs
+        // commandsFile)
+        std::string findCommands;
     };
 }
 

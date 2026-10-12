@@ -30,12 +30,80 @@
 #include <stdexcept>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+#include "recordreader.hpp"
+// #include "writer.hpp"
+
+void ESM4::Dialogue::loadFallout(ESM4::Reader& reader)
+{
+    RecordReader in(reader, "DIAL");
+    while (in.next())
+    {
+        switch (in.type())
+        {
+            case ESM::fourCC("EDID"):
+                in.string(mEditorId);
+                break;
+            case ESM::fourCC("FULL"):
+                in.string(mTopicName);
+                break;
+            case ESM::fourCC("QSTI"):
+                in.formId(mQuests.emplace_back());
+                break;
+            case ESM::fourCC("QSTR"):
+                in.formId(mQuestsRemoved.emplace_back());
+                break;
+            case ESM::fourCC("INFC"):
+                // The two are a pair. A size that no game uses is left alone, like the unused pair of the format
+                // reference, which the GECK writes by mistake.
+                if (in.size() == sizeof(ESM::FormId32))
+                    in.formId(mSharedInfos.emplace_back().mInfo);
+                else
+                {
+                    std::vector<std::uint8_t> ignored;
+                    in.bytes(ignored);
+                }
+                break;
+            case ESM::fourCC("INFX"):
+                if (in.size() == sizeof(std::int32_t) && !mSharedInfos.empty())
+                    in.value(mSharedInfos.back().mIndex);
+                else
+                {
+                    std::vector<std::uint8_t> ignored;
+                    in.bytes(ignored);
+                }
+                break;
+            case ESM::fourCC("PNAM"):
+                in.value(mPriority);
+                break;
+            case ESM::fourCC("TDUM"):
+                in.string(mTextDumb);
+                break;
+            case ESM::fourCC("DATA"):
+            {
+                std::vector<std::uint8_t> data;
+                // A few topics have the type only
+                in.bytes(data, { 1, 2 });
+                mDialType = data[0];
+                mDialFlags = data.size() > 1 ? data[1] : 0;
+                break;
+            }
+            default:
+                in.unknown();
+        }
+    }
+    in.finish();
+}
 
 void ESM4::Dialogue::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
+
+    if (reader.isFalloutFile())
+    {
+        loadFallout(reader);
+        return;
+    }
 
     while (reader.getSubRecordHeader())
     {

@@ -632,7 +632,21 @@ namespace ESM4
             }
         }
         for (const std::uint16_t opcode : called)
-            ++mCommands[opcode].mScripts;
+        {
+            CommandUse& use = mCommands[opcode];
+            ++use.mScripts;
+            ++use.mByHolder[holder];
+            if (mWatched.count(opcode) != 0)
+            {
+                // The record is what is listed: once, whether several of its scripts call the command or a later
+                // plugin overrides it (the list is short, so it is searched whole)
+                std::vector<std::string>& callers = mCallers[opcode];
+                const std::string caller = holder + " " + hex(record.toUint32(), 8);
+                if (callers.size() < maxCallersPerCommand
+                    && std::find(callers.begin(), callers.end(), caller) == callers.end())
+                    callers.push_back(caller);
+            }
+        }
 
         // A script that stopped at an error holds the statements before it only, so its blocks and conditions are
         // not closed and its jumps lead nowhere
@@ -1054,6 +1068,33 @@ namespace ESM4
         stream << "  " << mCommands.size() << " different commands, " << commandStatements
                << " statements call one; codes from 0x1400 on (extensions of the script language) are used by "
                << nvseCommands << " (script, command) pairs\n";
+
+        if (!mWatched.empty())
+        {
+            stream << "\nScripts that call the commands asked for (--find): the scripts by the type of record that "
+                      "holds them, then the first "
+                   << maxCallersPerCommand << " as record type and form id\n";
+            for (const std::uint16_t opcode : mWatched)
+            {
+                const auto use = mCommands.find(opcode);
+                stream << "  " << hex(opcode, 4);
+                if (mLookup)
+                {
+                    const std::string name(mLookup(opcode).mName);
+                    if (!name.empty())
+                        stream << ' ' << name;
+                }
+                stream << ": " << (use == mCommands.end() ? 0 : use->second.mScripts) << " scripts";
+                if (use != mCommands.end())
+                    for (const auto& [holder, count] : use->second.mByHolder)
+                        stream << ", " << holder << ' ' << count;
+                stream << '\n';
+                const auto callers = mCallers.find(opcode);
+                if (callers != mCallers.end())
+                    for (const std::string& caller : callers->second)
+                        stream << "    " << caller << '\n';
+            }
+        }
 
         writeArguments(stream);
         writeConditions(stream);

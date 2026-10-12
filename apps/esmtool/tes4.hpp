@@ -35,6 +35,10 @@ namespace EsmTool
     // and prints one report.
     int wornTes4(const Arguments& info);
 
+    // Counts the topics and responses of every Fallout file named in info.inputFiles, read in that order, and the
+    // functions their conditions call, and prints one report.
+    int dialogueTes4(const Arguments& info);
+
     // Decodes the compiled scripts of every Fallout file named in info.inputFiles, read in that order, and prints
     // counts of what they hold and of the scripts that do not decode.
     int scriptCodeTes4(const Arguments& info);

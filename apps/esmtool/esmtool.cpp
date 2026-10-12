@@ -77,13 +77,19 @@ Allowed modes:
          body and the animation files they list, with a few example file names.
          Give the files in load order, masters first. Prints no other record
          contents.
+  dialogue Counts the topics (DIAL) and responses (INFO) of one or more Fallout 3
+         or New Vegas files by type, flags and what they have (conditions,
+         choices, scripts), and the functions their conditions call. Give the
+         files in load order, masters first. With --commands it names the
+         functions. Prints no record contents.
   scriptcode Decodes the compiled scripts (SCDA) of one or more Fallout 3 or New
          Vegas files and counts the statements, blocks, commands and jumps
          they hold, and the scripts that do not decode. Give the files in load
          order, masters first. With --commands it also decodes the arguments of
-         every call. Prints no script contents, except a few bytes around the
-         place where the first scripts that fail to decode stop, and the first
-         calls whose arguments do not decode.
+         every call, and with --find lists the records whose scripts call the
+         commands it names. Prints no script contents, except a few bytes around
+         the place where the first scripts that fail to decode stop, and the
+         first calls whose arguments do not decode.
   worn   Counts the armour that the characters of one or more Fallout 3 or New
          Vegas files wear, with the code the game uses: the inventory, the
          template, the levelled lists and which pieces show on the body. Give
@@ -112,7 +118,10 @@ Allowed options)");
         addOption("failed", "Survey only the records that a loader rejects.  Only affects survey mode.");
         addOption("commands", bpo::value<std::string>(),
             "The CSV of the script commands of the game, which scripts/openfallout/dump_command_table.py writes.  Only "
-            "affects scriptcode mode.");
+            "affects the scriptcode and dialogue modes.");
+        addOption("find", bpo::value<std::string>(),
+            "Script commands, separated by commas, whose callers the scriptcode mode lists (the type and form id of "
+            "the records whose scripts call them).  Needs --commands.");
 
         addOption("encoding,e", bpo::value<std::string>(&(info.encoding))->default_value("win1252"),
             "Character encoding used in ESMTool:\n"
@@ -173,6 +182,8 @@ Allowed options)");
             info.types = variables["type"].as<std::vector<std::string>>();
         if (variables.count("name") > 0)
             info.name = variables["name"].as<std::string>();
+        if (variables.count("find") > 0)
+            info.findCommands = variables["find"].as<std::string>();
         if (variables.count("commands") > 0)
             info.commandsFile = Files::pathFromUnicodeString(variables["commands"].as<std::string>());
 
@@ -180,7 +191,7 @@ Allowed options)");
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
                 || info.mode == "survey" || info.mode == "references" || info.mode == "equipment"
                 || info.mode == "packages" || info.mode == "creatures" || info.mode == "worn"
-                || info.mode == "scriptcode"))
+                || info.mode == "scriptcode" || info.mode == "dialogue"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
             return false;
@@ -204,7 +215,8 @@ Allowed options)");
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
         // Only a survey or a count takes any number of files, the other modes take an input file and an output file.
         if (info.mode != "survey" && info.mode != "references" && info.mode != "equipment" && info.mode != "packages"
-            && info.mode != "creatures" && info.mode != "worn" && info.mode != "scriptcode" && inputFiles.size() > 2)
+            && info.mode != "creatures" && info.mode != "worn" && info.mode != "scriptcode" && info.mode != "dialogue"
+            && inputFiles.size() > 2)
         {
             std::cout << "\nERROR: more than two files specified\n\n";
             std::cout << desc << finalText << std::endl;
@@ -267,6 +279,8 @@ int main(int argc, char** argv)
             return creaturesTes4(info);
         else if (info.mode == "worn")
             return wornTes4(info);
+        else if (info.mode == "dialogue")
+            return dialogueTes4(info);
         else if (info.mode == "scriptcode")
             return scriptCodeTes4(info);
         else if (info.mode == "clone")

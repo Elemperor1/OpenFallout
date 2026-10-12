@@ -353,6 +353,69 @@ namespace
         EXPECT_EQ(use.mTotalArgumentBytes, 6u);
     }
 
+    TEST(ESM4ScriptCodeCensusTest, listsTheCallersOfTheCommandsAskedFor)
+    {
+        const std::string calls = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58, 0x1000 + 59 });
+        collect(
+            census, scriptRecord(0x1001, calls) + scriptRecord(0x1002, statement(0x1D)) + scriptRecord(0x1003, calls));
+
+        EXPECT_THAT(census.getCommands().at(0x1000 + 58).mByHolder, ElementsAre(Pair("SCPT", 2u)));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("--find"));
+        EXPECT_THAT(out.str(), HasSubstr("0x103A: 2 scripts, SCPT 2\n    SCPT 0x00001001\n    SCPT 0x00001003\n"));
+        EXPECT_THAT(out.str(), HasSubstr("0x103B: 0 scripts\n"));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, listsARecordOnceWhenSeveralOfItsScriptsCallTheCommand)
+    {
+        // a quest whose two log entries run a script each, and both call the command
+        const std::string calls = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        const std::string script = scriptHeader(0, static_cast<std::uint32_t>(calls.size()), 1)
+            + subRecord("SCDA", calls) + localVariable(1);
+        const std::string data = zString("EDID", "OFTestQuest") + subRecord("INDX", std::string("\x0a\0", 2))
+            + subRecord("QSDT", std::string(1, '\0')) + script + subRecord("QSDT", std::string(1, '\0')) + script;
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58 });
+        collect(census, record("QUST", 0x1001, data), "QUST");
+
+        EXPECT_EQ(census.getCommands().at(0x1000 + 58).mScripts, 2u);
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("0x103A: 2 scripts, QUST 2\n    QUST 0x00001001\n"));
+        EXPECT_THAT(out.str(), Not(HasSubstr("    QUST 0x00001001\n    QUST 0x00001001\n")));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, listsARecordOnceWhenALaterPluginOverridesIt)
+    {
+        const std::string call = statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'));
+        ESM4::ScriptCodeCensus census;
+        census.setWatchedCommands({ 0x1000 + 58 });
+        // the plugins come one after the other, and another caller comes between the record and its override
+        collect(census, scriptRecord(0x1001, call));
+        collect(census, scriptRecord(0x1002, call));
+        collect(census, scriptRecord(0x1001, call));
+
+        EXPECT_EQ(census.getCommands().at(0x1000 + 58).mScripts, 3u);
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), HasSubstr("    SCPT 0x00001001\n    SCPT 0x00001002\n"));
+        EXPECT_THAT(out.str(), Not(HasSubstr("SCPT 0x00001002\n    SCPT 0x00001001\n")));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, listsNoCallersWhenNoneAreAskedFor)
+    {
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'))));
+
+        std::ostringstream out;
+        census.write(out);
+        EXPECT_THAT(out.str(), Not(HasSubstr("--find")));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, skipsRecordsThatAreDeleted)
     {
         ESM4::ScriptCodeCensus census;
