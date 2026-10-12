@@ -18,6 +18,7 @@ ELSE_IF = 0x18
 END_IF = 0x19
 
 GAME_MODE = 0  # the type of block that runs every frame (or every delay of a quest)
+MENU_MODE_BLOCK = 1  # the same while a menu is open (Begin MenuMode 1001 names the menu)
 ON_ACTIVATE = 2  # the types of the blocks of events of objects
 SAY_TO_DONE = 7
 ON_LOAD = 21
@@ -197,10 +198,13 @@ def branch(code, expression, jump=0):
     return statement(code, u16(jump) + u16(len(expression)) + expression)
 
 
-def block(block_type, body):
-    """Begin <type> ... End: the length in the Begin counts from its end to the end of the End."""
+def block(block_type, body, names=None):
+    """Begin <type> ... End: the length in the Begin counts from its end to the end of the End. `names` is the one
+    argument that the Begin can have after its type (Begin SayToDone Topic, Begin MenuMode 1001): a form_argument or an
+    int_argument, written after a count of 1."""
     end = statement(END)
-    return statement(BEGIN, u16(block_type) + u32(len(body) + len(end))) + body + end
+    arguments = b"" if names is None else u16(1) + names
+    return statement(BEGIN, u16(block_type) + u32(len(body) + len(end)) + arguments) + body + end
 
 
 class Script:

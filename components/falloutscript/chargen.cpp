@@ -508,14 +508,7 @@ namespace FalloutScript
 
     void addChargenCommands(Interpreter& interpreter, Chargen& chargen, std::function<void()> opened)
     {
-        // The numbers are those of the menus in the executables (MenuMode N asks for them)
-        constexpr int raceSexMenu = 1036;
-        constexpr int chargenMenu = 1048;
-        constexpr int textEditMenu = 1051;
-        constexpr int specialBookMenu = 1060;
-        constexpr int loveTesterMenu = 1074;
-        constexpr int traitSelectMenu = 1076;
-        constexpr int traitMenu = 1084;
+        using namespace ChargenMenu;
 
         // What a command opens: the screens, the number of the menu, and whether its first argument is a count that the
         // screen gives out (a count of 0 or less opens nothing, unless the screen has a default) and adds to what the
@@ -564,7 +557,7 @@ namespace FalloutScript
         interpreter.setHandler("AddTagSkills", open({ { ChargenPage::Skills }, chargenMenu, true, true, true }));
         // The menu with the numbers: the first number is the points of SPECIAL, and when there are none the third is
         // the skills to tag; with none the games open nothing. No script of the games calls these.
-        const auto numbered = [&chargen, opened, chargenMenu](CallContext& call) {
+        const auto numbered = [&chargen, opened](CallContext& call) {
             std::vector<double> values;
             for (const Value& argument : call.mArguments)
                 values.push_back(argument.mNumber);

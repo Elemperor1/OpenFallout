@@ -243,6 +243,10 @@ namespace OFScript
             FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner) override;
         int takeButtonPressed(FalloutScript::FormId owner) override;
         bool menuOpen(int menu) override;
+        /// Whether a MenuMode block runs now: one that names a menu this game has (the message box, the conversation,
+        /// the screens of making a character) runs while that menu is open; one that names nothing, or a menu that
+        /// the game does not have by that number, runs while any menu is
+        bool menuBlockRuns(const FalloutScript::Block& block);
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
         /// What the record of the reference says it is, which is all that anyone but the player has to go by

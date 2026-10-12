@@ -227,12 +227,12 @@ namespace FalloutScript
         advance(seconds, BlockType::GameMode);
     }
 
-    void QuestManager::updateMenu(float seconds)
+    void QuestManager::updateMenu(float seconds, const BlockFilter& filter)
     {
-        advance(seconds, BlockType::MenuMode);
+        advance(seconds, BlockType::MenuMode, filter);
     }
 
-    void QuestManager::advance(float seconds, std::uint16_t blockType)
+    void QuestManager::advance(float seconds, std::uint16_t blockType, const BlockFilter& filter)
     {
         for (auto& [id, quest] : mQuests)
         {
@@ -242,7 +242,7 @@ namespace FalloutScript
             if (quest.mTimer < delay(id))
                 continue;
             quest.mTimer = 0;
-            mInterpreter.run(*quest.mInstance, blockType);
+            mInterpreter.run(*quest.mInstance, blockType, filter);
         }
     }
 

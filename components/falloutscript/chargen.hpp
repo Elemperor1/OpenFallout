@@ -28,6 +28,26 @@ namespace FalloutScript
         Traits, // the traits (New Vegas)
     };
 
+    /// The numbers of the menus that the screens of making a character stand for, which are those of the menus in the
+    /// executables (Begin MenuMode N asks for them)
+    namespace ChargenMenu
+    {
+        constexpr int raceSexMenu = 1036;
+        constexpr int chargenMenu = 1048;
+        constexpr int textEditMenu = 1051;
+        constexpr int specialBookMenu = 1060;
+        constexpr int loveTesterMenu = 1074;
+        constexpr int traitSelectMenu = 1076;
+        constexpr int traitMenu = 1084;
+
+        /// Whether a screen of making a character can stand for the menu of that number
+        constexpr bool isChargenMenu(int menu)
+        {
+            return menu == raceSexMenu || menu == chargenMenu || menu == textEditMenu || menu == specialBookMenu
+                || menu == loveTesterMenu || menu == traitSelectMenu || menu == traitMenu;
+        }
+    }
+
     /// A skill the player can tag, the number scripts know it by, and the attribute that governs it
     struct ChargenSkill
     {

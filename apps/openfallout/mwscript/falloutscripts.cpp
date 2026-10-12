@@ -309,8 +309,10 @@ namespace OFScript
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
-            mQuests.updateMenu(frametime);
-            mObjects.updateMenu();
+            const FalloutScript::BlockFilter filter
+                = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
+            mQuests.updateMenu(frametime, filter);
+            mObjects.updateMenu(filter);
             return;
         }
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
@@ -721,6 +723,18 @@ namespace OFScript
                 // The screens of making a character have the numbers of the menus they stand for
                 return menu != 0 && mChargen.menu() == menu;
         }
+    }
+
+    bool FalloutScripts::menuBlockRuns(const FalloutScript::Block& block)
+    {
+        if (block.mNames != FalloutScript::BlockNames::Number)
+            return true;
+        const int menu = block.mNumber;
+        if (menu == messageBoxMenu || menu == dialogueMenu || FalloutScript::ChargenMenu::isChargenMenu(menu))
+            return menuOpen(menu);
+        // The numbers of the other menus (the inventory, a container, resting) are not told apart: the block runs as
+        // one that names no menu does
+        return true;
     }
 
     namespace

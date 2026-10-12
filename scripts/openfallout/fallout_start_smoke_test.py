@@ -747,13 +747,17 @@ return {
             if tag == 'button' then
                 world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
                 print('OFTEST', 'dialogue said', tostring(world.globals.@SAID@))
+                print('OFTEST', 'dialogue blocks', tostring(world.globals.@WRONG@), tostring(world.globals.@TALK@),
+                    tostring(world.globals.@BOX@), tostring(world.globals.@ELSEWHERE@))
             end
         end,
     },
 }
 """.replace("@TALKER_REF@", str(plugin.TALKER_REF_ID)).replace("@BEGIN@", plugin.DIALOGUE_GLOBALS["begin"][1]).replace(
     "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1]).replace(
-    "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1])
+    "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1]).replace("@WRONG@", plugin.DIALOGUE_GLOBALS["wrong"][1]).replace(
+    "@TALK@", plugin.DIALOGUE_GLOBALS["talk"][1]).replace("@BOX@", plugin.DIALOGUE_GLOBALS["box"][1]).replace(
+    "@ELSEWHERE@", plugin.DIALOGUE_GLOBALS["elsewhere"][1])
 
 # The making of the character, in an engine of its own because its screens pause the game. A script of the world sets the
 # global that the script of a quest waits for, the script opens the menus (the race, then the name, SPECIAL with the
@@ -1610,6 +1614,23 @@ def check_dialogue(text):
     if not said or said[-1] != "1" or any(value not in ("0", "1") for value in said):
         problems.append("the talker was made to say a topic once, so the Begin SayToDone block of its script should have "
                         f"run once by the time the button was read: {said}")
+
+    # The blocks name what they are for: the one for a topic that was not said and the one for a menu that never opened
+    # did not run, and the ones for the conversation and for the message box ran while those were open
+    blocks = [line.split("\t") for line in lines("blocks")]
+    if not blocks or any(len(values) != 4 for values in blocks):
+        problems.append(f"expected 'dialogue blocks' lines with four values: {blocks}")
+    else:
+        if any(values[0] != "0" for values in blocks):
+            problems.append("a Begin SayToDone block for a topic that was not said should not run after another topic "
+                            f"was said: {blocks}")
+        if any(values[3] != "0" for values in blocks):
+            problems.append("a Begin MenuMode block for a menu that never opened (1074) should not run while the "
+                            f"conversation or the message box is open: {blocks}")
+        if blocks[-1][1] in ("", "0", "nil"):
+            problems.append(f"a Begin MenuMode 1009 block should run while the conversation is open: {blocks[-1]}")
+        if blocks[-1][2] in ("", "0", "nil"):
+            problems.append(f"a Begin MenuMode 1001 block should run while the message box is open: {blocks[-1]}")
 
     globals_ = {line.split("\t")[0]: line.split("\t")[1:] for line in lines("globals")}
     for tag, want in (("greeting", ["1", "0"]), ("options", ["1", "0"]), ("asked", ["1", "1"]), ("closed", ["1", "1"])):

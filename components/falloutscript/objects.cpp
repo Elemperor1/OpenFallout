@@ -125,12 +125,12 @@ namespace FalloutScript
         run(mUpdating, BlockType::GameMode);
     }
 
-    void ObjectScripts::updateMenu()
+    void ObjectScripts::updateMenu(const BlockFilter& filter)
     {
-        run(mMenuUpdating, BlockType::MenuMode);
+        run(mMenuUpdating, BlockType::MenuMode, filter);
     }
 
-    void ObjectScripts::run(const std::set<FormId>& references, std::uint16_t blockType)
+    void ObjectScripts::run(const std::set<FormId>& references, std::uint16_t blockType, const BlockFilter& filter)
     {
         // What runs can load and unload references, so what is run is a copy, and each is checked before its turn
         const std::vector<FormId> running(references.begin(), references.end());
@@ -142,7 +142,7 @@ namespace FalloutScript
             if (found == mObjects.end())
                 continue;
             const std::shared_ptr<Instance> instance = found->second.mInstance;
-            mInterpreter.run(*instance, blockType);
+            mInterpreter.run(*instance, blockType, filter);
         }
     }
 

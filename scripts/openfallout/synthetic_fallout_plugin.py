@@ -304,8 +304,15 @@ BUTTON_PICKED = 2
 SAID_TOPIC_ID = 0x8F3
 SAID_INFO_ID = 0x8F4
 SAID_TEXT = "Said aloud."
+# The blocks of the script name what they are for. SayToDone names the topic that was said, so a block that names another
+# topic must not run (the fifth global); MenuMode names the number of a menu: the conversation (1009) and the message box
+# (1001) are open at some time in the test and count (the sixth and seventh), the love tester (1074) is not and must not
+# (the eighth).
 DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd"),
-                    "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid")}
+                    "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid"),
+                    "wrong": (0x8F5, "OFTestDialogueWrong"), "talk": (0x8F6, "OFTestDialogueTalk"),
+                    "box": (0x8F7, "OFTestDialogueBox"), "elsewhere": (0x8F8, "OFTestDialogueElsewhere")}
+MENU_NUMBERS = {"talk": 1009, "box": 1001, "elsewhere": 1074}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
 TALKER_PLACE = (-300.0, 300.0)
@@ -363,7 +370,7 @@ AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test s
 AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
 AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 
-LAST_ID = 0x8F4 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8F8 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -730,11 +737,17 @@ def button_message():
 def button_script():
     """The script of the talker (an SCPT record of type 0): every frame, until a button has been read, it sets the
     global to the number of the button plus one (GetButtonPressed tells -1 for none, and a button is told once), and
-    each time the talker has said what it was told to say it adds one to another global (Begin SayToDone)."""
+    each time the talker has said what it was told to say it adds one to another global (Begin SayToDone Topic). A
+    block for another topic adds to a global that must stay 0, and the blocks of MenuMode add to the globals of the
+    menus they name (the conversation and the message box are open at some time, the love tester never is)."""
     sf = fallout_script
     script = sf.Script(0)
     button = script.form(DIALOGUE_GLOBALS["button"][0])
-    said = script.form(DIALOGUE_GLOBALS["said"][0])
+
+    def count(name):
+        target = sf.global_target(script.form(DIALOGUE_GLOBALS[name][0]))
+        return sf.set_to(target, target + sf.number("1") + sf.operator("+"))
+
     script.add(
         sf.statement(sf.SCRIPT_NAME),
         sf.block(sf.GAME_MODE, b"".join([
@@ -742,8 +755,10 @@ def button_script():
             sf.set_to(sf.global_target(button),
                       sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
             sf.statement(sf.END_IF)])),
-        sf.block(sf.SAY_TO_DONE, sf.set_to(sf.global_target(said),
-                                           sf.global_target(said) + sf.number("1") + sf.operator("+"))))
+        sf.block(sf.SAY_TO_DONE, count("said"), names=sf.form_argument(script.form(SAID_TOPIC_ID))),
+        sf.block(sf.SAY_TO_DONE, count("wrong"), names=sf.form_argument(script.form(ADDED_TOPIC_ID))),
+        *(sf.block(sf.MENU_MODE_BLOCK, count(name), names=sf.int_argument(number))
+          for name, number in MENU_NUMBERS.items()))
     return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
 
 

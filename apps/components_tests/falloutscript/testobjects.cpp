@@ -284,6 +284,37 @@ namespace
         EXPECT_EQ(setup.variable(crate, 2), 2);
     }
 
+    TEST(FalloutScriptObjectsTest, a_menu_mode_block_that_names_a_menu_runs_when_the_filter_accepts_it)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const auto count = [](std::uint16_t variable) {
+            return setTo(var('s', variable), var('s', variable) + number("1") + op("+"));
+        };
+        builder.code(scriptName() + beginNaming(BlockType::MenuMode, intArg(1001)) + count(1) + end()
+            + beginNaming(BlockType::MenuMode, intArg(1009)) + count(2) + end() + begin(BlockType::MenuMode) + count(3)
+            + end());
+        builder.variable(1, integerVariable, "box")
+            .variable(2, integerVariable, "talk")
+            .variable(3, integerVariable, "any");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mObjects.setLoaded(crate, true);
+
+        setup.mObjects.updateMenu();
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+        EXPECT_EQ(setup.variable(crate, 3), 1);
+
+        // The message box is open: the block of the conversation does not run
+        setup.mObjects.updateMenu([](const FalloutScript::Block& block) {
+            return block.mNames != FalloutScript::BlockNames::Number || block.mNumber == 1001;
+        });
+        EXPECT_EQ(setup.variable(crate, 1), 2);
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+        EXPECT_EQ(setup.variable(crate, 3), 2);
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_game_mode_every_frame)
     {
         Runner setup;
