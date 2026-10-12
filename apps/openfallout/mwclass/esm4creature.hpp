@@ -65,6 +65,10 @@ namespace OFClass
         /// for a package that no file has a record for)
         static const std::vector<const ESM4::AIPackage*>& getPackages(const OFWorld::Ptr& ptr);
 
+        /// The half extents of the body that a creature of Fallout is solid as (the cylinder of its physics body), from
+        /// the box of its record; none (all 0) for a creature of the games before Fallout
+        static osg::Vec3f getBodyHalfExtents(const OFWorld::Ptr& ptr);
+
     private:
         static ESM4CreatureCustomData& getCustomData(const OFWorld::ConstPtr& ptr);
     };

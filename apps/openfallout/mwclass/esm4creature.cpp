@@ -153,10 +153,17 @@ namespace OFClass
             ESM4Impl::insertObjectPhysics(ptr, model, rotation, physics);
             return;
         }
+        physics.addActorBody(ptr, getBodyHalfExtents(ptr), rotation);
+    }
+
+    osg::Vec3f ESM4Creature::getBodyHalfExtents(const OFWorld::Ptr& ptr)
+    {
+        if (!isFalloutCreature(ptr))
+            return osg::Vec3f();
         // The box is the one of the record that has the model
         const ESM4::Creature* boxOwner = getCustomData(ptr).mModel.mOwner;
         if (boxOwner == nullptr)
             boxOwner = ptr.get<ESM4::Creature>()->mBase;
-        physics.addActorBody(ptr, creatureBodyHalfExtents(*boxOwner), rotation);
+        return creatureBodyHalfExtents(*boxOwner);
     }
 }

@@ -107,6 +107,9 @@ namespace OFClass
         static const ESM4::Npc* getTraitsRecord(const OFWorld::Ptr& ptr);
         static const ESM4::Race* getRace(const OFWorld::Ptr& ptr);
         static bool isFemale(const OFWorld::Ptr& ptr);
+        /// The half extents of the body that the character is solid as (the cylinder of its physics body), from the
+        /// height of its race
+        static osg::Vec3f getBodyHalfExtents(const OFWorld::Ptr& ptr);
         static const std::vector<const ESM4::Armor*>& getEquippedArmor(const OFWorld::Ptr& ptr);
         static const std::vector<const ESM4::Clothing*>& getEquippedClothing(const OFWorld::Ptr& ptr);
         /// The AI packages of a character of Fallout, in the order of their priority (the first is the highest):

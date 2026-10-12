@@ -48,6 +48,8 @@
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4base.hpp"
+#include "../mwclass/esm4creature.hpp"
+#include "../mwclass/esm4npc.hpp"
 #include "../mwclass/esm4sources.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
@@ -526,7 +528,15 @@ namespace OFScript
                 || (ptr.getClass().isActor() && ptr.getClass().getCreatureStats(ptr).isDead()))
                 return;
             const ESM::Position& position = ptr.getRefData().getPosition();
-            osg::Vec3f half = world->getHalfExtents(ptr);
+            // The characters and creatures of Fallout are solid as the cylinders of their physics bodies, which the
+            // world does not tell (it gives the bounds of their models); the player is an actor of the engine
+            osg::Vec3f half;
+            if (ptr.getType() == ESM4::Npc::sRecordId)
+                half = OFClass::ESM4Npc::getBodyHalfExtents(ptr);
+            else if (ptr.getType() == ESM4::Creature::sRecordId)
+                half = OFClass::ESM4Creature::getBodyHalfExtents(ptr);
+            else
+                half = world->getHalfExtents(ptr);
             // An actor the physics has no body for yet stands about as tall as a person
             FalloutScript::TriggerBody body;
             body.mReference = reference;
@@ -2136,7 +2146,9 @@ namespace OFScript
         {
             // The same way the Morrowind script command places something next to an actor
             OFWorld::ManualRef ref(mStore, refId(request.mBase), 1);
-            ref.getPtr().mRef->mData.mPhysicsPostponed = !ref.getPtr().getClass().isActor();
+            // A character or creature of Fallout is an actor too: its body is made at once, as in a cell
+            ref.getPtr().mRef->mData.mPhysicsPostponed
+                = !ref.getPtr().getClass().isActor() && !isCharacterOrCreature(ref.getPtr());
             const OFWorld::Ptr placed = OFBase::Environment::get().getWorld()->safePlaceObject(
                 ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
             const ESM::FormId number = placed.getCellRef().getRefNum();
