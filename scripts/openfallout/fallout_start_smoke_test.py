@@ -1554,12 +1554,14 @@ def check_dialogue(text):
         return line is not None and all(part in line for part in parts)
 
     voiced = re.findall(r"Voice: (\S+)", text)
-    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH]
+    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH,
+              plugin.FOLDER_SOUND_PATH]
     if voiced != wanted:
         problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
                         "talker, a line whose only file is another voice's (the ask line) and the lines with none "
                         "should be silent, and a response that names a sound record (the added topic) should be said "
-                        f"with the file of the record: {voiced}, wanted {wanted}")
+                        "with the file of the record, or with the first file of the folder that the record names: "
+                        f"{voiced}, wanted {wanted}")
 
     greeting = one("greeting")
     if not has(greeting, "active=true speaking=true ended=false", f"speaker={plugin.TALKER_TITLE}",
@@ -1580,7 +1582,7 @@ def check_dialogue(text):
         problems.append("after the response the topic that it adds should be among the options, after the topics of "
                         f"the list: {after}")
     added = one("added")
-    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}]"):
+    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}|{plugin.ADDED_MORE_TEXT}]"):
         problems.append(f"picking the added topic should say its response: {added}")
     over = one("over")
     if not has(over, "active=false", "ended=true"):

@@ -1019,14 +1019,31 @@ namespace OFScript
                 if (!sound->mSoundFile.empty())
                     if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
                     {
-                        // As for every sound record: the mp3 that a wav was converted to, when that is what there is
-                        constexpr VFS::Path::NormalizedView soundDir("sound");
-                        constexpr VFS::Path::ExtensionView mp3("mp3");
                         const VFS::Manager& vfs = *resources->getVFS();
-                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
-                        if (vfs.exists(path))
-                            return path.value();
+                        std::string folder = VFS::Path::normalizeFilename(sound->mSoundFile);
+                        if (!folder.empty() && folder.back() == VFS::Path::separator)
+                        {
+                            // A sound record can name a folder (40, 108 and 151 of the responses with a sound in the
+                            // three games): the first file in it is said
+                            if (folder.compare(0, 6, "sound/") != 0)
+                                folder.insert(0, "sound/");
+                            for (const VFS::Path::Normalized& file : vfs.getRecursiveDirectoryIterator(folder))
+                            {
+                                const std::string_view extension = file.extension().value();
+                                if (extension == "wav" || extension == "ogg" || extension == "mp3")
+                                    return file.value();
+                            }
+                        }
+                        else
+                        {
+                            // As for every sound record: the mp3 a wav was converted to, when that is what there is
+                            constexpr VFS::Path::NormalizedView soundDir("sound");
+                            constexpr VFS::Path::ExtensionView mp3("mp3");
+                            const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+                                { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
+                            if (vfs.exists(path))
+                                return path.value();
+                        }
                     }
         const FalloutScript::VoiceIndex& index = voices();
         if (index.size() == 0 || line.mInfo == 0)

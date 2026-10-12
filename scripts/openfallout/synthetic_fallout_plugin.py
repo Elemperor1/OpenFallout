@@ -330,6 +330,13 @@ SOUND_ID = 0x8F1
 SOUND_NAME = "OFTestAddedSound"
 SOUND_FILE = "fx\\oftest\\added.wav"
 SOUND_PATH = "sound/fx/oftest/added.mp3"
+# The second line of the added topic's response names a sound record that names a folder (a trailing backslash, as some
+# records of the games do): the first file of the folder is said.
+FOLDER_SOUND_ID = 0x8F9
+FOLDER_SOUND_NAME = "OFTestFolderSound"
+FOLDER_SOUND_FILE = "fx\\oftestfolder\\"
+FOLDER_SOUND_PATH = "sound/fx/oftestfolder/first.wav"
+ADDED_MORE_TEXT = "It has a second line."
 GOODBYE_TEXT = "Farewell."
 # The voice files of the lines: sound/voice/<plugin>/<voice type>/<text>_<form id of the response, 8 hex digits>_<n>.ogg.
 # The greeting has a file in the folder of the voice of the talker and one in the folder of another voice (the talker's
@@ -370,7 +377,7 @@ AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test s
 AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
 AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 
-LAST_ID = 0x8F8 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8F9 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -1280,13 +1287,17 @@ def topic(form_id, name, title, kind, flags, priority=50.0):
 
 
 def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, show=None, sound=0,
-             say=None):
-    """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
-    when the response starts and the one that runs when it is over, which shows the message `show` when it is given
-    and makes the talker say the topic `say` when that is given. `sound` is the sound record the response names."""
+             say=None, more=()):
+    """An INFO record with one line (and the lines of `more`, each a text and the sound record it names). The scripts
+    are lists of statements (with the global they set): the one that runs when the response starts and the one that
+    runs when it is over, which shows the message `show` when it is given and makes the talker say the topic `say` when
+    that is given. `sound` is the sound record the response names."""
     subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
     subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
     subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, sound, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
+    for number, (more_text, more_sound) in enumerate(more, 2):
+        subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, number, more_sound, 0)), zstr(b"NAM1", more_text),
+                 zstr(b"NAM2", "")]
     subs += list(conditions)
     if prompt is not None:
         subs.append(zstr(b"RNAM", prompt))
@@ -1337,7 +1348,7 @@ def dialogue():
         topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
-                                              sound=SOUND_ID)]),
+                                              sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),
     ]
 
 
@@ -1628,7 +1639,9 @@ def plugin():
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
                                          script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
-            + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)])])
+            + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)]),
+                                record(b"SOUN", FOLDER_SOUND_ID, [zstr(b"EDID", FOLDER_SOUND_NAME),
+                                                                  zstr(b"FNAM", FOLDER_SOUND_FILE)])])
             + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
@@ -1682,6 +1695,9 @@ def write(out, animation=True, spline=True):
     sound_file = out / SOUND_PATH
     sound_file.parent.mkdir(parents=True, exist_ok=True)
     sound_file.write_bytes(b"OggS not a sound")
+    folder_file = out / FOLDER_SOUND_PATH
+    folder_file.parent.mkdir(parents=True, exist_ok=True)
+    folder_file.write_bytes(b"OggS not a sound")
     mesh.write_text(box_mesh(), encoding="ascii")
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),
