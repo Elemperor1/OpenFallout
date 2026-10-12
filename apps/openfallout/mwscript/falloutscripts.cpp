@@ -192,11 +192,13 @@ namespace OFScript
             return 0.0;
         });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
-            sayTopic(call.mReference, FalloutScript::formArgument(call, 0));
+            sayTopic(
+                call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
             return 0.0;
         });
         mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
-            sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0));
+            sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
+                FalloutScript::intArgument(call, 2) != 0);
             return 0.0;
         });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
@@ -797,8 +799,8 @@ namespace OFScript
         return mStore.get<ESM4::Dialogue>().getSize() > 0;
     }
 
-    bool FalloutScripts::sayTopic(
-        FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener)
+    bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic,
+        FalloutScript::FormId listener, bool forceSubtitles)
     {
         ESM::FormId base;
         if (reference == 0 || topic == 0 || !baseOf(reference, base))
@@ -810,7 +812,8 @@ namespace OFScript
             const FalloutScript::DialogueView view
                 = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener);
             for (const FalloutScript::DialogueLine& line : view.mLines)
-                lines.push_back({ voiceFile(reference, line), line.mText, lineSeconds(line.mText) });
+                lines.push_back(
+                    { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, forceSubtitles });
         }
         if (lines.empty())
             return false;
@@ -961,8 +964,8 @@ namespace OFScript
                     voiced = sound->sayActive(speaker);
                 }
                 saying->mWait = voiced ? 0.f : line.mSeconds;
-                // What is said can be read when it is far enough to hear it, if subtitles are on or when there is
-                // no voice to hear
+                // What is said can be read when it is far enough to hear it, if subtitles are on, when there is no
+                // voice to hear or when the script that said it forced them
                 constexpr float hearingDistance = 1500.f;
                 // The cells of an exterior worldspace are one place, an interior is the cell
                 const auto sameplace = [&] {
@@ -977,7 +980,7 @@ namespace OFScript
                     && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
                             .length()
                         <= hearingDistance;
-                if (near && (!voiced || Settings::gui().mSubtitles))
+                if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
                 {
                     const std::string name(speaker.getClass().getName(speaker));
                     OFBase::Environment::get().getWindowManager()->messageBox(
