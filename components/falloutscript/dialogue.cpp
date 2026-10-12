@@ -219,18 +219,20 @@ namespace FalloutScript
             if (!hasFlag(info, ESM4::INFO_Random))
                 return &info;
 
-            // The responses flagged Random that follow this one, up to the one flagged Random End, are a set to pick
-            // from
+            // The responses that can be said and are flagged Random that follow this one, up to the one flagged Random
+            // End or the first that can be said and is not Random, are a set to pick from. A response that cannot be
+            // said is passed over, whatever its flags.
             std::vector<const ESM4::DialogInfo*> candidates{ &info };
             if (!hasFlag(info, ESM4::INFO_RandomEnd))
             {
                 for (std::size_t j = i + 1; j < infos.size(); ++j)
                 {
                     const ESM4::DialogInfo& next = *infos[j];
+                    if (!canSay(next, speaker))
+                        continue;
                     if (!hasFlag(next, ESM4::INFO_Random))
                         break;
-                    if (canSay(next, speaker))
-                        candidates.push_back(&next);
+                    candidates.push_back(&next);
                     if (hasFlag(next, ESM4::INFO_RandomEnd))
                         break;
                 }

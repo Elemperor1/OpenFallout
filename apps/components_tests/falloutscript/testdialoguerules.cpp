@@ -447,6 +447,29 @@ namespace
         EXPECT_THAT(setup.mRandomCounts, ElementsAre(2u));
     }
 
+    TEST(FalloutScriptDialogueTest, aRunOfRandomResponsesPassesOverAResponseThatCannotBeSaid)
+    {
+        Harness setup;
+        ESM4::QuestStage& stage = setup.mRecords.mQuests.front().mStages.emplace_back();
+        stage.mIndex = 10;
+        stage.mLogEntries.emplace_back();
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "r1").mInfoFlags = ESM4::INFO_Random;
+        setup.mRecords.addInfo(0x3002, topicA, "later").mConditions.push_back(stageIs(runningQuest, 10));
+        setup.mRecords.addInfo(0x3003, topicA, "r2").mInfoFlags = ESM4::INFO_Random;
+        setup.start();
+
+        setup.mRandomPick = 5;
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("r2"));
+        EXPECT_THAT(setup.mRandomCounts, ElementsAre(2u));
+
+        // Once it can be said, it is a response that is not Random and the run ends at it
+        EXPECT_TRUE(setup.mQuests.setStage(runningQuest, 10));
+        setup.mRandomCounts.clear();
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("r1"));
+        EXPECT_THAT(setup.mRandomCounts, IsEmpty());
+    }
+
     TEST(FalloutScriptDialogueTest, aSpeechChallengeIsPassedUnlessACheckSaysOtherwise)
     {
         Harness setup;
