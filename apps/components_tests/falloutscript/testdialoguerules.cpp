@@ -374,6 +374,92 @@ namespace
         EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3001u);
     }
 
+    TEST(FalloutScriptDialogueTest, aResponseNeedsTheConditionsOfItsQuestToHoldForTheSpeaker)
+    {
+        Harness setup;
+        // The quest keeps the test of who may say its responses, which have none of their own
+        ESM4::TargetCondition touch{};
+        touch.condition = ESM4::CTF_GreaterThan;
+        touch.comparison = 0;
+        touch.functionIndex = functionTouch;
+        setup.mRecords.mQuests.front().mTargetConditions.push_back(touch);
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "of the quest with conditions");
+        setup.mRecords.addInfo(0x3002, topicA, "of no quest").mQuest = ESM::FormId();
+        setup.start();
+
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
+        EXPECT_THAT(setup.mTouched, ElementsAre(speaker.mReference));
+        setup.mTouchValue[speaker.mReference] = 1;
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3001u);
+    }
+
+    TEST(FalloutScriptDialogueTest, aResponseNeedsItsOwnConditionsAndThoseOfItsQuest)
+    {
+        Harness setup;
+        setup.mRecords.mQuests.front().mTargetConditions.push_back(stageIs(runningQuest, 0));
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "own condition fails").mConditions.push_back(stageIs(runningQuest, 10));
+        setup.mRecords.addInfo(0x3002, topicA, "both hold");
+        setup.start();
+
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
+    }
+
+    TEST(FalloutScriptDialogueTest, theQuestOfTheHighestPriorityIsTriedFirst)
+    {
+        Harness setup;
+        constexpr FormId highQuest = 0x00001002;
+        constexpr FormId asleepQuest = 0x00001003;
+        setup.mRecords.addQuest(highQuest, true);
+        setup.mRecords.mQuests.back().mData.priority = 50;
+        setup.mRecords.addQuest(asleepQuest, false);
+        setup.mRecords.mQuests.back().mData.priority = 90;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "of the quest of priority 0");
+        setup.mRecords.addInfo(0x3002, topicA, "of the quest of priority 50").mQuest = id(highQuest);
+        setup.mRecords.addInfo(0x3003, topicA, "next of that quest", 0x3002).mQuest = id(highQuest);
+        setup.mRecords.addInfo(0x3004, topicA, "of a quest that sleeps").mQuest = id(asleepQuest);
+        setup.start();
+
+        // The responses of one quest keep the order of their chain
+        EXPECT_THAT(ids(setup.mDialogue.responses(topicA)), ElementsAre(0x3004u, 0x3002u, 0x3003u, 0x3001u));
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
+    }
+
+    TEST(FalloutScriptDialogueTest, aRunOfRandomResponsesStaysInTheQuestItStartedIn)
+    {
+        Harness setup;
+        constexpr FormId highQuest = 0x00001002;
+        setup.mRecords.addQuest(highQuest, true);
+        setup.mRecords.mQuests.back().mData.priority = 50;
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "of the quest of priority 0").mInfoFlags = ESM4::INFO_Random;
+        setup.mRecords.addInfo(0x3002, topicA, "of the quest of priority 50").mQuest = id(highQuest);
+        setup.mRecords.mInfos.back().mInfoFlags = ESM4::INFO_Random;
+        setup.start();
+        setup.mRandomPick = 5;
+
+        // The order is now 0x3002, 0x3001: the run that starts at the first is not joined by the one of the other quest
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3002u);
+        EXPECT_THAT(setup.mRandomCounts, IsEmpty());
+    }
+
+    TEST(FalloutScriptDialogueTest, aQuestOfHigherPriorityThatCannotBeSaidLeavesTheTopicToTheNext)
+    {
+        Harness setup;
+        constexpr FormId highQuest = 0x00001002;
+        setup.mRecords.addQuest(highQuest, true);
+        setup.mRecords.mQuests.back().mData.priority = 50;
+        setup.mRecords.mQuests.back().mTargetConditions.push_back(stageIs(highQuest, 10));
+        setup.mRecords.addTopic(topicA, "A");
+        setup.mRecords.addInfo(0x3001, topicA, "of the quest of priority 0");
+        setup.mRecords.addInfo(0x3002, topicA, "of the quest of priority 50").mQuest = id(highQuest);
+        setup.start();
+
+        EXPECT_EQ(setup.mDialogue.responseFor(topicA, speaker)->mId.toUint32(), 0x3001u);
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseForOneSpeakerIsNotSaidByAnother)
     {
         Harness setup;

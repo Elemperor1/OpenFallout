@@ -77,9 +77,10 @@ namespace FalloutScript
 
     /// The rules of dialogue as the games have them, without the window: which topics the player can pick from, which
     /// response a topic gives, what is said and what a response does. The responses of a topic are tried in the order
-    /// of their chain of previous responses (PNAM), the first whose quest runs, whose speaker is the one talking,
-    /// that was not said (for those that are said once or once a day) and whose conditions hold is the one said; a run
-    /// of responses flagged Random gives one of those that can be said. A response that is said runs its begin script
+    /// of their chain of previous responses (PNAM), the quests of the highest priority first. The first whose quest
+    /// runs and whose conditions hold (the quest has some of its own), whose speaker is the one talking, that was not
+    /// said (for those that are said once or once a day) and whose conditions hold is the one said; a run of responses
+    /// flagged Random gives one of those that can be said. A response that is said runs its begin script
     /// at once; its end script runs when the response is finished, which also adds the topics it names to those the
     /// player has, and either ends the conversation (a response flagged Goodbye) or offers the topics it lists as
     /// choices, or else the topics at the top of the list and those the player has been given.
@@ -168,6 +169,8 @@ namespace FalloutScript
         };
 
         static std::vector<const ESM4::DialogInfo*> chainOrder(const std::vector<const ESM4::DialogInfo*>& inFileOrder);
+        /// The priority of the quest (0 for one that is not known)
+        int questPriority(FormId quest) const;
 
         std::vector<DialogueOption> options(const DialogueSpeaker& speaker, const std::vector<ESM::FormId>* choices);
         bool addOption(std::vector<DialogueOption>& options, FormId topic, const DialogueSpeaker& speaker);

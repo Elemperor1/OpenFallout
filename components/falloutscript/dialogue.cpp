@@ -130,7 +130,15 @@ namespace FalloutScript
         {
             const auto found = infos.find(id);
             if (found != infos.end())
+            {
                 entry.mInfos = chainOrder(found->second);
+                // A topic that several quests have responses to is answered by the quest of the highest priority that
+                // has one; the responses of the quests of the same priority keep the order of the chain
+                std::stable_sort(entry.mInfos.begin(), entry.mInfos.end(),
+                    [this](const ESM4::DialogInfo* left, const ESM4::DialogInfo* right) {
+                        return questPriority(toId(left->mQuest)) > questPriority(toId(right->mQuest));
+                    });
+            }
             if (entry.mRecord == nullptr)
                 continue;
             // The responses of other topics that the topic shows (New Vegas) are tried after its own, in the order they
@@ -181,10 +189,17 @@ namespace FalloutScript
         return 0;
     }
 
+    int DialogueManager::questPriority(FormId quest) const
+    {
+        const QuestState* state = mQuests.state(quest);
+        return state != nullptr && state->mRecord != nullptr ? state->mRecord->mData.priority : 0;
+    }
+
     bool DialogueManager::canSay(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker)
     {
         const FormId id = toId(info.mId);
-        if (const FormId quest = toId(info.mQuest); quest != 0 && !mQuests.running(quest))
+        const FormId quest = toId(info.mQuest);
+        if (quest != 0 && !mQuests.running(quest))
             return false;
         // What a character said is kept for that character: another can still say it
         const std::pair<FormId, FormId> key{ speaker.mReference, id };
@@ -203,6 +218,15 @@ namespace FalloutScript
         ConditionContext context;
         context.mSubject = speaker.mReference;
         context.mTarget = mListener;
+        // The conditions of the quest are about every response it has, before those of the response (the quests of
+        // the dialogue that anyone can say test the faction or the voice type of the speaker there)
+        if (quest != 0)
+        {
+            const QuestState* state = mQuests.state(quest);
+            if (state != nullptr && state->mRecord != nullptr
+                && !mConditions.holds(state->mRecord->mTargetConditions, context))
+                return false;
+        }
         return mConditions.holds(info.mConditions, context);
     }
 
@@ -222,13 +246,16 @@ namespace FalloutScript
 
             // The responses that can be said and are flagged Random that follow this one, up to the one flagged Random
             // End or the first that can be said and is not Random, are a set to pick from. A response that cannot be
-            // said is passed over, whatever its flags.
+            // said is passed over, whatever its flags. A set is of one quest: the responses of another quest are never
+            // part of it.
             std::vector<const ESM4::DialogInfo*> candidates{ &info };
             if (!hasFlag(info, ESM4::INFO_RandomEnd))
             {
                 for (std::size_t j = i + 1; j < infos.size(); ++j)
                 {
                     const ESM4::DialogInfo& next = *infos[j];
+                    if (next.mQuest != info.mQuest)
+                        break;
                     if (!canSay(next, speaker))
                         continue;
                     if (!hasFlag(next, ESM4::INFO_Random))
