@@ -290,7 +290,29 @@ GREETING_INFO_ID = 0x8CD
 ASK_INFO_ID = 0x8CE
 ADDED_INFO_ID = 0x8CF
 GOODBYE_INFO_ID = 0x8D0
-DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd")}
+# The button of a message box with buttons that the end of the conversation shows: the response that ends it shows the
+# message, and the script of the talker reads the button into the third global (the number of the button, plus one)
+BUTTON_MESSAGE_ID = 0x8D4
+BUTTON_SCRIPT_ID = 0x8D5
+BUTTON_MESSAGE_TITLE = "OpenFallout Test Message"
+BUTTON_MESSAGE_TEXT = "Pick one of the buttons."
+# the second button has a condition that the player does not meet (it is not shown); the third is picked by the test
+BUTTON_TEXTS = ("First choice", "Hidden choice", "Third choice")
+BUTTON_PICKED = 2
+# The end script of the question makes the talker say a topic outside of the conversation (Say), and when the talker has
+# said it the Begin SayToDone block of its script adds one to a global
+SAID_TOPIC_ID = 0x8F3
+SAID_INFO_ID = 0x8F4
+SAID_TEXT = "Said aloud."
+# The blocks of the script name what they are for. SayToDone names the topic that was said, so a block that names another
+# topic must not run (the fifth global); MenuMode names the number of a menu: the conversation (1009) and the message box
+# (1001) are open at some time in the test and count (the sixth and seventh), the love tester (1074) is not and must not
+# (the eighth).
+DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd"),
+                    "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid"),
+                    "wrong": (0x8F5, "OFTestDialogueWrong"), "talk": (0x8F6, "OFTestDialogueTalk"),
+                    "box": (0x8F7, "OFTestDialogueBox"), "elsewhere": (0x8F8, "OFTestDialogueElsewhere")}
+MENU_NUMBERS = {"talk": 1009, "box": 1001, "elsewhere": 1074}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
 TALKER_PLACE = (-300.0, 300.0)
@@ -308,6 +330,13 @@ SOUND_ID = 0x8F1
 SOUND_NAME = "OFTestAddedSound"
 SOUND_FILE = "fx\\oftest\\added.wav"
 SOUND_PATH = "sound/fx/oftest/added.mp3"
+# The second line of the added topic's response names a sound record that names a folder (a trailing backslash, as some
+# records of the games do): the first file of the folder is said.
+FOLDER_SOUND_ID = 0x8F9
+FOLDER_SOUND_NAME = "OFTestFolderSound"
+FOLDER_SOUND_FILE = "fx\\oftestfolder\\"
+FOLDER_SOUND_PATH = "sound/fx/oftestfolder/first.wav"
+ADDED_MORE_TEXT = "It has a second line."
 GOODBYE_TEXT = "Farewell."
 # The voice files of the lines: sound/voice/<plugin>/<voice type>/<text>_<form id of the response, 8 hex digits>_<n>.ogg.
 # The greeting has a file in the folder of the voice of the talker and one in the folder of another voice (the talker's
@@ -325,7 +354,30 @@ def voice_path(voice, text, response, number=1):
     return f"sound/voice/oftest.esm/{voice.lower()}/{text}_{response:08x}_{number}.ogg"
 
 
-LAST_ID = 0x8F1 # the largest form ID of the plugin, which the next object ID of its header follows
+# The making of the character: two traits and a perk that is none (PERK), a second playable race, the texts of two
+# actor values (AVIF) and a quest whose script opens the menus when the test asks for it, waits until the player is done
+# with all of their screens and then reads what the player made into globals
+TRAIT_A_ID = 0x8D6
+TRAIT_B_ID = 0x8D7
+NOT_A_TRAIT_ID = 0x8D8
+RACE_TWO_ID = 0x8D9
+AVIF_STRENGTH_ID = 0x8DA
+AVIF_BARTER_ID = 0x8DB
+CHARGEN_QUEST_ID = 0x8DC
+CHARGEN_SCRIPT_ID = 0x8DD
+CHARGEN_GLOBAL_NAMES = ("go", "state", "during", "after", "female", "race_two", "strength", "perception", "endurance",
+                        "charisma", "intelligence", "agility", "luck", "barter", "guns", "survival", "trait_a",
+                        "trait_b", "other")
+CHARGEN_GLOBALS = {name: (0x8DE + index, "OFTestCg" + name.title().replace("_", ""))
+                   for index, name in enumerate(CHARGEN_GLOBAL_NAMES)}
+TRAIT_A_NAME, TRAIT_B_NAME, NOT_A_TRAIT_NAME = "Test Trait Alpha", "Test Trait Beta", "Test Perk"
+RACE_TWO_NAME = "OFTestRaceTwo"
+AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test strength description."),
+              AVIF_BARTER_ID: ("Barter", "Barter of the test", "The test barter description.")}
+AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
+AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
+
+LAST_ID = 0x8F9 # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -675,6 +727,114 @@ def message():
     """The MESG record that the scripted object shows: a text and no buttons."""
     return record(b"MESG", MESSAGE_ID, [zstr(b"EDID", "OFTestMessage"), zstr(b"DESC", MESSAGE_TEXT),
                                         sub(b"DNAM", struct.pack("<I", 0)), sub(b"TNAM", struct.pack("<f", 2.0))])
+
+
+def button_message():
+    """The MESG record of a message box with three buttons, the second of which has a condition that nobody meets. The
+    flag 1 of DNAM makes it a box and not a note on the screen."""
+    subs = [zstr(b"EDID", "OFTestButtonMessage"), zstr(b"DESC", BUTTON_MESSAGE_TEXT), zstr(b"FULL", BUTTON_MESSAGE_TITLE),
+            sub(b"DNAM", struct.pack("<I", 1)), sub(b"TNAM", struct.pack("<I", 0))]
+    for index, text in enumerate(BUTTON_TEXTS):
+        subs.append(zstr(b"ITXT", text))
+        if index == 1:
+            subs.append(condition(GET_IS_VOICE_TYPE_FUNCTION, OTHER_VOICE_ID, compare=0x00, value=1.0))
+    return record(b"MESG", BUTTON_MESSAGE_ID, subs)
+
+
+def button_script():
+    """The script of the talker (an SCPT record of type 0): every frame, until a button has been read, it sets the
+    global to the number of the button plus one (GetButtonPressed tells -1 for none, and a button is told once), and
+    each time the talker has said what it was told to say it adds one to another global (Begin SayToDone Topic). A
+    block for another topic adds to a global that must stay 0, and the blocks of MenuMode add to the globals of the
+    menus they name (the conversation and the message box are open at some time, the love tester never is)."""
+    sf = fallout_script
+    script = sf.Script(0)
+    button = script.form(DIALOGUE_GLOBALS["button"][0])
+
+    def count(name):
+        target = sf.global_target(script.form(DIALOGUE_GLOBALS[name][0]))
+        return sf.set_to(target, target + sf.number("1") + sf.operator("+"))
+
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.GAME_MODE, b"".join([
+            sf.branch(sf.IF, sf.global_target(button) + sf.number("0") + sf.operator("==")),
+            sf.set_to(sf.global_target(button),
+                      sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
+            sf.statement(sf.END_IF)])),
+        sf.block(sf.SAY_TO_DONE, count("said"), names=sf.form_argument(script.form(SAID_TOPIC_ID))),
+        sf.block(sf.SAY_TO_DONE, count("wrong"), names=sf.form_argument(script.form(ADDED_TOPIC_ID))),
+        *(sf.block(sf.MENU_MODE_BLOCK, count(name), names=sf.int_argument(number))
+          for name, number in MENU_NUMBERS.items()))
+    return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
+
+
+def trait_perk(form_id, name, title, description, trait):
+    """A PERK record with no entries: the flag of a trait (and a name and a text to show) or of a perk that is none."""
+    return record(b"PERK", form_id, [zstr(b"EDID", name), zstr(b"FULL", title), zstr(b"DESC", description),
+                                     sub(b"DATA", bytes([1 if trait else 0, 0, 1, 1, 0]))])
+
+
+def actor_value_info(form_id, editor_id, title, description):
+    return record(b"AVIF", form_id, [zstr(b"EDID", editor_id), zstr(b"FULL", title), zstr(b"DESC", description)])
+
+
+def chargen_script():
+    """The script of the quest that makes the character (an SCPT record of type 1): when the test sets `go` it opens the
+    menus for the race, the name (as the scripts of the games do, one after the other), SPECIAL with the tagged skills
+    and the traits; once no menu is open (the game
+    stands still while one is, so this only happens after the player is done with all of them) it reads what the player
+    made into the globals."""
+    sf = fallout_script
+    script = sf.Script(1)
+    player = script.form(PLAYER_REFERENCE)
+    race_two, trait_a, trait_b, other = (script.form(form_id) for form_id in (
+        RACE_TWO_ID, TRAIT_A_ID, TRAIT_B_ID, NOT_A_TRAIT_ID))
+    names = {name: script.form(form_id) for name, (form_id, _) in CHARGEN_GLOBALS.items()}
+
+    def target(name):
+        return sf.global_target(names[name])
+
+    def read(name, code, *arguments, reference=0):
+        return sf.set_to(target(name), sf.call_token(code, *arguments, reference=reference))
+
+    attributes = {"strength": AV_STRENGTH, "perception": AV_PERCEPTION, "endurance": AV_ENDURANCE,
+                  "charisma": AV_CHARISMA, "intelligence": AV_INTELLIGENCE, "agility": AV_AGILITY, "luck": AV_LUCK,
+                  "barter": AV_BARTER, "guns": AV_GUNS, "survival": AV_SURVIVAL}
+    start = (
+        sf.global_target(names["go"]) + sf.number("1") + sf.operator("==")
+        + sf.global_target(names["state"]) + sf.number("0") + sf.operator("==") + sf.operator("&&"))
+    done = (sf.global_target(names["state"]) + sf.number("1") + sf.operator("==")
+            + sf.call_token(sf.MENU_MODE) + sf.number("0") + sf.operator("==") + sf.operator("&&"))
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.GAME_MODE, b"".join([
+            sf.branch(sf.IF, start),
+            sf.call(sf.SET_IN_CHARGEN, sf.int_argument(1)),
+            sf.call(sf.SHOW_RACE_MENU),
+            sf.call(sf.GET_PLAYER_NAME),
+            sf.call(sf.SET_SPECIAL_POINTS, sf.int_argument(40)),
+            sf.call(sf.SET_TAG_SKILLS, sf.int_argument(3)),
+            sf.call(sf.SHOW_TRAIT_MENU),
+            sf.set_to(target("state"), sf.number("1")),
+            sf.statement(sf.END_IF),
+            sf.branch(sf.IF, done),
+            read("during", sf.GET_IN_CHARGEN),
+            sf.call(sf.SET_IN_CHARGEN, sf.int_argument(0)),
+            read("after", sf.GET_IN_CHARGEN),
+            read("female", sf.GET_PC_IS_SEX, sf.int_argument(1)),
+            read("race_two", sf.GET_PC_IS_RACE, sf.form_argument(race_two)),
+            *(read(name, sf.GET_ACTOR_VALUE, sf.u16(number), reference=player) for name, number in attributes.items()),
+            read("trait_a", sf.HAS_PERK, sf.form_argument(trait_a), reference=player),
+            read("trait_b", sf.HAS_PERK, sf.form_argument(trait_b), reference=player),
+            read("other", sf.HAS_PERK, sf.form_argument(other), reference=player),
+            sf.set_to(target("state"), sf.number("2")),
+            sf.statement(sf.END_IF)])))
+    return record(b"SCPT", CHARGEN_SCRIPT_ID, [zstr(b"EDID", "OFTestChargenScript"), *sf.sub_records(script)])
+
+
+def chargen_quest():
+    return quest(CHARGEN_QUEST_ID, "OFTestChargenQuest", "OpenFallout Test Chargen", QUEST_FLAG_START_GAME, [], script=CHARGEN_SCRIPT_ID)
 
 
 def form_lists():
@@ -1058,13 +1218,13 @@ def part(index, name, path=None):
     return [sub(b"INDX", struct.pack("<I", index)), zstr(b"MODL", path or part_path(name))]
 
 
-def race():
+def race(form_id=RACE_ID, name=RACE_NAME):
     """A race with the data that the loader needs of one and the parts of a body that Fallout 3 gives it: the head (part
     0 of the 8 of the head data) and the upper body and the two hands (parts 0 to 2 of the 4 of the body data), for men.
     The skeleton is in the NPC_ record."""
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
-    return record(b"RACE", RACE_ID, [zstr(b"EDID", RACE_NAME), sub(b"DATA", data),
+    return record(b"RACE", form_id, [zstr(b"EDID", name), sub(b"DATA", data),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
                                      sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
@@ -1092,7 +1252,7 @@ def faction(form_id, name):
 
 
 def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=(), voice=None,
-           title="OpenFallout Test Person"):
+           title="OpenFallout Test Person", script=None):
     """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
@@ -1110,6 +1270,8 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
     subs += [sub(b"PKID", struct.pack("<I", package)) for package in packages]
     if voice is not None:
         subs.append(sub(b"VTCK", struct.pack("<I", voice)))
+    if script is not None:
+        subs.append(sub(b"SCRI", struct.pack("<I", script)))
     return record(b"NPC_", form_id, subs)
 
 
@@ -1124,12 +1286,18 @@ def topic(form_id, name, title, kind, flags, priority=50.0):
                                      sub(b"PNAM", struct.pack("<f", priority)), sub(b"DATA", bytes([kind, flags]))])
 
 
-def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, sound=0):
-    """An INFO record with one line. The scripts are lists of statements (with the global they set): the one that runs
-    when the response starts and the one that runs when it is over. `sound` is the sound record the response names."""
+def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=None, end=None, show=None, sound=0,
+             say=None, more=()):
+    """An INFO record with one line (and the lines of `more`, each a text and the sound record it names). The scripts
+    are lists of statements (with the global they set): the one that runs when the response starts and the one that
+    runs when it is over, which shows the message `show` when it is given and makes the talker say the topic `say` when
+    that is given. `sound` is the sound record the response names."""
     subs = [sub(b"DATA", struct.pack("<BBH", 0, 0, flags)), sub(b"QSTI", struct.pack("<I", QUEST_A_ID))]
     subs += [sub(b"NAME", struct.pack("<I", added)) for added in adds]
     subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, 1, sound, 0)), zstr(b"NAM1", text), zstr(b"NAM2", "")]
+    for number, (more_text, more_sound) in enumerate(more, 2):
+        subs += [sub(b"TRDT", struct.pack("<IiIB3xIB3x", 0, 0, 0, number, more_sound, 0)), zstr(b"NAM1", more_text),
+                 zstr(b"NAM2", "")]
     subs += list(conditions)
     if prompt is not None:
         subs.append(zstr(b"RNAM", prompt))
@@ -1138,8 +1306,16 @@ def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=
                              [begin])
     if end is not None:
         subs += [sub(b"NEXT")]
-        subs += stage_script([fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))],
-                             [end])
+        statements = [fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))]
+        references = [end]
+        if say is not None:
+            statements.append(fallout_script.call_on(2, fallout_script.SAY, fallout_script.form_argument(3)))
+            references += [TALKER_REF_ID, say]
+        subs += stage_script(statements, references)
+    elif show is not None:
+        subs += [sub(b"NEXT")]
+        subs += stage_script([fallout_script.call(fallout_script.SHOW_MESSAGE, fallout_script.form_argument(1))],
+                             [show])
     return record(b"INFO", form_id, subs)
 
 
@@ -1166,9 +1342,13 @@ def dialogue():
         topic_group(GOODBYE_TOPIC_ID, [response(GOODBYE_INFO_ID, GOODBYE_TEXT, flags=0x0001)]),
         topic(ASK_TOPIC_ID, "OFTestAsk", ASK_TOPIC_NAME, 0, 0x02, 90.0),
         topic_group(ASK_TOPIC_ID, [
-            response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end)]),
+            response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end,
+                     say=SAID_TOPIC_ID)]),
+        topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
+        topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
-        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, sound=SOUND_ID)]),
+        topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
+                                              sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),
     ]
 
 
@@ -1427,6 +1607,7 @@ def plugin():
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in DIALOGUE_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in CHARGEN_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l")
@@ -1439,20 +1620,28 @@ def plugin():
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
-            + top_group(b"MESG", [message()])
+            + top_group(b"MESG", [message(), button_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
-                                                 object_script("exterior")])
-            + top_group(b"QUST", quests())
+                                                 object_script("exterior"), button_script(), chargen_script()])
+            + top_group(b"QUST", [*quests(), chargen_quest()])
+            + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
+                                  trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),
+                                  trait_perk(NOT_A_TRAIT_ID, "OFTestPerkNotTrait", NOT_A_TRAIT_NAME, "No trait.", False)])
+            + top_group(b"AVIF", [actor_value_info(form_id, *texts[:1], *texts[1:])
+                                  for form_id, texts in AVIF_TEXTS.items()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
-            + top_group(b"RACE", [race()]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
+            + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", packages())
             + top_group(b"NPC_", [person(), *package_people(),
-                                  person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE)])
+                                  person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
+                                         script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
-            + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)])])
+            + top_group(b"SOUN", [record(b"SOUN", SOUND_ID, [zstr(b"EDID", SOUND_NAME), zstr(b"FNAM", SOUND_FILE)]),
+                                record(b"SOUN", FOLDER_SOUND_ID, [zstr(b"EDID", FOLDER_SOUND_NAME),
+                                                                  zstr(b"FNAM", FOLDER_SOUND_FILE)])])
             + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
@@ -1506,6 +1695,9 @@ def write(out, animation=True, spline=True):
     sound_file = out / SOUND_PATH
     sound_file.parent.mkdir(parents=True, exist_ok=True)
     sound_file.write_bytes(b"OggS not a sound")
+    folder_file = out / FOLDER_SOUND_PATH
+    folder_file.parent.mkdir(parents=True, exist_ok=True)
+    folder_file.write_bytes(b"OggS not a sound")
     mesh.write_text(box_mesh(), encoding="ascii")
     for name, (half_extents, center) in PERSON_PARTS.items():
         (out / "meshes" / Path(part_path(name).replace("\\", "/"))).write_text(box_mesh(half_extents, center),

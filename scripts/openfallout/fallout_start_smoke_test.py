@@ -50,6 +50,7 @@ The exit status is 0 when every check holds. It also checks that files/data/mesh
 placeholder_skeleton.py writes.
 """
 import argparse
+import ctypes
 import math
 import os
 import pty
@@ -59,6 +60,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -620,13 +622,15 @@ QUEST_SCRIPT = (QUEST_SCRIPT.replace("@FROM@", str(plugin.QUEST_DELAY * (plugin.
 # them, which adds a topic and runs a script when it ends, then the topic it added, whose response ends the conversation.
 DIALOGUE_FROM = 3.0
 DIALOGUE_TIMEOUT = 15.0
+# How long after the conversation the message box that its last response shows may wait for the harness to pick a button
+DIALOGUE_BUTTON_TIMEOUT = 20.0
 DIALOGUE_SCRIPT = """\
 local core = require('openfallout.core')
 local I = require('openfallout.interfaces')
 
 local conversation = core.conversation
-local elapsed, step, since = 0, 0, 0
-local ask, added
+local elapsed, step, since, poll = 0, 0, 0, 0
+local ask, added, buttonValue
 
 local function log(...) print('OFTEST', 'dialogue', ...) end
 
@@ -691,17 +695,36 @@ return {
                 log('closed', describe(conversation.get()))
                 core.sendGlobalEvent('OFTestReport', 'closed')
                 go(6)
-            elseif step == 6 and since >= 0.5 then
+            elseif step == 6 then
+                -- The last response showed a message box with buttons; the harness picks one with the keyboard, and the
+                -- script of the talker reads which (the script of the world tells what it read)
+                poll = poll + dt
+                if poll >= 0.5 then
+                    poll = 0
+                    core.sendGlobalEvent('OFTestReport', 'button')
+                end
+                if buttonValue and buttonValue > 0 then
+                    log('button', tostring(buttonValue))
+                    go(7)
+                elseif since >= @BUTTON_TIMEOUT@ then
+                    log('button timeout')
+                    go(7)
+                end
+            elseif step == 7 and since >= 0.5 then
                 core.quit()
             end
-            if step ~= 0 and step ~= 6 and since >= @TIMEOUT@ then
+            if step ~= 0 and step < 6 and since >= @TIMEOUT@ then
                 log('timeout at step', tostring(step), describe(view))
                 core.quit()
             end
         end,
     },
+    eventHandlers = {
+        OFTestButtonValue = function(value) buttonValue = value end,
+    },
 }
 """.replace("@FROM@", str(DIALOGUE_FROM)).replace("@TIMEOUT@", str(DIALOGUE_TIMEOUT)).replace(
+    "@BUTTON_TIMEOUT@", str(DIALOGUE_BUTTON_TIMEOUT)).replace(
     "@ASK_PROMPT@", plugin.ASK_PROMPT).replace("@ADDED@", plugin.ADDED_TOPIC_NAME)
 
 DIALOGUE_HOST_SCRIPT = """\
@@ -721,11 +744,165 @@ return {
         end,
         OFTestReport = function(tag)
             print('OFTEST', 'dialogue globals', tag, tostring(world.globals.@BEGIN@), tostring(world.globals.@END@))
+            if tag == 'button' then
+                world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
+                print('OFTEST', 'dialogue said', tostring(world.globals.@SAID@))
+                print('OFTEST', 'dialogue blocks', tostring(world.globals.@WRONG@), tostring(world.globals.@TALK@),
+                    tostring(world.globals.@BOX@), tostring(world.globals.@ELSEWHERE@))
+            end
         end,
     },
 }
 """.replace("@TALKER_REF@", str(plugin.TALKER_REF_ID)).replace("@BEGIN@", plugin.DIALOGUE_GLOBALS["begin"][1]).replace(
-    "@END@", plugin.DIALOGUE_GLOBALS["end"][1])
+    "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1]).replace(
+    "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1]).replace("@WRONG@", plugin.DIALOGUE_GLOBALS["wrong"][1]).replace(
+    "@TALK@", plugin.DIALOGUE_GLOBALS["talk"][1]).replace("@BOX@", plugin.DIALOGUE_GLOBALS["box"][1]).replace(
+    "@ELSEWHERE@", plugin.DIALOGUE_GLOBALS["elsewhere"][1])
+
+# The making of the character, in an engine of its own because its screens pause the game. A script of the world sets the
+# global that the script of a quest waits for, the script opens the menus (the race, then the name, SPECIAL with the
+# tagged skills, the traits), and a script of the player looks at each screen as it opens (core.chargen) and does what a player
+# does: the name is typed on the keyboard by the harness, the rest is picked with the functions the buttons of the
+# screens call. The script of the quest reads what was made into globals once the last screen is done.
+CHARGEN_FROM = 3.0
+CHARGEN_TIMEOUT = 15.0
+CHARGEN_SCRIPT = """\
+local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
+
+local chargen = core.chargen
+local elapsed, step, since = 0, 0, 0
+
+local function log(...) print('OFTEST', 'chargen', ...) end
+
+local function describe(state)
+    local attributes, tags, traits = {}, {}, {}
+    for _, attribute in ipairs(state.attributes) do table.insert(attributes, attribute.value) end
+    for _, skill in ipairs(state.skills) do
+        if skill.tagged then table.insert(tags, skill.number) end
+    end
+    for _, trait in ipairs(state.traits) do
+        table.insert(traits, trait.name .. (trait.picked and '*' or ''))
+    end
+    return string.format('name=%s female=%s points=%d attributes=[%s] tags=[%s] traits=[%s] races=%d skills=%d mode=%s',
+        state.name, tostring(state.female), state.pointsLeft, table.concat(attributes, ','), table.concat(tags, ','),
+        table.concat(traits, '|'), #state.races, #state.skills, tostring(I.UI.getMode()))
+end
+
+local function go(next)
+    step, since = next, 0
+end
+
+local function raceTwo(state)
+    for _, race in ipairs(state.races) do
+        if race.name == '@RACE_TWO@' then return race.id end
+    end
+end
+
+return {
+    engineHandlers = {
+        -- The game pauses with the screens, so the time is the real one
+        onFrame = function()
+            local dt = core.getRealFrameDuration()
+            elapsed = elapsed + dt
+            since = since + dt
+            local page = chargen.page()
+            if step == 0 then
+                if elapsed >= @FROM@ then
+                    core.sendGlobalEvent('OFTestChargenGo', {})
+                    go(1)
+                end
+            elseif step == 1 and page and page.page == 'race' then
+                local state = chargen.state()
+                log('screen race', describe(state))
+                for _, attribute in ipairs(state.attributes) do
+                    log('attribute', attribute.number, attribute.name, attribute.description)
+                end
+                chargen.setFemale(true)
+                chargen.setRace(raceTwo(state))
+                log('race picked', tostring(chargen.state().race == raceTwo(state)), tostring(chargen.state().female))
+                chargen.finish()
+                go(2)
+            elseif step == 2 and page and page.page == 'name' then
+                -- the harness types the name on the keyboard and presses Return
+                log('screen name', describe(chargen.state()))
+                go(3)
+            elseif step == 3 and page and page.page == 'special' then
+                log('screen special', describe(chargen.state()))
+                log('adjust', tostring(chargen.adjust(5, 3)), tostring(chargen.adjust(11, -2)),
+                    tostring(chargen.adjust(10, 4)), tostring(chargen.adjust(6, 1)), tostring(chargen.adjust(11, -9)))
+                log('special done', describe(chargen.state()))
+                chargen.finish()
+                go(4)
+            elseif step == 4 and page and page.page == 'skills' then
+                log('screen skills', describe(chargen.state()))
+                log('tag', tostring(chargen.toggleTag(32)), tostring(chargen.toggleTag(41)),
+                    tostring(chargen.toggleTag(44)), tostring(chargen.toggleTag(45)), tostring(chargen.toggleTag(33)))
+                log('skills done', describe(chargen.state()))
+                chargen.finish()
+                go(5)
+            elseif step == 5 and page and page.page == 'traits' then
+                local state = chargen.state()
+                log('screen traits', describe(state))
+                local picks = {}
+                for _, trait in ipairs(state.traits) do table.insert(picks, tostring(chargen.toggleTrait(trait.id))) end
+                log('picks', table.concat(picks, ','))
+                log('traits done', describe(chargen.state()))
+                chargen.finish()
+                go(6)
+            elseif step == 6 and not page then
+                log('closed', describe(chargen.state()))
+                go(7)
+            elseif step == 8 and since >= 0.5 then
+                core.quit()
+            end
+            if step > 0 and step < 7 and since >= @TIMEOUT@ then
+                log('timeout at step', tostring(step), tostring(page and page.page))
+                core.quit()
+            elseif step == 7 and since >= @TIMEOUT@ then
+                log('timeout waiting for the script of the quest')
+                core.quit()
+            end
+        end,
+    },
+    eventHandlers = {
+        OFTestChargenDone = function()
+            log('quest read')
+            go(8)
+        end,
+    },
+}
+""".replace("@FROM@", str(CHARGEN_FROM)).replace("@TIMEOUT@", str(CHARGEN_TIMEOUT)).replace(
+    "@RACE_TWO@", plugin.RACE_TWO_NAME)
+
+CHARGEN_HOST_SCRIPT = """\
+local world = require('openfallout.world')
+
+local reported = false
+local names = { @NAMES@ }
+
+return {
+    engineHandlers = {
+        onUpdate = function()
+            if reported or world.globals.@STATE@ ~= 2 then return end
+            reported = true
+            local parts = {}
+            for _, name in ipairs(names) do
+                table.insert(parts, name[1] .. '=' .. tostring(world.globals[name[2]]))
+            end
+            print('OFTEST', 'chargen', 'globals', table.concat(parts, ' '))
+            world.players[1]:sendEvent('OFTestChargenDone')
+        end,
+    },
+    eventHandlers = {
+        OFTestChargenGo = function()
+            world.globals.@GO@ = 1
+        end,
+    },
+}
+""".replace("@NAMES@", ", ".join("{ '%s', '%s' }" % (name, global_name)
+                               for name, (_, global_name) in plugin.CHARGEN_GLOBALS.items())).replace(
+    "@STATE@", plugin.CHARGEN_GLOBALS["state"][1]).replace("@GO@", plugin.CHARGEN_GLOBALS["go"][1])
 
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
@@ -1061,7 +1238,51 @@ def wait_for_pixels(process, log, seconds, pixels):
     return colours
 
 
-def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts"):
+KEY_TAB = 0xFF09
+KEY_RETURN = 0xFF0D
+
+
+def press_keys(keysyms, pause=0.4):
+    """Presses the keys on the virtual display (the X test extension), one after the other. False when the libraries
+    or the display are not there."""
+    try:
+        x11 = ctypes.CDLL("libX11.so.6")
+        xtst = ctypes.CDLL("libXtst.so.6")
+    except OSError:
+        return False
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XKeysymToKeycode.restype = ctypes.c_ubyte
+    display = ctypes.c_void_p(x11.XOpenDisplay(os.environ.get("DISPLAY", "").encode()))
+    if not display.value:
+        return False
+    for keysym in keysyms:
+        code = x11.XKeysymToKeycode(display, ctypes.c_ulong(keysym))
+        for down in (1, 0):
+            xtst.XTestFakeKeyEvent(display, code, down, 0)
+            x11.XFlush(display)
+            time.sleep(0.1)
+        time.sleep(pause)
+    x11.XCloseDisplay(display)
+    return True
+
+
+def press_keys_when_logged(log, pattern, keysyms, delay, stop):
+    """Waits for the line of the log and presses the keys `delay` seconds after it (a message box takes the keys when it
+    is on the screen, which it is a moment after the line)."""
+    while not stop.is_set():
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        if re.search(pattern, text):
+            stop.wait(delay)
+            if not stop.is_set():
+                press_keys(keysyms)
+            return
+        stop.wait(0.2)
+
+
+def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
+               keys=None):
+    """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
+    pressed after the log has a line that matches."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
@@ -1072,6 +1293,12 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
     os.close(slave)
     colours = {}
+    stop = threading.Event()
+    presser = None
+    if keys is not None:
+        presser = threading.Thread(target=press_keys_when_logged, daemon=True, args=(
+            home / ".config" / "openfallout" / "openfallout.log", keys[0], keys[1], keys[2], stop))
+        presser.start()
     try:
         colours = wait_for_pixels(process, home / ".config" / "openfallout" / "openfallout.log", seconds, pixels)
         process.wait(timeout=seconds)
@@ -1084,6 +1311,9 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
             process.kill()
             process.wait()
     os.close(master)
+    stop.set()
+    if presser is not None:
+        presser.join()
     return process.returncode, colours
 
 
@@ -1324,12 +1554,14 @@ def check_dialogue(text):
         return line is not None and all(part in line for part in parts)
 
     voiced = re.findall(r"Voice: (\S+)", text)
-    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH]
+    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH,
+              plugin.FOLDER_SOUND_PATH]
     if voiced != wanted:
         problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
                         "talker, a line whose only file is another voice's (the ask line) and the lines with none "
                         "should be silent, and a response that names a sound record (the added topic) should be said "
-                        f"with the file of the record: {voiced}, wanted {wanted}")
+                        "with the file of the record, or with the first file of the folder that the record names: "
+                        f"{voiced}, wanted {wanted}")
 
     greeting = one("greeting")
     if not has(greeting, "active=true speaking=true ended=false", f"speaker={plugin.TALKER_TITLE}",
@@ -1350,7 +1582,7 @@ def check_dialogue(text):
         problems.append("after the response the topic that it adds should be among the options, after the topics of "
                         f"the list: {after}")
     added = one("added")
-    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}]"):
+    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}|{plugin.ADDED_MORE_TEXT}]"):
         problems.append(f"picking the added topic should say its response: {added}")
     over = one("over")
     if not has(over, "active=false", "ended=true"):
@@ -1358,11 +1590,142 @@ def check_dialogue(text):
     closed = one("closed")
     if not has(closed, "active=false", "mode=nil"):
         problems.append(f"the window should be gone when the conversation is over: {closed}")
+    # The message box with buttons that the response ending the conversation shows: the third button is picked (the
+    # second has a condition the player does not meet), the host reports the number it has in the record, and the script of
+    # the talker reads it once (the number plus one)
+    shown = re.findall(r"Message: " + re.escape(plugin.BUTTON_MESSAGE_TEXT) + r"\s*$", text, re.M)
+    if len(shown) != 1:
+        problems.append(f"the response that ends the conversation should show the message with buttons once: {len(shown)}")
+    buttons = re.findall(r"Message buttons: (\d+)", text)
+    if buttons != [str(len(plugin.BUTTON_TEXTS) - 1)]:
+        problems.append(f"the button whose condition fails should not be shown, so two of three: {buttons}")
+    picked = re.findall(r"Message button: (-?\d+)", text)
+    if picked != [str(plugin.BUTTON_PICKED)]:
+        problems.append(f"the third button should be picked with Tab and Return, as number {plugin.BUTTON_PICKED} of the "
+                        f"record: {picked}")
+    if "OFTEST\tdialogue\tbutton timeout" in text:
+        problems.append("no button was picked in the message box (the keys did not reach it, or the script did not read it)")
+    else:
+        read = lines("button")
+        if read != [str(plugin.BUTTON_PICKED + 1)]:
+            problems.append(f"the script of the talker should read the button once, as {plugin.BUTTON_PICKED + 1}: {read}")
+
+    # The end script of the question made the talker say a topic outside of the conversation (Say), and when it had said
+    # it the Begin SayToDone block of the script of the talker ran: once
+    said = lines("said")
+    if not said or said[-1] != "1" or any(value not in ("0", "1") for value in said):
+        problems.append("the talker was made to say a topic once, so the Begin SayToDone block of its script should have "
+                        f"run once by the time the button was read: {said}")
+
+    # The blocks name what they are for: the one for a topic that was not said and the one for a menu that never opened
+    # did not run, and the ones for the conversation and for the message box ran while those were open
+    blocks = [line.split("\t") for line in lines("blocks")]
+    if not blocks or any(len(values) != 4 for values in blocks):
+        problems.append(f"expected 'dialogue blocks' lines with four values: {blocks}")
+    else:
+        if any(values[0] != "0" for values in blocks):
+            problems.append("a Begin SayToDone block for a topic that was not said should not run after another topic "
+                            f"was said: {blocks}")
+        if any(values[3] != "0" for values in blocks):
+            problems.append("a Begin MenuMode block for a menu that never opened (1074) should not run while the "
+                            f"conversation or the message box is open: {blocks}")
+        if blocks[-1][1] in ("", "0", "nil"):
+            problems.append(f"a Begin MenuMode 1009 block should run while the conversation is open: {blocks[-1]}")
+        if blocks[-1][2] in ("", "0", "nil"):
+            problems.append(f"a Begin MenuMode 1001 block should run while the message box is open: {blocks[-1]}")
+
     globals_ = {line.split("\t")[0]: line.split("\t")[1:] for line in lines("globals")}
     for tag, want in (("greeting", ["1", "0"]), ("options", ["1", "0"]), ("asked", ["1", "1"]), ("closed", ["1", "1"])):
         if globals_.get(tag) != want:
             problems.append(f"after '{tag}' the globals set by the begin script (greeting) and the end script (asked "
                             f"topic) should be {want}: {globals_.get(tag)}")
+    return problems
+
+
+def check_chargen(text):
+    """The problems with the making of the character: the screens open one after the other in the mode of the interface,
+    the name is typed on the keyboard, the picks follow the rules (the points of SPECIAL, three tags, the traits that are
+    traits), and what the script of the quest reads afterwards is what was made."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run", line, re.I):
+            problems.append(line)
+
+    def lines(kind):
+        found = (re.search(rf"OFTEST\tchargen[\t ]{kind}\t(.*)$", line) for line in text.splitlines())
+        return [match.group(1).strip() for match in found if match]
+
+    def one(kind):
+        found = lines(kind)
+        if len(found) != 1:
+            problems.append(f"expected one 'chargen {kind}' line, found {len(found)}")
+            return None
+        return found[0]
+
+    def has(line, *parts):
+        return line is not None and all(part in line for part in parts)
+
+    timeouts = [line for line in lines("timeout at step") + lines("timeout waiting for the script of the quest")]
+    if timeouts or "OFTEST\tchargen\ttimeout" in text:
+        problems.append("the making of the character did not go on: " + "; ".join(timeouts or ["timeout"]))
+    traits = (f"{plugin.TRAIT_A_NAME}|{plugin.TRAIT_B_NAME}", f"{plugin.TRAIT_B_NAME}|{plugin.TRAIT_A_NAME}")
+
+    race = one("screen race")
+    if not has(race, "name= ", "female=false", "points=5", "attributes=[5,5,5,5,5,5,5]", "tags=[]", "races=2",
+               "skills=13", "mode=Interface") or not any(has(race, f"traits=[{pair}]") for pair in traits):
+        problems.append("the first screen should be the sex and race, in the mode Interface, with SPECIAL at 5 each, "
+                        "five points to give, 13 skills, two races, and the two traits (not the perk that is none): "
+                        f"{race}")
+    picked = one("race picked")
+    if picked != "true\ttrue" and picked != "true true":
+        problems.append(f"the race and the sex picked should be what the state tells: {picked}")
+    name = one("screen name")
+    if not has(name, "name= ", "female=true", "mode=Interface"):
+        problems.append(f"the screen of the name comes after the race (GetPlayerName), with no name yet: {name}")
+    special = one("screen special")
+    if not has(special, "name=ada ", "points=5", "attributes=[5,5,5,5,5,5,5]", "mode=Interface"):
+        problems.append("the screen of SPECIAL should come after the name typed on the keyboard (ada) and Return, and "
+                        f"start from the attributes of the player: {special}")
+    adjusted = one("adjust")
+    if adjusted is None or adjusted.split() != ["true", "true", "true", "false", "false"]:
+        problems.append("three points to the strength, two taken from the luck and four to the agility fit (5 to give "
+                        "and 2 taken), a point more does not, and the luck can not go below 1 (then 3 - 9): "
+                        f"{adjusted}")
+    done = one("special done")
+    if not has(done, "points=0", "attributes=[8,5,5,5,5,9,3]"):
+        problems.append(f"SPECIAL should come to 8, 5, 5, 5, 5, 9 and 3: {done}")
+    tagged = one("tag")
+    if tagged is None or tagged.split() != ["true", "true", "true", "false", "false"]:
+        problems.append("three skills can be tagged (Barter, Guns, Survival) but not a fourth, and Big Guns is no "
+                        f"skill of New Vegas: {tagged}")
+    skills = one("skills done")
+    if not has(skills, "tags=[32,41,44]"):
+        problems.append(f"the tags should be Barter, Guns and Survival: {skills}")
+    traited = one("traits done")
+    if not has(traited, "tags=[32,41,44]") or traited.count("*") != 2:
+        problems.append(f"both traits should be picked: {traited}")
+    closed = one("closed")
+    if not has(closed, "mode=nil"):
+        problems.append(f"the interface should be left when the last screen is done: {closed}")
+    attributes = [line.split("\t") for line in lines("attribute")]
+    if len(attributes) != 7 or [row[0] for row in attributes] != [str(n) for n in range(5, 12)] \
+            or attributes[0][1:] != ["Strength of the test", "The test strength description."] \
+            or attributes[1][1] != "Perception":
+        problems.append("the attributes should have the names and texts that the actor value records give (and the "
+                        f"name of the game where there is no record): {attributes}")
+
+    globals_ = {}
+    found = one("globals")
+    if found is not None:
+        globals_ = dict(part.split("=", 1) for part in found.split() if "=" in part)
+    # Barter is governed by the charisma (5), Guns by the agility (9) and Survival by the endurance (5); the luck is 3, so
+    # a skill is 2 + twice its attribute + 1, and 15 more for the three that are tagged
+    wanted = {"go": "1", "state": "2", "during": "1", "after": "0", "female": "1", "race_two": "1", "strength": "8",
+              "perception": "5", "endurance": "5", "charisma": "5", "intelligence": "5", "agility": "9", "luck": "3",
+              "barter": "28", "guns": "36", "survival": "28", "trait_a": "1", "trait_b": "1", "other": "0"}
+    for key, value in wanted.items():
+        if globals_.get(key) != value:
+            problems.append(f"the script of the quest should read {key} as {value}: {globals_.get(key)}")
     return problems
 
 
@@ -1896,8 +2259,8 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue"],
-                        help="run only this start (or the conversation), not all")
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen"],
+                        help="run only this start (or the conversation, or the making of the character), not all")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -1925,6 +2288,10 @@ def main():
     (data / "scripts" / "dialoguehost.lua").write_text(DIALOGUE_HOST_SCRIPT, encoding="ascii")
     (data / "dialoguetest.omwscripts").write_text(
         "PLAYER: scripts/dialoguetest.lua\nGLOBAL: scripts/dialoguehost.lua\n", encoding="ascii")
+    (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
+    (data / "scripts" / "chargenhost.lua").write_text(CHARGEN_HOST_SCRIPT, encoding="ascii")
+    (data / "chargentest.omwscripts").write_text(
+        "PLAYER: scripts/chargentest.lua\nGLOBAL: scripts/chargenhost.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
@@ -1960,8 +2327,11 @@ def main():
         runtime = work / "dialogue" / "runtime"
         runtime.mkdir(mode=0o700)
         print("== dialogue: --start", plugin.CELL_NAME)
+        # The response that ends the conversation shows a message box with buttons: Tab goes to the next button, which is
+        # the third (the second is not shown), and Return picks it
         status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
-                               "dialoguetest.omwscripts")
+                               "dialoguetest.omwscripts",
+                               keys=(r"Message: " + re.escape(plugin.BUTTON_MESSAGE_TEXT), [KEY_TAB, KEY_RETURN], 1.5))
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         print(f"log: {log}")
@@ -1973,6 +2343,28 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (dialogue):", problem)
+        problems += found
+    if args.only in (None, "chargen"):
+        home = work / "chargen" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "chargen" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== chargen: --start", plugin.CELL_NAME)
+        # The name is typed on the keyboard when its screen has opened: three letters and Return
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                               "chargentest.omwscripts",
+                               keys=(r"OFTEST\tchargen\tscreen name", [0x61, 0x64, 0x61, KEY_RETURN], 1.5))
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_chargen(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (chargen):", problem)
         problems += found
     if xvfb is not None:
         xvfb.terminate()

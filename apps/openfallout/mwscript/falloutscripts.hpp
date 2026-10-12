@@ -3,6 +3,7 @@
 
 #include <array>
 #include <atomic>
+#include <deque>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -18,6 +19,7 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/dialogue.hpp>
@@ -162,6 +164,39 @@ namespace OFScript
         /// The conversation ends, also in the middle of a response
         void endConversation();
 
+        /// The screens of the making of the character: name, sex and race, SPECIAL, tagged skills and traits. The
+        /// commands that script call open them, and the interface (core.chargen) shows the one that is open and tells
+        /// when the player is done with it.
+        FalloutScript::Chargen& chargen() { return mChargen; }
+        /// The player is done with the screen: what it picked becomes the character (the attributes and skills the
+        /// player has, the traits as perks) and the next screen of the menu opens
+        void finishChargenPage();
+        /// The name and the description that the data has for an actor value (an attribute or a skill) by its editor
+        /// id; the name given when it has none
+        struct ActorValueText
+        {
+            std::string mName;
+            std::string mDescription;
+        };
+        ActorValueText actorValueText(std::string_view editorId, std::string_view fallback) const;
+        /// The races the player can be (playable and not children), by their form ids
+        struct ChargenRace
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+        };
+        std::vector<ChargenRace> playableRaces() const;
+        /// The traits of the data (New Vegas), by name
+        struct ChargenTrait
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            std::string mDescription;
+        };
+        std::vector<ChargenTrait> chargenTraits() const;
+        /// What the player is now: the sex and race the player picked or else those of its record
+        bool playerTraits(FalloutScript::ActorTraits& traits);
+
         FalloutScript::QuestManager& quests() { return mQuests; }
         const FalloutScript::QuestManager& quests() const { return mQuests; }
         FalloutScript::ObjectScripts& objects() { return mObjects; }
@@ -204,9 +239,22 @@ namespace OFScript
         void setPosition(FalloutScript::FormId reference, int axis, double value) override;
         void setAngle(FalloutScript::FormId reference, int axis, double radians) override;
 
-        void showMessage(FalloutScript::FormId message) override;
+        void showMessage(
+            FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner) override;
+        int takeButtonPressed(FalloutScript::FormId owner) override;
+        bool menuOpen(int menu) override;
+        /// Whether a MenuMode block runs now: one that names a menu this game has (the message box, the conversation,
+        /// the screens of making a character) runs while that menu is open; one that names nothing, or a menu that
+        /// the game does not have by that number, runs while any menu is
+        bool menuBlockRuns(const FalloutScript::Block& block);
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
+        /// What the record of the reference says it is, which is all that anyone but the player has to go by
+        bool traitsOfRecord(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits);
+        /// A screen of the making of the character begins: the attributes it starts from are those the player has
+        void beginChargenPage();
+        /// The skills the player has, from the attributes and the tags that the making of the character gave
+        void applyChargenSkills();
 
         /// The character says a response of the topic outside of a conversation: what the response does is done, and
         /// the lines are told to the player: the voice of the data and, when subtitles are on, the text
@@ -365,6 +413,20 @@ namespace OFScript
         void runOnMainThread(std::function<void()> action);
         void applyDisabled(FalloutScript::FormId reference, bool disabled);
         void tellPlayer(const std::string& text);
+
+        /// A message with buttons that waits to be shown, or is on the screen. The buttons are the ones whose
+        /// conditions hold, with the number each has in the record.
+        struct MessageBox
+        {
+            std::string mText;
+            std::vector<std::string> mButtons;
+            std::vector<int> mNumbers;
+            /// The one who showed it, who gets the button that is picked
+            FalloutScript::FormId mOwner = 0;
+        };
+        /// Shows the next message box when none is open and takes what the player picked in the one that was (the
+        /// thread of the frame only)
+        void updateMessageBoxes();
         void buildNames() const;
 
         const OFWorld::ESMStore& mStore;
@@ -378,6 +440,9 @@ namespace OFScript
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
+        FalloutScript::Chargen mChargen;
+        /// The screen the attributes were last started for
+        std::uint32_t mChargenSeeded = 0;
         /// What the player has been told and what was said. Scripts that Lua starts, the interface and the frame all
         /// reach it, so one at a time.
         mutable std::recursive_mutex mDialogueMutex;
@@ -400,6 +465,15 @@ namespace OFScript
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once
         std::mutex mDeferredMutex;
         std::vector<std::function<void()>> mDeferred;
+        /// The messages with buttons that wait their turn, and the numbers of the buttons of the one that is open
+        std::deque<MessageBox> mMessageQueue;
+        bool mMessageOpen = false;
+        std::vector<int> mOpenNumbers;
+        FalloutScript::FormId mOpenOwner = 0;
+        /// How many boxes wait or are open (scripts ask from their own thread)
+        std::atomic<int> mMessageBoxCount{ 0 };
+        /// The answer to the last message that was shown, and who may read it
+        FalloutScript::MessageAnswer mAnswer;
         std::map<FalloutScript::FormId, bool> mDeferredDisabled;
         /// Where other threads asked to put objects, for the same reason: the next command of the script starts from
         /// there
@@ -443,6 +517,9 @@ namespace OFScript
         mutable bool mNamesBuilt = false;
         mutable std::map<std::string, FalloutScript::FormId> mQuestNames;
         mutable std::map<std::string, FalloutScript::FormId> mGlobalNames;
+        /// The names and descriptions of the actor values by their editor ids in lower case, made when first asked for
+        mutable bool mActorValueTextBuilt = false;
+        mutable std::map<std::string, ActorValueText> mActorValueText;
     };
 }
 

@@ -1208,6 +1208,126 @@
 -- @field #string text What the list shows: the prompt of the response the topic gives, or else the name of the topic.
 
 ---
+-- @{#Chargen}: the screens of the making of the player's character in Fallout 3 and New Vegas (the name, the sex and
+-- race, the points of SPECIAL, the tagged skills and the traits). Not available in load scripts. A script of the game
+-- opens a menu with the commands `ShowNameMenu`, `ShowRaceMenu`, `ShowSPECIALBookMenu`, `ShowLoveTesterMenu`,
+-- `ShowChargenMenu` and `ShowTraitMenu`; the screens are shown by a player script, which gives the choices back with
+-- the functions here and ends each screen with `finish`.
+-- @field [parent=#core] #Chargen chargen
+
+---
+-- Functions of the making of the character.
+-- @type Chargen
+
+---
+-- The screen that is open, nothing when no menu is open. A menu of the game has one or more screens, one after the
+-- other.
+-- @function [parent=#Chargen] page
+-- @return #ChargenPage
+
+---
+-- How the character is now, with what the screens list.
+-- @function [parent=#Chargen] state
+-- @return #ChargenState
+
+---
+-- Sets the name. It is cleaned (no control characters, no spaces at the ends) and cut to `nameLimit` bytes.
+-- @function [parent=#Chargen] setName
+-- @param #string name
+-- @return #string The name that was kept.
+
+---
+-- Picks the sex.
+-- @function [parent=#Chargen] setFemale
+-- @param #boolean female
+
+---
+-- Picks the race.
+-- @function [parent=#Chargen] setRace
+-- @param #string race The `id` of one of `ChargenState.races`
+
+---
+-- Gives points to an attribute, or with a negative amount takes them back. Nothing changes when the points are not
+-- there to give or the value would leave `minimum` and `maximum`.
+-- @function [parent=#Chargen] adjust
+-- @param #number attribute The `number` of one of `ChargenState.attributes`
+-- @param #number delta
+-- @return #boolean Whether the attribute changed.
+
+---
+-- Tags a skill that is not tagged, or takes the tag off one that is. At most `tagLimit` skills are tagged.
+-- @function [parent=#Chargen] toggleTag
+-- @param #number skill The `number` of one of `ChargenState.skills`
+-- @return #boolean Whether the tag changed.
+
+---
+-- Picks a trait that is not picked, or lets one go. At most `traitLimit` traits are picked.
+-- @function [parent=#Chargen] toggleTrait
+-- @param #string trait The `id` of one of `ChargenState.traits`
+-- @return #boolean Whether the pick changed.
+
+---
+-- The player is done with the screen that is open: what it picked becomes the character (the attributes and the skills
+-- that come from them and the tags, the traits as perks), and the next screen of the menu opens. Nothing happens when
+-- no screen is open.
+-- @function [parent=#Chargen] finish
+
+---
+-- The screen that is open.
+-- @type ChargenPage
+-- @field #string page `"name"`, `"race"`, `"special"`, `"skills"` or `"traits"`.
+-- @field #number serial Another number for each screen that opens, so that two screens of the same page are told apart.
+-- @field #list<#number> values The values the command that opened the menu was called with.
+
+---
+-- How the character is.
+-- @type ChargenState
+-- @field #string name
+-- @field #boolean female The sex the player picked, and else the one of its record.
+-- @field #string race Form id of the race of the player, as picked or else as its record has it.
+-- @field #number pointsLeft The points of SPECIAL that are left to give.
+-- @field #number minimum The lowest value of an attribute.
+-- @field #number maximum The highest value of an attribute.
+-- @field #number tagLimit How many skills are tagged.
+-- @field #number traitLimit How many traits are picked.
+-- @field #number nameLimit The longest name, in bytes.
+-- @field #number tagsLeft
+-- @field #number traitsLeft
+-- @field #list<#ChargenAttribute> attributes The seven attributes of SPECIAL.
+-- @field #list<#ChargenSkill> skills The skills the game has, with what each is now.
+-- @field #list<#ChargenTrait> traits The traits of the data (none in Fallout 3).
+-- @field #list<#ChargenRace> races The races a player can be.
+
+---
+-- @type ChargenAttribute
+-- @field #number number The number scripts know the actor value by (5 to 11).
+-- @field #string name The name the data has for it.
+-- @field #string description What the data says of it.
+-- @field #number value
+
+---
+-- @type ChargenSkill
+-- @field #number number The number scripts know the actor value by.
+-- @field #string name
+-- @field #string description
+-- @field #number attribute The number of the attribute that governs the skill.
+-- @field #number value What the skill comes to with the attributes and the tag now.
+-- @field #boolean tagged
+
+---
+-- @type ChargenTrait
+-- @field #string id Form id of the perk that is the trait.
+-- @field #string name
+-- @field #string description
+-- @field #boolean picked
+
+---
+-- @type ChargenRace
+-- @field #string id Form id of the race.
+-- @field #string name
+-- @field #boolean selected
+
+---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
 -- @type DialogueRecord
 -- @field #string id Record identifier

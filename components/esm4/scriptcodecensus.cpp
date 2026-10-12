@@ -505,6 +505,15 @@ namespace ESM4
             ++tally.mTrailing;
             tally.mMaxTrailing = std::max(tally.mMaxTrailing, arguments.mTrailing);
         }
+        if (signature.mName == "ShowMessage")
+        {
+            const ScriptCode::Arguments values
+                = ScriptCode::decodeMessageValues(script.compiledScript, call, arguments, limits);
+            if (values.mError != ScriptCode::ArgumentError::None)
+                ++tally.mValuesFailed;
+            else if (values.mCount != 0)
+                ++tally.mValues;
+        }
         const std::size_t required = static_cast<std::size_t>(std::count_if(signature.mParameters->begin(),
             signature.mParameters->end(), [](const ScriptCode::Parameter& parameter) { return !parameter.mOptional; }));
         if (arguments.mCount < required)
@@ -773,6 +782,8 @@ namespace ESM4
             all.mDecoded += tally.mDecoded;
             all.mTrailing += tally.mTrailing;
             all.mFewer += tally.mFewer;
+            all.mValues += tally.mValues;
+            all.mValuesFailed += tally.mValuesFailed;
             for (const auto& [error, count] : tally.mErrors)
                 all.mErrors[error] += count;
         }
@@ -786,6 +797,9 @@ namespace ESM4
                << '\n';
         for (const auto& [error, count] : all.mErrors)
             stream << "    " << ScriptCode::argumentErrorText(error) << ": " << count << '\n';
+        if (all.mValues != 0 || all.mValuesFailed != 0)
+            stream << "  messages with values for their text: " << all.mValues
+                   << ", messages whose values do not decode: " << all.mValuesFailed << '\n';
         stream << "  calls of commands the table does not have: " << unknownCalls << " (" << mUnknownCommands.size()
                << " different codes)\n";
 

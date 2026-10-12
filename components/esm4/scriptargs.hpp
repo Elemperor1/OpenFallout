@@ -90,6 +90,16 @@ namespace ESM4::ScriptCode
     Arguments decodeArguments(const std::vector<std::uint8_t>& code, const Call& call,
         const std::vector<Parameter>& parameters, const Limits& limits);
 
+    // The most values a message can be given (the games keep ten)
+    constexpr std::uint16_t maxMessageValues = 10;
+
+    // Reads the values that a call of ShowMessage puts after its arguments, for the format tokens of the text: a u16
+    // count and that many numbers (written as for an integer, or 'Z' and the index of a reference for the form as a
+    // number), then four bytes that the command does not read. `arguments` are those of the same call, which say
+    // where the bytes they did not use start. A call with nothing after its arguments has no values.
+    Arguments decodeMessageValues(
+        const std::vector<std::uint8_t>& code, const Call& call, const Arguments& arguments, const Limits& limits);
+
     std::string_view argumentErrorText(ArgumentError error);
 }
 

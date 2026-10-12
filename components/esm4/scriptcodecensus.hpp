@@ -135,6 +135,8 @@ namespace ESM4
             std::uint32_t mMaxTrailing = 0;
             std::size_t mFewer
                 = 0; // decoded, with fewer arguments than the command has parameters that are not optional
+            std::size_t mValues = 0; // a message with values after its arguments that decode
+            std::size_t mValuesFailed = 0; // a message whose values do not
             std::map<ScriptCode::ArgumentError, std::size_t> mErrors;
         };
 

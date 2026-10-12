@@ -18,7 +18,9 @@ ELSE_IF = 0x18
 END_IF = 0x19
 
 GAME_MODE = 0  # the type of block that runs every frame (or every delay of a quest)
+MENU_MODE_BLOCK = 1  # the same while a menu is open (Begin MenuMode 1001 names the menu)
 ON_ACTIVATE = 2  # the types of the blocks of events of objects
+SAY_TO_DONE = 7
 ON_LOAD = 21
 CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a reference: ref.Command
 
@@ -67,6 +69,8 @@ REMOVE_ITEM = 0x1052
 KILL_ACTOR = 0x108B
 REMOVE_FROM_FACTION = 0x1180
 SHOW_MESSAGE = 0x1059
+GET_BUTTON_PRESSED = 0x101F
+SAY = 0x1033
 IS_ACTION_REF = 0x1069
 EVALUATE_PACKAGE = 0x105E
 ADD_SCRIPT_PACKAGE = 0x1097
@@ -85,6 +89,18 @@ ADD_NOTE = 0x117C
 GET_HAS_NOTE = 0x117E
 REWARD_XP = 0x1177
 REWARD_KARMA = 0x1204
+MENU_MODE = 0x1024
+SHOW_RACE_MENU = 0x10DA
+SHOW_NAME_MENU = 0x10DC
+GET_PLAYER_NAME = 0x11E1
+SET_IN_CHARGEN = 0x10E7
+SHOW_CHARGEN_MENU = 0x1197
+SET_SPECIAL_POINTS = 0x1218
+SET_TAG_SKILLS = 0x121A
+SHOW_TRAIT_MENU = 0x1268
+GET_IN_CHARGEN = 0x127F
+GET_PC_IS_RACE = 0x1082
+GET_PC_IS_SEX = 0x1083
 
 
 def u16(value):
@@ -182,10 +198,13 @@ def branch(code, expression, jump=0):
     return statement(code, u16(jump) + u16(len(expression)) + expression)
 
 
-def block(block_type, body):
-    """Begin <type> ... End: the length in the Begin counts from its end to the end of the End."""
+def block(block_type, body, names=None):
+    """Begin <type> ... End: the length in the Begin counts from its end to the end of the End. `names` is the one
+    argument that the Begin can have after its type (Begin SayToDone Topic, Begin MenuMode 1001): a form_argument or an
+    int_argument, written after a count of 1."""
     end = statement(END)
-    return statement(BEGIN, u16(block_type) + u32(len(body) + len(end))) + body + end
+    arguments = b"" if names is None else u16(1) + names
+    return statement(BEGIN, u16(block_type) + u32(len(body) + len(end)) + arguments) + body + end
 
 
 class Script:

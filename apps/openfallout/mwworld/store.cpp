@@ -1169,6 +1169,7 @@ template class OFWorld::TypedDynamicStore<ESM4::ActorCharacter, ESM::FormId>;
 template class OFWorld::TypedDynamicStore<ESM4::ActorCreature, ESM::FormId>;
 
 template class OFWorld::TypedDynamicStore<ESM4::Activator>;
+template class OFWorld::TypedDynamicStore<ESM4::ActorValueInfo>;
 template class OFWorld::TypedDynamicStore<ESM4::AIPackage>;
 template class OFWorld::TypedDynamicStore<ESM4::Ammunition>;
 template class OFWorld::TypedDynamicStore<ESM4::Armor>;
@@ -1202,6 +1203,7 @@ template class OFWorld::TypedDynamicStore<ESM4::MiscItem>;
 template class OFWorld::TypedDynamicStore<ESM4::MovableStatic>;
 template class OFWorld::TypedDynamicStore<ESM4::Npc>;
 template class OFWorld::TypedDynamicStore<ESM4::Outfit>;
+template class OFWorld::TypedDynamicStore<ESM4::Perk>;
 template class OFWorld::TypedDynamicStore<ESM4::Potion>;
 template class OFWorld::TypedDynamicStore<ESM4::Quest>;
 template class OFWorld::TypedDynamicStore<ESM4::Race>;

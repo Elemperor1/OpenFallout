@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -11,6 +12,7 @@
 #include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadavif.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadflst.hpp>
@@ -18,6 +20,7 @@
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
+#include <components/esm4/loadperk.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
@@ -26,6 +29,7 @@
 #include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/falloutscript/messagetext.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -138,6 +142,7 @@ namespace OFScript
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
+        , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
         , mPlayer(player)
@@ -157,6 +162,7 @@ namespace OFScript
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
+        FalloutScript::addChargenCommands(mInterpreter, mChargen, [this] { beginChargenPage(); });
         mDialogue.setGameHours([this] { return std::floor(gameDaysPassed()) * 24.0 + gameHour(); });
         mDialogue.setRandom([this](std::size_t count) {
             return std::uniform_int_distribution<std::size_t>(0, count - 1)(mDialogueRandom);
@@ -265,6 +271,8 @@ namespace OFScript
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
+        mChargen.clear();
+        mChargenSeeded = 0;
         mObjects.clear();
         {
             const std::lock_guard lock(mDeferredMutex);
@@ -273,6 +281,12 @@ namespace OFScript
             mDeferredPlaces.clear();
         }
         mQuests.reset();
+        mMessageQueue.clear();
+        mMessageOpen = false;
+        mOpenNumbers.clear();
+        mOpenOwner = 0;
+        mMessageBoxCount = 0;
+        mAnswer.clear();
         {
             const std::lock_guard lock(mDialogueMutex);
             mDialogue.reset();
@@ -289,9 +303,22 @@ namespace OFScript
     void FalloutScripts::update(float frametime, bool paused)
     {
         runPending();
+        updateMessageBoxes();
         updateVoices(frametime);
         if (paused)
+        {
+            // The game is stopped with no window open (a script of Lua paused the world): nothing runs
+            if (!menuOpen(0))
+                return;
+            // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
+            // blocks run in place of GameMode
+            mObjects.setSecondsPassed(frametime);
+            const FalloutScript::BlockFilter filter
+                = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
+            mQuests.updateMenu(frametime, filter);
+            mObjects.updateMenu(filter);
             return;
+        }
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
         constexpr float missingReportInterval = 30.f;
         mMissingTimer += frametime;
@@ -512,7 +539,11 @@ namespace OFScript
 
     void FalloutScripts::tellPlayer(const std::string& text)
     {
-        runOnMainThread([text] { OFBase::Environment::get().getWindowManager()->messageBox(text); });
+        // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
+        // notes during a conversation of Morrowind is hidden
+        runOnMainThread([text] {
+            OFBase::Environment::get().getWindowManager()->messageBox(text, OFGui::ShowInDialogueMode_Never);
+        });
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -559,7 +590,30 @@ namespace OFScript
         return true;
     }
 
-    void FalloutScripts::showMessage(FalloutScript::FormId message)
+    namespace
+    {
+        constexpr int messageBoxMenu = 1001;
+        constexpr int dialogueMenu = 1009;
+        // The flag of a message that is a box with buttons and not a note on the screen
+        constexpr std::uint32_t messageBoxFlag = 0x1;
+
+        /// The text of the interface shows `#` as the start of a colour, and a message can have it in its words
+        std::string escapeTags(const std::string& text)
+        {
+            std::string result;
+            result.reserve(text.size());
+            for (const char c : text)
+            {
+                result += c;
+                if (c == '#')
+                    result += c;
+            }
+            return result;
+        }
+    }
+
+    void FalloutScripts::showMessage(
+        FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner)
     {
         const ESM4::Message* record = mStore.get<ESM4::Message>().search(refId(message));
         if (record == nullptr)
@@ -567,11 +621,129 @@ namespace OFScript
             log("ShowMessage: the message " + FalloutScript::hex(message) + " is not known");
             return;
         }
-        if (record->mDescription.empty())
+        // The answer to the message before is gone as soon as another is shown (the answer to this one is its owner's
+        // to read once the player closes the box)
+        mAnswer.forget();
+        // The conditions before the first button are those of the message, and the ones after a button are its own;
+        // they are about the player
+        if (!mConditions.holds(record->mConditions, FalloutScript::ConditionContext()))
             return;
-        // Buttons make a message a question to the player, which the game can not ask yet: the text is shown alone
-        Log(Debug::Info) << "Message: " << record->mDescription;
-        tellPlayer(record->mDescription);
+        std::string text = FalloutScript::formatMessage(record->mDescription, values);
+        const bool isBox = (record->mMessageFlags & messageBoxFlag) != 0;
+        if (text.empty() && !isBox)
+            return;
+        Log(Debug::Info) << "Message: " << text;
+
+        MessageBox box;
+        box.mOwner = owner;
+        for (std::size_t i = 0; i < record->mButtons.size(); ++i)
+        {
+            const ESM4::Message::Button& button = record->mButtons[i];
+            if (!mConditions.holds(button.mConditions, FalloutScript::ConditionContext()))
+                continue;
+            box.mButtons.push_back(escapeTags(FalloutScript::formatMessage(button.mText, values)));
+            box.mNumbers.push_back(static_cast<int>(i));
+        }
+        // A message with buttons is a question to the player, and one that is a box is shown as one even when there is
+        // nothing to pick: it has the button that closes it
+        if (box.mButtons.empty() && !isBox)
+        {
+            tellPlayer(escapeTags(text));
+            return;
+        }
+        Log(Debug::Info) << "Message buttons: " << box.mButtons.size();
+        box.mText = escapeTags(text);
+        if (!record->mFullName.empty())
+            box.mText = escapeTags(record->mFullName) + "\n\n" + box.mText;
+        // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
+        // is queued in the next frame
+        ++mMessageBoxCount;
+        runOnMainThread([this, box = std::move(box)]() mutable {
+            mMessageQueue.push_back(std::move(box));
+            updateMessageBoxes();
+        });
+    }
+
+    void FalloutScripts::updateMessageBoxes()
+    {
+        OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+        if (windows == nullptr)
+            return;
+        if (mMessageOpen)
+        {
+            // The window tells the button once it is closed; a box that went away without one (the game was loaded)
+            // picked nothing
+            const int pressed = windows->readPressedButton();
+            if (pressed < 0 && windows->isInteractiveMessageBoxActive())
+                return;
+            mMessageOpen = false;
+            --mMessageBoxCount;
+            if (pressed >= 0 && static_cast<std::size_t>(pressed) < mOpenNumbers.size())
+            {
+                const int number = mOpenNumbers[static_cast<std::size_t>(pressed)];
+                mAnswer.picked(mOpenOwner, number);
+                Log(Debug::Info) << "Message button: " << number;
+            }
+            mOpenNumbers.clear();
+            mOpenOwner = 0;
+        }
+        // Another box (the main menu asking something) is not ours to replace
+        if (mMessageQueue.empty() || windows->isInteractiveMessageBoxActive())
+            return;
+        MessageBox box = std::move(mMessageQueue.front());
+        mMessageQueue.pop_front();
+        // A box with nothing to pick has the button that closes it, and that is the button 0
+        if (box.mButtons.empty())
+        {
+            box.mButtons.emplace_back(windows->getGameSettingString("sOK", "OK"));
+            box.mNumbers.push_back(0);
+        }
+        mOpenNumbers = box.mNumbers;
+        mOpenOwner = box.mOwner;
+        // The first button has the focus, so that Enter picks it
+        windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
+        mMessageOpen = true;
+    }
+
+    int FalloutScripts::takeButtonPressed(FalloutScript::FormId owner)
+    {
+        return mAnswer.take(owner);
+    }
+
+    bool FalloutScripts::menuOpen(int menu)
+    {
+        const bool message = mMessageBoxCount.load() > 0;
+        const bool dialogue = [this] {
+            const std::lock_guard lock(mDialogueMutex);
+            return mDialogue.active();
+        }();
+        switch (menu)
+        {
+            case 0:
+            {
+                OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+                return message || dialogue || mChargen.menuOpen() || (windows != nullptr && windows->isGuiMode());
+            }
+            case messageBoxMenu:
+                return message;
+            case dialogueMenu:
+                return dialogue;
+            default:
+                // The screens of making a character have the numbers of the menus they stand for
+                return menu != 0 && mChargen.menu() == menu;
+        }
+    }
+
+    bool FalloutScripts::menuBlockRuns(const FalloutScript::Block& block)
+    {
+        if (block.mNames != FalloutScript::BlockNames::Number)
+            return true;
+        const int menu = block.mNumber;
+        if (menu == messageBoxMenu || menu == dialogueMenu || FalloutScript::ChargenMenu::isChargenMenu(menu))
+            return menuOpen(menu);
+        // The numbers of the other menus (the inventory, a container, resting) are not told apart: the block runs as
+        // one that names no menu does
+        return true;
     }
 
     namespace
@@ -856,14 +1028,31 @@ namespace OFScript
                 if (!sound->mSoundFile.empty())
                     if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
                     {
-                        // As for every sound record: the mp3 that a wav was converted to, when that is what there is
-                        constexpr VFS::Path::NormalizedView soundDir("sound");
-                        constexpr VFS::Path::ExtensionView mp3("mp3");
                         const VFS::Manager& vfs = *resources->getVFS();
-                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
-                        if (vfs.exists(path))
-                            return path.value();
+                        std::string folder = VFS::Path::normalizeFilename(sound->mSoundFile);
+                        if (!folder.empty() && folder.back() == VFS::Path::separator)
+                        {
+                            // A sound record can name a folder (40, 108 and 151 of the responses with a sound in the
+                            // three games): the first file in it is said
+                            if (folder.compare(0, 6, "sound/") != 0)
+                                folder.insert(0, "sound/");
+                            for (const VFS::Path::Normalized& file : vfs.getRecursiveDirectoryIterator(folder))
+                            {
+                                const std::string_view extension = file.extension().value();
+                                if (extension == "wav" || extension == "ogg" || extension == "mp3")
+                                    return file.value();
+                            }
+                        }
+                        else
+                        {
+                            // As for every sound record: the mp3 a wav was converted to, when that is what there is
+                            constexpr VFS::Path::NormalizedView soundDir("sound");
+                            constexpr VFS::Path::ExtensionView mp3("mp3");
+                            const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+                                { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
+                            if (vfs.exists(path))
+                                return path.value();
+                        }
                     }
         const FalloutScript::VoiceIndex& index = voices();
         if (index.size() == 0 || line.mInfo == 0)
@@ -1106,6 +1295,38 @@ namespace OFScript
     }
 
     bool FalloutScripts::traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)
+    {
+        FalloutScript::ActorTraits found;
+        const bool known = traitsOfRecord(reference, found);
+        if (reference != mPlayer)
+        {
+            traits = found;
+            return known;
+        }
+        // The player is who the making of the character made it, and the record only says where it began. A sex or race
+        // that was picked takes the voice of the race with it.
+        const std::optional<bool> female = mChargen.female();
+        const FalloutScript::FormId race = mChargen.race();
+        if (!female && race == 0)
+        {
+            traits = found;
+            return known;
+        }
+        if (female)
+            found.mFemale = *female;
+        if (race != 0)
+            found.mRace = race;
+        if (const ESM4::Race* record = mStore.get<ESM4::Race>().search(refId(found.mRace)))
+        {
+            if (const FalloutScript::FormId voice = numberOf(record->mDefaultVoice[found.mFemale ? 1 : 0]))
+                found.mVoice = voice;
+            found.mChild = (record->mRaceFlags & 0x4) != 0;
+        }
+        traits = found;
+        return true;
+    }
+
+    bool FalloutScripts::traitsOfRecord(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)
     {
         ESM::FormId base;
         if (!baseOf(reference, base) || base.isZeroOrUnset())
@@ -1708,6 +1929,131 @@ namespace OFScript
         if (const ESM4::GlobalVariable* global = mStore.get<ESM4::GlobalVariable>().search(refId(id)))
             return global->mEditorId;
         return {};
+    }
+
+    FalloutScripts::ActorValueText FalloutScripts::actorValueText(
+        std::string_view editorId, std::string_view fallback) const
+    {
+        if (!mActorValueTextBuilt)
+        {
+            mActorValueTextBuilt = true;
+            for (const ESM4::ActorValueInfo& info : mStore.get<ESM4::ActorValueInfo>())
+                mActorValueText.emplace(
+                    Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+        }
+        ActorValueText text;
+        const auto found = mActorValueText.find(Misc::StringUtils::lowerCase(editorId));
+        if (found != mActorValueText.end())
+            text = found->second;
+        if (text.mName.empty())
+            text.mName = fallback;
+        return text;
+    }
+
+    std::vector<FalloutScripts::ChargenRace> FalloutScripts::playableRaces() const
+    {
+        constexpr std::uint32_t playableFlag = 0x1;
+        constexpr std::uint32_t childFlag = 0x4;
+        std::vector<ChargenRace> races;
+        for (const ESM4::Race& race : mStore.get<ESM4::Race>())
+        {
+            if ((race.mRaceFlags & playableFlag) == 0 || (race.mRaceFlags & childFlag) != 0)
+                continue;
+            races.push_back({ numberOf(race.mId), race.mFullName.empty() ? race.mEditorId : race.mFullName });
+        }
+        return races;
+    }
+
+    std::vector<FalloutScripts::ChargenTrait> FalloutScripts::chargenTraits() const
+    {
+        std::vector<ChargenTrait> traits;
+        if (!mChargen.hasTraits())
+            return traits;
+        for (const ESM4::Perk& perk : mStore.get<ESM4::Perk>())
+            if (perk.mData.mTrait != 0 && !perk.mFullName.empty())
+                traits.push_back({ numberOf(perk.mId), perk.mFullName, perk.mDescription });
+        std::sort(traits.begin(), traits.end(), [](const ChargenTrait& left, const ChargenTrait& right) {
+            return left.mName != right.mName ? left.mName < right.mName : left.mId < right.mId;
+        });
+        return traits;
+    }
+
+    bool FalloutScripts::playerTraits(FalloutScript::ActorTraits& traits)
+    {
+        return traitsOf(mPlayer, traits);
+    }
+
+    void FalloutScripts::beginChargenPage()
+    {
+        // A new character starts at 5 in each attribute, whatever its record says; one that has been through the screen
+        // starts from what it has now (which scripts may have changed since)
+        if (mChargen.page() != FalloutScript::ChargenPage::Special || mChargen.serial() == mChargenSeeded)
+            return;
+        mChargenSeeded = mChargen.serial();
+        std::array<int, FalloutScript::Chargen::attributeCount> attributes;
+        const bool made = mChargen.specialMade();
+        for (int i = 0; i < FalloutScript::Chargen::attributeCount; ++i)
+            attributes[static_cast<std::size_t>(i)] = made
+                ? static_cast<int>(std::lround(mActorValues.base(mPlayer, FalloutScript::Chargen::firstAttribute + i)))
+                : 5;
+        mChargen.setAttributes(attributes);
+    }
+
+    void FalloutScripts::applyChargenSkills()
+    {
+        for (const FalloutScript::ChargenSkill& skill : mChargen.skills())
+            mActorValues.setBase(mPlayer, skill.mNumber, mChargen.skillValue(skill.mNumber));
+    }
+
+    void FalloutScripts::finishChargenPage()
+    {
+        const std::optional<FalloutScript::ChargenPage> done = mChargen.finishPage();
+        if (!done)
+            return;
+        switch (*done)
+        {
+            case FalloutScript::ChargenPage::Special:
+                for (int i = 0; i < FalloutScript::Chargen::attributeCount; ++i)
+                    mActorValues.setBase(mPlayer, FalloutScript::Chargen::firstAttribute + i,
+                        mChargen.attribute(FalloutScript::Chargen::firstAttribute + i));
+                // The skills of a character that is made come from the attributes. A screen that gives more points to
+                // a character that has been made (a perk) leaves the skills as they are.
+                if (!mChargen.lastFinishAdded())
+                    applyChargenSkills();
+                break;
+            case FalloutScript::ChargenPage::Skills:
+                if (!mChargen.lastFinishAdded())
+                    applyChargenSkills();
+                else
+                {
+                    // Only the skills the player tagged or let go of change, by the bonus of a tag
+                    for (const int skill : mChargen.lastTagged())
+                        mActorValues.setBase(
+                            mPlayer, skill, mActorValues.base(mPlayer, skill) + FalloutScript::Chargen::tagBonus);
+                    for (const int skill : mChargen.lastUntagged())
+                        mActorValues.setBase(
+                            mPlayer, skill, mActorValues.base(mPlayer, skill) - FalloutScript::Chargen::tagBonus);
+                }
+                break;
+            case FalloutScript::ChargenPage::Traits:
+            {
+                // A trait is a perk the player has: the ones that were let go are taken back
+                const std::vector<FalloutScript::FormId> picked = mChargen.traits();
+                for (const FalloutScript::FormId trait : mChargen.givenTraits())
+                    if (std::find(picked.begin(), picked.end(), trait) == picked.end())
+                        mProgress.removePerk(mPlayer, trait);
+                for (const FalloutScript::FormId trait : picked)
+                    if (mProgress.perkRank(mPlayer, trait) == 0)
+                        mProgress.addPerk(mPlayer, trait);
+                mChargen.setGivenTraits(picked);
+                break;
+            }
+            case FalloutScript::ChargenPage::Name:
+            case FalloutScript::ChargenPage::Race:
+                // They are kept by the making of the character, and everything that asks reads them there
+                break;
+        }
+        beginChargenPage();
     }
 
     namespace

@@ -18,6 +18,7 @@
 #include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 
+#include "chargenbindings.hpp"
 #include "context.hpp"
 #include "conversationbindings.hpp"
 #include "coremwscriptbindings.hpp"
@@ -119,6 +120,8 @@ namespace OFLua
                 "openfallout_core_dialogue", [context]() { return initCoreDialogueBindings(context); });
             api["conversation"] = context.cachePackage(
                 "openfallout_core_conversation", [context]() { return initCoreConversationBindings(context); });
+            api["chargen"] = context.cachePackage(
+                "openfallout_core_chargen", [context]() { return initCoreChargenBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

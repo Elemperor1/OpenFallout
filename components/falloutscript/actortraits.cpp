@@ -24,6 +24,17 @@ namespace FalloutScript
                 return 0.0;
             return traits.mFemale == (argument(call, 0) >= 0.5) ? 1.0 : 0.0;
         });
+        // The race and the class of the player, whatever the command runs on
+        interpreter.setHandler("GetPCIsRace", [ask](CallContext& call) {
+            ActorTraits traits;
+            const FormId wanted = formArgument(call, 0);
+            return wanted != 0 && ask(call.mHost.player(), traits) && traits.mRace == wanted ? 1.0 : 0.0;
+        });
+        interpreter.setHandler("GetPCIsClass", [ask](CallContext& call) {
+            ActorTraits traits;
+            const FormId wanted = formArgument(call, 0);
+            return wanted != 0 && ask(call.mHost.player(), traits) && traits.mClass == wanted ? 1.0 : 0.0;
+        });
         interpreter.setHandler("GetIsVoiceType", [ask](CallContext& call) {
             ActorTraits traits;
             const FormId wanted = formArgument(call, 0);

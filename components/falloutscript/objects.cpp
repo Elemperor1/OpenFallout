@@ -55,6 +55,7 @@ namespace FalloutScript
 
         Object& object = mObjects[reference];
         object.mHasGameMode = hasBlockOfType(*prepared, BlockType::GameMode);
+        object.mHasMenuMode = hasBlockOfType(*prepared, BlockType::MenuMode);
         object.mInstance = std::make_shared<Instance>(std::move(prepared), reference);
         return object.mInstance.get();
     }
@@ -81,12 +82,15 @@ namespace FalloutScript
         if (!loaded)
         {
             mUpdating.erase(reference);
+            mMenuUpdating.erase(reference);
             mLoaded.erase(reference);
             return;
         }
         mLoaded.insert(reference);
         if (object.mHasGameMode)
             mUpdating.insert(reference);
+        if (object.mHasMenuMode)
+            mMenuUpdating.insert(reference);
         trigger(reference, BlockType::OnLoad);
     }
 
@@ -118,17 +122,27 @@ namespace FalloutScript
 
     void ObjectScripts::update()
     {
+        run(mUpdating, BlockType::GameMode);
+    }
+
+    void ObjectScripts::updateMenu(const BlockFilter& filter)
+    {
+        run(mMenuUpdating, BlockType::MenuMode, filter);
+    }
+
+    void ObjectScripts::run(const std::set<FormId>& references, std::uint16_t blockType, const BlockFilter& filter)
+    {
         // What runs can load and unload references, so what is run is a copy, and each is checked before its turn
-        const std::vector<FormId> running(mUpdating.begin(), mUpdating.end());
+        const std::vector<FormId> running(references.begin(), references.end());
         for (const FormId reference : running)
         {
-            if (mUpdating.count(reference) == 0)
+            if (references.count(reference) == 0)
                 continue;
             const auto found = mObjects.find(reference);
             if (found == mObjects.end())
                 continue;
             const std::shared_ptr<Instance> instance = found->second.mInstance;
-            mInterpreter.run(*instance, BlockType::GameMode);
+            mInterpreter.run(*instance, blockType, filter);
         }
     }
 
@@ -136,6 +150,7 @@ namespace FalloutScript
     {
         mObjects.clear();
         mUpdating.clear();
+        mMenuUpdating.clear();
         mLoaded.clear();
         mPrepared.clear();
         mReported.clear();
