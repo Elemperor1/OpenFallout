@@ -22,6 +22,9 @@ MENU_MODE_BLOCK = 1  # the same while a menu is open (Begin MenuMode 1001 names 
 ON_ACTIVATE = 2  # the types of the blocks of events of objects
 SAY_TO_DONE = 7
 ON_LOAD = 21
+ON_TRIGGER = 24 # the types of the blocks of a trigger volume
+ON_TRIGGER_ENTER = 26
+ON_TRIGGER_LEAVE = 27
 CALL_ON_REFERENCE = 0x1C  # the code of the statement that calls a command on a reference: ref.Command
 
 # The codes of commands the tests use, as the executables of the games number them

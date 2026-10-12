@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -35,6 +36,7 @@
 #include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
+#include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 #include <components/falloutscript/voicefiles.hpp>
 
@@ -356,6 +358,10 @@ namespace OFScript
         void runPending();
         /// Objects that were moved to cells that are not loaded stop running their scripts
         void dropObjectsThatLeft();
+        /// Lets a pass of the trigger volumes go by: the actors in each run the OnTrigger blocks of its script
+        void updateTriggers();
+        /// Whether the object of a cell that was loaded is a trigger, and its volume if it is
+        void registerTrigger(const OFWorld::Ptr& ptr, FalloutScript::FormId reference);
 
         /// A place in the world: the cell by its id, and the position and angles in it (radians)
         struct Place
@@ -524,6 +530,12 @@ namespace OFScript
         /// The objects of the loaded cells by their references: the world only knows those that were put in the scene,
         /// which a disabled one never was
         std::unordered_map<FalloutScript::FormId, OFWorld::Ptr> mReferences;
+        /// The trigger volumes of the loaded cells (the objects whose scripts have an OnTrigger block and whose
+        /// reference has a volume): their shapes by reference, from the records; where they stand is read from the
+        /// objects on every pass. The actors that can set them off are those of the loaded cells.
+        FalloutScript::TriggerVolumes mTriggers;
+        std::map<FalloutScript::FormId, FalloutScript::Volume> mTriggerShapes;
+        std::set<FalloutScript::FormId> mTriggerActors;
         /// What a cell that was just loaded waits for until the next frame: objects to enable or disable, and objects
         /// whose scripts run OnLoad
         std::vector<std::pair<FalloutScript::FormId, bool>> mPendingToggle;

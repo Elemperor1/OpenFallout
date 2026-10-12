@@ -79,6 +79,47 @@ namespace
                 return func(store.get<ESM4::Static>());
             case ESM::REC_TERM4:
                 return func(store.get<ESM4::Terminal>());
+            // The rest of the kinds of object that the cells of Fallout hold (PlaceAtMe makes them)
+            case ESM::REC_ACTI4:
+                return func(store.get<ESM4::Activator>());
+            case ESM::REC_ALCH4:
+                return func(store.get<ESM4::Potion>());
+            case ESM::REC_AMMO4:
+                return func(store.get<ESM4::Ammunition>());
+            case ESM::REC_ARMO4:
+                return func(store.get<ESM4::Armor>());
+            case ESM::REC_BOOK4:
+                return func(store.get<ESM4::Book>());
+            case ESM::REC_CLOT4:
+                return func(store.get<ESM4::Clothing>());
+            case ESM::REC_CONT4:
+                return func(store.get<ESM4::Container>());
+            case ESM::REC_CREA4:
+                return func(store.get<ESM4::Creature>());
+            case ESM::REC_DOOR4:
+                return func(store.get<ESM4::Door>());
+            case ESM::REC_FLOR4:
+                return func(store.get<ESM4::Flora>());
+            case ESM::REC_FURN4:
+                return func(store.get<ESM4::Furniture>());
+            case ESM::REC_IMOD4:
+                return func(store.get<ESM4::ItemMod>());
+            case ESM::REC_INGR4:
+                return func(store.get<ESM4::Ingredient>());
+            case ESM::REC_LIGH4:
+                return func(store.get<ESM4::Light>());
+            case ESM::REC_MISC4:
+                return func(store.get<ESM4::MiscItem>());
+            case ESM::REC_MSTT4:
+                return func(store.get<ESM4::MovableStatic>());
+            case ESM::REC_NPC_4:
+                return func(store.get<ESM4::Npc>());
+            case ESM::REC_SCOL4:
+                return func(store.get<ESM4::StaticCollection>());
+            case ESM::REC_TREE4:
+                return func(store.get<ESM4::Tree>());
+            case ESM::REC_WEAP4:
+                return func(store.get<ESM4::Weapon>());
             case 0:
                 throw std::logic_error(
                     "failed to create manual cell ref for " + name.toDebugString() + " (unknown ID)");

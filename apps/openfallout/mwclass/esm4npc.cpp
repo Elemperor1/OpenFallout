@@ -302,9 +302,14 @@ namespace OFClass
     void ESM4Npc::insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
         OFPhysics::PhysicsSystem& physics) const
     {
+        physics.addActorBody(ptr, getBodyHalfExtents(ptr), rotation);
+    }
+
+    osg::Vec3f ESM4Npc::getBodyHalfExtents(const OFWorld::Ptr& ptr)
+    {
         const ESM4::Race* race = getRace(ptr);
         const float raceHeight = race == nullptr ? 1.f : (isFemale(ptr) ? race->mHeightFemale : race->mHeightMale);
-        physics.addActorBody(ptr, npcBodyHalfExtents(raceHeight), rotation);
+        return npcBodyHalfExtents(raceHeight);
     }
 
     std::unique_ptr<OFWorld::Action> ESM4Npc::activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const
