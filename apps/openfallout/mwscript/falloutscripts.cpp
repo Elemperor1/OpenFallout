@@ -528,13 +528,14 @@ namespace OFScript
                 || (ptr.getClass().isActor() && ptr.getClass().getCreatureStats(ptr).isDead()))
                 return;
             const ESM::Position& position = ptr.getRefData().getPosition();
-            // The characters and creatures of Fallout are solid as the cylinders of their physics bodies, which the
-            // world does not tell (it gives the bounds of their models); the player is an actor of the engine
+            // The characters and creatures of Fallout are solid as the cylinders of their physics bodies (the scale of
+            // the reference on top), which the world does not tell (it gives the bounds of their models); the player is
+            // an actor of the engine
             osg::Vec3f half;
             if (ptr.getType() == ESM4::Npc::sRecordId)
-                half = OFClass::ESM4Npc::getBodyHalfExtents(ptr);
+                half = OFClass::ESM4Npc::getBodyHalfExtents(ptr) * ptr.getCellRef().getScale();
             else if (ptr.getType() == ESM4::Creature::sRecordId)
-                half = OFClass::ESM4Creature::getBodyHalfExtents(ptr);
+                half = OFClass::ESM4Creature::getBodyHalfExtents(ptr) * ptr.getCellRef().getScale();
             else
                 half = world->getHalfExtents(ptr);
             // An actor the physics has no body for yet stands about as tall as a person
