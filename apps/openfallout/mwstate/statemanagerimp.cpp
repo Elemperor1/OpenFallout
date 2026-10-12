@@ -168,15 +168,20 @@ void OFState::StateManager::newGame(bool bypass)
 {
     cleanup();
 
-    if (!bypass)
-        OFBase::Environment::get().getWindowManager()->setNewGame(true);
-
     try
     {
         Log(Debug::Info) << "Starting a new game";
         OFBase::Environment::get().getScriptManager()->getGlobalScripts().addStartup();
-        OFBase::Environment::get().getFalloutScripts()->reset();
-        OFBase::Environment::get().getWorld()->startNewGame(bypass);
+        auto falloutScripts = OFBase::Environment::get().getFalloutScripts();
+        falloutScripts->reset();
+        // A game that has the quest of character creation of Fallout starts as the games do: the quest, not the
+        // character generation of Morrowind, makes the character and takes the player to where the game begins
+        const bool falloutStart = !bypass && falloutScripts->newGameQuest() != 0;
+        if (!bypass && !falloutStart)
+            OFBase::Environment::get().getWindowManager()->setNewGame(true);
+        OFBase::Environment::get().getWorld()->startNewGame(bypass || falloutStart);
+        if (falloutStart)
+            falloutScripts->startNewGame();
 
         mState = State_Running;
         OFBase::Environment::get().getLuaManager()->gameLoaded();

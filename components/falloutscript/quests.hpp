@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <components/esm4/loadqust.hpp>
@@ -85,6 +86,8 @@ namespace FalloutScript
 
         bool known(FormId quest) const { return mQuests.count(quest) != 0; }
         const QuestState* state(FormId quest) const;
+        /// The quest with the editor id (the case does not matter), or 0 when there is none (or the editor id is empty)
+        FormId findByEditorId(std::string_view editorId) const;
 
         /// The script of the quest, which holds its variables (null when the quest has no script or is not known)
         Instance* instance(FormId quest);
@@ -126,6 +129,9 @@ namespace FalloutScript
         /// (the scripts of the games use it to go on with a quest that waits for a menu to open or to close). The
         /// filter picks the blocks that run: one that names a menu (Begin MenuMode 1001) is for that menu.
         void updateMenu(float seconds, const BlockFilter& filter = {});
+        /// Runs the block of the script of the quest at once, without waiting for its delay (the next run comes one
+        /// delay later). Nothing happens for a quest that does not run or has no script.
+        void runBlock(FormId quest, std::uint16_t blockType, const BlockFilter& filter = {});
 
     private:
         QuestState* find(FormId quest);

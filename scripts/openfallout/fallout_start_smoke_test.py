@@ -904,6 +904,39 @@ return {
                                for name, (_, global_name) in plugin.CHARGEN_GLOBALS.items())).replace(
     "@STATE@", plugin.CHARGEN_GLOBALS["state"][1]).replace("@GO@", plugin.CHARGEN_GLOBALS["go"][1])
 
+# The new game, in an engine of its own: started with `--new-game` and no `--start`, the engine does what the games do for
+# New Game. It finds the quest CG00 of the plugin, starts it and runs its MenuMode block, which sets stage 0, and the result
+# script of the stage moves the player to a marker of the interior cell and sets stage 5. This script of the world logs the
+# quest and the player once the game has run for NEW_GAME_FROM seconds, then quits.
+NEW_GAME_FROM = 3.0
+NEW_GAME_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+
+local elapsed, done = 0, false
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ then return end
+            done = true
+            local quest = world.quests.find('@QUEST@')
+            if quest then
+                print('OFTEST', 'newgame quest', string.format('stage=%d running=%s', quest.stage, tostring(quest.running)))
+            else
+                print('OFTEST', 'newgame quest', 'none')
+            end
+            local player = world.players[1]
+            print('OFTEST', 'newgame player', tostring(player.cell.isExterior), tostring(player.cell.name),
+                string.format('%.1f,%.1f,%.1f', player.position.x, player.position.y, player.position.z))
+            core.quit()
+        end,
+    },
+}
+"""
+NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME))
+
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
 # script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
@@ -1282,12 +1315,13 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
                keys=None):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
-    pressed after the log has a line that matches."""
+    pressed after the log has a line that matches. A `start` of None is a new game: `--new-game` with no `--start`."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data), "--content", "OFTest.esm",
-               "--content", scripts, "--skip-menu", "--start", start, "--no-grab"]
+               "--content", scripts, "--skip-menu", *(["--new-game"] if start is None else ["--start", start]),
+               "--no-grab"]
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, so give it one.
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
@@ -1726,6 +1760,35 @@ def check_chargen(text):
     for key, value in wanted.items():
         if globals_.get(key) != value:
             problems.append(f"the script of the quest should read {key} as {value}: {globals_.get(key)}")
+    return problems
+
+
+def check_new_game(text):
+    """The problems with the new game: the engine found the quest CG00, started it, its MenuMode block set stage 0, and
+    the result script of the stage moved the player to the marker of the interior cell and set stage 5."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
+            problems.append(line)
+    if f"New game: the quest of character creation is {plugin.NEW_GAME_QUEST_NAME}" not in text:
+        problems.append(f"the engine did not log the quest {plugin.NEW_GAME_QUEST_NAME} as the quest of character creation")
+    found = [re.search(r"OFTEST\tnewgame[\t ]quest\t(.*)$", line) for line in text.splitlines()]
+    quests = [match.group(1).strip() for match in found if match]
+    if quests != [f"stage={plugin.NEW_GAME_LAST_STAGE} running=true"]:
+        problems.append(f"the quest should be running at stage {plugin.NEW_GAME_LAST_STAGE} (its MenuMode block set stage "
+                        f"0, the result of which set stage {plugin.NEW_GAME_LAST_STAGE}): {quests}")
+    found = [re.search(r"OFTEST\tnewgame[\t ]player\t(\w+)\t(.*)\t([-\d.]+),([-\d.]+),([-\d.]+)$", line)
+             for line in text.splitlines()]
+    players = [match.groups() for match in found if match]
+    if len(players) != 1:
+        problems.append(f"expected one 'newgame player' line, found {len(players)}")
+    else:
+        exterior, name, x, y, _ = players[0]
+        wanted = plugin.NEW_GAME_PLACE
+        if exterior != "false" or name != plugin.CELL_NAME or abs(float(x) - wanted[0]) > MOVE_SLACK \
+                or abs(float(y) - wanted[1]) > MOVE_SLACK:
+            problems.append(f"the player should stand at the marker {wanted[:2]} of {plugin.CELL_NAME} (interior), the "
+                            f"result script of stage 0 moved them there: {players[0]}")
     return problems
 
 
@@ -2259,8 +2322,9 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen"],
-                        help="run only this start (or the conversation, or the making of the character), not all")
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame"],
+                        help="run only this start (or the conversation, the making of the character or the new game), "
+                             "not all")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -2292,6 +2356,8 @@ def main():
     (data / "scripts" / "chargenhost.lua").write_text(CHARGEN_HOST_SCRIPT, encoding="ascii")
     (data / "chargentest.omwscripts").write_text(
         "PLAYER: scripts/chargentest.lua\nGLOBAL: scripts/chargenhost.lua\n", encoding="ascii")
+    (data / "scripts" / "newgametest.lua").write_text(NEW_GAME_SCRIPT, encoding="ascii")
+    (data / "newgametest.omwscripts").write_text("GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
@@ -2365,6 +2431,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (chargen):", problem)
+        problems += found
+    if args.only in (None, "newgame"):
+        home = work / "newgame" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "newgame" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== newgame: --new-game, no --start")
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, None, [],
+                               "newgametest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_new_game(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (newgame):", problem)
         problems += found
     if xvfb is not None:
         xvfb.terminate()

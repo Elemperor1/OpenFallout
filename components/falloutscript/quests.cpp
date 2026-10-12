@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "arguments.hpp"
+#include "commandtable.hpp"
 
 namespace FalloutScript
 {
@@ -132,6 +133,17 @@ namespace FalloutScript
             && std::find(state->mStagesDone.begin(), state->mStagesDone.end(), stage) != state->mStagesDone.end();
     }
 
+    FormId QuestManager::findByEditorId(std::string_view editorId) const
+    {
+        if (editorId.empty())
+            return 0;
+        const std::string wanted = lowerCase(editorId);
+        for (const auto& [id, quest] : mQuests)
+            if (quest.mRecord != nullptr && lowerCase(quest.mRecord->mEditorId) == wanted)
+                return id;
+        return 0;
+    }
+
     bool QuestManager::running(FormId quest) const
     {
         const QuestState* state = find(quest);
@@ -230,6 +242,15 @@ namespace FalloutScript
     void QuestManager::updateMenu(float seconds, const BlockFilter& filter)
     {
         advance(seconds, BlockType::MenuMode, filter);
+    }
+
+    void QuestManager::runBlock(FormId id, std::uint16_t blockType, const BlockFilter& filter)
+    {
+        QuestState* quest = find(id);
+        if (quest == nullptr || !quest->mRunning || !quest->mInstance)
+            return;
+        quest->mTimer = 0;
+        mInterpreter.run(*quest->mInstance, blockType, filter);
     }
 
     void QuestManager::advance(float seconds, std::uint16_t blockType, const BlockFilter& filter)

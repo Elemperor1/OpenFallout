@@ -317,6 +317,65 @@ namespace
         EXPECT_TRUE(setup.mQuests.completed(questA));
     }
 
+    TEST(FalloutScriptQuestsTest, a_quest_is_found_by_its_editor_id_in_any_case)
+    {
+        Runner setup;
+        setup.mRecords.addQuest(questA).mEditorId = "CG00";
+        setup.mRecords.addQuest(questB).mEditorId = "VCG00";
+        setup.mRecords.addQuest(questC);
+        setup.start();
+
+        EXPECT_EQ(setup.mQuests.findByEditorId("CG00"), questA);
+        EXPECT_EQ(setup.mQuests.findByEditorId("cg00"), questA);
+        EXPECT_EQ(setup.mQuests.findByEditorId("Vcg00"), questB);
+        EXPECT_EQ(setup.mQuests.findByEditorId("CG01"), 0u);
+        EXPECT_EQ(setup.mQuests.findByEditorId(""), 0u);
+    }
+
+    TEST(FalloutScriptQuestsTest, a_block_of_the_script_of_a_quest_can_be_run_at_once)
+    {
+        Runner setup;
+        ScriptBuilder questScript;
+        questScript.mType = 1;
+        questScript.variable(1, TypeInteger, "game");
+        questScript.variable(2, TypeInteger, "menu");
+        questScript.code(scriptName() + begin(GameMode) + setTo(var('s', 1), var('s', 1) + number("1") + op("+"))
+            + end() + begin(1) + setTo(var('s', 2), var('s', 2) + number("1") + op("+")) + end());
+        ESM4::Script& record = setup.mRecords.mScripts[scriptOfA];
+        record.mId = ESM::FormId::fromUint32(scriptOfA);
+        record.mScript = questScript.definition();
+        setup.mRecords.addQuest(questA, 0, 5.f).mQuestScript = ESM::FormId::fromUint32(scriptOfA);
+        setup.start();
+        FalloutScript::Instance* instance = setup.mQuests.instance(questA);
+        ASSERT_NE(instance, nullptr);
+
+        // a quest that does not run runs nothing, the way the delay would leave it
+        setup.mQuests.runBlock(questA, 1);
+        EXPECT_EQ(instance->variable(2), 0);
+
+        // a quest that was started runs the block that is asked for, with no delay, and no other
+        setup.mQuests.start(questA);
+        setup.mQuests.runBlock(questA, 1);
+        EXPECT_EQ(instance->variable(1), 0);
+        EXPECT_EQ(instance->variable(2), 1);
+        setup.mQuests.runBlock(questA, GameMode);
+        EXPECT_EQ(instance->variable(1), 1);
+
+        // the filter says which blocks of the type run
+        setup.mQuests.runBlock(questA, 1, [](const FalloutScript::Block&) { return false; });
+        EXPECT_EQ(instance->variable(2), 1);
+
+        // the next run of the script comes one delay after this one
+        setup.mQuests.update(4.f);
+        EXPECT_EQ(instance->variable(1), 1);
+        setup.mQuests.update(1.f);
+        EXPECT_EQ(instance->variable(1), 2);
+
+        // quests that are not there are left alone
+        setup.mQuests.runBlock(questC, 1);
+        EXPECT_EQ(instance->variable(2), 1);
+    }
+
     TEST(FalloutScriptQuestsTest, starting_and_stopping_a_quest)
     {
         Runner setup;
