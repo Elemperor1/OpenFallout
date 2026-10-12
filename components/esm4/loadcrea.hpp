@@ -125,9 +125,11 @@ namespace ESM4
         ActorFaction mFaction; // the last SNAM, mFactions has them all
         std::vector<ActorFaction> mFactions; // every SNAM in the order of the record
         Data mData;
+        std::uint8_t mCreatureType = 0; // the first byte of DATA in Fallout: 0 animal, 1 mutated animal, ...
         FalloutStats mFalloutStats; // Fallout 3 and New Vegas keep the health and the attributes in the other layout
         ESM::FormId mCombatStyle;
         ESM::FormId mSoundBase;
+        ESM::FormId mVoice; // VTCK, the voice type (VTYP) of the creature
         ESM::FormId mSound;
         std::uint8_t mSoundChance;
         float mBaseScale;

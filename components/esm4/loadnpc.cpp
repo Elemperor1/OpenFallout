@@ -119,6 +119,12 @@ void ESM4::Npc::load(ESM4::Reader& reader)
                 mFactions.push_back(mFaction);
                 break;
             }
+            case ESM::fourCC("VTCK"):
+                if (subHdr.dataSize == sizeof(std::uint32_t))
+                    reader.getFormId(mVoice);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("RNAM"):
                 reader.getFormId(mRace);
                 break;
@@ -336,7 +342,6 @@ void ESM4::Npc::load(ESM4::Reader& reader)
             case ESM::fourCC("TINI"):
             case ESM::fourCC("TINV"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("VTCK"):
             case ESM::fourCC("GNAM"):
             case ESM::fourCC("SHRT"):
             case ESM::fourCC("SPOR"):

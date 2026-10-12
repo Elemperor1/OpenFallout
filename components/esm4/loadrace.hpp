@@ -128,7 +128,7 @@ namespace ESM4
         float mHeightFemale = 1.0f;
         float mWeightMale = 1.0f;
         float mWeightFemale = 1.0f;
-        std::uint32_t mRaceFlags; // 0x0001 = playable?
+        std::uint32_t mRaceFlags = 0; // 0x0001 = playable?
 
         std::vector<BodyPart> mHeadParts; // see HeadPartIndex
         std::vector<BodyPart> mHeadPartsFemale; // see HeadPartIndex
@@ -152,6 +152,7 @@ namespace ESM4
         std::vector<ESM::FormId> mBonusSpells; // race ability/power
         std::array<ESM::FormId, 2> mVNAM; // don't know what these are; 1 or 2 RACE FormIds
         std::array<ESM::FormId, 2> mDefaultHair; // male/female (HAIR FormId for TES4)
+        std::array<ESM::FormId, 2> mDefaultVoice{}; // male/female, the voice types (VTYP) of characters that have none
 
         std::uint32_t mNumKeywords;
 

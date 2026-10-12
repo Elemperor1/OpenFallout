@@ -15,6 +15,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
@@ -64,6 +65,7 @@ namespace OFScript
                                  private FalloutScript::QuestRecords,
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
+                                 private FalloutScript::ActorTraitRecords,
                                  private FalloutScript::ActorValueRecords,
                                  private FalloutScript::ReferenceRecords,
                                  private FalloutScript::FormListRecords,
@@ -155,6 +157,8 @@ namespace OFScript
         void setAngle(FalloutScript::FormId reference, int axis, double radians) override;
 
         void showMessage(FalloutScript::FormId message) override;
+
+        bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
 
         bool initialItems(
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;

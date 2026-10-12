@@ -19,6 +19,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadqust.hpp>
+#include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/wornarmor.hpp>
@@ -144,6 +145,7 @@ namespace OFScript
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
+        FalloutScript::addActorTraitCommands(mInterpreter, *this);
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
         mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
             if (call.mArguments.empty() || !call.mArguments[0].mIsText)
@@ -710,6 +712,59 @@ namespace OFScript
                 addAttributes(values, stats->mFalloutStats);
             addConfig(values, stats->mBaseConfig);
         }
+        return true;
+    }
+
+    bool FalloutScripts::traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)
+    {
+        ESM::FormId base;
+        if (!baseOf(reference, base) || base.isZeroOrUnset())
+            return false;
+        // Race, sex and voice are the Traits tab and the class is the Stats tab, which a record that has a template
+        // takes from it. A levelled list in the place of the template gives one of its characters, the one that the
+        // cell shows for this reference.
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), base);
+        FalloutScript::ActorTraits found;
+        bool female = false;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const OFClass::StoreWornArmorSource source(mStore);
+            const auto chain = ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+            const ESM4::Npc* traitsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseTraits);
+            const ESM4::Npc* statsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseStats);
+            if (traitsOwner == nullptr)
+                traitsOwner = npc;
+            if (statsOwner == nullptr)
+                statsOwner = npc;
+            found.mRace = numberOf(traitsOwner->mRace);
+            found.mClass = numberOf(statsOwner->mClass);
+            found.mVoice = numberOf(traitsOwner->mVoice);
+            female = traitsOwner->mIsFONV ? (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0
+                                          : (traitsOwner->mBaseConfig.tes5.flags & ESM4::Npc::TES5_Female) != 0;
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::Creature* traitsOwner = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseTraits);
+            if (traitsOwner == nullptr)
+                traitsOwner = creature;
+            found.mCreature = true;
+            found.mCreatureType = traitsOwner->mCreatureType;
+            found.mVoice = numberOf(traitsOwner->mVoice);
+        }
+        else
+            return false;
+        // A character with no voice of its own speaks with the voice that its race has for its sex
+        if (const ESM4::Race* race = mStore.get<ESM4::Race>().search(refId(found.mRace)))
+        {
+            if (found.mVoice == 0)
+                found.mVoice = numberOf(race->mDefaultVoice[female ? 1 : 0]);
+            found.mChild = !found.mCreature && (race->mRaceFlags & 0x4) != 0;
+        }
+        found.mFemale = female;
+        traits = found;
         return true;
     }
 

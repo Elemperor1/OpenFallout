@@ -191,6 +191,7 @@ namespace ESM4
 
         ESM::FormId mRace;
         ESM::FormId mClass;
+        ESM::FormId mVoice; // VTCK, the voice type (VTYP) of the character
         ESM::FormId mHair; // not for TES5, see mHeadParts
         ESM::FormId mEyes;
 

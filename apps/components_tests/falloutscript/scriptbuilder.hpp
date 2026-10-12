@@ -298,6 +298,12 @@ namespace FalloutScriptTest
     constexpr std::uint16_t OpGetObjectiveCompleted = 0x1110;
     constexpr std::uint16_t OpSetQuestDelay = 0x1111;
     constexpr std::uint16_t OpCompleteAllObjectives = 0x1112;
+    constexpr std::uint16_t OpGetTalkedToPC = 0x1032;
+    constexpr std::uint16_t OpIsTalking = 0x108D;
+    constexpr std::uint16_t OpGetTalkedToPCParam = 0x10AC;
+    constexpr std::uint16_t OpAddTopic = 0x1058;
+    constexpr std::uint16_t OpGetDialogueEmotion = 0x11B3;
+    constexpr std::uint16_t OpGetDialogueEmotionValue = 0x11B4;
 
     /// A small table of commands for the tests: Log "text", Twice number, the commands of quests, Touch (anything),
     /// and Nothing, which no handler runs
@@ -332,6 +338,12 @@ namespace FalloutScriptTest
         add(OpGetObjectiveCompleted, "GetObjectiveCompleted", { { TypeQuest, false }, { TypeInteger, false } });
         add(OpSetQuestDelay, "SetQuestDelay", { { TypeQuest, false }, { TypeFloat, false } });
         add(OpCompleteAllObjectives, "CompleteAllObjectives", { { TypeQuest, false } });
+        add(OpGetTalkedToPC, "GetTalkedToPC", {});
+        add(OpIsTalking, "IsTalking", {});
+        add(OpGetTalkedToPCParam, "GetTalkedToPCParam", { { TypeQuest, false } });
+        add(OpAddTopic, "AddTopic", { { TypeQuest, false } });
+        add(OpGetDialogueEmotion, "GetDialogueEmotion", {});
+        add(OpGetDialogueEmotionValue, "GetDialogueEmotionValue", {});
         return table;
     }
 

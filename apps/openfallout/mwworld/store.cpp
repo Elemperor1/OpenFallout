@@ -1213,6 +1213,7 @@ template class OFWorld::TypedDynamicStore<ESM4::StaticCollection>;
 template class OFWorld::TypedDynamicStore<ESM4::Terminal>;
 template class OFWorld::TypedDynamicStore<ESM4::TextureSet>;
 template class OFWorld::TypedDynamicStore<ESM4::Tree>;
+template class OFWorld::TypedDynamicStore<ESM4::VoiceType>;
 template class OFWorld::TypedDynamicStore<ESM4::Water>;
 template class OFWorld::TypedDynamicStore<ESM4::Weapon>;
 template class OFWorld::TypedDynamicStore<ESM4::Weather>;

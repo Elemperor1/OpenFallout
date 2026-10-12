@@ -26,6 +26,7 @@ namespace
         TypeQuestStage = 0x17,
         TypeDouble = 0x2C,
         TypeScriptVariable = 0x2D,
+        TypeVoiceType = 0x2E,
     };
 
     class Bytes
@@ -117,6 +118,8 @@ namespace
         EXPECT_EQ(classifyParameter(TypeVariableName), ParamClass::Other);
         EXPECT_EQ(classifyParameter(TypeObjectRef), ParamClass::Form);
         EXPECT_EQ(classifyParameter(TypeQuest), ParamClass::Form);
+        // the voice type of GetIsVoiceType is a form like the others
+        EXPECT_EQ(classifyParameter(TypeVoiceType), ParamClass::Form);
         // a type that no table lists is a form
         EXPECT_EQ(classifyParameter(0x45), ParamClass::Form);
         EXPECT_EQ(classifyParameter(0x1000), ParamClass::Form);

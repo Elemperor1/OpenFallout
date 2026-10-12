@@ -73,6 +73,32 @@ namespace
         return subRecord("ACBS", data);
     }
 
+    TEST(ESM4NpcTest, readsTheVoiceTypeOfACharacterOfFallout)
+    {
+        std::string voice;
+        append<std::uint32_t>(voice, 0x000ABCDE);
+        const std::string data = zString("EDID", "Npc") + falloutBaseConfig(0) + subRecord("VTCK", voice);
+
+        const ESM4::Npc npc = loadVersioned(0.94f, 15, data);
+
+        EXPECT_EQ(npc.mVoice.toUint32(), 0x000ABCDEu);
+        EXPECT_TRUE(loadVersioned(0.94f, 15, zString("EDID", "Npc") + falloutBaseConfig(0)).mVoice.isZeroOrUnset());
+    }
+
+    TEST(ESM4NpcTest, doesNotReadAVoiceTypeThatIsNotOneForm)
+    {
+        std::string voice;
+        append<std::uint32_t>(voice, 0x000ABCDE);
+        append<std::uint32_t>(voice, 0x000ABCDF);
+        const std::string data
+            = zString("EDID", "Npc") + falloutBaseConfig(0) + subRecord("VTCK", voice) + zString("FULL", "Name");
+
+        const ESM4::Npc npc = loadVersioned(0.94f, 15, data);
+
+        EXPECT_TRUE(npc.mVoice.isZeroOrUnset());
+        EXPECT_EQ(npc.mFullName, "Name");
+    }
+
     TEST(ESM4NpcTest, knowsTheContentFileItWasReadFromApartFromTheOneThatMadeIt)
     {
         // the plugin with the load order index 5 changes a character of its master, which has the index 2

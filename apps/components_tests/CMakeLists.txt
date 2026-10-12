@@ -124,6 +124,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testprojectile.cpp
     esm4/testradiationstage.cpp
     esm4/testragdoll.cpp
+    esm4/testrace.cpp
     esm4/testreadergame.cpp
     esm4/testrecipe.cpp
     esm4/testrecipecategory.cpp
@@ -145,6 +146,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmorcensus.cpp
 
     falloutscript/testactors.cpp
+    falloutscript/testactortraits.cpp
     falloutscript/testactorvalues.cpp
     falloutscript/testformlists.cpp
     falloutscript/testplacement.cpp
@@ -152,6 +154,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testreferencestate.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
+    falloutscript/testdialoguerules.cpp
     falloutscript/testmessagecommands.cpp
     falloutscript/testinterpreter.cpp
     falloutscript/testobjects.cpp

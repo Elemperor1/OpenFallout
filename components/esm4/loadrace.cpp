@@ -229,6 +229,18 @@ void ESM4::Race::load(ESM4::Reader& reader)
 
                 break;
             }
+            case ESM::fourCC("VTCK"): // FO3: the voice types of the male and the female
+            {
+                // Two forms; any other size is not read, so that it cannot take the bytes of the next sub-record
+                if (subHdr.dataSize == 2 * sizeof(std::uint32_t))
+                {
+                    reader.getFormId(mDefaultVoice[0]);
+                    reader.getFormId(mDefaultVoice[1]);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
+            }
             case ESM::fourCC("CNAM"):
                 //              CNAM       SNAM                     VNAM
                 // Sheogorath   0x0  0000  98 2b  10011000 00101011
@@ -728,7 +740,6 @@ void ESM4::Race::load(ESM4::Reader& reader)
             //
             case ESM::fourCC("YNAM"): // FO3
             case ESM::fourCC("NAM2"): // FO3
-            case ESM::fourCC("VTCK"): // FO3
             case ESM::fourCC("MODD"): // FO3
             case ESM::fourCC("ONAM"): // FO3
             case ESM::fourCC("APPR"): // FO4
