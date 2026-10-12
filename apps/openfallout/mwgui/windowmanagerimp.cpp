@@ -856,6 +856,11 @@ namespace OFGui
         return mMessageBoxManager->readPressedButton();
     }
 
+    bool WindowManager::pressInteractiveMessageBoxButton(std::size_t button)
+    {
+        return mMessageBoxManager->pressInteractiveMessageBoxButton(button);
+    }
+
     std::string_view WindowManager::getGameSettingString(std::string_view id, std::string_view defaultValue)
     {
         const ESM::GameSetting* setting = mStore->get<ESM::GameSetting>().search(id);

@@ -61,7 +61,7 @@ add_openfallout_dir (mwscript
 add_openfallout_dir (mwlua
     objectcache luamanagerimp object objectlists userdataserializer luaevents engineevents objectvariant loadscripts contentbindings
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
-    mwscriptbindings questbindings conversationbindings chargenbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
+    mwscriptbindings questbindings conversationbindings chargenbindings messagebindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
     postprocessingbindings stats recordstore debugbindings corebindings worldbindings worker landbindings magicbindings factionbindings
     classbindings itemdata inputprocessor animationbindings birthsignbindings racebindings markupbindings weatherbindings regionbindings
     types/types types/door types/item types/actor types/container types/lockable types/weapon types/npc types/bodypart

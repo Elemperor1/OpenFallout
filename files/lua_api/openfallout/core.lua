@@ -1328,6 +1328,33 @@
 -- @field #boolean selected
 
 ---
+-- @{#MessageBox}: the message box that a script of Fallout 3 or New Vegas has put on the screen (`ShowMessage` of a
+-- message that is a box, or has buttons). Not available in load scripts. The player picks a button with a click; a
+-- script can pick one too, which the script that showed the box reads with `GetButtonPressed` in the next frame.
+-- @field [parent=#core] #MessageBox messageBox
+
+---
+-- @type MessageBox
+
+---
+-- The box that is open: its text (the name of the message and its words), the buttons the player can pick from in the
+-- order the box lists them, and a number that is another for each box that opens. Nothing when no box is open.
+-- @function [parent=#MessageBox] current
+-- @return #MessageBoxState
+
+---
+-- Picks a button of the box that is open, as a click on it would.
+-- @function [parent=#MessageBox] press
+-- @param #number button The position of the button in `buttons`, from 1.
+-- @return #boolean False when no box is open or it has no such button.
+
+---
+-- @type MessageBoxState
+-- @field #number serial Another number for each box that opens.
+-- @field #string text
+-- @field #list<#string> buttons
+
+---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
 -- @type DialogueRecord
 -- @field #string id Record identifier

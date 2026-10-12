@@ -267,6 +267,10 @@ namespace OFBase
         /// (->MessageBoxmanager->InteractiveMessageBox)
         virtual int readPressedButton() = 0;
 
+        /// Presses a button of the interactive message box that is open, as a click on it would (counted from 0 in the
+        /// order the box lists them). False when no box is open or it has no such button.
+        virtual bool pressInteractiveMessageBoxButton(std::size_t button) = 0;
+
         virtual void updateConsoleObjectPtr(const OFWorld::Ptr& currentPtr, const OFWorld::Ptr& newPtr) = 0;
 
         /**

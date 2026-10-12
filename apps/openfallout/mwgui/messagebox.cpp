@@ -148,6 +148,11 @@ namespace OFGui
         return mInterMessageBoxe != nullptr;
     }
 
+    bool MessageBoxManager::pressInteractiveMessageBoxButton(std::size_t button)
+    {
+        return mInterMessageBoxe != nullptr && mInterMessageBoxe->press(button);
+    }
+
     bool MessageBoxManager::removeMessageBox(MessageBox* msgbox)
     {
         for (auto it = mMessageBoxes.begin(); it != mMessageBoxes.end(); ++it)
@@ -447,6 +452,14 @@ namespace OFGui
     int InteractiveMessageBox::readPressedButton()
     {
         return mButtonPressed;
+    }
+
+    bool InteractiveMessageBox::press(std::size_t button)
+    {
+        if (mMarkedToDelete || button >= mButtons.size())
+            return false;
+        buttonActivated(mButtons[button]);
+        return true;
     }
 
     bool InteractiveMessageBox::onControllerButtonEvent(const SDL_ControllerButtonEvent& arg)

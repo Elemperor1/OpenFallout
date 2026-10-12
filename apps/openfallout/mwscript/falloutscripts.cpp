@@ -30,6 +30,7 @@
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/messagetext.hpp>
+#include <components/falloutscript/playercontrols.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
@@ -39,6 +40,7 @@
 #include <components/vfs/recursivedirectoryiterator.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/soundmanager.hpp"
@@ -155,6 +157,7 @@ namespace OFScript
         FalloutScript::addPackageCommands(mInterpreter, *this);
         FalloutScript::addPlacementCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
+        FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
@@ -312,6 +315,14 @@ namespace OFScript
         mOpenOwner = 0;
         mMessageBoxCount = 0;
         mAnswer.clear();
+        {
+            const std::lock_guard lock(mOpenMessageMutex);
+            mOpenMessage.reset();
+        }
+        // A game starts with the player in control, whatever the one before took away
+        for (std::size_t i = 0; i < FalloutScript::playerControlCount; ++i)
+            if ((mControlsOff.load() & (1u << i)) != 0)
+                setPlayerControl(static_cast<FalloutScript::PlayerControl>(i), true);
         {
             const std::lock_guard lock(mDialogueMutex);
             mDialogue.reset();
@@ -666,7 +677,9 @@ namespace OFScript
             const ESM4::Message::Button& button = record->mButtons[i];
             if (!mConditions.holds(button.mConditions, FalloutScript::ConditionContext()))
                 continue;
-            box.mButtons.push_back(escapeTags(FalloutScript::formatMessage(button.mText, values)));
+            std::string label = FalloutScript::formatMessage(button.mText, values);
+            box.mButtons.push_back(escapeTags(label));
+            box.mPlainButtons.push_back(std::move(label));
             box.mNumbers.push_back(static_cast<int>(i));
         }
         // A message with buttons is a question to the player, and one that is a box is shown as one even when there is
@@ -677,9 +690,8 @@ namespace OFScript
             return;
         }
         Log(Debug::Info) << "Message buttons: " << box.mButtons.size();
-        box.mText = escapeTags(text);
-        if (!record->mFullName.empty())
-            box.mText = escapeTags(record->mFullName) + "\n\n" + box.mText;
+        box.mPlainText = record->mFullName.empty() ? text : record->mFullName + "\n\n" + text;
+        box.mText = escapeTags(box.mPlainText);
         // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
         // is queued in the next frame
         ++mMessageBoxCount;
@@ -703,6 +715,10 @@ namespace OFScript
                 return;
             mMessageOpen = false;
             --mMessageBoxCount;
+            {
+                const std::lock_guard lock(mOpenMessageMutex);
+                mOpenMessage.reset();
+            }
             if (pressed >= 0 && static_cast<std::size_t>(pressed) < mOpenNumbers.size())
             {
                 const int number = mOpenNumbers[static_cast<std::size_t>(pressed)];
@@ -721,10 +737,15 @@ namespace OFScript
         if (box.mButtons.empty())
         {
             box.mButtons.emplace_back(windows->getGameSettingString("sOK", "OK"));
+            box.mPlainButtons.push_back(box.mButtons.back());
             box.mNumbers.push_back(0);
         }
         mOpenNumbers = box.mNumbers;
         mOpenOwner = box.mOwner;
+        {
+            const std::lock_guard lock(mOpenMessageMutex);
+            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons };
+        }
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
         mMessageOpen = true;
@@ -733,6 +754,78 @@ namespace OFScript
     int FalloutScripts::takeButtonPressed(FalloutScript::FormId owner)
     {
         return mAnswer.take(owner);
+    }
+
+    std::optional<FalloutScripts::OpenMessage> FalloutScripts::openMessage() const
+    {
+        const std::lock_guard lock(mOpenMessageMutex);
+        return mOpenMessage;
+    }
+
+    bool FalloutScripts::pressMessageButton(std::size_t button)
+    {
+        {
+            const std::lock_guard lock(mOpenMessageMutex);
+            if (!mOpenMessage || button >= mOpenMessage->mButtons.size())
+                return false;
+        }
+        runOnMainThread([button] {
+            if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                windows->pressInteractiveMessageBoxButton(button);
+        });
+        return true;
+    }
+
+    void FalloutScripts::setPlayerControl(FalloutScript::PlayerControl control, bool enabled)
+    {
+        const unsigned bit = 1u << static_cast<std::size_t>(control);
+        const unsigned before = enabled ? mControlsOff.fetch_and(~bit) : mControlsOff.fetch_or(bit);
+        if (((before & bit) == 0) == enabled)
+            return;
+        static constexpr const char* names[]
+            = { "movement", "pipboy", "fighting", "point of view", "looking", "rollover", "sneaking" };
+        Log(Debug::Info) << "Player controls: " << names[static_cast<std::size_t>(control)]
+                         << (enabled ? " on" : " off");
+        // The switches of the engine are those of Morrowind: movement is also what lets the player activate things, and
+        // the controls that no switch stands for (the Pip-Boy, rollover, sneaking) have nothing to turn yet
+        std::vector<std::string_view> switches;
+        switch (control)
+        {
+            case FalloutScript::PlayerControl::Movement:
+                switches = { "playercontrols", "playerjumping" };
+                break;
+            case FalloutScript::PlayerControl::Fighting:
+                switches = { "playerfighting", "playermagic" };
+                break;
+            case FalloutScript::PlayerControl::PointOfView:
+                switches = { "playerviewswitch", "vanitymode" };
+                break;
+            case FalloutScript::PlayerControl::Looking:
+                switches = { "playerlooking" };
+                break;
+            default:
+                return;
+        }
+        runOnMainThread([control, enabled, switches = std::move(switches)] {
+            OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
+            if (input == nullptr)
+                return;
+            // Taking looking away turns the player to the front in Morrowind, which would undo the way the player was
+            // put to face (a move to a marker turns the player, and the scenes begin with looking taken away)
+            OFBase::World* world = OFBase::Environment::get().getWorld();
+            OFWorld::Ptr player;
+            osg::Vec3f facing;
+            if (control == FalloutScript::PlayerControl::Looking && !enabled && world != nullptr)
+            {
+                player = world->getPlayerPtr();
+                if (!player.isEmpty())
+                    facing = player.getRefData().getPosition().asRotationVec3();
+            }
+            for (const std::string_view name : switches)
+                input->toggleControlSwitch(name, enabled);
+            if (!player.isEmpty())
+                world->rotateObject(player, facing);
+        });
     }
 
     bool FalloutScripts::menuOpen(int menu)

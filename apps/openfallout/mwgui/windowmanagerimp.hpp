@@ -277,6 +277,7 @@ namespace OFGui
 
         int readPressedButton() override; ///< returns the index of the pressed button or -1 if no button was pressed
                                           ///< (->MessageBoxmanager->InteractiveMessageBox)
+        bool pressInteractiveMessageBoxButton(std::size_t button) override;
 
         void update(float duration);
 

@@ -28,6 +28,9 @@ namespace OFGui
         bool createInteractiveMessageBox(std::string_view message, const std::vector<std::string>& buttons,
             bool immediate = false, int defaultFocus = -1);
         bool isInteractiveMessageBox();
+        /// Presses a button of the interactive message box that is open; false when there is none, or it has no such
+        /// button
+        bool pressInteractiveMessageBoxButton(std::size_t button);
 
         std::size_t getMessagesCount();
 
@@ -96,6 +99,8 @@ namespace OFGui
             const std::vector<std::string>& buttons, bool immediate, size_t defaultFocus);
         void mousePressed(MyGUI::Widget* widget);
         int readPressedButton();
+        /// A click on the button (counted from 0); false when the box has no such button or is already answered
+        bool press(std::size_t button);
 
         MyGUI::Widget* getDefaultKeyFocus() override;
 

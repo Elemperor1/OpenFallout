@@ -68,6 +68,7 @@ import placeholder_skeleton
 import synthetic_fallout_plugin as plugin
 
 ROOT = Path(__file__).resolve().parents[2]
+AUTOPLAY = ROOT / "scripts" / "openfallout" / "autoplay"
 
 # Where the walk ends, in the units of the game, relative to where it starts: the pillar is PILLAR_DISTANCE north of the
 # start and a cube wide, the player a box 40 wide, so it comes to a halt about 20 units short of the pillar's south
@@ -906,12 +907,40 @@ return {
 
 # The new game, in an engine of its own: started with `--new-game` and no `--start`, the engine does what the games do for
 # New Game. It finds the quest CG00 of the plugin, starts it and runs its MenuMode block, which sets stage 0, and the result
-# script of the stage moves the player to a marker of the interior cell and sets stage 5. This script of the world logs the
-# quest and the player once the game has run for NEW_GAME_FROM seconds, then quits.
+# script of the stage takes the controls of the player, moves the player to a marker of the interior cell (which faces a way)
+# and sets stage 5. The script of the quest shows a message box with two buttons; autoplay.lua (the tool in
+# scripts/openfallout/autoplay, which is what runs the intro on real data) picks the first, which sets stage 10, which gives
+# the controls back and opens the screen for the name, which autoplay.lua finishes. A script of the player logs the box and
+# the controls while it is open (and that the box takes no button that is not there); this script of the world logs the
+# quest, the controls and the player once the game has run for NEW_GAME_FROM seconds, then quits.
 NEW_GAME_FROM = 3.0
+CONTROL_KEYS = "'playercontrols', 'playerfighting', 'playerlooking', 'playerviewswitch'"
+NEW_GAME_PLAYER_SCRIPT = """\
+local core = require('openfallout.core')
+local input = require('openfallout.input')
+local self = require('openfallout.self')
+
+local seen = nil
+
+return {
+    engineHandlers = {
+        onFrame = function()
+            local box = core.messageBox.current()
+            if not box or box.serial == seen then return end
+            seen = box.serial
+            local row = {}
+            for _, key in ipairs({ @KEYS@ }) do table.insert(row, key .. '=' .. tostring(input.getControlSwitch(key))) end
+            print('OFTEST', 'newgame box', string.format('buttons=%d first=%s second=%s', #box.buttons, box.buttons[1],
+                box.buttons[2]), table.concat(row, ' '), string.format('yaw=%.3f', self.rotation:getYaw()),
+                'bounds=' .. tostring(core.messageBox.press(0)) .. ',' .. tostring(core.messageBox.press(#box.buttons + 1)))
+        end,
+    },
+}
+""".replace("@KEYS@", CONTROL_KEYS)
 NEW_GAME_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
+local types = require('openfallout.types')
 
 local elapsed, done = 0, false
 
@@ -928,6 +957,11 @@ return {
                 print('OFTEST', 'newgame quest', 'none')
             end
             local player = world.players[1]
+            local row = {}
+            for _, key in ipairs({ @KEYS@ }) do
+                table.insert(row, key .. '=' .. tostring(types.Player.getControlSwitch(player, key)))
+            end
+            print('OFTEST', 'newgame controls', table.concat(row, ' '))
             print('OFTEST', 'newgame player', tostring(player.cell.isExterior), tostring(player.cell.name),
                 string.format('%.1f,%.1f,%.1f', player.position.x, player.position.y, player.position.z))
             core.quit()
@@ -936,7 +970,8 @@ return {
 }
 """
 NEW_GAME_START_ELSEWHERE = f"{plugin.WORLD_NAME}:0,0" # the exterior cell the engine logs as OFTestWorldCell (0, 0)
-NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME))
+NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME)
+                   .replace("@KEYS@", CONTROL_KEYS))
 
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
@@ -1765,8 +1800,11 @@ def check_chargen(text):
 
 
 def check_new_game(text):
-    """The problems with the new game: the engine found the quest CG00, started it, its MenuMode block set stage 0, and
-    the result script of the stage moved the player to the marker of the interior cell and set stage 5."""
+    """The problems with the new game: the engine found the quest CG00, started it, its MenuMode block set stage 0, the
+    result script of the stage took the controls of the player and moved them to the marker of the interior cell (facing the
+    way the marker does) and set stage 5; the script of the quest showed a box with two buttons, which autoplay.lua
+    answered with the first, so that stage 10 was set, which gave the controls back and opened the screen for the name,
+    which autoplay.lua finished."""
     problems = []
     for line in text.splitlines():
         if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
@@ -1781,6 +1819,30 @@ def check_new_game(text):
     if quests != [f"stage={plugin.NEW_GAME_LAST_STAGE} running=true"]:
         problems.append(f"the quest should be running at stage {plugin.NEW_GAME_LAST_STAGE} (its MenuMode block set stage "
                         f"0, the result of which set stage {plugin.NEW_GAME_LAST_STAGE}): {quests}")
+    boxes = [line for line in text.splitlines() if re.search(r"OFTEST\tnewgame[\t ]box\t", line)]
+    if len(boxes) != 1:
+        problems.append(f"expected one 'newgame box' line (the box the quest shows), found {len(boxes)}")
+    else:
+        first, second = plugin.NEW_GAME_BUTTONS
+        wanted = (f"buttons=2 first={first} second={second}\t"
+                  "playercontrols=false playerfighting=false playerlooking=false playerviewswitch=false\t"
+                  f"yaw={plugin.NEW_GAME_YAW:.3f}\tbounds=false,false")
+        if not boxes[0].endswith(wanted):
+            problems.append(f"while the box is open the player should have lost movement, fighting, looking and the view "
+                            f"(DisablePlayerControls 1 1 1 1 1), still face the way of the marker, and the box should take "
+                            f"no button it does not have: {boxes[0]!r} should end with {wanted!r}")
+    found = [re.search(r"OFTEST\tnewgame[\t ]controls\t(.*)$", line) for line in text.splitlines()]
+    controls = [match.group(1).strip() for match in found if match]
+    if controls != ["playercontrols=true playerfighting=true playerlooking=true playerviewswitch=true"]:
+        problems.append(f"EnablePlayerControls should have given all the controls back: {controls}")
+    automatic = re.findall(r"AUTOPLAY\t(box press\t1\ttrue|chargen finish\tname\tname=" + plugin.NEW_GAME_NAME + r")",
+                           text)
+    if len(automatic) != 2:
+        problems.append(f"autoplay.lua should have pressed the first button of the box and finished the screen of the name "
+                        f"with the name {plugin.NEW_GAME_NAME}: {automatic}")
+    for stage in (plugin.NEW_GAME_WAIT_STAGE, plugin.NEW_GAME_LAST_STAGE):
+        if f"AUTOPLAY\tquest\t{plugin.NEW_GAME_QUEST_NAME}\tstage={stage} running=true" not in text:
+            problems.append(f"autoplayworld.lua should have logged stage {stage} of the quest")
     found = [re.search(r"OFTEST\tnewgame[\t ]player\t(\w+)\t(.*)\t([-\d.]+),([-\d.]+),([-\d.]+)$", line)
              for line in text.splitlines()]
     players = [match.groups() for match in found if match]
@@ -2363,7 +2425,13 @@ def main():
     (data / "chargentest.omwscripts").write_text(
         "PLAYER: scripts/chargentest.lua\nGLOBAL: scripts/chargenhost.lua\n", encoding="ascii")
     (data / "scripts" / "newgametest.lua").write_text(NEW_GAME_SCRIPT, encoding="ascii")
-    (data / "newgametest.omwscripts").write_text("GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
+    (data / "scripts" / "newgameplayer.lua").write_text(NEW_GAME_PLAYER_SCRIPT, encoding="ascii")
+    # the tool that plays the intro on real data does the answering here
+    for name in ("autoplay.lua", "autoplayworld.lua"):
+        shutil.copy(AUTOPLAY / "scripts" / name, data / "scripts" / name)
+    (data / "newgametest.omwscripts").write_text(
+        "PLAYER: scripts/autoplay.lua\nPLAYER: scripts/newgameplayer.lua\nGLOBAL: scripts/autoplayworld.lua\n"
+        "GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"

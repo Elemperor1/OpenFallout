@@ -379,16 +379,25 @@ AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 
 # The quest that starts a new game, as CG00 does in Fallout 3: the engine finds it by its editor ID, starts it and runs
 # its MenuMode block (the main menu counts as a menu), which sets stage 0 as long as the quest is before stage 5; the
-# result script of stage 0 moves the player to a marker and sets stage 5
+# result script of stage 0 takes the controls of the player, moves the player to a marker (which faces a way) and sets
+# stage 5. At stage 5 the script of the quest shows a message box with two buttons and sets stage 6; once the test has
+# picked the first button (from Lua, as a click would) it sets stage 10, which gives the controls back and opens the name
+# screen.
 NEW_GAME_QUEST_NAME = "CG00"
 NEW_GAME_QUEST_ID = 0x8FA
 NEW_GAME_SCRIPT_ID = 0x8FB
 NEW_GAME_PLACE_REF_ID = 0x8FC
+NEW_GAME_MESSAGE_ID = 0x8FD
 NEW_GAME_PLACE = (300.0, 200.0, 0.0) # in the interior cell
+NEW_GAME_YAW = 1.0 # the way the marker faces, radians
 NEW_GAME_FIRST_STAGE = 0
-NEW_GAME_LAST_STAGE = 5
+NEW_GAME_BOX_STAGE = 5
+NEW_GAME_WAIT_STAGE = 6
+NEW_GAME_LAST_STAGE = 10
+NEW_GAME_BUTTONS = ("First choice", "Second choice")
+NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x8FC # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x8FD # the largest form ID of the plugin, which the next object ID of its header follows
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
 CELL_NAME = "OFTestCell"
@@ -850,32 +859,63 @@ def chargen_quest():
 
 def new_game_script():
     """The script of the quest that starts a new game (an SCPT record of type 1): `Begin MenuMode`, no number, with
-    `if GetStage CG00 < 5` then `SetStage CG00 0`, as the script of CG00 starts the game of Fallout 3."""
+    `if GetStage CG00 < 5` then `SetStage CG00 0`, as the script of CG00 starts the game of Fallout 3; and `Begin
+    GameMode`, which at stage 5 shows the message box and sets stage 6, and at stage 6 sets stage 10 once the first
+    button has been picked (as the script of CG00 shows its box for the sex of the player and reads the answer)."""
     sf = fallout_script
     script = sf.Script(1)
     quest = script.form(NEW_GAME_QUEST_ID)
-    before_last = (sf.call_token(sf.GET_STAGE, sf.form_argument(quest)) + sf.number(str(NEW_GAME_LAST_STAGE))
-                   + sf.operator("<"))
+    message = script.form(NEW_GAME_MESSAGE_ID)
+
+    def stage_is(stage):
+        return (sf.call_token(sf.GET_STAGE, sf.form_argument(quest)) + sf.number(str(stage)) + sf.operator("=="))
+
+    before_box = (sf.call_token(sf.GET_STAGE, sf.form_argument(quest)) + sf.number(str(NEW_GAME_BOX_STAGE))
+                  + sf.operator("<"))
+    picked_first = sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("0") + sf.operator("==")
     script.add(
         sf.statement(sf.SCRIPT_NAME),
         sf.block(sf.MENU_MODE_BLOCK, b"".join([
-            sf.branch(sf.IF, before_last),
+            sf.branch(sf.IF, before_box),
             sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_FIRST_STAGE)),
+            sf.statement(sf.END_IF)])),
+        sf.block(sf.GAME_MODE, b"".join([
+            sf.branch(sf.IF, stage_is(NEW_GAME_BOX_STAGE)),
+            sf.call(sf.SHOW_MESSAGE, sf.form_argument(message)),
+            sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_WAIT_STAGE)),
+            sf.statement(sf.END_IF),
+            sf.branch(sf.IF, stage_is(NEW_GAME_WAIT_STAGE)),
+            sf.branch(sf.IF, picked_first),
+            sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_LAST_STAGE)),
+            sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
     return record(b"SCPT", NEW_GAME_SCRIPT_ID, [zstr(b"EDID", "OFTestNewGameScript"), *sf.sub_records(script)])
 
 
+def new_game_message():
+    """The MESG record of the box that the quest of the new game shows: two buttons, no condition."""
+    subs = [zstr(b"EDID", "OFTestNewGameMessage"), zstr(b"DESC", "Pick the first button."),
+            sub(b"DNAM", struct.pack("<I", 1)), sub(b"TNAM", struct.pack("<I", 0))]
+    subs += [zstr(b"ITXT", text) for text in NEW_GAME_BUTTONS]
+    return record(b"MESG", NEW_GAME_MESSAGE_ID, subs)
+
+
 def new_game_quest():
-    """CG00: stage 0 moves the player to the marker and sets stage 5 (the quest is not Start Game Enabled, so only a new
-    game starts it)."""
+    """CG00: stage 0 takes five of the controls of the player (movement, the Pip-Boy, fighting, the view and looking),
+    moves the player to the marker and sets stage 5; stage 10 gives all the controls back and opens the screen for the
+    name (the quest is not Start Game Enabled, so only a new game starts it)."""
     sf = fallout_script
     # the references of the result script, in the order of their entries: the player, the marker, the quest
-    first = [sf.call_on(1, sf.MOVE_TO_MARKER, sf.form_argument(2)),
-             sf.call(sf.SET_STAGE, sf.form_argument(3), sf.int_argument(NEW_GAME_LAST_STAGE))]
+    first = [sf.call(sf.DISABLE_PLAYER_CONTROLS, *[sf.int_argument(1)] * 5),
+             sf.call_on(1, sf.MOVE_TO_MARKER, sf.form_argument(2)),
+             sf.call(sf.SET_STAGE, sf.form_argument(3), sf.int_argument(NEW_GAME_BOX_STAGE))]
+    last = [sf.call_counted(sf.ENABLE_PLAYER_CONTROLS), sf.call(sf.GET_PLAYER_NAME)]
     return quest(NEW_GAME_QUEST_ID, NEW_GAME_QUEST_NAME, "OpenFallout Test New Game", 0,
                  [(NEW_GAME_FIRST_STAGE, "The game starts", 0, [], first,
                    [PLAYER_REFERENCE, NEW_GAME_PLACE_REF_ID, NEW_GAME_QUEST_ID]),
-                  (NEW_GAME_LAST_STAGE, "The game goes on", 0, [], [], [])],
+                  (NEW_GAME_BOX_STAGE, "The game asks", 0, [], [], []),
+                  (NEW_GAME_WAIT_STAGE, "The game waits", 0, [], [], []),
+                  (NEW_GAME_LAST_STAGE, "The game goes on", 0, [], last, [])],
                  script=NEW_GAME_SCRIPT_ID)
 
 
@@ -1633,7 +1673,7 @@ def plugin():
         refr(FLOOR_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
         refr(MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
-        refr(NEW_GAME_PLACE_REF_ID, TARGET_MARKER_ID, NEW_GAME_PLACE),
+        refr(NEW_GAME_PLACE_REF_ID, TARGET_MARKER_ID, NEW_GAME_PLACE, rotation=(0.0, 0.0, NEW_GAME_YAW)),
         achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
         talker_reference(),
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
@@ -1663,7 +1703,7 @@ def plugin():
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior")])
-            + top_group(b"MESG", [message(), button_message()])
+            + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
                                                  new_game_script()])
