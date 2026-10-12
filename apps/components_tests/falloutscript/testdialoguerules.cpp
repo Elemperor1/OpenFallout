@@ -553,6 +553,21 @@ namespace
         EXPECT_THAT(setup.texts(setup.mDialogue.start(speaker)), ElementsAre("Back again"));
     }
 
+    TEST(FalloutScriptDialogueTest, aSpeakerWithNothingToSayHasNotBeenTalkedTo)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(greeting, "Greeting", "GREETING");
+        // The only greeting is for a speaker that has been talked to
+        setup.mRecords.addInfo(0x3001, greeting, "Back again").mConditions.push_back(talkedToPlayer(1));
+        setup.start();
+
+        const FalloutScript::DialogueView& started = setup.mDialogue.start(speaker);
+
+        EXPECT_THAT(started.mLines, IsEmpty());
+        EXPECT_THAT(started.mOptions, IsEmpty());
+        EXPECT_FALSE(setup.mDialogue.talkedToPlayer(speaker.mReference));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseSaidOnceIsSaidAgainWhenTheConversationLeftItBeforeItsEnd)
     {
         Harness setup;

@@ -18,9 +18,14 @@ local hintColor = util.color.rgb(0.6, 0.7, 0.6)
 
 local textSize = ui._getDefaultFontSize() + 4
 local gap = v2(0, 6)
+-- About the height of a line of text, with some room (the layout is not asked, the lines are counted)
+local lineHeight = textSize * 1.15
 
 local element = nil
 local visible = false
+-- The topics are listed from this one, and as many as fit the screen: there is no scrolling widget, so the list is
+-- moved by the wheel and the keys
+local optionOffset, optionCount = 1, 0
 -- The response that is said, the line of it that is being said, how long it has been (until the player has had the
 -- time to read it, or the voice is over) and how long since its voice ended
 local playedResponse = nil
@@ -60,6 +65,7 @@ end
 local function pick(topic)
     local view = conversation.choose(topic)
     playedResponse = nil
+    optionOffset = 1
     render(view)
     startResponse(view)
 end
@@ -128,39 +134,82 @@ function render(view)
     end
     local width = math.max(360, math.floor(ui.screenSize().x * 0.6))
     local inner = width - 48
+    -- the panel ends at the bottom of the screen with some room, and has padding
+    local available = ui.screenSize().y * 0.94 - 48
 
     -- the window has the same width whatever the lines are
     local rows = { { props = { size = v2(inner, 0) } } }
-    local function add(layout)
+    local used = 0
+    local function add(layout, lineCount)
         if #rows > 1 then
             rows[#rows + 1] = { props = { size = gap } }
+            used = used + gap.y
         end
         rows[#rows + 1] = layout
+        used = used + (lineCount or 1) * lineHeight
     end
 
     if view.speakerName ~= '' then
-        add {
+        add({
             type = ui.TYPE.Text,
             props = { text = view.speakerName, textSize = textSize + 2, textColor = speakerColor },
-        }
+        }, 1)
     end
     for _, line in ipairs(view.lines) do
-        add(paragraph(line.text, focusColor, inner))
+        local layout = paragraph(line.text, focusColor, inner)
+        add(layout, #layout.lines)
     end
 
     local panelEvents = nil
+    optionCount = 0
     if view.speaking then
-        add {
+        add({
             type = ui.TYPE.Text,
             props = { text = 'Click or press Space to continue', textSize = textSize - 4, textColor = hintColor },
-        }
+        }, 1)
         panelEvents = { mouseClick = async:callback(function() advance() end) }
     else
-        for _, option in ipairs(view.options) do
-            local topic = option.topic
-            add(optionRow(option.text, function() pick(topic) end, inner))
+        local options = view.options
+        optionOffset = math.max(1, math.min(optionOffset, #options))
+        -- The topics from the first one shown, as many as fit what is left of the screen (at least one). When they
+        -- do not all fit, a line says which are shown.
+        local function fit(room)
+            local shown, taken = {}, 0
+            for index = optionOffset, #options do
+                local topic = options[index].topic
+                local row = optionRow(options[index].text, function() pick(topic) end, inner)
+                local height = #row.lines * lineHeight + gap.y
+                if #shown > 0 and taken + height > room then
+                    break
+                end
+                shown[#shown + 1] = row
+                taken = taken + height
+            end
+            return shown
         end
-        if #view.options == 0 then
+        local left = available - used
+        local shown = fit(left)
+        local first, last = optionOffset, optionOffset + #shown - 1
+        local partial = first > 1 or last < #options
+        if partial then
+            shown = fit(left - lineHeight - gap.y)
+            last = optionOffset + #shown - 1
+        end
+        optionCount = #shown
+        for _, row in ipairs(shown) do
+            add(row, #row.lines)
+        end
+        if partial then
+            add({
+                type = ui.TYPE.Text,
+                props = {
+                    text = string.format('%d-%d of %d (wheel, Page Up/Down)', first, last, #options),
+                    textSize = textSize - 4,
+                    textColor = hintColor,
+                },
+            }, 1)
+        end
+        if #options == 0 then
             add(optionRow('Goodbye', function()
                 conversation.close()
                 closeWindow()
@@ -191,11 +240,34 @@ function render(view)
     }
 end
 
+-- Moves the list of topics (by a number of topics, down when it is positive) when it does not all fit the screen
+local function scroll(by)
+    local view = conversation.get()
+    if not visible or view.speaking or not view.options or #view.options == 0 then
+        return
+    end
+    local moved
+    if by > 0 then
+        -- the last page is not left with one topic: a page ends where the last topic does
+        if optionOffset + optionCount > #view.options then
+            return
+        end
+        moved = math.min(optionOffset + by, math.max(optionOffset + 1, #view.options - optionCount + 1))
+    else
+        moved = math.max(1, optionOffset + by)
+    end
+    if moved ~= optionOffset then
+        optionOffset = moved
+        render(view)
+    end
+end
+
 -- The response has been read: what it does is done and the options appear, or the conversation is over
 function advance()
     conversation.stopVoice()
     local view = conversation.finish()
     playedResponse = nil
+    optionOffset = 1
     if view.ended then
         destroyElement()
         closeWindow()
@@ -206,6 +278,7 @@ end
 
 local function show()
     visible = true
+    optionOffset = 1
     local view = conversation.get()
     render(view)
     startResponse(view)
@@ -270,10 +343,27 @@ return {
                     advance()
                 end
             elseif key.code >= input.KEY._1 and key.code <= input.KEY._9 then
-                local option = view.options[key.code - input.KEY._1 + 1]
+                -- the numbers are those of the topics that are shown
+                local number = key.code - input.KEY._1 + 1
+                local option = number <= optionCount and view.options[optionOffset + number - 1] or nil
                 if option then
                     pick(option.topic)
                 end
+            elseif key.code == input.KEY.DownArrow then
+                scroll(1)
+            elseif key.code == input.KEY.UpArrow then
+                scroll(-1)
+            elseif key.code == input.KEY.PageDown then
+                scroll(math.max(1, optionCount))
+            elseif key.code == input.KEY.PageUp then
+                scroll(-math.max(1, optionCount))
+            end
+        end,
+        onMouseWheel = function(vertical)
+            if vertical > 0 then
+                scroll(-1)
+            elseif vertical < 0 then
+                scroll(1)
             end
         end,
     },

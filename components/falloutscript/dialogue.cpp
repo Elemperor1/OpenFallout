@@ -346,7 +346,7 @@ namespace FalloutScript
         // it), so the speaker has been talked to once the greeting is chosen
         const FormId first = topic != 0 ? topic : mGreeting;
         const ESM4::DialogInfo* greeting = first != 0 ? responseFor(first, speaker) : nullptr;
-        mTalkedTo.insert(speaker.mReference);
+        const bool firstMeeting = mTalkedTo.insert(speaker.mReference).second;
         if (greeting != nullptr)
         {
             mView = speak(*greeting, speaker, first);
@@ -355,6 +355,10 @@ namespace FalloutScript
         }
         else
             mView.mOptions = options(speaker, nullptr);
+        // A speaker with nothing to say and nothing to pick from does not talk (the host ends the conversation), so
+        // the player has not talked to it
+        if (firstMeeting && mView.mLines.empty() && mView.mOptions.empty())
+            mTalkedTo.erase(speaker.mReference);
         return mView;
     }
 
