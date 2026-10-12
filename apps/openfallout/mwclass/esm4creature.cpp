@@ -111,6 +111,20 @@ namespace OFClass
         return data.mModel.mOwner->mModel.getNormalized();
     }
 
+    std::unique_ptr<OFWorld::Action> ESM4Creature::activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const
+    {
+        // Only a creature that is flagged Allow PC Dialogue (by the record that its template leaves the base data to)
+        // can be talked to
+        if (isFalloutCreature(ptr))
+        {
+            const ESM4::Creature* baseData = getCustomData(ptr).mBaseData;
+            if (baseData != nullptr && (baseData->mBaseConfig.fo3.flags & ESM4::Creature::FO3_AllowPCDialog) != 0)
+                if (std::unique_ptr<OFWorld::Action> talk = ESM4Impl::talkAction(ptr, actor))
+                    return talk;
+        }
+        return Class::activate(ptr, actor);
+    }
+
     std::string_view ESM4Creature::getName(const OFWorld::ConstPtr& ptr) const
     {
         if (!isFalloutCreature(ptr))

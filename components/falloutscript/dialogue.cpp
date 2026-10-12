@@ -202,6 +202,7 @@ namespace FalloutScript
             return false;
         ConditionContext context;
         context.mSubject = speaker.mReference;
+        context.mTarget = mListener;
         return mConditions.holds(info.mConditions, context);
     }
 
@@ -345,7 +346,7 @@ namespace FalloutScript
         // it), so the speaker has been talked to once the greeting is chosen
         const FormId first = topic != 0 ? topic : mGreeting;
         const ESM4::DialogInfo* greeting = first != 0 ? responseFor(first, speaker) : nullptr;
-        mTalkedTo.insert(speaker.mReference);
+        const bool firstMeeting = mTalkedTo.insert(speaker.mReference).second;
         if (greeting != nullptr)
         {
             mView = speak(*greeting, speaker, first);
@@ -354,6 +355,10 @@ namespace FalloutScript
         }
         else
             mView.mOptions = options(speaker, nullptr);
+        // A speaker with nothing to say and nothing to pick from does not talk (the host ends the conversation), so
+        // the player has not talked to it
+        if (firstMeeting && mView.mLines.empty() && mView.mOptions.empty())
+            mTalkedTo.erase(speaker.mReference);
         return mView;
     }
 
@@ -404,7 +409,9 @@ namespace FalloutScript
         }
 
         // A response that goes on is followed by the first of its follow-ups that can be said, before the player has a
-        // say. None is said twice in the exchange, so follow-ups that name each other in a circle end.
+        // say. None is said twice in the exchange, so follow-ups that name each other in a circle end. The character
+        // says them all: the next speaker of a response is Target in every record of the files that has follow-ups
+        // (its default), and the followers are voiced by characters, never by the player.
         for (const ESM::FormId followUp : info.mFollowUps)
         {
             const auto next = mInfoIndex.find(toId(followUp));
@@ -435,21 +442,56 @@ namespace FalloutScript
         mView.mOptions.clear();
     }
 
-    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic)
+    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps)
     {
+        // The listener matters for the choice of the responses (their conditions) and for nothing after it
+        const FormId outerListener = mListener;
+        mListener = listener;
+        struct Restore
+        {
+            FormId& mTarget;
+            FormId mValue;
+            ~Restore() { mTarget = mValue; }
+        } restore{ mListener, outerListener };
+
         const ESM4::DialogInfo* info = responseFor(topic, speaker);
         if (info == nullptr)
             return DialogueView();
         DialogueView view = speak(*info, speaker, topic);
-        markSaid(*info, speaker);
         view.mSpeaking = false;
-        // As in finish(), the end script sees the response that was said
-        const DialogueView outer = mView;
-        mView = view;
-        runScript(info->mEndScript, speaker);
-        mView = outer;
-        for (const ESM::FormId added : info->mAddTopics)
-            addTopic(toId(added));
+        DialogueView current = view; // the response that was said last
+        std::set<FormId> chain;
+        while (info != nullptr)
+        {
+            chain.insert(toId(info->mId));
+            markSaid(*info, speaker);
+            // As in finish(), the end script sees the response that was said
+            const DialogueView outer = mView;
+            mView = current;
+            runScript(info->mEndScript, speaker);
+            mView = outer;
+            for (const ESM::FormId added : info->mAddTopics)
+                addTopic(toId(added));
+
+            // The first follow-up that can be said goes on, none is said twice, and a goodbye is the end
+            const ESM4::DialogInfo* next = nullptr;
+            for (const ESM::FormId followUp : info->mFollowUps)
+            {
+                const auto found = mInfoIndex.find(toId(followUp));
+                if (!followUps || hasFlag(*info, ESM4::INFO_Goodbye) || found == mInfoIndex.end()
+                    || chain.count(found->first) != 0 || !canSay(*found->second, speaker))
+                    continue;
+                next = found->second;
+                break;
+            }
+            info = next;
+            if (info != nullptr)
+            {
+                current = speak(*info, speaker, topic);
+                current.mSpeaking = false;
+                view.mLines.insert(view.mLines.end(), current.mLines.begin(), current.mLines.end());
+            }
+        }
         return view;
     }
 

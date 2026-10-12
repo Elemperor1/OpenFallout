@@ -10,6 +10,7 @@
 
 #include "../mwgui/tooltips.hpp"
 
+#include "../mwworld/action.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -27,6 +28,10 @@ namespace OFClass
         void insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
             OFPhysics::PhysicsSystem& physics);
         OFGui::ToolTipInfo getToolTipInfo(std::string_view name, int count);
+
+        /// The action of the player activating a character or creature of Fallout: talking, when the content has
+        /// dialogue and the character is alive. Null when the character does not talk (or the actor is not the player).
+        std::unique_ptr<OFWorld::Action> talkAction(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor);
 
         /// What chooses among the entries of the levelled lists that a placed actor depends on: the same actor gets the
         /// same choices each time, and two actors of one base record do not necessarily get the same.

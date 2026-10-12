@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -66,13 +67,34 @@ namespace FalloutScript
         constexpr std::uint16_t OnClose = 32;
     }
 
+    /// What a block names after its event: Begin SayToDone Topic names a form, Begin MenuMode 1001 a number
+    enum class BlockNames : std::uint8_t
+    {
+        Nothing, // the Begin has no argument, or one of a shape that is not read
+        Form,
+        Number,
+    };
+
     /// A block of statements that runs on an event: Begin <type> ... End
     struct Block
     {
         std::uint16_t mType = 0;
         std::size_t mBegin = 0; // index of the Begin statement
         std::size_t mEnd = 0; // index of the End statement
+        BlockNames mNames = BlockNames::Nothing;
+        FormId mForm = 0; // the form that the block names
+        std::int32_t mNumber = 0; // the number that the block names
     };
+
+    /// Says whether a block runs for the event that is happening: a block that names something is for that thing only
+    using BlockFilter = std::function<bool(const Block&)>;
+
+    /// Whether a block is for an event about this form: one that names a form (Begin SayToDone Topic) runs for that
+    /// form only, one that names nothing, or a number, runs for any
+    inline bool blockIsForForm(const Block& block, FormId form)
+    {
+        return block.mNames != BlockNames::Form || block.mForm == form;
+    }
 
     /// Where the branches of a condition lead: each If, ElseIf and Else knows the statement that follows its
     /// body (the next ElseIf, the Else or the EndIf) and the EndIf of the whole condition.
@@ -94,6 +116,8 @@ namespace FalloutScript
     {
         const CommandInfo* mCommand = nullptr;
         ESM4::ScriptCode::Arguments mArguments;
+        /// The values a message is given after its arguments (ShowMessage), for the tokens of its text
+        ESM4::ScriptCode::Arguments mValues;
         CallProblem mProblem = CallProblem::None;
     };
 

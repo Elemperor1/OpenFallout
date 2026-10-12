@@ -87,6 +87,9 @@ namespace OFClass
         void insertObjectPhysics(const OFWorld::Ptr& ptr, const std::string& model, const osg::Quat& rotation,
             OFPhysics::PhysicsSystem& physics) const override;
 
+        /// The player talks to a character of Fallout
+        std::unique_ptr<OFWorld::Action> activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const override;
+
         bool hasToolTip(const OFWorld::ConstPtr& ptr) const override { return true; }
         OFGui::ToolTipInfo getToolTipInfo(const OFWorld::ConstPtr& ptr, int count) const override
         {

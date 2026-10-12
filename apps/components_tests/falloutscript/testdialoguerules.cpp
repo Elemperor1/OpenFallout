@@ -311,6 +311,55 @@ namespace
         EXPECT_NE(setup.mDialogue.responseFor(topicA, speaker), nullptr);
     }
 
+    TEST(FalloutScriptDialogueTest, aResponseSaidToACharacterAsksTheConditionsOnTheTargetAboutIt)
+    {
+        constexpr FormId listener = 0x00ff0005;
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A");
+        ESM4::TargetCondition touch{};
+        touch.condition = static_cast<std::uint32_t>(ESM4::CTF_GreaterThan | ESM4::CTF_RunOnTarget);
+        touch.comparison = 0;
+        touch.functionIndex = functionTouch;
+        setup.mRecords.addInfo(0x3001, topicA, "yes").mConditions.push_back(touch);
+        setup.start();
+        setup.mTouchValue[listener] = 1;
+
+        // said to the player, the condition on the target is about the player, who does not meet it
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre());
+        EXPECT_THAT(setup.mTouched, ElementsAre(FalloutScript::playerReference));
+        // said to another character, it is about that one
+        setup.mTouched.clear();
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, listener)), ElementsAre("yes"));
+        EXPECT_THAT(setup.mTouched, ElementsAre(listener));
+    }
+
+    TEST(FalloutScriptDialogueTest, aResponseSaidInAConversationBetweenCharactersGoesOnWithItsFollowUps)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        setup.mRecords.addInfo(0x3001, topicA, "first").mEndScript = logScript("end first").definition();
+        setup.mRecords.addInfo(0x3002, topicA, "asleep", 0x3001).mQuest = id(sleepingQuest);
+        ESM4::DialogInfo& second = setup.mRecords.addInfo(0x3003, topicA, "second", 0x3001);
+        second.mScript = logScript("begin second").definition();
+        second.mEndScript = logScript("end second").definition();
+        setup.mRecords.addInfo(0x3004, topicA, "third", 0x3003);
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3999), id(0x3002), id(0x3003) };
+        setup.mRecords.mInfos[2].mFollowUps = { id(0x3004), id(0x3001) };
+        setup.start();
+
+        // Said as a single response (Say, SayTo) it stops at the first
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA)), ElementsAre("first"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first"));
+
+        // Said in a conversation it goes on: the follow-ups that are not there or can not be said are passed over,
+        // the scripts of each response run, and the one that was said already is not said again
+        setup.mLogged.clear();
+        EXPECT_THAT(
+            setup.texts(setup.mDialogue.say(speaker, topicA, 0, true)), ElementsAre("first", "second", "third"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first", "begin second", "end second"));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3004, speaker.mReference));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseNeedsItsQuestToRun)
     {
         Harness setup;
@@ -529,6 +578,21 @@ namespace
         EXPECT_TRUE(setup.mDialogue.talkedToPlayer(speaker.mReference));
         setup.mDialogue.end();
         EXPECT_THAT(setup.texts(setup.mDialogue.start(speaker)), ElementsAre("Back again"));
+    }
+
+    TEST(FalloutScriptDialogueTest, aSpeakerWithNothingToSayHasNotBeenTalkedTo)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(greeting, "Greeting", "GREETING");
+        // The only greeting is for a speaker that has been talked to
+        setup.mRecords.addInfo(0x3001, greeting, "Back again").mConditions.push_back(talkedToPlayer(1));
+        setup.start();
+
+        const FalloutScript::DialogueView& started = setup.mDialogue.start(speaker);
+
+        EXPECT_THAT(started.mLines, IsEmpty());
+        EXPECT_THAT(started.mOptions, IsEmpty());
+        EXPECT_FALSE(setup.mDialogue.talkedToPlayer(speaker.mReference));
     }
 
     TEST(FalloutScriptDialogueTest, aResponseSaidOnceIsSaidAgainWhenTheConversationLeftItBeforeItsEnd)

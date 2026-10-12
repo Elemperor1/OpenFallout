@@ -14,6 +14,44 @@ namespace FalloutScript
         }
     }
 
+    namespace
+    {
+        /// The block that a Begin statement starts. What follows the length of the Begin is a count of 0, or a count of
+        /// 1 and a form ('r' and its index in the table of references) or a number ('n' and a 32 bit integer); the
+        /// block names nothing for a shape that is not one of these (or a form that a variable holds).
+        Block readBlock(const ESM4::ScriptCode::Statement& statement, std::size_t index,
+            const std::vector<std::uint8_t>& code, const std::vector<ReferenceSlot>& references)
+        {
+            Block block;
+            block.mType = statement.mBlockType;
+            block.mBegin = index;
+            block.mEnd = index;
+            const std::size_t first = statement.mArgumentsOffset;
+            const std::size_t last = std::min<std::size_t>(statement.mEnd, code.size());
+            if (last < first + 3 || code[first] != 1 || code[first + 1] != 0)
+                return block;
+            const std::size_t at = first + 3;
+            if (code[first + 2] == 'r' && last == at + 2)
+            {
+                const std::size_t number = code[at] | (static_cast<std::size_t>(code[at + 1]) << 8);
+                if (number >= 1 && number <= references.size() && !references[number - 1].mIsVariable)
+                {
+                    block.mNames = BlockNames::Form;
+                    block.mForm = references[number - 1].mForm;
+                }
+            }
+            else if (code[first + 2] == 'n' && last == at + 4)
+            {
+                std::uint32_t value = 0;
+                for (std::size_t i = 0; i < 4; ++i)
+                    value |= static_cast<std::uint32_t>(code[at + i]) << (8 * i);
+                block.mNames = BlockNames::Number;
+                block.mNumber = static_cast<std::int32_t>(value);
+            }
+            return block;
+        }
+    }
+
     Script Script::prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands)
     {
         Script script;
@@ -114,7 +152,7 @@ namespace FalloutScript
                         return fail("a Begin inside an If", i);
                     inBlock = true;
                     hasBlocks = true;
-                    mBlocks.push_back(Block{ statements[i].mBlockType, i, i });
+                    mBlocks.push_back(readBlock(statements[i], i, mCode, mReferences));
                     break;
                 case Kind::End:
                     if (!inBlock)
@@ -169,7 +207,7 @@ namespace FalloutScript
         // A script with no blocks is a list of statements to run, and the one block of it is all of them
         mIsResult = !hasBlocks;
         if (mIsResult)
-            mBlocks.push_back(Block{ 0, 0, statements.size() });
+            mBlocks.push_back(Block{ 0, 0, statements.size(), BlockNames::Nothing, 0, 0 });
         return true;
     }
 

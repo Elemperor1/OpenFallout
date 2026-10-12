@@ -11,7 +11,13 @@
 #include "../mwrender/renderinginterface.hpp"
 #include "../mwrender/vismask.hpp"
 
+#include "../mwmechanics/actorutil.hpp"
+
 #include "../mwphysics/physicssystem.hpp"
+
+#include "../mwscript/falloutscripts.hpp"
+
+#include "../mwworld/actiontalk.hpp"
 #include "../mwworld/ptr.hpp"
 
 namespace OFClass
@@ -41,6 +47,16 @@ namespace OFClass
     {
         return (reference.mIndex * 2654435761u + static_cast<std::uint32_t>(reference.mContentFile))
             ^ (baseId.mIndex * 40503u);
+    }
+
+    std::unique_ptr<OFWorld::Action> ESM4Impl::talkAction(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor)
+    {
+        if (actor != OFMechanics::getPlayer())
+            return nullptr;
+        const OFScript::FalloutScripts& scripts = *OFBase::Environment::get().getFalloutScripts();
+        if (!scripts.hasDialogue() || scripts.isDead(ptr))
+            return nullptr;
+        return std::make_unique<OFWorld::ActionTalk>(ptr);
     }
 
     OFGui::ToolTipInfo ESM4Impl::getToolTipInfo(std::string_view name, int count)

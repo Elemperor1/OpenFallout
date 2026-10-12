@@ -22,14 +22,22 @@
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscpt.hpp>
+#include <components/esm4/loadsoun.hpp>
+#include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/settings/values.hpp>
+#include <components/vfs/manager.hpp>
+#include <components/vfs/recursivedirectoryiterator.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/soundmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4base.hpp"
@@ -130,6 +138,8 @@ namespace OFScript
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
+        , mDialogue(mInterpreter, mConditions, mQuests, *this)
+        , mDialogueRandom(std::random_device()())
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
@@ -146,6 +156,51 @@ namespace OFScript
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
+        FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
+        mDialogue.setGameHours([this] { return std::floor(gameDaysPassed()) * 24.0 + gameHour(); });
+        mDialogue.setRandom([this](std::size_t count) {
+            return std::uniform_int_distribution<std::size_t>(0, count - 1)(mDialogueRandom);
+        });
+        // The speaker is the object the command is called on. A conversation with the player opens the interface,
+        // which is for the thread of the frame; one with another character only runs what the response does.
+        mInterpreter.setHandler("StartConversation", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId speaker = call.mReference;
+            const FalloutScript::FormId target = FalloutScript::formArgument(call, 0);
+            const FalloutScript::FormId topic = FalloutScript::formArgument(call, 1);
+            if (speaker == 0 || speaker == mPlayer)
+                return 0.0;
+            if (target == 0 || target == mPlayer)
+            {
+                runOnMainThread([this, speaker, topic] {
+                    const OFWorld::Ptr ptr = findReference(speaker);
+                    if (!ptr.isEmpty())
+                        talkTo(ptr, topic);
+                });
+            }
+            else
+            {
+                // With no topic the exchange starts with the greeting, as it does with the player
+                FalloutScript::FormId first = topic;
+                if (first == 0)
+                {
+                    const std::lock_guard lock(mDialogueMutex);
+                    first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
+                }
+                if (first != 0)
+                    sayTopic(speaker, first, target, false, true);
+            }
+            return 0.0;
+        });
+        mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
+            sayTopic(
+                call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
+            return 0.0;
+        });
+        mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
+            sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
+                FalloutScript::intArgument(call, 2) != 0);
+            return 0.0;
+        });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
         mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
             if (call.mArguments.empty() || !call.mArguments[0].mIsText)
@@ -218,11 +273,23 @@ namespace OFScript
             mDeferredPlaces.clear();
         }
         mQuests.reset();
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            mDialogue.reset();
+            mSpeakerName.clear();
+            // What was being said belongs to the game that is gone: the references would name other objects in the
+            // next one
+            mConversationVoiceFile.clear();
+            mConversationVoiceSpeaker = 0;
+            mConversationVoice = static_cast<int>(VoiceState::None);
+        }
+        mSayings.clear();
     }
 
     void FalloutScripts::update(float frametime, bool paused)
     {
         runPending();
+        updateVoices(frametime);
         if (paused)
             return;
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
@@ -713,6 +780,329 @@ namespace OFScript
             addConfig(values, stats->mBaseConfig);
         }
         return true;
+    }
+
+    void FalloutScripts::forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const
+    {
+        for (const ESM4::Dialogue& topic : mStore.get<ESM4::Dialogue>())
+            function(topic);
+    }
+
+    void FalloutScripts::forEachInfo(const std::function<void(const ESM4::DialogInfo&)>& function) const
+    {
+        for (const ESM4::DialogInfo& info : mStore.get<ESM4::DialogInfo>())
+            function(info);
+    }
+
+    bool FalloutScripts::hasDialogue() const
+    {
+        return mStore.get<ESM4::Dialogue>().getSize() > 0;
+    }
+
+    bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic,
+        FalloutScript::FormId listener, bool forceSubtitles, bool followUps)
+    {
+        ESM::FormId base;
+        if (reference == 0 || topic == 0 || !baseOf(reference, base))
+            return false;
+        std::vector<SaidLine> lines;
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            // The player is the listener when none is named (and is the one conditions on the target are about then)
+            const FalloutScript::DialogueView view
+                = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps);
+            for (const FalloutScript::DialogueLine& line : view.mLines)
+                lines.push_back(
+                    { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, topic, forceSubtitles });
+        }
+        if (lines.empty())
+            return false;
+        lines.back().mEnd = true;
+        runOnMainThread(
+            [this, reference, lines = std::move(lines)]() mutable { startSaying(reference, std::move(lines)); });
+        return true;
+    }
+
+    float FalloutScripts::lineSeconds(const std::string& text)
+    {
+        // How long a line takes to read: the time that a response stays when there is no voice to wait for
+        constexpr float secondsPerCharacter = 0.055f;
+        constexpr float shortest = 1.5f;
+        constexpr float longest = 12.f;
+        return std::clamp(static_cast<float>(text.size()) * secondsPerCharacter, shortest, longest);
+    }
+
+    const FalloutScript::VoiceIndex& FalloutScripts::voices()
+    {
+        const std::lock_guard lock(mVoiceMutex);
+        if (!mVoiceIndexBuilt)
+        {
+            mVoiceIndexBuilt = true;
+            if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                for (const VFS::Path::Normalized& path :
+                    resources->getVFS()->getRecursiveDirectoryIterator("sound/voice/"))
+                    mVoiceIndex.add(path.value());
+            Log(Debug::Info) << "Voice files: " << mVoiceIndex.size();
+        }
+        return mVoiceIndex;
+    }
+
+    std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)
+    {
+        // A response can name a sound record (TRDT) to be said in place of a voice file; when its file is there that is
+        // what is said, and when it is not the voice files are looked for as for any other response
+        if (line.mSound != 0)
+            if (const ESM4::Sound* sound = mStore.get<ESM4::Sound>().search(refId(line.mSound)))
+                if (!sound->mSoundFile.empty())
+                    if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                    {
+                        // As for every sound record: the mp3 that a wav was converted to, when that is what there is
+                        constexpr VFS::Path::NormalizedView soundDir("sound");
+                        constexpr VFS::Path::ExtensionView mp3("mp3");
+                        const VFS::Manager& vfs = *resources->getVFS();
+                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
+                        if (vfs.exists(path))
+                            return path.value();
+                    }
+        const FalloutScript::VoiceIndex& index = voices();
+        if (index.size() == 0 || line.mInfo == 0)
+            return {};
+        // The folder of a response is that of the plugin that has it: the one that its id names, or one that is loaded
+        // after it and overrides it. The plugin has the files of the lines it records, the id counting from its 24
+        // bits. The one loaded last is looked in first: a plugin that overrides a response and records it again is
+        // heard, and one that overrides it without a recording leaves the voice of the plugin before it.
+        std::vector<std::string> plugins;
+        const std::size_t own = line.mInfo >> 24;
+        for (std::size_t i = mContentFiles.size(); i-- > own;)
+        {
+            // A plugin that has a response of its own with the same lower digits has the file of that one (the ids of
+            // different plugins count from the same numbers)
+            if (i != own
+                && mStore.get<ESM4::DialogInfo>().search(
+                    refId((static_cast<FalloutScript::FormId>(i) << 24) | (line.mInfo & 0xFFFFFF))))
+                continue;
+            plugins.push_back(Misc::StringUtils::lowerCase(mContentFiles[i]));
+        }
+        std::string voiceType;
+        FalloutScript::ActorTraits traits;
+        if (traitsOf(speaker, traits) && traits.mVoice != 0)
+            if (const ESM4::VoiceType* type = mStore.get<ESM4::VoiceType>().search(refId(traits.mVoice)))
+                voiceType = type->mEditorId;
+        return index.find(plugins, voiceType, line.mInfo, line.mNumber);
+    }
+
+    void FalloutScripts::startSaying(FalloutScript::FormId reference, std::vector<SaidLine> lines)
+    {
+        // A character that says a line is not interrupted by the next: they come one after the other
+        Saying saying;
+        saying.mReference = reference;
+        saying.mLines = std::move(lines);
+        for (Saying& other : mSayings)
+            if (other.mReference == reference)
+            {
+                for (SaidLine& line : saying.mLines)
+                    other.mLines.push_back(std::move(line));
+                return;
+            }
+        mSayings.push_back(std::move(saying));
+    }
+
+    void FalloutScripts::updateVoices(float frametime)
+    {
+        // Nothing to look after in most frames, and the sound is not there before the game is
+        const auto conversationState = static_cast<VoiceState>(mConversationVoice.load());
+        if (mSayings.empty() && conversationState != VoiceState::Pending && conversationState != VoiceState::Playing)
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (sound == nullptr || world == nullptr)
+            return;
+
+        // The voice of the conversation
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            const auto state = static_cast<VoiceState>(mConversationVoice.load());
+            if (state == VoiceState::Pending || state == VoiceState::Playing)
+            {
+                const OFWorld::Ptr speaker = findReference(mConversationVoiceSpeaker);
+                if (speaker.isEmpty())
+                    mConversationVoice = static_cast<int>(VoiceState::Done);
+                else if (state == VoiceState::Pending)
+                {
+                    sound->say(speaker, VFS::Path::Normalized(mConversationVoiceFile));
+                    // Without an output to play on (or a file that does not decode) nothing is said and the lines wait
+                    // as long as they take to read
+                    mConversationVoice
+                        = static_cast<int>(sound->sayActive(speaker) ? VoiceState::Playing : VoiceState::None);
+                }
+                else if (!sound->sayActive(speaker))
+                    mConversationVoice = static_cast<int>(VoiceState::Done);
+            }
+        }
+
+        // The lines that characters say outside of a conversation
+        const OFWorld::Ptr player = world->getPlayerPtr();
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> finished; // the speaker and the topic
+        for (auto saying = mSayings.begin(); saying != mSayings.end();)
+        {
+            const OFWorld::Ptr speaker = findReference(saying->mReference);
+            if (speaker.isEmpty() || saying->mNext >= saying->mLines.size())
+            {
+                saying = mSayings.erase(saying);
+                continue;
+            }
+            const SaidLine& line = saying->mLines[saying->mNext];
+            if (!saying->mStarted)
+            {
+                saying->mStarted = true;
+                saying->mWait = line.mSeconds;
+                bool voiced = false;
+                if (!line.mVoice.empty())
+                {
+                    sound->say(speaker, VFS::Path::Normalized(line.mVoice));
+                    voiced = sound->sayActive(speaker);
+                }
+                saying->mWait = voiced ? 0.f : line.mSeconds;
+                // What is said can be read when it is far enough to hear it, if subtitles are on, when there is no
+                // voice to hear or when the script that said it forced them
+                constexpr float hearingDistance = 1500.f;
+                // The cells of an exterior worldspace are one place, an interior is the cell
+                const auto sameplace = [&] {
+                    const auto* at = speaker.getCell();
+                    const auto* with = player.getCell();
+                    if (at == with)
+                        return true;
+                    return at != nullptr && with != nullptr && at->isExterior() && with->isExterior()
+                        && at->getCell()->getWorldSpace() == with->getCell()->getWorldSpace();
+                };
+                const bool near = !player.isEmpty() && sameplace()
+                    && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
+                            .length()
+                        <= hearingDistance;
+                if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
+                {
+                    const std::string name(speaker.getClass().getName(speaker));
+                    OFBase::Environment::get().getWindowManager()->messageBox(
+                        name.empty() ? line.mText : name + ": " + line.mText, OFGui::ShowInDialogueMode_Never);
+                }
+            }
+            else
+            {
+                saying->mWait -= frametime;
+                // A voice that plays is waited for; a line without one stays as long as it takes to read
+                if (!sound->sayActive(speaker) && saying->mWait <= 0)
+                {
+                    if (line.mEnd)
+                        finished.emplace_back(saying->mReference, line.mTopic);
+                    ++saying->mNext;
+                    saying->mStarted = false;
+                }
+            }
+            ++saying;
+        }
+        // The script of a character that has said what it was told to goes on (Begin SayToDone Topic): the blocks that
+        // name the topic that was said, and those that name none. It can say more, so this waits until the lines are
+        // no longer being walked.
+        for (const auto& [speaker, topic] : finished)
+            mObjects.trigger(
+                speaker, FalloutScript::BlockType::SayToDone, 0, [topic = topic](const FalloutScript::Block& block) {
+                    return FalloutScript::blockIsForForm(block, topic);
+                });
+    }
+
+    bool FalloutScripts::sayConversationLine(std::size_t index)
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        const FalloutScript::DialogueView& view = mDialogue.view();
+        if (!mDialogue.active() || index >= view.mLines.size())
+            return false;
+        mConversationVoiceFile = voiceFile(mDialogue.speaker().mReference, view.mLines[index]);
+        mConversationVoiceSpeaker = mDialogue.speaker().mReference;
+        if (mConversationVoiceFile.empty())
+        {
+            mConversationVoice = static_cast<int>(VoiceState::None);
+            return false;
+        }
+        Log(Debug::Info) << "Voice: " << mConversationVoiceFile;
+        mConversationVoice = static_cast<int>(VoiceState::Pending);
+        return true;
+    }
+
+    void FalloutScripts::stopConversationVoice()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        if (mConversationVoice.load() == static_cast<int>(VoiceState::None))
+            return;
+        const FalloutScript::FormId speaker = mConversationVoiceSpeaker;
+        mConversationVoice = static_cast<int>(VoiceState::None);
+        // The sound is the business of the thread of the frame
+        runOnMainThread([this, speaker] {
+            const OFWorld::Ptr ptr = findReference(speaker);
+            if (!ptr.isEmpty())
+                OFBase::Environment::get().getSoundManager()->stopSay(ptr);
+        });
+    }
+
+    bool FalloutScripts::startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic)
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        ESM::FormId base;
+        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+            return false;
+        const std::lock_guard lock(mDialogueMutex);
+        if (mDialogue.active())
+            return mDialogue.speaker().mReference == reference;
+        const FalloutScript::DialogueView& view = mDialogue.start({ reference, numberOf(base) }, topic);
+        // A character with nothing to say and nothing to pick from does not talk
+        if (view.mLines.empty() && view.mOptions.empty())
+        {
+            mDialogue.end();
+            return false;
+        }
+        mSpeakerName = std::string(speaker.getClass().getName(speaker));
+        return true;
+    }
+
+    bool FalloutScripts::talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic)
+    {
+        if (!startConversation(speaker, topic))
+            return false;
+        OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, speaker);
+        return true;
+    }
+
+    FalloutScripts::Conversation FalloutScripts::conversation() const
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        Conversation result;
+        result.mActive = mDialogue.active();
+        result.mView = mDialogue.view();
+        result.mSpeakerName = mSpeakerName;
+        for (const FalloutScript::DialogueLine& line : result.mView.mLines)
+        {
+            result.mLineDurations.push_back(lineSeconds(line.mText));
+            result.mDuration += result.mLineDurations.back();
+        }
+        return result;
+    }
+
+    void FalloutScripts::chooseOption(FalloutScript::FormId topic)
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.choose(topic);
+    }
+
+    void FalloutScripts::finishResponse()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.finish();
+    }
+
+    void FalloutScripts::endConversation()
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        mDialogue.end();
     }
 
     bool FalloutScripts::traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits)

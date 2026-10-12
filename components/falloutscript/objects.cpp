@@ -9,10 +9,10 @@ namespace FalloutScript
 {
     namespace
     {
-        bool hasBlockOfType(const Script& script, std::uint16_t blockType)
+        bool hasBlockOfType(const Script& script, std::uint16_t blockType, const BlockFilter& filter = {})
         {
             return std::any_of(script.blocks().begin(), script.blocks().end(),
-                [blockType](const Block& block) { return block.mType == blockType; });
+                [&](const Block& block) { return block.mType == blockType && (!filter || filter(block)); });
         }
     }
 
@@ -65,10 +65,10 @@ namespace FalloutScript
         return found != mObjects.end() ? found->second.mInstance.get() : nullptr;
     }
 
-    bool ObjectScripts::hasBlock(FormId reference, std::uint16_t blockType) const
+    bool ObjectScripts::hasBlock(FormId reference, std::uint16_t blockType, const BlockFilter& filter) const
     {
         const auto found = mObjects.find(reference);
-        return found != mObjects.end() && hasBlockOfType(found->second.mInstance->script(), blockType);
+        return found != mObjects.end() && hasBlockOfType(found->second.mInstance->script(), blockType, filter);
     }
 
     void ObjectScripts::setLoaded(FormId reference, bool loaded)
@@ -96,10 +96,11 @@ namespace FalloutScript
         return found != mObjects.end() && found->second.mLoaded;
     }
 
-    bool ObjectScripts::trigger(FormId reference, std::uint16_t blockType, FormId actionReference)
+    bool ObjectScripts::trigger(
+        FormId reference, std::uint16_t blockType, FormId actionReference, const BlockFilter& filter)
     {
         const auto found = mObjects.find(reference);
-        if (found == mObjects.end() || !hasBlockOfType(found->second.mInstance->script(), blockType))
+        if (found == mObjects.end() || !hasBlockOfType(found->second.mInstance->script(), blockType, filter))
             return false;
         // The script keeps living while it runs, even if a command it calls makes the object forget it
         const std::shared_ptr<Instance> instance = found->second.mInstance;
@@ -111,7 +112,7 @@ namespace FalloutScript
             ~Restore() { mTarget = mValue; }
         } restore{ mActionReference, mActionReference };
         mActionReference = actionReference;
-        mInterpreter.run(*instance, blockType);
+        mInterpreter.run(*instance, blockType, filter);
         return true;
     }
 

@@ -143,6 +143,16 @@ namespace FalloutScriptTest
     {
         return statement(0x10, Bytes().u16(blockType).u32(0));
     }
+    /// A block that names a form (refArg) or a number (intArg) after its type, as in Begin SayToDone Topic
+    inline Bytes beginNaming(std::uint16_t blockType, const Bytes& named)
+    {
+        return statement(0x10, Bytes().u16(blockType).u32(0).u16(1).add(named));
+    }
+    /// A block of a type that can name something, with a count of 0 in place of it
+    inline Bytes beginNamingNothing(std::uint16_t blockType)
+    {
+        return statement(0x10, Bytes().u16(blockType).u32(0).u16(0));
+    }
     inline Bytes end()
     {
         return statement(0x11);

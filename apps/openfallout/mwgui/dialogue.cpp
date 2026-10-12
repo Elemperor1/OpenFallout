@@ -8,6 +8,7 @@
 #include <MyGUI_Window.h>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm/defs.hpp>
 #include <components/esm3/loadcrea.hpp>
 #include <components/settings/values.hpp>
 #include <components/translation/translation.hpp>
@@ -365,6 +366,8 @@ namespace OFGui
 
     bool DialogueWindow::exit()
     {
+        if (mPtr.isEmpty())
+            return true;
         if ((OFBase::Environment::get().getDialogueManager()->isInChoice()))
         {
             return false;
@@ -470,6 +473,9 @@ namespace OFGui
 
     void DialogueWindow::setPtr(const OFWorld::Ptr& actor)
     {
+        // A character of Fallout has its conversation in the interface of the scripts that Lua runs
+        if (!actor.isEmpty() && ESM::isESM4Rec(static_cast<ESM::RecNameInts>(actor.getType())))
+            return;
         if (actor.isEmpty() || !actor.getClass().isActor())
         {
             Log(Debug::Warning) << "Warning: can not talk with non-actor object.";

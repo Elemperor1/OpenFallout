@@ -612,6 +612,121 @@ QUEST_SCRIPT = (QUEST_SCRIPT.replace("@FROM@", str(plugin.QUEST_DELAY * (plugin.
                 .replace("@OBJECTIVE@", str(plugin.QUEST_OBJECTIVE))
                 .replace("@A_STAGE@", str(plugin.QUEST_A_STAGE)).replace("@COUNTER@", plugin.COUNTER_NAME))
 
+# The conversation, in an engine of its own because it pauses the game, which the walk must not be. A script of the world
+# activates the talker (the player does, in the game) and a script of the player looks at the conversation with
+# core.conversation: the greeting that the voice type and the sex of the talker pick (the one for another voice must not be
+# said), its begin script, the window of the built-in script that shows it (the mode Dialogue) and moves on when the
+# response has been read, the options (the topic at the top of the list, the goodbye) and the response to the first of
+# them, which adds a topic and runs a script when it ends, then the topic it added, whose response ends the conversation.
+DIALOGUE_FROM = 3.0
+DIALOGUE_TIMEOUT = 15.0
+DIALOGUE_SCRIPT = """\
+local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
+
+local conversation = core.conversation
+local elapsed, step, since = 0, 0, 0
+local ask, added
+
+local function log(...) print('OFTEST', 'dialogue', ...) end
+
+local function describe(view)
+    local lines, options = {}, {}
+    for _, line in ipairs(view.lines) do table.insert(lines, line.text) end
+    for _, option in ipairs(view.options) do table.insert(options, option.text) end
+    return string.format('active=%s speaking=%s ended=%s speaker=%s lines=[%s] options=[%s] mode=%s',
+        tostring(view.active), tostring(view.speaking), tostring(view.ended), view.speakerName,
+        table.concat(lines, '|'), table.concat(options, '|'), tostring(I.UI.getMode()))
+end
+
+local function go(next)
+    step, since = next, 0
+end
+
+return {
+    engineHandlers = {
+        -- The game pauses with the conversation, so the time is the real one
+        onFrame = function()
+            local dt = core.getRealFrameDuration()
+            elapsed = elapsed + dt
+            since = since + dt
+            local view = conversation.get()
+            if step == 0 then
+                if elapsed >= @FROM@ then
+                    log('available', tostring(conversation.available()))
+                    core.sendGlobalEvent('OFTestTalk', {})
+                    go(1)
+                end
+            elseif step == 1 and view.active then
+                log('greeting', describe(view))
+                core.sendGlobalEvent('OFTestReport', 'greeting')
+                go(2)
+            elseif step == 2 and view.active and not view.speaking then
+                -- The window read the greeting and went on
+                log('options', describe(view))
+                core.sendGlobalEvent('OFTestReport', 'options')
+                for _, option in ipairs(view.options) do
+                    if option.text == '@ASK_PROMPT@' then ask = option.topic end
+                end
+                if ask then
+                    local after = conversation.choose(ask)
+                    log('asked', describe(after))
+                end
+                go(3)
+            elseif step == 3 and view.active and not view.speaking then
+                log('after ask', describe(view))
+                core.sendGlobalEvent('OFTestReport', 'asked')
+                for _, option in ipairs(view.options) do
+                    if option.text == '@ADDED@' then added = option.topic end
+                end
+                if added then
+                    log('added', describe(conversation.choose(added)))
+                end
+                go(4)
+            elseif step == 4 and (view.ended or not view.active) then
+                log('over', describe(view))
+                go(5)
+            elseif step == 5 and since >= 1 then
+                -- The window went with the end of the conversation
+                log('closed', describe(conversation.get()))
+                core.sendGlobalEvent('OFTestReport', 'closed')
+                go(6)
+            elseif step == 6 and since >= 0.5 then
+                core.quit()
+            end
+            if step ~= 0 and step ~= 6 and since >= @TIMEOUT@ then
+                log('timeout at step', tostring(step), describe(view))
+                core.quit()
+            end
+        end,
+    },
+}
+""".replace("@FROM@", str(DIALOGUE_FROM)).replace("@TIMEOUT@", str(DIALOGUE_TIMEOUT)).replace(
+    "@ASK_PROMPT@", plugin.ASK_PROMPT).replace("@ADDED@", plugin.ADDED_TOPIC_NAME)
+
+DIALOGUE_HOST_SCRIPT = """\
+local core = require('openfallout.core')
+local world = require('openfallout.world')
+
+return {
+    eventHandlers = {
+        OFTestTalk = function()
+            local ok, talker = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @TALKER_REF@))
+            if ok and talker:isValid() then
+                print('OFTEST', 'dialogue talker found')
+                talker:activateBy(world.players[1])
+            else
+                print('OFTEST', 'dialogue talker missing')
+            end
+        end,
+        OFTestReport = function(tag)
+            print('OFTEST', 'dialogue globals', tag, tostring(world.globals.@BEGIN@), tostring(world.globals.@END@))
+        end,
+    },
+}
+""".replace("@TALKER_REF@", str(plugin.TALKER_REF_ID)).replace("@BEGIN@", plugin.DIALOGUE_GLOBALS["begin"][1]).replace(
+    "@END@", plugin.DIALOGUE_GLOBALS["end"][1])
+
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
 # script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
@@ -946,12 +1061,12 @@ def wait_for_pixels(process, log, seconds, pixels):
     return colours
 
 
-def run_engine(program, resources, data, home, runtime, seconds, start, pixels):
+def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts"):
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data), "--content", "OFTest.esm",
-               "--content", "walktest.omwscripts", "--skip-menu", "--start", start, "--no-grab"]
+               "--content", scripts, "--skip-menu", "--start", start, "--no-grab"]
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, so give it one.
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
@@ -1172,6 +1287,82 @@ def check(text, scenario, colours, animated=True):
     problems += check_objects(whole, scenario)
     if "Quitting peacefully" not in whole:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_dialogue(text):
+    """The problems with the conversation: the greeting for the voice of the talker (and not the one for another voice)
+    is said, its begin script has run, the window shows it (the mode Dialogue) and goes on, the options are the topic at
+    the top of the list with its prompt and the goodbye, the response to the first adds a topic and its end
+    script runs, the added topic ends the conversation and the window closes with it."""
+    problems = []
+
+    def lines(kind):
+        found = (re.search(rf"OFTEST\tdialogue[\t ]{kind}\t(.*)$", line) for line in text.splitlines())
+        return [match.group(1).strip() for match in found if match]
+
+    def one(kind):
+        found = lines(kind)
+        if len(found) != 1:
+            problems.append(f"expected one 'dialogue {kind}' line, found {len(found)}")
+            return None
+        return found[0]
+
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run", line, re.I):
+            problems.append(line)
+    timeouts = lines("timeout at step")
+    if timeouts:
+        problems.append("the conversation did not go on: " + "; ".join(timeouts))
+    found = one("available")
+    if found is not None and found != "true":
+        problems.append(f"core.conversation.available() should be true with the topics of the plugin loaded: {found}")
+    if "OFTEST\tdialogue talker found" not in text:
+        problems.append("the talker was not found by the script of the world")
+
+    def has(line, *parts):
+        return line is not None and all(part in line for part in parts)
+
+    voiced = re.findall(r"Voice: (\S+)", text)
+    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH]
+    if voiced != wanted:
+        problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
+                        "talker, a line whose only file is another voice's (the ask line) and the lines with none "
+                        "should be silent, and a response that names a sound record (the added topic) should be said "
+                        f"with the file of the record: {voiced}, wanted {wanted}")
+
+    greeting = one("greeting")
+    if not has(greeting, "active=true speaking=true ended=false", f"speaker={plugin.TALKER_TITLE}",
+               f"lines=[{plugin.GREETING_TEXT}]", "options=[]", "mode=Dialogue"):
+        problems.append("the conversation should open with the greeting for the voice and the sex of the talker (and "
+                        f"not the one for another voice), in the mode Dialogue: {greeting}")
+    options = one("options")
+    if not has(options, "active=true speaking=false", f"lines=[{plugin.GREETING_TEXT}]",
+               f"options=[{plugin.ASK_PROMPT}|Goodbye.]", "mode=Dialogue"):
+        problems.append("once the greeting was read the options should be the topic at the top of the list (with its "
+                        f"prompt, first for its priority) and the goodbye: {options}")
+    asked = one("asked")
+    if not has(asked, "speaking=true", f"lines=[{plugin.ASK_TEXT}]", "options=[]"):
+        problems.append(f"picking the topic should say its response: {asked}")
+    after = one("after ask")
+    if not has(after, "speaking=false", f"lines=[{plugin.ASK_TEXT}]",
+               f"options=[{plugin.ASK_PROMPT}|Goodbye.|{plugin.ADDED_TOPIC_NAME}]"):
+        problems.append("after the response the topic that it adds should be among the options, after the topics of "
+                        f"the list: {after}")
+    added = one("added")
+    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}]"):
+        problems.append(f"picking the added topic should say its response: {added}")
+    over = one("over")
+    if not has(over, "active=false", "ended=true"):
+        problems.append(f"a response flagged as the goodbye should end the conversation: {over}")
+    closed = one("closed")
+    if not has(closed, "active=false", "mode=nil"):
+        problems.append(f"the window should be gone when the conversation is over: {closed}")
+    globals_ = {line.split("\t")[0]: line.split("\t")[1:] for line in lines("globals")}
+    for tag, want in (("greeting", ["1", "0"]), ("options", ["1", "0"]), ("asked", ["1", "1"]), ("closed", ["1", "1"])):
+        if globals_.get(tag) != want:
+            problems.append(f"after '{tag}' the globals set by the begin script (greeting) and the end script (asked "
+                            f"topic) should be {want}: {globals_.get(tag)}")
     return problems
 
 
@@ -1705,8 +1896,8 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS],
-                        help="run only this start, not both")
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue"],
+                        help="run only this start (or the conversation), not all")
     args = parser.parse_args()
 
     build = args.build.resolve()
@@ -1730,6 +1921,10 @@ def main():
     (data / "scripts" / "questtest.lua").write_text(QUEST_SCRIPT, encoding="ascii")
     (data / "scripts" / "objecttest.lua").write_text(OBJECT_SCRIPT, encoding="ascii")
     (data / "scripts" / "gatetest.lua").write_text(GATE_SCRIPT, encoding="ascii")
+    (data / "scripts" / "dialoguetest.lua").write_text(DIALOGUE_SCRIPT, encoding="ascii")
+    (data / "scripts" / "dialoguehost.lua").write_text(DIALOGUE_HOST_SCRIPT, encoding="ascii")
+    (data / "dialoguetest.omwscripts").write_text(
+        "PLAYER: scripts/dialoguetest.lua\nGLOBAL: scripts/dialoguehost.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
@@ -1758,6 +1953,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print(f"PROBLEM ({scenario.name}):", problem)
+        problems += found
+    if args.only in (None, "dialogue"):
+        home = work / "dialogue" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "dialogue" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== dialogue: --start", plugin.CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                               "dialoguetest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_dialogue(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (dialogue):", problem)
         problems += found
     if xvfb is not None:
         xvfb.terminate()

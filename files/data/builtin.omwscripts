@@ -32,6 +32,7 @@ GLOBAL: scripts/omw/mechanics/projectiles.lua
 
 # User interface
 PLAYER: scripts/omw/ui.lua
+PLAYER: scripts/omw/falloutdialogue.lua
 
 # Lua console
 MENU: scripts/omw/console/menu.lua
