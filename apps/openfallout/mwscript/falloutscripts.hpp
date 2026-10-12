@@ -500,6 +500,8 @@ namespace OFScript
         /// The messages with buttons that wait their turn, and the numbers of the buttons of the one that is open
         std::deque<MessageBox> mMessageQueue;
         bool mMessageOpen = false;
+        std::uint64_t mOpenBoxId
+            = 0; // the box of the window manager that shows it, to tell it from one that replaced it
         std::vector<int> mOpenNumbers;
         FalloutScript::FormId mOpenOwner = 0;
         /// The box on the screen, for Lua to see and answer

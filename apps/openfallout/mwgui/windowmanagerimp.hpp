@@ -166,6 +166,7 @@ namespace OFGui
         bool isPostProcessorHudVisible() const override;
         bool isSettingsWindowVisible() const override;
         bool isInteractiveMessageBoxActive() const override;
+        std::uint64_t interactiveMessageBoxId() const override;
 
         void toggleVisible(GuiWindow wnd) override;
 

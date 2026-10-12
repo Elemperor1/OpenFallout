@@ -1,6 +1,7 @@
 #ifndef MWGUI_MESSAGE_BOX_H
 #define MWGUI_MESSAGE_BOX_H
 
+#include <cstdint>
 #include <memory>
 
 #include "windowbase.hpp"
@@ -28,6 +29,9 @@ namespace OFGui
         bool createInteractiveMessageBox(std::string_view message, const std::vector<std::string>& buttons,
             bool immediate = false, int defaultFocus = -1);
         bool isInteractiveMessageBox();
+        /// The identifier of the interactive message box that is open, 0 when there is none. A box that replaces
+        /// another one has an identifier of its own.
+        std::uint64_t getInteractiveMessageBoxId() const { return mInterMessageBoxe != nullptr ? mInteractiveId : 0; }
         /// Presses a button of the interactive message box that is open; false when there is none, or it has no such
         /// button
         bool pressInteractiveMessageBoxButton(std::size_t button);
@@ -66,6 +70,7 @@ namespace OFGui
     private:
         std::vector<std::unique_ptr<MessageBox>> mMessageBoxes;
         std::unique_ptr<InteractiveMessageBox> mInterMessageBoxe;
+        std::uint64_t mInteractiveId = 0;
         MessageBox* mStaticMessageBox;
         float mMessageBoxSpeed;
         int mLastButtonPressed;

@@ -139,6 +139,7 @@ namespace OFGui
         mInterMessageBoxe
             = std::make_unique<InteractiveMessageBox>(*this, std::string{ message }, buttons, immediate, defaultFocus);
         mLastButtonPressed = -1;
+        ++mInteractiveId;
 
         return true;
     }

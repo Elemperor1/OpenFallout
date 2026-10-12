@@ -710,8 +710,12 @@ namespace OFScript
         {
             // The window tells the button once it is closed; a box that went away without one (the game was loaded)
             // picked nothing
-            const int pressed = windows->readPressedButton();
-            if (pressed < 0 && windows->isInteractiveMessageBoxActive())
+            // A box that another part of the game opened in its place (a message of Lua, a question of the menu) was
+            // not answered by the player, and the answer that box gets is not ours to take
+            const std::uint64_t current = windows->interactiveMessageBoxId();
+            const bool replaced = current != 0 && current != mOpenBoxId;
+            const int pressed = replaced ? -1 : windows->readPressedButton();
+            if (!replaced && pressed < 0 && current != 0)
                 return;
             mMessageOpen = false;
             --mMessageBoxCount;
@@ -748,6 +752,7 @@ namespace OFScript
         }
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
+        mOpenBoxId = windows->interactiveMessageBoxId();
         mMessageOpen = true;
     }
 
@@ -779,7 +784,9 @@ namespace OFScript
                 if (!mOpenMessage || mOpenMessage->mSerial != serial)
                     return;
             }
-            if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+            // The box that is open must be the one that was asked for: another one can have taken its place
+            OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+            if (windows != nullptr && windows->interactiveMessageBoxId() == mOpenBoxId)
                 windows->pressInteractiveMessageBoxButton(button);
         });
         return true;

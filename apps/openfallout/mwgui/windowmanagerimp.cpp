@@ -1778,6 +1778,11 @@ namespace OFGui
         return mMessageBoxManager && mMessageBoxManager->isInteractiveMessageBox();
     }
 
+    std::uint64_t WindowManager::interactiveMessageBoxId() const
+    {
+        return mMessageBoxManager ? mMessageBoxManager->getInteractiveMessageBoxId() : 0;
+    }
+
     OFGui::GuiMode WindowManager::getMode() const
     {
         if (mGuiModes.empty())

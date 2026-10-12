@@ -140,6 +140,9 @@ namespace OFBase
         virtual bool isPostProcessorHudVisible() const = 0;
         virtual bool isSettingsWindowVisible() const = 0;
         virtual bool isInteractiveMessageBoxActive() const = 0;
+        /// Names the interactive message box that is open: each box has an identifier of its own, which another box
+        /// that replaces it does not share. 0 when no box is open.
+        virtual std::uint64_t interactiveMessageBoxId() const = 0;
 
         virtual void toggleVisible(OFGui::GuiWindow wnd) = 0;
 
