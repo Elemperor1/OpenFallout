@@ -213,8 +213,7 @@ namespace OFWorld
 
         void setRandomSeed(uint32_t seed) override;
 
-        void startNewGame(bool bypass) override;
-        ///< \param bypass Bypass regular game start.
+        void startNewGame(bool bypass, bool useStartCell) override;
 
         void clear() override;
 

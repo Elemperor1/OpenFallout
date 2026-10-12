@@ -248,6 +248,31 @@ namespace OFScript
         mContentFiles = std::move(files);
     }
 
+    FalloutScript::FormId FalloutScripts::newGameQuest() const
+    {
+        // A list with the master of Fallout 3 starts in Vault 101 as Fallout 3 does (Tale of Two Wastelands has both
+        // masters); New Vegas has the quest of its own, and still holds the CG00 of Fallout 3 in its records
+        const bool fallout3 = std::any_of(mContentFiles.begin(), mContentFiles.end(),
+            [](const std::string& file) { return Misc::StringUtils::ciEqual(file, fallout3Master); });
+        if (!fallout3)
+            if (const FalloutScript::FormId quest = mQuests.findByEditorId("VCG00"))
+                return quest;
+        return mQuests.findByEditorId("CG00");
+    }
+
+    void FalloutScripts::startNewGame()
+    {
+        const FalloutScript::FormId quest = newGameQuest();
+        if (quest == 0)
+            return;
+        log("New game: the quest of character creation is " + editorId(quest));
+        mQuests.start(quest);
+        // The main menu is a menu, so the menu mode block of the script of the quest runs and sets its first stage
+        const FalloutScript::BlockFilter filter
+            = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
+        mQuests.runBlock(quest, FalloutScript::BlockType::MenuMode, filter);
+    }
+
     void FalloutScripts::reset()
     {
         reportMissingCommands();

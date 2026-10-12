@@ -94,6 +94,15 @@ namespace OFScript
         /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
         void setContentFiles(std::vector<std::string> files);
 
+        /// The quest of character creation, which the games start when the player picks New in the main menu: the
+        /// executables name it in their ini file (CG00 in Fallout 3, VCG00 in New Vegas), and here it is found by its
+        /// editor id. 0 when the content has none (a list of Morrowind format files). Call it after reset().
+        FalloutScript::FormId newGameQuest() const;
+        /// Starts a new game as the games do: the quest of character creation runs, and its script gets the first
+        /// run of its menu mode block (the main menu is a menu), which sets its first stage; the quest takes the
+        /// player to where the game starts from there. Does nothing without such a quest.
+        void startNewGame();
+
         /// Lets a frame pass: what scripts asked of the world from another thread is done, and the scripts of the
         /// quests that run get their turn, and so do the scripts of the objects in the loaded cells. A game that is
         /// paused (the menus of the game) does the first only: the time of the game does not pass.
