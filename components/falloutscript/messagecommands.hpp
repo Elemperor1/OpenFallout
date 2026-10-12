@@ -31,16 +31,16 @@ namespace FalloutScript
     };
 
     /// The answer to the last message with buttons and who may read it. The games keep one answer for all scripts:
-    /// showing a message forgets the one before and gives the next to the one who showed it, and the answer is told
-    /// once, to that one only (another script that asks gets -1 and leaves it where it is). It can be used from any
-    /// thread.
+    /// showing a message forgets the one before, the answer to a box is given to the one who showed it when the player
+    /// closes it (also when another message was shown while it was open), and the answer is told once, to that one
+    /// only (another script that asks gets -1 and leaves it where it is). It can be used from any thread.
     class MessageAnswer
     {
     public:
-        /// A message was shown for `owner`: the answer to the one before is gone
-        void shown(FormId owner);
-        /// The player picked a button of the message, counted from 0 as the record lists them
-        void picked(int button);
+        /// A message was shown: the answer to the one before is gone
+        void forget();
+        /// The player picked a button of the message that `owner` showed, counted from 0 as the record lists them
+        void picked(FormId owner, int button);
         /// The button for `owner`, or -1 when none was picked, it is for another, or `owner` is none; it is taken
         int take(FormId owner);
         void clear();

@@ -203,6 +203,8 @@ namespace FalloutScript
             int mMenu = 0;
             int mCount = 0;
             bool mAdd = false;
+            /// The values of the command that asked for it
+            std::vector<double> mValues;
         };
         std::deque<Screen> mScreens;
         std::vector<int> mTagsAtStart; // the tags when the screen of skills opened

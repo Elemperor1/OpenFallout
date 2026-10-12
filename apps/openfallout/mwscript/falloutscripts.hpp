@@ -421,6 +421,8 @@ namespace OFScript
             std::string mText;
             std::vector<std::string> mButtons;
             std::vector<int> mNumbers;
+            /// The one who showed it, who gets the button that is picked
+            FalloutScript::FormId mOwner = 0;
         };
         /// Shows the next message box when none is open and takes what the player picked in the one that was (the
         /// thread of the frame only)
@@ -467,6 +469,7 @@ namespace OFScript
         std::deque<MessageBox> mMessageQueue;
         bool mMessageOpen = false;
         std::vector<int> mOpenNumbers;
+        FalloutScript::FormId mOpenOwner = 0;
         /// How many boxes wait or are open (scripts ask from their own thread)
         std::atomic<int> mMessageBoxCount{ 0 };
         /// The answer to the last message that was shown, and who may read it

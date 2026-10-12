@@ -253,8 +253,8 @@ namespace
         EXPECT_THAT(chargen.values(), ElementsAre(1));
         chargen.finishPage();
         EXPECT_EQ(chargen.page(), std::optional<ChargenPage>(ChargenPage::Race));
-        // the values of the menu that was asked for second are not kept for it: they stay the first's
-        EXPECT_THAT(chargen.values(), ElementsAre(1));
+        // and it has the values it was asked for with, not those of the menu before
+        EXPECT_THAT(chargen.values(), ElementsAre(2));
     }
 
     TEST(FalloutScriptChargenTest, a_screen_has_the_number_of_the_menu_it_belongs_to)

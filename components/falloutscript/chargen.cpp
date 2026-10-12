@@ -122,11 +122,10 @@ namespace FalloutScript
             // A game without traits has no screen for them
             if (page == ChargenPage::Traits && mGame != Game::NewVegas)
                 continue;
-            mScreens.push_back({ page, menu, count, add });
+            mScreens.push_back({ page, menu, count, add, values });
         }
         if (!wasOpen && !mScreens.empty())
         {
-            mValues = values;
             ++mSerial;
             activate();
         }
@@ -137,6 +136,7 @@ namespace FalloutScript
         if (mScreens.empty())
             return;
         const Screen& screen = mScreens.front();
+        mValues = screen.mValues;
         if (screen.mPage == ChargenPage::Special)
         {
             const int sum = attributeSum();

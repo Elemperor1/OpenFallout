@@ -14,17 +14,18 @@ namespace FalloutScript
         }
     }
 
-    void MessageAnswer::shown(FormId owner)
+    void MessageAnswer::forget()
     {
         const std::lock_guard lock(mMutex);
         mButton = -1;
-        mOwner = owner;
+        mOwner = 0;
     }
 
-    void MessageAnswer::picked(int button)
+    void MessageAnswer::picked(FormId owner, int button)
     {
         const std::lock_guard lock(mMutex);
         mButton = button;
+        mOwner = owner;
     }
 
     int MessageAnswer::take(FormId owner)

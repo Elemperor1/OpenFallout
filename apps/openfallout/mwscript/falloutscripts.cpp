@@ -284,6 +284,7 @@ namespace OFScript
         mMessageQueue.clear();
         mMessageOpen = false;
         mOpenNumbers.clear();
+        mOpenOwner = 0;
         mMessageBoxCount = 0;
         mAnswer.clear();
         {
@@ -617,9 +618,9 @@ namespace OFScript
             log("ShowMessage: the message " + FalloutScript::hex(message) + " is not known");
             return;
         }
-        // The answer to the message before is gone as soon as another is shown, and the answer to this one is its
-        // owner's to read
-        mAnswer.shown(owner);
+        // The answer to the message before is gone as soon as another is shown (the answer to this one is its owner's
+        // to read once the player closes the box)
+        mAnswer.forget();
         // The conditions before the first button are those of the message, and the ones after a button are its own;
         // they are about the player
         if (!mConditions.holds(record->mConditions, FalloutScript::ConditionContext()))
@@ -631,6 +632,7 @@ namespace OFScript
         Log(Debug::Info) << "Message: " << text;
 
         MessageBox box;
+        box.mOwner = owner;
         for (std::size_t i = 0; i < record->mButtons.size(); ++i)
         {
             const ESM4::Message::Button& button = record->mButtons[i];
@@ -650,9 +652,11 @@ namespace OFScript
         box.mText = escapeTags(text);
         if (!record->mFullName.empty())
             box.mText = escapeTags(record->mFullName) + "\n\n" + box.mText;
+        // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
+        // is queued in the next frame
+        ++mMessageBoxCount;
         runOnMainThread([this, box = std::move(box)]() mutable {
             mMessageQueue.push_back(std::move(box));
-            ++mMessageBoxCount;
             updateMessageBoxes();
         });
     }
@@ -674,10 +678,11 @@ namespace OFScript
             if (pressed >= 0 && static_cast<std::size_t>(pressed) < mOpenNumbers.size())
             {
                 const int number = mOpenNumbers[static_cast<std::size_t>(pressed)];
-                mAnswer.picked(number);
+                mAnswer.picked(mOpenOwner, number);
                 Log(Debug::Info) << "Message button: " << number;
             }
             mOpenNumbers.clear();
+            mOpenOwner = 0;
         }
         // Another box (the main menu asking something) is not ours to replace
         if (mMessageQueue.empty() || windows->isInteractiveMessageBoxActive())
@@ -691,6 +696,7 @@ namespace OFScript
             box.mNumbers.push_back(0);
         }
         mOpenNumbers = box.mNumbers;
+        mOpenOwner = box.mOwner;
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
         mMessageOpen = true;

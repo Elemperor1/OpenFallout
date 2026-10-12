@@ -53,7 +53,8 @@ namespace
         {
             mShown.push_back(message);
             mCalls.push_back({ message, values, owner });
-            mAnswer.shown(owner);
+            (void)owner;
+            mAnswer.forget();
         }
         int takeButtonPressed(FormId owner) override
         {
@@ -136,8 +137,8 @@ namespace
         builder.variable(1, integerVariable, "first").variable(2, integerVariable, "second");
         setup.addScript(builder);
         setup.mObjects.add(crate, scriptOfCrates);
-        setup.mScreen.mAnswer.shown(crate);
-        setup.mScreen.mAnswer.picked(2);
+        setup.mScreen.mAnswer.forget();
+        setup.mScreen.mAnswer.picked(crate, 2);
 
         setup.mObjects.trigger(crate, BlockType::OnActivate);
 
@@ -155,8 +156,8 @@ namespace
         setup.addScript(builder);
         setup.mObjects.add(crate, scriptOfCrates);
         setup.mObjects.add(otherCrate, scriptOfCrates);
-        setup.mScreen.mAnswer.shown(crate);
-        setup.mScreen.mAnswer.picked(1);
+        setup.mScreen.mAnswer.forget();
+        setup.mScreen.mAnswer.picked(crate, 1);
 
         setup.mObjects.trigger(otherCrate, BlockType::OnActivate);
         EXPECT_EQ(setup.mObjects.instance(otherCrate)->variable(1), -1);
@@ -207,8 +208,8 @@ namespace
             + setTo(var('s', 1), callToken(OpGetButtonPressed, Bytes())) + end());
         setup.addScript(builder);
         setup.mObjects.add(crate, scriptOfCrates);
-        setup.mScreen.mAnswer.shown(crate);
-        setup.mScreen.mAnswer.picked(3);
+        setup.mScreen.mAnswer.forget();
+        setup.mScreen.mAnswer.picked(crate, 3);
 
         setup.mObjects.trigger(crate, BlockType::OnActivate);
 
@@ -218,17 +219,32 @@ namespace
     TEST(FalloutScriptMessageCommandsTest, the_answer_of_a_message_is_for_the_one_who_showed_it)
     {
         FalloutScript::MessageAnswer answer;
-        answer.shown(0x01005000);
-        answer.picked(0);
+        answer.forget();
+        answer.picked(0x01005000, 0);
         // the answer is for the quest, and 0 is a button like the others
         EXPECT_EQ(answer.take(0x01005001), -1);
         EXPECT_EQ(answer.take(0), -1);
         EXPECT_EQ(answer.take(0x01005000), 0);
         EXPECT_EQ(answer.take(0x01005000), -1);
-        answer.shown(0x01005000);
-        answer.picked(4);
+        answer.forget();
+        answer.picked(0x01005000, 4);
         answer.clear();
         EXPECT_EQ(answer.take(0x01005000), -1);
+    }
+
+    TEST(FalloutScriptMessageCommandsTest, the_answer_goes_to_the_owner_of_the_box_that_was_closed_not_of_a_later_one)
+    {
+        FalloutScript::MessageAnswer answer;
+        // two scripts show a box before the first is closed: the second call forgets, and owns nothing yet
+        answer.forget();
+        answer.forget();
+        answer.picked(0x01005000, 1);
+        EXPECT_EQ(answer.take(0x01005001), -1);
+        EXPECT_EQ(answer.take(0x01005000), 1);
+        // the second box is closed later and its answer is the second owner's
+        answer.picked(0x01005001, 2);
+        EXPECT_EQ(answer.take(0x01005000), -1);
+        EXPECT_EQ(answer.take(0x01005001), 2);
     }
 
     TEST(FalloutScriptMessageCommandsTest, menu_mode_asks_for_the_menu_of_its_number_or_for_any)
