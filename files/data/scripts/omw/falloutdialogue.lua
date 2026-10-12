@@ -47,10 +47,16 @@ local function closeWindow()
 end
 
 local advance, render
+-- The lines of the response do not all fit the screen
+local responseWindowed = false
 
 local function startLine(index)
     lineIndex, lineElapsed, voiceOverFor = index, 0, 0
     lineVoiced = conversation.say(index)
+    -- A response that does not fit the screen shows the lines from the one that is said
+    if responseWindowed and visible then
+        render(conversation.get())
+    end
 end
 
 -- A response that is new: its first line is said
@@ -70,20 +76,58 @@ local function pick(topic)
     startResponse(view)
 end
 
+-- The characters of a word with their widths in letters: the ideographs, kana and hangul of the languages that are
+-- written without spaces are about twice as wide as a letter. Text that is not UTF-8 is taken a byte at a time.
+local function glyphs(word)
+    local list = {}
+    local ok = pcall(function()
+        for _, code in utf8.codes(word) do
+            list[#list + 1] = { utf8.char(code), code >= 0x2E80 and 2 or 1 }
+        end
+    end)
+    if not ok then
+        list = {}
+        for i = 1, #word do
+            list[i] = { word:sub(i, i), 1 }
+        end
+    end
+    return list
+end
+
 -- The words of a text in lines that fit the width. Text widgets do not wrap to a width and then grow in height (they
 -- grow in width, past the edge of the screen), and a text edit can wrap but takes the clicks, so the lines are made here
--- with a width for a letter that is on the large side, and each is a widget of its own.
+-- with a width for a letter that is on the large side, and each is a widget of its own. A word that is longer than a
+-- line (text of a language written without spaces) is cut between its characters.
 local function wrap(text, width)
     local limit = math.max(8, math.floor(width / (textSize * 0.55)))
-    local lines, current = {}, ''
+    local lines, current, used = {}, '', 0
     for word in text:gmatch('%S+') do
-        if current == '' then
-            current = word
-        elseif #current + 1 + #word <= limit then
-            current = current .. ' ' .. word
+        local list = glyphs(word)
+        local wordWidth = 0
+        for _, glyph in ipairs(list) do
+            wordWidth = wordWidth + glyph[2]
+        end
+        if wordWidth <= limit then
+            if current == '' then
+                current, used = word, wordWidth
+            elseif used + 1 + wordWidth <= limit then
+                current, used = current .. ' ' .. word, used + 1 + wordWidth
+            else
+                lines[#lines + 1] = current
+                current, used = word, wordWidth
+            end
         else
-            lines[#lines + 1] = current
-            current = word
+            if current ~= '' then
+                lines[#lines + 1] = current
+            end
+            current, used = '', 0
+            for _, glyph in ipairs(list) do
+                if used + glyph[2] > limit and current ~= '' then
+                    lines[#lines + 1] = current
+                    current, used = '', 0
+                end
+                current, used = current .. glyph[1], used + glyph[2]
+            end
         end
     end
     lines[#lines + 1] = current
@@ -155,9 +199,38 @@ function render(view)
             props = { text = view.speakerName, textSize = textSize + 2, textColor = speakerColor },
         }, 1)
     end
+    -- The lines of the response that fit what is left of the screen (with room for a row of topics or the hint): from
+    -- the line that is said while it is said, the last ones when it is over
+    local layouts, total = {}, 0
+    local function heightOf(layout)
+        return #layout.lines * lineHeight + gap.y
+    end
     for _, line in ipairs(view.lines) do
-        local layout = paragraph(line.text, focusColor, inner)
-        add(layout, #layout.lines)
+        layouts[#layouts + 1] = paragraph(line.text, focusColor, inner)
+        total = total + heightOf(layouts[#layouts])
+    end
+    local first, last = 1, #layouts
+    local room = available - used - lineHeight - gap.y
+    responseWindowed = total > room and #layouts > 1
+    if responseWindowed then
+        local taken
+        if view.speaking then
+            first = math.max(1, math.min(lineIndex, #layouts))
+            last, taken = first, heightOf(layouts[first])
+            while last < #layouts and taken + heightOf(layouts[last + 1]) <= room do
+                last = last + 1
+                taken = taken + heightOf(layouts[last])
+            end
+        else
+            first, taken = #layouts, heightOf(layouts[#layouts])
+            while first > 1 and taken + heightOf(layouts[first - 1]) <= room do
+                first = first - 1
+                taken = taken + heightOf(layouts[first])
+            end
+        end
+    end
+    for index = first, last do
+        add(layouts[index], #layouts[index].lines)
     end
 
     local panelEvents = nil
