@@ -92,6 +92,20 @@ namespace
         EXPECT_EQ(creature.mFalloutStats.mHealth, 50);
     }
 
+    TEST(ESM4CreatureTest, doesNotReadAVoiceTypeThatIsNotOneForm)
+    {
+        std::string voice;
+        append<std::uint32_t>(voice, 0x00ABCDEF);
+        append<std::uint32_t>(voice, 0x00ABCDF0);
+        const std::string data = zString("EDID", "Beast") + subRecord("ACBS", actorConfig(0x1, 2, 0))
+            + subRecord("VTCK", voice) + zString("FULL", "Beast Name");
+
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        EXPECT_TRUE(creature.mVoice.isZeroOrUnset());
+        EXPECT_EQ(creature.mFullName, "Beast Name");
+    }
+
     TEST(ESM4CreatureTest, readsTheTemplateAndWhatARecordTakesFromIt)
     {
         const std::uint16_t flags = ESM4::Creature::Template_UseModel | ESM4::Creature::Template_UseBaseData;

@@ -188,7 +188,10 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                 reader.getFormId(mBodyParts.emplace_back());
                 break;
             case ESM::fourCC("VTCK"): // FO3
-                reader.getFormId(mVoice);
+                if (subHdr.dataSize == sizeof(std::uint32_t))
+                    reader.getFormId(mVoice);
+                else
+                    reader.skipSubRecordData();
                 break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("RNAM"):
