@@ -403,6 +403,7 @@ namespace OFScript
     {
         // This runs while the scene is being changed, which scripts must not change in turn (enabling or disabling an
         // object takes it out of the scene or puts it in): what they do waits for the next frame
+        const std::size_t volumesBefore = mTriggerShapes.size();
         cell.forEach([&](const OFWorld::Ptr& ptr) {
             const FalloutScript::FormId reference = referenceOf(ptr);
             if (reference == 0)
@@ -436,6 +437,9 @@ namespace OFScript
             }
             return true;
         });
+        if (mTriggerShapes.size() != volumesBefore)
+            Log(Debug::Info) << "Trigger volumes: " << (mTriggerShapes.size() - volumesBefore) << " in a loaded cell, "
+                             << mTriggerShapes.size() << " in all";
     }
 
     void FalloutScripts::registerTrigger(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
@@ -542,6 +546,11 @@ namespace OFScript
                   const FalloutScript::BlockFilter filter = [actor](const FalloutScript::Block& block) {
                       return FalloutScript::blockIsForForm(block, actor);
                   };
+                  // OnTrigger repeats every pass, so only the changes are told
+                  if (blockType != FalloutScript::BlockType::OnTrigger)
+                      Log(Debug::Info) << (blockType == FalloutScript::BlockType::OnTriggerEnter ? "Trigger enter: "
+                                                                                                 : "Trigger leave: ")
+                                       << std::hex << trigger << " by " << actor;
                   mObjects.trigger(trigger, blockType, actor, filter);
               };
         mTriggers.update(bodies, active, raise);
