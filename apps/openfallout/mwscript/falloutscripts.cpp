@@ -263,7 +263,13 @@ namespace OFScript
             const std::lock_guard lock(mDialogueMutex);
             mDialogue.reset();
             mSpeakerName.clear();
+            // What was being said belongs to the game that is gone: the references would name other objects in the
+            // next one
+            mConversationVoiceFile.clear();
+            mConversationVoiceSpeaker = 0;
+            mConversationVoice = static_cast<int>(VoiceState::None);
         }
+        mSayings.clear();
     }
 
     void FalloutScripts::update(float frametime, bool paused)
@@ -829,10 +835,11 @@ namespace OFScript
             return {};
         // The folder of a response is that of the plugin that has it: the one that its id names, or one that is loaded
         // after it and overrides it. The plugin has the files of the lines it records, the id counting from its 24
-        // bits.
+        // bits. The one loaded last is looked in first: a plugin that overrides a response and records it again is
+        // heard, and one that overrides it without a recording leaves the voice of the plugin before it.
         std::vector<std::string> plugins;
         const std::size_t own = line.mInfo >> 24;
-        for (std::size_t i = own; i < mContentFiles.size(); ++i)
+        for (std::size_t i = mContentFiles.size(); i-- > own;)
         {
             // A plugin that has a response of its own with the same lower digits has the file of that one (the ids of
             // different plugins count from the same numbers)

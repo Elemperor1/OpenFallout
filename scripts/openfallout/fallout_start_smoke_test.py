@@ -626,7 +626,7 @@ local I = require('openfallout.interfaces')
 
 local conversation = core.conversation
 local elapsed, step, since = 0, 0, 0
-local ask, secret
+local ask, added
 
 local function log(...) print('OFTEST', 'dialogue', ...) end
 
@@ -677,10 +677,10 @@ return {
                 log('after ask', describe(view))
                 core.sendGlobalEvent('OFTestReport', 'asked')
                 for _, option in ipairs(view.options) do
-                    if option.text == '@SECRET@' then secret = option.topic end
+                    if option.text == '@ADDED@' then added = option.topic end
                 end
-                if secret then
-                    log('secret', describe(conversation.choose(secret)))
+                if added then
+                    log('added', describe(conversation.choose(added)))
                 end
                 go(4)
             elseif step == 4 and (view.ended or not view.active) then
@@ -702,7 +702,7 @@ return {
     },
 }
 """.replace("@FROM@", str(DIALOGUE_FROM)).replace("@TIMEOUT@", str(DIALOGUE_TIMEOUT)).replace(
-    "@ASK_PROMPT@", plugin.ASK_PROMPT).replace("@SECRET@", plugin.SECRET_TOPIC_NAME)
+    "@ASK_PROMPT@", plugin.ASK_PROMPT).replace("@ADDED@", plugin.ADDED_TOPIC_NAME)
 
 DIALOGUE_HOST_SCRIPT = """\
 local core = require('openfallout.core')
@@ -1293,8 +1293,8 @@ def check(text, scenario, colours, animated=True):
 def check_dialogue(text):
     """The problems with the conversation: the greeting for the voice of the talker (and not the one for another voice)
     is said, its begin script has run, the window shows it (the mode Dialogue) and goes on, the options are the topic at
-    the top of the list with its prompt and the goodbye, the response to the first adds the secret topic and its end
-    script runs, the secret ends the conversation and the window closes with it."""
+    the top of the list with its prompt and the goodbye, the response to the first adds a topic and its end
+    script runs, the added topic ends the conversation and the window closes with it."""
     problems = []
 
     def lines(kind):
@@ -1311,8 +1311,9 @@ def check_dialogue(text):
     for line in text.splitlines():
         if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run", line, re.I):
             problems.append(line)
-    if "OFTEST\tdialogue timeout" in text:
-        problems.append("the conversation did not go on: " + lines("timeout")[0])
+    timeouts = lines("timeout at step")
+    if timeouts:
+        problems.append("the conversation did not go on: " + "; ".join(timeouts))
     found = one("available")
     if found is not None and found != "true":
         problems.append(f"core.conversation.available() should be true with the topics of the plugin loaded: {found}")
@@ -1344,12 +1345,12 @@ def check_dialogue(text):
         problems.append(f"picking the topic should say its response: {asked}")
     after = one("after ask")
     if not has(after, "speaking=false", f"lines=[{plugin.ASK_TEXT}]",
-               f"options=[{plugin.ASK_PROMPT}|Goodbye.|{plugin.SECRET_TOPIC_NAME}]"):
+               f"options=[{plugin.ASK_PROMPT}|Goodbye.|{plugin.ADDED_TOPIC_NAME}]"):
         problems.append("after the response the topic that it adds should be among the options, after the topics of "
                         f"the list: {after}")
-    secret = one("secret")
-    if not has(secret, "speaking=true", f"lines=[{plugin.SECRET_TEXT}]"):
-        problems.append(f"picking the secret topic should say its response: {secret}")
+    added = one("added")
+    if not has(added, "speaking=true", f"lines=[{plugin.ADDED_TEXT}]"):
+        problems.append(f"picking the added topic should say its response: {added}")
     over = one("over")
     if not has(over, "active=false", "ended=true"):
         problems.append(f"a response flagged as the goodbye should end the conversation: {over}")
