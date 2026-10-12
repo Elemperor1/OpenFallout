@@ -280,6 +280,8 @@ namespace
         EXPECT_EQ(infos[0].mResponses[0].mEmotionValue, 4);
         EXPECT_EQ(infos[0].mResponses[0].mNumber, 7);
         EXPECT_TRUE(infos[0].mResponses[0].mSound.isZeroOrUnset());
+        // The fields of the old layout say no sound too, not an unset form id read as a number
+        EXPECT_EQ(infos[0].mResponseData.sound, 0u);
     }
 
     TEST(ESM4DialogInfoFalloutTest, readsDataOfThreeBytesWithOneByteOfFlags)

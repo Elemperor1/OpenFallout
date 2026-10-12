@@ -197,7 +197,8 @@ void ESM4::DialogInfo::load(ESM4::Reader& reader)
             mResponseData.emoType = first.mEmotionType;
             mResponseData.emoValue = first.mEmotionValue;
             mResponseData.responseNo = first.mNumber;
-            mResponseData.sound = first.mSound.toUint32();
+            // A response of 16 bytes has no sound: 0 here, where an unset form id would come out as 0xFF000000
+            mResponseData.sound = first.mSound.isZeroOrUnset() ? 0 : first.mSound.toUint32();
             mResponseData.flags = first.mFlags;
         }
         return;
