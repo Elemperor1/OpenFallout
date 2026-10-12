@@ -307,6 +307,9 @@ namespace OFScript
         updateVoices(frametime);
         if (paused)
         {
+            // The game is stopped with no window open (a script of Lua paused the world): nothing runs
+            if (!menuOpen(0))
+                return;
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
