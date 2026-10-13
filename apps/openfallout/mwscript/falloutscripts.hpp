@@ -26,6 +26,7 @@
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/formlists.hpp>
+#include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
@@ -127,6 +128,28 @@ namespace OFScript
         /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
         /// yet.
         bool isDead(const OFWorld::Ptr& actor) const;
+
+        /// The actor sits on, lies on or leans against the furniture, which IsCurrentFurnitureRef and
+        /// IsCurrentFurnitureObj tell, until it gets up or is moved away from it. With `place` the actor is put on the
+        /// entry of the marker of the furniture that it uses, facing as the entry says (the player who activates a
+        /// chair goes there at once, as in the games; there is no animation yet), or at the furniture when the model
+        /// has no marker; a character that walked there is at it already. Does nothing for a furniture or an actor
+        /// that scripts have no number for. False when the model has entries and none is free (nothing is done then),
+        /// true otherwise.
+        bool useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place);
+        /// What the default activation of a furniture does: a character, creature or the player that uses furniture
+        /// already gets up (whichever furniture it activates), another one uses it as `useFurniture` does with `place`
+        void activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
+        /// The actor gets up from the furniture it uses (it is where it was: the games play an animation there)
+        void leaveFurniture(const OFWorld::Ptr& actor);
+        /// Where the actor would stand to use the furniture: the entry of its marker that the record enables, that no
+        /// one else uses and that is the nearest to the actor, and the heading it faces there. False when there is
+        /// none (the model has no marker).
+        bool furnitureSeat(
+            const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, osg::Vec3f& position, float& heading);
+        /// Whether the actor uses some furniture now (a character does not leave it for another package that has
+        /// become eligible, as the games keep a seated character in its chair until the package that sat it ends)
+        bool usesFurniture(const OFWorld::Ptr& actor) const;
 
         /// The AI packages that scripts gave the character, the last given first (those that no content file has a
         /// record of are left out)
@@ -273,6 +296,7 @@ namespace OFScript
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
         void removeScriptPackage(FalloutScript::FormId actor) override;
         void evaluatePackage(FalloutScript::FormId actor) override;
+        void resetAI(FalloutScript::FormId actor) override;
         FalloutScript::FormId currentPackage(FalloutScript::FormId actor) override;
 
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
@@ -358,6 +382,7 @@ namespace OFScript
             double distance, int direction) override;
         double gameHour() override;
         double gameDaysPassed() override;
+        FalloutScript::FormId currentFurniture(FalloutScript::FormId actor) override;
 
         /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
         /// content file, or an object that PlaceAtMe made
@@ -379,6 +404,13 @@ namespace OFScript
         void dropObjectsThatLeft();
         /// Lets a pass of the trigger volumes go by: the actors in each run the OnTrigger blocks of its script
         void updateTriggers();
+        /// An actor that has moved away from its furniture does not use it any more
+        void updateFurniture();
+        std::vector<FalloutScript::FurnitureEntry> furnitureEntries(const OFWorld::Ptr& furniture);
+        std::optional<FalloutScript::FurnitureSeat> chooseSeat(
+            FalloutScript::FormId user, const OFWorld::Ptr& furniture, const osg::Vec3f& from);
+        /// The reference of the actor as scripts name it (the player has the one of the player)
+        FalloutScript::FormId scriptReferenceOf(const OFWorld::Ptr& actor) const;
         /// Whether the object of a cell that was loaded is a trigger, and its volume if it is
         void registerTrigger(const OFWorld::Ptr& ptr, FalloutScript::FormId reference);
 
@@ -448,6 +480,9 @@ namespace OFScript
         /// The cell that the place is in: the one it names, or for an exterior cell the one that the position is in.
         /// Null for a cell that is not known.
         OFWorld::CellStore* cellAt(const Place& place);
+        /// Whether the two places are in the same cell, or in exterior cells of one worldspace (where positions are
+        /// comparable)
+        bool inOneSpace(const Place& a, const Place& b);
         /// Where the reference is: the place of the world with the moves that scripts have asked for and the world has
         /// not made yet. False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua,
         /// which runs only while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the
@@ -577,6 +612,21 @@ namespace OFScript
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
+        /// The furniture that an actor uses, and where the actor was put on it: it stops using it when it is more than
+        /// a few steps from there. Scripts ask from other threads too.
+        struct FurnitureUse
+        {
+            FalloutScript::FormId mFurniture = 0;
+            osg::Vec3f mPlace;
+            /// The entry of the marker that it uses, -1 for none
+            int mEntry = -1;
+            /// Where the furniture was when it was used: it is not used any more when it is moved from there
+            osg::Vec3f mFurniturePlace;
+        };
+        std::map<FalloutScript::FormId, FurnitureUse> mFurniture;
+        mutable std::mutex mFurnitureMutex;
+        /// The entries of the marker of each furniture, read from its model once (by the number of its record)
+        std::map<FalloutScript::FormId, std::vector<FalloutScript::FurnitureEntry>> mFurnitureEntries;
         std::mt19937 mRandom;
         std::vector<std::string> mContentFiles;
         /// Seconds of play since the commands that scripts reached without a handler were last written to the log

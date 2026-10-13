@@ -28,8 +28,8 @@ files of the games.
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
 writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
-`meshes/openfallout/wall.nif`, `meshes/openfallout/person_foot.nif`, `meshes/characters/_male/skeleton.nif`,
-`meshes/characters/_male/mtidle.kf`,
+`meshes/openfallout/wall.nif`, `meshes/openfallout/chair.nif`, `meshes/openfallout/person_foot.nif`,
+`meshes/characters/_male/skeleton.nif`, `meshes/characters/_male/mtidle.kf`,
 `textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
 """
 import argparse
@@ -38,6 +38,7 @@ import struct
 from pathlib import Path
 
 import fallout_script
+import furniture_marker
 import havok_wall
 import idle_animation
 import placeholder_skeleton
@@ -400,7 +401,7 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x914 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x91F # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and never changed), and so has the package that
 # the conditional character follows first, for as long as quest C is below QUEST_C_STAGE (a Guard package at the place
@@ -419,7 +420,30 @@ EARLY_PACKAGE_IDS = {"interior": 0x911, "exterior": 0x912}
 # OnTriggerEnter and OnTrigger blocks for the player, OnTriggerEnter for anyone, and OnTriggerLeave for the player; when
 # the player comes in it also makes a person at the middle of the box with PlaceAtMe)
 TRIGGER_GLOBALS = {"enters": (0x8FE, "OFTestTriggerEnters"), "stays": (0x8FF, "OFTestTriggerStays"),
-                   "leaves": (0x900, "OFTestTriggerLeaves"), "any": (0x901, "OFTestTriggerAnyEnters")}
+                   "leaves": (0x900, "OFTestTriggerLeaves"), "any": (0x901, "OFTestTriggerAnyEnters"),
+                   "sits": (0x917, "OFTestTriggerSits")}
+# A chair in the box. The script of the trigger sets the global `sits` every frame to what IsCurrentFurnitureRef tells of the
+# player and the chair: 1 after the player has activated the chair, until the player is moved away from where it sat.
+FURNITURE_ID = 0x915
+FURNITURE_REF_ID = 0x916
+FURNITURE_OFFSET = (0.0, 60.0) # from the middle of the trigger, along the long side of its box
+# The model of the chair has the marker of a chair (furniture_marker.py): one entry for sitting, where the character stands to
+# sit down, beside the chair. The flags of the record enable it (bit 0 is the first entry) and say it is for sitting (the
+# top bit).
+FURNITURE_MESH = "openfallout\\chair.nif"
+FURNITURE_ENTRY = ((40.0, 25.0, 0.0), 1500, 14) # the offset, the orientation in thousandths of a radian, the kind
+FURNITURE_FLAGS = 0x40000001
+# A sitter: a character whose first package is to travel to a second chair (and so sits there), and whose second package, to
+# travel to a marker, is on and not done all the while: it stays in the chair. Its script sets the global `sitter` to what
+# IsCurrentFurnitureRef tells of it and the chair.
+SITTER_ID = 0x918
+SITTER_PACKAGE_IDS = (0x919, 0x91A) # to the chair, then to the marker
+SITTER_SCRIPT_ID = 0x91B
+SITTER_CHAIR_REF_ID = 0x91C
+SITTER_MARKER_REF_ID = 0x91D
+SITTER_REF_ID = 0x91E
+SITTER_GLOBAL = (0x91F, "OFTestSitterInChair")
+SITTER_PLACES = {"sitter": (-300.0, -1200.0), "chair": (-300.0, -1400.0), "marker": (-300.0, -1000.0)}
 TRIGGER_SCRIPT_ID = 0x902
 TRIGGER_BASE_ID = 0x903
 TRIGGER_REF_ID = 0x904
@@ -1233,6 +1257,7 @@ def trigger_script():
     player = script.form(PLAYER_REFERENCE)
     trigger = script.form(TRIGGER_REF_ID)
     person_base = script.form(NPC_ID)
+    chair = script.form(FURNITURE_REF_ID)
     counts = {name: script.form(form_id) for name, (form_id, _) in TRIGGER_GLOBALS.items()}
 
     def add_one(global_index):
@@ -1248,7 +1273,10 @@ def trigger_script():
                  names=sf.form_argument(player)),
         sf.block(sf.ON_TRIGGER_ENTER, add_one(counts["any"])),
         sf.block(sf.ON_TRIGGER, add_one(counts["stays"]), names=sf.form_argument(player)),
-        sf.block(sf.ON_TRIGGER_LEAVE, add_one(counts["leaves"]), names=sf.form_argument(player)))
+        sf.block(sf.ON_TRIGGER_LEAVE, add_one(counts["leaves"]), names=sf.form_argument(player)),
+        sf.block(sf.GAME_MODE, sf.set_to(sf.global_target(counts["sits"]),
+                                         sf.call_token(sf.IS_CURRENT_FURNITURE_REF, sf.form_argument(chair),
+                                                       reference=player))))
     return record(b"SCPT", TRIGGER_SCRIPT_ID, [zstr(b"EDID", "OFTestTriggerScript"), *sf.sub_records(script)])
 
 
@@ -1264,6 +1292,46 @@ def trigger_reference():
     x, y = TRIGGER_PLACE
     return refr(TRIGGER_REF_ID, TRIGGER_BASE_ID, (x, y, TRIGGER_HALF[2]), rotation=(0.0, 0.0, TRIGGER_YAW),
                 primitive=(TRIGGER_HALF, 1))
+
+
+def sitter_script():
+    """The script of the sitter (an SCPT record of type 0): every frame it sets the global to whether it uses its chair."""
+    sf = fallout_script
+    script = sf.Script(0)
+    chair = script.form(SITTER_CHAIR_REF_ID)
+    seat = script.form(SITTER_GLOBAL[0])
+    script.add(sf.statement(sf.SCRIPT_NAME),
+               sf.block(sf.GAME_MODE, sf.set_to(sf.global_target(seat),
+                                                sf.call_token(sf.IS_CURRENT_FURNITURE_REF, sf.form_argument(chair)))))
+    return record(b"SCPT", SITTER_SCRIPT_ID, [zstr(b"EDID", "OFTestSitterScript"), *sf.sub_records(script)])
+
+
+def sitter_packages():
+    return [package(SITTER_PACKAGE_IDS[0], "OFTestSitterChair", PACKAGE_TRAVEL,
+                    (LOCATION_NEAR_REFERENCE, SITTER_CHAIR_REF_ID), TRAVEL_RADIUS),
+            package(SITTER_PACKAGE_IDS[1], "OFTestSitterMarker", PACKAGE_TRAVEL,
+                    (LOCATION_NEAR_REFERENCE, SITTER_MARKER_REF_ID), TRAVEL_RADIUS)]
+
+
+def sitter_references():
+    """The sitter, its chair and its marker, in the interior cell."""
+    def at(name):
+        return (*SITTER_PLACES[name], 0.0)
+
+    return [achr(SITTER_REF_ID, at("sitter"), SITTER_ID), refr(SITTER_CHAIR_REF_ID, FURNITURE_ID, at("chair")),
+            refr(SITTER_MARKER_REF_ID, TARGET_MARKER_ID, at("marker"))]
+
+
+def furniture_base():
+    """A piece of furniture: a name, the model with the marker of a chair and the flags that enable its one entry."""
+    return record(b"FURN", FURNITURE_ID, [zstr(b"EDID", "OFTestChair"), zstr(b"FULL", "OpenFallout Test Chair"),
+                                          zstr(b"MODL", FURNITURE_MESH), sub(b"MNAM", struct.pack("<I", FURNITURE_FLAGS))])
+
+
+def furniture_reference():
+    """The chair, on the floor inside the box of the trigger."""
+    x, y = TRIGGER_PLACE
+    return refr(FURNITURE_REF_ID, FURNITURE_ID, (x + FURNITURE_OFFSET[0], y + FURNITURE_OFFSET[1], 0.0))
 
 
 def stage_script(statements, references):
@@ -1815,6 +1883,8 @@ def plugin():
         *package_refs(0, (0.0, 0.0)),
         *object_refs("interior", (0.0, 0.0)),
         trigger_reference(),
+        furniture_reference(),
+        *sitter_references(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -1831,6 +1901,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l") for form_id, name in PROGRESS_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l")
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
+                                  global_variable(SITTER_GLOBAL[0], SITTER_GLOBAL[1], b"l"),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f")
@@ -1839,10 +1910,11 @@ def plugin():
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base()])
+            + top_group(b"FURN", [furniture_base()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
-                                                 new_game_script(), trigger_script(), watch_script("interior"),
+                                                 new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
                                                  watch_script("exterior")])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest()])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
@@ -1855,8 +1927,10 @@ def plugin():
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", packages())
+            + top_group(b"PACK", [*packages(), *sitter_packages()])
             + top_group(b"NPC_", [person(), *package_people(),
+                                  person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
+                                         script=SITTER_SCRIPT_ID),
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
                                          script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])
@@ -1926,6 +2000,7 @@ def write(out, animation=True, spline=True):
     (out / "meshes" / Path(part_path("head").replace("\\", "/")).with_suffix(".egm")).write_bytes(head_morphs())
     (out / "meshes" / Path(WALL_MESH.replace("\\", "/"))).write_bytes(
         havok_wall.wall(WALL_HALF_EXTENTS, (0.0, 0.0, WALL_HALF_EXTENTS[2])))
+    (out / "meshes" / Path(FURNITURE_MESH.replace("\\", "/"))).write_bytes(furniture_marker.chair([FURNITURE_ENTRY]))
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())

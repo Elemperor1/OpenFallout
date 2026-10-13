@@ -27,11 +27,12 @@ namespace FalloutScript
             const FormId package = formArgument(call, 0);
             return package != 0 && call.mReference != 0 && world.currentPackage(call.mReference) == package ? 1.0 : 0.0;
         });
-        // ResetAI also drops what the character was doing (combat, a conversation); none of that is kept here, so it
-        // comes to the character looking at its packages again
+        // ResetAI also drops what the character was doing: it gets up from the furniture it uses (the scripts of the
+        // New Vegas intro use it to get Doc out of his chair). Combat and conversations are not kept here, so it comes
+        // to the character looking at its packages again.
         interpreter.setHandler("ResetAI", [&world](CallContext& call) {
             if (call.mReference != 0)
-                world.evaluatePackage(call.mReference);
+                world.resetAI(call.mReference);
             return 0.0;
         });
     }

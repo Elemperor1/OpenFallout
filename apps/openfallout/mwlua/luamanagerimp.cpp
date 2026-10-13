@@ -17,6 +17,7 @@
 #include <components/esm/luascripts.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
+#include <components/esm4/loadfurn.hpp>
 
 #include <components/settings/values.hpp>
 
@@ -35,6 +36,7 @@
 #include "../mwrender/bonegroup.hpp"
 #include "../mwrender/postprocessor.hpp"
 
+#include "../mwworld/class.hpp"
 #include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/player.hpp"
@@ -628,6 +630,11 @@ namespace OFLua
 
     void LuaManager::defaultActivation(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
     {
+        // An actor that activates furniture of Fallout sits on it, lies on it or leans against it, and one that is
+        // using furniture already gets up, whichever furniture it activates
+        if (object.getType() == ESM4::Furniture::sRecordId)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                scripts->activateFurniture(actor, object);
         mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 

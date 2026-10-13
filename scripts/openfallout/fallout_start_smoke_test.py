@@ -1033,11 +1033,51 @@ local function report(tag)
         g.@STAYS@, g.@LEAVES@))
 end
 
+-- After the walk the player activates the chair in the box (from outside the box): it is put at the chair, and the script of
+-- the trigger, which asks the game whether the player uses the chair every frame, sees it; it is moved away from there and
+-- does not use the chair any more
+local function chair()
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @CHAIR@))
+    return ok and object:isValid() and object or nil
+end
+local function sitter(tag)
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER@))
+    local seat = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER_CHAIR@)) and
+        world.getObjectByFormId(core.getFormId('OFTest.esm', @SITTER_CHAIR@))
+    print('OFTEST', 'sitter', tag, tostring(world.globals.@SITTER_GLOBAL@),
+        ok and seat and string.format('%.0f', (object.position - seat.position):length()) or 'no sitter')
+end
+-- Where the player is from the chair (across, along: the chair is not turned), and the way it faces
+local function sits(tag)
+    local object, player = chair(), world.players[1]
+    local offset = object and player.position - object.position
+    print('OFTEST', 'furniture', tag, tostring(world.globals.@SITS@),
+        offset and string.format('%.0f\t%.0f\t%.0f\t%.1f', offset.x, offset.y, offset.z, player.rotation:getYaw())
+            or 'no chair')
+end
+
+-- The sitter's chair has one entry and the sitter is on it: the player who activates that chair is not put there
+local function occupied(tag)
+    local ok, seat = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER_CHAIR@))
+    print('OFTEST', 'occupied', tag, ok and string.format('%.0f', (world.players[1].position - seat.position):length())
+        or 'no chair')
+end
+local function takeSitterChair()
+    local ok, seat = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER_CHAIR@))
+    if ok then seat:activateBy(world.players[1]) end
+end
+
 local steps = {
     { 1.5, function() report('before') put(0, 100) end },
     { 3.0, function() report('inside') put(100, 0) end },
     { 4.5, function() report('outside') put(0, -100) end },
-    { 6.0, function() report('again') core.quit() end },
+    { 6.0, function() report('again') put(100, 0) end },
+    { 7.0, function() sits('before') local object = chair() if object then object:activateBy(world.players[1]) end end },
+    { 8.0, function() sits('sat') put(300, 0) end },
+    { 9.0, function() sits('away') end },
+    { 12.5, function() occupied('before') takeSitterChair() end },
+    { 13.5, function() occupied('after') end },
+    { 15.0, function() sitter('later') core.quit() end },
 }
 
 return {
@@ -1056,7 +1096,10 @@ return {
 TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).replace("@Y@", str(plugin.TRIGGER_PLACE[1]))
                   .replace("@ENTERS@", plugin.TRIGGER_GLOBALS["enters"][1]).replace("@ANY@", plugin.TRIGGER_GLOBALS["any"][1])
                   .replace("@STAYS@", plugin.TRIGGER_GLOBALS["stays"][1])
-                  .replace("@LEAVES@", plugin.TRIGGER_GLOBALS["leaves"][1]))
+                  .replace("@LEAVES@", plugin.TRIGGER_GLOBALS["leaves"][1])
+                  .replace("@SITS@", plugin.TRIGGER_GLOBALS["sits"][1]).replace("@CHAIR@", str(plugin.FURNITURE_REF_ID))
+                  .replace("@SITTER_GLOBAL@", plugin.SITTER_GLOBAL[1]).replace("@SITTER_CHAIR@", str(plugin.SITTER_CHAIR_REF_ID))
+                  .replace("@SITTER@", str(plugin.SITTER_REF_ID)))
 
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
@@ -1925,6 +1968,62 @@ def check_triggers(text):
     if (enters, any_enters, leaves) != (2, 4, 1):
         problems.append("coming in again should have run the enters a second time (for anyone twice more: the player and "
                         f"the second person that is made, while the first stays) and no leave: {found['again']}")
+    # The chair: not used before the player activates it; used once the player has (and put at it); not used any more once
+    # the player is moved away from where it sat
+    sat = {}
+    for line in text.splitlines():
+        match = re.search(r"OFTEST\tfurniture\t(\w+)\t(-?\d+)\t(.+)$", line)
+        if match:
+            sat[match.group(1)] = (int(match.group(2)), match.group(3))
+    for tag in ("before", "sat", "away"):
+        if tag not in sat:
+            problems.append(f"no 'furniture {tag}' line in the log")
+    if len(sat) == 3:
+        if sat["before"][0] != 0:
+            problems.append(f"IsCurrentFurnitureRef should be 0 for a player who has not used the chair: {sat['before']}")
+        if sat["sat"][0] != 1:
+            problems.append("a player who activated the chair should be using it (IsCurrentFurnitureRef 1 in the script of "
+                            f"the trigger): {sat['sat']}")
+        where = sat["sat"][1].split("\t")
+        if len(where) != 4:
+            problems.append(f"the player who sat down should be put at the chair: {sat['sat']}")
+        else:
+            across, along, up, yaw = (float(value) for value in where)
+            # On the entry of the marker of the model (the chair is not turned): beside the chair, facing as the entry says
+            (entry_x, entry_y, _), orientation, _ = plugin.FURNITURE_ENTRY
+            if abs(across - entry_x) > 5 or abs(along - entry_y) > 5 or abs(up) > 5:
+                problems.append("the player who sat down should be put on the entry of the marker of the chair "
+                                f"({entry_x:.0f}, {entry_y:.0f}) from it, not at the middle of it: {sat['sat']}")
+            if abs(yaw - orientation / 1000.0) > 0.3:
+                problems.append(f"the player should face as the entry of the chair says ({orientation / 1000.0}): "
+                                f"{sat['sat']}")
+        if sat["away"][0] != 0:
+            problems.append("a player who was moved away from the chair should not use it any more (IsCurrentFurnitureRef "
+                            f"0): {sat['away']}")
+    if "Furniture: " not in text:
+        problems.append("the engine did not log that the player used the furniture")
+    # A chair whose only entry is taken is not used by a second one: the player stays where it was
+    taken = dict(re.findall(r"OFTEST\toccupied\t(\w+)\t(\d+|no chair)$", text, re.M))
+    if set(taken) != {"before", "after"}:
+        problems.append(f"expected 'occupied before' and 'occupied after' lines: {taken}")
+    elif "no chair" in taken.values() or abs(int(taken["after"]) - int(taken["before"])) > 5:
+        problems.append("a player who activates a chair whose only entry is in use should not be put there: "
+                        f"{taken}")
+    if "cannot use" not in text:
+        problems.append("the engine did not log that the chair with its only entry in use was refused")
+    # The sitter travelled to its chair and sat there (the script sees it), and stayed though its second package, which is
+    # not done, came after it
+    later = re.findall(r"OFTEST\tsitter\tlater\t(-?\d+)\t(\d+|no sitter)$", text, re.M)
+    if len(later) != 1:
+        problems.append(f"expected one 'sitter later' line: {later}")
+    else:
+        if later[0][0] != "1":
+            problems.append(f"a character that has got to a chair by its package should use it: {later[0]}")
+        # It stands on the entry of the marker of the chair, which is that far from the middle of the chair
+        entry_distance = math.hypot(*plugin.FURNITURE_ENTRY[0][:2])
+        if later[0][1] == "no sitter" or abs(int(later[0][1]) - entry_distance) > 15:
+            problems.append("a character in a chair should stay there, on the entry of its marker, while its package for "
+                            f"it is on, not walk on to the package that comes after: {later[0]}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

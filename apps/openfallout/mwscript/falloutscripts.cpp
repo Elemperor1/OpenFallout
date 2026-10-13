@@ -16,6 +16,7 @@
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadflst.hpp>
+#include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -35,6 +36,8 @@
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/nif/extra.hpp>
+#include <components/resource/niffilemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/settings/values.hpp>
 #include <components/vfs/manager.hpp>
@@ -308,6 +311,10 @@ namespace OFScript
         mTriggers.clear();
         mTriggerActors.clear();
         mScriptPackages.clear();
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            mFurniture.clear();
+        }
         mActors.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -377,6 +384,7 @@ namespace OFScript
             reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
+        updateFurniture();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
         mQuests.update(frametime);
@@ -769,19 +777,22 @@ namespace OFScript
         Place b;
         if (!whereIs(first, a) || !whereIs(second, b))
             return false;
-        // In the same cell, or in exterior cells of one worldspace
-        if (a.mCell != b.mCell)
-        {
-            const OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
-            const OFWorld::CellStore* cellA = model->findCell(a.mCell);
-            const OFWorld::CellStore* cellB = model->findCell(b.mCell);
-            if (cellA == nullptr || cellB == nullptr
-                || !(cellA->isExterior() && cellB->isExterior()
-                    && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace()))
-                return false;
-        }
+        if (!inOneSpace(a, b))
+            return false;
         result = (a.mPosition - b.mPosition).length();
         return true;
+    }
+
+    bool FalloutScripts::inOneSpace(const Place& a, const Place& b)
+    {
+        // In the same cell, or in exterior cells of one worldspace
+        if (a.mCell == b.mCell)
+            return true;
+        const OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        const OFWorld::CellStore* cellA = model->findCell(a.mCell);
+        const OFWorld::CellStore* cellB = model->findCell(b.mCell);
+        return cellA != nullptr && cellB != nullptr && cellA->isExterior() && cellB->isExterior()
+            && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace();
     }
 
     namespace
@@ -1842,6 +1853,221 @@ namespace OFScript
         return reference != 0 && mActors.isDead(reference);
     }
 
+    FalloutScript::FormId FalloutScripts::scriptReferenceOf(const OFWorld::Ptr& actor) const
+    {
+        return actor == OFBase::Environment::get().getWorld()->getPlayerPtr() ? mPlayer : referenceOf(actor);
+    }
+
+    std::vector<FalloutScript::FurnitureEntry> FalloutScripts::furnitureEntries(const OFWorld::Ptr& furniture)
+    {
+        const ESM4::Furniture& record = *furniture.get<ESM4::Furniture>()->mBase;
+        const FalloutScript::FormId key = record.mId.toUint32();
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            const auto found = mFurnitureEntries.find(key);
+            if (found != mFurnitureEntries.end())
+                return found->second;
+        }
+        std::vector<FalloutScript::FurnitureEntry> entries;
+        Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
+        if (resources != nullptr && !record.mModel.empty())
+        {
+            try
+            {
+                // One block of the model has the markers
+                const Nif::NIFFilePtr file = resources->getNifFileManager()->get(
+                    Misc::ResourceHelpers::correctMeshPath(record.mModel.getNormalized()));
+                for (const auto& block : file->mRecords)
+                {
+                    const auto* marker = dynamic_cast<const Nif::BSFurnitureMarker*>(block.get());
+                    if (marker == nullptr)
+                        continue;
+                    for (const auto& legacy : marker->mLegacyMarkers)
+                        entries.push_back({ { legacy.mOffset.x(), legacy.mOffset.y(), legacy.mOffset.z() },
+                            legacy.mOrientation / 1000.f, legacy.mPositionRef });
+                    for (const auto& position : marker->mMarkers)
+                        entries.push_back({ { position.mOffset.x(), position.mOffset.y(), position.mOffset.z() },
+                            position.mHeading, 0 });
+                    break;
+                }
+            }
+            catch (const std::exception& e)
+            {
+                Log(Debug::Warning) << "Furniture " << record.mEditorId
+                                    << ": the markers of the model cannot be read: " << e.what();
+            }
+        }
+        const std::lock_guard lock(mFurnitureMutex);
+        mFurnitureEntries[key] = entries;
+        return entries;
+    }
+
+    std::optional<FalloutScript::FurnitureSeat> FalloutScripts::chooseSeat(
+        FalloutScript::FormId user, const OFWorld::Ptr& furniture, const osg::Vec3f& from)
+    {
+        const std::vector<FalloutScript::FurnitureEntry> entries = furnitureEntries(furniture);
+        if (entries.empty())
+            return std::nullopt;
+        // The entries that others use are left to them
+        const FalloutScript::FormId seat = referenceOf(furniture);
+        std::uint32_t used = 0;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            for (const auto& [other, use] : mFurniture)
+                if (other != user && use.mFurniture == seat && use.mEntry >= 0
+                    && static_cast<std::size_t>(use.mEntry) < FalloutScript::maxFurnitureEntries)
+                    used |= 1u << use.mEntry;
+        }
+        const ESM::Position& position = furniture.getRefData().getPosition();
+        FalloutScript::FurniturePlacement placement;
+        placement.mPosition = { position.pos[0], position.pos[1], position.pos[2] };
+        for (int axis = 0; axis < 3; ++axis)
+            placement.mRotation[axis] = position.rot[axis];
+        placement.mScale = furniture.getCellRef().getScale();
+        return FalloutScript::chooseFurnitureSeat(entries, furniture.get<ESM4::Furniture>()->mBase->mActiveMarkerFlags,
+            used, placement, { from.x(), from.y(), from.z() });
+    }
+
+    bool FalloutScripts::furnitureSeat(
+        const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, osg::Vec3f& position, float& heading)
+    {
+        if (furniture.isEmpty() || furniture.getType() != ESM4::Furniture::sRecordId)
+            return false;
+        const std::optional<FalloutScript::FurnitureSeat> seat
+            = chooseSeat(scriptReferenceOf(actor), furniture, actor.getRefData().getPosition().asVec3());
+        if (!seat)
+            return false;
+        position = osg::Vec3f(seat->mPosition.x, seat->mPosition.y, seat->mPosition.z);
+        heading = seat->mHeading;
+        return true;
+    }
+
+    bool FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const FalloutScript::FormId seat = referenceOf(furniture);
+        if (user == 0 || seat == 0)
+            return true;
+        osg::Vec3f where = actor.getRefData().getPosition().asVec3();
+        const std::optional<FalloutScript::FurnitureSeat> entry = chooseSeat(user, furniture, where);
+        if (!entry && !furnitureEntries(furniture).empty())
+        {
+            // The model has places to use and none is free (or the record enables none): the games do nothing then
+            Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " cannot use " << FalloutScript::hex(seat)
+                             << ": no entry of its marker is free";
+            return false;
+        }
+        Place seatPlace;
+        Place userPlace;
+        if (place && whereIs(seat, seatPlace) && whereIs(user, userPlace) && inOneSpace(seatPlace, userPlace))
+        {
+            // The world is not changed in the middle of what activates: the actor is put there in the next frame
+            Move move;
+            move.mWhere = seatPlace;
+            move.mParts = Move::PositionX | Move::PositionY | Move::PositionZ;
+            if (entry)
+            {
+                move.mWhere.mPosition = osg::Vec3f(entry->mPosition.x, entry->mPosition.y, entry->mPosition.z);
+                move.mWhere.mAngle.z() = entry->mHeading;
+                move.mParts |= Move::AngleZ;
+            }
+            where = move.mWhere.mPosition;
+            askForMove(user, move);
+        }
+        else
+            place = false;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            FurnitureUse& use = mFurniture[user];
+            use.mFurniture = seat;
+            use.mPlace = where;
+            use.mFurniturePlace = furniture.getRefData().getPosition().asVec3();
+            // An entry is taken only by an actor that is put on it
+            use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
+        }
+        Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
+                         << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
+                         << (place ? " (put there)" : "");
+        return true;
+    }
+
+    void FalloutScripts::activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture)
+    {
+        // The characters and creatures of Fallout are not actors of the engine, so isActor does not tell them
+        if (actor.isEmpty() || !(actor.getClass().isActor() || isCharacterOrCreature(actor)))
+            return;
+        if (usesFurniture(actor))
+            leaveFurniture(actor);
+        else
+            useFurniture(actor, furniture, true);
+    }
+
+    void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        FalloutScript::FormId seat = 0;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            const auto found = mFurniture.find(user);
+            if (found == mFurniture.end())
+                return;
+            seat = found->second.mFurniture;
+            mFurniture.erase(found);
+        }
+        Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " gets up from " << FalloutScript::hex(seat);
+    }
+
+    bool FalloutScripts::usesFurniture(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const std::lock_guard lock(mFurnitureMutex);
+        return user != 0 && mFurniture.count(user) != 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::currentFurniture(FalloutScript::FormId actor)
+    {
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(actor);
+        return found != mFurniture.end() ? found->second.mFurniture : 0;
+    }
+
+    void FalloutScripts::updateFurniture()
+    {
+        // An actor that is more than a few steps from where it sat down, or is gone, disabled, deleted or dead, or
+        // whose furniture is gone, has got up
+        constexpr float reach = 128.f;
+        std::vector<std::pair<FalloutScript::FormId, FurnitureUse>> uses;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            uses.assign(mFurniture.begin(), mFurniture.end());
+        }
+        for (const auto& [user, use] : uses)
+        {
+            const OFWorld::Ptr actor = findReference(user);
+            const bool present = !actor.isEmpty() && actor.getRefData().isEnabled() && !actor.mRef->isDeleted();
+            // The player is an actor of the engine, whose death the stats tell; the others are told by the host
+            const bool dead = present
+                && (mActors.isDead(user)
+                    || (actor.getClass().isActor() && actor.getClass().getCreatureStats(actor).isDead()));
+            // The furniture is gone when it is not there, is disabled or deleted
+            const OFWorld::Ptr furniture = present ? findReference(use.mFurniture) : OFWorld::Ptr();
+            // or has been moved to another place, since the actor was put where the furniture was
+            constexpr float furnitureMoved = 16.f;
+            const bool furnitureThere = !furniture.isEmpty() && furniture.getRefData().isEnabled()
+                && !furniture.mRef->isDeleted()
+                && (furniture.getRefData().getPosition().asVec3() - use.mFurniturePlace).length() <= furnitureMoved;
+            if (present && !dead && furnitureThere
+                && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
+                continue;
+            {
+                const std::lock_guard lock(mFurnitureMutex);
+                mFurniture.erase(user);
+            }
+            Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " gets up from "
+                             << FalloutScript::hex(use.mFurniture);
+        }
+    }
+
     void FalloutScripts::addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package)
     {
         // The packages are read by the characters on the thread of the frame, so they are changed there
@@ -1873,6 +2099,19 @@ namespace OFScript
         runOnMainThread([this, actor] {
             const OFWorld::Ptr ptr = findReference(actor);
             if (!ptr.isEmpty() && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
+                OFBase::Environment::get().getMechanicsManager()->evaluateFalloutPackages(ptr);
+        });
+    }
+
+    void FalloutScripts::resetAI(FalloutScript::FormId actor)
+    {
+        // The character gets up from the furniture it uses, then looks at its packages again
+        runOnMainThread([this, actor] {
+            const OFWorld::Ptr ptr = findReference(actor);
+            if (ptr.isEmpty())
+                return;
+            leaveFurniture(ptr);
+            if (ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
                 OFBase::Environment::get().getMechanicsManager()->evaluateFalloutPackages(ptr);
         });
     }

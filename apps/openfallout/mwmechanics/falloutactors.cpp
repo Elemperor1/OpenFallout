@@ -14,6 +14,7 @@
 #include <components/detournavigator/status.hpp>
 #include <components/esm/util.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/packageschedule.hpp>
@@ -421,6 +422,9 @@ namespace OFMechanics
             return;
         const auto found = mMinds.find(ptr.mRef);
         Mind& mind = found != mMinds.end() ? *found->second : makeMind(ptr);
+        // A character in a piece of furniture gets up when it is told to follow, which no package change tells
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+            scripts->leaveFurniture(ptr);
         Command command;
         command.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
         command.mTarget = target.getCellRef().getRefNum();
@@ -541,6 +545,13 @@ namespace OFMechanics
                     if (!sharesSpace(mind.mPtr, reference))
                         return false;
                     goal.mCenter = reference.getRefData().getPosition().asVec3();
+                    // A character that goes to a piece of furniture goes to the place of its marker where it sits down,
+                    // which is beside the furniture, not to the middle of it
+                    if (frame.mScripts != nullptr && reference.getType() == ESM4::Furniture::sRecordId)
+                    {
+                        float heading = 0.f;
+                        frame.mScripts->furnitureSeat(mind.mPtr, reference, goal.mCenter, heading);
+                    }
                     if (!isLoaded(frame, mind.mPtr, goal.mCenter))
                         return false;
                     hasFacing = goal.mBehaviour == ESM4::PackageBehaviour::Stay;
@@ -761,7 +772,15 @@ namespace OFMechanics
                 consider(package, true);
             for (const ESM4::AIPackage* package : mind.mPackages)
                 consider(package, false);
-            const Choice& chosen = fresh.mPackage != nullptr ? fresh : current.mPackage != nullptr ? current : done;
+            // An actor sitting in the furniture that its package led it to stays there while that package is on and
+            // no package that comes before it is: the games take it from the chair when a package asks, not because
+            // another one has become possible
+            const bool seated
+                = current.mPackage != nullptr && frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr);
+            const Choice& chosen = seated     ? current
+                : fresh.mPackage != nullptr   ? fresh
+                : current.mPackage != nullptr ? current
+                                              : done;
 
             if (chosen.mPackage == mind.mPackage)
             {
@@ -784,6 +803,9 @@ namespace OFMechanics
             // The package it followed is changed when it was not done, and the one it follows begins
             if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0)
                 raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
+            // A character in a piece of furniture gets up when it is given another package (the games ask it to leave)
+            if (frame.mScripts != nullptr)
+                frame.mScripts->leaveFurniture(mind.mPtr);
             if (chosen.mPackage != nullptr)
             {
                 mind.mDone.erase(chosen.mPackage);
@@ -814,8 +836,24 @@ namespace OFMechanics
         void finishTravel(const Frame& frame, FalloutActors::Mind& mind)
         {
             const ESM4::AIPackage* package = mind.mPackage;
-            if (package == nullptr || package->mData.type != ESM4::Package_Travel || !mind.mDone.insert(package).second)
+            if (package == nullptr || package->mData.type != ESM4::Package_Travel || mind.mDone.count(package) != 0)
                 return;
+            // A character that has got to a piece of furniture uses it, and the script of the package is told after
+            // that, as the games tell it when the character is in place
+            if (package->mLocation.type == ESM4::Location_NearReference && frame.mScripts != nullptr)
+            {
+                const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
+                    ESM::RefNum(ESM::FormId::fromUint32(package->mLocation.location)));
+                if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId
+                    && !frame.mScripts->useFurniture(mind.mPtr, place, true))
+                {
+                    // Every place of it is taken: the package is not done, and the character tries again later
+                    mind.mAtGoal = false;
+                    mind.mWait = giveUpTime;
+                    return;
+                }
+            }
+            mind.mDone.insert(package);
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;
