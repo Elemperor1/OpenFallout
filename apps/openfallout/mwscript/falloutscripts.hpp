@@ -477,6 +477,9 @@ namespace OFScript
         /// The cell that the place is in: the one it names, or for an exterior cell the one that the position is in.
         /// Null for a cell that is not known.
         OFWorld::CellStore* cellAt(const Place& place);
+        /// Whether the two places are in the same cell, or in exterior cells of one worldspace (where positions are
+        /// comparable)
+        bool inOneSpace(const Place& a, const Place& b);
         /// Where the reference is: the place of the world with the moves that scripts have asked for and the world has
         /// not made yet. False for a reference nobody knows. A script that Lua starts asks this on the thread of Lua,
         /// which runs only while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the

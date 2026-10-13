@@ -777,19 +777,22 @@ namespace OFScript
         Place b;
         if (!whereIs(first, a) || !whereIs(second, b))
             return false;
-        // In the same cell, or in exterior cells of one worldspace
-        if (a.mCell != b.mCell)
-        {
-            const OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
-            const OFWorld::CellStore* cellA = model->findCell(a.mCell);
-            const OFWorld::CellStore* cellB = model->findCell(b.mCell);
-            if (cellA == nullptr || cellB == nullptr
-                || !(cellA->isExterior() && cellB->isExterior()
-                    && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace()))
-                return false;
-        }
+        if (!inOneSpace(a, b))
+            return false;
         result = (a.mPosition - b.mPosition).length();
         return true;
+    }
+
+    bool FalloutScripts::inOneSpace(const Place& a, const Place& b)
+    {
+        // In the same cell, or in exterior cells of one worldspace
+        if (a.mCell == b.mCell)
+            return true;
+        const OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        const OFWorld::CellStore* cellA = model->findCell(a.mCell);
+        const OFWorld::CellStore* cellB = model->findCell(b.mCell);
+        return cellA != nullptr && cellB != nullptr && cellA->isExterior() && cellB->isExterior()
+            && cellA->getCell()->getWorldSpace() == cellB->getCell()->getWorldSpace();
     }
 
     namespace
@@ -1956,7 +1959,7 @@ namespace OFScript
         }
         Place seatPlace;
         Place userPlace;
-        if (place && whereIs(seat, seatPlace) && whereIs(user, userPlace) && seatPlace.mCell == userPlace.mCell)
+        if (place && whereIs(seat, seatPlace) && whereIs(user, userPlace) && inOneSpace(seatPlace, userPlace))
         {
             // The world is not changed in the middle of what activates: the actor is put there in the next frame
             Move move;
@@ -2018,8 +2021,8 @@ namespace OFScript
 
     void FalloutScripts::updateFurniture()
     {
-        // An actor that is more than a few steps from where it sat down, or is gone, disabled, deleted or dead, has got
-        // up
+        // An actor that is more than a few steps from where it sat down, or is gone, disabled, deleted or dead, or
+        // whose furniture is gone, has got up
         constexpr float reach = 128.f;
         std::vector<std::pair<FalloutScript::FormId, FurnitureUse>> uses;
         {
@@ -2034,7 +2037,12 @@ namespace OFScript
             const bool dead = present
                 && (mActors.isDead(user)
                     || (actor.getClass().isActor() && actor.getClass().getCreatureStats(actor).isDead()));
-            if (present && !dead && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
+            // The furniture is gone when it is not there, is disabled or deleted
+            const OFWorld::Ptr furniture = present ? findReference(use.mFurniture) : OFWorld::Ptr();
+            const bool furnitureThere
+                = !furniture.isEmpty() && furniture.getRefData().isEnabled() && !furniture.mRef->isDeleted();
+            if (present && !dead && furnitureThere
+                && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
                 continue;
             {
                 const std::lock_guard lock(mFurnitureMutex);

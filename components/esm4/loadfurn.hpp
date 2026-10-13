@@ -51,7 +51,7 @@ namespace ESM4
         float mBoundRadius;
 
         ESM::FormId mScriptId;
-        std::uint32_t mActiveMarkerFlags;
+        std::uint32_t mActiveMarkerFlags = 0; // MNAM, which a record may leave out
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
