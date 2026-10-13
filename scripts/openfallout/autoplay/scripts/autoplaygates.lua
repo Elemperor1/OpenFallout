@@ -4,6 +4,9 @@
 -- player at the reference (the middle of its volume), 'activate' makes the player activate it, 'setstage' puts the quest at
 -- the stage `to` (a stand-in for what the engine cannot bring about yet: a fight, a switch). A gate is tried `tries` times
 -- at most (its own `tries` if it has one: activating a piece of furniture a second time gets the player up from it).
+-- A gate can have its own `settle` (the quest has to stand still that long first): the stand-ins that come after the gate
+-- that is meant to bring the stage about are given a minute, so that what the engine does by itself is not covered up. The
+-- log says which gates were used ("AUTOPLAY gate setstage ..."): each stand-in that is used is something the engine lacks.
 -- `boxes` names the button that autoplay.lua presses in a message box (a negative number counts from the last button); any
 -- other box gets the first.
 -- The references are the ones the Mac found in the base plugins (static survey, rounds 7 and 8); `ref` is the form id without
@@ -36,10 +39,12 @@ return {
         { quest = 'CG02', stage = 20, file = 'Fallout3.esm', ref = 0x0300F2, how = 'activate' },
         { quest = 'CG02', stage = 21, file = 'Fallout3.esm', ref = 0x031649, how = 'activate' },
         { quest = 'CG02', stage = 35, file = 'Fallout3.esm', ref = 0x031D48, how = 'activate', tries = 1 },
+        { quest = 'CG02', stage = 35, how = 'setstage', to = 38, settle = 60 }, -- the intercom, if its talk does not do it
         { quest = 'CG02', stage = 38, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 40, file = 'Fallout3.esm', ref = 0x0300E8, how = 'activate' },
         { quest = 'CG02', stage = 42, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 44, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
+        { quest = 'CG02', stage = 44, how = 'setstage', to = 50, settle = 60 }, -- the Dad's walk to the range, if he does not
         { quest = 'CG02', stage = 50, how = 'setstage', to = 55 }, -- three hits with the BB gun
         { quest = 'CG02', stage = 55, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 60, how = 'setstage', to = 70 }, -- the radroach dies
@@ -50,6 +55,7 @@ return {
         { quest = 'CG03', stage = 6, file = 'Fallout3.esm', ref = 0x01CE3A, how = 'activate' },
         { quest = 'CG03', stage = 10, file = 'Fallout3.esm', ref = 0x057AEB, how = 'walk' },
         { quest = 'CG03', stage = 15, file = 'Fallout3.esm', ref = 0x01CE25, how = 'activate' },
+        { quest = 'CG03', stage = 20, how = 'setstage', to = 25, settle = 60 }, -- the talk of Amata and Butch, if it stops
         { quest = 'CG03', stage = 25, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate' },
         { quest = 'CG03', stage = 42, how = 'setstage', to = 45 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },

@@ -16,7 +16,7 @@ button does. `scripts/autoplaygates.lua` lists them (quest, stage, plugin, refer
 character starts a talk): when a quest has stood at such a stage for twenty seconds, the world script puts the player in the
 middle of the reference or makes the player activate it, and logs `AUTOPLAY gate`. A gate is tried twice. A gate can also put the
 quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, the fights of the intro of Fallout 3 and the
-switches in the reactor. The table also names the button of a message box that is not the first (the box at the door out of Vault
+switches in the reactor, and what a gate before it should have brought about: such a stand-in has a `settle` of a minute, and each one that the log shows was used is something the engine does not do yet. The table also names the button of a message box that is not the first (the box at the door out of Vault
 101 leaves with its last button). The table holds the
 references that the static surveys found; a stage that waits for something else (the characters finishing their packages, the
 timers of the intros, a fight) is left as it is, and the quest line shows where the run stopped.

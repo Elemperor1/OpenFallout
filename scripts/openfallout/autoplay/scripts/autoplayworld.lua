@@ -75,7 +75,8 @@ return {
             for index, gate in ipairs(config.gates) do
                 local quest = world.quests.find(gate.quest)
                 if quest and quest.stage == gate.stage and (tries[index] or 0) < (gate.tries or config.tries)
-                    and real - (changed[gate.quest] or real) >= config.settle and real - lastGate >= config.settle then
+                    and real - (changed[gate.quest] or real) >= (gate.settle or config.settle)
+                    and real - lastGate >= config.settle then
                     useGate(index, gate, real)
                 end
             end
