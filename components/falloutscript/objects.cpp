@@ -108,15 +108,29 @@ namespace FalloutScript
             return false;
         // The script keeps living while it runs, even if a command it calls makes the object forget it
         const std::shared_ptr<Instance> instance = found->second.mInstance;
-        // The action reference of the event outside is back when this one ends, however it ends
-        struct Restore
-        {
-            FormId& mTarget;
-            FormId mValue;
-            ~Restore() { mTarget = mValue; }
-        } restore{ mActionReference, mActionReference };
-        mActionReference = actionReference;
+        const ActionScope scope(mActionReference, actionReference);
         mInterpreter.run(*instance, blockType, filter);
+        return true;
+    }
+
+    bool ObjectScripts::runResult(const ESM4::ScriptDefinition& definition, FormId reference)
+    {
+        if (reference == 0 || definition.compiledScript.empty())
+            return false;
+        std::shared_ptr<const Script> script = prepared(definition);
+        if (!script->usable())
+        {
+            if (mReportedDefinitions.insert(&definition).second)
+                mInterpreter.host().log(
+                    "A script that runs on an event of a package cannot be run: " + script->problemText());
+            return false;
+        }
+        // A script with blocks is not a list of statements: there is nothing to run
+        if (!script->isResult())
+            return false;
+        Instance instance(std::move(script), reference);
+        const ActionScope scope(mActionReference, 0);
+        mInterpreter.runResult(instance);
         return true;
     }
 
@@ -154,6 +168,7 @@ namespace FalloutScript
         mLoaded.clear();
         mPrepared.clear();
         mReported.clear();
+        mReportedDefinitions.clear();
         mSeconds = 0;
         mActionReference = 0;
     }

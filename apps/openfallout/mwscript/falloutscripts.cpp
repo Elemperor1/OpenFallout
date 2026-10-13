@@ -1856,6 +1856,41 @@ namespace OFScript
         return mConditions.holds(package.mTargetConditions, context);
     }
 
+    void FalloutScripts::packageEvent(const OFWorld::Ptr& actor, const ESM4::AIPackage& package, PackageEvent event)
+    {
+        namespace BlockType = FalloutScript::BlockType;
+        const FalloutScript::FormId reference = referenceOf(actor);
+        if (reference == 0)
+            return;
+        const ESM4::AIPackage::Event* scripted = &package.mBegin;
+        std::uint16_t blockType = BlockType::OnPackageStart;
+        const char* what = "begins";
+        switch (event)
+        {
+            case PackageEvent::Start:
+                break;
+            case PackageEvent::Done:
+                scripted = &package.mEnd;
+                blockType = BlockType::OnPackageDone;
+                what = "is done";
+                break;
+            case PackageEvent::Change:
+                scripted = &package.mChange;
+                blockType = BlockType::OnPackageChange;
+                what = "is changed";
+                break;
+        }
+        // The script of the package comes first, then the blocks of the character that name the package or none
+        const FalloutScript::FormId form = numberOf(package.mId);
+        bool ran = mObjects.runResult(scripted->mScript, reference);
+        ran = mObjects.trigger(reference, blockType, 0, [form](const FalloutScript::Block& block) {
+            return FalloutScript::blockIsForForm(block, form);
+        }) || ran;
+        if (ran)
+            Log(Debug::Info) << "Package " << package.mEditorId << " of " << std::hex << reference << std::dec << " "
+                             << what;
+    }
+
     FalloutScript::FormId FalloutScripts::cellOf(FalloutScript::FormId reference)
     {
         // Where the script has put the reference counts, though the world has not done it yet

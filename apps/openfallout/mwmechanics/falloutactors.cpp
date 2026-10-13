@@ -4,6 +4,7 @@
 #include <cmath>
 #include <deque>
 #include <limits>
+#include <set>
 #include <vector>
 
 #include <components/debug/debuglog.hpp>
@@ -68,6 +69,9 @@ namespace OFMechanics
         // player goes about), and before it tries again to go where it could not
         constexpr float pathRetryTime = 1.f;
         constexpr float giveUpTime = 10.f;
+        // A character that has not got to the place of a Travel package that scripts wait for after this many tries
+        // is put there
+        constexpr int failuresBeforeJump = 2;
         // The navigator is asked for paths that end at the nearest place within this distance of the target
         constexpr float endTolerance = 96.f;
         // A follower asks for a new path when the one it follows has gone this far from where its path ends
@@ -125,6 +129,9 @@ namespace OFMechanics
         };
 
         const ESM4::AIPackage* mPackage = nullptr; // the one that it follows now
+        /// The packages it has done (a Travel package whose place it got to) and has not begun again since. They come
+        /// after the packages that are not done, and it stays with the one it follows if that is the only one left.
+        std::set<const ESM4::AIPackage*> mDone;
         FalloutGoal mGoal;
         Following mFollowing;
         bool mCommanded = false; // a script told it to follow, which the packages do not change
@@ -137,6 +144,7 @@ namespace OFMechanics
         bool mWalking = false; // it goes to mDestination
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
+        int mFailures = 0; // how many times in a row it has had no way to get to the place of the package
         osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
         std::deque<osg::Vec3f> mWaypoints;
@@ -162,6 +170,13 @@ namespace OFMechanics
 
     namespace
     {
+        struct PendingEvent
+        {
+            OFWorld::Ptr mActor;
+            const ESM4::AIPackage* mPackage = nullptr;
+            OFScript::FalloutScripts::PackageEvent mEvent = OFScript::FalloutScripts::PackageEvent::Start;
+        };
+
         // The things of the game that all the actors use in a frame
         struct Frame
         {
@@ -171,6 +186,9 @@ namespace OFMechanics
             bool mNavigator = false;
             /// What decides the conditions of the packages: null when there are no scripts
             OFScript::FalloutScripts* mScripts = nullptr;
+            /// What the packages of the actors do that scripts are told of, which they are after all the actors have
+            /// had their turn: a script that runs in the middle of it can give an actor a package or move it
+            std::vector<PendingEvent>* mEvents = nullptr;
         };
 
         const std::vector<const ESM4::AIPackage*>& packagesOf(const OFWorld::Ptr& ptr)
@@ -276,6 +294,18 @@ namespace OFMechanics
             }
         }
 
+        /// Whether the package runs scripts when it begins, is done or is changed
+        bool hasEvents(const ESM4::AIPackage& package)
+        {
+            return package.mBegin.mPresent || package.mEnd.mPresent || package.mChange.mPresent;
+        }
+
+        void raise(const Frame& frame, const OFWorld::Ptr& actor, const ESM4::AIPackage& package,
+            OFScript::FalloutScripts::PackageEvent event)
+        {
+            if (frame.mEvents != nullptr)
+                frame.mEvents->push_back({ actor, &package, event });
+        }
     }
 
     namespace
@@ -573,15 +603,16 @@ namespace OFMechanics
         Walk walkTo(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination, float duration,
             float arrival = 0.f, bool run = false)
         {
-            const OFRender::FalloutActorAnimation* animation = walker(frame.mWorld, mind.mPtr);
-            if (animation == nullptr)
-                return Walk::Failed;
-
+            // A character that is there already has arrived, whether it could walk or not
             if (arrival > 0.f && isNear(mind.position(), destination, arrival))
             {
                 mind.mWaypoints.clear();
                 return Walk::Arrived;
             }
+
+            const OFRender::FalloutActorAnimation* animation = walker(frame.mWorld, mind.mPtr);
+            if (animation == nullptr)
+                return Walk::Failed;
 
             if (!mind.mWalking)
             {
@@ -658,50 +689,72 @@ namespace OFMechanics
             return mind.mStuck >= stuckTime ? Walk::Failed : Walk::Moving;
         }
 
-        /// Looks at the packages and starts to follow the first that is on, if it is not the one that is followed
+        /// What the actor does for a package that is on
+        struct Choice
+        {
+            const ESM4::AIPackage* mPackage = nullptr;
+            FalloutGoal mGoal;
+            FalloutActors::Mind::Following mFollowing;
+            bool mHasFacing = false;
+            float mFacing = 0.f;
+        };
+
+        /// Looks at the packages and starts to follow the first that is on, if it is not the one that is followed. A
+        /// package that is done comes after the others that are on, and the actor goes on with another package when
+        /// there is one; when there is none it stays with the one it follows if that is done, else it goes back to the
+        /// first that is done (a character does the Travel package of the day again once the night is over).
         void review(const Frame& frame, FalloutActors::Mind& mind)
         {
-            const ESM4::AIPackage* chosen = nullptr;
-            FalloutGoal goal;
-            FalloutActors::Mind::Following following;
-            bool hasFacing = false;
-            float facing = 0.f;
-            // What a script gave it comes first, whatever the time and the conditions are
+            Choice fresh; // the first that is on and not done
+            Choice current; // the one that is followed, when it is done and still on
+            Choice done; // the first of the others that are done and on
+            const auto consider = [&](const ESM4::AIPackage* package, bool scripted) {
+                if (package == nullptr || fresh.mPackage != nullptr)
+                    return;
+                if (scripted)
+                {
+                    // What a script gave it is on whatever the time and the conditions are
+                    if (ESM4::packageBehaviour(package->mData.type) == ESM4::PackageBehaviour::None)
+                        return;
+                }
+                else
+                {
+                    ESM4::PackageSkip skip = ESM4::packageSkip(*package, frame.mClock);
+                    // The time and the kind are right: it is on if its conditions hold
+                    if (skip == ESM4::PackageSkip::Conditions && frame.mScripts != nullptr
+                        && frame.mScripts->packageConditionsHold(*package, mind.mPtr))
+                        skip = ESM4::PackageSkip::None;
+                    if (skip != ESM4::PackageSkip::None)
+                        return;
+                }
+                Choice choice;
+                choice.mPackage = package;
+                if (!makeGoal(
+                        frame, mind, *package, choice.mGoal, choice.mHasFacing, choice.mFacing, choice.mFollowing))
+                    return;
+                if (mind.mDone.count(package) == 0)
+                    fresh = std::move(choice);
+                else if (package == mind.mPackage)
+                    current = std::move(choice);
+                else if (done.mPackage == nullptr)
+                    done = std::move(choice);
+            };
             for (const ESM4::AIPackage* package : mind.mScripted)
-            {
-                if (package == nullptr || ESM4::packageBehaviour(package->mData.type) == ESM4::PackageBehaviour::None
-                    || !makeGoal(frame, mind, *package, goal, hasFacing, facing, following))
-                    continue;
-                chosen = package;
-                break;
-            }
+                consider(package, true);
             for (const ESM4::AIPackage* package : mind.mPackages)
-            {
-                if (chosen != nullptr)
-                    break;
-                if (package == nullptr)
-                    continue;
-                ESM4::PackageSkip skip = ESM4::packageSkip(*package, frame.mClock);
-                // The time and the kind are right: it is on if its conditions hold
-                if (skip == ESM4::PackageSkip::Conditions && frame.mScripts != nullptr
-                    && frame.mScripts->packageConditionsHold(*package, mind.mPtr))
-                    skip = ESM4::PackageSkip::None;
-                if (skip != ESM4::PackageSkip::None)
-                    continue;
-                if (!makeGoal(frame, mind, *package, goal, hasFacing, facing, following))
-                    continue;
-                chosen = package;
-            }
-            if (chosen == mind.mPackage)
+                consider(package, false);
+            const Choice& chosen = fresh.mPackage != nullptr ? fresh : current.mPackage != nullptr ? current : done;
+
+            if (chosen.mPackage == mind.mPackage)
             {
                 // A place that the package names by a reference goes with it when something moves the reference
-                if (chosen != nullptr && chosen->mLocation.type == ESM4::Location_NearReference)
+                if (chosen.mPackage != nullptr && chosen.mPackage->mLocation.type == ESM4::Location_NearReference)
                 {
-                    mind.mHasFacing = hasFacing;
-                    mind.mFacing = facing;
-                    if ((goal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
+                    mind.mHasFacing = chosen.mHasFacing;
+                    mind.mFacing = chosen.mFacing;
+                    if ((chosen.mGoal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
                     {
-                        mind.mGoal.mCenter = goal.mCenter;
+                        mind.mGoal.mCenter = chosen.mGoal.mCenter;
                         mind.mAtGoal = false;
                         mind.mPathRetry = 0.f;
                         stopWalking(mind);
@@ -710,20 +763,71 @@ namespace OFMechanics
                 return;
             }
 
-            mind.mPackage = chosen;
-            mind.mGoal = chosen != nullptr ? goal : FalloutGoal();
-            mind.mFollowing = chosen != nullptr ? following : FalloutActors::Mind::Following();
-            mind.mHasFacing = chosen != nullptr && hasFacing;
-            mind.mFacing = facing;
+            // The package it followed is changed when it was not done, and the one it follows begins
+            if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0)
+                raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
+            if (chosen.mPackage != nullptr)
+            {
+                mind.mDone.erase(chosen.mPackage);
+                raise(frame, mind.mPtr, *chosen.mPackage, OFScript::FalloutScripts::PackageEvent::Start);
+            }
+
+            mind.mPackage = chosen.mPackage;
+            mind.mGoal = chosen.mPackage != nullptr ? chosen.mGoal : FalloutGoal();
+            mind.mFollowing = chosen.mPackage != nullptr ? chosen.mFollowing : FalloutActors::Mind::Following();
+            mind.mHasFacing = chosen.mPackage != nullptr && chosen.mHasFacing;
+            mind.mFacing = chosen.mFacing;
             mind.mAtGoal = false;
+            mind.mFailures = 0;
             mind.mWait = 0.f;
             mind.mPathRetry = 0.f;
             stopWalking(mind);
-            Log(Debug::Verbose) << "Package of " << mind.mPtr.getCellRef().getRefId() << " at " << frame.mClock.mHour
-                                << " o'clock: " << (chosen != nullptr ? chosen->mEditorId : std::string("none")) << " ("
-                                << behaviourName(chosen != nullptr ? ESM4::packageBehaviour(chosen->mData.type)
-                                                                   : ESM4::PackageBehaviour::None)
-                                << ")";
+            // The packages that run scripts are the ones a quest waits for: they are told even if the log is not
+            Log(chosen.mPackage != nullptr && hasEvents(*chosen.mPackage) ? Debug::Info : Debug::Verbose)
+                << "Package of " << mind.mPtr.getCellRef().getRefId() << " at " << frame.mClock.mHour
+                << " o'clock: " << (chosen.mPackage != nullptr ? chosen.mPackage->mEditorId : std::string("none"))
+                << " ("
+                << behaviourName(chosen.mPackage != nullptr ? ESM4::packageBehaviour(chosen.mPackage->mData.type)
+                                                            : ESM4::PackageBehaviour::None)
+                << ")";
+        }
+
+        /// A character has got to the place of its Travel package: the package is done, once
+        void finishTravel(const Frame& frame, FalloutActors::Mind& mind)
+        {
+            const ESM4::AIPackage* package = mind.mPackage;
+            if (package == nullptr || package->mData.type != ESM4::Package_Travel || !mind.mDone.insert(package).second)
+                return;
+            raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
+            // The packages are looked at again at once: the next one is followed
+            mind.mReview = 0.f;
+        }
+    }
+
+    namespace
+    {
+        /// A character that has a package that tells scripts what happens to it cannot get to its place: that is
+        /// logged, and a Travel package that it has failed twice is done by putting the character at the place, since a
+        /// quest waits for it (the way may be one that the navigator does not know, or the character cannot walk)
+        void failToGetThere(const Frame& frame, FalloutActors::Mind& mind)
+        {
+            const ESM4::AIPackage& package = *mind.mPackage;
+            ++mind.mFailures;
+            const bool jump = package.mData.type == ESM4::Package_Travel && mind.mFailures >= failuresBeforeJump;
+            Log(Debug::Info) << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                             << ": no way to get there ("
+                             << (walker(frame.mWorld, mind.mPtr) == nullptr ? "it cannot walk"
+                                                                            : "the navigator has no path")
+                             << ")" << (jump ? ", put there" : "");
+            if (!jump)
+                return;
+            osg::Vec3f place = mind.mGoal.mCenter;
+            place.z() = groundHeight(frame.mWorld, place);
+            frame.mWorld.moveObject(mind.mPtr, place);
+            mind.mAtGoal = true;
+            mind.mRestPlace = mind.position();
+            mind.mWait = 0.f;
+            finishTravel(frame, mind);
         }
     }
 
@@ -738,8 +842,9 @@ namespace OFMechanics
             return;
 
         const OFWorld::TimeStamp now = world.getTimeStamp();
+        std::vector<PendingEvent> events;
         Frame frame{ world, falloutClock(now.getHour(), now.getDay()), player.getRefData().getPosition().asVec3(),
-            Settings::navigator().mEnable, OFBase::Environment::get().getFalloutScripts() };
+            Settings::navigator().mEnable, OFBase::Environment::get().getFalloutScripts(), &events };
         duration = std::min(duration, longestStep);
         const float range = static_cast<float>(Settings::game().mActorsProcessingRange);
 
@@ -790,12 +895,16 @@ namespace OFMechanics
                             case Walk::Arrived:
                                 mind.mAtGoal = true;
                                 mind.mRestPlace = mind.position();
+                                mind.mFailures = 0;
                                 stopWalking(mind);
+                                finishTravel(frame, mind);
                                 break;
                             case Walk::Failed:
                                 // It cannot get there; it tries again after a while
                                 stopWalking(mind);
                                 mind.mWait = giveUpTime;
+                                if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
+                                    failToGetThere(frame, mind);
                                 break;
                             default:
                                 break;
@@ -875,5 +984,12 @@ namespace OFMechanics
                 }
             }
         }
+
+        // The scripts of the packages run now that every actor has had its turn: what they do (give an actor a package,
+        // move one) is for the next frame
+        if (frame.mScripts != nullptr)
+            for (const PendingEvent& event : events)
+                if (!event.mActor.isEmpty())
+                    frame.mScripts->packageEvent(event.mActor, *event.mPackage, event.mEvent);
     }
 }

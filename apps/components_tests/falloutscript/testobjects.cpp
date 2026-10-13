@@ -259,6 +259,82 @@ namespace
         EXPECT_TRUE(setup.mObjects.hasBlock(crate, BlockType::SayToDone));
     }
 
+    TEST(FalloutScriptObjectsTest, a_list_of_statements_runs_on_the_reference_it_is_given)
+    {
+        constexpr FormId counter = 0x01000900;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t global = builder.form(counter);
+        builder.code(setTo(Bytes().u8('G').u16(global), Bytes().u8('G').u16(global) + number("1") + op("+")));
+        const ESM4::ScriptDefinition list = builder.definition();
+        setup.mHost.mGlobals[counter] = 0;
+
+        EXPECT_TRUE(setup.mObjects.runResult(list, crate));
+        EXPECT_TRUE(setup.mObjects.runResult(list, crate));
+        EXPECT_EQ(setup.mHost.mGlobals[counter], 2);
+
+        // Nothing to run for a script with no code, on no reference, or with blocks (which are not a list)
+        EXPECT_FALSE(setup.mObjects.runResult(ESM4::ScriptDefinition(), crate));
+        EXPECT_FALSE(setup.mObjects.runResult(list, 0));
+        ScriptBuilder blocks;
+        const std::uint16_t blockGlobal = blocks.form(counter);
+        blocks.code(
+            scriptName() + begin(BlockType::GameMode) + setTo(Bytes().u8('G').u16(blockGlobal), number("7")) + end());
+        const ESM4::ScriptDefinition withBlocks = blocks.definition();
+        EXPECT_FALSE(setup.mObjects.runResult(withBlocks, crate));
+        EXPECT_EQ(setup.mHost.mGlobals[counter], 2);
+    }
+
+    TEST(
+        FalloutScriptObjectsTest, a_command_in_a_list_of_statements_that_names_no_reference_acts_on_the_one_it_runs_for)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(command(OpDisable, arguments(0)));
+        const ESM4::ScriptDefinition list = builder.definition();
+
+        EXPECT_TRUE(setup.mObjects.runResult(list, crate));
+        EXPECT_EQ(setup.mWorld.mDisabled, std::set<FormId>{ crate });
+    }
+
+    TEST(FalloutScriptObjectsTest, the_blocks_of_the_events_of_packages_run_for_the_package_they_name)
+    {
+        constexpr FormId package = 0x01000A00;
+        constexpr FormId otherPackage = 0x01000A01;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t named = builder.form(package);
+        const auto count = [](std::uint16_t variable) {
+            return setTo(var('s', variable), var('s', variable) + number("1") + op("+"));
+        };
+        builder.code(scriptName() + beginNaming(BlockType::OnPackageStart, refArg(named)) + count(1) + end()
+            + beginNaming(BlockType::OnPackageDone, refArg(named)) + count(2) + end()
+            + beginNamingNothing(BlockType::OnPackageDone) + count(3) + end()
+            + beginNaming(BlockType::OnPackageChange, refArg(named)) + count(4) + end());
+        builder.variable(1, integerVariable, "start")
+            .variable(2, integerVariable, "done")
+            .variable(3, integerVariable, "any")
+            .variable(4, integerVariable, "change");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        const auto happens = [&setup](std::uint16_t blockType, FormId form) {
+            return setup.mObjects.trigger(crate, blockType, 0,
+                [form](const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, form); });
+        };
+        EXPECT_TRUE(happens(BlockType::OnPackageStart, package));
+        EXPECT_FALSE(happens(BlockType::OnPackageStart, otherPackage));
+        EXPECT_TRUE(happens(BlockType::OnPackageDone, package));
+        // Another package is done: only the block that names none runs
+        EXPECT_TRUE(happens(BlockType::OnPackageDone, otherPackage));
+        EXPECT_FALSE(happens(BlockType::OnPackageChange, otherPackage));
+        EXPECT_TRUE(happens(BlockType::OnPackageChange, package));
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+        EXPECT_EQ(setup.variable(crate, 3), 2);
+        EXPECT_EQ(setup.variable(crate, 4), 1);
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_menu_mode_while_a_menu_is_open)
     {
         Runner setup;

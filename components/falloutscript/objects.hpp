@@ -54,6 +54,11 @@ namespace FalloutScript
         bool trigger(
             FormId reference, std::uint16_t blockType, FormId actionReference = 0, const BlockFilter& filter = {});
 
+        /// Runs a script that is a list of statements, such as the one a package runs when it begins, ends or changes,
+        /// with the reference as its object: the commands in it that name none act on the reference. Returns whether
+        /// the script has code to run (one that can not be run is reported, once for each).
+        bool runResult(const ESM4::ScriptDefinition& definition, FormId reference);
+
         /// Lets a frame pass: the GameMode blocks of the loaded references run, in the order of their form ids
         void update();
         /// Lets a frame pass while a menu is open: the MenuMode blocks of the loaded references run instead (those
@@ -80,6 +85,25 @@ namespace FalloutScript
             bool mHasMenuMode = false;
         };
 
+        /// Makes the object that caused the event the one GetActionRef tells, and gives back the one of the event
+        /// outside when it ends, however it ends
+        struct ActionScope
+        {
+            ActionScope(FormId& target, FormId value)
+                : mTarget(target)
+                , mPrevious(target)
+            {
+                mTarget = value;
+            }
+            ~ActionScope() { mTarget = mPrevious; }
+            ActionScope(const ActionScope&) = delete;
+            ActionScope& operator=(const ActionScope&) = delete;
+
+        private:
+            FormId& mTarget;
+            FormId mPrevious;
+        };
+
         std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
         void run(const std::set<FormId>& references, std::uint16_t blockType, const BlockFilter& filter = {});
 
@@ -95,6 +119,7 @@ namespace FalloutScript
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
         /// The scripts that were reported as not runnable, so that they are reported once
         std::set<FormId> mReported;
+        std::set<const ESM4::ScriptDefinition*> mReportedDefinitions;
         float mSeconds = 0;
         FormId mActionReference = 0;
     };
