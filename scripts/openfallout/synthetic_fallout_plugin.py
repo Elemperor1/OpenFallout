@@ -28,8 +28,8 @@ files of the games.
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
 writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
-`meshes/openfallout/wall.nif`, `meshes/openfallout/person_foot.nif`, `meshes/characters/_male/skeleton.nif`,
-`meshes/characters/_male/mtidle.kf`,
+`meshes/openfallout/wall.nif`, `meshes/openfallout/chair.nif`, `meshes/openfallout/person_foot.nif`,
+`meshes/characters/_male/skeleton.nif`, `meshes/characters/_male/mtidle.kf`,
 `textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
 """
 import argparse
@@ -38,6 +38,7 @@ import struct
 from pathlib import Path
 
 import fallout_script
+import furniture_marker
 import havok_wall
 import idle_animation
 import placeholder_skeleton
@@ -426,6 +427,12 @@ TRIGGER_GLOBALS = {"enters": (0x8FE, "OFTestTriggerEnters"), "stays": (0x8FF, "O
 FURNITURE_ID = 0x915
 FURNITURE_REF_ID = 0x916
 FURNITURE_OFFSET = (0.0, 60.0) # from the middle of the trigger, along the long side of its box
+# The model of the chair has the marker of a chair (furniture_marker.py): one entry for sitting, where the character stands to
+# sit down, beside the chair. The flags of the record enable it (bit 0 is the first entry) and say it is for sitting (the
+# top bit).
+FURNITURE_MESH = "openfallout\\chair.nif"
+FURNITURE_ENTRY = ((40.0, 25.0, 0.0), 1500, 14) # the offset, the orientation in thousandths of a radian, the kind
+FURNITURE_FLAGS = 0x40000001
 # A sitter: a character whose first package is to travel to a second chair (and so sits there), and whose second package, to
 # travel to a marker, is on and not done all the while: it stays in the chair. Its script sets the global `sitter` to what
 # IsCurrentFurnitureRef tells of it and the chair.
@@ -1316,9 +1323,9 @@ def sitter_references():
 
 
 def furniture_base():
-    """A piece of furniture: a name and no model."""
+    """A piece of furniture: a name, the model with the marker of a chair and the flags that enable its one entry."""
     return record(b"FURN", FURNITURE_ID, [zstr(b"EDID", "OFTestChair"), zstr(b"FULL", "OpenFallout Test Chair"),
-                                          sub(b"MNAM", struct.pack("<I", 0))])
+                                          zstr(b"MODL", FURNITURE_MESH), sub(b"MNAM", struct.pack("<I", FURNITURE_FLAGS))])
 
 
 def furniture_reference():
@@ -1993,6 +2000,7 @@ def write(out, animation=True, spline=True):
     (out / "meshes" / Path(part_path("head").replace("\\", "/")).with_suffix(".egm")).write_bytes(head_morphs())
     (out / "meshes" / Path(WALL_MESH.replace("\\", "/"))).write_bytes(
         havok_wall.wall(WALL_HALF_EXTENTS, (0.0, 0.0, WALL_HALF_EXTENTS[2])))
+    (out / "meshes" / Path(FURNITURE_MESH.replace("\\", "/"))).write_bytes(furniture_marker.chair([FURNITURE_ENTRY]))
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())

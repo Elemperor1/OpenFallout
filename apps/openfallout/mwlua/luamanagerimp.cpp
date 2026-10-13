@@ -630,10 +630,16 @@ namespace OFLua
 
     void LuaManager::defaultActivation(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
     {
-        // An actor that activates furniture of Fallout sits on it, lies on it or leans against it
+        // An actor that activates furniture of Fallout sits on it, lies on it or leans against it, and one that is
+        // using furniture already gets up, whichever furniture it activates
         if (object.getType() == ESM4::Furniture::sRecordId && actor.getClass().isActor())
             if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
-                scripts->useFurniture(actor, object, true);
+            {
+                if (scripts->usesFurniture(actor))
+                    scripts->leaveFurniture(actor);
+                else
+                    scripts->useFurniture(actor, object, true);
+            }
         mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 

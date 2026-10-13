@@ -1047,10 +1047,13 @@ local function sitter(tag)
     print('OFTEST', 'sitter', tag, tostring(world.globals.@SITTER_GLOBAL@),
         ok and seat and string.format('%.0f', (object.position - seat.position):length()) or 'no sitter')
 end
+-- Where the player is from the chair (across, along: the chair is not turned), and the way it faces
 local function sits(tag)
     local object, player = chair(), world.players[1]
+    local offset = object and player.position - object.position
     print('OFTEST', 'furniture', tag, tostring(world.globals.@SITS@),
-        object and string.format('%.0f', (player.position - object.position):length()) or 'no chair')
+        offset and string.format('%.0f\t%.0f\t%.0f\t%.1f', offset.x, offset.y, offset.z, player.rotation:getYaw())
+            or 'no chair')
 end
 
 local steps = {
@@ -1956,7 +1959,7 @@ def check_triggers(text):
     # the player is moved away from where it sat
     sat = {}
     for line in text.splitlines():
-        match = re.search(r"OFTEST\tfurniture\t(\w+)\t(-?\d+)\t(\d+|no chair)$", line)
+        match = re.search(r"OFTEST\tfurniture\t(\w+)\t(-?\d+)\t(.+)$", line)
         if match:
             sat[match.group(1)] = (int(match.group(2)), match.group(3))
     for tag in ("before", "sat", "away"):
@@ -1968,8 +1971,19 @@ def check_triggers(text):
         if sat["sat"][0] != 1:
             problems.append("a player who activated the chair should be using it (IsCurrentFurnitureRef 1 in the script of "
                             f"the trigger): {sat['sat']}")
-        if sat["sat"][1] == "no chair" or int(sat["sat"][1]) > 5:
+        where = sat["sat"][1].split("\t")
+        if len(where) != 4:
             problems.append(f"the player who sat down should be put at the chair: {sat['sat']}")
+        else:
+            across, along, up, yaw = (float(value) for value in where)
+            # On the entry of the marker of the model (the chair is not turned): beside the chair, facing as the entry says
+            (entry_x, entry_y, _), orientation, _ = plugin.FURNITURE_ENTRY
+            if abs(across - entry_x) > 5 or abs(along - entry_y) > 5 or abs(up) > 5:
+                problems.append("the player who sat down should be put on the entry of the marker of the chair "
+                                f"({entry_x:.0f}, {entry_y:.0f}) from it, not at the middle of it: {sat['sat']}")
+            if abs(yaw - orientation / 1000.0) > 0.3:
+                problems.append(f"the player should face as the entry of the chair says ({orientation / 1000.0}): "
+                                f"{sat['sat']}")
         if sat["away"][0] != 0:
             problems.append("a player who was moved away from the chair should not use it any more (IsCurrentFurnitureRef "
                             f"0): {sat['away']}")
@@ -1983,9 +1997,11 @@ def check_triggers(text):
     else:
         if later[0][0] != "1":
             problems.append(f"a character that has got to a chair by its package should use it: {later[0]}")
-        if later[0][1] == "no sitter" or int(later[0][1]) > 120:
-            problems.append("a character in a chair should stay there while its package for it is on, not walk on to the "
-                            f"package that comes after: {later[0]}")
+        # It stands on the entry of the marker of the chair, which is that far from the middle of the chair
+        entry_distance = math.hypot(*plugin.FURNITURE_ENTRY[0][:2])
+        if later[0][1] == "no sitter" or abs(int(later[0][1]) - entry_distance) > 15:
+            problems.append("a character in a chair should stay there, on the entry of its marker, while its package for "
+                            f"it is on, not walk on to the package that comes after: {later[0]}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

@@ -542,6 +542,13 @@ namespace OFMechanics
                     if (!sharesSpace(mind.mPtr, reference))
                         return false;
                     goal.mCenter = reference.getRefData().getPosition().asVec3();
+                    // A character that goes to a piece of furniture goes to the place of its marker where it sits down,
+                    // which is beside the furniture, not to the middle of it
+                    if (frame.mScripts != nullptr && reference.getType() == ESM4::Furniture::sRecordId)
+                    {
+                        float heading = 0.f;
+                        frame.mScripts->furnitureSeat(mind.mPtr, reference, goal.mCenter, heading);
+                    }
                     if (!isLoaded(frame, mind.mPtr, goal.mCenter))
                         return false;
                     hasFacing = goal.mBehaviour == ESM4::PackageBehaviour::Stay;
@@ -832,7 +839,7 @@ namespace OFMechanics
                 const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
                     ESM::RefNum(ESM::FormId::fromUint32(package->mLocation.location)));
                 if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId)
-                    frame.mScripts->useFurniture(mind.mPtr, place, false);
+                    frame.mScripts->useFurniture(mind.mPtr, place, true);
             }
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
