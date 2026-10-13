@@ -1978,7 +1978,8 @@ namespace OFScript
             FurnitureUse& use = mFurniture[user];
             use.mFurniture = seat;
             use.mPlace = where;
-            use.mEntry = entry ? static_cast<int>(entry->mIndex) : -1;
+            // An entry is taken only by an actor that is put on it
+            use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
         }
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
