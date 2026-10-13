@@ -11,16 +11,20 @@ return {
     gates = {
         -- Fallout 3, Vault 101 (cell 0x028138): the Dad's trigger (a sphere, sets stage 12 for the player); the way out of the
         -- crib (any actor, sets 40); the baby book (OnActivate, gives SPECIAL; activated while the stage is 30 or more); the
-        -- trigger at the end of the quest (sets 100). The gate of the playpen, which the player activates at stage 20,
-        -- is not in the table yet: nobody has its id.
+        -- trigger at the end of the quest (sets 100); the gate of the playpen (a door, OnActivate sets 30 when the stage is
+        -- 20, which the Dad's packages bring about: the stage is 14 until he has closed the gate himself).
         { quest = 'CG01', stage = 10, file = 'Fallout3.esm', ref = 0x02EA54, how = 'walk' },
+        { quest = 'CG01', stage = 20, file = 'Fallout3.esm', ref = 0x047803, how = 'activate' },
         { quest = 'CG01', stage = 30, file = 'Fallout3.esm', ref = 0x02EA53, how = 'walk' },
         { quest = 'CG01', stage = 40, file = 'Fallout3.esm', ref = 0x02ECC0, how = 'activate' },
         { quest = 'CG01', stage = 90, file = 'Fallout3.esm', ref = 0x02ECC2, how = 'walk' },
         -- New Vegas, Doc Mitchell's house (cell 0x103df9): the Vigor Tester's trigger (stage 60); the Vigor Tester itself
-        -- (OnActivate, gives SPECIAL, sets 65 when the stage is 60 and the objective shows); the trigger of the door (sets 115)
+        -- (OnActivate, gives SPECIAL, sets 65 when the stage is 60 and the objective shows); Doc Mitchell, who talks when the
+        -- stage is 80 (the goodbye lines of his topics set 85, and the traits and tags come in the talk after it); the trigger
+        -- of the door (sets 115)
         { quest = 'VCG01', stage = 55, file = 'FalloutNV.esm', ref = 0x104C16, how = 'walk' },
         { quest = 'VCG01', stage = 60, file = 'FalloutNV.esm', ref = 0x104C13, how = 'activate' },
+        { quest = 'VCG01', stage = 80, file = 'FalloutNV.esm', ref = 0x104C0F, how = 'activate' },
         { quest = 'VCG01', stage = 110, file = 'FalloutNV.esm', ref = 0x107236, how = 'walk' },
     },
 }

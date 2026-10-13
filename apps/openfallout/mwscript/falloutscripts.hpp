@@ -134,6 +134,19 @@ namespace OFScript
         /// Whether the conditions of the package hold for the character. A package that has none holds.
         bool packageConditionsHold(const ESM4::AIPackage& package, const OFWorld::Ptr& actor);
 
+        /// What happens to an AI package of a character that scripts can see
+        enum class PackageEvent
+        {
+            Start, // the character begins to follow it
+            Done, // the character has done what it says (a Travel package: it got there)
+            Change, // another package takes its place before it is done
+        };
+        /// A character's package begins, is done or is changed: the script of the package for the event runs on the
+        /// character, and so do the blocks of the script of the character for the event (OnPackageStart, OnPackageDone,
+        /// OnPackageChange) that name the package, or none. Runs scripts, so not in the middle of what the characters
+        /// are doing in their frame.
+        void packageEvent(const OFWorld::Ptr& actor, const ESM4::AIPackage& package, PackageEvent event);
+
         /// What the player is shown of the conversation that is open, with the name of the character who talks
         struct Conversation
         {

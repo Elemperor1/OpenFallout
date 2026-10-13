@@ -513,25 +513,33 @@ return {
                                       for name in ("conditional", "scripted")))
 
 # Opens the gate of the packages of the conditional character: sets the stage of quest C that the second of its packages
-# needs (a global script, at the game time that the plugin names)
+# needs (a global script, at the game time that the plugin names). Late in the walk it tells what the packages told the
+# scripts: the globals that the scripts of the events of the packages and of the walker count in.
 GATE_SCRIPT = """\
 local world = require('openfallout.world')
 
-local elapsed, done = 0, false
+local elapsed, done, reported = 0, false, false
 
 return {
     engineHandlers = {
         onUpdate = function(dt)
             elapsed = elapsed + dt
-            if done or elapsed < @FROM@ then return end
-            done = true
-            local quest = world.quests.find('@QUEST@')
-            print('OFTEST', 'gate opened', tostring(quest ~= nil and quest:setStage(@STAGE@)))
+            if not done and elapsed >= @FROM@ then
+                done = true
+                local quest = world.quests.find('@QUEST@')
+                print('OFTEST', 'gate opened', tostring(quest ~= nil and quest:setStage(@STAGE@)))
+            end
+            if not reported and elapsed >= @EVENTS_FROM@ then
+                reported = true
+                local g = world.globals
+                print('OFTEST', 'package events', @EVENTS@)
+            end
         end,
     },
 }
 """.replace("@FROM@", str(plugin.GATE_FROM)).replace("@QUEST@", plugin.QUEST_C_NAME).replace(
-    "@STAGE@", str(plugin.QUEST_C_STAGE))
+    "@STAGE@", str(plugin.QUEST_C_STAGE)).replace("@EVENTS_FROM@", str(WALK_SECONDS - 2)).replace(
+    "@EVENTS@", ", ".join(f"tostring(g.{name})" for _, name in plugin.PACKAGE_EVENT_GLOBALS.values()))
 
 # Tells the companion, a character with no package, to follow the player (a global script, from the game time that the
 # plugin names). The reference of each kind of cell is tried, the one that is loaded takes it.
@@ -2388,9 +2396,12 @@ def check_packages(text, scenario, animated):
     problems += check_followers(text, scenario, samples, animated, where)
     problems += check_scripted_packages(text, scenario, samples, animated, where)
     if not animated:
-        moved = max(away("walker", position) for _, position, _ in walker)
-        if moved > UNMOVED_RANGE:
-            problems.append(f"the walker was moved {moved:.1f} units, but it has no animation to walk with")
+        # Its Travel package tells scripts when it is done, which a quest may wait for: a character that cannot walk there
+        # is put at the marker instead (the second time it finds no way)
+        _, (x, y, _), _ = walker[-1]
+        if math.hypot(x - target[0], y - target[1]) > UNMOVED_RANGE:
+            problems.append(f"the walker, which has no animation to walk with and a package that scripts wait for, ended "
+                            f"at {x:.0f},{y:.0f}, not at the marker at {target[0]:.0f},{target[1]:.0f}")
         moved = max(away("roamer", position) for _, position, _ in samples["roamer"])
         if moved > UNMOVED_RANGE:
             problems.append(f"the roamer was moved {moved:.1f} units, but it has no animation to walk with")
@@ -2434,6 +2445,7 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     problems = []
     if "OFTEST\tgate opened\ttrue" not in text:
         problems.append("the stage of quest C that opens the gate was not set from Lua")
+    problems += check_package_events(text)
 
     def marker(name):
         x, y = plugin.GATE_PLACES[name]
@@ -2474,6 +2486,23 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     if (message := edge_of("scripted_marker", scripted)) is not None:
         problems.append("the scripted character, which a script gave a package, " + message)
     return problems
+
+
+def check_package_events(text):
+    """The problems with what the packages tell scripts. The Travel package of the walker is begun once and done once
+    (the walker walks there, or is put there when it cannot walk), never changed; the package of the conditional character that holds until the gate
+    opens is begun once and changed when the gate opens (never done); the blocks of the script of the walker that name the
+    Travel package, and the one that names none, run for its events, and the one that names the package for the night,
+    which is not on, does not."""
+    names = list(plugin.PACKAGE_EVENT_GLOBALS)
+    match = re.search(r"OFTEST\tpackage events\t" + r"\t".join([r"(-?\d+)"] * len(names)), text)
+    if not match:
+        return ["the script did not log what the events of the packages counted"]
+    got = dict(zip(names, map(int, match.groups())))
+    expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 0, "early_begin": 1, "early_end": 0,
+                "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1}
+    return [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
+            f"{want}" for name, want in expected.items() if got[name] != want]
 
 
 def check_creatures(text, scenario, found, animated):

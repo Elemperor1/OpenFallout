@@ -397,7 +397,21 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x904 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x912 # the largest form ID of the plugin, which the next object ID of its header follows
+# What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
+# counts them: it is begun once, done once when the walker gets there, and never changed), and so has the package that
+# the conditional character follows first, for as long as quest C is below QUEST_C_STAGE (a Guard package at the place
+# the character is put, which stays: it is begun once, and changed when the gate opens and another package is on; it is
+# never done). The script of the walker has blocks for the events of the packages too: one that names the Travel package
+# for its start and one for its end, one that names the package for the night (which is not on) for its end, and one that
+# names none for its end (any package).
+PACKAGE_EVENT_GLOBALS = {"travel_begin": (0x905, "OFTestTravelBegin"), "travel_end": (0x906, "OFTestTravelEnd"),
+                         "travel_change": (0x907, "OFTestTravelChange"), "early_begin": (0x908, "OFTestEarlyBegin"),
+                         "early_end": (0x909, "OFTestEarlyEnd"), "early_change": (0x90A, "OFTestEarlyChange"),
+                         "block_start": (0x90B, "OFTestBlockStart"), "block_done": (0x90C, "OFTestBlockDone"),
+                         "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny")}
+WATCH_SCRIPT_IDS = {"interior": 0x90F, "exterior": 0x910}
+EARLY_PACKAGE_IDS = {"interior": 0x911, "exterior": 0x912}
 # The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
 # OnTriggerEnter and OnTrigger blocks for the player, OnTriggerEnter for anyone, and OnTriggerLeave for the player; when
 # the player comes in it also makes a person at the middle of the box with PlaceAtMe)
@@ -490,7 +504,9 @@ NIGHT_START = 22
 NIGHT_HOURS = 4
 PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
+PACKAGE_GUARD = 14
 LOCATION_NEAR_REFERENCE = 0
+LOCATION_NEAR_CURRENT = 2
 LOCATION_NEAR_EDITOR = 3
 # The quests: A starts with the game and its script counts the delays of the quest (QUEST_DELAY seconds each) and sets
 # stage 10 on the third. The result script of that stage sets stage 20 of B and adds COUNTER_ADDS to a global, and B
@@ -514,6 +530,7 @@ GET_STAGE_FUNCTION = 58 # the number the games give GetStage in a condition
 GET_IS_SEX_FUNCTION = 70
 GET_IS_VOICE_TYPE_FUNCTION = 427
 CONDITION_AT_LEAST = 0x60 # the comparison "greater than or equal to" of a condition
+CONDITION_BELOW = 0x80 # the comparison "less than"
 QUEST_OBJECTIVE_TEXT = "Do the thing"
 QUEST_FLAG_START_GAME = 0x01
 STAGE_FLAG_COMPLETE_QUEST = 0x01
@@ -1499,12 +1516,25 @@ def talker_reference():
     return achr(TALKER_REF_ID, (*TALKER_PLACE, 0.0), base=TALKER_ID)
 
 
+def add_one_to_global():
+    """The statements of a script that counts: the first form it names is a global, which it adds 1 to."""
+    sf = fallout_script
+    return [sf.set_to(sf.global_target(1), sf.global_target(1) + sf.number("1") + sf.operator("+"))]
+
+
+def package_event(marker, global_name):
+    """The marker of an event of a package (POBA when it begins, POEA when it ends, POCA when it changes) and the script
+    that runs for it, which adds 1 to the global."""
+    return [sub(marker), *stage_script(add_one_to_global(), [PACKAGE_EVENT_GLOBALS[global_name][0]])]
+
+
 def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0,
-            conditions=()):
+            conditions=(), events=()):
     """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
     location as a type, a form ID or 0 and a radius, the schedule (any month, any day, no date, the hour or 0xff for
     any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout),
-    then the conditions (CTDA sub-records) that must hold."""
+    then the conditions (CTDA sub-records) that must hold, then the events (the marker of each and the global its script
+    counts)."""
     subs = [zstr(b"EDID", name), sub(b"PKDT", struct.pack("<IBBH", 0, kind, 0, 0))]
     if location is not None:
         subs.append(sub(b"PLDT", struct.pack("<iIi", *location, radius)))
@@ -1512,6 +1542,8 @@ def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0,
     if target is not None:
         subs.append(sub(b"PTDT", struct.pack("<iIif", *target, distance, 0.0)))
     subs += conditions
+    for marker, global_name in events:
+        subs += package_event(marker, global_name)
     return record(b"PACK", form_id, subs)
 
 
@@ -1524,10 +1556,17 @@ def packages():
         records.append(package(NIGHT_PACKAGE_IDS[kind], "OFTestNight" + kind.capitalize(), PACKAGE_TRAVEL,
                                (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["night"][index]), 0, NIGHT_START, NIGHT_HOURS))
         records.append(package(TRAVEL_PACKAGE_IDS[kind], "OFTestTravel" + kind.capitalize(), PACKAGE_TRAVEL,
-                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index]), TRAVEL_RADIUS))
+                               (LOCATION_NEAR_REFERENCE, PACKAGE_REF_IDS["target"][index]), TRAVEL_RADIUS,
+                               events=((b"POBA", "travel_begin"), (b"POEA", "travel_end"),
+                                       (b"POCA", "travel_change"))))
         # Quest C is at its stage when the test sets it (GATE_FROM): at least that stage, or stage 99 which it never has
         gate_open = condition(GET_STAGE_FUNCTION, QUEST_C_ID, compare=CONDITION_AT_LEAST, value=float(QUEST_C_STAGE))
         gate_never = condition(GET_STAGE_FUNCTION, QUEST_C_ID, compare=0x00, value=99.0)
+        # The package that the conditional character follows until the gate opens: it stays where it is put
+        gate_closed = condition(GET_STAGE_FUNCTION, QUEST_C_ID, compare=CONDITION_BELOW, value=float(QUEST_C_STAGE))
+        records.append(package(EARLY_PACKAGE_IDS[kind], "OFTestEarly" + kind.capitalize(), PACKAGE_GUARD,
+                               (LOCATION_NEAR_CURRENT, 0), TRAVEL_RADIUS, conditions=[gate_closed],
+                               events=((b"POBA", "early_begin"), (b"POEA", "early_end"), (b"POCA", "early_change"))))
         records.append(package(BLOCKED_PACKAGE_IDS[kind], "OFTestBlocked" + kind.capitalize(), PACKAGE_TRAVEL,
                                (LOCATION_NEAR_REFERENCE, GATE_REF_IDS["blocked"][index]), TRAVEL_RADIUS,
                                conditions=[gate_never]))
@@ -1539,10 +1578,33 @@ def packages():
     return records
 
 
+def watch_script(kind):
+    """The script of the walker (an SCPT record of type 0), which counts the events of its packages: the start and the end
+    of the Travel package, the end of the package for the night, which is not on, and the end of any package."""
+    sf = fallout_script
+    script = sf.Script(0)
+    travel, night = (script.form(ids[kind]) for ids in (TRAVEL_PACKAGE_IDS, NIGHT_PACKAGE_IDS))
+    counts = {name: script.form(form_id) for name, (form_id, _) in PACKAGE_EVENT_GLOBALS.items()}
+
+    def add_one(name):
+        return sf.set_to(sf.global_target(counts[name]),
+                         sf.global_target(counts[name]) + sf.number("1") + sf.operator("+"))
+
+    script.add(
+        sf.statement(sf.SCRIPT_NAME),
+        sf.block(sf.ON_PACKAGE_START, add_one("block_start"), names=sf.form_argument(travel)),
+        sf.block(sf.ON_PACKAGE_DONE, add_one("block_done"), names=sf.form_argument(travel)),
+        sf.block(sf.ON_PACKAGE_DONE, add_one("block_other"), names=sf.form_argument(night)),
+        sf.block(sf.ON_PACKAGE_DONE, add_one("block_any")))
+    return record(b"SCPT", WATCH_SCRIPT_IDS[kind], [zstr(b"EDID", "OFTestWatchScript" + kind.title()),
+                                                    *sf.sub_records(script)])
+
+
 def package_people():
     """The walker of each kind of cell, the idler and the roamer."""
     people = [person(WALKER_IDS[kind], "OFTestWalker" + kind.capitalize(),
-                     [NIGHT_PACKAGE_IDS[kind], TRAVEL_PACKAGE_IDS[kind]], dressed=False)
+                     [NIGHT_PACKAGE_IDS[kind], TRAVEL_PACKAGE_IDS[kind]], dressed=False,
+                     script=WATCH_SCRIPT_IDS[kind])
               for kind in ("interior", "exterior")]
     people.append(person(IDLER_ID, "OFTestIdler", dressed=False, items=[(SUIT_ID, IDLER_ITEMS)],
                          factions=list(zip(FACTION_IDS, IDLER_RANKS))))
@@ -1552,7 +1614,8 @@ def package_people():
     people.append(person(COMPANION_ID, "OFTestCompanion", dressed=False))
     for kind in ("interior", "exterior"):
         people.append(person(CONDITIONAL_IDS[kind], "OFTestConditional" + kind.capitalize(),
-                             [BLOCKED_PACKAGE_IDS[kind], GATED_PACKAGE_IDS[kind]], dressed=False))
+                             [EARLY_PACKAGE_IDS[kind], BLOCKED_PACKAGE_IDS[kind], GATED_PACKAGE_IDS[kind]],
+                             dressed=False))
         people.append(person(SCRIPTED_WALKER_IDS[kind], "OFTestScriptedWalker" + kind.capitalize(), dressed=False))
     return people
 
@@ -1752,6 +1815,8 @@ def plugin():
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in TRIGGER_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l")
+                                    for form_id, name in PACKAGE_EVENT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in DIALOGUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in CHARGEN_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in STATE_GLOBALS.values()),
@@ -1769,7 +1834,8 @@ def plugin():
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
-                                                 new_game_script(), trigger_script()])
+                                                 new_game_script(), trigger_script(), watch_script("interior"),
+                                                 watch_script("exterior")])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest()])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
                                   trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),

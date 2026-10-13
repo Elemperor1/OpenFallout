@@ -1,6 +1,7 @@
 -- Plays the New Game of Fallout 3 and New Vegas for a person who is not there: answers the message boxes, finishes the
--- screens of character creation, picks the first topic of a conversation, and logs each of these in lines that start with
--- AUTOPLAY (counts and numbers, no text of the game). It is a developer tool, not part of the game: it is loaded with
+-- screens of character creation, picks the topics of a conversation (the one it has picked least often with the
+-- character, the first of them) and ends it when it has picked them all twice, and logs each of these in lines that
+-- start with AUTOPLAY (counts and numbers, no text of the game). It is a developer tool, not part of the game: it is loaded with
 --     openfallout --data scripts/openfallout/autoplay --content autoplay.omwscripts ...
 -- The scripts of the data folder are of the player (this file) and of the world (autoplayworld.lua, which follows the quests).
 local core = require('openfallout.core')
@@ -13,10 +14,16 @@ local DELAY = 0.7
 local BUTTON = 1
 -- The name the character is given
 local NAME = 'Autoplay'
+-- How often a topic is picked with a character, over all the conversations, before the conversation is ended instead
+local MAX_PICKS = 2
+-- How long (real seconds) a conversation that has nothing to pick from, and says nothing, is left before it is ended
+local CLOSE_AFTER = 3
 
 local boxSerial, boxWaited, boxAnswered = nil, 0, nil
 local pageSerial, pageWaited = nil, 0
-local topicWaited = 0
+local topicWaited, emptyWaited = 0, 0
+-- How often each topic was picked, by the character and the topic
+local picks = {}
 local lastStatus = 0
 
 local function log(...) print('AUTOPLAY', ...) end
@@ -64,16 +71,39 @@ end
 local function pickTopic(dt)
     if not core.conversation.available() then return end
     local state = core.conversation.get()
-    if not state.active or state.speaking or #state.options == 0 then
-        topicWaited = 0
+    if not state.active or state.speaking then
+        topicWaited, emptyWaited = 0, 0
         return
     end
-    topicWaited = topicWaited + dt
-    if topicWaited >= DELAY then
+    if #state.options == 0 then
+        -- nothing to pick from: the player would press Goodbye
         topicWaited = 0
-        log('topic', string.format('options=%d', #state.options))
-        core.conversation.choose(state.options[1].topic)
+        emptyWaited = emptyWaited + dt
+        if emptyWaited >= CLOSE_AFTER then
+            emptyWaited = 0
+            log('conversation close', 'options=0')
+            core.conversation.close()
+        end
+        return
     end
+    emptyWaited = 0
+    topicWaited = topicWaited + dt
+    if topicWaited < DELAY then return end
+    topicWaited = 0
+    local best, bestCount, bestKey
+    for index, option in ipairs(state.options) do
+        local key = state.speakerId .. ' ' .. option.topic
+        local count = picks[key] or 0
+        if best == nil or count < bestCount then best, bestCount, bestKey = index, count, key end
+    end
+    if bestCount >= MAX_PICKS then
+        log('conversation close', string.format('options=%d picked=%d', #state.options, bestCount))
+        core.conversation.close()
+        return
+    end
+    picks[bestKey] = bestCount + 1
+    log('topic', string.format('options=%d pick=%d count=%d', #state.options, best, bestCount + 1))
+    core.conversation.choose(state.options[best].topic)
 end
 
 return {
