@@ -308,6 +308,10 @@ namespace OFScript
         mTriggers.clear();
         mTriggerActors.clear();
         mScriptPackages.clear();
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            mFurniture.clear();
+        }
         mActors.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -377,6 +381,7 @@ namespace OFScript
             reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
+        updateFurniture();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
         mQuests.update(frametime);
@@ -1840,6 +1845,78 @@ namespace OFScript
     {
         const FalloutScript::FormId reference = referenceOf(actor);
         return reference != 0 && mActors.isDead(reference);
+    }
+
+    FalloutScript::FormId FalloutScripts::scriptReferenceOf(const OFWorld::Ptr& actor) const
+    {
+        return actor == OFBase::Environment::get().getWorld()->getPlayerPtr() ? mPlayer : referenceOf(actor);
+    }
+
+    void FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const FalloutScript::FormId seat = referenceOf(furniture);
+        if (user == 0 || seat == 0)
+            return;
+        osg::Vec3f where = actor.getRefData().getPosition().asVec3();
+        Place seatPlace;
+        Place userPlace;
+        if (place && whereIs(seat, seatPlace) && whereIs(user, userPlace) && seatPlace.mCell == userPlace.mCell)
+        {
+            // The world is not changed in the middle of what activates: the actor is put there in the next frame
+            where = seatPlace.mPosition;
+            Move move;
+            move.mWhere = seatPlace;
+            move.mParts = Move::PositionX | Move::PositionY | Move::PositionZ;
+            askForMove(user, move);
+        }
+        else
+            place = false;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            FurnitureUse& use = mFurniture[user];
+            use.mFurniture = seat;
+            use.mPlace = where;
+        }
+        Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
+                         << (place ? " (put there)" : "");
+    }
+
+    bool FalloutScripts::usesFurniture(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const std::lock_guard lock(mFurnitureMutex);
+        return user != 0 && mFurniture.count(user) != 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::currentFurniture(FalloutScript::FormId actor)
+    {
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(actor);
+        return found != mFurniture.end() ? found->second.mFurniture : 0;
+    }
+
+    void FalloutScripts::updateFurniture()
+    {
+        // An actor that is more than a few steps from where it sat down, or is gone, has got up
+        constexpr float reach = 128.f;
+        std::vector<std::pair<FalloutScript::FormId, FurnitureUse>> uses;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            uses.assign(mFurniture.begin(), mFurniture.end());
+        }
+        for (const auto& [user, use] : uses)
+        {
+            const OFWorld::Ptr actor = findReference(user);
+            if (!actor.isEmpty() && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
+                continue;
+            {
+                const std::lock_guard lock(mFurnitureMutex);
+                mFurniture.erase(user);
+            }
+            Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " gets up from "
+                             << FalloutScript::hex(use.mFurniture);
+        }
     }
 
     void FalloutScripts::addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package)

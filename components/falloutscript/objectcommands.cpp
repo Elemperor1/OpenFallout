@@ -108,6 +108,16 @@ namespace FalloutScript
                 ? 1.0
                 : 0.0;
         });
+        interpreter.setHandler("IsCurrentFurnitureRef", [&world](CallContext& call) {
+            const FormId wanted = formArgument(call, 0);
+            return wanted != 0 && call.mReference != 0 && world.currentFurniture(call.mReference) == wanted ? 1.0 : 0.0;
+        });
+        interpreter.setHandler("IsCurrentFurnitureObj", [&world](CallContext& call) {
+            const FormId wanted = formArgument(call, 0);
+            const FormId furniture = call.mReference != 0 ? world.currentFurniture(call.mReference) : 0;
+            FormId base = 0;
+            return wanted != 0 && furniture != 0 && world.baseFormOf(furniture, base) && base == wanted ? 1.0 : 0.0;
+        });
         interpreter.setHandler("GetGlobalValue", [](CallContext& call) {
             double value = 0;
             const FormId global = formArgument(call, 0);

@@ -14,6 +14,7 @@
 #include <components/detournavigator/status.hpp>
 #include <components/esm/util.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/packageschedule.hpp>
@@ -761,7 +762,15 @@ namespace OFMechanics
                 consider(package, true);
             for (const ESM4::AIPackage* package : mind.mPackages)
                 consider(package, false);
-            const Choice& chosen = fresh.mPackage != nullptr ? fresh : current.mPackage != nullptr ? current : done;
+            // An actor sitting in the furniture that its package led it to stays there while that package is on and
+            // no package that comes before it is: the games take it from the chair when a package asks, not because
+            // another one has become possible
+            const bool seated
+                = current.mPackage != nullptr && frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr);
+            const Choice& chosen = seated     ? current
+                : fresh.mPackage != nullptr   ? fresh
+                : current.mPackage != nullptr ? current
+                                              : done;
 
             if (chosen.mPackage == mind.mPackage)
             {
@@ -816,6 +825,15 @@ namespace OFMechanics
             const ESM4::AIPackage* package = mind.mPackage;
             if (package == nullptr || package->mData.type != ESM4::Package_Travel || !mind.mDone.insert(package).second)
                 return;
+            // A character that has got to a piece of furniture uses it, and the script of the package is told after
+            // that, as the games tell it when the character is in place
+            if (package->mLocation.type == ESM4::Location_NearReference && frame.mScripts != nullptr)
+            {
+                const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
+                    ESM::RefNum(ESM::FormId::fromUint32(package->mLocation.location)));
+                if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId)
+                    frame.mScripts->useFurniture(mind.mPtr, place, false);
+            }
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;

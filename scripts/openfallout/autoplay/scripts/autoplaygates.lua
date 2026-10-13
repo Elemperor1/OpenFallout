@@ -24,10 +24,14 @@ return {
         { quest = 'CG01', stage = 90, file = 'Fallout3.esm', ref = 0x02ECC2, how = 'walk' },
         -- New Vegas, Doc Mitchell's house (cell 0x103df9): the Vigor Tester's trigger (stage 60); the Vigor Tester itself
         -- (OnActivate, gives SPECIAL, sets 65 when the stage is 60 and the objective shows); Doc Mitchell, who talks when the
-        -- stage is 80 (the goodbye lines of his topics set 85, and the traits and tags come in the talk after it); the trigger
-        -- of the door (sets 115)
+        -- stage is 80 and the player has sat on the couch (the goodbye lines of his topics set 85, and the traits and tags
+        -- come in the talk after it); the trigger of the door (sets 115)
         { quest = 'VCG01', stage = 55, file = 'FalloutNV.esm', ref = 0x104C16, how = 'walk' },
         { quest = 'VCG01', stage = 60, file = 'FalloutNV.esm', ref = 0x104C13, how = 'activate' },
+        -- Stage 80 waits for the player to sit on the couch while Doc sits in his chair (round 12): the couch is a FURN, and
+        -- activating it puts the player there and makes it the furniture the player uses, which the script of the couch's trigger
+        -- looks at; that script then makes Doc talk. Doc himself is activated if that has not brought the talk about.
+        { quest = 'VCG01', stage = 80, file = 'FalloutNV.esm', ref = 0x103E55, how = 'activate' },
         { quest = 'VCG01', stage = 80, file = 'FalloutNV.esm', ref = 0x104C0F, how = 'activate' },
         { quest = 'VCG01', stage = 110, file = 'FalloutNV.esm', ref = 0x107236, how = 'walk' },
     },

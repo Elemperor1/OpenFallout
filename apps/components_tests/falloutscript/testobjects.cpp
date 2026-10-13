@@ -45,6 +45,8 @@ namespace
     constexpr std::uint16_t OpGetDisabled = 0x1023;
     constexpr std::uint16_t OpGetInCell = 0x1043;
     constexpr std::uint16_t OpGetIsID = 0x1048;
+    constexpr std::uint16_t OpIsCurrentFurnitureRef = 0x10A2;
+    constexpr std::uint16_t OpIsCurrentFurnitureObj = 0x10A3;
     constexpr std::uint16_t OpGetInSameCell = 0x1020;
     constexpr std::uint16_t OpPlaceAtMe = 0x1025;
     constexpr std::uint16_t OpGetCurrentTime = 0x1012;
@@ -66,6 +68,7 @@ namespace
         std::map<std::pair<FormId, FormId>, double> mDistances;
         std::map<FormId, FormId> mBases;
         std::map<FormId, FormId> mWorldspaces;
+        std::map<FormId, FormId> mFurniture; // by the actor
         std::map<std::pair<FormId, FormId>, FormId> mLinks; // by the reference and the keyword
 
         struct Placement
@@ -128,6 +131,11 @@ namespace
                 return false;
             base = found->second;
             return true;
+        }
+        FormId currentFurniture(FormId actor) override
+        {
+            const auto found = mFurniture.find(actor);
+            return found != mFurniture.end() ? found->second : 0;
         }
         FormId worldspaceOf(FormId reference) override
         {
@@ -617,6 +625,69 @@ namespace
         setup.addScript(scriptOfCrates, builder);
         setup.mObjects.add(crate, scriptOfCrates);
         setup.mWorld.mBases[crate] = crateBase;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, is_current_furniture_ref_is_yes_for_the_furniture_the_actor_uses_only)
+    {
+        constexpr FormId couch = 0x01000300;
+        constexpr FormId chair = 0x01000301;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t couchSlot = builder.form(couch);
+        const std::uint16_t chairSlot = builder.form(chair);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpIsCurrentFurnitureRef, arguments(1).add(refArg(couchSlot))))
+            + setTo(var('s', 2), callToken(OpIsCurrentFurnitureRef, arguments(1).add(refArg(chairSlot)))) + end());
+        builder.variable(1, integerVariable, "isCouch").variable(2, integerVariable, "isChair");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mFurniture[crate] = couch;
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, is_current_furniture_ref_is_no_for_an_actor_that_uses_none)
+    {
+        constexpr FormId couch = 0x01000300;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t couchSlot = builder.form(couch);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpIsCurrentFurnitureRef, arguments(1).add(refArg(couchSlot)))) + end());
+        builder.variable(1, integerVariable, "isCouch");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true);
+
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, is_current_furniture_obj_compares_the_form_of_the_furniture_the_actor_uses)
+    {
+        constexpr FormId couch = 0x01000300;
+        constexpr FormId couchBase = 0x01000400;
+        constexpr FormId otherBase = 0x01000401;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t baseSlot = builder.form(couchBase);
+        const std::uint16_t otherSlot = builder.form(otherBase);
+        builder.code(scriptName() + begin(BlockType::OnLoad)
+            + setTo(var('s', 1), callToken(OpIsCurrentFurnitureObj, arguments(1).add(refArg(baseSlot))))
+            + setTo(var('s', 2), callToken(OpIsCurrentFurnitureObj, arguments(1).add(refArg(otherSlot)))) + end());
+        builder.variable(1, integerVariable, "isBase").variable(2, integerVariable, "isOther");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+        setup.mWorld.mFurniture[crate] = couch;
+        setup.mWorld.mBases[couch] = couchBase;
 
         setup.mObjects.setLoaded(crate, true);
 
