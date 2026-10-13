@@ -203,9 +203,10 @@ namespace OFScript
         /// says one response of its topic, a Conversation package for the player begins a conversation (the interface
         /// opens, which is for the thread of the frame), and a package for another character makes the exchange of the
         /// two (follow-ups and all). `listener` is the character it talks to, empty for the player. False when the
-        /// character is to try again later, because the player is busy with a menu or another conversation; a character
-        /// that has nothing to say is done all the same.
-        bool speakPackage(const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener);
+        /// character is to try again later, because the player is busy with a menu or another conversation (`busy`, if
+        /// given, says with what); a character that has nothing to say is done all the same.
+        bool speakPackage(const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener,
+            std::string* busy = nullptr);
         /// Whether the character is still saying lines that it was told to say outside of a conversation
         bool isSaying(const OFWorld::Ptr& speaker) const;
         /// The conversation as it is now (nothing active when none is open)

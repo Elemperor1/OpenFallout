@@ -1,5 +1,6 @@
 #include "datetimemanager.hpp"
 
+#include <components/debug/debuglog.hpp>
 #include <components/l10n/manager.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -256,7 +257,26 @@ namespace OFWorld
     {
         auto stateManager = OFBase::Environment::get().getStateManager();
         auto wm = OFBase::Environment::get().getWindowManager();
-        mPaused = !mPausedTags.empty() || wm->isConsoleMode() || wm->isPostProcessorHudVisible()
-            || wm->isInteractiveMessageBoxActive() || stateManager->getState() == OFBase::StateManager::State_NoGame;
+        const bool console = wm->isConsoleMode();
+        const bool hud = wm->isPostProcessorHudVisible();
+        const bool box = wm->isInteractiveMessageBoxActive();
+        const bool noGame = stateManager->getState() == OFBase::StateManager::State_NoGame;
+        const bool paused = !mPausedTags.empty() || console || hud || box || noGame;
+        // What stops the world is told when it changes: a game that stands still is told apart from one that waits
+        if (paused != mPaused && !noGame)
+        {
+            if (paused)
+            {
+                std::string tags;
+                for (const std::string& tag : mPausedTags)
+                    tags += (tags.empty() ? "" : ",") + tag;
+                Log(Debug::Info) << "The world is paused by" << (tags.empty() ? "" : " the tags " + tags)
+                                 << (console ? " the console" : "") << (hud ? " the post-processor HUD" : "")
+                                 << (box ? " a message box" : "");
+            }
+            else
+                Log(Debug::Info) << "The world is running again";
+        }
+        mPaused = paused;
     }
 }

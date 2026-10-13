@@ -14,6 +14,8 @@ local DONE = { MQ01 = 10, VMQ01 = 10, CG04 = 200, VCG01 = 200 }
 local LIMIT = 2400
 
 local last, changed, tries = {}, {}, {}
+-- What stops the world, told when it changes: the tags that pause it (the screens do, with the tag ui)
+local pausedNow = ''
 local elapsed = 0
 local started = core.getRealTime()
 local lastGate = 0
@@ -46,6 +48,14 @@ return {
         onUpdate = function(dt)
             elapsed = elapsed + dt
             local real = core.getRealTime() - started
+            local tags = {}
+            for tag in pairs(world.getPausedTags()) do table.insert(tags, tag) end
+            table.sort(tags)
+            local paused = string.format('paused=%s tags=%s', tostring(core.isWorldPaused()), table.concat(tags, ','))
+            if paused ~= pausedNow then
+                pausedNow = paused
+                print('AUTOPLAY', 'world', paused, string.format('real=%.1f', real))
+            end
             for _, name in ipairs(QUESTS) do
                 local quest = world.quests.find(name)
                 if quest then

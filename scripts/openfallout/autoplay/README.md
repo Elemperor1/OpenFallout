@@ -7,7 +7,9 @@ conversation where every topic has been picked twice, or that has none to pick a
 button would end it), and logs what it did in lines that start with `AUTOPLAY` (counts and
 numbers, no text of the game). The world script logs the stage of the quests of the two intros each time one changes and
 quits when the intro is over (`CG04` or `VCG01` stage 200, or the main quest starts: `MQ01` or `VMQ01` stage 10) or after
-forty minutes.
+forty minutes. The player script logs `AUTOPLAY status` every five seconds (the screen that is open, whether the world is paused,
+the cell and the place of the player) and the world script logs `AUTOPLAY world` when what pauses the world changes, so that a run
+that stands still can be told from one that waits.
 
 Some stages wait for the player to walk into a trigger volume, to activate an object or to talk to a character, which no
 button does. `scripts/autoplaygates.lua` lists them (quest, stage, plugin, reference, `walk` or `activate`; activating a

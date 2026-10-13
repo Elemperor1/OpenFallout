@@ -403,7 +403,8 @@ NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
 LAST_ID = 0x91F # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
-# counts them: it is begun once, done once when the walker gets there, and never changed), and so has the package that
+# counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
+# on and the done one is over for the walker), and so has the package that
 # the conditional character follows first, for as long as quest C is below QUEST_C_STAGE (a Guard package at the place
 # the character is put, which stays: it is begun once, and changed when the gate opens and another package is on; it is
 # never done). The script of the walker has blocks for the events of the packages too: one that names the Travel package

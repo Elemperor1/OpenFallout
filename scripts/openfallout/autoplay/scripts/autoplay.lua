@@ -132,8 +132,9 @@ return {
             if lastStatus >= 5 then
                 lastStatus = 0
                 local cell = self.cell
-                log('status', 'mode=' .. tostring(I.UI.getMode()), string.format('cell=%s pos=%.0f,%.0f,%.0f',
-                    cell and tostring(cell.id) or 'none', self.position.x, self.position.y, self.position.z))
+                log('status', 'mode=' .. tostring(I.UI.getMode()), 'paused=' .. tostring(core.isWorldPaused()),
+                    string.format('cell=%s pos=%.0f,%.0f,%.0f', cell and tostring(cell.id) or 'none', self.position.x,
+                        self.position.y, self.position.z))
             end
         end,
     },

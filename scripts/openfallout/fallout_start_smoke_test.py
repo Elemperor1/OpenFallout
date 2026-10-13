@@ -2601,7 +2601,8 @@ def check_scripted_packages(text, scenario, samples, animated, where):
 
 def check_package_events(text, scenario, animated):
     """The problems with what the packages tell scripts. The Travel package of the walker is begun once and done once
-    (the walker walks there, or is put there when it cannot walk), never changed; the package of the conditional character that holds until the gate
+    (the walker walks there, or is put there when it cannot walk), and changed once after that, as nothing follows it;
+    the package of the conditional character that holds until the gate
     opens is begun once and changed when the gate opens (never done); the blocks of the script of the walker that name the
     Travel package, and the one that names none, run for its events, and the one that names the package for the night,
     which is not on, does not. The speaker of the interior has a Dialogue package: it walks to the player, says its line and
@@ -2611,7 +2612,7 @@ def check_package_events(text, scenario, animated):
     if not match:
         return ["the script did not log what the events of the packages counted"]
     got = dict(zip(names, map(int, match.groups())))
-    expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 0, "early_begin": 1, "early_end": 0,
+    expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 1, "early_begin": 1, "early_end": 0,
                 "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1,
                 "speaker_done": 1 if not scenario.exterior and animated else 0}
     problems = [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "

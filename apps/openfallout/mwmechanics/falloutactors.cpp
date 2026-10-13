@@ -151,6 +151,9 @@ namespace OFMechanics
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
+        /// A package that is done and has nothing after it is over for the actor, and its Change script has been told
+        bool mChangeTold = false;
+        int mWaitingFor = 0; // why a Dialogue package stands still (a waitFor constant), once told in the log
         int mFailures = 0; // how many times in a row it has had no way to get to the place of the package
         osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
@@ -815,11 +818,21 @@ namespace OFMechanics
                         stopWalking(mind);
                     }
                 }
+                // A package that is done and that nothing follows (the character stays where it did it) is over: the
+                // games take it from the character, and its Change script is told, once. A character in a piece of
+                // furniture is still at what the package led it to.
+                if (chosen.mPackage != nullptr && !seated && !mind.mChangeTold
+                    && mind.mDone.count(chosen.mPackage) != 0)
+                {
+                    mind.mChangeTold = true;
+                    raise(frame, mind.mPtr, *chosen.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
+                }
                 return;
             }
 
-            // The package it followed is changed when it was not done, and the one it follows begins
-            if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0)
+            // The package it followed is changed, done or not, unless it was told so already, and the one it follows
+            // begins
+            if (mind.mPackage != nullptr && !mind.mChangeTold)
                 raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
             // A character in a piece of furniture gets up when it is given another package (the games ask it to leave)
             if (frame.mScripts != nullptr)
@@ -837,6 +850,8 @@ namespace OFMechanics
             mind.mFacing = chosen.mFacing;
             mind.mAtGoal = false;
             mind.mSpoke = false;
+            mind.mChangeTold = false;
+            mind.mWaitingFor = 0;
             mind.mFailures = 0;
             mind.mWait = 0.f;
             mind.mPathRetry = 0.f;
@@ -942,6 +957,25 @@ namespace OFMechanics
             }
         }
 
+        constexpr int waitNothing = 0;
+        constexpr int waitForTarget = 1; // the one it talks to is not around
+        constexpr int waitForPlayer = 2; // the player is busy with a menu, a box or a conversation
+
+        /// Tells why a Dialogue package stands still, once for each reason, as the packages that run scripts are the
+        /// ones a quest waits for
+        void waitFor(FalloutActors::Mind& mind, int reason, const std::string& detail = std::string())
+        {
+            if (mind.mWaitingFor == reason || mind.mPackage == nullptr)
+                return;
+            mind.mWaitingFor = reason;
+            if (reason == waitNothing)
+                return;
+            Log(hasEvents(*mind.mPackage) ? Debug::Info : Debug::Verbose)
+                << "Package " << mind.mPackage->mEditorId << " of " << mind.mPtr.getCellRef().getRefId() << ": waits, "
+                << (reason == waitForTarget ? "the one it talks to is not around"
+                                            : "the player is busy (" + detail + ")");
+        }
+
         /// One frame of a Dialogue package. The character goes to the place of the package when it names one, then to
         /// its target, as near as the package says, and talks: a Say To package says a response of its topic, a
         /// Conversation package begins the conversation. The package is done when it has said what it came to say.
@@ -985,6 +1019,7 @@ namespace OFMechanics
             {
                 // The one it talks to is not around: it waits where it is
                 stopWalking(mind);
+                waitFor(mind, waitForTarget);
                 return;
             }
             const float distance = mind.mFollowing.mDistance;
@@ -1029,12 +1064,15 @@ namespace OFMechanics
             OFWorld::Ptr listener;
             if (!mind.mFollowing.mPlayer)
                 listener = OFBase::Environment::get().getWorldModel()->getPtr(mind.mFollowing.mRef);
-            if (frame.mScripts != nullptr && !frame.mScripts->speakPackage(mind.mPtr, *package, listener))
+            std::string busy;
+            if (frame.mScripts != nullptr && !frame.mScripts->speakPackage(mind.mPtr, *package, listener, &busy))
             {
                 // The player is busy: it tries again in a moment
                 mind.mWait = pathRetryTime;
+                waitFor(mind, waitForPlayer, busy);
                 return;
             }
+            mind.mWaitingFor = waitNothing;
             mind.mSpoke = true;
             Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
                              << ": it talks to " << (mind.mFollowing.mPlayer ? "the player" : "a character");

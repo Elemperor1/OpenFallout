@@ -1637,7 +1637,7 @@ namespace OFScript
     }
 
     bool FalloutScripts::speakPackage(
-        const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener)
+        const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener, std::string* busy)
     {
         const FalloutScript::FormId reference = referenceOf(speaker);
         if (reference == 0 || speaker.isEmpty())
@@ -1663,7 +1663,19 @@ namespace OFScript
         // open, a message or a menu
         OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
         if (windows != nullptr && windows->isGuiMode())
+        {
+            if (busy != nullptr)
+            {
+                *busy = "mode " + std::to_string(static_cast<int>(windows->getMode()));
+                if (windows->isConsoleMode())
+                    *busy += ", the console";
+                if (windows->isPostProcessorHudVisible())
+                    *busy += ", the post-processor HUD";
+                if (windows->isInteractiveMessageBoxActive())
+                    *busy += ", a message box";
+            }
             return false;
+        }
         if (!talkTo(speaker, topic))
             Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
                              << ": it has nothing to say to the player";
