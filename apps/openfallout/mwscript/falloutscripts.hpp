@@ -199,12 +199,12 @@ namespace OFScript
         bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// startConversation and the interface that shows it. For the thread of the frame.
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
-        /// What a character with a Dialogue package does once it is near its target: a Say To package says one
-        /// response of its topic, a Conversation package begins a conversation (with the player the interface opens,
-        /// which is for the thread of the frame; with another character the exchange is said, follow-ups and all).
-        /// `listener` is the character it talks to, empty for the player. False when the character is to try again
-        /// later, because the player is busy with a menu or another conversation; a character that has nothing to say
-        /// is done all the same.
+        /// What a character with a Dialogue package does once it is where it talks: a Say To package for the player
+        /// says one response of its topic, a Conversation package for the player begins a conversation (the interface
+        /// opens, which is for the thread of the frame), and a package for another character makes the exchange of the
+        /// two (follow-ups and all). `listener` is the character it talks to, empty for the player. False when the
+        /// character is to try again later, because the player is busy with a menu or another conversation; a character
+        /// that has nothing to say is done all the same.
         bool speakPackage(const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener);
         /// Whether the character is still saying lines that it was told to say outside of a conversation
         bool isSaying(const OFWorld::Ptr& speaker) const;

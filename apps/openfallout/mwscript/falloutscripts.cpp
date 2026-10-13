@@ -1645,17 +1645,18 @@ namespace OFScript
         const FalloutScript::FormId topic = package.mDialogue.mTopic;
         const bool toPlayer = listener.isEmpty();
         const FalloutScript::FormId target = toPlayer ? mPlayer : referenceOf(listener);
-        if (package.mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo)
-        {
-            // One response of the topic, said to the target, and that is all
-            if (!sayTopic(reference, topic, toPlayer ? 0 : target, false, false))
-                Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
-                                 << ": there is nothing it can say";
-            return true;
-        }
+        // With another character the games make it a conversation of the two, a Say To package as well
         if (!toPlayer)
         {
             converse(reference, target, topic);
+            return true;
+        }
+        if (package.mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo)
+        {
+            // One response of the topic, said to the player, and that is all
+            if (!sayTopic(reference, topic, 0, false, false))
+                Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
+                                 << ": there is nothing it can say";
             return true;
         }
         // A conversation with the player is the interface: it waits for the player to be done with the one that is

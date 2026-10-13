@@ -989,8 +989,11 @@ namespace OFMechanics
             }
             const float distance = mind.mFollowing.mDistance;
             const float away = distanceByFloor(mind.position(), target);
-            // One that cannot get to its target says what it came to say from where it is
-            if (mind.mFailures < failuresBeforeJump && falloutFollowMoves(away, distance, mind.mWalking))
+            // The games walk a Say To package up to the player; any other talk starts where the character is once it
+            // has been to its place. One that cannot get to the player says what it came to say from where it is.
+            const bool approach = package->mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo
+                && mind.mFollowing.mPlayer && mind.mFailures < failuresBeforeJump;
+            if (approach && falloutFollowMoves(away, distance, mind.mWalking))
             {
                 // The one it talks to has gone on: the path is made again
                 if (!mind.mWalking || distanceAcross(target, mind.mDestination) > repathDistance)
