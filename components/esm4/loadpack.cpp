@@ -131,7 +131,9 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
                 std::uint32_t size = subHdr.dataSize;
                 reader.get(mDialogue.mFov);
                 reader.get(mDialogue.mTopic);
-                reader.adjustFormId(mDialogue.mTopic);
+                // No topic (0) is the greeting; adjusting it would make it the form ID 0 of this file
+                if (mDialogue.mTopic != 0)
+                    reader.adjustFormId(mDialogue.mTopic);
                 size -= sizeof(float) + sizeof(ESM::FormId32);
                 if (size >= sizeof(std::uint32_t))
                 {
