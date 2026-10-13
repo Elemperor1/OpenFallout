@@ -913,7 +913,7 @@ return {
 # the controls back and opens the screen for the name, which autoplay.lua finishes. A script of the player logs the box and
 # the controls while it is open (and that the box takes no button that is not there); this script of the world logs the
 # quest, the controls and the player once the game has run for NEW_GAME_FROM seconds, then quits.
-NEW_GAME_FROM = 3.0
+NEW_GAME_FROM = 6.0 # game seconds; the box stops the game for a moment, and the two gates of autoplay are tried one second apart
 CONTROL_KEYS = "'playercontrols', 'playerfighting', 'playerlooking', 'playerviewswitch'"
 NEW_GAME_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
@@ -942,6 +942,7 @@ return {
             for _, key in ipairs({ @KEYS@ }) do table.insert(row, key .. '=' .. tostring(input.getControlSwitch(key))) end
             print('OFTEST', 'newgame box', string.format('buttons=%d first=%s second=%s', #box.buttons, box.buttons[1],
                 box.buttons[2]), table.concat(row, ' '), string.format('yaw=%.3f', self.rotation:getYaw()),
+                string.format('at=%.0f,%.0f', self.position.x, self.position.y),
                 'bounds=' .. tostring(core.messageBox.press(0)) .. ',' .. tostring(core.messageBox.press(#box.buttons + 1)))
         end,
     },
@@ -972,6 +973,9 @@ return {
                 table.insert(row, key .. '=' .. tostring(types.Player.getControlSwitch(player, key)))
             end
             print('OFTEST', 'newgame controls', table.concat(row, ' '))
+            -- what the gates of autoplay did: the player came into the trigger and activated the scripted object
+            print('OFTEST', 'newgame gates', string.format('enters=%d any=%d activated=%d', world.globals.@ENTERS@,
+                world.globals.@ANY@, world.globals.@ACTIVATED@))
             print('OFTEST', 'newgame player', tostring(player.cell.isExterior), tostring(player.cell.name),
                 string.format('%.1f,%.1f,%.1f', player.position.x, player.position.y, player.position.z))
             core.quit()
@@ -981,7 +985,23 @@ return {
 """
 NEW_GAME_START_ELSEWHERE = f"{plugin.WORLD_NAME}:0,0" # the exterior cell the engine logs as OFTestWorldCell (0, 0)
 NEW_GAME_SCRIPT = (NEW_GAME_SCRIPT.replace("@FROM@", str(NEW_GAME_FROM)).replace("@QUEST@", plugin.NEW_GAME_QUEST_NAME)
-                   .replace("@KEYS@", CONTROL_KEYS))
+                   .replace("@KEYS@", CONTROL_KEYS).replace("@ENTERS@", plugin.TRIGGER_GLOBALS["enters"][1])
+                   .replace("@ANY@", plugin.TRIGGER_GLOBALS["any"][1])
+                   .replace("@ACTIVATED@", plugin.OBJECT_GLOBALS["activated"][1]))
+
+# The table of the gates of autoplay (what the intro waits for: a trigger volume to walk into, an object to activate), for the
+# plugin of the test: when the quest stands at its last stage for a second, autoplayworld.lua puts the player in the trigger
+# volume and makes the player activate the scripted object, once each
+NEW_GAME_GATES = f"""\
+return {{
+    settle = 1,
+    tries = 1,
+    gates = {{
+        {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.TRIGGER_REF_ID}, how = 'walk' }},
+        {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.SCRIPTED_REF_IDS["interior"]}, how = 'activate' }},
+    }},
+}}
+"""
 
 # Walks the player into the trigger of the plugin and out of it again, and logs what the script of the trigger counted.
 # The box is turned a quarter about z, so that its long side runs along y: a point 100 to the side along y is inside it,
@@ -1921,11 +1941,12 @@ def check_new_game(text):
         first, second = plugin.NEW_GAME_BUTTONS
         wanted = (f"buttons=2 first={first} second={second}\t"
                   "playercontrols=false playerfighting=false playerlooking=false playerviewswitch=false\t"
-                  f"yaw={plugin.NEW_GAME_YAW:.3f}\tbounds=false,false")
+                  f"yaw={plugin.NEW_GAME_YAW:.3f}\tat={plugin.NEW_GAME_PLACE[0]:.0f},{plugin.NEW_GAME_PLACE[1]:.0f}"
+                  "\tbounds=false,false")
         if not boxes[0].endswith(wanted):
             problems.append(f"while the box is open the player should have lost movement, fighting, looking and the view "
-                            f"(DisablePlayerControls 1 1 1 1 1), still face the way of the marker, and the box should take "
-                            f"no button it does not have: {boxes[0]!r} should end with {wanted!r}")
+                            f"(DisablePlayerControls 1 1 1 1 1), stand at the marker and face the way of it, and the box "
+                            f"should take no button it does not have: {boxes[0]!r} should end with {wanted!r}")
     stances = [match.group(1).strip() for match in
                (re.search(r"OFTEST\tnewgame[\t ]stance\t(.*)$", line) for line in text.splitlines()) if match]
     if stances != ["drawn\ttrue", "after\ttrue"]:
@@ -1943,6 +1964,20 @@ def check_new_game(text):
     for stage in (plugin.NEW_GAME_WAIT_STAGE, plugin.NEW_GAME_LAST_STAGE):
         if f"AUTOPLAY\tquest\t{plugin.NEW_GAME_QUEST_NAME}\tstage={stage} running=true" not in text:
             problems.append(f"autoplayworld.lua should have logged stage {stage} of the quest")
+    # the quest stands at its last stage, so the two gates of the table are tried once each, in the order of the table
+    for how, ref in (("walk", plugin.TRIGGER_REF_ID), ("activate", plugin.SCRIPTED_REF_IDS["interior"])):
+        wanted = (f"AUTOPLAY\tgate\t{how}\t{plugin.NEW_GAME_QUEST_NAME}\t"
+                  f"stage={plugin.NEW_GAME_LAST_STAGE} ref={ref:06X} try=1\tok")
+        if wanted not in text:
+            problems.append(f"autoplayworld.lua should have logged the gate {how!r} as {wanted!r}")
+    if text.count("AUTOPLAY\tgate\t") != 2:
+        problems.append(f"each gate should be tried once, found {text.count('AUTOPLAY' + chr(9) + 'gate' + chr(9))} tries")
+    gates = [match.group(1) for match in
+             (re.search(r"OFTEST\tnewgame[\t ]gates\t(.*)$", line) for line in text.splitlines()) if match]
+    if gates != ["enters=1 any=2 activated=1"]:
+        problems.append("the walk gate should have put the player in the trigger (OnTriggerEnter for the player once, and "
+                        "for anyone twice: the player and the person that the script makes) and the activate gate should "
+                        f"have run the OnActivate block of the scripted object once: {gates}")
     found = [re.search(r"OFTEST\tnewgame[\t ]player\t(\w+)\t(.*)\t([-\d.]+),([-\d.]+),([-\d.]+)$", line)
              for line in text.splitlines()]
     players = [match.groups() for match in found if match]
@@ -1950,11 +1985,11 @@ def check_new_game(text):
         problems.append(f"expected one 'newgame player' line, found {len(players)}")
     else:
         exterior, name, x, y, _ = players[0]
-        wanted = plugin.NEW_GAME_PLACE
+        wanted = plugin.TRIGGER_PLACE
         if exterior != "false" or name != plugin.CELL_NAME or abs(float(x) - wanted[0]) > MOVE_SLACK \
                 or abs(float(y) - wanted[1]) > MOVE_SLACK:
-            problems.append(f"the player should stand at the marker {wanted[:2]} of {plugin.CELL_NAME} (interior), the "
-                            f"result script of stage 0 moved them there: {players[0]}")
+            problems.append(f"the player should stand at the trigger {wanted[:2]} of {plugin.CELL_NAME} (interior), where "
+                            f"the walk gate of autoplay put them after the marker: {players[0]}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems
@@ -2531,6 +2566,7 @@ def main():
     # the tool that plays the intro on real data does the answering here
     for name in ("autoplay.lua", "autoplayworld.lua"):
         shutil.copy(AUTOPLAY / "scripts" / name, data / "scripts" / name)
+    (data / "scripts" / "autoplaygates.lua").write_text(NEW_GAME_GATES, encoding="ascii")
     (data / "newgametest.omwscripts").write_text(
         "PLAYER: scripts/autoplay.lua\nPLAYER: scripts/newgameplayer.lua\nGLOBAL: scripts/autoplayworld.lua\n"
         "GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
