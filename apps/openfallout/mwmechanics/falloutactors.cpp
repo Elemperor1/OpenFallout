@@ -298,6 +298,8 @@ namespace OFMechanics
                     return "stays";
                 case ESM4::PackageBehaviour::Roam:
                     return "goes about";
+                case ESM4::PackageBehaviour::Talk:
+                    return "goes and talks";
                 default:
                     return "does nothing";
             }
@@ -858,6 +860,37 @@ namespace OFMechanics
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;
         }
+
+        /// A character has got to the place of its Dialogue package: it talks to the player, once, and the package is
+        /// done. Whom else a character talks to is not made yet, and nothing is done for such a package.
+        void finishDialogue(const Frame& frame, FalloutActors::Mind& mind)
+        {
+            const ESM4::AIPackage* package = mind.mPackage;
+            if (package == nullptr || package->mData.type != ESM4::Package_Dialogue || mind.mDone.count(package) != 0
+                || frame.mScripts == nullptr)
+                return;
+            const ESM::RefNum target = ESM::FormId::fromUint32(package->mTarget.target);
+            if (package->mTarget.type != 0
+                || !falloutIsPlayerReference(target, falloutFirstPlugin(frame.mWorld.getContentFiles())))
+            {
+                Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                                 << ": it talks to a character other than the player, which is not made yet";
+                return;
+            }
+            if (!sharesSpace(mind.mPtr, frame.mWorld.getPlayerPtr()) || !frame.mScripts->talkTo(mind.mPtr))
+            {
+                // The player is elsewhere, or is in another conversation, or it has nothing to say: it tries again
+                // later
+                mind.mAtGoal = false;
+                mind.mWait = giveUpTime;
+                return;
+            }
+            Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                             << ": it talks to the player";
+            mind.mDone.insert(package);
+            raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
+            mind.mReview = 0.f;
+        }
     }
 
     namespace
@@ -940,6 +973,7 @@ namespace OFMechanics
                 case ESM4::PackageBehaviour::None:
                     break;
                 case ESM4::PackageBehaviour::Stay:
+                case ESM4::PackageBehaviour::Talk:
                 {
                     // Something else (a script) moved it from where it stood, up or down as well: it goes back
                     if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance)
@@ -954,6 +988,7 @@ namespace OFMechanics
                                 mind.mFailures = 0;
                                 stopWalking(mind);
                                 finishTravel(frame, mind);
+                                finishDialogue(frame, mind);
                                 break;
                             case Walk::Failed:
                                 // It cannot get there; it tries again after a while

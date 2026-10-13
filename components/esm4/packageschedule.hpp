@@ -41,13 +41,15 @@ namespace ESM4
 
     // What the game does for a package. Most packages that the data has (Travel, Sandbox, Patrol, Sleep, Guard, Eat and
     // Wander are 4,000 of the 4,885 of New Vegas) place the character at or around a location; Follow and Accompany
-    // (184) keep it near another character; the others need what is not there yet (a target to attack, a conversation).
+    // (184) keep it near another character; Dialogue (15) takes it to its place, where it talks to its target; the
+    // others need what is not there yet (a target to attack).
     enum class PackageBehaviour
     {
         None, // the game has nothing to do for it, so the next package in the list is followed
         Stay, // the character goes to the location and stays there
         Roam, // the character moves about the location, standing still for a while at each place it goes to
         Follow, // the character keeps within the distance of the package of the target of the package
+        Talk, // the character goes to the location and talks to the target of the package there
     };
 
     PackageBehaviour packageBehaviour(int packageType);
