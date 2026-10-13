@@ -674,7 +674,8 @@ namespace OFMechanics
             // The player is in the way: wait where it is, for a while
             const float toPlayer = distanceAcross(place, frame.mPlayer);
             const bool wasPassing = mind.mYield.mPassing;
-            const bool nearPlayer = distanceAcross(position, frame.mPlayer) < yieldDistance;
+            const bool nearPlayer = std::abs(position.z() - frame.mPlayer.z()) < yieldHeight
+                && distanceAcross(position, frame.mPlayer) < yieldDistance;
             const bool inTheWay = std::abs(place.z() - frame.mPlayer.z()) < yieldHeight && toPlayer < yieldDistance
                 && toPlayer < distanceAcross(position, frame.mPlayer);
             if (falloutYields(mind.mYield, nearPlayer, inTheWay, duration, yieldPatience))
