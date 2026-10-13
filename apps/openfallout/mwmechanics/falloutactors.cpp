@@ -157,6 +157,8 @@ namespace OFMechanics
         /// The Dialogue packages that are on and that are left out because the one to talk to is not around, once told
         /// in the log
         mutable std::set<const ESM4::AIPackage*> mSkipTold;
+        /// How often the character went from one package to another, for the log: a pair that comes back is told
+        std::map<std::pair<const ESM4::AIPackage*, const ESM4::AIPackage*>, int> mSwitches;
         int mFailures = 0; // how many times in a row it has had no way to get to the place of the package
         osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
@@ -769,14 +771,27 @@ namespace OFMechanics
             Choice fresh; // the first that is on and not done
             Choice current; // the one that is followed, when it is done and still on
             Choice done; // the first of the others that are done and on
+            // Why the package that is followed is not the one to follow, for the log
+            std::string followedIs = "on";
             const auto consider = [&](const ESM4::AIPackage* package, bool scripted) {
-                if (package == nullptr || fresh.mPackage != nullptr)
+                if (package == nullptr)
                     return;
+                const bool followed = package == mind.mPackage;
+                if (fresh.mPackage != nullptr)
+                {
+                    if (followed)
+                        followedIs = "behind " + fresh.mPackage->mEditorId;
+                    return;
+                }
                 if (scripted)
                 {
                     // What a script gave it is on whatever the time and the conditions are
                     if (ESM4::packageBehaviour(package->mData.type) == ESM4::PackageBehaviour::None)
+                    {
+                        if (followed)
+                            followedIs = "of a kind that does nothing";
                         return;
+                    }
                 }
                 else
                 {
@@ -786,13 +801,23 @@ namespace OFMechanics
                         && frame.mScripts->packageConditionsHold(*package, mind.mPtr))
                         skip = ESM4::PackageSkip::None;
                     if (skip != ESM4::PackageSkip::None)
+                    {
+                        if (followed)
+                            followedIs = skip == ESM4::PackageSkip::Schedule ? "not for this time"
+                                : skip == ESM4::PackageSkip::Conditions      ? "not on, its conditions do not hold"
+                                                                             : "of a kind that does nothing";
                         return;
+                    }
                 }
                 Choice choice;
                 choice.mPackage = package;
                 if (!makeGoal(
                         frame, mind, *package, choice.mGoal, choice.mHasFacing, choice.mFacing, choice.mFollowing))
+                {
+                    if (followed)
+                        followedIs = "without a place or a target to go to";
                     return;
+                }
                 if (mind.mDone.count(package) == 0)
                     fresh = std::move(choice);
                 else if (package == mind.mPackage)
@@ -839,6 +864,19 @@ namespace OFMechanics
                     raise(frame, mind.mPtr, *chosen.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
                 }
                 return;
+            }
+
+            // A character that goes back and forth between the same two packages is told once, and again later
+            if (mind.mPackage != nullptr && chosen.mPackage != nullptr)
+            {
+                const int times = ++mind.mSwitches[{ mind.mPackage, chosen.mPackage }];
+                if (times == 2 || times == 20)
+                    Log(Debug::Info) << "Package of " << mind.mPtr.getCellRef().getRefId() << ": goes from "
+                                     << mind.mPackage->mEditorId << " to " << chosen.mPackage->mEditorId << " again ("
+                                     << times << " times; " << mind.mPackage->mEditorId << " is " << followedIs
+                                     << (mind.mDone.count(mind.mPackage) != 0 ? ", done" : ", not done") << "; "
+                                     << chosen.mPackage->mEditorId
+                                     << (mind.mDone.count(chosen.mPackage) != 0 ? " was done" : " is not done") << ")";
             }
 
             // The package it followed is changed, done or not, unless it was told so already, and the one it follows

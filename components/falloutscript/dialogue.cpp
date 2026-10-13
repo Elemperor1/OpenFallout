@@ -336,6 +336,8 @@ namespace FalloutScript
             DialogueLine& line = view.mLines.emplace_back();
             line.mText = response.mText;
             line.mInfo = id;
+            line.mSpeaker = speaker.mReference;
+            line.mSpeakerBase = speaker.mBase;
             line.mNumber = response.mNumber;
             line.mEmotion = response.mEmotionType;
             line.mEmotionValue = response.mEmotionValue;
@@ -492,8 +494,8 @@ namespace FalloutScript
             addTopic(toId(added));
     }
 
-    DialogueView DialogueManager::say(
-        const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps, bool deferEnd)
+    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps,
+        bool deferEnd, FormId listenerBase)
     {
         // The follow-ups are chosen by the conditions, which what the end script of a response did can change: with
         // them the end scripts run as the responses are said
@@ -508,43 +510,101 @@ namespace FalloutScript
             ~Restore() { mTarget = mValue; }
         } restore{ mListener, outerListener };
 
+        // Two characters that talk to each other take turns, each one is the listener of the other
+        const bool turns = followUps && listener != 0 && listenerBase != 0;
+        const DialogueSpeaker partner{ listener, listenerBase };
+        DialogueSpeaker talker = speaker;
+
         const ESM4::DialogInfo* info = responseFor(topic, speaker);
         if (info == nullptr)
             return DialogueView();
-        DialogueView view = speak(*info, speaker, topic);
+        FormId viewTopic = topic;
+        DialogueView view = speak(*info, talker, viewTopic);
         view.mSpeaking = false;
         DialogueView current = view; // the response that was said last
         std::set<FormId> chain;
         while (info != nullptr)
         {
             chain.insert(toId(info->mId));
-            markSaid(*info, speaker);
+            markSaid(*info, talker);
             if (!deferEnd || info->mResponses.empty())
             {
                 // As in finish(), the end script sees the response that was said
                 const DialogueView outer = mView;
                 mView = current;
-                runScript(info->mEndScript, speaker);
+                runScript(info->mEndScript, talker);
                 mView = outer;
                 for (const ESM::FormId added : info->mAddTopics)
                     addTopic(toId(added));
             }
 
-            // The first follow-up that can be said goes on, none is said twice, and a goodbye is the end
+            // The first follow-up that can be said goes on, none is said twice, and a goodbye is the end. The next
+            // speaker of a response is its target: the other one of two characters, and the same one when the other
+            // has nothing to say.
             const ESM4::DialogInfo* next = nullptr;
-            for (const ESM::FormId followUp : info->mFollowUps)
+            DialogueSpeaker nextTalker = talker;
+            FormId nextTopic = topic;
+            std::vector<DialogueSpeaker> candidates{ talker };
+            if (turns)
             {
-                const auto found = mInfoIndex.find(toId(followUp));
-                if (!followUps || hasFlag(*info, ESM4::INFO_Goodbye) || found == mInfoIndex.end()
-                    || chain.count(found->first) != 0 || !canSay(*found->second, speaker))
-                    continue;
-                next = found->second;
-                break;
+                const DialogueSpeaker& other = talker.mReference == speaker.mReference ? partner : speaker;
+                candidates.insert(
+                    candidates.begin() + (info->mNextSpeaker == ESM4::DialogInfo::Speaker_Self ? 1 : 0), other);
             }
+            // What the conditions on the target are about, for each of the two
+            const auto listeningTo = [&](const DialogueSpeaker& who) {
+                if (!turns)
+                    return listener;
+                return who.mReference == speaker.mReference ? partner.mReference : speaker.mReference;
+            };
+            if (followUps && !hasFlag(*info, ESM4::INFO_Goodbye))
+            {
+                for (const ESM::FormId followUp : info->mFollowUps)
+                {
+                    const auto found = mInfoIndex.find(toId(followUp));
+                    if (found == mInfoIndex.end() || chain.count(found->first) != 0)
+                        continue;
+                    for (const DialogueSpeaker& who : candidates)
+                    {
+                        mListener = listeningTo(who);
+                        if (!canSay(*found->second, who))
+                            continue;
+                        next = found->second;
+                        nextTalker = who;
+                        break;
+                    }
+                    if (next != nullptr)
+                        break;
+                }
+                // A response that is run immediately goes on with the topics it offers: the first that has a response
+                // for one of the two
+                if (next == nullptr && turns && hasFlag(*info, ESM4::INFO_RunImmediately))
+                {
+                    for (const ESM::FormId choice : info->mChoices)
+                    {
+                        for (const DialogueSpeaker& who : candidates)
+                        {
+                            mListener = listeningTo(who);
+                            const ESM4::DialogInfo* response = responseFor(toId(choice), who);
+                            if (response == nullptr || chain.count(toId(response->mId)) != 0)
+                                continue;
+                            next = response;
+                            nextTalker = who;
+                            nextTopic = toId(choice);
+                            break;
+                        }
+                        if (next != nullptr)
+                            break;
+                    }
+                }
+            }
+            mListener = turns ? listeningTo(nextTalker) : listener;
             info = next;
             if (info != nullptr)
             {
-                current = speak(*info, speaker, topic);
+                talker = nextTalker;
+                viewTopic = nextTopic;
+                current = speak(*info, talker, viewTopic);
                 current.mSpeaking = false;
                 view.mLines.insert(view.mLines.end(), current.mLines.begin(), current.mLines.end());
             }

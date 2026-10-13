@@ -360,6 +360,93 @@ namespace
         EXPECT_TRUE(setup.mDialogue.wasSaid(0x3004, speaker.mReference));
     }
 
+    // A scene of two characters: the responses are for one or the other, each is said once and is run immediately
+    // with the topic of the scene as its choice, as the scenes of the games are made
+    void addScene(Harness& setup, FormId first, FormId second)
+    {
+        setup.mRecords.addTopic(topicA, "A", "TopicA", false);
+        const std::pair<FormId, std::string> parts[]
+            = { { first, "first one" }, { second, "second one" }, { first, "first two" }, { second, "second two" } };
+        FormId info = 0x3001;
+        for (const auto& [who, text] : parts)
+        {
+            ESM4::DialogInfo& record = setup.mRecords.addInfo(info++, topicA, text);
+            record.mSpeaker = id(who);
+            record.mInfoFlags = ESM4::INFO_SayOnce | ESM4::INFO_RunImmediately;
+            record.mChoices = { id(topicA) };
+        }
+        setup.mRecords.mInfos.back().mInfoFlags = ESM4::INFO_SayOnce | ESM4::INFO_Goodbye;
+        setup.mRecords.mInfos.back().mChoices.clear();
+    }
+
+    std::vector<FormId> speakersOf(const FalloutScript::DialogueView& view)
+    {
+        std::vector<FormId> result;
+        for (const FalloutScript::DialogueLine& line : view.mLines)
+            result.push_back(line.mSpeaker);
+        return result;
+    }
+
+    TEST(FalloutScriptDialogueTest, twoCharactersTakeTurnsAndAResponseRunImmediatelyGoesOnWithItsChoices)
+    {
+        constexpr DialogueSpeaker other{ 0x00ff0005, 0x00003005 };
+        Harness setup;
+        addScene(setup, speaker.mBase, other.mBase);
+        setup.start();
+
+        const FalloutScript::DialogueView said
+            = setup.mDialogue.say(speaker, topicA, other.mReference, true, true, other.mBase);
+
+        EXPECT_THAT(setup.texts(said), ElementsAre("first one", "second one", "first two", "second two"));
+        EXPECT_THAT(
+            speakersOf(said), ElementsAre(speaker.mReference, other.mReference, speaker.mReference, other.mReference));
+        EXPECT_EQ(said.mLines.back().mSpeakerBase, other.mBase);
+        // what each said is kept for it
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3002, other.mReference));
+        EXPECT_FALSE(setup.mDialogue.wasSaid(0x3002, speaker.mReference));
+    }
+
+    TEST(FalloutScriptDialogueTest, withoutTheRecordOfTheListenerNoOneTakesTurnsAndARunImmediatelyResponseStops)
+    {
+        constexpr DialogueSpeaker other{ 0x00ff0005, 0x00003005 };
+        Harness setup;
+        addScene(setup, speaker.mBase, other.mBase);
+        setup.start();
+
+        // said to the player, or to a character whose record is not known, only the response asked for is said
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, 0, true, true)), ElementsAre("first one"));
+
+        Harness unknown;
+        addScene(unknown, speaker.mBase, other.mBase);
+        unknown.start();
+        EXPECT_THAT(unknown.texts(unknown.mDialogue.say(speaker, topicA, other.mReference, true, true)),
+            ElementsAre("first one"));
+    }
+
+    TEST(FalloutScriptDialogueTest, theNextSpeakerOfAResponseCanBeItsOwn)
+    {
+        constexpr DialogueSpeaker other{ 0x00ff0005, 0x00003005 };
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", false);
+        // two responses that anyone can say, the first one says that it is followed by itself and the other by its
+        // target
+        ESM4::DialogInfo& first = setup.mRecords.addInfo(0x3001, topicA, "first");
+        first.mNextSpeaker = ESM4::DialogInfo::Speaker_Self;
+        first.mFollowUps = { id(0x3002) };
+        ESM4::DialogInfo& second = setup.mRecords.addInfo(0x3002, topicA, "second");
+        second.mNextSpeaker = ESM4::DialogInfo::Speaker_Target;
+        second.mFollowUps = { id(0x3003) };
+        setup.mRecords.addInfo(0x3003, topicA, "third");
+        setup.start();
+
+        const FalloutScript::DialogueView said
+            = setup.mDialogue.say(speaker, topicA, other.mReference, true, true, other.mBase);
+
+        EXPECT_THAT(setup.texts(said), ElementsAre("first", "second", "third"));
+        EXPECT_THAT(speakersOf(said), ElementsAre(speaker.mReference, speaker.mReference, other.mReference));
+    }
+
     TEST(FalloutScriptDialogueTest, theEndScriptOfAResponseSaidWithADeferredEndRunsWhenTheHostFinishesIt)
     {
         Harness setup;

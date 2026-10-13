@@ -366,6 +366,9 @@ namespace OFScript
             /// The record of the speaker, kept with the line: a speaker that was made while the game runs and has left
             /// the loaded cells has no reference to tell it by when the response ends
             FalloutScript::FormId mSpeakerBase = 0;
+            /// The character that says the line when it is not the one the lines were given to (0 for that one): in an
+            /// exchange of two characters they take turns
+            FalloutScript::FormId mSpeaker = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };

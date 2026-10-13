@@ -1295,8 +1295,13 @@ namespace OFScript
         {
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
-            const FalloutScript::DialogueView view = mDialogue.say(
-                { reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps, !followUps);
+            // A character that is spoken to is a speaker as well, when the two talk to each other
+            ESM::FormId listenerBase;
+            const bool toCharacter = listener != 0 && listener != mPlayer;
+            if (toCharacter && !baseOf(listener, listenerBase))
+                listenerBase = ESM::FormId();
+            const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic,
+                toCharacter ? listener : 0, followUps, !followUps, toCharacter ? numberOf(listenerBase) : 0);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
             // says something to the player that nobody hears, or nothing, is otherwise silent
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1312,11 +1317,14 @@ namespace OFScript
             {
                 const FalloutScript::DialogueLine& line = view.mLines[i];
                 SaidLine& said = lines.emplace_back();
-                said.mVoice = voiceFile(reference, line);
+                // The other character of an exchange says its lines with its own voice
+                const FalloutScript::FormId lineSpeaker = line.mSpeaker != 0 ? line.mSpeaker : reference;
+                said.mSpeaker = lineSpeaker != reference ? lineSpeaker : 0;
+                said.mVoice = voiceFile(lineSpeaker, line);
                 said.mText = line.mText;
                 said.mSeconds = lineSeconds(line.mText);
                 said.mTopic = topic;
-                said.mSpeakerBase = numberOf(base);
+                said.mSpeakerBase = line.mSpeakerBase != 0 ? line.mSpeakerBase : numberOf(base);
                 said.mForceSubtitles = forceSubtitles;
                 // The response is over with its last line: its end script runs then, not when the speaker is told
                 // to say it (with follow-ups the end scripts have run, they decide which response comes next)
@@ -1487,24 +1495,31 @@ namespace OFScript
         // then the script of the speaker, which is told when it has said all that it was told to
         struct Over
         {
-            FalloutScript::FormId mSpeaker = 0;
+            FalloutScript::FormId mSpeaker = 0; // who said the line
             FalloutScript::FormId mTopic = 0;
             FalloutScript::FormId mEndInfo = 0;
             FalloutScript::FormId mBase = 0;
             bool mDone = false;
+            FalloutScript::FormId mTold = 0; // the character that was told to say it, whose script is told it is over
         };
         std::vector<Over> finished;
         for (auto saying = mSayings.begin(); saying != mSayings.end();)
         {
-            const OFWorld::Ptr speaker = findReference(saying->mReference);
+            // The line is said by the character that was told to say them, or by the other of an exchange
+            const auto sayerOf
+                = [&](const SaidLine& line) { return line.mSpeaker != 0 ? line.mSpeaker : saying->mReference; };
+            const OFWorld::Ptr speaker = saying->mNext < saying->mLines.size()
+                ? findReference(sayerOf(saying->mLines[saying->mNext]))
+                : OFWorld::Ptr();
             if (speaker.isEmpty() || saying->mNext >= saying->mLines.size())
             {
                 // A speaker who is not there any more does not say what is left, but what the responses do is done
-                if (speaker.isEmpty())
+                if (saying->mNext < saying->mLines.size())
                     for (std::size_t i = saying->mNext; i < saying->mLines.size(); ++i)
                         if (saying->mLines[i].mEndInfo != 0)
-                            finished.push_back({ saying->mReference, saying->mLines[i].mTopic,
-                                saying->mLines[i].mEndInfo, saying->mLines[i].mSpeakerBase, false });
+                            finished.push_back(
+                                { sayerOf(saying->mLines[i]), saying->mLines[i].mTopic, saying->mLines[i].mEndInfo,
+                                    saying->mLines[i].mSpeakerBase, false, saying->mReference });
                 saying = mSayings.erase(saying);
                 continue;
             }
@@ -1550,8 +1565,8 @@ namespace OFScript
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
                     if (line.mEndInfo != 0 || line.mEnd)
-                        finished.push_back(
-                            { saying->mReference, line.mTopic, line.mEndInfo, line.mSpeakerBase, line.mEnd });
+                        finished.push_back({ sayerOf(line), line.mTopic, line.mEndInfo, line.mSpeakerBase, line.mEnd,
+                            saying->mReference });
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
@@ -1569,7 +1584,7 @@ namespace OFScript
                 mDialogue.finishSaid({ over.mSpeaker, over.mBase }, over.mEndInfo, over.mTopic);
             }
             if (over.mDone)
-                mObjects.trigger(over.mSpeaker, FalloutScript::BlockType::SayToDone, 0,
+                mObjects.trigger(over.mTold, FalloutScript::BlockType::SayToDone, 0,
                     [topic = over.mTopic](
                         const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, topic); });
         }
@@ -1686,7 +1701,9 @@ namespace OFScript
     {
         const FalloutScript::FormId reference = referenceOf(speaker);
         return reference != 0 && std::any_of(mSayings.begin(), mSayings.end(), [reference](const Saying& saying) {
-            return saying.mReference == reference;
+            // The one who was told to say, or the one whose line is being said in an exchange of two characters
+            return saying.mReference == reference
+                || (saying.mNext < saying.mLines.size() && saying.mLines[saying.mNext].mSpeaker == reference);
         });
     }
 
