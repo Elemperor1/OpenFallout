@@ -137,6 +137,9 @@ namespace OFScript
         /// that scripts have no number for. False when the model has entries and none is free (nothing is done then),
         /// true otherwise.
         bool useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place);
+        /// What the default activation of a furniture does: a character, creature or the player that uses furniture
+        /// already gets up (whichever furniture it activates), another one uses it as `useFurniture` does with `place`
+        void activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
         /// The actor gets up from the furniture it uses (it is where it was: the games play an animation there)
         void leaveFurniture(const OFWorld::Ptr& actor);
         /// Where the actor would stand to use the furniture: the entry of its marker that the record enables, that no
@@ -617,6 +620,8 @@ namespace OFScript
             osg::Vec3f mPlace;
             /// The entry of the marker that it uses, -1 for none
             int mEntry = -1;
+            /// Where the furniture was when it was used: it is not used any more when it is moved from there
+            osg::Vec3f mFurniturePlace;
         };
         std::map<FalloutScript::FormId, FurnitureUse> mFurniture;
         mutable std::mutex mFurnitureMutex;

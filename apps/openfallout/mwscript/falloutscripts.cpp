@@ -1981,6 +1981,7 @@ namespace OFScript
             FurnitureUse& use = mFurniture[user];
             use.mFurniture = seat;
             use.mPlace = where;
+            use.mFurniturePlace = furniture.getRefData().getPosition().asVec3();
             // An entry is taken only by an actor that is put on it
             use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
         }
@@ -1988,6 +1989,17 @@ namespace OFScript
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
                          << (place ? " (put there)" : "");
         return true;
+    }
+
+    void FalloutScripts::activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture)
+    {
+        // The characters and creatures of Fallout are not actors of the engine, so isActor does not tell them
+        if (actor.isEmpty() || !(actor.getClass().isActor() || isCharacterOrCreature(actor)))
+            return;
+        if (usesFurniture(actor))
+            leaveFurniture(actor);
+        else
+            useFurniture(actor, furniture, true);
     }
 
     void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)
@@ -2039,8 +2051,11 @@ namespace OFScript
                     || (actor.getClass().isActor() && actor.getClass().getCreatureStats(actor).isDead()));
             // The furniture is gone when it is not there, is disabled or deleted
             const OFWorld::Ptr furniture = present ? findReference(use.mFurniture) : OFWorld::Ptr();
-            const bool furnitureThere
-                = !furniture.isEmpty() && furniture.getRefData().isEnabled() && !furniture.mRef->isDeleted();
+            // or has been moved to another place, since the actor was put where the furniture was
+            constexpr float furnitureMoved = 16.f;
+            const bool furnitureThere = !furniture.isEmpty() && furniture.getRefData().isEnabled()
+                && !furniture.mRef->isDeleted()
+                && (furniture.getRefData().getPosition().asVec3() - use.mFurniturePlace).length() <= furnitureMoved;
             if (present && !dead && furnitureThere
                 && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
                 continue;
