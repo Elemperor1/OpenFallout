@@ -922,6 +922,8 @@ namespace OFMechanics
                     mind.mWait = giveUpTime;
                     if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
                         failToGetThere(frame, mind);
+                    else
+                        ++mind.mFailures;
                     return false;
                 case Walk::Waiting:
                     mind.mPathWaiting += duration;
@@ -951,11 +953,31 @@ namespace OFMechanics
 
             if (!mind.mAtGoal)
             {
-                // Only a place that a reference names is gone to; otherwise the character is where it talks from
+                // Only a place that a reference names is gone to; otherwise the character is where it talks from. One
+                // that cannot get to the place talks from where it is, as a Travel package is done by putting the
+                // character there: a quest waits for it
                 if (package->mLocation.type != ESM4::Location_NearReference)
                     mind.mAtGoal = true;
                 else if (!goToPlace(frame, mind, duration))
+                {
+                    if (mind.mFailures < failuresBeforeJump)
+                        return;
+                    mind.mAtGoal = true;
+                    mind.mFailures = 0;
+                    mind.mWait = 0.f;
+                }
+            }
+
+            if (mind.mSpoke)
+            {
+                // It is done with the last line that it says
+                if (frame.mScripts != nullptr && frame.mScripts->isSaying(mind.mPtr))
                     return;
+                mind.mSpoke = false;
+                mind.mDone.insert(package);
+                raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
+                mind.mReview = 0.f;
+                return;
             }
 
             osg::Vec3f target;
@@ -967,7 +989,8 @@ namespace OFMechanics
             }
             const float distance = mind.mFollowing.mDistance;
             const float away = distanceByFloor(mind.position(), target);
-            if (!mind.mSpoke && falloutFollowMoves(away, distance, mind.mWalking))
+            // One that cannot get to its target says what it came to say from where it is
+            if (mind.mFailures < failuresBeforeJump && falloutFollowMoves(away, distance, mind.mWalking))
             {
                 // The one it talks to has gone on: the path is made again
                 if (!mind.mWalking || distanceAcross(target, mind.mDestination) > repathDistance)
@@ -979,12 +1002,15 @@ namespace OFMechanics
                 {
                     case Walk::Arrived:
                         stopWalking(mind);
+                        mind.mFailures = 0;
                         break;
                     case Walk::Failed:
                         stopWalking(mind);
-                        mind.mWait = giveUpTime;
+                        mind.mWait = pathRetryTime;
                         if (hasEvents(*package))
                             failToGetThere(frame, mind);
+                        else
+                            ++mind.mFailures;
                         break;
                     default:
                         break;
@@ -997,30 +1023,18 @@ namespace OFMechanics
             faceToward(
                 frame, mind, std::atan2(target.x() - mind.position().x(), target.y() - mind.position().y()), duration);
 
-            if (!mind.mSpoke)
+            OFWorld::Ptr listener;
+            if (!mind.mFollowing.mPlayer)
+                listener = OFBase::Environment::get().getWorldModel()->getPtr(mind.mFollowing.mRef);
+            if (frame.mScripts != nullptr && !frame.mScripts->speakPackage(mind.mPtr, *package, listener))
             {
-                OFWorld::Ptr listener;
-                if (!mind.mFollowing.mPlayer)
-                    listener = OFBase::Environment::get().getWorldModel()->getPtr(mind.mFollowing.mRef);
-                if (frame.mScripts != nullptr && !frame.mScripts->speakPackage(mind.mPtr, *package, listener))
-                {
-                    // The player is busy: it tries again in a moment
-                    mind.mWait = pathRetryTime;
-                    return;
-                }
-                mind.mSpoke = true;
-                Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
-                                 << ": it talks to " << (mind.mFollowing.mPlayer ? "the player" : "a character");
+                // The player is busy: it tries again in a moment
+                mind.mWait = pathRetryTime;
                 return;
             }
-
-            // It is done with the last line that it says
-            if (frame.mScripts != nullptr && frame.mScripts->isSaying(mind.mPtr))
-                return;
-            mind.mSpoke = false;
-            mind.mDone.insert(package);
-            raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
-            mind.mReview = 0.f;
+            mind.mSpoke = true;
+            Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                             << ": it talks to " << (mind.mFollowing.mPlayer ? "the player" : "a character");
         }
     }
 
