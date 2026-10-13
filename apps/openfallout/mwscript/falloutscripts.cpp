@@ -1313,6 +1313,7 @@ namespace OFScript
                 said.mText = line.mText;
                 said.mSeconds = lineSeconds(line.mText);
                 said.mTopic = topic;
+                said.mSpeakerBase = numberOf(base);
                 said.mForceSubtitles = forceSubtitles;
                 // The response is over with its last line: its end script runs then, not when the speaker is told
                 // to say it (with follow-ups the end scripts have run, they decide which response comes next)
@@ -1472,6 +1473,7 @@ namespace OFScript
             FalloutScript::FormId mSpeaker = 0;
             FalloutScript::FormId mTopic = 0;
             FalloutScript::FormId mEndInfo = 0;
+            FalloutScript::FormId mBase = 0;
             bool mDone = false;
         };
         std::vector<Over> finished;
@@ -1484,8 +1486,8 @@ namespace OFScript
                 if (speaker.isEmpty())
                     for (std::size_t i = saying->mNext; i < saying->mLines.size(); ++i)
                         if (saying->mLines[i].mEndInfo != 0)
-                            finished.push_back(
-                                { saying->mReference, saying->mLines[i].mTopic, saying->mLines[i].mEndInfo, false });
+                            finished.push_back({ saying->mReference, saying->mLines[i].mTopic,
+                                saying->mLines[i].mEndInfo, saying->mLines[i].mSpeakerBase, false });
                 saying = mSayings.erase(saying);
                 continue;
             }
@@ -1531,7 +1533,8 @@ namespace OFScript
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
                     if (line.mEndInfo != 0 || line.mEnd)
-                        finished.push_back({ saying->mReference, line.mTopic, line.mEndInfo, line.mEnd });
+                        finished.push_back(
+                            { saying->mReference, line.mTopic, line.mEndInfo, line.mSpeakerBase, line.mEnd });
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
@@ -1546,9 +1549,7 @@ namespace OFScript
             if (over.mEndInfo != 0)
             {
                 const std::lock_guard lock(mDialogueMutex);
-                ESM::FormId base;
-                if (baseOf(over.mSpeaker, base))
-                    mDialogue.finishSaid({ over.mSpeaker, numberOf(base) }, over.mEndInfo, over.mTopic);
+                mDialogue.finishSaid({ over.mSpeaker, over.mBase }, over.mEndInfo, over.mTopic);
             }
             if (over.mDone)
                 mObjects.trigger(over.mSpeaker, FalloutScript::BlockType::SayToDone, 0,

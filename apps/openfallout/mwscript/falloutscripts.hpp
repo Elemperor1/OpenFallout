@@ -323,6 +323,9 @@ namespace OFScript
             /// The response that this is the last line of: its end script runs, and the topics it adds are given, when
             /// the line is over (and before the script of the speaker is told that it has said what it was told to)
             FalloutScript::FormId mEndInfo = 0;
+            /// The record of the speaker, kept with the line: a speaker that was made while the game runs and has left
+            /// the loaded cells has no reference to tell it by when the response ends
+            FalloutScript::FormId mSpeakerBase = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };
