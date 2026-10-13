@@ -11,18 +11,23 @@ local QUESTS = { 'CG00', 'CG01', 'CG02', 'CG03', 'CG04', 'CGTutorial', 'MQ01', '
     'VMQ01' }
 local DONE = { MQ01 = 10, VMQ01 = 10, CG04 = 200, VCG01 = 200 }
 -- Real seconds after which the run ends whatever happens
-local LIMIT = 900
+local LIMIT = 2400
 
 local last, changed, tries = {}, {}, {}
 local elapsed = 0
 local started = core.getRealTime()
 local lastGate = 0
 
--- Does what the gate says: the player goes to the middle of the reference (a trigger volume), or activates it
+-- Does what the gate says: the player goes to the middle of the reference (a trigger volume), or activates it, or the quest
+-- is put at a stage (for what the engine cannot bring about yet: a fight)
 local function useGate(index, gate, real)
     tries[index] = (tries[index] or 0) + 1
     lastGate = real
     local ok, err = pcall(function()
+        if gate.how == 'setstage' then
+            if not world.quests.find(gate.quest):setStage(gate.to) then error('not set') end
+            return
+        end
         local object = world.getObjectByFormId(core.getFormId(gate.file, gate.ref))
         local player = world.players[1]
         if gate.how == 'activate' then
@@ -31,7 +36,8 @@ local function useGate(index, gate, real)
             player:teleport(object.cell, object.position)
         end
     end)
-    print('AUTOPLAY', 'gate', gate.how, gate.quest, string.format('stage=%d ref=%06X try=%d', gate.stage, gate.ref, tries[index]),
+    local target = gate.how == 'setstage' and string.format('to=%d', gate.to) or string.format('ref=%06X', gate.ref)
+    print('AUTOPLAY', 'gate', gate.how, gate.quest, string.format('stage=%d %s try=%d', gate.stage, target, tries[index]),
         ok and 'ok' or tostring(err))
 end
 

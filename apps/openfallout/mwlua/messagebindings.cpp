@@ -16,7 +16,8 @@ namespace OFLua
         sol::table api(lua, sol::create);
 
         // The box that is open: a table with its text, the buttons the player can pick from (in the order they are
-        // listed) and a number that is another for each box that opens. Nothing when no box is open.
+        // listed), the form of its message (as core.getFormId writes one) and a number that is another for each box that
+        // opens. Nothing when no box is open.
         api["current"] = [lua]() -> sol::object {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             if (scripts == nullptr)
@@ -26,6 +27,7 @@ namespace OFLua
                 return sol::nil;
             sol::table result(lua, sol::create);
             result["serial"] = open->mSerial;
+            result["form"] = open->mForm;
             result["text"] = open->mText;
             sol::table buttons(lua, sol::create);
             int index = 1;

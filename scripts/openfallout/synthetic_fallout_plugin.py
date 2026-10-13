@@ -385,7 +385,7 @@ AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 # its MenuMode block (the main menu counts as a menu), which sets stage 0 as long as the quest is before stage 5; the
 # result script of stage 0 takes the controls of the player, moves the player to a marker (which faces a way) and sets
 # stage 5. At stage 5 the script of the quest shows a message box with two buttons and sets stage 6; once the test has
-# picked the first button (from Lua, as a click would) it sets stage 10, which gives the controls back and opens the name
+# picked the last button (from Lua, as a click would) it sets stage 10, which gives the controls back and opens the name
 # screen.
 NEW_GAME_QUEST_NAME = "CG00"
 NEW_GAME_QUEST_ID = 0x8FA
@@ -939,8 +939,9 @@ def chargen_quest():
 def new_game_script():
     """The script of the quest that starts a new game (an SCPT record of type 1): `Begin MenuMode`, no number, with
     `if GetStage CG00 < 5` then `SetStage CG00 0`, as the script of CG00 starts the game of Fallout 3; and `Begin
-    GameMode`, which at stage 5 shows the message box and sets stage 6, and at stage 6 sets stage 10 once the first
-    button has been picked (as the script of CG00 shows its box for the sex of the player and reads the answer)."""
+    GameMode`, which at stage 5 shows the message box and sets stage 6, and at stage 6 sets stage 10 once the last
+    button has been picked (as the script of CG00 shows its box for the sex of the player and reads the answer; autoplay
+    presses the first button of a box unless its table names the message)."""
     sf = fallout_script
     script = sf.Script(1)
     quest = script.form(NEW_GAME_QUEST_ID)
@@ -951,7 +952,7 @@ def new_game_script():
 
     before_box = (sf.call_token(sf.GET_STAGE, sf.form_argument(quest)) + sf.number(str(NEW_GAME_BOX_STAGE))
                   + sf.operator("<"))
-    picked_first = sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("0") + sf.operator("==")
+    picked_last = sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("==")
     script.add(
         sf.statement(sf.SCRIPT_NAME),
         sf.block(sf.MENU_MODE_BLOCK, b"".join([
@@ -964,7 +965,7 @@ def new_game_script():
             sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_WAIT_STAGE)),
             sf.statement(sf.END_IF),
             sf.branch(sf.IF, stage_is(NEW_GAME_WAIT_STAGE)),
-            sf.branch(sf.IF, picked_first),
+            sf.branch(sf.IF, picked_last),
             sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_LAST_STAGE)),
             sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
@@ -973,7 +974,7 @@ def new_game_script():
 
 def new_game_message():
     """The MESG record of the box that the quest of the new game shows: two buttons, no condition."""
-    subs = [zstr(b"EDID", "OFTestNewGameMessage"), zstr(b"DESC", "Pick the first button."),
+    subs = [zstr(b"EDID", "OFTestNewGameMessage"), zstr(b"DESC", "Pick the last button."),
             sub(b"DNAM", struct.pack("<I", 1)), sub(b"TNAM", struct.pack("<I", 0))]
     subs += [zstr(b"ITXT", text) for text in NEW_GAME_BUTTONS]
     return record(b"MESG", NEW_GAME_MESSAGE_ID, subs)

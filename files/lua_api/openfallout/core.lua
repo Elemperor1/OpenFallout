@@ -1351,6 +1351,7 @@
 ---
 -- @type MessageBoxState
 -- @field #number serial Another number for each box that opens.
+-- @field #string form The message record the box shows, written as `core.getFormId` writes a form.
 -- @field #string text
 -- @field #list<#string> buttons
 

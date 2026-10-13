@@ -7,10 +7,11 @@
 local core = require('openfallout.core')
 local self = require('openfallout.self')
 local I = require('openfallout.interfaces')
+local config = require('scripts.autoplaygates')
 
 -- How long (real seconds) a box, a screen or a conversation is left alone before it is answered
 local DELAY = 0.7
--- The button of a message box that is picked (counted from 1)
+-- The button of a message box that is picked (counted from 1), unless the table of gates names the message
 local BUTTON = 1
 -- The name the character is given
 local NAME = 'Autoplay'
@@ -28,6 +29,19 @@ local lastStatus = 0
 
 local function log(...) print('AUTOPLAY', ...) end
 
+-- The button to press: the one that autoplaygates.lua names for the message of the box (a negative number counts from the
+-- last button: -1 is the last), else the first
+local function buttonFor(box)
+    for _, entry in ipairs(config.boxes or {}) do
+        local ok, form = pcall(core.getFormId, entry.file, entry.ref)
+        if ok and form == box.form then
+            local button = entry.button < 0 and #box.buttons + 1 + entry.button or entry.button
+            return math.max(1, math.min(button, #box.buttons))
+        end
+    end
+    return math.min(BUTTON, #box.buttons)
+end
+
 local function answerBox(dt)
     local box = core.messageBox.current()
     if not box then
@@ -42,7 +56,7 @@ local function answerBox(dt)
     end
     boxWaited = boxWaited + dt
     if boxWaited >= DELAY and boxSerial ~= nil then
-        local button = math.min(BUTTON, #box.buttons)
+        local button = buttonFor(box)
         log('box press', button, tostring(core.messageBox.press(button)))
         boxAnswered, boxSerial = box.serial, nil
     end

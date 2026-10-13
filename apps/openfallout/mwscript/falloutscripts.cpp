@@ -832,6 +832,7 @@ namespace OFScript
 
         MessageBox box;
         box.mOwner = owner;
+        box.mForm = refId(message).serializeText();
         for (std::size_t i = 0; i < record->mButtons.size(); ++i)
         {
             const ESM4::Message::Button& button = record->mButtons[i];
@@ -908,7 +909,7 @@ namespace OFScript
         mOpenOwner = box.mOwner;
         {
             const std::lock_guard lock(mOpenMessageMutex);
-            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons };
+            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons, box.mForm };
         }
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);

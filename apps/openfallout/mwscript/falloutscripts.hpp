@@ -230,6 +230,8 @@ namespace OFScript
             std::uint32_t mSerial = 0;
             std::string mText;
             std::vector<std::string> mButtons;
+            /// The message record, as core.getFormId writes a form
+            std::string mForm;
         };
         /// The box that is open, if any (any thread)
         std::optional<OpenMessage> openMessage() const;
@@ -527,6 +529,7 @@ namespace OFScript
             std::vector<std::string> mButtons;
             std::vector<std::string> mPlainButtons;
             std::vector<int> mNumbers;
+            std::string mForm;
             /// The one who showed it, who gets the button that is picked
             FalloutScript::FormId mOwner = 0;
         };

@@ -1006,6 +1006,9 @@ NEW_GAME_GATES = f"""\
 return {{
     settle = 1,
     tries = 1,
+    boxes = {{
+        {{ file = 'OFTest.esm', ref = {plugin.NEW_GAME_MESSAGE_ID}, button = -1 }},
+    }},
     gates = {{
         {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.TRIGGER_REF_ID}, how = 'walk' }},
         {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.SCRIPTED_REF_IDS["interior"]}, how = 'activate' }},
@@ -2071,10 +2074,11 @@ def check_new_game(text):
     controls = [match.group(1).strip() for match in found if match]
     if controls != ["playercontrols=true playerfighting=true playerlooking=true playerviewswitch=true"]:
         problems.append(f"EnablePlayerControls should have given all the controls back: {controls}")
-    automatic = re.findall(r"AUTOPLAY\t(box press\t1\ttrue|chargen finish\tname\tname=" + plugin.NEW_GAME_NAME + r")",
+    automatic = re.findall(r"AUTOPLAY\t(box press\t2\ttrue|chargen finish\tname\tname=" + plugin.NEW_GAME_NAME + r")",
                            text)
     if len(automatic) != 2:
-        problems.append(f"autoplay.lua should have pressed the first button of the box and finished the screen of the name "
+        problems.append(f"autoplay.lua should have pressed the last button of the box (the table of gates names the message) and "
+                        f"finished the screen of the name "
                         f"with the name {plugin.NEW_GAME_NAME}: {automatic}")
     for stage in (plugin.NEW_GAME_WAIT_STAGE, plugin.NEW_GAME_LAST_STAGE):
         if f"AUTOPLAY\tquest\t{plugin.NEW_GAME_QUEST_NAME}\tstage={stage} running=true" not in text:
