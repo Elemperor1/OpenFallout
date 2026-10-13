@@ -729,9 +729,20 @@ return {
                     go(7)
                 end
             elseif step == 7 and since >= 0.5 then
+                -- A second conversation that the script ends without the window: the window goes with it, and the game
+                -- is not left paused
+                core.sendGlobalEvent('OFTestTalk', {})
+                go(8)
+            elseif step == 8 and view.active then
+                conversation.close()
+                go(9)
+            elseif step == 9 and since >= 1 then
+                log('dropped', describe(conversation.get()))
+                go(10)
+            elseif step == 10 then
                 core.quit()
             end
-            if step ~= 0 and step < 6 and since >= @TIMEOUT@ then
+            if step ~= 0 and (step < 6 or step == 8) and since >= @TIMEOUT@ then
                 log('timeout at step', tostring(step), describe(view))
                 core.quit()
             end
@@ -1764,8 +1775,9 @@ def check_dialogue(text):
         return line is not None and all(part in line for part in parts)
 
     voiced = re.findall(r"Voice: (\S+)", text)
-    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH,
-              plugin.FOLDER_SOUND_PATH]
+    greeting_voice = plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID)
+    # the second conversation, which the script ends, says the greeting again
+    wanted = [greeting_voice, plugin.SOUND_PATH, plugin.FOLDER_SOUND_PATH, greeting_voice]
     if voiced != wanted:
         problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
                         "talker, a line whose only file is another voice's (the ask line) and the lines with none "
@@ -1800,6 +1812,10 @@ def check_dialogue(text):
     closed = one("closed")
     if not has(closed, "active=false", "mode=nil"):
         problems.append(f"the window should be gone when the conversation is over: {closed}")
+    dropped = one("dropped")
+    if not has(dropped, "active=false", "mode=nil"):
+        problems.append("a conversation that a script ends with core.conversation.close should take the window with it, "
+                        f"and not leave the game paused: {dropped}")
     # The message box with buttons that the response ending the conversation shows: the third button is picked (the
     # second has a condition the player does not meet), the host reports the number it has in the record, and the script of
     # the talker reads it once (the number plus one)
