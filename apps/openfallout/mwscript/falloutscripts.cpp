@@ -13,6 +13,7 @@
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadavif.hpp>
+#include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadflst.hpp>
@@ -201,17 +202,7 @@ namespace OFScript
                 });
             }
             else
-            {
-                // With no topic the exchange starts with the greeting, as it does with the player
-                FalloutScript::FormId first = topic;
-                if (first == 0)
-                {
-                    const std::lock_guard lock(mDialogueMutex);
-                    first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
-                }
-                if (first != 0)
-                    sayTopic(speaker, first, target, false, true);
-            }
+                converse(speaker, target, topic);
             return 0.0;
         });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
@@ -1340,6 +1331,20 @@ namespace OFScript
         return true;
     }
 
+    void FalloutScripts::converse(
+        FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic)
+    {
+        // With no topic the exchange starts with the greeting, as it does with the player
+        FalloutScript::FormId first = topic;
+        if (first == 0)
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
+        }
+        if (first != 0)
+            sayTopic(speaker, first, target, false, true);
+    }
+
     float FalloutScripts::lineSeconds(const std::string& text)
     {
         // How long a line takes to read: the time that a response stays when there is no voice to wait for
@@ -1628,6 +1633,47 @@ namespace OFScript
             return false;
         OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, speaker);
         return true;
+    }
+
+    bool FalloutScripts::speakPackage(
+        const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener)
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        if (reference == 0 || speaker.isEmpty())
+            return true;
+        const FalloutScript::FormId topic = package.mDialogue.mTopic;
+        const bool toPlayer = listener.isEmpty();
+        const FalloutScript::FormId target = toPlayer ? mPlayer : referenceOf(listener);
+        if (package.mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo)
+        {
+            // One response of the topic, said to the target, and that is all
+            if (!sayTopic(reference, topic, toPlayer ? 0 : target, false, false))
+                Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
+                                 << ": there is nothing it can say";
+            return true;
+        }
+        if (!toPlayer)
+        {
+            converse(reference, target, topic);
+            return true;
+        }
+        // A conversation with the player is the interface: it waits for the player to be done with the one that is
+        // open, a message or a menu
+        OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+        if (windows != nullptr && windows->isGuiMode())
+            return false;
+        if (!talkTo(speaker, topic))
+            Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
+                             << ": it has nothing to say to the player";
+        return true;
+    }
+
+    bool FalloutScripts::isSaying(const OFWorld::Ptr& speaker) const
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        return reference != 0 && std::any_of(mSayings.begin(), mSayings.end(), [reference](const Saying& saying) {
+            return saying.mReference == reference;
+        });
     }
 
     FalloutScripts::Conversation FalloutScripts::conversation() const
@@ -1984,6 +2030,7 @@ namespace OFScript
             use.mFurniturePlace = furniture.getRefData().getPosition().asVec3();
             // An entry is taken only by an actor that is put on it
             use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
+            use.mKind = entry ? entry->mRef : 10;
         }
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
@@ -2029,6 +2076,13 @@ namespace OFScript
         const std::lock_guard lock(mFurnitureMutex);
         const auto found = mFurniture.find(actor);
         return found != mFurniture.end() ? found->second.mFurniture : 0;
+    }
+
+    int FalloutScripts::currentFurnitureKind(FalloutScript::FormId actor)
+    {
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(actor);
+        return found != mFurniture.end() ? found->second.mKind : 0;
     }
 
     void FalloutScripts::updateFurniture()
@@ -2192,6 +2246,22 @@ namespace OFScript
             return 0;
         const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
         return id != nullptr ? numberOf(*id) : 0;
+    }
+
+    bool FalloutScripts::inCell(FalloutScript::FormId reference, FalloutScript::FormId cell)
+    {
+        const FalloutScript::FormId here = cellOf(reference);
+        if (here == 0 || cell == 0)
+            return false;
+        if (here == cell)
+            return true;
+        // The games compare the names of the cells with the name of the asked one as the beginning (the intro of
+        // Fallout 3 asks for "Vault101" in the cells of the vault): the editor ids are what the data gives as names
+        const auto& cells = mStore.get<ESM4::Cell>();
+        const ESM4::Cell* wanted = cells.search(refId(cell));
+        const ESM4::Cell* actual = cells.search(refId(here));
+        return wanted != nullptr && actual != nullptr
+            && FalloutScript::cellNameBegins(actual->mEditorId, wanted->mEditorId);
     }
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)

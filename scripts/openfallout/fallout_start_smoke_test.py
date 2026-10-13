@@ -2552,7 +2552,7 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     problems = []
     if "OFTEST\tgate opened\ttrue" not in text:
         problems.append("the stage of quest C that opens the gate was not set from Lua")
-    problems += check_package_events(text)
+    problems += check_package_events(text, scenario, animated)
 
     def marker(name):
         x, y = plugin.GATE_PLACES[name]
@@ -2595,21 +2595,29 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     return problems
 
 
-def check_package_events(text):
+def check_package_events(text, scenario, animated):
     """The problems with what the packages tell scripts. The Travel package of the walker is begun once and done once
     (the walker walks there, or is put there when it cannot walk), never changed; the package of the conditional character that holds until the gate
     opens is begun once and changed when the gate opens (never done); the blocks of the script of the walker that name the
     Travel package, and the one that names none, run for its events, and the one that names the package for the night,
-    which is not on, does not."""
+    which is not on, does not. The speaker of the interior has a Dialogue package: it walks to the player, says its line and
+    its package is done when the line is over (it does not walk without the animation, and the exterior has none)."""
     names = list(plugin.PACKAGE_EVENT_GLOBALS)
     match = re.search(r"OFTEST\tpackage events\t" + r"\t".join([r"(-?\d+)"] * len(names)), text)
     if not match:
         return ["the script did not log what the events of the packages counted"]
     got = dict(zip(names, map(int, match.groups())))
     expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 0, "early_begin": 1, "early_end": 0,
-                "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1}
-    return [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
-            f"{want}" for name, want in expected.items() if got[name] != want]
+                "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1,
+                "speaker_done": 1 if not scenario.exterior and animated else 0}
+    problems = [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
+                f"{want}" for name, want in expected.items() if got[name] != want]
+    if not scenario.exterior and animated:
+        if not re.search(r"Package OFTestSpeak of .*: it talks to the player", text):
+            problems.append("the speaker, whose Dialogue package sends it to the player, did not talk to the player")
+        if not re.search(r"Say: .* is to say topic OFTestSpeakTopic .*: 1 line\(s\)", text):
+            problems.append("the topic of the Dialogue package of the speaker was not said")
+    return problems
 
 
 def check_creatures(text, scenario, found, animated):

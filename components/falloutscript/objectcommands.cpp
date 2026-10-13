@@ -1,5 +1,6 @@
 #include "objectcommands.hpp"
 
+#include <cctype>
 #include <cmath>
 #include <limits>
 
@@ -12,6 +13,20 @@ namespace FalloutScript
         /// What GetDistance tells for two objects that can not be measured, so that a script that asks whether
         /// something is near does not find it near
         constexpr double unmeasurable = std::numeric_limits<float>::max();
+    }
+
+    bool cellNameBegins(std::string_view name, std::string_view prefix)
+    {
+        if (prefix.empty() || name.size() < prefix.size())
+            return false;
+        for (std::size_t i = 0; i < prefix.size(); ++i)
+        {
+            const unsigned char a = static_cast<unsigned char>(name[i]);
+            const unsigned char b = static_cast<unsigned char>(prefix[i]);
+            if (std::tolower(a) != std::tolower(b))
+                return false;
+        }
+        return true;
     }
 
     void addObjectCommands(
@@ -55,7 +70,7 @@ namespace FalloutScript
         });
         interpreter.setHandler("GetInCell", [&world](CallContext& call) {
             const FormId cell = formArgument(call, 0);
-            return call.mReference != 0 && cell != 0 && world.cellOf(call.mReference) == cell ? 1.0 : 0.0;
+            return call.mReference != 0 && cell != 0 && world.inCell(call.mReference, cell) ? 1.0 : 0.0;
         });
         interpreter.setHandler("GetInSameCell", [&world](CallContext& call) {
             const FormId other = formArgument(call, 0);
@@ -117,6 +132,17 @@ namespace FalloutScript
             const FormId furniture = call.mReference != 0 ? world.currentFurniture(call.mReference) : 0;
             FormId base = 0;
             return wanted != 0 && furniture != 0 && world.baseFormOf(furniture, base) && base == wanted ? 1.0 : 0.0;
+        });
+        // The games count a character that is getting into the furniture, in it, and getting out of it (1, 2, 3, 4 for
+        // sitting, 2 while it sits down, 3 once it has, 4 while it gets up); there is no animation here, so the
+        // character is settled (3) all the time it uses a piece of furniture
+        interpreter.setHandler("GetSitting", [&world](CallContext& call) {
+            const int kind = call.mReference != 0 ? world.currentFurnitureKind(call.mReference) : 0;
+            return kind >= 10 && kind <= 20 ? 3.0 : 0.0;
+        });
+        interpreter.setHandler("GetSleeping", [&world](CallContext& call) {
+            const int kind = call.mReference != 0 ? world.currentFurnitureKind(call.mReference) : 0;
+            return kind >= 1 && kind <= 9 ? 3.0 : 0.0;
         });
         interpreter.setHandler("GetGlobalValue", [](CallContext& call) {
             double value = 0;

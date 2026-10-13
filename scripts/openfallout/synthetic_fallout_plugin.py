@@ -413,7 +413,8 @@ PACKAGE_EVENT_GLOBALS = {"travel_begin": (0x905, "OFTestTravelBegin"), "travel_e
                          "travel_change": (0x907, "OFTestTravelChange"), "early_begin": (0x908, "OFTestEarlyBegin"),
                          "early_end": (0x909, "OFTestEarlyEnd"), "early_change": (0x90A, "OFTestEarlyChange"),
                          "block_start": (0x90B, "OFTestBlockStart"), "block_done": (0x90C, "OFTestBlockDone"),
-                         "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny")}
+                         "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny"),
+                         "speaker_done": (0x925, "OFTestSpeakerDone")}
 WATCH_SCRIPT_IDS = {"interior": 0x90F, "exterior": 0x910}
 EARLY_PACKAGE_IDS = {"interior": 0x911, "exterior": 0x912}
 # The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
@@ -444,6 +445,17 @@ SITTER_MARKER_REF_ID = 0x91D
 SITTER_REF_ID = 0x91E
 SITTER_GLOBAL = (0x91F, "OFTestSitterInChair")
 SITTER_PLACES = {"sitter": (-300.0, -1200.0), "chair": (-300.0, -1400.0), "marker": (-300.0, -1000.0)}
+# A speaker: a character with a Dialogue package of the kind Say To, which sends it to the player (it stops within
+# SPEAKER_DISTANCE of the player) to say a topic with one response, once. The package is done when the line is over, and its
+# script counts that.
+SPEAKER_ID = 0x920
+SPEAKER_PACKAGE_ID = 0x921
+SPEAKER_REF_ID = 0x922
+SPEAK_TOPIC_ID = 0x923
+SPEAK_INFO_ID = 0x924
+SPEAK_TEXT = "Over here."
+SPEAKER_PLACE = (700.0, -600.0)
+SPEAKER_DISTANCE = 150
 TRIGGER_SCRIPT_ID = 0x902
 TRIGGER_BASE_ID = 0x903
 TRIGGER_REF_ID = 0x904
@@ -532,6 +544,8 @@ NIGHT_HOURS = 4
 PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
 PACKAGE_GUARD = 14
+PACKAGE_DIALOGUE = 15
+DIALOGUE_SAY_TO = 1
 LOCATION_NEAR_REFERENCE = 0
 LOCATION_NEAR_CURRENT = 2
 LOCATION_NEAR_EDITOR = 3
@@ -1322,6 +1336,17 @@ def sitter_references():
             refr(SITTER_MARKER_REF_ID, TARGET_MARKER_ID, at("marker"))]
 
 
+def speaker_packages():
+    return [package(SPEAKER_PACKAGE_ID, "OFTestSpeak", PACKAGE_DIALOGUE, target=(0, PLAYER_REFERENCE),
+                    distance=SPEAKER_DISTANCE, dialogue=(SPEAK_TOPIC_ID, DIALOGUE_SAY_TO),
+                    events=((b"POEA", "speaker_done"),))]
+
+
+def speaker_references():
+    """The speaker, in the interior cell."""
+    return [achr(SPEAKER_REF_ID, (*SPEAKER_PLACE, 0.0), SPEAKER_ID)]
+
+
 def furniture_base():
     """A piece of furniture: a name, the model with the marker of a chair and the flags that enable its one entry."""
     return record(b"FURN", FURNITURE_ID, [zstr(b"EDID", "OFTestChair"), zstr(b"FULL", "OpenFallout Test Chair"),
@@ -1582,6 +1607,8 @@ def dialogue():
                      say=SAID_TOPIC_ID)]),
         topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
         topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT, end=DIALOGUE_GLOBALS["said_end"][0])]),
+        topic(SPEAK_TOPIC_ID, "OFTestSpeakTopic", "", 0, 0),
+        topic_group(SPEAK_TOPIC_ID, [response(SPEAK_INFO_ID, SPEAK_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
                                               sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),
@@ -1605,7 +1632,7 @@ def package_event(marker, global_name):
 
 
 def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0,
-            conditions=(), events=()):
+            conditions=(), events=(), dialogue=None):
     """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
     location as a type, a form ID or 0 and a radius, the schedule (any month, any day, no date, the hour or 0xff for
     any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout),
@@ -1617,6 +1644,9 @@ def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0,
     subs.append(sub(b"PSDT", struct.pack("<BBBBI", 0xff, 0xff, 0, time, duration)))
     if target is not None:
         subs.append(sub(b"PTDT", struct.pack("<iIif", *target, distance, 0.0)))
+    if dialogue is not None:
+        # PKDD of Fallout: the field of view, the topic, the flags, 4 bytes and the type (0: a conversation, 1: Say To)
+        subs.append(sub(b"PKDD", struct.pack("<fIIIi", 0.0, dialogue[0], 0, 0, dialogue[1])))
     subs += conditions
     for marker, global_name in events:
         subs += package_event(marker, global_name)
@@ -1885,6 +1915,7 @@ def plugin():
         trigger_reference(),
         furniture_reference(),
         *sitter_references(),
+        *speaker_references(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -1927,10 +1958,11 @@ def plugin():
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", [*packages(), *sitter_packages()])
+            + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages()])
             + top_group(b"NPC_", [person(), *package_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
+                                  person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
                                          script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])

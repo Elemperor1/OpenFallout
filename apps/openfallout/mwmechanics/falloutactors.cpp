@@ -150,6 +150,7 @@ namespace OFMechanics
         bool mWalking = false; // it goes to mDestination
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
+        bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
         int mFailures = 0; // how many times in a row it has had no way to get to the place of the package
         osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
@@ -533,6 +534,21 @@ namespace OFMechanics
                 return followPosition(frame, mind.mPtr, following, position);
             }
 
+            if (goal.mBehaviour == ESM4::PackageBehaviour::Talk)
+            {
+                // Only a reference can be talked to; it has to be around, or the package is not on
+                if (package.mTarget.type != 0)
+                    return false;
+                const ESM::RefNum target = ESM::FormId::fromUint32(package.mTarget.target);
+                following.mPlayer
+                    = falloutIsPlayerReference(target, falloutFirstPlugin(frame.mWorld.getContentFiles()));
+                following.mRef = target;
+                following.mDistance = falloutTalkDistance(package.mTarget.distance);
+                osg::Vec3f position;
+                if (!followPosition(frame, mind.mPtr, following, position))
+                    return false;
+            }
+
             // Where it was put by the file, which is where most packages are about
             goal.mCenter = mind.mPtr.getCellRef().getPosition().asVec3();
             switch (package.mLocation.type)
@@ -820,6 +836,7 @@ namespace OFMechanics
             mind.mHasFacing = chosen.mPackage != nullptr && chosen.mHasFacing;
             mind.mFacing = chosen.mFacing;
             mind.mAtGoal = false;
+            mind.mSpoke = false;
             mind.mFailures = 0;
             mind.mWait = 0.f;
             mind.mPathRetry = 0.f;
@@ -860,37 +877,6 @@ namespace OFMechanics
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;
         }
-
-        /// A character has got to the place of its Dialogue package: it talks to the player, once, and the package is
-        /// done. Whom else a character talks to is not made yet, and nothing is done for such a package.
-        void finishDialogue(const Frame& frame, FalloutActors::Mind& mind)
-        {
-            const ESM4::AIPackage* package = mind.mPackage;
-            if (package == nullptr || package->mData.type != ESM4::Package_Dialogue || mind.mDone.count(package) != 0
-                || frame.mScripts == nullptr)
-                return;
-            const ESM::RefNum target = ESM::FormId::fromUint32(package->mTarget.target);
-            if (package->mTarget.type != 0
-                || !falloutIsPlayerReference(target, falloutFirstPlugin(frame.mWorld.getContentFiles())))
-            {
-                Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
-                                 << ": it talks to a character other than the player, which is not made yet";
-                return;
-            }
-            if (!sharesSpace(mind.mPtr, frame.mWorld.getPlayerPtr()) || !frame.mScripts->talkTo(mind.mPtr))
-            {
-                // The player is elsewhere, or is in another conversation, or it has nothing to say: it tries again
-                // later
-                mind.mAtGoal = false;
-                mind.mWait = giveUpTime;
-                return;
-            }
-            Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
-                             << ": it talks to the player";
-            mind.mDone.insert(package);
-            raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
-            mind.mReview = 0.f;
-        }
     }
 
     namespace
@@ -917,6 +903,124 @@ namespace OFMechanics
             mind.mRestPlace = mind.position();
             mind.mWait = 0.f;
             finishTravel(frame, mind);
+        }
+
+        /// One frame of going to the place of the package; true when the character has got there
+        bool goToPlace(const Frame& frame, FalloutActors::Mind& mind, float duration)
+        {
+            switch (walkTo(frame, mind, mind.mGoal.mCenter, duration, mind.mGoal.mRadius))
+            {
+                case Walk::Arrived:
+                    mind.mAtGoal = true;
+                    mind.mRestPlace = mind.position();
+                    mind.mFailures = 0;
+                    stopWalking(mind);
+                    return true;
+                case Walk::Failed:
+                    // It cannot get there; it tries again after a while
+                    stopWalking(mind);
+                    mind.mWait = giveUpTime;
+                    if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
+                        failToGetThere(frame, mind);
+                    return false;
+                case Walk::Waiting:
+                    mind.mPathWaiting += duration;
+                    if (mind.mPathWaiting >= pathWaitingReport && !mind.mPathWaitingReported && mind.mPackage != nullptr
+                        && hasEvents(*mind.mPackage))
+                    {
+                        mind.mPathWaitingReported = true;
+                        Log(Debug::Info) << "Package " << mind.mPackage->mEditorId << " of "
+                                         << mind.mPtr.getCellRef().getRefId() << ": no path for " << pathWaitingReport
+                                         << " s (the navigator has no mesh here yet)";
+                    }
+                    return false;
+                default:
+                    mind.mPathWaiting = 0.f;
+                    return false;
+            }
+        }
+
+        /// One frame of a Dialogue package. The character goes to the place of the package when it names one, then to
+        /// its target, as near as the package says, and talks: a Say To package says a response of its topic, a
+        /// Conversation package begins the conversation. The package is done when it has said what it came to say.
+        void talk(const Frame& frame, FalloutActors::Mind& mind, float duration)
+        {
+            const ESM4::AIPackage* package = mind.mPackage;
+            if (package == nullptr || mind.mDone.count(package) != 0 || mind.mWait > 0.f)
+                return;
+
+            if (!mind.mAtGoal)
+            {
+                // Only a place that a reference names is gone to; otherwise the character is where it talks from
+                if (package->mLocation.type != ESM4::Location_NearReference)
+                    mind.mAtGoal = true;
+                else if (!goToPlace(frame, mind, duration))
+                    return;
+            }
+
+            osg::Vec3f target;
+            if (!followPosition(frame, mind.mPtr, mind.mFollowing, target))
+            {
+                // The one it talks to is not around: it waits where it is
+                stopWalking(mind);
+                return;
+            }
+            const float distance = mind.mFollowing.mDistance;
+            const float away = distanceByFloor(mind.position(), target);
+            if (!mind.mSpoke && falloutFollowMoves(away, distance, mind.mWalking))
+            {
+                // The one it talks to has gone on: the path is made again
+                if (!mind.mWalking || distanceAcross(target, mind.mDestination) > repathDistance)
+                {
+                    mind.mDestination = target;
+                    mind.mWaypoints.clear();
+                }
+                switch (walkTo(frame, mind, mind.mDestination, duration, distance, falloutFollowRuns(away, distance)))
+                {
+                    case Walk::Arrived:
+                        stopWalking(mind);
+                        break;
+                    case Walk::Failed:
+                        stopWalking(mind);
+                        mind.mWait = giveUpTime;
+                        if (hasEvents(*package))
+                            failToGetThere(frame, mind);
+                        break;
+                    default:
+                        break;
+                }
+                return;
+            }
+
+            if (mind.mWalking)
+                stopWalking(mind);
+            faceToward(
+                frame, mind, std::atan2(target.x() - mind.position().x(), target.y() - mind.position().y()), duration);
+
+            if (!mind.mSpoke)
+            {
+                OFWorld::Ptr listener;
+                if (!mind.mFollowing.mPlayer)
+                    listener = OFBase::Environment::get().getWorldModel()->getPtr(mind.mFollowing.mRef);
+                if (frame.mScripts != nullptr && !frame.mScripts->speakPackage(mind.mPtr, *package, listener))
+                {
+                    // The player is busy: it tries again in a moment
+                    mind.mWait = pathRetryTime;
+                    return;
+                }
+                mind.mSpoke = true;
+                Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                                 << ": it talks to " << (mind.mFollowing.mPlayer ? "the player" : "a character");
+                return;
+            }
+
+            // It is done with the last line that it says
+            if (frame.mScripts != nullptr && frame.mScripts->isSaying(mind.mPtr))
+                return;
+            mind.mSpoke = false;
+            mind.mDone.insert(package);
+            raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
+            mind.mReview = 0.f;
         }
     }
 
@@ -973,50 +1077,19 @@ namespace OFMechanics
                 case ESM4::PackageBehaviour::None:
                     break;
                 case ESM4::PackageBehaviour::Stay:
-                case ESM4::PackageBehaviour::Talk:
                 {
                     // Something else (a script) moved it from where it stood, up or down as well: it goes back
                     if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance)
                         mind.mAtGoal = false;
-                    if (!mind.mAtGoal && mind.mWait <= 0.f)
-                    {
-                        switch (walkTo(frame, mind, mind.mGoal.mCenter, duration, mind.mGoal.mRadius))
-                        {
-                            case Walk::Arrived:
-                                mind.mAtGoal = true;
-                                mind.mRestPlace = mind.position();
-                                mind.mFailures = 0;
-                                stopWalking(mind);
-                                finishTravel(frame, mind);
-                                finishDialogue(frame, mind);
-                                break;
-                            case Walk::Failed:
-                                // It cannot get there; it tries again after a while
-                                stopWalking(mind);
-                                mind.mWait = giveUpTime;
-                                if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
-                                    failToGetThere(frame, mind);
-                                break;
-                            case Walk::Waiting:
-                                mind.mPathWaiting += duration;
-                                if (mind.mPathWaiting >= pathWaitingReport && !mind.mPathWaitingReported
-                                    && mind.mPackage != nullptr && hasEvents(*mind.mPackage))
-                                {
-                                    mind.mPathWaitingReported = true;
-                                    Log(Debug::Info) << "Package " << mind.mPackage->mEditorId << " of "
-                                                     << mind.mPtr.getCellRef().getRefId() << ": no path for "
-                                                     << pathWaitingReport << " s (the navigator has no mesh here yet)";
-                                }
-                                break;
-                            default:
-                                mind.mPathWaiting = 0.f;
-                                break;
-                        }
-                    }
+                    if (!mind.mAtGoal && mind.mWait <= 0.f && goToPlace(frame, mind, duration))
+                        finishTravel(frame, mind);
                     if (mind.mAtGoal && mind.mHasFacing)
                         faceToward(frame, mind, mind.mFacing, duration);
                     break;
                 }
+                case ESM4::PackageBehaviour::Talk:
+                    talk(frame, mind, duration);
+                    break;
                 case ESM4::PackageBehaviour::Follow:
                 {
                     osg::Vec3f target;

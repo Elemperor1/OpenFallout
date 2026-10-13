@@ -90,6 +90,21 @@ namespace ESM4
         };
 #pragma pack(pop)
 
+        /// The dialogue data of a Dialogue package of Fallout 3 and New Vegas (PKDD)
+        struct DialogueData
+        {
+            enum Type : std::int32_t
+            {
+                Conversation = 0,
+                SayTo = 1,
+            };
+
+            float mFov = 0; // of the camera
+            ESM::FormId32 mTopic = 0; // a DIAL, 0 for none (the greeting)
+            std::uint32_t mFlags = 0;
+            std::int32_t mType = Conversation; // a record too short to have it is a conversation
+        };
+
         /// What a package of Fallout 3 and New Vegas does when it begins, ends or is changed.
         struct Event
         {
@@ -108,6 +123,7 @@ namespace ESM4
         PSDT mSchedule;
         PLDT mLocation;
         PTDT mTarget;
+        DialogueData mDialogue;
         std::vector<CTDA> mConditions;
         std::vector<TargetCondition> mTargetConditions; // CTDA of 28 bytes, and of 20 bytes in Fallout 3
 

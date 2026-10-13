@@ -58,6 +58,13 @@ namespace OFMechanics
         return std::clamp(distance, falloutSmallestFollow, falloutLargestFollow);
     }
 
+    float falloutTalkDistance(std::int32_t packageDistance)
+    {
+        if (packageDistance <= 0)
+            return falloutDefaultTalk;
+        return std::clamp(static_cast<float>(packageDistance), falloutSmallestTalk, falloutLargestTalk);
+    }
+
     bool falloutFollowMoves(float away, float distance, bool walking)
     {
         return away > (walking ? distance : distance + falloutFollowSlack);

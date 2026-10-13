@@ -199,6 +199,15 @@ namespace OFScript
         bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// startConversation and the interface that shows it. For the thread of the frame.
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// What a character with a Dialogue package does once it is near its target: a Say To package says one
+        /// response of its topic, a Conversation package begins a conversation (with the player the interface opens,
+        /// which is for the thread of the frame; with another character the exchange is said, follow-ups and all).
+        /// `listener` is the character it talks to, empty for the player. False when the character is to try again
+        /// later, because the player is busy with a menu or another conversation; a character that has nothing to say
+        /// is done all the same.
+        bool speakPackage(const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener);
+        /// Whether the character is still saying lines that it was told to say outside of a conversation
+        bool isSaying(const OFWorld::Ptr& speaker) const;
         /// The conversation as it is now (nothing active when none is open)
         Conversation conversation() const;
         /// The speaker says the line of the response that is said, with the voice of the data. False when the line has
@@ -291,6 +300,7 @@ namespace OFScript
         void setDisabled(FalloutScript::FormId reference, bool disabled) override;
         bool distance(FalloutScript::FormId first, FalloutScript::FormId second, double& result) override;
         FalloutScript::FormId cellOf(FalloutScript::FormId reference) override;
+        bool inCell(FalloutScript::FormId reference, FalloutScript::FormId cell) override;
         void activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate) override;
 
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
@@ -330,6 +340,9 @@ namespace OFScript
         /// followed by its follow-ups, as in a conversation (StartConversation between two characters).
         bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener = 0,
             bool forceSubtitles = false, bool followUps = false);
+        /// The character begins an exchange with another character: the topic is said (the greeting when none is
+        /// named) and the other answers, as in a conversation with the player
+        void converse(FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -383,6 +396,7 @@ namespace OFScript
         double gameHour() override;
         double gameDaysPassed() override;
         FalloutScript::FormId currentFurniture(FalloutScript::FormId actor) override;
+        int currentFurnitureKind(FalloutScript::FormId actor) override;
 
         /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
         /// content file, or an object that PlaceAtMe made
@@ -620,6 +634,8 @@ namespace OFScript
             osg::Vec3f mPlace;
             /// The entry of the marker that it uses, -1 for none
             int mEntry = -1;
+            /// The kind of use the entry says (sleeping 1 to 9, sitting 10 to 20), sitting for furniture with no marker
+            int mKind = 10;
             /// Where the furniture was when it was used: it is not used any more when it is moved from there
             osg::Vec3f mFurniturePlace;
         };

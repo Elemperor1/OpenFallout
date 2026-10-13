@@ -191,6 +191,15 @@ namespace
         EXPECT_FLOAT_EQ(falloutFollowDistance(100000), falloutLargestFollow);
     }
 
+    TEST(FalloutPackagesTest, aCharacterTalksFromTheDistanceOfThePackageWithinLimits)
+    {
+        EXPECT_FLOAT_EQ(falloutTalkDistance(300), 300.f);
+        EXPECT_FLOAT_EQ(falloutTalkDistance(0), falloutDefaultTalk);
+        EXPECT_FLOAT_EQ(falloutTalkDistance(-4), falloutDefaultTalk);
+        EXPECT_FLOAT_EQ(falloutTalkDistance(10), falloutSmallestTalk);
+        EXPECT_FLOAT_EQ(falloutTalkDistance(100000), falloutLargestTalk);
+    }
+
     TEST(FalloutPackagesTest, aScriptCanNameAnyDistanceToFollowAt)
     {
         EXPECT_FLOAT_EQ(falloutScriptFollowDistance(300.5f), 300.5f);

@@ -230,6 +230,42 @@ namespace
         EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
     }
 
+    TEST(ESM4PackageTest, readsTheDialogueDataOfAPackageOfFallout)
+    {
+        // the field of view, the topic, flags, four bytes, the type (Say To) and four bytes more
+        std::string data;
+        append<float>(data, 100.f);
+        append<std::uint32_t>(data, 0x00001234);
+        append<std::uint32_t>(data, 0x100);
+        append<std::uint32_t>(data, 0);
+        append<std::int32_t>(data, 1);
+        append<std::uint32_t>(data, 0);
+        const ESM4::AIPackage result = loadFromAFalloutFile(zString("EDID", "SayTo") + falloutPackageData(15, 8)
+            + subRecord("PKDD", data) + subRecord("PLDT", bytePattern(12, 10)));
+
+        EXPECT_EQ(result.mData.type, 15);
+        EXPECT_EQ(result.mDialogue.mFov, 100.f);
+        EXPECT_EQ(result.mDialogue.mTopic, 0x00001234u);
+        EXPECT_EQ(result.mDialogue.mFlags, 0x100u);
+        EXPECT_EQ(result.mDialogue.mType, ESM4::AIPackage::DialogueData::SayTo);
+        // the sub-record after it is read from the right place
+        EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
+    TEST(ESM4PackageTest, takesAPackageWithDialogueDataThatIsTooShortForTheTypeAsAConversation)
+    {
+        std::string data;
+        append<float>(data, 100.f);
+        append<std::uint32_t>(data, 0x00001234);
+        append<std::uint32_t>(data, 0);
+        append<std::uint32_t>(data, 0);
+        const ESM4::AIPackage result
+            = loadFromAFalloutFile(zString("EDID", "Talk") + falloutPackageData(15, 8) + subRecord("PKDD", data));
+
+        EXPECT_EQ(result.mDialogue.mTopic, 0x00001234u);
+        EXPECT_EQ(result.mDialogue.mType, ESM4::AIPackage::DialogueData::Conversation);
+    }
+
     TEST(ESM4PackageTest, ignoresSubrecordsThatNoEventClaims)
     {
         // The loader is shared with games whose packages have no event markers.

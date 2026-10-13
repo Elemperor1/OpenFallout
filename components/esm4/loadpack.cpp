@@ -119,6 +119,35 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
 
                 break;
             }
+            case ESM::fourCC("PKDD"):
+            {
+                // Fallout 3 and New Vegas: the field of view, the topic, flags, four bytes and the type of the dialogue
+                // (a few records stop before it)
+                if (!reader.isFalloutFile() || subHdr.dataSize < sizeof(float) + sizeof(ESM::FormId32))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                std::uint32_t size = subHdr.dataSize;
+                reader.get(mDialogue.mFov);
+                reader.get(mDialogue.mTopic);
+                reader.adjustFormId(mDialogue.mTopic);
+                size -= sizeof(float) + sizeof(ESM::FormId32);
+                if (size >= sizeof(std::uint32_t))
+                {
+                    reader.get(mDialogue.mFlags);
+                    size -= sizeof(std::uint32_t);
+                }
+                if (size >= 2 * sizeof(std::uint32_t))
+                {
+                    reader.skipSubRecordData(sizeof(std::uint32_t));
+                    reader.get(mDialogue.mType);
+                    size -= 2 * sizeof(std::uint32_t);
+                }
+                if (size > 0)
+                    reader.skipSubRecordData(size);
+                break;
+            }
             case ESM::fourCC("CTDA"):
             {
                 // A CTDA of 24 bytes is also the form of Fallout 3 and New Vegas that has no reference.
@@ -180,7 +209,6 @@ void ESM4::AIPackage::load(ESM4::Reader& reader)
             case ESM::fourCC("IDLC"): // FO3
             case ESM::fourCC("IDLF"): // FO3
             case ESM::fourCC("IDLT"): // FO3
-            case ESM::fourCC("PKDD"): // FO3
             case ESM::fourCC("PKD2"): // FO3
             case ESM::fourCC("PKPT"): // FO3
             case ESM::fourCC("PKED"): // FO3
