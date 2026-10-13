@@ -2018,7 +2018,8 @@ namespace OFScript
 
     void FalloutScripts::updateFurniture()
     {
-        // An actor that is more than a few steps from where it sat down, or is gone or dead, has got up
+        // An actor that is more than a few steps from where it sat down, or is gone, disabled, deleted or dead, has got
+        // up
         constexpr float reach = 128.f;
         std::vector<std::pair<FalloutScript::FormId, FurnitureUse>> uses;
         {
@@ -2028,11 +2029,12 @@ namespace OFScript
         for (const auto& [user, use] : uses)
         {
             const OFWorld::Ptr actor = findReference(user);
+            const bool present = !actor.isEmpty() && actor.getRefData().isEnabled() && !actor.mRef->isDeleted();
             // The player is an actor of the engine, whose death the stats tell; the others are told by the host
-            const bool dead = mActors.isDead(user)
-                || (!actor.isEmpty() && actor.getClass().isActor()
-                    && actor.getClass().getCreatureStats(actor).isDead());
-            if (!actor.isEmpty() && !dead && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
+            const bool dead = present
+                && (mActors.isDead(user)
+                    || (actor.getClass().isActor() && actor.getClass().getCreatureStats(actor).isDead()));
+            if (present && !dead && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
                 continue;
             {
                 const std::lock_guard lock(mFurnitureMutex);
