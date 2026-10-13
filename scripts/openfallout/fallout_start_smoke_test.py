@@ -1056,6 +1056,17 @@ local function sits(tag)
             or 'no chair')
 end
 
+-- The sitter's chair has one entry and the sitter is on it: the player who activates that chair is not put there
+local function occupied(tag)
+    local ok, seat = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER_CHAIR@))
+    print('OFTEST', 'occupied', tag, ok and string.format('%.0f', (world.players[1].position - seat.position):length())
+        or 'no chair')
+end
+local function takeSitterChair()
+    local ok, seat = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', @SITTER_CHAIR@))
+    if ok then seat:activateBy(world.players[1]) end
+end
+
 local steps = {
     { 1.5, function() report('before') put(0, 100) end },
     { 3.0, function() report('inside') put(100, 0) end },
@@ -1064,7 +1075,9 @@ local steps = {
     { 7.0, function() sits('before') local object = chair() if object then object:activateBy(world.players[1]) end end },
     { 8.0, function() sits('sat') put(300, 0) end },
     { 9.0, function() sits('away') end },
-    { 14.0, function() sitter('later') core.quit() end },
+    { 12.5, function() occupied('before') takeSitterChair() end },
+    { 13.5, function() occupied('after') end },
+    { 15.0, function() sitter('later') core.quit() end },
 }
 
 return {
@@ -1989,6 +2002,15 @@ def check_triggers(text):
                             f"0): {sat['away']}")
     if "Furniture: " not in text:
         problems.append("the engine did not log that the player used the furniture")
+    # A chair whose only entry is taken is not used by a second one: the player stays where it was
+    taken = dict(re.findall(r"OFTEST\toccupied\t(\w+)\t(\d+|no chair)$", text, re.M))
+    if set(taken) != {"before", "after"}:
+        problems.append(f"expected 'occupied before' and 'occupied after' lines: {taken}")
+    elif "no chair" in taken.values() or abs(int(taken["after"]) - int(taken["before"])) > 5:
+        problems.append("a player who activates a chair whose only entry is in use should not be put there: "
+                        f"{taken}")
+    if "cannot use" not in text:
+        problems.append("the engine did not log that the chair with its only entry in use was refused")
     # The sitter travelled to its chair and sat there (the script sees it), and stayed though its second package, which is
     # not done, came after it
     later = re.findall(r"OFTEST\tsitter\tlater\t(-?\d+)\t(\d+|no sitter)$", text, re.M)

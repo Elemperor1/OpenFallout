@@ -1947,6 +1947,13 @@ namespace OFScript
             return;
         osg::Vec3f where = actor.getRefData().getPosition().asVec3();
         const std::optional<FalloutScript::FurnitureSeat> entry = chooseSeat(user, furniture, where);
+        if (!entry && !furnitureEntries(furniture).empty())
+        {
+            // The model has places to use and none is free (or the record enables none): the games do nothing then
+            Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " cannot use " << FalloutScript::hex(seat)
+                             << ": no entry of its marker is free";
+            return;
+        }
         Place seatPlace;
         Place userPlace;
         if (place && whereIs(seat, seatPlace) && whereIs(user, userPlace) && seatPlace.mCell == userPlace.mCell)

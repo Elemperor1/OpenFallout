@@ -800,6 +800,9 @@ namespace OFMechanics
             // The package it followed is changed when it was not done, and the one it follows begins
             if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0)
                 raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
+            // A character in a piece of furniture gets up when it is given another package (the games ask it to leave)
+            if (frame.mScripts != nullptr)
+                frame.mScripts->leaveFurniture(mind.mPtr);
             if (chosen.mPackage != nullptr)
             {
                 mind.mDone.erase(chosen.mPackage);
