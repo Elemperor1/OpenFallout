@@ -112,7 +112,8 @@ namespace OFMechanics
 
     bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience)
     {
-        if (!nearPlayer)
+        // A step that would bring the actor within the distance blocks it before it is near the player
+        if (!nearPlayer && !inTheWay)
             state = FalloutYield();
         if (state.mPassing || !inTheWay)
             return false;

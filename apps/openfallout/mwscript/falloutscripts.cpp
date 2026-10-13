@@ -1293,7 +1293,7 @@ namespace OFScript
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
             const FalloutScript::DialogueView view = mDialogue.say(
-                { reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps, true);
+                { reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps, !followUps);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
             // says something to the player that nobody hears, or nothing, is otherwise silent
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1315,8 +1315,8 @@ namespace OFScript
                 said.mTopic = topic;
                 said.mForceSubtitles = forceSubtitles;
                 // The response is over with its last line: its end script runs then, not when the speaker is told
-                // to say it
-                if (i + 1 == view.mLines.size() || view.mLines[i + 1].mInfo != line.mInfo)
+                // to say it (with follow-ups the end scripts have run, they decide which response comes next)
+                if (!followUps && (i + 1 == view.mLines.size() || view.mLines[i + 1].mInfo != line.mInfo))
                     said.mEndInfo = line.mInfo;
             }
         }

@@ -495,6 +495,9 @@ namespace FalloutScript
     DialogueView DialogueManager::say(
         const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps, bool deferEnd)
     {
+        // The follow-ups are chosen by the conditions, which what the end script of a response did can change: with
+        // them the end scripts run as the responses are said
+        deferEnd = deferEnd && !followUps;
         // The listener matters for the choice of the responses (their conditions) and for nothing after it
         const FormId outerListener = mListener;
         mListener = listener;

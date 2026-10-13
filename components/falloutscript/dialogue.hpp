@@ -150,7 +150,8 @@ namespace FalloutScript
         /// With `deferEnd` the end scripts of the responses and the topics they add are left for finishSaid(), which
         /// the host calls when the speaker has said them (the games run them when the line is over, and a quest that
         /// waits for the end of one line before it says the next relies on it); a response with no lines has its end
-        /// script run here, as there is nothing to wait for.
+        /// script run here, as there is nothing to wait for. With `followUps` as well the end scripts run here: which
+        /// follow-up comes next depends on what the end script of the response before it did.
         DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0, bool followUps = false,
             bool deferEnd = false);
         /// What a response said with `deferEnd` does when it is over: its end script (which sees the response, as in

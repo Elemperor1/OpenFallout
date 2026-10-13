@@ -103,7 +103,9 @@ namespace OFMechanics
     /// Whether the actor waits where it is this frame. It waits when its next step would bring it nearer to the player
     /// than it is allowed (`inTheWay`), for `patience` seconds; a player that does not move in that time (autoplay
     /// puts it somewhere and waits, a person who left the keyboard) is walked past. The actor waits again once it is
-    /// not near the player any more (`nearPlayer` false), which a step past the player brings about.
+    /// not near the player any more and its next step would not bring it near either (`nearPlayer` and `inTheWay`
+    /// false), which a step past the player brings about. An actor held up at the edge of the distance (not near yet,
+    /// its next step is in the way) counts the time as well.
     bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience);
 }
 

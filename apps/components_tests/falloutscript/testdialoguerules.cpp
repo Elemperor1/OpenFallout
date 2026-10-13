@@ -398,6 +398,22 @@ namespace
         EXPECT_THAT(setup.mLogged, ElementsAre("end silent"));
     }
 
+    TEST(FalloutScriptDialogueTest, theEndScriptsRunAsTheResponsesAreSaidWhenTheyGoOnWithFollowUpsEvenWhenDeferred)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        ESM4::DialogInfo& first = setup.mRecords.addInfo(0x3001, topicA, "first");
+        first.mEndScript = logScript("end first").definition();
+        ESM4::DialogInfo& second = setup.mRecords.addInfo(0x3002, topicA, "second", 0x3001);
+        second.mScript = logScript("begin second").definition();
+        setup.mRecords.mInfos[0].mFollowUps = { id(0x3002) };
+        setup.start();
+
+        // Which follow-up comes depends on what the end script of the response before it did: it has run by then
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, 0, true, true)), ElementsAre("first", "second"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("end first", "begin second"));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseNeedsItsQuestToRun)
     {
         Harness setup;

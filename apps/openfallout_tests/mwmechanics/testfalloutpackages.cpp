@@ -171,6 +171,17 @@ namespace
         EXPECT_TRUE(state.mPassing);
     }
 
+    TEST(FalloutPackagesTest, anActorHeldUpAtTheEdgeOfTheDistanceAlsoWaitsAndThenWalksPast)
+    {
+        FalloutYield state;
+        // It is not near the player yet, but its next step is: it stops there, and the wait adds up
+        EXPECT_TRUE(falloutYields(state, false, true, 1.f, 4.f));
+        EXPECT_TRUE(falloutYields(state, false, true, 2.f, 4.f));
+        EXPECT_FLOAT_EQ(state.mWaited, 3.f);
+        EXPECT_FALSE(falloutYields(state, false, true, 1.5f, 4.f));
+        EXPECT_TRUE(state.mPassing);
+    }
+
     TEST(FalloutPackagesTest, aFollowerKeepsTheDistanceOfThePackageWithinLimits)
     {
         EXPECT_FLOAT_EQ(falloutFollowDistance(300), 300.f);
