@@ -2017,7 +2017,7 @@ namespace OFScript
 
     void FalloutScripts::updateFurniture()
     {
-        // An actor that is more than a few steps from where it sat down, or is gone, has got up
+        // An actor that is more than a few steps from where it sat down, or is gone or dead, has got up
         constexpr float reach = 128.f;
         std::vector<std::pair<FalloutScript::FormId, FurnitureUse>> uses;
         {
@@ -2027,7 +2027,11 @@ namespace OFScript
         for (const auto& [user, use] : uses)
         {
             const OFWorld::Ptr actor = findReference(user);
-            if (!actor.isEmpty() && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
+            // The player is an actor of the engine, whose death the stats tell; the others are told by the host
+            const bool dead = mActors.isDead(user)
+                || (!actor.isEmpty() && actor.getClass().isActor()
+                    && actor.getClass().getCreatureStats(actor).isDead());
+            if (!actor.isEmpty() && !dead && (actor.getRefData().getPosition().asVec3() - use.mPlace).length() <= reach)
                 continue;
             {
                 const std::lock_guard lock(mFurnitureMutex);
@@ -2078,11 +2082,11 @@ namespace OFScript
         // The character gets up from the furniture it uses, then looks at its packages again
         runOnMainThread([this, actor] {
             const OFWorld::Ptr ptr = findReference(actor);
-            if (!ptr.isEmpty() && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
-            {
-                leaveFurniture(ptr);
+            if (ptr.isEmpty())
+                return;
+            leaveFurniture(ptr);
+            if (ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
                 OFBase::Environment::get().getMechanicsManager()->evaluateFalloutPackages(ptr);
-            }
         });
     }
 
