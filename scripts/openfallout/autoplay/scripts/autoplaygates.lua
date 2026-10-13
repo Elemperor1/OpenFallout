@@ -60,6 +60,9 @@ return {
         { quest = 'CG03', stage = 42, how = 'setstage', to = 45 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         { quest = 'CG03', stage = 55, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
+        -- The script of the classroom trigger waits for the seven classmates to be sitting, which their packages of the type Find
+        -- bring about (the engine does not follow those yet)
+        { quest = 'CG03', stage = 55, how = 'setstage', to = 60, settle = 60 },
         { quest = 'CG03', stage = 80, file = 'Fallout3.esm', ref = 0x02B797, how = 'walk' },
         -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight: the stand-in), Butch, the trigger in
         -- the atrium, the Overseer, Amata, the trigger by the reactor, the three switches (a stand-in: the open state of a
