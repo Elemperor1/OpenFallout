@@ -14,6 +14,10 @@ return {
         -- trigger at the end of the quest (sets 100); the gate of the playpen (a door, OnActivate sets 30 when the stage is
         -- 20, which the Dad's packages bring about: the stage is 14 until he has closed the gate himself).
         { quest = 'CG01', stage = 10, file = 'Fallout3.esm', ref = 0x02EA54, how = 'walk' },
+        -- Stage 14 waits for the Dad to close the gate of the playpen (his Travel package CG01DadCloseGate). The player stands
+        -- in the sphere of his trigger, which is where he walks, so the player goes back to where it began: the marker that
+        -- the Dad's package leads him to is on the way to it, and the Dad leaves the sphere (round 11)
+        { quest = 'CG01', stage = 14, file = 'Fallout3.esm', ref = 0x02EA4F, how = 'walk' },
         { quest = 'CG01', stage = 20, file = 'Fallout3.esm', ref = 0x047803, how = 'activate' },
         { quest = 'CG01', stage = 30, file = 'Fallout3.esm', ref = 0x02EA53, how = 'walk' },
         { quest = 'CG01', stage = 40, file = 'Fallout3.esm', ref = 0x02ECC0, how = 'activate' },

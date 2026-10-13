@@ -511,6 +511,8 @@ namespace OFScript
         std::atomic<int> mConversationVoice{ 0 };
         /// The characters that say lines outside of a conversation (the thread of the frame only)
         std::vector<Saying> mSayings;
+        /// The speakers and topics that sayTopic has logged (the first time is logged), under mDialogueMutex
+        std::set<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mSayLogged;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

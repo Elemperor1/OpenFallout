@@ -59,6 +59,8 @@ namespace OFMechanics
         constexpr float groundProbeDown = 160.f;
         // An actor waits for the player to move out of the way when it would come this close
         constexpr float yieldDistance = 70.f;
+        // ... for this many seconds: a player that stands in the way (it is not moved by anyone) is walked past
+        constexpr float yieldPatience = 4.f;
         // ... unless the player is this far above or below it: a player upstairs is not in the way
         constexpr float yieldHeight = 64.f;
         // An actor that has not come this fraction of the distance that it should have for this long is stuck
@@ -69,6 +71,9 @@ namespace OFMechanics
         // player goes about), and before it tries again to go where it could not
         constexpr float pathRetryTime = 1.f;
         constexpr float giveUpTime = 10.f;
+        // A package that scripts wait for and has had no path for this long is logged once (the navigator makes its
+        // mesh as the player goes about, and a character in a cell that it does not make one for waits for ever)
+        constexpr float pathWaitingReport = 10.f;
         // A character that has not got to the place of a Travel package that scripts wait for after this many tries
         // is put there
         constexpr int failuresBeforeJump = 2;
@@ -155,6 +160,9 @@ namespace OFMechanics
         float mCheckpointTime = 0.f;
         float mStuck = 0.f;
         bool mYielded = false;
+        FalloutYield mYield; // how long it has waited for the player to move out of its way, and whether it goes on
+        float mPathWaiting = 0.f; // how long the navigator has had no mesh to make a path on
+        bool mPathWaitingReported = false;
 
         Mind(const OFWorld::Ptr& ptr, std::vector<const ESM4::AIPackage*> packages, std::uint64_t seed)
             : mPtr(ptr)
@@ -328,6 +336,9 @@ namespace OFMechanics
             mind.mWaypoints.clear();
             mind.mStuck = 0.f;
             mind.mYielded = false;
+            mind.mYield = FalloutYield();
+            mind.mPathWaiting = 0.f;
+            mind.mPathWaitingReported = false;
         }
 
         void releaseAgent(FalloutActors::Mind& mind)
@@ -660,14 +671,20 @@ namespace OFMechanics
 
             faceToward(frame, mind, std::atan2(next.x() - position.x(), next.y() - position.y()), duration);
 
-            // The player is in the way: wait where it is
+            // The player is in the way: wait where it is, for a while
             const float toPlayer = distanceAcross(place, frame.mPlayer);
-            if (std::abs(place.z() - frame.mPlayer.z()) < yieldHeight && toPlayer < yieldDistance
-                && toPlayer < distanceAcross(position, frame.mPlayer))
+            const bool wasPassing = mind.mYield.mPassing;
+            const bool nearPlayer = distanceAcross(position, frame.mPlayer) < yieldDistance;
+            const bool inTheWay = std::abs(place.z() - frame.mPlayer.z()) < yieldHeight && toPlayer < yieldDistance
+                && toPlayer < distanceAcross(position, frame.mPlayer);
+            if (falloutYields(mind.mYield, nearPlayer, inTheWay, duration, yieldPatience))
             {
                 mind.mYielded = true;
                 return Walk::Moving;
             }
+            if (mind.mYield.mPassing && !wasPassing)
+                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " waited " << yieldPatience
+                                 << " s for the player to move out of its way and goes on";
             if (!isLoaded(frame, mind.mPtr, place))
                 return Walk::Failed;
 
@@ -906,7 +923,19 @@ namespace OFMechanics
                                 if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
                                     failToGetThere(frame, mind);
                                 break;
+                            case Walk::Waiting:
+                                mind.mPathWaiting += duration;
+                                if (mind.mPathWaiting >= pathWaitingReport && !mind.mPathWaitingReported
+                                    && mind.mPackage != nullptr && hasEvents(*mind.mPackage))
+                                {
+                                    mind.mPathWaitingReported = true;
+                                    Log(Debug::Info) << "Package " << mind.mPackage->mEditorId << " of "
+                                                     << mind.mPtr.getCellRef().getRefId() << ": no path for "
+                                                     << pathWaitingReport << " s (the navigator has no mesh here yet)";
+                                }
+                                break;
                             default:
+                                mind.mPathWaiting = 0.f;
                                 break;
                         }
                     }

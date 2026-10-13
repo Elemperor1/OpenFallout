@@ -56,7 +56,8 @@ namespace FalloutScript
 
         /// Runs a script that is a list of statements, such as the one a package runs when it begins, ends or changes,
         /// with the reference as its object: the commands in it that name none act on the reference. Returns whether
-        /// the script has code to run (one that can not be run is reported, once for each).
+        /// the script has code to run (one that can not be run is reported, once for each). The definition must remain
+        /// alive and unchanged until clear(), because prepared scripts are cached by definition address.
         bool runResult(const ESM4::ScriptDefinition& definition, FormId reference);
 
         /// Lets a frame pass: the GameMode blocks of the loaded references run, in the order of their form ids

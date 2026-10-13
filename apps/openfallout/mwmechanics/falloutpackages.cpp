@@ -109,4 +109,17 @@ namespace OFMechanics
             return to;
         return from + way * (distance / length);
     }
+
+    bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience)
+    {
+        if (!nearPlayer)
+            state = FalloutYield();
+        if (state.mPassing || !inTheWay)
+            return false;
+        state.mWaited += duration;
+        if (state.mWaited < patience)
+            return true;
+        state.mPassing = true;
+        return false;
+    }
 }

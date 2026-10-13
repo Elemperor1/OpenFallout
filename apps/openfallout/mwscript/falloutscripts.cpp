@@ -348,6 +348,7 @@ namespace OFScript
             mConversationVoice = static_cast<int>(VoiceState::None);
         }
         mSayings.clear();
+        mSayLogged.clear();
     }
 
     void FalloutScripts::update(float frametime, bool paused)
@@ -1280,13 +1281,30 @@ namespace OFScript
     {
         ESM::FormId base;
         if (reference == 0 || topic == 0 || !baseOf(reference, base))
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            if (mSayLogged.insert({ reference, topic }).second)
+                Log(Debug::Info) << "Say: " << std::hex << reference << " is to say topic " << topic << std::dec
+                                 << ", which cannot be done (the speaker or the topic is not there)";
             return false;
+        }
         std::vector<SaidLine> lines;
         {
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
             const FalloutScript::DialogueView view
                 = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps);
+            // The first time that a character is told to say a topic is logged, with what came of it: a script that
+            // says something to the player that nobody hears, or nothing, is otherwise silent
+            if (mSayLogged.insert({ reference, topic }).second)
+            {
+                const ESM4::Dialogue* record = mDialogue.topic(topic);
+                Log(Debug::Info) << "Say: " << std::hex << reference << std::dec << " is to say topic "
+                                 << (record != nullptr ? record->mEditorId : std::string("(not there)")) << " ("
+                                 << std::hex << topic << std::dec << "): "
+                                 << (view.mLines.empty() ? std::string("nothing it can say")
+                                                         : std::to_string(view.mLines.size()) + " line(s)");
+            }
             for (const FalloutScript::DialogueLine& line : view.mLines)
                 lines.push_back(
                     { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, topic, forceSubtitles });

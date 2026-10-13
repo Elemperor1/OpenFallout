@@ -91,6 +91,20 @@ namespace OFMechanics
 
     /// The place `distance` from `from` toward `to`, or `to` if it is that close
     osg::Vec3f falloutStepToward(const osg::Vec3f& from, const osg::Vec3f& to, float distance);
+
+    /// What an actor that meets the player on its way remembers: how long it has waited for the player to move, and
+    /// whether it has waited long enough and goes on
+    struct FalloutYield
+    {
+        float mWaited = 0.f;
+        bool mPassing = false;
+    };
+
+    /// Whether the actor waits where it is this frame. It waits when its next step would bring it nearer to the player
+    /// than it is allowed (`inTheWay`), for `patience` seconds; a player that does not move in that time (autoplay
+    /// puts it somewhere and waits, a person who left the keyboard) is walked past. The actor waits again once it is
+    /// not near the player any more (`nearPlayer` false), which a step past the player brings about.
+    bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience);
 }
 
 #endif
