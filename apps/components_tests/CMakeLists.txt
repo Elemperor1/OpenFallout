@@ -139,6 +139,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testsleepdeprivationstage.cpp
     esm4/testspell.cpp
     esm4/testsurvey.cpp
+    esm4/testtalkingactivator.cpp
     esm4/testterminal.cpp
     esm4/testvoicetype.cpp
     esm4/testwater.cpp

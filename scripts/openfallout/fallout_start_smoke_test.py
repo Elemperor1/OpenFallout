@@ -517,6 +517,8 @@ return {
 # scripts: the globals that the scripts of the events of the packages and of the walker count in.
 GATE_SCRIPT = """\
 local world = require('openfallout.world')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
 
 local elapsed, done, reported = 0, false, false
 
@@ -533,12 +535,19 @@ return {
                 reported = true
                 local g = world.globals
                 print('OFTEST', 'package events', @EVENTS@)
+                -- the talking activator is an object of the world, of its own type
+                local found, valid, typed = pcall(function()
+                    local intercom = world.getObjectByFormId(core.getFormId('OFTest.esm', @INTERCOM@))
+                    return intercom:isValid(), intercom.type == types.ESM4TalkingActivator
+                end)
+                print('OFTEST', 'intercom', tostring(found and valid), tostring(found and typed))
             end
         end,
     },
 }
 """.replace("@FROM@", str(plugin.GATE_FROM)).replace("@QUEST@", plugin.QUEST_C_NAME).replace(
-    "@STAGE@", str(plugin.QUEST_C_STAGE)).replace("@EVENTS_FROM@", str(WALK_SECONDS - 2)).replace(
+    "@STAGE@", str(plugin.QUEST_C_STAGE)).replace("@INTERCOM@", str(plugin.INTERCOM_REF_ID)).replace(
+    "@EVENTS_FROM@", str(WALK_SECONDS - 2)).replace(
     "@EVENTS@", ", ".join(f"tostring(g.{name})" for _, name in plugin.PACKAGE_EVENT_GLOBALS.values()))
 
 # Tells the companion, a character with no package, to follow the player (a global script, from the game time that the
@@ -2606,7 +2615,9 @@ def check_package_events(text, scenario, animated):
     opens is begun once and changed when the gate opens (never done); the blocks of the script of the walker that name the
     Travel package, and the one that names none, run for its events, and the one that names the package for the night,
     which is not on, does not. The speaker of the interior has a Dialogue package: it walks to the player, says its line and
-    its package is done when the line is over (it does not walk without the animation, and the exterior has none)."""
+    its package is done when the line is over (it does not walk without the animation, and the exterior has none). The
+    character of the interior whose Dialogue package targets the intercom (a talking activator) talks to it where it
+    stands, and its package is done when the line is over."""
     names = list(plugin.PACKAGE_EVENT_GLOBALS)
     match = re.search(r"OFTEST\tpackage events\t" + r"\t".join([r"(-?\d+)"] * len(names)), text)
     if not match:
@@ -2614,7 +2625,8 @@ def check_package_events(text, scenario, animated):
     got = dict(zip(names, map(int, match.groups())))
     expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 1, "early_begin": 1, "early_end": 0,
                 "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1,
-                "speaker_done": 1 if not scenario.exterior and animated else 0}
+                "speaker_done": 1 if not scenario.exterior and animated else 0,
+                "intercom_done": 0 if scenario.exterior else 1}
     problems = [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
                 f"{want}" for name, want in expected.items() if got[name] != want]
     if not scenario.exterior and animated:
@@ -2622,6 +2634,15 @@ def check_package_events(text, scenario, animated):
             problems.append("the speaker, whose Dialogue package sends it to the player, did not talk to the player")
         if not re.search(r"Say: .* is to say topic OFTestSpeakTopic .*: 1 line\(s\)", text):
             problems.append("the topic of the Dialogue package of the speaker was not said")
+    intercom = re.search(r"OFTEST\tintercom\t(\w+)\t(\w+)", text)
+    if not intercom:
+        problems.append("the script did not log whether the talking activator is an object of the world")
+    elif (intercom.group(1), intercom.group(2)) != (("false", "false") if scenario.exterior else ("true", "true")):
+        problems.append("the talking activator should be an object of its own type in the interior and not be in the "
+                        f"exterior: {intercom.group(0)}")
+    if not scenario.exterior:
+        if not re.search(r"Package OFTestIntercomTalk of .*: it talks to a character", text):
+            problems.append("the character whose Dialogue package targets the talking activator did not talk to it")
     return problems
 
 

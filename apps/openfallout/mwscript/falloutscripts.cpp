@@ -1794,6 +1794,13 @@ namespace OFScript
             found.mCreatureType = traitsOwner->mCreatureType;
             found.mVoice = numberOf(traitsOwner->mVoice);
         }
+        else if (const ESM4::TalkingActivator* activator = mStore.get<ESM4::TalkingActivator>().search(base))
+        {
+            // An intercom or a radio has the voice type its record names, and no race, class or sex
+            traits = FalloutScript::ActorTraits();
+            traits.mVoice = numberOf(activator->mVoiceType);
+            return true;
+        }
         else
             return false;
         // A character with no voice of its own speaks with the voice that its race has for its sex

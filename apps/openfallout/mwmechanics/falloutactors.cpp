@@ -154,6 +154,9 @@ namespace OFMechanics
         /// A package that is done and has nothing after it is over for the actor, and its Change script has been told
         bool mChangeTold = false;
         int mWaitingFor = 0; // why a Dialogue package stands still (a waitFor constant), once told in the log
+        /// The Dialogue packages that are on and that are left out because the one to talk to is not around, once told
+        /// in the log
+        mutable std::set<const ESM4::AIPackage*> mSkipTold;
         int mFailures = 0; // how many times in a row it has had no way to get to the place of the package
         osg::Vec3f mRestPlace; // where it stood when it reached it
         osg::Vec3f mDestination;
@@ -549,7 +552,15 @@ namespace OFMechanics
                 following.mDistance = falloutTalkDistance(package.mTarget.distance);
                 osg::Vec3f position;
                 if (!followPosition(frame, mind.mPtr, following, position))
+                {
+                    // A package that is on and is left out says so, once: a quest can wait for it
+                    if (mind.mSkipTold.insert(&package).second)
+                        Log(hasEvents(package) ? Debug::Info : Debug::Verbose)
+                            << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                            << ": left out, the one it talks to ("
+                            << ESM::RefId(ESM::FormId::fromUint32(package.mTarget.target)) << ") is not around";
                     return false;
+                }
             }
 
             // Where it was put by the file, which is where most packages are about

@@ -77,12 +77,17 @@ void ESM4::TalkingActivator::load(ESM4::Reader& reader)
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
+            case ESM::fourCC("MODB"):
+            case ESM::fourCC("MODD"):
             case ESM::fourCC("OBND"):
             case ESM::fourCC("VMAD"):
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::TACT::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                // The engine only needs the model, name, script and voice of the activator: what else a record has
+                // (the records of the games have more than this loader knew) is left
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

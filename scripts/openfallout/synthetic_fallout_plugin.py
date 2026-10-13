@@ -401,7 +401,7 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x91F # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x92D # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -415,7 +415,8 @@ PACKAGE_EVENT_GLOBALS = {"travel_begin": (0x905, "OFTestTravelBegin"), "travel_e
                          "early_end": (0x909, "OFTestEarlyEnd"), "early_change": (0x90A, "OFTestEarlyChange"),
                          "block_start": (0x90B, "OFTestBlockStart"), "block_done": (0x90C, "OFTestBlockDone"),
                          "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny"),
-                         "speaker_done": (0x925, "OFTestSpeakerDone")}
+                         "speaker_done": (0x925, "OFTestSpeakerDone"),
+                         "intercom_done": (0x92D, "OFTestIntercomDone")}
 WATCH_SCRIPT_IDS = {"interior": 0x90F, "exterior": 0x910}
 EARLY_PACKAGE_IDS = {"interior": 0x911, "exterior": 0x912}
 # The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
@@ -457,6 +458,20 @@ SPEAK_INFO_ID = 0x924
 SPEAK_TEXT = "Over here."
 SPEAKER_PLACE = (700.0, -600.0)
 SPEAKER_DISTANCE = 150
+# An intercom: a talking activator (TACT) with the voice type of its record, and next to it a character with a Dialogue
+# package of the kind Conversation whose target is the intercom. The character says the topic to it from where it stands, and
+# its package is done when the line is over (its script counts that).
+INTERCOM_ID = 0x926
+INTERCOM_REF_ID = 0x927
+INTERCOM_USER_ID = 0x928
+INTERCOM_USER_REF_ID = 0x929
+INTERCOM_PACKAGE_ID = 0x92A
+INTERCOM_TOPIC_ID = 0x92B
+INTERCOM_INFO_ID = 0x92C
+INTERCOM_TEXT = "Anybody there?"
+INTERCOM_PLACE = (700.0, -300.0)
+INTERCOM_USER_PLACE = (550.0, -300.0)
+INTERCOM_DISTANCE = 100
 TRIGGER_SCRIPT_ID = 0x902
 TRIGGER_BASE_ID = 0x903
 TRIGGER_REF_ID = 0x904
@@ -546,6 +561,7 @@ PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
 PACKAGE_GUARD = 14
 PACKAGE_DIALOGUE = 15
+DIALOGUE_CONVERSATION = 0
 DIALOGUE_SAY_TO = 1
 LOCATION_NEAR_REFERENCE = 0
 LOCATION_NEAR_CURRENT = 2
@@ -1349,6 +1365,24 @@ def speaker_references():
     return [achr(SPEAKER_REF_ID, (*SPEAKER_PLACE, 0.0), SPEAKER_ID)]
 
 
+def intercom_base():
+    """The talking activator: a name and a voice type, no model."""
+    return record(b"TACT", INTERCOM_ID, [zstr(b"EDID", "OFTestIntercom"), zstr(b"FULL", "Test Intercom"),
+                                        sub(b"VNAM", struct.pack("<I", OTHER_VOICE_ID))])
+
+
+def intercom_packages():
+    return [package(INTERCOM_PACKAGE_ID, "OFTestIntercomTalk", PACKAGE_DIALOGUE, target=(0, INTERCOM_REF_ID),
+                    distance=INTERCOM_DISTANCE, dialogue=(INTERCOM_TOPIC_ID, DIALOGUE_CONVERSATION),
+                    events=((b"POEA", "intercom_done"),))]
+
+
+def intercom_references():
+    """The intercom and the character that talks to it, in the interior cell."""
+    return [refr(INTERCOM_REF_ID, INTERCOM_ID, (*INTERCOM_PLACE, 0.0)),
+            achr(INTERCOM_USER_REF_ID, (*INTERCOM_USER_PLACE, 0.0), INTERCOM_USER_ID)]
+
+
 def furniture_base():
     """A piece of furniture: a name, the model with the marker of a chair and the flags that enable its one entry."""
     return record(b"FURN", FURNITURE_ID, [zstr(b"EDID", "OFTestChair"), zstr(b"FULL", "OpenFallout Test Chair"),
@@ -1611,6 +1645,8 @@ def dialogue():
         topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT, end=DIALOGUE_GLOBALS["said_end"][0])]),
         topic(SPEAK_TOPIC_ID, "OFTestSpeakTopic", "", 0, 0),
         topic_group(SPEAK_TOPIC_ID, [response(SPEAK_INFO_ID, SPEAK_TEXT)]),
+        topic(INTERCOM_TOPIC_ID, "OFTestIntercomTopic", "", 0, 0),
+        topic_group(INTERCOM_TOPIC_ID, [response(INTERCOM_INFO_ID, INTERCOM_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
                                               sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),
@@ -1918,6 +1954,7 @@ def plugin():
         furniture_reference(),
         *sitter_references(),
         *speaker_references(),
+        *intercom_references(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -1942,6 +1979,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
+            + top_group(b"TACT", [intercom_base()])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base()])
             + top_group(b"FURN", [furniture_base()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
@@ -1960,11 +1998,13 @@ def plugin():
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages()])
+            + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
             + top_group(b"NPC_", [person(), *package_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
                                   person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
+                                  person(INTERCOM_USER_ID, "OFTestIntercomUser", [INTERCOM_PACKAGE_ID],
+                                         dressed=False),
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
                                          script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])

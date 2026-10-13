@@ -37,6 +37,7 @@
 #include <components/esm4/loadmstt.hpp>
 #include <components/esm4/loadscol.hpp>
 #include <components/esm4/loadstat.hpp>
+#include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadtree.hpp>
 #include <components/esm4/loadweap.hpp>
 
@@ -286,6 +287,9 @@ namespace OFLua
                             break;
                         case ESM::REC_STAT4:
                             cell.mStore->template forEachType<ESM4::Static>(visitor);
+                            break;
+                        case ESM::REC_TACT4:
+                            cell.mStore->template forEachType<ESM4::TalkingActivator>(visitor);
                             break;
                         case ESM::REC_TREE4:
                             cell.mStore->template forEachType<ESM4::Tree>(visitor);
