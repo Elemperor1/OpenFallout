@@ -360,6 +360,44 @@ namespace
         EXPECT_TRUE(setup.mDialogue.wasSaid(0x3004, speaker.mReference));
     }
 
+    TEST(FalloutScriptDialogueTest, theEndScriptOfAResponseSaidWithADeferredEndRunsWhenTheHostFinishesIt)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        ESM4::DialogInfo& first = setup.mRecords.addInfo(0x3001, topicA, "first");
+        first.mScript = logScript("begin first").definition();
+        first.mEndScript = logScript("end first").definition();
+        first.mAddTopics = { id(topicB) };
+        setup.mRecords.addTopic(topicB, "B", "TopicB", false);
+        setup.mRecords.addInfo(0x3002, topicB, "b");
+        setup.start();
+
+        // The response is said (it has its lines, its begin script ran, it is not said again) but its end script waits
+        const FalloutScript::DialogueView said = setup.mDialogue.say(speaker, topicA, 0, false, true);
+        EXPECT_THAT(setup.texts(said), ElementsAre("first"));
+        EXPECT_THAT(setup.mLogged, ElementsAre("begin first"));
+        EXPECT_TRUE(setup.mDialogue.wasSaid(0x3001, speaker.mReference));
+        EXPECT_THAT(setup.topics(setup.mDialogue.view()), ElementsAre());
+        // ... until the host says that the speaker has said it: then the end script runs, and the topic is given
+        setup.mDialogue.finishSaid(speaker, said.mLines.back().mInfo, topicA);
+        EXPECT_THAT(setup.mLogged, ElementsAre("begin first", "end first"));
+        setup.mDialogue.start(speaker, 0);
+        EXPECT_THAT(setup.topics(setup.mDialogue.view()), Contains(topicB));
+    }
+
+    TEST(FalloutScriptDialogueTest, theEndScriptOfAResponseWithNoLinesRunsAtOnceEvenWhenItIsDeferred)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", true);
+        ESM4::DialogInfo& silent = setup.mRecords.addInfo(0x3001, topicA, "unused");
+        silent.mResponses.clear();
+        silent.mEndScript = logScript("end silent").definition();
+        setup.start();
+
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, 0, false, true)), ElementsAre());
+        EXPECT_THAT(setup.mLogged, ElementsAre("end silent"));
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseNeedsItsQuestToRun)
     {
         Harness setup;

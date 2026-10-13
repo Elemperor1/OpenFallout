@@ -320,6 +320,9 @@ namespace OFScript
             bool mEnd = false;
             /// The topic that was said, which the script of the speaker is told of (Begin SayToDone Topic)
             FalloutScript::FormId mTopic = 0;
+            /// The response that this is the last line of: its end script runs, and the topics it adds are given, when
+            /// the line is over (and before the script of the speaker is told that it has said what it was told to)
+            FalloutScript::FormId mEndInfo = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };

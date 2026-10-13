@@ -1292,8 +1292,8 @@ namespace OFScript
         {
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
-            const FalloutScript::DialogueView view
-                = mDialogue.say({ reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps);
+            const FalloutScript::DialogueView view = mDialogue.say(
+                { reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps, true);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
             // says something to the player that nobody hears, or nothing, is otherwise silent
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1305,9 +1305,20 @@ namespace OFScript
                                  << (view.mLines.empty() ? std::string("nothing it can say")
                                                          : std::to_string(view.mLines.size()) + " line(s)");
             }
-            for (const FalloutScript::DialogueLine& line : view.mLines)
-                lines.push_back(
-                    { voiceFile(reference, line), line.mText, lineSeconds(line.mText), false, topic, forceSubtitles });
+            for (std::size_t i = 0; i < view.mLines.size(); ++i)
+            {
+                const FalloutScript::DialogueLine& line = view.mLines[i];
+                SaidLine& said = lines.emplace_back();
+                said.mVoice = voiceFile(reference, line);
+                said.mText = line.mText;
+                said.mSeconds = lineSeconds(line.mText);
+                said.mTopic = topic;
+                said.mForceSubtitles = forceSubtitles;
+                // The response is over with its last line: its end script runs then, not when the speaker is told
+                // to say it
+                if (i + 1 == view.mLines.size() || view.mLines[i + 1].mInfo != line.mInfo)
+                    said.mEndInfo = line.mInfo;
+            }
         }
         if (lines.empty())
             return false;
@@ -1454,12 +1465,27 @@ namespace OFScript
 
         // The lines that characters say outside of a conversation
         const OFWorld::Ptr player = world->getPlayerPtr();
-        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> finished; // the speaker and the topic
+        // What the lines that are over bring about, in order: the end script of a response that ended with the line,
+        // then the script of the speaker, which is told when it has said all that it was told to
+        struct Over
+        {
+            FalloutScript::FormId mSpeaker = 0;
+            FalloutScript::FormId mTopic = 0;
+            FalloutScript::FormId mEndInfo = 0;
+            bool mDone = false;
+        };
+        std::vector<Over> finished;
         for (auto saying = mSayings.begin(); saying != mSayings.end();)
         {
             const OFWorld::Ptr speaker = findReference(saying->mReference);
             if (speaker.isEmpty() || saying->mNext >= saying->mLines.size())
             {
+                // A speaker who is not there any more does not say what is left, but what the responses do is done
+                if (speaker.isEmpty())
+                    for (std::size_t i = saying->mNext; i < saying->mLines.size(); ++i)
+                        if (saying->mLines[i].mEndInfo != 0)
+                            finished.push_back(
+                                { saying->mReference, saying->mLines[i].mTopic, saying->mLines[i].mEndInfo, false });
                 saying = mSayings.erase(saying);
                 continue;
             }
@@ -1504,8 +1530,8 @@ namespace OFScript
                 // A voice that plays is waited for; a line without one stays as long as it takes to read
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
-                    if (line.mEnd)
-                        finished.emplace_back(saying->mReference, line.mTopic);
+                    if (line.mEndInfo != 0 || line.mEnd)
+                        finished.push_back({ saying->mReference, line.mTopic, line.mEndInfo, line.mEnd });
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
@@ -1515,11 +1541,20 @@ namespace OFScript
         // The script of a character that has said what it was told to goes on (Begin SayToDone Topic): the blocks that
         // name the topic that was said, and those that name none. It can say more, so this waits until the lines are
         // no longer being walked.
-        for (const auto& [speaker, topic] : finished)
-            mObjects.trigger(
-                speaker, FalloutScript::BlockType::SayToDone, 0, [topic = topic](const FalloutScript::Block& block) {
-                    return FalloutScript::blockIsForForm(block, topic);
-                });
+        for (const Over& over : finished)
+        {
+            if (over.mEndInfo != 0)
+            {
+                const std::lock_guard lock(mDialogueMutex);
+                ESM::FormId base;
+                if (baseOf(over.mSpeaker, base))
+                    mDialogue.finishSaid({ over.mSpeaker, numberOf(base) }, over.mEndInfo, over.mTopic);
+            }
+            if (over.mDone)
+                mObjects.trigger(over.mSpeaker, FalloutScript::BlockType::SayToDone, 0,
+                    [topic = over.mTopic](
+                        const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, topic); });
+        }
     }
 
     bool FalloutScripts::sayConversationLine(std::size_t index)

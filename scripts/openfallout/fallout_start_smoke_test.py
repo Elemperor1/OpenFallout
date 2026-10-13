@@ -756,6 +756,7 @@ return {
             if tag == 'button' then
                 world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
                 print('OFTEST', 'dialogue said', tostring(world.globals.@SAID@))
+                print('OFTEST', 'dialogue ordered', tostring(world.globals.@ORDERED@))
                 print('OFTEST', 'dialogue blocks', tostring(world.globals.@WRONG@), tostring(world.globals.@TALK@),
                     tostring(world.globals.@BOX@), tostring(world.globals.@ELSEWHERE@))
             end
@@ -766,7 +767,8 @@ return {
     "@END@", plugin.DIALOGUE_GLOBALS["end"][1]).replace("@BUTTON@", plugin.DIALOGUE_GLOBALS["button"][1]).replace(
     "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1]).replace("@WRONG@", plugin.DIALOGUE_GLOBALS["wrong"][1]).replace(
     "@TALK@", plugin.DIALOGUE_GLOBALS["talk"][1]).replace("@BOX@", plugin.DIALOGUE_GLOBALS["box"][1]).replace(
-    "@ELSEWHERE@", plugin.DIALOGUE_GLOBALS["elsewhere"][1])
+    "@ELSEWHERE@", plugin.DIALOGUE_GLOBALS["elsewhere"][1]).replace(
+    "@ORDERED@", plugin.DIALOGUE_GLOBALS["ordered"][1])
 
 # The making of the character, in an engine of its own because its screens pause the game. A script of the world sets the
 # global that the script of a quest waits for, the script opens the menus (the race, then the name, SPECIAL with the
@@ -1769,6 +1771,12 @@ def check_dialogue(text):
     if not said or said[-1] != "1" or any(value not in ("0", "1") for value in said):
         problems.append("the talker was made to say a topic once, so the Begin SayToDone block of its script should have "
                         f"run once by the time the button was read: {said}")
+
+    # The end script of the response that was said had run by then (it sets a global that the block reads): once
+    ordered = lines("ordered")
+    if not ordered or ordered[-1] != "1" or any(value not in ("0", "1") for value in ordered):
+        problems.append("the end script of a response that is said should have run, when its line was over, before the "
+                        f"Begin SayToDone block of the talker did: {ordered}")
 
     # The blocks name what they are for: the one for a topic that was not said and the one for a menu that never opened
     # did not run, and the ones for the conversation and for the message box ran while those were open
