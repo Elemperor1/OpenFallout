@@ -147,7 +147,16 @@ namespace FalloutScript
         /// target are about (the player when it is 0). Returns the lines, which are empty when no response can be
         /// said. With `followUps` the response goes on as it does in a conversation (StartConversation between two
         /// characters): the first follow-up that can be said comes after it, and so on, and the lines are all of them.
-        DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0, bool followUps = false);
+        /// With `deferEnd` the end scripts of the responses and the topics they add are left for finishSaid(), which
+        /// the host calls when the speaker has said them (the games run them when the line is over, and a quest that
+        /// waits for the end of one line before it says the next relies on it); a response with no lines has its end
+        /// script run here, as there is nothing to wait for. With `followUps` as well the end scripts run here: which
+        /// follow-up comes next depends on what the end script of the response before it did.
+        DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0, bool followUps = false,
+            bool deferEnd = false);
+        /// What a response said with `deferEnd` does when it is over: its end script (which sees the response, as in
+        /// a conversation) and the topics it adds. `info` is the response as the lines of the view name it.
+        void finishSaid(const DialogueSpeaker& speaker, FormId info, FormId topic);
 
         // Looking
 
@@ -174,6 +183,8 @@ namespace FalloutScript
 
         std::vector<DialogueOption> options(const DialogueSpeaker& speaker, const std::vector<ESM::FormId>* choices);
         bool addOption(std::vector<DialogueOption>& options, FormId topic, const DialogueSpeaker& speaker);
+        /// The view of the response (its lines), without its scripts
+        DialogueView viewOf(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic) const;
         /// The view of the response being said, after its start script ran. The topic is the one it was picked under,
         /// or 0 for the topic of the record.
         DialogueView speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic = 0);

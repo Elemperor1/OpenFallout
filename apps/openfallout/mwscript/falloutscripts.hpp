@@ -320,6 +320,12 @@ namespace OFScript
             bool mEnd = false;
             /// The topic that was said, which the script of the speaker is told of (Begin SayToDone Topic)
             FalloutScript::FormId mTopic = 0;
+            /// The response that this is the last line of: its end script runs, and the topics it adds are given, when
+            /// the line is over (and before the script of the speaker is told that it has said what it was told to)
+            FalloutScript::FormId mEndInfo = 0;
+            /// The record of the speaker, kept with the line: a speaker that was made while the game runs and has left
+            /// the loaded cells has no reference to tell it by when the response ends
+            FalloutScript::FormId mSpeakerBase = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };
@@ -511,6 +517,8 @@ namespace OFScript
         std::atomic<int> mConversationVoice{ 0 };
         /// The characters that say lines outside of a conversation (the thread of the frame only)
         std::vector<Saying> mSayings;
+        /// The speakers and topics that sayTopic has logged (the first time is logged), under mDialogueMutex
+        std::set<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mSayLogged;
         FalloutScript::FormId mPlayer;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once

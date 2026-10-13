@@ -321,7 +321,8 @@ namespace FalloutScript
         mInterpreter.runResult(instance);
     }
 
-    DialogueView DialogueManager::speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic)
+    DialogueView DialogueManager::viewOf(
+        const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic) const
     {
         const FormId id = toId(info.mId);
         DialogueView view;
@@ -342,6 +343,12 @@ namespace FalloutScript
             line.mSpeakerAnimation = toId(response.mSpeakerAnimation);
             line.mListenerAnimation = toId(response.mListenerAnimation);
         }
+        return view;
+    }
+
+    DialogueView DialogueManager::speak(const ESM4::DialogInfo& info, const DialogueSpeaker& speaker, FormId topic)
+    {
+        DialogueView view = viewOf(info, speaker, topic);
         // The script that runs when the response starts. The view is kept for the commands that ask what is said.
         const DialogueView outer = mView;
         mView = view;
@@ -469,8 +476,28 @@ namespace FalloutScript
         mView.mOptions.clear();
     }
 
-    DialogueView DialogueManager::say(const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps)
+    void DialogueManager::finishSaid(const DialogueSpeaker& speaker, FormId infoId, FormId topic)
     {
+        const auto found = mInfoIndex.find(infoId);
+        if (found == mInfoIndex.end())
+            return;
+        const ESM4::DialogInfo& info = *found->second;
+        // As in finish(), the end script sees the response that was said
+        const DialogueView outer = mView;
+        mView = viewOf(info, speaker, topic);
+        mView.mSpeaking = false;
+        runScript(info.mEndScript, speaker);
+        mView = outer;
+        for (const ESM::FormId added : info.mAddTopics)
+            addTopic(toId(added));
+    }
+
+    DialogueView DialogueManager::say(
+        const DialogueSpeaker& speaker, FormId topic, FormId listener, bool followUps, bool deferEnd)
+    {
+        // The follow-ups are chosen by the conditions, which what the end script of a response did can change: with
+        // them the end scripts run as the responses are said
+        deferEnd = deferEnd && !followUps;
         // The listener matters for the choice of the responses (their conditions) and for nothing after it
         const FormId outerListener = mListener;
         mListener = listener;
@@ -492,13 +519,16 @@ namespace FalloutScript
         {
             chain.insert(toId(info->mId));
             markSaid(*info, speaker);
-            // As in finish(), the end script sees the response that was said
-            const DialogueView outer = mView;
-            mView = current;
-            runScript(info->mEndScript, speaker);
-            mView = outer;
-            for (const ESM::FormId added : info->mAddTopics)
-                addTopic(toId(added));
+            if (!deferEnd || info->mResponses.empty())
+            {
+                // As in finish(), the end script sees the response that was said
+                const DialogueView outer = mView;
+                mView = current;
+                runScript(info->mEndScript, speaker);
+                mView = outer;
+                for (const ESM::FormId added : info->mAddTopics)
+                    addTopic(toId(added));
+            }
 
             // The first follow-up that can be said goes on, none is said twice, and a goodbye is the end
             const ESM4::DialogInfo* next = nullptr;

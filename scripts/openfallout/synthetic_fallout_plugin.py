@@ -300,7 +300,9 @@ BUTTON_MESSAGE_TEXT = "Pick one of the buttons."
 BUTTON_TEXTS = ("First choice", "Hidden choice", "Third choice")
 BUTTON_PICKED = 2
 # The end script of the question makes the talker say a topic outside of the conversation (Say), and when the talker has
-# said it the Begin SayToDone block of its script adds one to a global
+# said it the Begin SayToDone block of its script adds one to a global. The end script of the response that is said sets
+# another global, and the block adds one to a third only when that one is set by then: a response ends when its line is
+# over, and its end script has run by the time the talker is told that it is done.
 SAID_TOPIC_ID = 0x8F3
 SAID_INFO_ID = 0x8F4
 SAID_TEXT = "Said aloud."
@@ -311,7 +313,8 @@ SAID_TEXT = "Said aloud."
 DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFTestDialogueEnd"),
                     "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid"),
                     "wrong": (0x8F5, "OFTestDialogueWrong"), "talk": (0x8F6, "OFTestDialogueTalk"),
-                    "box": (0x8F7, "OFTestDialogueBox"), "elsewhere": (0x8F8, "OFTestDialogueElsewhere")}
+                    "box": (0x8F7, "OFTestDialogueBox"), "elsewhere": (0x8F8, "OFTestDialogueElsewhere"),
+                    "said_end": (0x913, "OFTestDialogueSaidEnd"), "ordered": (0x914, "OFTestDialogueOrdered")}
 MENU_NUMBERS = {"talk": 1009, "box": 1001, "elsewhere": 1074}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
@@ -397,7 +400,7 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x912 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x914 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and never changed), and so has the package that
 # the conditional character follows first, for as long as quest C is below QUEST_C_STAGE (a Guard package at the place
@@ -815,7 +818,12 @@ def button_script():
             sf.set_to(sf.global_target(button),
                       sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("+")),
             sf.statement(sf.END_IF)])),
-        sf.block(sf.SAY_TO_DONE, count("said"), names=sf.form_argument(script.form(SAID_TOPIC_ID))),
+        sf.block(sf.SAY_TO_DONE, b"".join([
+            count("said"),
+            sf.branch(sf.IF, sf.global_target(script.form(DIALOGUE_GLOBALS["said_end"][0])) + sf.number("1")
+                      + sf.operator("==")),
+            count("ordered"),
+            sf.statement(sf.END_IF)]), names=sf.form_argument(script.form(SAID_TOPIC_ID))),
         sf.block(sf.SAY_TO_DONE, count("wrong"), names=sf.form_argument(script.form(ADDED_TOPIC_ID))),
         *(sf.block(sf.MENU_MODE_BLOCK, count(name), names=sf.int_argument(number))
           for name, number in MENU_NUMBERS.items()))
@@ -1505,7 +1513,7 @@ def dialogue():
             response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end,
                      say=SAID_TOPIC_ID)]),
         topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
-        topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT)]),
+        topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT, end=DIALOGUE_GLOBALS["said_end"][0])]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
                                               sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),

@@ -109,4 +109,18 @@ namespace OFMechanics
             return to;
         return from + way * (distance / length);
     }
+
+    bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience)
+    {
+        // A step that would bring the actor within the distance blocks it before it is near the player
+        if (!nearPlayer && !inTheWay)
+            state = FalloutYield();
+        if (state.mPassing || !inTheWay)
+            return false;
+        state.mWaited += duration;
+        if (state.mWaited < patience)
+            return true;
+        state.mPassing = true;
+        return false;
+    }
 }
