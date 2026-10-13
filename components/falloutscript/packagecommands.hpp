@@ -20,6 +20,9 @@ namespace FalloutScript
         virtual void removeScriptPackage(FormId actor) = 0;
         /// The character looks at its packages again, now and not at the next time it does
         virtual void evaluatePackage(FormId actor) = 0;
+        /// The character's AI starts over: it drops what it was doing (it gets up from the furniture it uses) and looks
+        /// at its packages again
+        virtual void resetAI(FormId actor) { evaluatePackage(actor); }
 
         /// The package the character follows now (0 for none, and for a character the host does not know or can not
         /// tell about)

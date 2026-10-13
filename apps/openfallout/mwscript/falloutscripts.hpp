@@ -292,6 +292,7 @@ namespace OFScript
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
         void removeScriptPackage(FalloutScript::FormId actor) override;
         void evaluatePackage(FalloutScript::FormId actor) override;
+        void resetAI(FalloutScript::FormId actor) override;
         FalloutScript::FormId currentPackage(FalloutScript::FormId actor) override;
 
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;

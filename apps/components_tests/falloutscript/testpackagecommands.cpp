@@ -30,12 +30,14 @@ namespace
     constexpr std::uint16_t OpAddScriptPackage = 0x1097;
     constexpr std::uint16_t OpRemoveScriptPackage = 0x1098;
     constexpr std::uint16_t OpGetIsCurrentPackage = 0x10A1;
+    constexpr std::uint16_t OpResetAI = 0x11FA;
 
     class FakeActors : public FalloutScript::PackageWorld
     {
     public:
         std::map<FormId, std::vector<FormId>> mPackages;
         std::vector<FormId> mEvaluated;
+        std::vector<FormId> mReset;
         std::map<FormId, FormId> mCurrent;
 
         void addScriptPackage(FormId actor, FormId package) override { mPackages[actor].push_back(package); }
@@ -45,6 +47,7 @@ namespace
                 packages.pop_back();
         }
         void evaluatePackage(FormId actor) override { mEvaluated.push_back(actor); }
+        void resetAI(FormId actor) override { mReset.push_back(actor); }
         FormId currentPackage(FormId actor) override
         {
             const auto found = mCurrent.find(actor);
@@ -91,6 +94,21 @@ namespace
         EXPECT_THAT(setup.mActors.mPackages,
             UnorderedElementsAre(Pair(guard, ElementsAre(patrol)), Pair(otherGuard, ElementsAre(patrol))));
         EXPECT_THAT(setup.mActors.mEvaluated, ElementsAre(guard));
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, reset_ai_starts_the_ai_of_the_character_over)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpResetAI, arguments(0)) + end());
+        setup.addScript(builder);
+        setup.mObjects.add(guard, scriptOfGuards);
+
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+
+        EXPECT_THAT(setup.mActors.mReset, ElementsAre(guard));
+        EXPECT_THAT(setup.mActors.mEvaluated, IsEmpty());
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

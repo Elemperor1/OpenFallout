@@ -2072,6 +2072,19 @@ namespace OFScript
         });
     }
 
+    void FalloutScripts::resetAI(FalloutScript::FormId actor)
+    {
+        // The character gets up from the furniture it uses, then looks at its packages again
+        runOnMainThread([this, actor] {
+            const OFWorld::Ptr ptr = findReference(actor);
+            if (!ptr.isEmpty() && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr())
+            {
+                leaveFurniture(ptr);
+                OFBase::Environment::get().getMechanicsManager()->evaluateFalloutPackages(ptr);
+            }
+        });
+    }
+
     FalloutScript::FormId FalloutScripts::currentPackage(FalloutScript::FormId actor)
     {
         // The characters make up their minds on the thread of the frame, which is the only one that may look
