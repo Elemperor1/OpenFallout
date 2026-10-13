@@ -1939,12 +1939,12 @@ namespace OFScript
         return true;
     }
 
-    void FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
+    bool FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
     {
         const FalloutScript::FormId user = scriptReferenceOf(actor);
         const FalloutScript::FormId seat = referenceOf(furniture);
         if (user == 0 || seat == 0)
-            return;
+            return true;
         osg::Vec3f where = actor.getRefData().getPosition().asVec3();
         const std::optional<FalloutScript::FurnitureSeat> entry = chooseSeat(user, furniture, where);
         if (!entry && !furnitureEntries(furniture).empty())
@@ -1952,7 +1952,7 @@ namespace OFScript
             // The model has places to use and none is free (or the record enables none): the games do nothing then
             Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " cannot use " << FalloutScript::hex(seat)
                              << ": no entry of its marker is free";
-            return;
+            return false;
         }
         Place seatPlace;
         Place userPlace;
@@ -1984,6 +1984,7 @@ namespace OFScript
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
                          << (place ? " (put there)" : "");
+        return true;
     }
 
     void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)

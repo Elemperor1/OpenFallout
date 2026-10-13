@@ -422,6 +422,9 @@ namespace OFMechanics
             return;
         const auto found = mMinds.find(ptr.mRef);
         Mind& mind = found != mMinds.end() ? *found->second : makeMind(ptr);
+        // A character in a piece of furniture gets up when it is told to follow, which no package change tells
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+            scripts->leaveFurniture(ptr);
         Command command;
         command.mPlayer = target == OFBase::Environment::get().getWorld()->getPlayerPtr();
         command.mTarget = target.getCellRef().getRefNum();
@@ -833,7 +836,7 @@ namespace OFMechanics
         void finishTravel(const Frame& frame, FalloutActors::Mind& mind)
         {
             const ESM4::AIPackage* package = mind.mPackage;
-            if (package == nullptr || package->mData.type != ESM4::Package_Travel || !mind.mDone.insert(package).second)
+            if (package == nullptr || package->mData.type != ESM4::Package_Travel || mind.mDone.count(package) != 0)
                 return;
             // A character that has got to a piece of furniture uses it, and the script of the package is told after
             // that, as the games tell it when the character is in place
@@ -841,9 +844,16 @@ namespace OFMechanics
             {
                 const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
                     ESM::RefNum(ESM::FormId::fromUint32(package->mLocation.location)));
-                if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId)
-                    frame.mScripts->useFurniture(mind.mPtr, place, true);
+                if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId
+                    && !frame.mScripts->useFurniture(mind.mPtr, place, true))
+                {
+                    // Every place of it is taken: the package is not done, and the character tries again later
+                    mind.mAtGoal = false;
+                    mind.mWait = giveUpTime;
+                    return;
+                }
             }
+            mind.mDone.insert(package);
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;

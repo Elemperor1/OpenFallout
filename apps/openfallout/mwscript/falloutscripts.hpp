@@ -134,8 +134,9 @@ namespace OFScript
         /// entry of the marker of the furniture that it uses, facing as the entry says (the player who activates a
         /// chair goes there at once, as in the games; there is no animation yet), or at the furniture when the model
         /// has no marker; a character that walked there is at it already. Does nothing for a furniture or an actor
-        /// that scripts have no number for.
-        void useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place);
+        /// that scripts have no number for. False when the model has entries and none is free (nothing is done then),
+        /// true otherwise.
+        bool useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place);
         /// The actor gets up from the furniture it uses (it is where it was: the games play an animation there)
         void leaveFurniture(const OFWorld::Ptr& actor);
         /// Where the actor would stand to use the furniture: the entry of its marker that the record enables, that no
