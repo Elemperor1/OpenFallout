@@ -347,6 +347,8 @@ namespace OFScript
         /// The character begins an exchange with another character: the topic is said (the greeting when none is
         /// named) and the other answers, as in a conversation with the player
         void converse(FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic);
+        /// The topic of a package: none (0) is the greeting, as it is with the player
+        FalloutScript::FormId packageTopic(FalloutScript::FormId topic);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();

@@ -1401,14 +1401,16 @@ namespace OFScript
         FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic)
     {
         // With no topic the exchange starts with the greeting, as it does with the player
-        FalloutScript::FormId first = topic;
-        if (first == 0)
-        {
-            const std::lock_guard lock(mDialogueMutex);
-            first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
-        }
-        if (first != 0)
+        if (const FalloutScript::FormId first = packageTopic(topic); first != 0)
             sayTopic(speaker, first, target, false, true);
+    }
+
+    FalloutScript::FormId FalloutScripts::packageTopic(FalloutScript::FormId topic)
+    {
+        if (topic != 0)
+            return topic;
+        const std::lock_guard lock(mDialogueMutex);
+        return mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
     }
 
     float FalloutScripts::lineSeconds(const std::string& text)
@@ -1728,7 +1730,7 @@ namespace OFScript
         if (package.mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo)
         {
             // One response of the topic, said to the player, and that is all
-            if (!sayTopic(reference, topic, 0, false, false))
+            if (!sayTopic(reference, packageTopic(topic), 0, false, false))
                 Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
                                  << ": there is nothing it can say";
             return true;
