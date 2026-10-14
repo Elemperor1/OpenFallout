@@ -26,5 +26,5 @@ openfallout --skip-menu --new-game --content Fallout3.esm \
     --data scripts/openfallout/autoplay --content autoplay.omwscripts
 ```
 
-The scripts need `core.messageBox` (Lua API revision 169). `scripts/openfallout/fallout_start_smoke_test.py --only newgame`
+The scripts need `core.messageBox` (Lua API revision 170). `scripts/openfallout/fallout_start_smoke_test.py --only newgame`
 runs the same files against the synthetic plugin.
