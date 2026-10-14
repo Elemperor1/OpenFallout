@@ -9,18 +9,24 @@ namespace FalloutScript
 {
     /// The settings of the games (the GMST records) that say how the actor values that depend on others are worked out.
     /// A setting that the files do not have keeps the value of New Vegas; Fallout 3 differs in the health a level gives
-    /// (10) and the action points an agility point gives (2), and its files say so.
+    /// (10) and the action points an agility point gives (2), and its files say so. The offsets are only known by their
+    /// names in the GECK (0 until the files say otherwise): they are added to the attribute before its multiplier.
     struct DerivedStatSettings
     {
         double mHealthEnduranceMult = 20; // fAVDHealthEnduranceMult, the player
+        double mHealthEnduranceOffset = 0; // fAVDHealthEnduranceOffset: added to the endurance before the multiplier
         double mHealthLevelMult = 5; // fAVDHealthLevelMult, the player
         double mNpcHealthEnduranceMult = 5; // fAVDNPCHealthEnduranceMult, everyone else
+        double mNpcHealthEnduranceOffset = 0; // fAVDNPCHealthEnduranceOffset
         double mNpcHealthLevelMult = 5; // fAVDNPCHealthLevelMult
         double mActionPointsBase = 65; // fAVDActionPointsBase
         double mActionPointsMult = 3; // fAVDActionPointsMult
         double mCarryWeightBase = 150; // fAVDCarryWeightsBase
         double mCarryWeightMult = 10; // fAVDCarryWeightMult
         double mMeleeDamageStrengthMult = 0.5; // fAVDMeleeDamageStrengthMult
+        double mMeleeDamageStrengthOffset = 0; // fAVDMeleeDamageStrengthOffset: added to the strength
+        double mCritLuckBase = 0; // fAVDCritLuckBase
+        double mCritLuckMult = 1; // fAVDCritLuckMult
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 
@@ -41,7 +47,7 @@ namespace FalloutScript
         /// What a hit with a melee weapon (and the hands) adds to its damage
         double meleeDamage(const DerivedStatSettings& settings, double strength);
         /// The chance of a critical hit in percent
-        double criticalChance(double luck);
+        double criticalChance(const DerivedStatSettings& settings, double luck);
     }
 }
 

@@ -1367,7 +1367,7 @@ namespace OFScript
             case AV::carryWeight:
                 return Derived::carryWeight(settings, permanent(AV::strength));
             case AV::criticalChance:
-                return Derived::criticalChance(permanent(AV::luck));
+                return Derived::criticalChance(settings, permanent(AV::luck));
             case AV::meleeDamage:
                 return Derived::meleeDamage(settings, permanent(AV::strength));
             case AV::health:

@@ -69,6 +69,28 @@ namespace
         EXPECT_EQ(npcHealth(DerivedStatSettings(), -100, 1, 1), 1);
     }
 
+    TEST(FalloutScriptDerivedStatsTest, the_offsets_of_the_files_move_the_attribute_before_it_is_multiplied)
+    {
+        // GECK: Starting Health = END * mult + (90 + mult * offset) + the share of the level
+        const DerivedStatSettings settings = settingsOf({ { "fAVDHealthEnduranceOffset", 1 },
+            { "fAVDNPCHealthEnduranceOffset", -1 }, { "fAVDMeleeDamageStrengthOffset", -5 }, { "fAVDCritLuckBase", 3 },
+            { "fAVDCritLuckMult", 2 } });
+        EXPECT_EQ(settings.mHealthEnduranceOffset, 1);
+        EXPECT_EQ(settings.mNpcHealthEnduranceOffset, -1);
+        EXPECT_EQ(playerHealth(settings, 95, 5, 1), 95 + 6 * 20 + 5);
+        EXPECT_EQ(npcHealth(settings, 50, 5, 1), 50 + 4 * 5 + 5);
+        EXPECT_EQ(meleeDamage(settings, 7), 1);
+        EXPECT_EQ(meleeDamage(settings, 2), 0); // never below nothing
+        EXPECT_EQ(criticalChance(settings, 5), 13);
+        EXPECT_EQ(criticalChance(settings, 60), 100);
+
+        // The files that do not name them keep the offsets at nothing, the critical chance that of the luck
+        const DerivedStatSettings none = settingsOf({});
+        EXPECT_EQ(none.mCritLuckBase, 0);
+        EXPECT_EQ(none.mCritLuckMult, 1);
+        EXPECT_EQ(none.mMeleeDamageStrengthOffset, 0);
+    }
+
     TEST(FalloutScriptDerivedStatsTest, the_other_stats_follow_the_attributes)
     {
         EXPECT_EQ(actionPoints(DerivedStatSettings(), 5), 80);
@@ -76,9 +98,9 @@ namespace
         EXPECT_EQ(carryWeight(DerivedStatSettings(), 5), 200);
         EXPECT_EQ(carryWeight(DerivedStatSettings(), 10), 250);
         EXPECT_EQ(meleeDamage(DerivedStatSettings(), 7), 3.5);
-        EXPECT_EQ(criticalChance(5), 5);
-        EXPECT_EQ(criticalChance(500), 100);
-        EXPECT_EQ(criticalChance(-3), 0);
+        EXPECT_EQ(criticalChance(DerivedStatSettings(), 5), 5);
+        EXPECT_EQ(criticalChance(DerivedStatSettings(), 500), 100);
+        EXPECT_EQ(criticalChance(DerivedStatSettings(), -3), 0);
     }
 
     // Records that work the derived values out the way the host does, from the attributes the actor value store tells

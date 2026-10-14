@@ -24,28 +24,33 @@ namespace FalloutScript
         if (!lookup)
             return settings;
         take(lookup, "fAVDHealthEnduranceMult", settings.mHealthEnduranceMult);
+        take(lookup, "fAVDHealthEnduranceOffset", settings.mHealthEnduranceOffset);
         take(lookup, "fAVDHealthLevelMult", settings.mHealthLevelMult);
         take(lookup, "fAVDNPCHealthEnduranceMult", settings.mNpcHealthEnduranceMult);
+        take(lookup, "fAVDNPCHealthEnduranceOffset", settings.mNpcHealthEnduranceOffset);
         take(lookup, "fAVDNPCHealthLevelMult", settings.mNpcHealthLevelMult);
         take(lookup, "fAVDActionPointsBase", settings.mActionPointsBase);
         take(lookup, "fAVDActionPointsMult", settings.mActionPointsMult);
         take(lookup, "fAVDCarryWeightsBase", settings.mCarryWeightBase);
         take(lookup, "fAVDCarryWeightMult", settings.mCarryWeightMult);
         take(lookup, "fAVDMeleeDamageStrengthMult", settings.mMeleeDamageStrengthMult);
+        take(lookup, "fAVDMeleeDamageStrengthOffset", settings.mMeleeDamageStrengthOffset);
+        take(lookup, "fAVDCritLuckBase", settings.mCritLuckBase);
+        take(lookup, "fAVDCritLuckMult", settings.mCritLuckMult);
         return settings;
     }
 
     double DerivedStats::playerHealth(
         const DerivedStatSettings& settings, double baseHealth, double endurance, int level)
     {
-        return std::max(
-            baseHealth + endurance * settings.mHealthEnduranceMult + atLeastOne(level) * settings.mHealthLevelMult,
+        return std::max(baseHealth + (endurance + settings.mHealthEnduranceOffset) * settings.mHealthEnduranceMult
+                + atLeastOne(level) * settings.mHealthLevelMult,
             1.0);
     }
 
     double DerivedStats::npcHealth(const DerivedStatSettings& settings, double baseHealth, double endurance, int level)
     {
-        return std::max(baseHealth + endurance * settings.mNpcHealthEnduranceMult
+        return std::max(baseHealth + (endurance + settings.mNpcHealthEnduranceOffset) * settings.mNpcHealthEnduranceMult
                 + atLeastOne(level) * settings.mNpcHealthLevelMult,
             1.0);
     }
@@ -62,11 +67,11 @@ namespace FalloutScript
 
     double DerivedStats::meleeDamage(const DerivedStatSettings& settings, double strength)
     {
-        return std::max(strength * settings.mMeleeDamageStrengthMult, 0.0);
+        return std::max((strength + settings.mMeleeDamageStrengthOffset) * settings.mMeleeDamageStrengthMult, 0.0);
     }
 
-    double DerivedStats::criticalChance(double luck)
+    double DerivedStats::criticalChance(const DerivedStatSettings& settings, double luck)
     {
-        return std::clamp(luck, 0.0, 100.0);
+        return std::clamp(settings.mCritLuckBase + luck * settings.mCritLuckMult, 0.0, 100.0);
     }
 }
