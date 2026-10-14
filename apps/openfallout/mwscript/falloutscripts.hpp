@@ -685,18 +685,23 @@ namespace OFScript
         std::map<FalloutScript::FormId, double> mGlobals;
         std::mutex mDerivedSettingsMutex;
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
-        /// The date the world starts at (the initial values of GameYear, GameMonth, GameDay and GameDaysPassed), read
-        /// when the first date global is asked for
+        /// The date the world starts at (the initial values of GameYear, GameMonth and GameDay), read when the first
+        /// date global is asked for
         struct CalendarStart
         {
             FalloutScript::GameDate mDate;
-            double mDaysPassed = 0;
-            int mMonthBase = 1;
         };
         std::mutex mCalendarMutex;
         std::optional<CalendarStart> mCalendarStart;
+        /// The days that scripts moved the date by when they set GameYear, GameMonth or GameDay
+        long long mCalendarShift = 0;
         /// The date of the world now, false when the files do not have the globals of the date
         bool currentDate(FalloutScript::GameDate& date);
+        /// The caller holds mCalendarMutex
+        bool dateNow(FalloutScript::GameDate& date);
+        /// A script sets one of the three date globals (0 the year, 1 the month, 2 the day): the date moves to it and
+        /// goes on from there. False when the files have no date.
+        bool setDate(int part, double value);
         /// Editor ids in lower case, made when first asked for
         mutable bool mNamesBuilt = false;
         mutable std::map<std::string, FalloutScript::FormId> mQuestNames;

@@ -215,33 +215,62 @@ namespace
         EXPECT_FLOAT_EQ(ending[0].mGame.mSightUsage, 0.f);
     }
 
+    // Loads the one record of a plugin that is a Fallout 3 file (or of the header version the caller gives), by its
+    // record only: the group headers of Fallout have another size than the synthetic plugins have.
+    template <class Record>
+    Record loadFromAPlugin(float version, std::uint32_t formVersion, std::string_view type, const std::string& data)
+    {
+        std::string hedr;
+        append<float>(hedr, version);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+        const std::string plugin = versionedRecord("TES4", 0, subRecord("HEDR", hedr), formVersion)
+            + versionedRecord(type, 1, data, formVersion);
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        EXPECT_TRUE(reader.getRecordHeader());
+        reader.getRecordData();
+        Record result;
+        result.load(reader);
+        return result;
+    }
+
     TEST(ESM4CombatDataTest, readsTheRatingAndThresholdOfArmor)
     {
         // Fallout 3: the rating times 100 and flags
         std::string fo3;
         append<std::int16_t>(fo3, 2500);
         append<std::uint16_t>(fo3, 1);
-        const std::vector<ESM4::Armor> first
-            = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 1, zString("EDID", "A") + subRecord("DNAM", fo3)));
-        ASSERT_TRUE(first.at(0).mHasRating);
-        EXPECT_FLOAT_EQ(first[0].mRating, 25.f);
-        EXPECT_EQ(first[0].mDnamFlags, 1);
-        EXPECT_FLOAT_EQ(first[0].mDamageThreshold, 0.f);
+        const ESM4::Armor first
+            = loadFromAPlugin<ESM4::Armor>(1.34f, 15, "ARMO", zString("EDID", "A") + subRecord("DNAM", fo3));
+        ASSERT_TRUE(first.mHasRating);
+        EXPECT_FLOAT_EQ(first.mRating, 25.f);
+        EXPECT_EQ(first.mDnamFlags, 1);
+        EXPECT_FLOAT_EQ(first.mDamageThreshold, 0.f);
 
         // New Vegas: then the damage threshold
         std::string nv = fo3;
         append<float>(nv, 12.5f);
         append<std::uint32_t>(nv, 0);
-        const std::vector<ESM4::Armor> second
-            = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 1, zString("EDID", "B") + subRecord("DNAM", nv)));
-        ASSERT_TRUE(second.at(0).mHasRating);
-        EXPECT_FLOAT_EQ(second[0].mRating, 25.f);
-        EXPECT_FLOAT_EQ(second[0].mDamageThreshold, 12.5f);
+        const ESM4::Armor second
+            = loadFromAPlugin<ESM4::Armor>(1.34f, 15, "ARMO", zString("EDID", "B") + subRecord("DNAM", nv));
+        ASSERT_TRUE(second.mHasRating);
+        EXPECT_FLOAT_EQ(second.mRating, 25.f);
+        EXPECT_FLOAT_EQ(second.mDamageThreshold, 12.5f);
 
         // Another size is not this record
-        const std::vector<ESM4::Armor> other = loadRecords<ESM4::Armor>(
-            "ARMO", record("ARMO", 1, zString("EDID", "C") + subRecord("DNAM", std::string(8, '\0'))));
-        EXPECT_FALSE(other.at(0).mHasRating);
+        const ESM4::Armor other = loadFromAPlugin<ESM4::Armor>(
+            1.34f, 15, "ARMO", zString("EDID", "C") + subRecord("DNAM", std::string(8, '\0')));
+        EXPECT_FALSE(other.mHasRating);
+    }
+
+    TEST(ESM4CombatDataTest, doesNotReadTheArmorRatingOfSkyrimAsOneOfFallout)
+    {
+        // The DNAM of Skyrim has the size of the one of Fallout 3 and holds one number
+        std::string skyrim;
+        append<std::int32_t>(skyrim, 2500);
+        const ESM4::Armor armor
+            = loadFromAPlugin<ESM4::Armor>(0.94f, 43, "ARMO", zString("EDID", "S") + subRecord("DNAM", skyrim));
+        EXPECT_FALSE(armor.mHasRating);
     }
 
     std::string aiData()
@@ -412,20 +441,48 @@ namespace
         stats[4] = 80;
         stats[8] = 14;
 
-        return header()
-            + topGroup("WEAP",
-                record("WEAP", 0x1001, weaponRecord("Rifle", 5))
-                    + record("WEAP", 0x1002, weaponRecord("Pistol", 3))
+        // A Fallout file: its records and groups have the headers of Fallout, 24 bytes
+        const auto fo = [](std::string_view type, std::uint32_t id, std::string_view data, std::uint32_t flags = 0) {
+            std::string result(type);
+            append<std::uint32_t>(result, static_cast<std::uint32_t>(data.size()));
+            append<std::uint32_t>(result, flags);
+            append<std::uint32_t>(result, id);
+            append<std::uint32_t>(result, 0); // revision
+            append<std::uint16_t>(result, 15); // form version
+            append<std::uint16_t>(result, 0);
+            result.append(data);
+            return result;
+        };
+        const auto group = [](std::string_view type, std::string_view children) {
+            std::string result("GRUP");
+            append<std::uint32_t>(result, static_cast<std::uint32_t>(24 + children.size()));
+            result.append(type);
+            append<std::int32_t>(result, 0); // top level group
+            append<std::uint16_t>(result, 0); // stamp
+            append<std::uint16_t>(result, 0);
+            append<std::uint16_t>(result, 0); // version
+            append<std::uint16_t>(result, 0);
+            result.append(children);
+            return result;
+        };
+        std::string hedr;
+        append<float>(hedr, 1.34f);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+
+        return fo("TES4", 0, subRecord("HEDR", hedr))
+            + group("WEAP",
+                fo("WEAP", 0x1001, weaponRecord("Rifle", 5))
+                    + fo("WEAP", 0x1002, weaponRecord("Pistol", 3))
                     // an animation type that does not exist
-                    + record("WEAP", 0x1003, weaponRecord("Odd", 40)) + record("WEAP", 0x1004, weaponRecord("Gone", 5))
-                    + record("WEAP", 0x1004, "", ESM4::Rec_Deleted))
-            + topGroup("PROJ", record("PROJ", 0x2001, zString("EDID", "Bullet") + subRecord("DATA", bytes)))
-            + topGroup("ARMO", record("ARMO", 0x3001, zString("EDID", "Suit") + subRecord("DNAM", armour)))
-            + topGroup("CREA",
-                record(
-                    "CREA", 0x4001, zString("EDID", "Beast") + subRecord("AIDT", aiData()) + subRecord("DATA", stats)))
-            + topGroup("ALCH",
-                record("ALCH", 0x5001,
+                    + fo("WEAP", 0x1003, weaponRecord("Odd", 40)) + fo("WEAP", 0x1004, weaponRecord("Gone", 5))
+                    + fo("WEAP", 0x1004, "", ESM4::Rec_Deleted))
+            + group("PROJ", fo("PROJ", 0x2001, zString("EDID", "Bullet") + subRecord("DATA", bytes)))
+            + group("ARMO", fo("ARMO", 0x3001, zString("EDID", "Suit") + subRecord("DNAM", armour)))
+            + group("CREA",
+                fo("CREA", 0x4001, zString("EDID", "Beast") + subRecord("AIDT", aiData()) + subRecord("DATA", stats)))
+            + group("ALCH",
+                fo("ALCH", 0x5001,
                     zString("EDID", "Stimpak") + subRecord("DATA", weight)
                         + valueSubRecord<std::uint32_t>("EFID", 0x00010090) + subRecord("EFIT", effect)));
     }

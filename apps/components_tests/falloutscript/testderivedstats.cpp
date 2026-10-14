@@ -231,4 +231,34 @@ namespace
         EXPECT_EQ(nearest.mDay, 31);
         EXPECT_EQ(calendar.after({ 2277, 2, 10 }, -5).mDay, 10);
     }
+
+    TEST(FalloutScriptCalendarTest, a_date_is_its_day_in_the_count_of_days_and_back)
+    {
+        for (const int base : { 0, 1 })
+        {
+            const Calendar calendar(base);
+            const GameDate start{ 2277, base + 9, 23 };
+            for (const long long days : { 0ll, 1ll, 8ll, 9ll, 39ll, 70ll, 365ll, 1000ll })
+            {
+                const GameDate date = calendar.after(start, days);
+                EXPECT_EQ(calendar.dayNumber(date), calendar.dayNumber(start) + days) << "base " << base;
+                const GameDate again = calendar.dateOf(calendar.dayNumber(date));
+                EXPECT_EQ(again.mYear, date.mYear);
+                EXPECT_EQ(again.mMonth, date.mMonth);
+                EXPECT_EQ(again.mDay, date.mDay);
+            }
+        }
+    }
+
+    TEST(FalloutScriptCalendarTest, a_day_before_the_first_one_is_the_first_one)
+    {
+        const Calendar calendar(0);
+        const GameDate first = calendar.dateOf(-12);
+        EXPECT_EQ(first.mYear, 0);
+        EXPECT_EQ(first.mMonth, 0);
+        EXPECT_EQ(first.mDay, 1);
+        EXPECT_EQ(calendar.dayNumber({ 0, 0, 1 }), 0);
+        EXPECT_EQ(calendar.dayNumber({ 1, 0, 1 }), 365);
+        EXPECT_EQ(calendar.dayNumber({ 0, 11, 31 }), 364);
+    }
 }

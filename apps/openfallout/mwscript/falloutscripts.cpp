@@ -333,6 +333,10 @@ namespace OFScript
             const std::lock_guard lock(mFurnitureMutex);
             mFurniture.clear();
         }
+        {
+            const std::lock_guard lock(mCalendarMutex);
+            mCalendarShift = 0;
+        }
         mActors.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -2986,9 +2990,28 @@ namespace OFScript
         return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sDaysPassed) : 0.0;
     }
 
-    bool FalloutScripts::currentDate(FalloutScript::GameDate& date)
+    namespace
     {
-        const std::lock_guard lock(mCalendarMutex);
+        /// The games count the months from 0 (the GECK documents GameMonth as 0 to 11)
+        constexpr int calendarMonthBase = 0;
+        /// A new game of the world starts counting its days at 1
+        constexpr double newGameDaysPassed = 1.0;
+
+        /// 0 for GameYear, 1 for GameMonth, 2 for GameDay, -1 for any other global
+        int datePartOf(std::string_view editorId)
+        {
+            if (Misc::StringUtils::ciEqual(editorId, "GameYear"))
+                return 0;
+            if (Misc::StringUtils::ciEqual(editorId, "GameMonth"))
+                return 1;
+            if (Misc::StringUtils::ciEqual(editorId, "GameDay"))
+                return 2;
+            return -1;
+        }
+    }
+
+    bool FalloutScripts::dateNow(FalloutScript::GameDate& date)
+    {
         if (!mCalendarStart)
         {
             CalendarStart start;
@@ -2997,37 +3020,63 @@ namespace OFScript
             bool day = false;
             for (const ESM4::GlobalVariable& global : mStore.get<ESM4::GlobalVariable>())
             {
-                if (Misc::StringUtils::ciEqual(global.mEditorId, "GameYear"))
+                switch (datePartOf(global.mEditorId))
                 {
-                    year = true;
-                    start.mDate.mYear = static_cast<int>(global.mValue);
+                    case 0:
+                        year = true;
+                        start.mDate.mYear = static_cast<int>(global.mValue);
+                        break;
+                    case 1:
+                        month = true;
+                        start.mDate.mMonth = static_cast<int>(global.mValue);
+                        break;
+                    case 2:
+                        day = true;
+                        start.mDate.mDay = static_cast<int>(global.mValue);
+                        break;
+                    default:
+                        break;
                 }
-                else if (Misc::StringUtils::ciEqual(global.mEditorId, "GameMonth"))
-                {
-                    month = true;
-                    start.mDate.mMonth = static_cast<int>(global.mValue);
-                }
-                else if (Misc::StringUtils::ciEqual(global.mEditorId, "GameDay"))
-                {
-                    day = true;
-                    start.mDate.mDay = static_cast<int>(global.mValue);
-                }
-                else if (Misc::StringUtils::ciEqual(global.mEditorId, "GameDaysPassed"))
-                    start.mDaysPassed = global.mValue;
             }
             // Files that do not have the three globals (or are not loaded yet) have no date, and are asked again
             if (!year || !month || !day)
                 return false;
-            // Both games begin in October, which tells whether their files count the months from 0 (9) or from 1 (10)
-            start.mMonthBase = start.mDate.mMonth == 9 ? 0 : 1;
             mCalendarStart = start;
         }
         const OFBase::World* world = OFBase::Environment::get().getWorld();
         if (world == nullptr)
             return false;
-        const double passed = world->getGlobalFloat(OFWorld::Globals::sDaysPassed) - mCalendarStart->mDaysPassed;
-        date = FalloutScript::Calendar(mCalendarStart->mMonthBase)
-                   .after(mCalendarStart->mDate, static_cast<long long>(std::floor(std::max(passed, 0.0))));
+        // The days of the world pass from the new game's day, whatever the record of GameDaysPassed starts at
+        const double passed = world->getGlobalFloat(OFWorld::Globals::sDaysPassed) - newGameDaysPassed;
+        const FalloutScript::Calendar calendar(calendarMonthBase);
+        date = calendar.dateOf(calendar.dayNumber(mCalendarStart->mDate)
+            + static_cast<long long>(std::floor(std::max(passed, 0.0))) + mCalendarShift);
+        return true;
+    }
+
+    bool FalloutScripts::currentDate(FalloutScript::GameDate& date)
+    {
+        const std::lock_guard lock(mCalendarMutex);
+        return dateNow(date);
+    }
+
+    bool FalloutScripts::setDate(int part, double value)
+    {
+        const std::lock_guard lock(mCalendarMutex);
+        FalloutScript::GameDate now;
+        if (!dateNow(now))
+            return false;
+        FalloutScript::GameDate wanted = now;
+        const int whole = static_cast<int>(std::clamp(std::floor(value), -1.0e6, 1.0e6));
+        if (part == 0)
+            wanted.mYear = whole;
+        else if (part == 1)
+            wanted.mMonth = whole;
+        else
+            wanted.mDay = whole;
+        const FalloutScript::Calendar calendar(calendarMonthBase);
+        // The date goes on from the one the script gave; a day that does not exist in its month is the nearest one
+        mCalendarShift += calendar.dayNumber(wanted) - calendar.dayNumber(now);
         return true;
     }
 
@@ -3044,16 +3093,13 @@ namespace OFScript
                 return true;
             }
         }
-        // The date moves with the days that pass, unless a script has set the global
-        if (mGlobals.find(global) == mGlobals.end())
+        // The date moves with the days that pass; a script that sets it moves the date to the one it gives
+        if (const int part = datePartOf(record->mEditorId); part >= 0)
         {
             FalloutScript::GameDate date;
-            const bool isYear = Misc::StringUtils::ciEqual(record->mEditorId, "GameYear");
-            const bool isMonth = Misc::StringUtils::ciEqual(record->mEditorId, "GameMonth");
-            const bool isDay = Misc::StringUtils::ciEqual(record->mEditorId, "GameDay");
-            if ((isYear || isMonth || isDay) && currentDate(date))
+            if (currentDate(date))
             {
-                value = isYear ? date.mYear : isMonth ? date.mMonth : date.mDay;
+                value = part == 0 ? date.mYear : part == 1 ? date.mMonth : date.mDay;
                 return true;
             }
         }
@@ -3075,6 +3121,8 @@ namespace OFScript
                 return true;
             }
         }
+        if (const int part = datePartOf(record->mEditorId); part >= 0 && setDate(part, value))
+            return true;
         mGlobals[global] = fitToType(record->mType, value);
         return true;
     }

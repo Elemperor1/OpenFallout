@@ -13,7 +13,7 @@ namespace FalloutScript
 
     /// The calendar of the games: twelve months of the usual lengths and no leap year (the calendar of the game world
     /// that this engine comes from has the same). The first month is January, and the number the games give it is the
-    /// base: 1 when they count from 1.
+    /// base: the GECK documents GameMonth as 0 to 11.
     class Calendar
     {
     public:
@@ -31,7 +31,15 @@ namespace FalloutScript
         /// day out of range) is taken to the nearest date there is. Nothing happens for a negative number of days.
         GameDate after(GameDate start, long long days) const;
 
+        /// The number of the day in a count that begins with the first day of year 0 (a date that is none is taken to
+        /// the nearest date there is)
+        long long dayNumber(GameDate date) const;
+        /// The date of a day in that count (a number below 0 is the first day)
+        GameDate dateOf(long long dayNumber) const;
+
     private:
+        GameDate normalized(GameDate date) const;
+
         int mMonthBase;
     };
 }

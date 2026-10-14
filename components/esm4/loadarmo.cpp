@@ -72,7 +72,7 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("DNAM"):
                 // Fallout 3 and New Vegas: the armor rating (a hundred times what the games show) and flags, then (New
                 // Vegas) the damage threshold. The DNAM of Skyrim and Fallout 4 is another thing.
-                if (subHdr.dataSize == 4 || subHdr.dataSize == 12)
+                if (reader.isFalloutFile() && (subHdr.dataSize == 4 || subHdr.dataSize == 12))
                 {
                     std::int16_t rating;
                     reader.get(rating);
