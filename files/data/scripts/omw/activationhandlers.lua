@@ -12,7 +12,10 @@ local function ESM4DoorActivation(door, actor)
     local Door4 = types.ESM4Door
     core.sound.playSound3d(Door4.record(door).openSound, actor)
     if Door4.isTeleport(door) then
-        actor:teleport(Door4.destCell(door), Door4.destPosition(door), Door4.destRotation(door))
+        -- A script can have an object that is not an actor activate a door: nothing goes through it
+        if types.Actor.objectIsInstance(actor) then
+            actor:teleport(Door4.destCell(door), Door4.destPosition(door), Door4.destRotation(door))
+        end
     else
         door.enabled = false
         async:newSimulationTimer(5, EnableObject, door)
@@ -43,7 +46,10 @@ local function onActivate(obj, actor)
     if handled then
         return
     end
-    types.Actor.activeEffects(actor):remove('invisibility')
+    -- The activator of a script can be any object (a door that activates itself), and only an actor loses its invisibility
+    if types.Actor.objectIsInstance(actor) then
+        types.Actor.activeEffects(actor):remove('invisibility')
+    end
     world._runStandardActivationAction(obj, actor)
 end
 

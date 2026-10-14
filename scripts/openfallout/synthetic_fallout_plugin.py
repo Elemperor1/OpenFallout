@@ -1039,11 +1039,12 @@ def object_script(kind):
     disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
     and kills it, reads the rank of the player in a faction and the suits of a creature placed as a levelled list; every
     frame it counts the frames, measures its distance to the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
-    second time, lets the object do what it does by default (Activate)."""
+    second time, lets the object do what it does by default (Activate), the third time activates the mover as the object."""
     sf = fallout_script
     script = sf.Script(0)
     index = ("interior", "exterior").index(kind)
     victim = script.form(VICTIM_REF_IDS[kind])
+    scripted = script.form(SCRIPTED_REF_IDS[kind])
     player = script.form(PLAYER_REFERENCE)
     walker = script.form(GATE_REF_IDS["scripted"][index])
     walker_package = script.form(SCRIPT_PACKAGE_IDS[kind])
@@ -1254,6 +1255,10 @@ def object_script(kind):
             add_one(activated),
             sf.branch(sf.IF, sf.global_target(activated) + sf.number("2") + sf.operator("==")),
             sf.call_counted(sf.ACTIVATE),
+            sf.statement(sf.END_IF),
+            # The third activation has the scripted object itself activate the mover: an activator that is no actor
+            sf.branch(sf.IF, sf.global_target(activated) + sf.number("3") + sf.operator("==")),
+            sf.call_on(mover, sf.ACTIVATE, sf.form_argument(scripted)),
             sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
     return record(b"SCPT", OBJECT_SCRIPT_IDS[kind], [zstr(b"EDID", "OFTestObjectScript" + kind.title()),

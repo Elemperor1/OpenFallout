@@ -74,13 +74,18 @@ return {
         { quest = 'CG04', stage = 15, file = 'Fallout3.esm', ref = 0x02A325, how = 'walk' },
         { quest = 'CG04', stage = 18, file = 'Fallout3.esm', ref = 0x0230E3, how = 'activate' },
         { quest = 'CG04', stage = 20, file = 'Fallout3.esm', ref = 0x0230E3, how = 'activate' },
-        { quest = 'CG04', stage = 21, file = 'Fallout3.esm', ref = 0x02D4B6, how = 'walk', tries = 1 },
-        { quest = 'CG04', stage = 22, file = 'Fallout3.esm', ref = 0x02D4B6, how = 'walk', tries = 1 },
-        { quest = 'CG04', stage = 23, file = 'Fallout3.esm', ref = 0x02D4B6, how = 'walk', tries = 1 },
-        { quest = 'CG04', stage = 24, file = 'Fallout3.esm', ref = 0x02D4B6, how = 'walk', tries = 1 },
+        -- The stop boxes of the radroaches are in the atrium (cell 0x024511), and Lua reaches the objects of the loaded cells
+        -- only: the player goes through the door of the vault (activate) at 21 and then walks into the box at 33
+        { quest = 'CG04', stage = 21, file = 'Fallout3.esm', ref = 0x054285, how = 'activate', tries = 2 },
+        { quest = 'CG04', stage = 33, file = 'Fallout3.esm', ref = 0x02D4B6, how = 'walk', tries = 2 },
         { quest = 'CG04', stage = 35, file = 'Fallout3.esm', ref = 0x0230E1, how = 'activate' },
         { quest = 'CG04', stage = 38, file = 'Fallout3.esm', ref = 0x0230E4, how = 'activate' },
         { quest = 'CG04', stage = 50, file = 'Fallout3.esm', ref = 0x057E98, how = 'walk' },
+        -- The switches in the reactor room are read with GetOpenState, which the engine does not have yet: the stand-ins
+        -- put the quest on to 110 and 120 (the door in the atrium that leads to the entrance, where the control panel is,
+        -- is used by the player first: the panel is in another cell)
+        { quest = 'CG04', stage = 60, how = 'setstage', to = 110, settle = 30 },
+        { quest = 'CG04', stage = 110, file = 'Fallout3.esm', ref = 0x05398D, how = 'activate', tries = 1 },
         { quest = 'CG04', stage = 110, how = 'setstage', to = 120 },
         { quest = 'CG04', stage = 120, file = 'Fallout3.esm', ref = 0x02987D, how = 'activate' },
         { quest = 'CG04', stage = 142, file = 'Fallout3.esm', ref = 0x0230E4, how = 'activate' },

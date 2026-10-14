@@ -1145,6 +1145,7 @@ local follower_ids, inverse_ids = { @FOLLOWER@ }, { @INVERSE@ }
 local locker_ids = { @LOCKER@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
+local by_object = 0
 
 local function find(ids)
     for _, id in ipairs(ids) do
@@ -1157,8 +1158,10 @@ return {
     engineHandlers = {
         -- The activations of the scripted object that reach the handlers of Lua: its OnActivate block takes the first
         -- one and passes the second on with Activate
-        onActivate = function(object)
+        onActivate = function(object, actor)
             if scripted_object ~= nil and object == scripted_object then defaults = defaults + 1 end
+            -- An activator that is no actor: the third activation has the scripted object activate the mover
+            if scripted_object ~= nil and actor == scripted_object then by_object = by_object + 1 end
         end,
         onUpdate = function(dt)
             elapsed = elapsed + dt
@@ -1184,6 +1187,7 @@ return {
                 local once = g.@ACTIVATED@
                 scripted:activateBy(player)
                 print('OFTEST', 'object activated', tostring(once), tostring(g.@ACTIVATED@))
+                scripted:activateBy(player)
                 victim.enabled = true
                 -- An object made while the game runs has no reference number of a plugin, and the scripts of Fallout
                 -- must let it be put in the cell and activated like the others
@@ -1199,6 +1203,7 @@ return {
                 print('OFTEST', 'object victim again', tostring(victim.enabled),
                     tostring(world.globals.@VICTIM_DISABLED@))
                 print('OFTEST', 'object defaults', tostring(defaults))
+                print('OFTEST', 'object by object', tostring(by_object))
                 local g = world.globals
                 print('OFTEST', 'object idler', tostring(g.@ITEMS@), tostring(g.@RANK@), tostring(g.@JOINED@),
                     tostring(g.@DEAD@))
@@ -2269,6 +2274,10 @@ def check_objects(text, scenario):
     if found is not None and found != ["1"]:
         problems.append("of the two activations only the second, which calls Activate, should reach the handlers of "
                         "Lua (1): " + str(found))
+    found = one("by object")
+    if found is not None and found != ["1"]:
+        problems.append("the third activation, in which the scripted object activates the mover, should reach the handlers "
+                        "of Lua with the object as the activator (1): " + str(found))
     found = one("idler")
     expected = [str(plugin.IDLER_ITEMS + plugin.IDLER_ADDS - plugin.IDLER_TAKES), str(plugin.IDLER_RANKS[0]), "0", "1"]
     if found is not None and found != expected:
