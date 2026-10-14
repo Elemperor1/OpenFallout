@@ -35,10 +35,11 @@ namespace FalloutScript
     };
 
     /// What the games work out from other actor values, in the formulas the settings of their files support: the base
-    /// health is the one that the record of the character gives
+    /// health is the one that the record of the character gives (100 for the player in both games, so that it has
+    /// 200 health at the first level with 5 endurance)
     namespace DerivedStats
     {
-        /// The player: the base health of the record, a share of its endurance and one for each level
+        /// The player: the base health of the record, a share of its endurance and one for each level after the first
         double playerHealth(const DerivedStatSettings& settings, double baseHealth, double endurance, int level);
         /// Everyone else (characters and creatures)
         double npcHealth(const DerivedStatSettings& settings, double baseHealth, double endurance, int level);

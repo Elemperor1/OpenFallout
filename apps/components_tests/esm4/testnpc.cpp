@@ -255,6 +255,22 @@ namespace
         }
     }
 
+    TEST(ESM4NpcTest, readsTheHealthAfterTheBytesInFrontOfItInTheLongRecordsOfFallout3)
+    {
+        // Two records of Fallout 3 have 14 bytes before the health and the attributes in their 25 bytes of DATA
+        std::string stats(14, '\x05');
+        append<std::int32_t>(stats, 50);
+        for (std::uint8_t value = 1; value <= 7; ++value)
+            append<std::uint8_t>(stats, value);
+        ASSERT_EQ(stats.size(), 25u);
+
+        const ESM4::Npc npc = loadVersioned(0.94f, 15, zString("EDID", "Npc") + subRecord("DATA", stats));
+
+        EXPECT_TRUE(npc.mFalloutStats.mKnown);
+        EXPECT_EQ(npc.mFalloutStats.mHealth, 50);
+        EXPECT_THAT(npc.mFalloutStats.mAttributes, ElementsAre(1, 2, 3, 4, 5, 6, 7));
+    }
+
     TEST(ESM4NpcTest, aCharacterWithoutDataOrSkillsHasNoneKnown)
     {
         const ESM4::Npc npc

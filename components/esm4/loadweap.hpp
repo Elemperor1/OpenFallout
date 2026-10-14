@@ -180,7 +180,6 @@ namespace ESM4
             float mActionPoints = 0.f;
             std::uint8_t mSilent = 0;
             std::uint8_t mModRequired = 0;
-            std::uint8_t mFlags = 0;
         };
 
         ESM::FormId mId; // from the header

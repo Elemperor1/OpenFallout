@@ -126,7 +126,7 @@ namespace
         append<float>(data, 25.f); // action points
         append<std::uint8_t>(data, 1); // silent
         append<std::uint8_t>(data, 0); // mod required
-        append<std::uint8_t>(data, 2); // flags
+        append<std::uint8_t>(data, 2); // padding
         append<std::uint8_t>(data, 0);
         return data;
     }
@@ -197,7 +197,7 @@ namespace
         EXPECT_FLOAT_EQ(weapon.mVats.mDamageMultiplier, 1.5f);
         EXPECT_FLOAT_EQ(weapon.mVats.mActionPoints, 25.f);
         EXPECT_EQ(weapon.mVats.mSilent, 1);
-        EXPECT_EQ(weapon.mVats.mFlags, 2);
+        EXPECT_EQ(weapon.mVats.mModRequired, 0);
         EXPECT_EQ(weapon.mAmmo.toUint32(), 0x00010060u);
         EXPECT_EQ(weapon.mImpactDataSet.toUint32(), 0x00010070u);
         EXPECT_EQ(weapon.mFirstPersonObject.toUint32(), 0x00010080u);

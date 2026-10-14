@@ -44,14 +44,14 @@ namespace FalloutScript
         const DerivedStatSettings& settings, double baseHealth, double endurance, int level)
     {
         return std::max(baseHealth + (endurance + settings.mHealthEnduranceOffset) * settings.mHealthEnduranceMult
-                + atLeastOne(level) * settings.mHealthLevelMult,
+                + (atLeastOne(level) - 1) * settings.mHealthLevelMult,
             1.0);
     }
 
     double DerivedStats::npcHealth(const DerivedStatSettings& settings, double baseHealth, double endurance, int level)
     {
         return std::max(baseHealth + (endurance + settings.mNpcHealthEnduranceOffset) * settings.mNpcHealthEnduranceMult
-                + atLeastOne(level) * settings.mNpcHealthLevelMult,
+                + (atLeastOne(level) - 1) * settings.mNpcHealthLevelMult,
             1.0);
     }
 

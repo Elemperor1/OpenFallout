@@ -189,13 +189,15 @@ void ESM4::Npc::load(ESM4::Reader& reader)
                     reader.get(&mData, 33); // FIXME: check packing
                 else if (mIsFONV && subHdr.dataSize >= 11)
                 {
-                    // The health and the attributes; records of older versions have more bytes after them
+                    // The health and the attributes; records of older versions have more bytes after them, and two
+                    // records of Fallout 3 (FFER63Hunter and FFER07DeadGuy) 14 bytes in front of them
                     std::vector<std::uint8_t> bytes(subHdr.dataSize);
                     if (reader.get(bytes.data(), bytes.size()))
                     {
-                        std::memcpy(&mFalloutStats.mHealth, bytes.data(), sizeof(std::int32_t));
-                        std::memcpy(
-                            mFalloutStats.mAttributes.data(), bytes.data() + 4, mFalloutStats.mAttributes.size());
+                        const std::size_t start = subHdr.dataSize == 25 ? 14 : 0;
+                        std::memcpy(&mFalloutStats.mHealth, bytes.data() + start, sizeof(std::int32_t));
+                        std::memcpy(mFalloutStats.mAttributes.data(), bytes.data() + start + 4,
+                            mFalloutStats.mAttributes.size());
                         mFalloutStats.mKnown = true;
                     }
                 }

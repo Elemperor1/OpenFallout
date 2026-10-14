@@ -52,33 +52,36 @@ namespace
 
     TEST(FalloutScriptDerivedStatsTest, the_player_has_200_health_at_the_first_level_with_5_endurance_in_both_games)
     {
-        // New Vegas: 95 in the record, 5 for each level; Fallout 3: 90, 10 for each level
-        EXPECT_EQ(playerHealth(DerivedStatSettings(), 95, 5, 1), 200);
-        EXPECT_EQ(playerHealth(settingsOf({ { "fAVDHealthLevelMult", 10 } }), 90, 5, 1), 200);
+        // The record of the player has 100 in both games; each level after the first gives 5 in New Vegas, 10 in
+        // Fallout 3
+        EXPECT_EQ(playerHealth(DerivedStatSettings(), 100, 5, 1), 200);
+        EXPECT_EQ(playerHealth(settingsOf({ { "fAVDHealthLevelMult", 10 } }), 100, 5, 1), 200);
+        EXPECT_EQ(playerHealth(DerivedStatSettings(), 100, 5, 2), 205);
+        EXPECT_EQ(playerHealth(settingsOf({ { "fAVDHealthLevelMult", 10 } }), 100, 5, 2), 210);
         // more endurance and more levels give more
-        EXPECT_EQ(playerHealth(DerivedStatSettings(), 95, 8, 10), 95 + 160 + 50);
+        EXPECT_EQ(playerHealth(DerivedStatSettings(), 100, 8, 10), 100 + 160 + 45);
         // a level below the first is the first
-        EXPECT_EQ(playerHealth(DerivedStatSettings(), 95, 5, 0), 200);
+        EXPECT_EQ(playerHealth(DerivedStatSettings(), 100, 5, 0), 200);
     }
 
     TEST(FalloutScriptDerivedStatsTest, characters_and_creatures_have_less_health_for_their_endurance_and_level)
     {
-        EXPECT_EQ(npcHealth(DerivedStatSettings(), 50, 5, 1), 50 + 25 + 5);
-        EXPECT_EQ(npcHealth(DerivedStatSettings(), 500, 6, 20), 500 + 30 + 100);
+        EXPECT_EQ(npcHealth(DerivedStatSettings(), 50, 5, 1), 50 + 25);
+        EXPECT_EQ(npcHealth(DerivedStatSettings(), 500, 6, 20), 500 + 30 + 95);
         // never below a point of health
         EXPECT_EQ(npcHealth(DerivedStatSettings(), -100, 1, 1), 1);
     }
 
     TEST(FalloutScriptDerivedStatsTest, the_offsets_of_the_files_move_the_attribute_before_it_is_multiplied)
     {
-        // GECK: Starting Health = END * mult + (90 + mult * offset) + the share of the level
+        // GECK: Starting Health = END * mult + (the base + mult * offset) + the share of the level
         const DerivedStatSettings settings = settingsOf({ { "fAVDHealthEnduranceOffset", 1 },
             { "fAVDNPCHealthEnduranceOffset", -1 }, { "fAVDMeleeDamageStrengthOffset", -5 }, { "fAVDCritLuckBase", 3 },
             { "fAVDCritLuckMult", 2 } });
         EXPECT_EQ(settings.mHealthEnduranceOffset, 1);
         EXPECT_EQ(settings.mNpcHealthEnduranceOffset, -1);
-        EXPECT_EQ(playerHealth(settings, 95, 5, 1), 95 + 6 * 20 + 5);
-        EXPECT_EQ(npcHealth(settings, 50, 5, 1), 50 + 4 * 5 + 5);
+        EXPECT_EQ(playerHealth(settings, 100, 5, 1), 100 + 6 * 20);
+        EXPECT_EQ(npcHealth(settings, 50, 5, 2), 50 + 4 * 5 + 5);
         EXPECT_EQ(meleeDamage(settings, 7), 1);
         EXPECT_EQ(meleeDamage(settings, 2), 0); // never below nothing
         EXPECT_EQ(criticalChance(settings, 5), 13);
@@ -122,7 +125,7 @@ namespace
             {
                 case ActorValue::health:
                     return playerHealth(
-                        DerivedStatSettings(), actor == player ? 95 : 50, permanent(ActorValue::endurance), mLevel);
+                        DerivedStatSettings(), actor == player ? 100 : 50, permanent(ActorValue::endurance), mLevel);
                 case ActorValue::actionPoints:
                     return actionPoints(DerivedStatSettings(), permanent(ActorValue::agility));
                 default:
@@ -140,7 +143,7 @@ namespace
         ActorValues values(&records);
 
         EXPECT_EQ(values.current(player, ActorValue::health), 200);
-        EXPECT_EQ(values.current(guard, ActorValue::health), 50 + 8 * 20 + 5);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 50 + 8 * 20);
         EXPECT_EQ(values.current(guard, ActorValue::actionPoints), 65 + 7 * 3);
         // what the records do not work out stays what it was
         EXPECT_EQ(values.current(guard, ActorValue::fatigue), 100);
@@ -158,7 +161,7 @@ namespace
         EXPECT_EQ(values.current(player, ActorValue::health), 220);
         values.setBase(player, ActorValue::endurance, 10);
         records.mLevel = 3;
-        EXPECT_EQ(values.current(player, ActorValue::health), 95 + 11 * 20 + 3 * 5);
+        EXPECT_EQ(values.current(player, ActorValue::health), 100 + 11 * 20 + 2 * 5);
     }
 
     TEST(FalloutScriptDerivedStatsTest, damage_comes_off_a_worked_out_value_and_a_set_value_replaces_it)
@@ -176,7 +179,7 @@ namespace
         EXPECT_EQ(values.current(guard, ActorValue::health), 12);
         // a new game works everything out again
         values.clear();
-        EXPECT_EQ(values.current(player, ActorValue::health), 95 + 100 + 9 * 5);
+        EXPECT_EQ(values.current(player, ActorValue::health), 100 + 100 + 8 * 5);
     }
 
     TEST(FalloutScriptCalendarTest, a_day_follows_the_day_before_it)

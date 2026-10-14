@@ -208,8 +208,8 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
                     reader.get(mVats.mActionPoints);
                     reader.get(mVats.mSilent);
                     reader.get(mVats.mModRequired);
-                    reader.get(mVats.mFlags);
-                    std::uint8_t padding;
+                    // Two bytes of padding follow
+                    std::uint16_t padding;
                     reader.get(padding);
                     mHasVats = true;
                 }
