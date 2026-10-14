@@ -51,6 +51,54 @@ namespace ESM4
             std::vector<AlternateTexture> mAlternateTextures; // DMDS
         };
 
+        enum class Type : std::uint16_t
+        {
+            Missile = 1,
+            Lobber = 2,
+            Beam = 4,
+            Flame = 8,
+            ContinuousBeam = 16,
+        };
+
+        enum Flags : std::uint16_t
+        {
+            Hitscan = 0x0001,
+            Explosion = 0x0002,
+            AltTrigger = 0x0004,
+            MuzzleFlash = 0x0008,
+            CanBeDisabled = 0x0020,
+            CanBePickedUp = 0x0040,
+            Supersonic = 0x0080,
+            PinsLimbs = 0x0100,
+            PassThroughSmallTransparent = 0x0200,
+        };
+
+        /// DATA, decoded (the form ids already adjusted); what its bytes do not reach is the default
+        struct GameData
+        {
+            std::uint16_t mFlags = 0;
+            std::uint16_t mType = 0;
+            float mGravity = 0.f;
+            float mSpeed = 0.f; // units a second
+            float mRange = 0.f;
+            ESM::FormId mLight;
+            ESM::FormId mMuzzleFlashLight;
+            float mTracerChance = 0.f;
+            float mProximityFuse = 0.f; // the explosion goes off when a target is this near (AltTrigger)
+            float mFuseTimer = 0.f; // or after this long
+            ESM::FormId mExplosion;
+            ESM::FormId mSound;
+            float mMuzzleFlashDuration = 0.f;
+            float mFadeDuration = 0.f;
+            float mImpactForce = 0.f;
+            ESM::FormId mCountdownSound;
+            ESM::FormId mDisableSound;
+            ESM::FormId mDefaultWeaponSource;
+        };
+
+        /// The decoded DATA; the form ids in it are read from the bytes of the record, which the loader adjusted
+        GameData gameData() const;
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 

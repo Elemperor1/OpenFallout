@@ -119,7 +119,8 @@ namespace ESM4
         std::vector<ESM::FormId> mSpell;
         ESM::FormId mScriptId;
 
-        AIData mAIData;
+        AIData mAIData{};
+        FalloutAIData mFalloutAI; // AIDT of Fallout 3 and New Vegas
         std::vector<ESM::FormId> mAIPackages;
         ActorBaseConfig mBaseConfig{};
         ActorFaction mFaction; // the last SNAM, mFactions has them all
@@ -148,6 +149,7 @@ namespace ESM4
 
         ESM::FormId mBaseTemplate; // FO3/FONV
         std::vector<ESM::FormId> mBodyParts; // FO3/FONV
+        std::uint8_t mAttackReach = 0; // RNAM, FO3/FONV
 
         bool mIsFONV = false; // the record is one of Fallout 3 or New Vegas (Reader::isFalloutFile())
 

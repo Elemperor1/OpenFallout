@@ -83,6 +83,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testcensus.cpp
     esm4/testchallenge.cpp
     esm4/testclimate.cpp
+    esm4/testcombatdata.cpp
     esm4/testcombatstyle.cpp
     esm4/testconditionparams.cpp
     esm4/testcreature.cpp
@@ -151,6 +152,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testactortraits.cpp
     falloutscript/testactorvalues.cpp
     falloutscript/testchargen.cpp
+    falloutscript/testderivedstats.cpp
     falloutscript/testformlists.cpp
     falloutscript/testfurniture.cpp
     falloutscript/testplacement.cpp

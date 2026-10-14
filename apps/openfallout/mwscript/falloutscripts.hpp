@@ -21,9 +21,11 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
+#include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/enableparents.hpp>
 #include <components/falloutscript/formlists.hpp>
@@ -395,6 +397,10 @@ namespace OFScript
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
+        std::optional<double> derivedValue(
+            FalloutScript::FormId actor, int value, const std::function<double(int)>& permanent) override;
+        /// The settings of the files for the actor values that are worked out, read when the first is asked for
+        const FalloutScript::DerivedStatSettings& derivedSettings();
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
@@ -677,6 +683,20 @@ namespace OFScript
         void reportMissingCommands();
         /// The values the global variables have now, for those that were set (the others have the value of the record)
         std::map<FalloutScript::FormId, double> mGlobals;
+        std::mutex mDerivedSettingsMutex;
+        std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
+        /// The date the world starts at (the initial values of GameYear, GameMonth, GameDay and GameDaysPassed), read
+        /// when the first date global is asked for
+        struct CalendarStart
+        {
+            FalloutScript::GameDate mDate;
+            double mDaysPassed = 0;
+            int mMonthBase = 1;
+        };
+        std::mutex mCalendarMutex;
+        std::optional<CalendarStart> mCalendarStart;
+        /// The date of the world now, false when the files do not have the globals of the date
+        bool currentDate(FalloutScript::GameDate& date);
         /// Editor ids in lower case, made when first asked for
         mutable bool mNamesBuilt = false;
         mutable std::map<std::string, FalloutScript::FormId> mQuestNames;

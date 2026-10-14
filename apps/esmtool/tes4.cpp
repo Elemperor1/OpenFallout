@@ -15,6 +15,7 @@
 #include <components/esm/refid.hpp>
 #include <components/esm/typetraits.hpp>
 #include <components/esm4/census.hpp>
+#include <components/esm4/combatcensus.hpp>
 #include <components/esm4/creaturecensus.hpp>
 #include <components/esm4/dialoguecensus.hpp>
 #include <components/esm4/equipmentcensus.hpp>
@@ -903,6 +904,11 @@ namespace EsmTool
     int packagesTes4(const Arguments& info)
     {
         return countTes4<ESM4::PackageCensus>(info, "Packages", "packages");
+    }
+
+    int combatTes4(const Arguments& info)
+    {
+        return countTes4<ESM4::CombatCensus>(info, "Combat", "combat data");
     }
 
     int creaturesTes4(const Arguments& info)

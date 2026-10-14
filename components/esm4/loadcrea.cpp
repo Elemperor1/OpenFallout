@@ -88,7 +88,11 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("AIDT"):
                 if (subHdr.dataSize == 20) // FO3
-                    reader.skipSubRecordData();
+                {
+                    std::array<std::uint8_t, 20> bytes;
+                    reader.get(bytes.data(), bytes.size());
+                    mFalloutAI = decodeFalloutAIData(bytes.data());
+                }
                 else
                     reader.get(mAIData); // 12 bytes
                 break;
@@ -107,6 +111,10 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                     if (reader.get(bytes.data(), bytes.size()))
                     {
                         mCreatureType = bytes[0];
+                        mFalloutStats.mCombatSkill = bytes[1];
+                        mFalloutStats.mMagicSkill = bytes[2];
+                        mFalloutStats.mStealthSkill = bytes[3];
+                        std::memcpy(&mFalloutStats.mDamage, bytes.data() + 8, sizeof(std::uint16_t));
                         std::uint16_t health = 0;
                         std::memcpy(&health, bytes.data() + 4, sizeof(health));
                         mFalloutStats.mHealth = health;
@@ -193,8 +201,13 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
-            case ESM::fourCC("MODT"):
             case ESM::fourCC("RNAM"):
+                if (subHdr.dataSize == sizeof(std::uint8_t))
+                    reader.get(mAttackReach);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("MODT"):
             case ESM::fourCC("CSDT"):
             case ESM::fourCC("EAMT"): // FO3
             case ESM::fourCC("NAM4"): // FO3

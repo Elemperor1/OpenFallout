@@ -20,6 +20,36 @@ namespace ESM4
     /// An explosion of Fallout 3 and New Vegas.
     struct Explosion
     {
+        enum Flags : std::uint32_t
+        {
+            AlwaysUsesWorldOrientation = 0x00000001,
+            KnockDownAlways = 0x00000002,
+            KnockDownByFormula = 0x00000004,
+            IgnoreLosCheck = 0x00000008,
+            PushExplosionSourceRefOnly = 0x00000010,
+            IgnoreImageSpaceSwap = 0x00000020,
+        };
+
+        /// DATA, decoded
+        struct GameData
+        {
+            float mForce = 0.f;
+            float mDamage = 0.f;
+            float mRadius = 0.f; // units
+            ESM::FormId mLight;
+            ESM::FormId mSound1;
+            std::uint32_t mFlags = 0;
+            float mImageSpaceRadius = 0.f;
+            ESM::FormId mImpactDataSet;
+            ESM::FormId mSound2;
+            float mRadiationLevel = 0.f;
+            float mRadiationDissipationTime = 0.f;
+            float mRadiationRadius = 0.f;
+            std::uint32_t mSoundLevel = 0;
+        };
+
+        GameData gameData() const;
+
         ESM::FormId mId; // from the header
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 

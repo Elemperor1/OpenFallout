@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ACTORVALUES_H
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ACTORVALUES_H
 
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -21,8 +22,17 @@ namespace FalloutScript
     namespace ActorValue
     {
         constexpr int strength = 5;
+        constexpr int perception = 6;
+        constexpr int endurance = 7;
+        constexpr int charisma = 8;
+        constexpr int intelligence = 9;
+        constexpr int agility = 10;
         constexpr int luck = 11;
+        constexpr int actionPoints = 12;
+        constexpr int carryWeight = 13;
+        constexpr int criticalChance = 14;
         constexpr int health = 16;
+        constexpr int meleeDamage = 17;
         constexpr int speedMult = 21;
         constexpr int fatigue = 22;
         constexpr int karma = 23;
@@ -53,6 +63,16 @@ namespace FalloutScript
         /// The level that the record of the reference gives it for a player of that level (a record can take a share
         /// of it). False when the host can not tell what the reference is or it is not a character or creature.
         virtual bool levelOf(FormId /*actor*/, int /*playerLevel*/, int& /*level*/) { return false; }
+
+        /// The value that the games work out for the actor from its other actor values (the health from its
+        /// endurance and level, the action points from its agility, ...), when the actor value is one of those and the
+        /// host can tell. The function gives the permanent value that the actor has of another actor value (its
+        /// attributes, which a script may have changed).
+        virtual std::optional<double> derivedValue(
+            FormId /*actor*/, int /*value*/, const std::function<double(int)>& /*permanent*/)
+        {
+            return std::nullopt;
+        }
     };
 
     /// The actor values of characters and creatures, as far as nothing else in the game keeps them yet. An actor value
@@ -70,6 +90,9 @@ namespace FalloutScript
         }
 
         static bool isValid(int value) { return value >= 0 && value < ActorValue::count; }
+
+        /// Whether the games work the actor value out from others (see ActorValueRecords::derivedValue)
+        static bool isDerived(int value);
 
         /// What a reference has of an actor value until a script sets it: 5 for each of the SPECIAL attributes, a full
         /// health, fatigue, speed and condition of the head and limbs, an average skill and nothing else
@@ -107,9 +130,11 @@ namespace FalloutScript
             double mDamage = 0;
         };
 
-        /// What the actor has of the value until a script sets it: the record's, or else the starting value. The caller
-        /// holds the lock.
+        /// What the actor has of the value until a script sets it: the record's, or the one worked out from other
+        /// values, or else the starting value. The caller holds the lock.
         double startOf(FormId actor, int value) const;
+        /// The base plus the modifier, for a caller that holds the lock
+        double permanentOf(FormId actor, int value) const;
         /// An entry with its base filled in, for the actor value of that number
         double baseOf(FormId actor, const Entry& entry, int value) const;
 

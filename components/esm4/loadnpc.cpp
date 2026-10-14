@@ -147,6 +147,13 @@ void ESM4::Npc::load(ESM4::Reader& reader)
             //
             case ESM::fourCC("AIDT"):
             {
+                if (subHdr.dataSize == 20)
+                {
+                    std::array<std::uint8_t, 20> bytes;
+                    reader.get(bytes.data(), bytes.size());
+                    mFalloutAI = decodeFalloutAIData(bytes.data());
+                    break;
+                }
                 if (subHdr.dataSize != 12)
                 {
                     reader.skipSubRecordData(); // FIXME: process the subrecord rather than skip

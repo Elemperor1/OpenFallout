@@ -29,6 +29,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 
 #include <components/esm/formid.hpp>
 
@@ -132,6 +133,67 @@ namespace ESM4
     };
 #pragma pack(pop)
 
+    /// AIDT of a character or creature of Fallout 3 and New Vegas (20 bytes): how it behaves in a fight and what it
+    /// does for others
+    struct FalloutAIData
+    {
+        enum Aggression : std::uint8_t
+        {
+            Unaggressive = 0,
+            Aggressive = 1,
+            VeryAggressive = 2,
+            Frenzied = 3,
+        };
+
+        enum Confidence : std::uint8_t
+        {
+            Cowardly = 0,
+            Cautious = 1,
+            Average = 2,
+            Brave = 3,
+            Foolhardy = 4,
+        };
+
+        enum Assistance : std::uint8_t
+        {
+            HelpsNobody = 0,
+            HelpsAllies = 1,
+            HelpsFriendsAndAllies = 2,
+        };
+
+        bool mKnown = false;
+        std::uint8_t mAggression = Unaggressive;
+        std::uint8_t mConfidence = Average;
+        std::uint8_t mEnergyLevel = 50;
+        std::uint8_t mResponsibility = 50;
+        std::uint8_t mMood = 0;
+        std::uint32_t mServices = 0;
+        std::int8_t mTrainedSkill = -1;
+        std::uint8_t mMaxTrainingLevel = 0;
+        std::uint8_t mAssistance = HelpsNobody;
+        std::uint8_t mAggroRadiusFlags = 0; // 1: the radius is used
+        std::int32_t mAggroRadius = 0;
+    };
+
+    /// The 20 bytes of an AIDT of Fallout 3 and New Vegas
+    inline FalloutAIData decodeFalloutAIData(const std::uint8_t* bytes)
+    {
+        FalloutAIData data;
+        data.mKnown = true;
+        data.mAggression = bytes[0];
+        data.mConfidence = bytes[1];
+        data.mEnergyLevel = bytes[2];
+        data.mResponsibility = bytes[3];
+        data.mMood = bytes[4];
+        std::memcpy(&data.mServices, bytes + 8, sizeof(data.mServices));
+        data.mTrainedSkill = static_cast<std::int8_t>(bytes[12]);
+        data.mMaxTrainingLevel = bytes[13];
+        data.mAssistance = bytes[14];
+        data.mAggroRadiusFlags = bytes[15];
+        std::memcpy(&data.mAggroRadius, bytes + 16, sizeof(data.mAggroRadius));
+        return data;
+    }
+
     /// What DATA says of a character or creature of Fallout 3 and New Vegas: the base health and the seven attributes
     /// (strength, perception, endurance, charisma, intelligence, agility, luck)
     struct FalloutStats
@@ -139,6 +201,11 @@ namespace ESM4
         bool mKnown = false;
         std::int32_t mHealth = 0;
         std::array<std::uint8_t, 7> mAttributes{};
+        // A creature also has the combat, magic and stealth skills (0 to 100) and the damage of its attack
+        std::uint8_t mCombatSkill = 0;
+        std::uint8_t mMagicSkill = 0;
+        std::uint8_t mStealthSkill = 0;
+        std::uint16_t mDamage = 0;
     };
 
     struct BodyTemplate // TES5
