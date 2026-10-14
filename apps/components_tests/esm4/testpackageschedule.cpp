@@ -155,9 +155,10 @@ namespace
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Roam) << type;
         for (const int type : std::initializer_list<int>{ ESM4::Package_Follow, ESM4::Package_Accompany })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Follow) << type;
+        EXPECT_EQ(ESM4::packageBehaviour(ESM4::Package_Dialogue), ESM4::PackageBehaviour::Talk);
         for (const int type : std::initializer_list<int>{ ESM4::Package_Find, ESM4::Package_Escort,
                  ESM4::Package_UseItemAt, ESM4::Package_Ambush, ESM4::Package_FleeNotCombat, ESM4::Package_CastMagic,
-                 ESM4::Package_Dialogue, ESM4::Package_UseWeapon, 99, -1 })
+                 ESM4::Package_UseWeapon, 99, -1 })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::None) << type;
     }
 
@@ -172,7 +173,9 @@ namespace
             ESM4::packageSkip(package(ESM4::Package_Sandbox, schedule(20, 2)), noon), ESM4::PackageSkip::Schedule);
         // A package of no use is skipped whatever its schedule says
         EXPECT_EQ(
-            ESM4::packageSkip(package(ESM4::Package_Dialogue, schedule(20, 2)), noon), ESM4::PackageSkip::Behaviour);
+            ESM4::packageSkip(package(ESM4::Package_Escort, schedule(20, 2)), noon), ESM4::PackageSkip::Behaviour);
+        // and one that talks is followed like the others
+        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Dialogue), noon), ESM4::PackageSkip::None);
 
         ESM4::AIPackage conditional = package(ESM4::Package_Sandbox);
         conditional.mTargetConditions.emplace_back();
@@ -200,16 +203,16 @@ namespace
         const ESM4::AIPackage sleep = package(ESM4::Package_Sleep, schedule(22, 8));
         ESM4::AIPackage quest = package(ESM4::Package_Travel);
         quest.mTargetConditions.emplace_back();
-        const ESM4::AIPackage talk = package(ESM4::Package_Dialogue);
+        const ESM4::AIPackage escort = package(ESM4::Package_Escort);
         const ESM4::AIPackage work = package(ESM4::Package_Sandbox, schedule(8, 12));
         const ESM4::AIPackage idle = package(ESM4::Package_Wander);
-        const std::vector<const ESM4::AIPackage*> list{ nullptr, &quest, &talk, &sleep, &work, &idle };
+        const std::vector<const ESM4::AIPackage*> list{ nullptr, &quest, &escort, &sleep, &work, &idle };
 
         EXPECT_EQ(ESM4::choosePackage(list, clock(23.f)), &sleep);
         EXPECT_EQ(ESM4::choosePackage(list, clock(3.f)), &sleep);
         EXPECT_EQ(ESM4::choosePackage(list, clock(9.f)), &work);
         EXPECT_EQ(ESM4::choosePackage(list, clock(21.f)), &idle);
-        EXPECT_EQ(ESM4::choosePackage({ &quest, &talk }, clock(9.f)), nullptr);
+        EXPECT_EQ(ESM4::choosePackage({ &quest, &escort }, clock(9.f)), nullptr);
         EXPECT_EQ(ESM4::choosePackage({}, clock(9.f)), nullptr);
     }
 

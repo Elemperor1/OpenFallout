@@ -3,6 +3,7 @@
 
 #include <components/esm4/inventory.hpp>
 #include <components/esm4/loadstat.hpp>
+#include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadtree.hpp>
 #include <components/misc/strings/algorithm.hpp>
 
@@ -187,6 +188,38 @@ namespace OFClass
         }
 
         bool hasToolTip(const OFWorld::ConstPtr& ptr) const override { return !getName(ptr).empty(); }
+    };
+
+    /// A talking activator of Fallout (an intercom, a radio): the player talks to it as to a character
+    class ESM4TalkingActivator final
+        : public OFWorld::RegisteredClass<ESM4TalkingActivator, ESM4Base<ESM4::TalkingActivator>>
+    {
+        friend OFWorld::RegisteredClass<ESM4TalkingActivator, ESM4Base<ESM4::TalkingActivator>>;
+        ESM4TalkingActivator()
+            : OFWorld::RegisteredClass<ESM4TalkingActivator, ESM4Base<ESM4::TalkingActivator>>(
+                  ESM4::TalkingActivator::sRecordId)
+        {
+        }
+
+    public:
+        std::string_view getName(const OFWorld::ConstPtr& ptr) const override
+        {
+            return ptr.get<ESM4::TalkingActivator>()->mBase->mFullName;
+        }
+
+        OFGui::ToolTipInfo getToolTipInfo(const OFWorld::ConstPtr& ptr, int count) const override
+        {
+            return ESM4Impl::getToolTipInfo(getName(ptr), count);
+        }
+
+        bool hasToolTip(const OFWorld::ConstPtr& ptr) const override { return !getName(ptr).empty(); }
+
+        std::unique_ptr<OFWorld::Action> activate(const OFWorld::Ptr& ptr, const OFWorld::Ptr& actor) const override
+        {
+            if (std::unique_ptr<OFWorld::Action> talk = ESM4Impl::talkAction(ptr, actor))
+                return talk;
+            return OFWorld::Class::activate(ptr, actor);
+        }
     };
 }
 

@@ -399,6 +399,13 @@ return {
                 return
             end
             local view = conversation.get()
+            -- A conversation that something else ended (a script, core.conversation.close) takes the window with it:
+            -- the game is paused while the mode is there
+            if not view.active then
+                destroyElement()
+                closeWindow()
+                return
+            end
             if not view.speaking then
                 return
             end

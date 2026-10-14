@@ -13,6 +13,7 @@
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadavif.hpp>
+#include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadflst.hpp>
@@ -201,17 +202,7 @@ namespace OFScript
                 });
             }
             else
-            {
-                // With no topic the exchange starts with the greeting, as it does with the player
-                FalloutScript::FormId first = topic;
-                if (first == 0)
-                {
-                    const std::lock_guard lock(mDialogueMutex);
-                    first = mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
-                }
-                if (first != 0)
-                    sayTopic(speaker, first, target, false, true);
-            }
+                converse(speaker, target, topic);
             return 0.0;
         });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
@@ -223,6 +214,28 @@ namespace OFScript
             sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
                 FalloutScript::intArgument(call, 2) != 0);
             return 0.0;
+        });
+        // A talking activator (an intercom) speaks for the character it is set to, which is who conditions about it are
+        // about: the lines of the intercom are those of that character, and the one that talks to it is talking to that
+        // character. Without an argument the activator speaks for nobody.
+        mInterpreter.setHandler("SetTalkingActivatorActor", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId activator = call.mReference;
+            const FalloutScript::FormId actor = FalloutScript::formArgument(call, 0);
+            if (activator == 0)
+                return 0.0;
+            {
+                const std::lock_guard lock(mTalkingActorMutex);
+                if (actor == 0)
+                    mTalkingActors.erase(activator);
+                else
+                    mTalkingActors[activator] = actor;
+            }
+            Log(Debug::Info) << "Talking activator " << std::hex << activator << " speaks for " << actor << std::dec;
+            return 0.0;
+        });
+        mInterpreter.setHandler("IsTalkingActivatorActor", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId actor = FalloutScript::formArgument(call, 0);
+            return actor != 0 && talkingActorOf(call.mReference) == actor ? 1.0 : 0.0;
         });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
         mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
@@ -295,6 +308,10 @@ namespace OFScript
         reportMissingCommands();
         mGlobals.clear();
         mDisabled.clear();
+        {
+            const std::lock_guard lock(mTalkingActorMutex);
+            mTalkingActors.clear();
+        }
         mPendingToggle.clear();
         mPendingLoad.clear();
         mPendingMoves.clear();
@@ -721,7 +738,7 @@ namespace OFScript
         applyDisabled(reference, disabled);
     }
 
-    void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
+    void FalloutScripts::applyDisabledAlone(FalloutScript::FormId reference, bool disabled)
     {
         const OFWorld::Ptr ptr = findReference(reference);
         if (ptr.isEmpty())
@@ -734,6 +751,37 @@ namespace OFScript
             OFBase::Environment::get().getWorld()->disable(ptr);
         else
             OFBase::Environment::get().getWorld()->enable(ptr);
+    }
+
+    void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
+    {
+        applyDisabledAlone(reference, disabled);
+        // The objects that have this one for their enable parent follow it, and theirs follow them
+        std::size_t followed = 0;
+        for (const auto& [follower, followerDisabled] : enableParents().followers(reference, disabled))
+        {
+            applyDisabledAlone(follower, followerDisabled);
+            ++followed;
+        }
+        if (followed > 0)
+            Log(Debug::Info) << "Enable parent " << std::hex << reference << std::dec << " "
+                             << (disabled ? "disabled" : "enabled") << ": " << followed << " objects follow";
+    }
+
+    const FalloutScript::EnableParents& FalloutScripts::enableParents()
+    {
+        if (mEnableParentsRead)
+            return mEnableParents;
+        mEnableParentsRead = true;
+        const auto read = [this](const auto& ref) {
+            if (!ref.mEsp.parent.isZeroOrUnset())
+                mEnableParents.add(numberOf(ref.mId), numberOf(ref.mEsp.parent),
+                    (ref.mEsp.flags & ESM4::EnableParent::Flag_Inversed) != 0);
+        };
+        mStore.get<ESM4::Reference>().forEachPlaced(read);
+        mStore.get<ESM4::ActorCharacter>().forEachPlaced(read);
+        mStore.get<ESM4::ActorCreature>().forEachPlaced(read);
+        return mEnableParents;
     }
 
     void FalloutScripts::tellPlayer(const std::string& text)
@@ -841,6 +889,7 @@ namespace OFScript
 
         MessageBox box;
         box.mOwner = owner;
+        box.mForm = refId(message).serializeText();
         for (std::size_t i = 0; i < record->mButtons.size(); ++i)
         {
             const ESM4::Message::Button& button = record->mButtons[i];
@@ -917,7 +966,7 @@ namespace OFScript
         mOpenOwner = box.mOwner;
         {
             const std::lock_guard lock(mOpenMessageMutex);
-            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons };
+            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons, box.mForm };
         }
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
@@ -1291,7 +1340,7 @@ namespace OFScript
         FalloutScript::FormId listener, bool forceSubtitles, bool followUps)
     {
         ESM::FormId base;
-        if (reference == 0 || topic == 0 || !baseOf(reference, base))
+        if (reference == 0 || topic == 0 || !conditionBaseOf(reference, base))
         {
             const std::lock_guard lock(mDialogueMutex);
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1303,8 +1352,13 @@ namespace OFScript
         {
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
-            const FalloutScript::DialogueView view = mDialogue.say(
-                { reference, numberOf(base) }, topic, listener == mPlayer ? 0 : listener, followUps, !followUps);
+            // A character that is spoken to is a speaker as well, when the two talk to each other
+            ESM::FormId listenerBase;
+            const bool toCharacter = listener != 0 && listener != mPlayer;
+            if (toCharacter && !conditionBaseOf(listener, listenerBase))
+                listenerBase = ESM::FormId();
+            const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic,
+                toCharacter ? listener : 0, followUps, !followUps, toCharacter ? numberOf(listenerBase) : 0);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
             // says something to the player that nobody hears, or nothing, is otherwise silent
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1320,11 +1374,14 @@ namespace OFScript
             {
                 const FalloutScript::DialogueLine& line = view.mLines[i];
                 SaidLine& said = lines.emplace_back();
-                said.mVoice = voiceFile(reference, line);
+                // The other character of an exchange says its lines with its own voice
+                const FalloutScript::FormId lineSpeaker = line.mSpeaker != 0 ? line.mSpeaker : reference;
+                said.mSpeaker = lineSpeaker != reference ? lineSpeaker : 0;
+                said.mVoice = voiceFile(lineSpeaker, line);
                 said.mText = line.mText;
                 said.mSeconds = lineSeconds(line.mText);
                 said.mTopic = topic;
-                said.mSpeakerBase = numberOf(base);
+                said.mSpeakerBase = line.mSpeakerBase != 0 ? line.mSpeakerBase : numberOf(base);
                 said.mForceSubtitles = forceSubtitles;
                 // The response is over with its last line: its end script runs then, not when the speaker is told
                 // to say it (with follow-ups the end scripts have run, they decide which response comes next)
@@ -1338,6 +1395,22 @@ namespace OFScript
         runOnMainThread(
             [this, reference, lines = std::move(lines)]() mutable { startSaying(reference, std::move(lines)); });
         return true;
+    }
+
+    void FalloutScripts::converse(
+        FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic)
+    {
+        // With no topic the exchange starts with the greeting, as it does with the player
+        if (const FalloutScript::FormId first = packageTopic(topic); first != 0)
+            sayTopic(speaker, first, target, false, true);
+    }
+
+    FalloutScript::FormId FalloutScripts::packageTopic(FalloutScript::FormId topic)
+    {
+        if (topic != 0)
+            return topic;
+        const std::lock_guard lock(mDialogueMutex);
+        return mDialogue.findTopic(FalloutScript::DialogueManager::greetingTopic);
     }
 
     float FalloutScripts::lineSeconds(const std::string& text)
@@ -1481,24 +1554,31 @@ namespace OFScript
         // then the script of the speaker, which is told when it has said all that it was told to
         struct Over
         {
-            FalloutScript::FormId mSpeaker = 0;
+            FalloutScript::FormId mSpeaker = 0; // who said the line
             FalloutScript::FormId mTopic = 0;
             FalloutScript::FormId mEndInfo = 0;
             FalloutScript::FormId mBase = 0;
             bool mDone = false;
+            FalloutScript::FormId mTold = 0; // the character that was told to say it, whose script is told it is over
         };
         std::vector<Over> finished;
         for (auto saying = mSayings.begin(); saying != mSayings.end();)
         {
-            const OFWorld::Ptr speaker = findReference(saying->mReference);
+            // The line is said by the character that was told to say them, or by the other of an exchange
+            const auto sayerOf
+                = [&](const SaidLine& line) { return line.mSpeaker != 0 ? line.mSpeaker : saying->mReference; };
+            const OFWorld::Ptr speaker = saying->mNext < saying->mLines.size()
+                ? findReference(sayerOf(saying->mLines[saying->mNext]))
+                : OFWorld::Ptr();
             if (speaker.isEmpty() || saying->mNext >= saying->mLines.size())
             {
                 // A speaker who is not there any more does not say what is left, but what the responses do is done
-                if (speaker.isEmpty())
+                if (saying->mNext < saying->mLines.size())
                     for (std::size_t i = saying->mNext; i < saying->mLines.size(); ++i)
                         if (saying->mLines[i].mEndInfo != 0)
-                            finished.push_back({ saying->mReference, saying->mLines[i].mTopic,
-                                saying->mLines[i].mEndInfo, saying->mLines[i].mSpeakerBase, false });
+                            finished.push_back(
+                                { sayerOf(saying->mLines[i]), saying->mLines[i].mTopic, saying->mLines[i].mEndInfo,
+                                    saying->mLines[i].mSpeakerBase, false, saying->mReference });
                 saying = mSayings.erase(saying);
                 continue;
             }
@@ -1544,8 +1624,8 @@ namespace OFScript
                 if (!sound->sayActive(speaker) && saying->mWait <= 0)
                 {
                     if (line.mEndInfo != 0 || line.mEnd)
-                        finished.push_back(
-                            { saying->mReference, line.mTopic, line.mEndInfo, line.mSpeakerBase, line.mEnd });
+                        finished.push_back({ sayerOf(line), line.mTopic, line.mEndInfo, line.mSpeakerBase, line.mEnd,
+                            saying->mReference });
                     ++saying->mNext;
                     saying->mStarted = false;
                 }
@@ -1563,7 +1643,7 @@ namespace OFScript
                 mDialogue.finishSaid({ over.mSpeaker, over.mBase }, over.mEndInfo, over.mTopic);
             }
             if (over.mDone)
-                mObjects.trigger(over.mSpeaker, FalloutScript::BlockType::SayToDone, 0,
+                mObjects.trigger(over.mTold, FalloutScript::BlockType::SayToDone, 0,
                     [topic = over.mTopic](
                         const FalloutScript::Block& block) { return FalloutScript::blockIsForForm(block, topic); });
         }
@@ -1606,7 +1686,9 @@ namespace OFScript
     {
         const FalloutScript::FormId reference = referenceOf(speaker);
         ESM::FormId base;
-        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+        // A talking activator speaks for a character (the intercom of Vault 101): the responses are those of the
+        // character
+        if (reference == 0 || !conditionBaseOf(reference, base) || base.isZeroOrUnset())
             return false;
         const std::lock_guard lock(mDialogueMutex);
         if (mDialogue.active())
@@ -1628,6 +1710,62 @@ namespace OFScript
             return false;
         OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, speaker);
         return true;
+    }
+
+    bool FalloutScripts::speakPackage(
+        const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener, std::string* busy)
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        if (reference == 0 || speaker.isEmpty())
+            return true;
+        const FalloutScript::FormId topic = package.mDialogue.mTopic;
+        const bool toPlayer = listener.isEmpty();
+        const FalloutScript::FormId target = toPlayer ? mPlayer : referenceOf(listener);
+        // With another character the games make it a conversation of the two, a Say To package as well
+        if (!toPlayer)
+        {
+            converse(reference, target, topic);
+            return true;
+        }
+        if (package.mDialogue.mType == ESM4::AIPackage::DialogueData::SayTo)
+        {
+            // One response of the topic, said to the player, and that is all
+            if (!sayTopic(reference, packageTopic(topic), 0, false, false))
+                Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
+                                 << ": there is nothing it can say";
+            return true;
+        }
+        // A conversation with the player is the interface: it waits for the player to be done with the one that is
+        // open, a message or a menu
+        OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+        if (windows != nullptr && windows->isGuiMode())
+        {
+            if (busy != nullptr)
+            {
+                *busy = "mode " + std::to_string(static_cast<int>(windows->getMode()));
+                if (windows->isConsoleMode())
+                    *busy += ", the console";
+                if (windows->isPostProcessorHudVisible())
+                    *busy += ", the post-processor HUD";
+                if (windows->isInteractiveMessageBoxActive())
+                    *busy += ", a message box";
+            }
+            return false;
+        }
+        if (!talkTo(speaker, topic))
+            Log(Debug::Info) << "Package " << package.mEditorId << " of " << speaker.getCellRef().getRefId()
+                             << ": it has nothing to say to the player";
+        return true;
+    }
+
+    bool FalloutScripts::isSaying(const OFWorld::Ptr& speaker) const
+    {
+        const FalloutScript::FormId reference = referenceOf(speaker);
+        return reference != 0 && std::any_of(mSayings.begin(), mSayings.end(), [reference](const Saying& saying) {
+            // The one who was told to say, or the one whose line is being said in an exchange of two characters
+            return saying.mReference == reference
+                || (saying.mNext < saying.mLines.size() && saying.mLines[saying.mNext].mSpeaker == reference);
+        });
     }
 
     FalloutScripts::Conversation FalloutScripts::conversation() const
@@ -1734,6 +1872,13 @@ namespace OFScript
             found.mCreatureType = traitsOwner->mCreatureType;
             found.mVoice = numberOf(traitsOwner->mVoice);
         }
+        else if (const ESM4::TalkingActivator* activator = mStore.get<ESM4::TalkingActivator>().search(base))
+        {
+            // An intercom or a radio has the voice type its record names, and no race, class or sex
+            traits = FalloutScript::ActorTraits();
+            traits.mVoice = numberOf(activator->mVoiceType);
+            return true;
+        }
         else
             return false;
         // A character with no voice of its own speaks with the voice that its race has for its sex
@@ -1804,10 +1949,25 @@ namespace OFScript
     bool FalloutScripts::baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base)
     {
         ESM::FormId form;
-        if (!baseOf(reference, form) || form.isZeroOrUnset())
+        if (!conditionBaseOf(reference, form) || form.isZeroOrUnset())
             return false;
         base = numberOf(form);
         return base != 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::talkingActorOf(FalloutScript::FormId activator)
+    {
+        const std::lock_guard lock(mTalkingActorMutex);
+        const auto found = mTalkingActors.find(activator);
+        return found != mTalkingActors.end() ? found->second : 0;
+    }
+
+    bool FalloutScripts::conditionBaseOf(FalloutScript::FormId reference, ESM::FormId& base)
+    {
+        if (const FalloutScript::FormId actor = talkingActorOf(reference);
+            actor != 0 && baseOf(actor, base) && !base.isZeroOrUnset())
+            return true;
+        return baseOf(reference, base);
     }
 
     FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)
@@ -1984,6 +2144,7 @@ namespace OFScript
             use.mFurniturePlace = furniture.getRefData().getPosition().asVec3();
             // An entry is taken only by an actor that is put on it
             use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
+            use.mKind = entry ? entry->mRef : 10;
         }
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
@@ -2029,6 +2190,13 @@ namespace OFScript
         const std::lock_guard lock(mFurnitureMutex);
         const auto found = mFurniture.find(actor);
         return found != mFurniture.end() ? found->second.mFurniture : 0;
+    }
+
+    int FalloutScripts::currentFurnitureKind(FalloutScript::FormId actor)
+    {
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(actor);
+        return found != mFurniture.end() ? found->second.mKind : 0;
     }
 
     void FalloutScripts::updateFurniture()
@@ -2192,6 +2360,22 @@ namespace OFScript
             return 0;
         const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
         return id != nullptr ? numberOf(*id) : 0;
+    }
+
+    bool FalloutScripts::inCell(FalloutScript::FormId reference, FalloutScript::FormId cell)
+    {
+        const FalloutScript::FormId here = cellOf(reference);
+        if (here == 0 || cell == 0)
+            return false;
+        if (here == cell)
+            return true;
+        // The games compare the names of the cells with the name of the asked one as the beginning (the intro of
+        // Fallout 3 asks for "Vault101" in the cells of the vault): the editor ids are what the data gives as names
+        const auto& cells = mStore.get<ESM4::Cell>();
+        const ESM4::Cell* wanted = cells.search(refId(cell));
+        const ESM4::Cell* actual = cells.search(refId(here));
+        return wanted != nullptr && actual != nullptr
+            && FalloutScript::cellNameBegins(actual->mEditorId, wanted->mEditorId);
     }
 
     bool FalloutScripts::currentPlace(FalloutScript::FormId reference, Place& result)

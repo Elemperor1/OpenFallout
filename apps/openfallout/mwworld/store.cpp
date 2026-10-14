@@ -1212,6 +1212,7 @@ template class OFWorld::TypedDynamicStore<ESM4::Sound>;
 template class OFWorld::TypedDynamicStore<ESM4::SoundReference>;
 template class OFWorld::TypedDynamicStore<ESM4::Static>;
 template class OFWorld::TypedDynamicStore<ESM4::StaticCollection>;
+template class OFWorld::TypedDynamicStore<ESM4::TalkingActivator>;
 template class OFWorld::TypedDynamicStore<ESM4::Terminal>;
 template class OFWorld::TypedDynamicStore<ESM4::TextureSet>;
 template class OFWorld::TypedDynamicStore<ESM4::Tree>;

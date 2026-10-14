@@ -110,7 +110,7 @@ namespace
 
     // Loads the one package of a plugin that is a Fallout 3 file, by its record only: the group headers of Fallout have
     // another size than the synthetic plugins have.
-    ESM4::AIPackage loadFromAFalloutFile(const std::string& data)
+    ESM4::AIPackage loadFromAFalloutFile(const std::string& data, std::uint32_t modIndex = 0)
     {
         std::string hedr;
         append<float>(hedr, 1.34f);
@@ -119,6 +119,7 @@ namespace
         const std::string plugin
             = versionedRecord("TES4", 0, subRecord("HEDR", hedr), 15) + versionedRecord("PACK", 1, data, 15);
         ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        reader.setModIndex(modIndex);
         EXPECT_TRUE(reader.getRecordHeader());
         EXPECT_TRUE(reader.isFalloutFile());
         reader.getRecordData();
@@ -228,6 +229,67 @@ namespace
         EXPECT_EQ(result.mTarget.distance, 300);
         // the sub-record after it is read from the right place
         EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
+    TEST(ESM4PackageTest, readsTheDialogueDataOfAPackageOfFallout)
+    {
+        // the field of view, the topic, flags, four bytes, the type (Say To) and four bytes more
+        std::string data;
+        append<float>(data, 100.f);
+        append<std::uint32_t>(data, 0x00001234);
+        append<std::uint32_t>(data, 0x100);
+        append<std::uint32_t>(data, 0);
+        append<std::int32_t>(data, 1);
+        append<std::uint32_t>(data, 0);
+        const ESM4::AIPackage result = loadFromAFalloutFile(zString("EDID", "SayTo") + falloutPackageData(15, 8)
+            + subRecord("PKDD", data) + subRecord("PLDT", bytePattern(12, 10)));
+
+        EXPECT_EQ(result.mData.type, 15);
+        EXPECT_EQ(result.mDialogue.mFov, 100.f);
+        EXPECT_EQ(result.mDialogue.mTopic, 0x00001234u);
+        EXPECT_EQ(result.mDialogue.mFlags, 0x100u);
+        EXPECT_EQ(result.mDialogue.mType, ESM4::AIPackage::DialogueData::SayTo);
+        // the sub-record after it is read from the right place
+        EXPECT_EQ(result.mLocation.type, 0x0D0C0B0A);
+    }
+
+    TEST(ESM4PackageTest, keepsNoTopicOfADialoguePackageAsNoTopicInAFileThatIsNotTheFirst)
+    {
+        // A package with no topic starts with the greeting; its topic must stay 0 when IDs get the index of the file
+        std::string none;
+        append<float>(none, 100.f);
+        append<std::uint32_t>(none, 0);
+        append<std::uint32_t>(none, 0);
+        append<std::uint32_t>(none, 0);
+        append<std::int32_t>(none, 0);
+        std::string some;
+        append<float>(some, 100.f);
+        append<std::uint32_t>(some, 0x00001234);
+        append<std::uint32_t>(some, 0);
+        append<std::uint32_t>(some, 0);
+        append<std::int32_t>(some, 0);
+
+        const ESM4::AIPackage greeting
+            = loadFromAFalloutFile(zString("EDID", "Greet") + falloutPackageData(15, 8) + subRecord("PKDD", none), 3);
+        const ESM4::AIPackage topic
+            = loadFromAFalloutFile(zString("EDID", "Topic") + falloutPackageData(15, 8) + subRecord("PKDD", some), 3);
+
+        EXPECT_EQ(greeting.mDialogue.mTopic, 0u);
+        EXPECT_EQ(topic.mDialogue.mTopic, 0x03001234u);
+    }
+
+    TEST(ESM4PackageTest, takesAPackageWithDialogueDataThatIsTooShortForTheTypeAsAConversation)
+    {
+        std::string data;
+        append<float>(data, 100.f);
+        append<std::uint32_t>(data, 0x00001234);
+        append<std::uint32_t>(data, 0);
+        append<std::uint32_t>(data, 0);
+        const ESM4::AIPackage result
+            = loadFromAFalloutFile(zString("EDID", "Talk") + falloutPackageData(15, 8) + subRecord("PKDD", data));
+
+        EXPECT_EQ(result.mDialogue.mTopic, 0x00001234u);
+        EXPECT_EQ(result.mDialogue.mType, ESM4::AIPackage::DialogueData::Conversation);
     }
 
     TEST(ESM4PackageTest, ignoresSubrecordsThatNoEventClaims)

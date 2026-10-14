@@ -139,6 +139,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testsleepdeprivationstage.cpp
     esm4/testspell.cpp
     esm4/testsurvey.cpp
+    esm4/testtalkingactivator.cpp
     esm4/testterminal.cpp
     esm4/testvoicetype.cpp
     esm4/testwater.cpp
@@ -158,6 +159,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
     falloutscript/testdialoguerules.cpp
+    falloutscript/testenableparents.cpp
     falloutscript/testmessagecommands.cpp
     falloutscript/testinterpreter.cpp
     falloutscript/testobjects.cpp

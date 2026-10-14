@@ -47,6 +47,8 @@ namespace
     constexpr std::uint16_t OpGetIsID = 0x1048;
     constexpr std::uint16_t OpIsCurrentFurnitureRef = 0x10A2;
     constexpr std::uint16_t OpIsCurrentFurnitureObj = 0x10A3;
+    constexpr std::uint16_t OpGetSitting = 0x109F;
+    constexpr std::uint16_t OpGetSleeping = 0x1031;
     constexpr std::uint16_t OpGetInSameCell = 0x1020;
     constexpr std::uint16_t OpPlaceAtMe = 0x1025;
     constexpr std::uint16_t OpGetCurrentTime = 0x1012;
@@ -65,6 +67,7 @@ namespace
     public:
         std::set<FormId> mDisabled;
         std::map<FormId, FormId> mCells;
+        std::map<FormId, int> mFurnitureKinds;
         std::map<std::pair<FormId, FormId>, double> mDistances;
         std::map<FormId, FormId> mBases;
         std::map<FormId, FormId> mWorldspaces;
@@ -136,6 +139,11 @@ namespace
         {
             const auto found = mFurniture.find(actor);
             return found != mFurniture.end() ? found->second : 0;
+        }
+        int currentFurnitureKind(FormId actor) override
+        {
+            const auto found = mFurnitureKinds.find(actor);
+            return found != mFurnitureKinds.end() ? found->second : 0;
         }
         FormId worldspaceOf(FormId reference) override
         {
@@ -612,6 +620,18 @@ namespace
         EXPECT_EQ(setup.variable(crate, 3), 0);
     }
 
+    TEST(FalloutScriptObjectsTest, cell_names_begin_with_the_name_of_the_cell_asked_for)
+    {
+        // GetInCell of the games: the name of the asked cell is the beginning of the name of the cell it is in
+        EXPECT_TRUE(FalloutScript::cellNameBegins("Vault101d", "Vault101"));
+        EXPECT_TRUE(FalloutScript::cellNameBegins("VAULT101B", "vault101"));
+        EXPECT_TRUE(FalloutScript::cellNameBegins("Vault101", "Vault101"));
+        EXPECT_FALSE(FalloutScript::cellNameBegins("Vault102", "Vault101"));
+        EXPECT_FALSE(FalloutScript::cellNameBegins("Vault", "Vault101"));
+        EXPECT_FALSE(FalloutScript::cellNameBegins("Vault101", ""));
+        EXPECT_FALSE(FalloutScript::cellNameBegins("", "Vault101"));
+    }
+
     TEST(FalloutScriptObjectsTest, get_is_id_compares_the_form_the_object_stands_for)
     {
         Runner setup;
@@ -669,6 +689,40 @@ namespace
         setup.mObjects.setLoaded(crate, true);
 
         EXPECT_EQ(setup.variable(crate, 1), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_sitting_and_get_sleeping_tell_the_kind_of_use_as_settled)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnLoad) + setTo(var('s', 1), callToken(OpGetSitting, arguments(0)))
+            + setTo(var('s', 2), callToken(OpGetSleeping, arguments(0))) + end());
+        builder.variable(1, integerVariable, "sitting").variable(2, integerVariable, "sleeping");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        // Sitting down on a chair (entry kind 14 is what the couch and chair of the New Vegas intro have)
+        setup.mWorld.mFurnitureKinds[crate] = 14;
+        setup.mObjects.setLoaded(crate, true);
+        EXPECT_EQ(setup.variable(crate, 1), 3);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, get_sitting_is_no_for_an_actor_that_lies_or_uses_nothing)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnLoad) + setTo(var('s', 1), callToken(OpGetSitting, arguments(0)))
+            + setTo(var('s', 2), callToken(OpGetSleeping, arguments(0))) + end());
+        builder.variable(1, integerVariable, "sitting").variable(2, integerVariable, "sleeping");
+        setup.addScript(scriptOfCrates, builder);
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        // Lying in a bed
+        setup.mWorld.mFurnitureKinds[crate] = 3;
+        setup.mObjects.setLoaded(crate, true);
+        EXPECT_EQ(setup.variable(crate, 1), 0);
+        EXPECT_EQ(setup.variable(crate, 2), 3);
     }
 
     TEST(FalloutScriptObjectsTest, is_current_furniture_obj_compares_the_form_of_the_furniture_the_actor_uses)

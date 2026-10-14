@@ -88,7 +88,8 @@ namespace FalloutScript
             Nesting(const Nesting&) = delete;
             Nesting& operator=(const Nesting&) = delete;
         } nesting(mNesting);
-        quest->mStage = index;
+        // The stage of a quest is the highest that was set (the games keep it so; the stage that is set still runs)
+        quest->mStage = std::max(quest->mStage, index);
         if (!done)
             quest->mStagesDone.push_back(index);
         quest->mRunning = true;

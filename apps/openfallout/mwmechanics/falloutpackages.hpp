@@ -69,6 +69,14 @@ namespace OFMechanics
     /// Whether the follower runs after the one it follows
     bool falloutFollowRuns(float away, float distance);
 
+    /// The distance, in game units, at which a character with a Dialogue package talks to its target, whatever distance
+    /// the package names (the games take 120 for one that names none)
+    constexpr float falloutDefaultTalk = 120.f;
+    constexpr float falloutSmallestTalk = 80.f;
+    constexpr float falloutLargestTalk = 1024.f;
+
+    float falloutTalkDistance(std::int32_t packageDistance);
+
     /// The position in the content files of the first plugin (a file with the extension esm, esp or esl, whatever the
     /// case; the scripts the engine adds come first), where the games keep the player's reference: -1 when there is
     /// none

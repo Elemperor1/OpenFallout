@@ -25,6 +25,7 @@
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/dialogue.hpp>
+#include <components/falloutscript/enableparents.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -199,6 +200,16 @@ namespace OFScript
         bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// startConversation and the interface that shows it. For the thread of the frame.
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// What a character with a Dialogue package does once it is where it talks: a Say To package for the player
+        /// says one response of its topic, a Conversation package for the player begins a conversation (the interface
+        /// opens, which is for the thread of the frame), and a package for another character makes the exchange of the
+        /// two (follow-ups and all). `listener` is the character it talks to, empty for the player. False when the
+        /// character is to try again later, because the player is busy with a menu or another conversation (`busy`, if
+        /// given, says with what); a character that has nothing to say is done all the same.
+        bool speakPackage(const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener,
+            std::string* busy = nullptr);
+        /// Whether the character is still saying lines that it was told to say outside of a conversation
+        bool isSaying(const OFWorld::Ptr& speaker) const;
         /// The conversation as it is now (nothing active when none is open)
         Conversation conversation() const;
         /// The speaker says the line of the response that is said, with the voice of the data. False when the line has
@@ -221,6 +232,8 @@ namespace OFScript
             std::uint32_t mSerial = 0;
             std::string mText;
             std::vector<std::string> mButtons;
+            /// The message record, as core.getFormId writes a form
+            std::string mForm;
         };
         /// The box that is open, if any (any thread)
         std::optional<OpenMessage> openMessage() const;
@@ -291,6 +304,7 @@ namespace OFScript
         void setDisabled(FalloutScript::FormId reference, bool disabled) override;
         bool distance(FalloutScript::FormId first, FalloutScript::FormId second, double& result) override;
         FalloutScript::FormId cellOf(FalloutScript::FormId reference) override;
+        bool inCell(FalloutScript::FormId reference, FalloutScript::FormId cell) override;
         void activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate) override;
 
         void addScriptPackage(FalloutScript::FormId actor, FalloutScript::FormId package) override;
@@ -330,6 +344,11 @@ namespace OFScript
         /// followed by its follow-ups, as in a conversation (StartConversation between two characters).
         bool sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic, FalloutScript::FormId listener = 0,
             bool forceSubtitles = false, bool followUps = false);
+        /// The character begins an exchange with another character: the topic is said (the greeting when none is
+        /// named) and the other answers, as in a conversation with the player
+        void converse(FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic);
+        /// The topic of a package: none (0) is the greeting, as it is with the player
+        FalloutScript::FormId packageTopic(FalloutScript::FormId topic);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -350,6 +369,9 @@ namespace OFScript
             /// The record of the speaker, kept with the line: a speaker that was made while the game runs and has left
             /// the loaded cells has no reference to tell it by when the response ends
             FalloutScript::FormId mSpeakerBase = 0;
+            /// The character that says the line when it is not the one the lines were given to (0 for that one): in an
+            /// exchange of two characters they take turns
+            FalloutScript::FormId mSpeaker = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
         };
@@ -383,6 +405,7 @@ namespace OFScript
         double gameHour() override;
         double gameDaysPassed() override;
         FalloutScript::FormId currentFurniture(FalloutScript::FormId actor) override;
+        int currentFurnitureKind(FalloutScript::FormId actor) override;
 
         /// The reference as scripts name it, 0 for an object that has no number a script can use: a reference of a
         /// content file, or an object that PlaceAtMe made
@@ -397,6 +420,10 @@ namespace OFScript
         /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
         /// it is not known (yet); the base is empty for a reference that has none.
         bool baseOf(FalloutScript::FormId reference, ESM::FormId& base);
+        /// The record that the conditions about a reference are about: that of the character a talking activator speaks
+        /// for (SetTalkingActivatorActor), and the record of the reference otherwise
+        bool conditionBaseOf(FalloutScript::FormId reference, ESM::FormId& base);
+        FalloutScript::FormId talkingActorOf(FalloutScript::FormId activator);
         /// The object of the reference when it is in a cell that is loaded, else an empty one
         OFWorld::Ptr findReference(FalloutScript::FormId reference);
         void runPending();
@@ -501,6 +528,10 @@ namespace OFScript
         /// The action is done at once on the thread of the frame, and in the next frame on any other.
         void runOnMainThread(std::function<void()> action);
         void applyDisabled(FalloutScript::FormId reference, bool disabled);
+        /// Enables or disables the object alone, where it is or when its cell is loaded
+        void applyDisabledAlone(FalloutScript::FormId reference, bool disabled);
+        /// Who has whom for an enable parent, read from the records the first time it is asked for
+        const FalloutScript::EnableParents& enableParents();
         void tellPlayer(const std::string& text);
 
         /// A message with buttons that waits to be shown, or is on the screen. The buttons are the ones whose
@@ -513,6 +544,7 @@ namespace OFScript
             std::vector<std::string> mButtons;
             std::vector<std::string> mPlainButtons;
             std::vector<int> mNumbers;
+            std::string mForm;
             /// The one who showed it, who gets the button that is picked
             FalloutScript::FormId mOwner = 0;
         };
@@ -583,6 +615,13 @@ namespace OFScript
         /// Whether scripts disabled (true) or enabled (false) objects in cells that were not loaded at the time, which
         /// holds until the cell is loaded
         std::map<FalloutScript::FormId, bool> mDisabled;
+        /// The characters that talking activators speak for, by the reference of the activator (scripts ask from their
+        /// own thread, the conversations from the thread of the frame)
+        std::mutex mTalkingActorMutex;
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mTalkingActors;
+        /// The objects that follow the state of another one (their enable parent)
+        FalloutScript::EnableParents mEnableParents;
+        bool mEnableParentsRead = false;
         /// The objects of the loaded cells by their references: the world only knows those that were put in the scene,
         /// which a disabled one never was
         std::unordered_map<FalloutScript::FormId, OFWorld::Ptr> mReferences;
@@ -620,6 +659,8 @@ namespace OFScript
             osg::Vec3f mPlace;
             /// The entry of the marker that it uses, -1 for none
             int mEntry = -1;
+            /// The kind of use the entry says (sleeping 1 to 9, sitting 10 to 20), sitting for furniture with no marker
+            int mKind = 10;
             /// Where the furniture was when it was used: it is not used any more when it is moved from there
             osg::Vec3f mFurniturePlace;
         };

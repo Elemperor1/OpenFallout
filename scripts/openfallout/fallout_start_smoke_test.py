@@ -517,6 +517,8 @@ return {
 # scripts: the globals that the scripts of the events of the packages and of the walker count in.
 GATE_SCRIPT = """\
 local world = require('openfallout.world')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
 
 local elapsed, done, reported = 0, false, false
 
@@ -533,12 +535,19 @@ return {
                 reported = true
                 local g = world.globals
                 print('OFTEST', 'package events', @EVENTS@)
+                -- the talking activator is an object of the world, of its own type
+                local found, valid, typed = pcall(function()
+                    local intercom = world.getObjectByFormId(core.getFormId('OFTest.esm', @INTERCOM@))
+                    return intercom:isValid(), intercom.type == types.ESM4TalkingActivator
+                end)
+                print('OFTEST', 'intercom', tostring(found and valid), tostring(found and typed))
             end
         end,
     },
 }
 """.replace("@FROM@", str(plugin.GATE_FROM)).replace("@QUEST@", plugin.QUEST_C_NAME).replace(
-    "@STAGE@", str(plugin.QUEST_C_STAGE)).replace("@EVENTS_FROM@", str(WALK_SECONDS - 2)).replace(
+    "@STAGE@", str(plugin.QUEST_C_STAGE)).replace("@INTERCOM@", str(plugin.INTERCOM_REF_ID)).replace(
+    "@EVENTS_FROM@", str(WALK_SECONDS - 2)).replace(
     "@EVENTS@", ", ".join(f"tostring(g.{name})" for _, name in plugin.PACKAGE_EVENT_GLOBALS.values()))
 
 # Tells the companion, a character with no package, to follow the player (a global script, from the game time that the
@@ -720,9 +729,20 @@ return {
                     go(7)
                 end
             elseif step == 7 and since >= 0.5 then
+                -- A second conversation that the script ends without the window: the window goes with it, and the game
+                -- is not left paused
+                core.sendGlobalEvent('OFTestTalk', {})
+                go(8)
+            elseif step == 8 and view.active then
+                conversation.close()
+                go(9)
+            elseif step == 9 and since >= 1 then
+                log('dropped', describe(conversation.get()))
+                go(10)
+            elseif step == 10 then
                 core.quit()
             end
-            if step ~= 0 and step < 6 and since >= @TIMEOUT@ then
+            if step ~= 0 and (step < 6 or step == 8) and since >= @TIMEOUT@ then
                 log('timeout at step', tostring(step), describe(view))
                 core.quit()
             end
@@ -1006,6 +1026,9 @@ NEW_GAME_GATES = f"""\
 return {{
     settle = 1,
     tries = 1,
+    boxes = {{
+        {{ file = 'OFTest.esm', ref = {plugin.NEW_GAME_MESSAGE_ID}, button = -1 }},
+    }},
     gates = {{
         {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.TRIGGER_REF_ID}, how = 'walk' }},
         {{ quest = '{plugin.NEW_GAME_QUEST_NAME}', stage = {plugin.NEW_GAME_LAST_STAGE}, file = 'OFTest.esm', ref = {plugin.SCRIPTED_REF_IDS["interior"]}, how = 'activate' }},
@@ -1118,9 +1141,11 @@ local traveller_ids = { @TRAVELLER@ }
 local crosser_ids = { @CROSSER@ }
 local traveller_object, setter_object = nil, nil
 local doomed_ids = { @DOOMED@ }
+local follower_ids, inverse_ids = { @FOLLOWER@ }, { @INVERSE@ }
 local locker_ids = { @LOCKER@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
+local by_object = 0
 
 local function find(ids)
     for _, id in ipairs(ids) do
@@ -1133,8 +1158,10 @@ return {
     engineHandlers = {
         -- The activations of the scripted object that reach the handlers of Lua: its OnActivate block takes the first
         -- one and passes the second on with Activate
-        onActivate = function(object)
+        onActivate = function(object, actor)
             if scripted_object ~= nil and object == scripted_object then defaults = defaults + 1 end
+            -- An activator that is no actor: the third activation has the scripted object activate the mover
+            if scripted_object ~= nil and actor == scripted_object then by_object = by_object + 1 end
         end,
         onUpdate = function(dt)
             elapsed = elapsed + dt
@@ -1153,10 +1180,14 @@ return {
                     tostring(g.@FRAMES@ > 10), tostring(g.@VICTIM_DISABLED@), tostring(g.@ACTIVATED@),
                     string.format('%d %d', math.floor(g.@DISTANCE@),
                         math.floor((scripted.position - player.position):length())))
+                -- The cubes that have the victim for their enable parent: the script disabled the victim, so the one that
+                -- is enabled with it is disabled and the one that has the flag that inverses it is enabled
+                print('OFTEST', 'object followers', tostring(find(follower_ids).enabled), tostring(find(inverse_ids).enabled))
                 scripted:activateBy(player)
                 local once = g.@ACTIVATED@
                 scripted:activateBy(player)
                 print('OFTEST', 'object activated', tostring(once), tostring(g.@ACTIVATED@))
+                scripted:activateBy(player)
                 victim.enabled = true
                 -- An object made while the game runs has no reference number of a plugin, and the scripts of Fallout
                 -- must let it be put in the cell and activated like the others
@@ -1172,6 +1203,7 @@ return {
                 print('OFTEST', 'object victim again', tostring(victim.enabled),
                     tostring(world.globals.@VICTIM_DISABLED@))
                 print('OFTEST', 'object defaults', tostring(defaults))
+                print('OFTEST', 'object by object', tostring(by_object))
                 local g = world.globals
                 print('OFTEST', 'object idler', tostring(g.@ITEMS@), tostring(g.@RANK@), tostring(g.@JOINED@),
                     tostring(g.@DEAD@))
@@ -1291,6 +1323,8 @@ OBJECT_FROM = 4.0  # game seconds before the Lua script looks, enough for the ce
 OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SCRIPTED@", ", ".join(map(str, plugin.SCRIPTED_REF_IDS.values())))
                  .replace("@VICTIM@", ", ".join(map(str, plugin.VICTIM_REF_IDS.values())))
+                 .replace("@FOLLOWER@", ", ".join(map(str, plugin.FOLLOWER_REF_IDS.values())))
+                 .replace("@INVERSE@", ", ".join(map(str, plugin.INVERSE_REF_IDS.values())))
                  .replace("@MOVER@", ", ".join(map(str, plugin.MOVER_REF_IDS.values())))
                  .replace("@FAR@", ", ".join(map(str, plugin.FAR_MOVER_REF_IDS.values())))
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
@@ -1752,8 +1786,9 @@ def check_dialogue(text):
         return line is not None and all(part in line for part in parts)
 
     voiced = re.findall(r"Voice: (\S+)", text)
-    wanted = [plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID), plugin.SOUND_PATH,
-              plugin.FOLDER_SOUND_PATH]
+    greeting_voice = plugin.voice_path("OFTestVoice", "oftest_oftestgreeting", plugin.GREETING_INFO_ID)
+    # the second conversation, which the script ends, says the greeting again
+    wanted = [greeting_voice, plugin.SOUND_PATH, plugin.FOLDER_SOUND_PATH, greeting_voice]
     if voiced != wanted:
         problems.append("the lines that have a voice file should look it up in the folder of the voice type of the "
                         "talker, a line whose only file is another voice's (the ask line) and the lines with none "
@@ -1788,6 +1823,10 @@ def check_dialogue(text):
     closed = one("closed")
     if not has(closed, "active=false", "mode=nil"):
         problems.append(f"the window should be gone when the conversation is over: {closed}")
+    dropped = one("dropped")
+    if not has(dropped, "active=false", "mode=nil"):
+        problems.append("a conversation that a script ends with core.conversation.close should take the window with it, "
+                        f"and not leave the game paused: {dropped}")
     # The message box with buttons that the response ending the conversation shows: the third button is picked (the
     # second has a condition the player does not meet), the host reports the number it has in the record, and the script of
     # the talker reads it once (the number plus one)
@@ -2071,10 +2110,11 @@ def check_new_game(text):
     controls = [match.group(1).strip() for match in found if match]
     if controls != ["playercontrols=true playerfighting=true playerlooking=true playerviewswitch=true"]:
         problems.append(f"EnablePlayerControls should have given all the controls back: {controls}")
-    automatic = re.findall(r"AUTOPLAY\t(box press\t1\ttrue|chargen finish\tname\tname=" + plugin.NEW_GAME_NAME + r")",
+    automatic = re.findall(r"AUTOPLAY\t(box press\t2\ttrue|chargen finish\tname\tname=" + plugin.NEW_GAME_NAME + r")",
                            text)
     if len(automatic) != 2:
-        problems.append(f"autoplay.lua should have pressed the first button of the box and finished the screen of the name "
+        problems.append(f"autoplay.lua should have pressed the last button of the box (the table of gates names the message) and "
+                        f"finished the screen of the name "
                         f"with the name {plugin.NEW_GAME_NAME}: {automatic}")
     for stage in (plugin.NEW_GAME_WAIT_STAGE, plugin.NEW_GAME_LAST_STAGE):
         if f"AUTOPLAY\tquest\t{plugin.NEW_GAME_QUEST_NAME}\tstage={stage} running=true" not in text:
@@ -2215,6 +2255,11 @@ def check_objects(text, scenario):
         if abs(measured - expected) > OBJECT_DISTANCE_SLACK:
             problems.append(f"GetDistance should be within {OBJECT_DISTANCE_SLACK} units of the distance Lua sees: "
                             + str(found))
+    found = one("followers")
+    if found is not None and found != ["false", "true"]:
+        problems.append("the cubes that have the cube the script disabled for their enable parent should follow it: the "
+                        "one enabled with it should be disabled and the one with the inverse flag enabled (false, "
+                        "true): " + str(found))
     found = one("activated")
     if found is not None and found != ["1", "2"]:
         problems.append("OnActivate should count each of the two activations by the player (1 then 2): " + str(found))
@@ -2229,6 +2274,10 @@ def check_objects(text, scenario):
     if found is not None and found != ["1"]:
         problems.append("of the two activations only the second, which calls Activate, should reach the handlers of "
                         "Lua (1): " + str(found))
+    found = one("by object")
+    if found is not None and found != ["1"]:
+        problems.append("the third activation, in which the scripted object activates the mover, should reach the handlers "
+                        "of Lua with the object as the activator (1): " + str(found))
     found = one("idler")
     expected = [str(plugin.IDLER_ITEMS + plugin.IDLER_ADDS - plugin.IDLER_TAKES), str(plugin.IDLER_RANKS[0]), "0", "1"]
     if found is not None and found != expected:
@@ -2552,7 +2601,7 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     problems = []
     if "OFTEST\tgate opened\ttrue" not in text:
         problems.append("the stage of quest C that opens the gate was not set from Lua")
-    problems += check_package_events(text)
+    problems += check_package_events(text, scenario, animated)
 
     def marker(name):
         x, y = plugin.GATE_PLACES[name]
@@ -2595,21 +2644,42 @@ def check_scripted_packages(text, scenario, samples, animated, where):
     return problems
 
 
-def check_package_events(text):
+def check_package_events(text, scenario, animated):
     """The problems with what the packages tell scripts. The Travel package of the walker is begun once and done once
-    (the walker walks there, or is put there when it cannot walk), never changed; the package of the conditional character that holds until the gate
+    (the walker walks there, or is put there when it cannot walk), and changed once after that, as nothing follows it;
+    the package of the conditional character that holds until the gate
     opens is begun once and changed when the gate opens (never done); the blocks of the script of the walker that name the
     Travel package, and the one that names none, run for its events, and the one that names the package for the night,
-    which is not on, does not."""
+    which is not on, does not. The speaker of the interior has a Dialogue package: it walks to the player, says its line and
+    its package is done when the line is over (it does not walk without the animation, and the exterior has none). The
+    character of the interior whose Dialogue package targets the intercom (a talking activator) talks to it where it
+    stands, and its package is done when the line is over."""
     names = list(plugin.PACKAGE_EVENT_GLOBALS)
     match = re.search(r"OFTEST\tpackage events\t" + r"\t".join([r"(-?\d+)"] * len(names)), text)
     if not match:
         return ["the script did not log what the events of the packages counted"]
     got = dict(zip(names, map(int, match.groups())))
-    expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 0, "early_begin": 1, "early_end": 0,
-                "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1}
-    return [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
-            f"{want}" for name, want in expected.items() if got[name] != want]
+    expected = {"travel_begin": 1, "travel_end": 1, "travel_change": 1, "early_begin": 1, "early_end": 0,
+                "early_change": 1, "block_start": 1, "block_done": 1, "block_other": 0, "block_any": 1,
+                "speaker_done": 1 if not scenario.exterior and animated else 0,
+                "intercom_done": 0 if scenario.exterior else 1}
+    problems = [f"the global {plugin.PACKAGE_EVENT_GLOBALS[name][1]} counted {got[name]} events of packages, expected "
+                f"{want}" for name, want in expected.items() if got[name] != want]
+    if not scenario.exterior and animated:
+        if not re.search(r"Package OFTestSpeak of .*: it talks to the player", text):
+            problems.append("the speaker, whose Dialogue package sends it to the player, did not talk to the player")
+        if not re.search(r"Say: .* is to say topic OFTestSpeakTopic .*: 1 line\(s\)", text):
+            problems.append("the topic of the Dialogue package of the speaker was not said")
+    intercom = re.search(r"OFTEST\tintercom\t(\w+)\t(\w+)", text)
+    if not intercom:
+        problems.append("the script did not log whether the talking activator is an object of the world")
+    elif (intercom.group(1), intercom.group(2)) != (("false", "false") if scenario.exterior else ("true", "true")):
+        problems.append("the talking activator should be an object of its own type in the interior and not be in the "
+                        f"exterior: {intercom.group(0)}")
+    if not scenario.exterior:
+        if not re.search(r"Package OFTestIntercomTalk of .*: it talks to a character", text):
+            problems.append("the character whose Dialogue package targets the talking activator did not talk to it")
+    return problems
 
 
 def check_creatures(text, scenario, found, animated):

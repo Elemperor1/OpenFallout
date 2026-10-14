@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_OBJECTCOMMANDS_H
 
 #include <functional>
+#include <string_view>
 
 #include "interpreter.hpp"
 #include "objects.hpp"
@@ -24,6 +25,10 @@ namespace FalloutScript
         virtual bool distance(FormId first, FormId second, double& result) = 0;
         /// The form id of the cell the reference is in, 0 for a reference the host does not know
         virtual FormId cellOf(FormId reference) = 0;
+        /// Whether the reference is in the cell that GetInCell names. The games compare the names of the two cells and
+        /// take the name of the one asked for as the beginning of the other (letters of any case), so a cell stands
+        /// for the cells whose names begin with its own; a host that has no names has the cells themselves.
+        virtual bool inCell(FormId reference, FormId cell) { return cell != 0 && cellOf(reference) == cell; }
         /// The activator activates the target: the object does what it does by default, or, when `runOnActivate` is
         /// set, its script runs its OnActivate block in place of that. Nothing happens for an object or an activator
         /// the host does not know.
@@ -45,6 +50,9 @@ namespace FalloutScript
         /// The reference of the furniture that the actor sits on, lies on or leans against; 0 when it uses none (or the
         /// host does not know it)
         virtual FormId currentFurniture(FormId /*actor*/) { return 0; }
+        /// The kind of use of the furniture that the actor uses, the number the entry of its marker has: 1 to 9
+        /// sleeping, 10 to 20 sitting, more is leaning or standing at it. 0 when the actor uses none.
+        virtual int currentFurnitureKind(FormId /*actor*/) { return 0; }
         /// Makes `count` objects of the base form next to the reference, `distance` units from it in the direction (0
         /// in front of it, 1 behind, 2 to its left, 3 to its right), and tells the reference of the first. 0 when
         /// nothing is made.
@@ -55,9 +63,14 @@ namespace FalloutScript
         }
     };
 
+    /// Whether `name` begins with `prefix`, letters of any case alike: the test that GetInCell makes of the names of
+    /// two cells. A prefix that is empty never matches (a cell with no name stands for nothing).
+    bool cellNameBegins(std::string_view name, std::string_view prefix);
+
     /// Gives the commands of objects to the interpreter: Activate, Enable, Disable, MarkForDelete, GetDisabled,
     /// GetDistance, GetInCell, GetInSameCell, GetInWorldspace, GetLinkedRef, PlaceAtMe, GetSelf, GetActionRef,
-    /// IsActionRef, GetIsReference, GetIsID, IsCurrentFurnitureRef, IsCurrentFurnitureObj, GetGlobalValue,
+    /// IsActionRef, GetIsReference, GetIsID, IsCurrentFurnitureRef, IsCurrentFurnitureObj, GetSitting, GetSleeping,
+    /// GetGlobalValue,
     /// GetCurrentTime, GetDayOfWeek, GetSecondsPassed and GetRandomPercent. Those that the command table does not have
     /// are left out. `random` gives the whole numbers from 0 to 99 for GetRandomPercent.
     void addObjectCommands(

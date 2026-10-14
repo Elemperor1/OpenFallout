@@ -44,6 +44,10 @@ namespace FalloutScript
     {
         std::string mText;
         FormId mInfo = 0;
+        /// Who says it: the character (its reference and its record), which is not always the one that started the
+        /// exchange when two characters talk to each other
+        FormId mSpeaker = 0;
+        FormId mSpeakerBase = 0;
         std::uint8_t mNumber = 0; // the number in the name of the voice file
         std::uint32_t mEmotion = 0; // 0 neutral, 1 anger, 2 disgust, 3 fear, 4 sad, 5 happy, 6 surprise, 7 pained
         std::int32_t mEmotionValue = 0;
@@ -87,12 +91,15 @@ namespace FalloutScript
     ///
     /// Not done: the speech challenge is passed unless a check is set (setChallengeCheck), the flags for characters
     /// of low or high intelligence are not looked at, and a response that is run immediately waits for the player to
-    /// pick it like any other.
+    /// pick it like any other (only in an exchange between two characters it goes on at once, and there the choices of
+    /// a response that is not run immediately are followed too when they name the topic of the scene or the goodbye).
     class DialogueManager
     {
     public:
         /// The editor id of the topic that starts every conversation
         static constexpr const char* greetingTopic = "Greeting";
+        /// The editor id of the topic that ends one
+        static constexpr const char* goodbyeTopic = "Goodbye";
 
         DialogueManager(Interpreter& interpreter, ConditionEvaluator& conditions, QuestManager& quests,
             const DialogueRecords& records);
@@ -152,8 +159,13 @@ namespace FalloutScript
         /// waits for the end of one line before it says the next relies on it); a response with no lines has its end
         /// script run here, as there is nothing to wait for. With `followUps` as well the end scripts run here: which
         /// follow-up comes next depends on what the end script of the response before it did.
+        /// When the listener is a character whose record is given (`listenerBase`) and the response goes on, the two
+        /// take turns: the next speaker of a response is its target, so the response that comes next is looked for
+        /// among the listener's first, and the speaker's when the listener has none. A response flagged Run
+        /// Immediately goes on at once with the first response of the topics it offers as choices (the exchanges of
+        /// the scenes of the games are made of those).
         DialogueView say(const DialogueSpeaker& speaker, FormId topic, FormId listener = 0, bool followUps = false,
-            bool deferEnd = false);
+            bool deferEnd = false, FormId listenerBase = 0);
         /// What a response said with `deferEnd` does when it is over: its end script (which sees the response, as in
         /// a conversation) and the topics it adds. `info` is the response as the lines of the view name it.
         void finishSaid(const DialogueSpeaker& speaker, FormId info, FormId topic);
@@ -207,6 +219,7 @@ namespace FalloutScript
         std::unordered_map<FormId, TopicEntry> mEntries;
         std::unordered_map<FormId, const ESM4::DialogInfo*> mInfoIndex;
         FormId mGreeting = 0;
+        FormId mGoodbye = 0;
         /// The topics at the top of the list, the highest priority first
         std::vector<FormId> mTopLevel;
         /// The topics the player was given, in the order they were

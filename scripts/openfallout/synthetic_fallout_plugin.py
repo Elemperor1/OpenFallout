@@ -385,7 +385,7 @@ AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
 # its MenuMode block (the main menu counts as a menu), which sets stage 0 as long as the quest is before stage 5; the
 # result script of stage 0 takes the controls of the player, moves the player to a marker (which faces a way) and sets
 # stage 5. At stage 5 the script of the quest shows a message box with two buttons and sets stage 6; once the test has
-# picked the first button (from Lua, as a click would) it sets stage 10, which gives the controls back and opens the name
+# picked the last button (from Lua, as a click would) it sets stage 10, which gives the controls back and opens the name
 # screen.
 NEW_GAME_QUEST_NAME = "CG00"
 NEW_GAME_QUEST_ID = 0x8FA
@@ -401,9 +401,10 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x91F # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x931 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
-# counts them: it is begun once, done once when the walker gets there, and never changed), and so has the package that
+# counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
+# on and the done one is over for the walker), and so has the package that
 # the conditional character follows first, for as long as quest C is below QUEST_C_STAGE (a Guard package at the place
 # the character is put, which stays: it is begun once, and changed when the gate opens and another package is on; it is
 # never done). The script of the walker has blocks for the events of the packages too: one that names the Travel package
@@ -413,7 +414,9 @@ PACKAGE_EVENT_GLOBALS = {"travel_begin": (0x905, "OFTestTravelBegin"), "travel_e
                          "travel_change": (0x907, "OFTestTravelChange"), "early_begin": (0x908, "OFTestEarlyBegin"),
                          "early_end": (0x909, "OFTestEarlyEnd"), "early_change": (0x90A, "OFTestEarlyChange"),
                          "block_start": (0x90B, "OFTestBlockStart"), "block_done": (0x90C, "OFTestBlockDone"),
-                         "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny")}
+                         "block_other": (0x90D, "OFTestBlockOther"), "block_any": (0x90E, "OFTestBlockAny"),
+                         "speaker_done": (0x925, "OFTestSpeakerDone"),
+                         "intercom_done": (0x92D, "OFTestIntercomDone")}
 WATCH_SCRIPT_IDS = {"interior": 0x90F, "exterior": 0x910}
 EARLY_PACKAGE_IDS = {"interior": 0x911, "exterior": 0x912}
 # The trigger volume: an activator with a script that counts who comes into, stays in and leaves a box (the script has
@@ -444,6 +447,31 @@ SITTER_MARKER_REF_ID = 0x91D
 SITTER_REF_ID = 0x91E
 SITTER_GLOBAL = (0x91F, "OFTestSitterInChair")
 SITTER_PLACES = {"sitter": (-300.0, -1200.0), "chair": (-300.0, -1400.0), "marker": (-300.0, -1000.0)}
+# A speaker: a character with a Dialogue package of the kind Say To, which sends it to the player (it stops within
+# SPEAKER_DISTANCE of the player) to say a topic with one response, once. The package is done when the line is over, and its
+# script counts that.
+SPEAKER_ID = 0x920
+SPEAKER_PACKAGE_ID = 0x921
+SPEAKER_REF_ID = 0x922
+SPEAK_TOPIC_ID = 0x923
+SPEAK_INFO_ID = 0x924
+SPEAK_TEXT = "Over here."
+SPEAKER_PLACE = (700.0, -600.0)
+SPEAKER_DISTANCE = 150
+# An intercom: a talking activator (TACT) with the voice type of its record, and next to it a character with a Dialogue
+# package of the kind Conversation whose target is the intercom. The character says the topic to it from where it stands, and
+# its package is done when the line is over (its script counts that).
+INTERCOM_ID = 0x926
+INTERCOM_REF_ID = 0x927
+INTERCOM_USER_ID = 0x928
+INTERCOM_USER_REF_ID = 0x929
+INTERCOM_PACKAGE_ID = 0x92A
+INTERCOM_TOPIC_ID = 0x92B
+INTERCOM_INFO_ID = 0x92C
+INTERCOM_TEXT = "Anybody there?"
+INTERCOM_PLACE = (700.0, -300.0)
+INTERCOM_USER_PLACE = (550.0, -300.0)
+INTERCOM_DISTANCE = 100
 TRIGGER_SCRIPT_ID = 0x902
 TRIGGER_BASE_ID = 0x903
 TRIGGER_REF_ID = 0x904
@@ -452,6 +480,12 @@ TRIGGER_YAW = math.pi / 2 # a quarter turn about z: the long side of the box run
 TRIGGER_HALF = (150.0, 20.0, 50.0) # the half sizes the record gives (x, y, z) before the turn
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
+# Two cubes that have the victim for their enable parent (XESP): one is enabled when the victim is, the other has the
+# flag that inverses it. The script disables the victim, and they follow it.
+FOLLOWER_REF_IDS = {"interior": 0x92E, "exterior": 0x92F}
+INVERSE_REF_IDS = {"interior": 0x930, "exterior": 0x931}
+FOLLOWER_PLACE = (300.0, -800.0)
+INVERSE_PLACE = (300.0, -1100.0)
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -532,6 +566,9 @@ NIGHT_HOURS = 4
 PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
 PACKAGE_GUARD = 14
+PACKAGE_DIALOGUE = 15
+DIALOGUE_CONVERSATION = 0
+DIALOGUE_SAY_TO = 1
 LOCATION_NEAR_REFERENCE = 0
 LOCATION_NEAR_CURRENT = 2
 LOCATION_NEAR_EDITOR = 3
@@ -699,8 +736,11 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None):
+         primitive=None, enable_parent=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if enable_parent is not None:
+        # XESP, 8 bytes: the reference that this one is enabled with, and the flags (1: the other way round)
+        subs.append(sub(b"XESP", struct.pack("<II", *enable_parent)))
     if primitive is not None:
         # XPRM, 32 bytes: the bounds, the colour, a float for the way the editor draws it and the type (1 a box)
         bounds, kind = primitive
@@ -925,8 +965,9 @@ def chargen_quest():
 def new_game_script():
     """The script of the quest that starts a new game (an SCPT record of type 1): `Begin MenuMode`, no number, with
     `if GetStage CG00 < 5` then `SetStage CG00 0`, as the script of CG00 starts the game of Fallout 3; and `Begin
-    GameMode`, which at stage 5 shows the message box and sets stage 6, and at stage 6 sets stage 10 once the first
-    button has been picked (as the script of CG00 shows its box for the sex of the player and reads the answer)."""
+    GameMode`, which at stage 5 shows the message box and sets stage 6, and at stage 6 sets stage 10 once the last
+    button has been picked (as the script of CG00 shows its box for the sex of the player and reads the answer; autoplay
+    presses the first button of a box unless its table names the message)."""
     sf = fallout_script
     script = sf.Script(1)
     quest = script.form(NEW_GAME_QUEST_ID)
@@ -937,7 +978,7 @@ def new_game_script():
 
     before_box = (sf.call_token(sf.GET_STAGE, sf.form_argument(quest)) + sf.number(str(NEW_GAME_BOX_STAGE))
                   + sf.operator("<"))
-    picked_first = sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("0") + sf.operator("==")
+    picked_last = sf.call_token(sf.GET_BUTTON_PRESSED) + sf.number("1") + sf.operator("==")
     script.add(
         sf.statement(sf.SCRIPT_NAME),
         sf.block(sf.MENU_MODE_BLOCK, b"".join([
@@ -950,7 +991,7 @@ def new_game_script():
             sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_WAIT_STAGE)),
             sf.statement(sf.END_IF),
             sf.branch(sf.IF, stage_is(NEW_GAME_WAIT_STAGE)),
-            sf.branch(sf.IF, picked_first),
+            sf.branch(sf.IF, picked_last),
             sf.call(sf.SET_STAGE, sf.form_argument(quest), sf.int_argument(NEW_GAME_LAST_STAGE)),
             sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
@@ -959,7 +1000,7 @@ def new_game_script():
 
 def new_game_message():
     """The MESG record of the box that the quest of the new game shows: two buttons, no condition."""
-    subs = [zstr(b"EDID", "OFTestNewGameMessage"), zstr(b"DESC", "Pick the first button."),
+    subs = [zstr(b"EDID", "OFTestNewGameMessage"), zstr(b"DESC", "Pick the last button."),
             sub(b"DNAM", struct.pack("<I", 1)), sub(b"TNAM", struct.pack("<I", 0))]
     subs += [zstr(b"ITXT", text) for text in NEW_GAME_BUTTONS]
     return record(b"MESG", NEW_GAME_MESSAGE_ID, subs)
@@ -998,11 +1039,12 @@ def object_script(kind):
     disables the cube next to it, gives the scripted walker its package, changes the items and factions of the idler
     and kills it, reads the rank of the player in a faction and the suits of a creature placed as a levelled list; every
     frame it counts the frames, measures its distance to the player and keeps whether the cube is disabled; when activated it counts the activations by the player and, the
-    second time, lets the object do what it does by default (Activate)."""
+    second time, lets the object do what it does by default (Activate), the third time activates the mover as the object."""
     sf = fallout_script
     script = sf.Script(0)
     index = ("interior", "exterior").index(kind)
     victim = script.form(VICTIM_REF_IDS[kind])
+    scripted = script.form(SCRIPTED_REF_IDS[kind])
     player = script.form(PLAYER_REFERENCE)
     walker = script.form(GATE_REF_IDS["scripted"][index])
     walker_package = script.form(SCRIPT_PACKAGE_IDS[kind])
@@ -1214,6 +1256,10 @@ def object_script(kind):
             sf.branch(sf.IF, sf.global_target(activated) + sf.number("2") + sf.operator("==")),
             sf.call_counted(sf.ACTIVATE),
             sf.statement(sf.END_IF),
+            # The third activation has the scripted object itself activate the mover: an activator that is no actor
+            sf.branch(sf.IF, sf.global_target(activated) + sf.number("3") + sf.operator("==")),
+            sf.call_on(mover, sf.ACTIVATE, sf.form_argument(scripted)),
+            sf.statement(sf.END_IF),
             sf.statement(sf.END_IF)])))
     return record(b"SCPT", OBJECT_SCRIPT_IDS[kind], [zstr(b"EDID", "OFTestObjectScript" + kind.title()),
                                                      *fallout_script.sub_records(script)])
@@ -1230,6 +1276,10 @@ def object_refs(kind, origin):
     x, y = origin
     return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
             refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
+            refr(FOLLOWER_REF_IDS[kind], CUBE_ID, (x + FOLLOWER_PLACE[0], y + FOLLOWER_PLACE[1], CUBE / 2),
+                 enable_parent=(VICTIM_REF_IDS[kind], 0)),
+            refr(INVERSE_REF_IDS[kind], CUBE_ID, (x + INVERSE_PLACE[0], y + INVERSE_PLACE[1], CUBE / 2),
+                 enable_parent=(VICTIM_REF_IDS[kind], 1)),
             refr(MOVER_REF_IDS[kind], CUBE_ID, (x + MOVER_PLACE[0], y + MOVER_PLACE[1], CUBE / 2)),
             refr(FAR_MOVER_REF_IDS[kind], CUBE_ID, (x + FAR_MOVER_PLACE[0], y + FAR_MOVER_PLACE[1], CUBE / 2)),
             refr(SLEEPER_REF_IDS[kind], CUBE_ID, (x + SLEEPER_PLACE[0], y + SLEEPER_PLACE[1], CUBE / 2)),
@@ -1320,6 +1370,35 @@ def sitter_references():
 
     return [achr(SITTER_REF_ID, at("sitter"), SITTER_ID), refr(SITTER_CHAIR_REF_ID, FURNITURE_ID, at("chair")),
             refr(SITTER_MARKER_REF_ID, TARGET_MARKER_ID, at("marker"))]
+
+
+def speaker_packages():
+    return [package(SPEAKER_PACKAGE_ID, "OFTestSpeak", PACKAGE_DIALOGUE, target=(0, PLAYER_REFERENCE),
+                    distance=SPEAKER_DISTANCE, dialogue=(SPEAK_TOPIC_ID, DIALOGUE_SAY_TO),
+                    events=((b"POEA", "speaker_done"),))]
+
+
+def speaker_references():
+    """The speaker, in the interior cell."""
+    return [achr(SPEAKER_REF_ID, (*SPEAKER_PLACE, 0.0), SPEAKER_ID)]
+
+
+def intercom_base():
+    """The talking activator: a name and a voice type, no model."""
+    return record(b"TACT", INTERCOM_ID, [zstr(b"EDID", "OFTestIntercom"), zstr(b"FULL", "Test Intercom"),
+                                        sub(b"VNAM", struct.pack("<I", OTHER_VOICE_ID))])
+
+
+def intercom_packages():
+    return [package(INTERCOM_PACKAGE_ID, "OFTestIntercomTalk", PACKAGE_DIALOGUE, target=(0, INTERCOM_REF_ID),
+                    distance=INTERCOM_DISTANCE, dialogue=(INTERCOM_TOPIC_ID, DIALOGUE_CONVERSATION),
+                    events=((b"POEA", "intercom_done"),))]
+
+
+def intercom_references():
+    """The intercom and the character that talks to it, in the interior cell."""
+    return [refr(INTERCOM_REF_ID, INTERCOM_ID, (*INTERCOM_PLACE, 0.0)),
+            achr(INTERCOM_USER_REF_ID, (*INTERCOM_USER_PLACE, 0.0), INTERCOM_USER_ID)]
 
 
 def furniture_base():
@@ -1582,6 +1661,10 @@ def dialogue():
                      say=SAID_TOPIC_ID)]),
         topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
         topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT, end=DIALOGUE_GLOBALS["said_end"][0])]),
+        topic(SPEAK_TOPIC_ID, "OFTestSpeakTopic", "", 0, 0),
+        topic_group(SPEAK_TOPIC_ID, [response(SPEAK_INFO_ID, SPEAK_TEXT)]),
+        topic(INTERCOM_TOPIC_ID, "OFTestIntercomTopic", "", 0, 0),
+        topic_group(INTERCOM_TOPIC_ID, [response(INTERCOM_INFO_ID, INTERCOM_TEXT)]),
         topic(ADDED_TOPIC_ID, "OFTestAdded", ADDED_TOPIC_NAME, 0, 0),
         topic_group(ADDED_TOPIC_ID, [response(ADDED_INFO_ID, ADDED_TEXT, flags=0x0001, show=BUTTON_MESSAGE_ID,
                                               sound=SOUND_ID, more=((ADDED_MORE_TEXT, FOLDER_SOUND_ID),))]),
@@ -1605,7 +1688,7 @@ def package_event(marker, global_name):
 
 
 def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0, target=None, distance=0,
-            conditions=(), events=()):
+            conditions=(), events=(), dialogue=None):
     """A PACK record of Fallout 3: the editor ID, the data (the flags, the kind of package and 2 bytes the games add), the
     location as a type, a form ID or 0 and a radius, the schedule (any month, any day, no date, the hour or 0xff for
     any, how many hours it lasts) and the target as a type and a form ID (0: a reference), the distance to keep and a float (16 bytes in Fallout),
@@ -1617,6 +1700,9 @@ def package(form_id, name, kind, location=None, radius=0, time=0xff, duration=0,
     subs.append(sub(b"PSDT", struct.pack("<BBBBI", 0xff, 0xff, 0, time, duration)))
     if target is not None:
         subs.append(sub(b"PTDT", struct.pack("<iIif", *target, distance, 0.0)))
+    if dialogue is not None:
+        # PKDD of Fallout: the field of view, the topic, the flags, 4 bytes and the type (0: a conversation, 1: Say To)
+        subs.append(sub(b"PKDD", struct.pack("<fIIIi", 0.0, dialogue[0], 0, 0, dialogue[1])))
     subs += conditions
     for marker, global_name in events:
         subs += package_event(marker, global_name)
@@ -1885,6 +1971,8 @@ def plugin():
         trigger_reference(),
         furniture_reference(),
         *sitter_references(),
+        *speaker_references(),
+        *intercom_references(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -1909,6 +1997,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
+            + top_group(b"TACT", [intercom_base()])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base()])
             + top_group(b"FURN", [furniture_base()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
@@ -1927,10 +2016,13 @@ def plugin():
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", [*packages(), *sitter_packages()])
+            + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
             + top_group(b"NPC_", [person(), *package_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
+                                  person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
+                                  person(INTERCOM_USER_ID, "OFTestIntercomUser", [INTERCOM_PACKAGE_ID],
+                                         dressed=False),
                                   person(TALKER_ID, TALKER_NAME, dressed=False, voice=VOICE_ID, title=TALKER_TITLE,
                                          script=BUTTON_SCRIPT_ID)])
             + top_group(b"VTYP", [voice_type(VOICE_ID, "OFTestVoice"), voice_type(OTHER_VOICE_ID, "OFTestOtherVoice")])

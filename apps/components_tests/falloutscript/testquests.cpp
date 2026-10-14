@@ -147,6 +147,30 @@ namespace
         EXPECT_EQ(state->mJournal[0].mStage, 10);
     }
 
+    TEST(FalloutScriptQuestsTest, the_stage_of_a_quest_is_the_highest_that_was_set)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        ScriptBuilder low;
+        low.code(logCall("low"));
+        TestRecords::addEntry(quest, 10);
+        TestRecords::addEntry(quest, 20);
+        TestRecords::addEntry(quest, 40);
+        TestRecords::addEntry(quest, 22, "", 0, &low);
+        setup.start();
+
+        EXPECT_TRUE(setup.mQuests.setStage(questA, 40));
+        EXPECT_TRUE(setup.mQuests.setStage(questA, 22));
+
+        // The lower stage is done and runs, but the quest stays at the stage that it had reached
+        EXPECT_TRUE(setup.mQuests.stageDone(questA, 22));
+        EXPECT_THAT(setup.mLogged, ElementsAre("low"));
+        EXPECT_EQ(setup.mQuests.stage(questA), 40);
+
+        EXPECT_TRUE(setup.mQuests.setStage(questA, 10));
+        EXPECT_EQ(setup.mQuests.stage(questA), 40);
+    }
+
     TEST(FalloutScriptQuestsTest, a_stage_the_quest_does_not_have_does_nothing)
     {
         Runner setup;

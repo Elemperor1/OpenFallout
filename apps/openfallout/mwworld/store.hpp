@@ -531,6 +531,14 @@ namespace OFWorld
             }
         }
 
+        /// Calls the visitor with every reference the content files placed, in no particular order
+        template <class Visitor>
+        void forEachPlaced(Visitor&& visitor) const
+        {
+            for (const auto& [_, ref] : this->mStatic)
+                visitor(ref);
+        }
+
         std::span<const T* const> getByCell(ESM::RefId cellId) const
         {
             auto it = mPerCellReferences.find(cellId);

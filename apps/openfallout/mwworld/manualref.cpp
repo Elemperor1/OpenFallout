@@ -1,6 +1,7 @@
 #include "manualref.hpp"
 #include <components/esm/records.hpp>
 #include <components/esm4/loadstat.hpp>
+#include <components/esm4/loadtact.hpp>
 
 #include "esmstore.hpp"
 
@@ -77,6 +78,8 @@ namespace
                 return func(store.get<ESM::BodyPart>());
             case ESM::REC_STAT4:
                 return func(store.get<ESM4::Static>());
+            case ESM::REC_TACT4:
+                return func(store.get<ESM4::TalkingActivator>());
             case ESM::REC_TERM4:
                 return func(store.get<ESM4::Terminal>());
             // The rest of the kinds of object that the cells of Fallout hold (PlaceAtMe makes them)
