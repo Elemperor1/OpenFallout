@@ -215,6 +215,28 @@ namespace OFScript
                 FalloutScript::intArgument(call, 2) != 0);
             return 0.0;
         });
+        // A talking activator (an intercom) speaks for the character it is set to, which is who conditions about it are
+        // about: the lines of the intercom are those of that character, and the one that talks to it is talking to that
+        // character. Without an argument the activator speaks for nobody.
+        mInterpreter.setHandler("SetTalkingActivatorActor", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId activator = call.mReference;
+            const FalloutScript::FormId actor = FalloutScript::formArgument(call, 0);
+            if (activator == 0)
+                return 0.0;
+            {
+                const std::lock_guard lock(mTalkingActorMutex);
+                if (actor == 0)
+                    mTalkingActors.erase(activator);
+                else
+                    mTalkingActors[activator] = actor;
+            }
+            Log(Debug::Info) << "Talking activator " << std::hex << activator << " speaks for " << actor << std::dec;
+            return 0.0;
+        });
+        mInterpreter.setHandler("IsTalkingActivatorActor", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId actor = FalloutScript::formArgument(call, 0);
+            return actor != 0 && talkingActorOf(call.mReference) == actor ? 1.0 : 0.0;
+        });
         // IsDLCInstalled names a plugin ("Caravan Pack"), which is installed when the game loads it
         mInterpreter.setHandler("IsDLCInstalled", [this](FalloutScript::CallContext& call) {
             if (call.mArguments.empty() || !call.mArguments[0].mIsText)
@@ -286,6 +308,10 @@ namespace OFScript
         reportMissingCommands();
         mGlobals.clear();
         mDisabled.clear();
+        {
+            const std::lock_guard lock(mTalkingActorMutex);
+            mTalkingActors.clear();
+        }
         mPendingToggle.clear();
         mPendingLoad.clear();
         mPendingMoves.clear();
@@ -1314,7 +1340,7 @@ namespace OFScript
         FalloutScript::FormId listener, bool forceSubtitles, bool followUps)
     {
         ESM::FormId base;
-        if (reference == 0 || topic == 0 || !baseOf(reference, base))
+        if (reference == 0 || topic == 0 || !conditionBaseOf(reference, base))
         {
             const std::lock_guard lock(mDialogueMutex);
             if (mSayLogged.insert({ reference, topic }).second)
@@ -1329,7 +1355,7 @@ namespace OFScript
             // A character that is spoken to is a speaker as well, when the two talk to each other
             ESM::FormId listenerBase;
             const bool toCharacter = listener != 0 && listener != mPlayer;
-            if (toCharacter && !baseOf(listener, listenerBase))
+            if (toCharacter && !conditionBaseOf(listener, listenerBase))
                 listenerBase = ESM::FormId();
             const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic,
                 toCharacter ? listener : 0, followUps, !followUps, toCharacter ? numberOf(listenerBase) : 0);
@@ -1919,10 +1945,25 @@ namespace OFScript
     bool FalloutScripts::baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base)
     {
         ESM::FormId form;
-        if (!baseOf(reference, form) || form.isZeroOrUnset())
+        if (!conditionBaseOf(reference, form) || form.isZeroOrUnset())
             return false;
         base = numberOf(form);
         return base != 0;
+    }
+
+    FalloutScript::FormId FalloutScripts::talkingActorOf(FalloutScript::FormId activator)
+    {
+        const std::lock_guard lock(mTalkingActorMutex);
+        const auto found = mTalkingActors.find(activator);
+        return found != mTalkingActors.end() ? found->second : 0;
+    }
+
+    bool FalloutScripts::conditionBaseOf(FalloutScript::FormId reference, ESM::FormId& base)
+    {
+        if (const FalloutScript::FormId actor = talkingActorOf(reference);
+            actor != 0 && baseOf(actor, base) && !base.isZeroOrUnset())
+            return true;
+        return baseOf(reference, base);
     }
 
     FalloutScript::FormId FalloutScripts::worldspaceOf(FalloutScript::FormId reference)

@@ -424,6 +424,39 @@ namespace
             ElementsAre("first one"));
     }
 
+    TEST(FalloutScriptDialogueTest, aSceneThatIsNotRunImmediatelyStillFollowsItsOwnTopicAndTheGoodbye)
+    {
+        constexpr DialogueSpeaker other{ 0x00ff0005, 0x00003005 };
+        constexpr FormId menu = 0x2998;
+        Harness setup;
+        setup.mRecords.addTopic(topicA, "A", "TopicA", false);
+        setup.mRecords.addTopic(goodbye, "GOODBYE", "Goodbye", false);
+        setup.mRecords.addTopic(menu, "Menu", "Menu", false);
+        // The intercom of the Vault: one character, the other through the intercom, the first again with the goodbye.
+        // None is run immediately, each offers a topic.
+        ESM4::DialogInfo& first = setup.mRecords.addInfo(0x3001, topicA, "first");
+        first.mSpeaker = id(speaker.mBase);
+        first.mChoices = { id(menu), id(topicA) };
+        ESM4::DialogInfo& second = setup.mRecords.addInfo(0x3002, topicA, "second");
+        second.mSpeaker = id(other.mBase);
+        second.mChoices = { id(goodbye) };
+        ESM4::DialogInfo& last = setup.mRecords.addInfo(0x3003, goodbye, "last");
+        last.mSpeaker = id(speaker.mBase);
+        last.mInfoFlags = ESM4::INFO_Goodbye;
+        // A menu of topics is for the player to pick from, and is not followed
+        setup.mRecords.addInfo(0x3004, menu, "menu answer");
+        setup.start();
+
+        const FalloutScript::DialogueView said
+            = setup.mDialogue.say(speaker, topicA, other.mReference, true, true, other.mBase);
+
+        EXPECT_THAT(setup.texts(said), ElementsAre("first", "second", "last"));
+        EXPECT_THAT(speakersOf(said), ElementsAre(speaker.mReference, other.mReference, speaker.mReference));
+
+        // Said to the player, or alone, the response stops where it did
+        EXPECT_THAT(setup.texts(setup.mDialogue.say(speaker, topicA, 0, true, true)), ElementsAre("first"));
+    }
+
     TEST(FalloutScriptDialogueTest, theNextSpeakerOfAResponseCanBeItsOwn)
     {
         constexpr DialogueSpeaker other{ 0x00ff0005, 0x00003005 };

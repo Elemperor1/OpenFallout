@@ -91,12 +91,15 @@ namespace FalloutScript
     ///
     /// Not done: the speech challenge is passed unless a check is set (setChallengeCheck), the flags for characters
     /// of low or high intelligence are not looked at, and a response that is run immediately waits for the player to
-    /// pick it like any other (only in an exchange between two characters it goes on at once).
+    /// pick it like any other (only in an exchange between two characters it goes on at once, and there the choices of
+    /// a response that is not run immediately are followed too when they name the topic of the scene or the goodbye).
     class DialogueManager
     {
     public:
         /// The editor id of the topic that starts every conversation
         static constexpr const char* greetingTopic = "Greeting";
+        /// The editor id of the topic that ends one
+        static constexpr const char* goodbyeTopic = "Goodbye";
 
         DialogueManager(Interpreter& interpreter, ConditionEvaluator& conditions, QuestManager& quests,
             const DialogueRecords& records);
@@ -216,6 +219,7 @@ namespace FalloutScript
         std::unordered_map<FormId, TopicEntry> mEntries;
         std::unordered_map<FormId, const ESM4::DialogInfo*> mInfoIndex;
         FormId mGreeting = 0;
+        FormId mGoodbye = 0;
         /// The topics at the top of the list, the highest priority first
         std::vector<FormId> mTopLevel;
         /// The topics the player was given, in the order they were

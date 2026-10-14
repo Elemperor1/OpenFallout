@@ -418,6 +418,10 @@ namespace OFScript
         /// is looked for among the objects of the loaded cells, which only the thread of the frame may do. False when
         /// it is not known (yet); the base is empty for a reference that has none.
         bool baseOf(FalloutScript::FormId reference, ESM::FormId& base);
+        /// The record that the conditions about a reference are about: that of the character a talking activator speaks
+        /// for (SetTalkingActivatorActor), and the record of the reference otherwise
+        bool conditionBaseOf(FalloutScript::FormId reference, ESM::FormId& base);
+        FalloutScript::FormId talkingActorOf(FalloutScript::FormId activator);
         /// The object of the reference when it is in a cell that is loaded, else an empty one
         OFWorld::Ptr findReference(FalloutScript::FormId reference);
         void runPending();
@@ -609,6 +613,10 @@ namespace OFScript
         /// Whether scripts disabled (true) or enabled (false) objects in cells that were not loaded at the time, which
         /// holds until the cell is loaded
         std::map<FalloutScript::FormId, bool> mDisabled;
+        /// The characters that talking activators speak for, by the reference of the activator (scripts ask from their
+        /// own thread, the conversations from the thread of the frame)
+        std::mutex mTalkingActorMutex;
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mTalkingActors;
         /// The objects that follow the state of another one (their enable parent)
         FalloutScript::EnableParents mEnableParents;
         bool mEnableParentsRead = false;

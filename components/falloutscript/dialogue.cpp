@@ -109,6 +109,7 @@ namespace FalloutScript
         mChain.clear();
         mPrepared.clear();
         mGreeting = 0;
+        mGoodbye = 0;
         mActive = false;
         mView = DialogueView();
         mSpeaking = nullptr;
@@ -154,6 +155,8 @@ namespace FalloutScript
                 mTopLevel.push_back(id);
             if (sameText(entry.mRecord->mEditorId, greetingTopic))
                 mGreeting = id;
+            if (sameText(entry.mRecord->mEditorId, goodbyeTopic))
+                mGoodbye = id;
         }
         // The order of the topics that have the same priority is that of their ids, which is stable and does not
         // depend on the hash
@@ -577,11 +580,16 @@ namespace FalloutScript
                         break;
                 }
                 // A response that is run immediately goes on with the topics it offers: the first that has a response
-                // for one of the two
-                if (next == nullptr && turns && hasFlag(*info, ESM4::INFO_RunImmediately))
+                // for one of the two. In a scene between two characters there is no player to pick, and the scenes
+                // that are not run immediately offer the topic of the scene again or the goodbye (the intercom of
+                // the Vault, the guard and the Overseer), which are followed as well; other topics are a menu.
+                if (next == nullptr && turns)
                 {
+                    const bool immediately = hasFlag(*info, ESM4::INFO_RunImmediately);
                     for (const ESM::FormId choice : info->mChoices)
                     {
+                        if (!immediately && toId(choice) != viewTopic && toId(choice) != mGoodbye)
+                            continue;
                         for (const DialogueSpeaker& who : candidates)
                         {
                             mListener = listeningTo(who);
