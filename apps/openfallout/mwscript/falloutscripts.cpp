@@ -12,7 +12,11 @@
 #include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadalch.hpp>
+#include <components/esm4/loadammo.hpp>
+#include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadavif.hpp>
+#include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
@@ -20,7 +24,9 @@
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadgmst.hpp>
+#include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadperk.hpp>
@@ -30,6 +36,7 @@
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadvtyp.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/messagetext.hpp>
@@ -157,6 +164,7 @@ namespace OFScript
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
         , mActors(*this)
+        , mEquipment(*this, mActors)
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
@@ -175,6 +183,12 @@ namespace OFScript
         FalloutScript::addMessageCommands(mInterpreter, *this);
         FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
+        FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
+        // The container of an item is the holder its script was last run for
+        mInterpreter.setHandler("GetContainer", [this](FalloutScript::CallContext& call) {
+            const auto found = mItemHolders.find(call.mReference);
+            return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
+        });
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
@@ -338,6 +352,8 @@ namespace OFScript
             mCalendarShift = 0;
         }
         mActors.clear();
+        mEquipment.clear();
+        mItemHolders.clear();
         mActorValues.clear();
         mReferenceState.clear();
         mFormLists.clear();
@@ -409,6 +425,7 @@ namespace OFScript
         updateFurniture();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
+        raiseItemEvents();
         mQuests.update(frametime);
         mObjects.update();
     }
@@ -1288,6 +1305,117 @@ namespace OFScript
         }
         else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
             take(container->mInventory);
+        return true;
+    }
+
+    bool FalloutScripts::itemInfo(FalloutScript::FormId item, FalloutScript::ItemInfo& info)
+    {
+        const ESM::RefId id = refId(item);
+        info = FalloutScript::ItemInfo();
+        if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Weapon;
+            info.mAnimationType = weapon->mHasGameData ? weapon->mGame.mAnimationType : 0;
+            info.mWeight = weapon->mData.weight;
+            return true;
+        }
+        if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Armor;
+            info.mSlots = armor->mArmorFlags;
+            info.mRating = armor->mHasRating ? armor->mRating : 0.0;
+            info.mThreshold = armor->mDamageThreshold;
+            info.mWeight = armor->mData.weight;
+            return true;
+        }
+        if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Ammo;
+            info.mWeight = ammo->mData.mWeight;
+            return true;
+        }
+        if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Aid;
+            info.mWeight = potion->mData.weight;
+            return true;
+        }
+        if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(id))
+        {
+            info.mWeight = misc->mData.weight;
+            return true;
+        }
+        if (const ESM4::Book* book = mStore.get<ESM4::Book>().search(id))
+        {
+            info.mWeight = book->mData.weight;
+            return true;
+        }
+        if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(id))
+        {
+            info.mWeight = ingredient->mData.weight;
+            return true;
+        }
+        return false;
+    }
+
+    FalloutScript::FormId FalloutScripts::itemScript(FalloutScript::FormId item)
+    {
+        const ESM::RefId id = refId(item);
+        const auto scriptOfRecord = [](const auto* record) { return record == nullptr ? 0 : numberOf(record->mScriptId); };
+        if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(id))
+            return scriptOfRecord(weapon);
+        if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))
+            return scriptOfRecord(armor);
+        if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
+            return numberOf(ammo->mScript);
+        if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(id))
+            return scriptOfRecord(potion);
+        if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(id))
+            return scriptOfRecord(misc);
+        if (const ESM4::Book* book = mStore.get<ESM4::Book>().search(id))
+            return scriptOfRecord(book);
+        if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(id))
+            return scriptOfRecord(ingredient);
+        return 0;
+    }
+
+    void FalloutScripts::raiseItemEvents()
+    {
+        namespace BlockType = FalloutScript::BlockType;
+        const auto raise = [this](FalloutScript::FormId item, FalloutScript::FormId holder, std::uint16_t blockType) {
+            const FalloutScript::FormId script = itemScript(item);
+            if (script == 0 || mObjects.add(item, script) == nullptr)
+                return;
+            mItemHolders[item] = holder;
+            // A block that names a container is for that container, or for a character made from that record
+            FalloutScript::FormId base = 0;
+            baseFormOf(holder, base);
+            mObjects.trigger(item, blockType, holder, [holder, base](const FalloutScript::Block& block) {
+                return block.mNames != FalloutScript::BlockNames::Form || block.mForm == holder || block.mForm == base;
+            });
+        };
+        // A script takes items away without a drop (RemoveItem): the OnDrop blocks run when something is dropped
+        for (const FalloutScript::ActorState::ItemChange& change : mActors.takeChanges())
+            if (change.mCount > 0)
+                raise(change.mItem, change.mHolder, BlockType::OnAdd);
+        for (const FalloutScript::Equipment::WornChange& change : mEquipment.takeChanges())
+            raise(change.mItem, change.mActor, change.mWorn ? BlockType::OnEquip : BlockType::OnUnequip);
+    }
+
+    bool FalloutScripts::pickUp(const OFWorld::Ptr& item, const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId reference = referenceOf(item);
+        const FalloutScript::FormId holder
+            = actor == OFBase::Environment::get().getWorld()->getPlayerPtr() ? mPlayer : referenceOf(actor);
+        ESM::FormId base;
+        if (reference == 0 || holder == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+            return false;
+        const FalloutScript::FormId form = numberOf(base);
+        FalloutScript::ItemInfo info;
+        if (!itemInfo(form, info))
+            return false;
+        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1));
+        setDisabled(reference, true);
         return true;
     }
 

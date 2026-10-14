@@ -43,6 +43,7 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mHolders.clear();
         mDead.clear();
+        mChanges.clear();
     }
 
     void ActorState::knowItems(FormId id, Holder& entry)
@@ -120,10 +121,13 @@ namespace FalloutScript
         if (!entry.mItemsKnown)
         {
             entry.mItemEdits[item].add(count);
+            noteChange(id, item, count);
             return;
         }
         int& held = entry.mItems[item];
+        const int before = held;
         held = static_cast<int>(std::min<std::int64_t>(std::int64_t(held) + count, mostItems));
+        noteChange(id, item, held - before);
     }
 
     int ActorState::removeItem(FormId id, FormId item, int count)
@@ -139,7 +143,9 @@ namespace FalloutScript
             ItemEdit& edit = entry.mItemEdits[item];
             const std::int64_t before = edit.apply(0);
             edit.remove(count);
-            return static_cast<int>(before - edit.apply(0));
+            const int removed = static_cast<int>(before - edit.apply(0));
+            noteChange(id, item, -removed);
+            return removed;
         }
         const auto found = entry.mItems.find(item);
         if (found == entry.mItems.end())
@@ -148,7 +154,34 @@ namespace FalloutScript
         found->second -= removed;
         if (found->second <= 0)
             entry.mItems.erase(found);
+        noteChange(id, item, -removed);
         return removed;
+    }
+
+    bool ActorState::items(FormId id, std::vector<std::pair<FormId, int>>& result)
+    {
+        const std::lock_guard lock(mMutex);
+        Holder& entry = holder(id);
+        knowItems(id, entry);
+        if (!entry.mItemsKnown)
+            return false;
+        result.assign(entry.mItems.begin(), entry.mItems.end());
+        return true;
+    }
+
+    void ActorState::noteChange(FormId holder, FormId item, int count)
+    {
+        constexpr std::size_t mostChanges = 4096;
+        if (count != 0 && mChanges.size() < mostChanges)
+            mChanges.push_back({ holder, item, count });
+    }
+
+    std::vector<ActorState::ItemChange> ActorState::takeChanges()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<ItemChange> changes;
+        changes.swap(mChanges);
+        return changes;
     }
 
     bool ActorState::isDead(FormId actor) const
@@ -233,6 +266,37 @@ namespace FalloutScript
             const FormId item = formArgument(call, 0);
             return call.mReference != 0 && item != 0 ? static_cast<double>(state.itemCount(call.mReference, item))
                                                      : 0.0;
+        });
+        interpreter.setHandler("RemoveAllItems", [&state](CallContext& call) {
+            // The items go to the reference that the script names, or are gone
+            std::vector<std::pair<FormId, int>> held;
+            if (call.mReference == 0 || !state.items(call.mReference, held))
+                return 0.0;
+            const FormId target = formArgument(call, 0);
+            for (const auto& [item, count] : held)
+            {
+                const int removed = state.removeItem(call.mReference, item, count);
+                if (target != 0 && target != call.mReference)
+                    state.addItem(target, item, removed);
+            }
+            return 0.0;
+        });
+        interpreter.setHandler("DuplicateAllItems", [&state](CallContext& call) {
+            std::vector<std::pair<FormId, int>> held;
+            const FormId target = formArgument(call, 0);
+            if (call.mReference == 0 || target == 0 || target == call.mReference
+                || !state.items(call.mReference, held))
+                return 0.0;
+            for (const auto& [item, count] : held)
+                state.addItem(target, item, count);
+            return 0.0;
+        });
+        interpreter.setHandler("AddItemHealthPercent", [&state](CallContext& call) {
+            // Nothing wears out yet: the health of the item is the same as for AddItem
+            const FormId item = formArgument(call, 0);
+            if (call.mReference != 0 && item != 0)
+                state.addItem(call.mReference, item, intArgument(call, 1));
+            return 0.0;
         });
         interpreter.setHandler("GetDead",
             [&state](CallContext& call) { return call.mReference != 0 && state.isDead(call.mReference) ? 1.0 : 0.0; });

@@ -632,9 +632,14 @@ namespace OFLua
     {
         // An actor that activates furniture of Fallout sits on it, lies on it or leans against it, and one that is
         // using furniture already gets up, whichever furniture it activates
-        if (object.getType() == ESM4::Furniture::sRecordId)
-            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+        {
+            if (object.getType() == ESM4::Furniture::sRecordId)
                 scripts->activateFurniture(actor, object);
+            // An item of Fallout that an actor activates goes into its inventory
+            else
+                scripts->pickUp(object, actor);
+        }
         mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
     }
 

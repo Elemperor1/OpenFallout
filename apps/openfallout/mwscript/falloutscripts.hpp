@@ -28,6 +28,7 @@
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/enableparents.hpp>
+#include <components/falloutscript/equipment.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -78,6 +79,7 @@ namespace OFScript
                                  private FalloutScript::QuestRecords,
                                  private FalloutScript::ObjectWorld,
                                  private FalloutScript::ActorRecords,
+                                 private FalloutScript::ItemRecords,
                                  private FalloutScript::ActorTraitRecords,
                                  private FalloutScript::DialogueRecords,
                                  private FalloutScript::ActorValueRecords,
@@ -127,6 +129,16 @@ namespace OFScript
         /// action reference, and tells whether it has one. An object whose script has one does not do what it does by
         /// default: its script asks for that with Activate.
         bool activated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+
+        /// An actor picks an item up from the world (the default activation of an item): the item goes to its
+        /// inventory, the reference is gone from its cell (disabled, as the games take a reference out of the world),
+        /// and the script of the item runs its OnAdd block. False for an object that is no item, or when the actor
+        /// has no number for scripts.
+        bool pickUp(const OFWorld::Ptr& item, const OFWorld::Ptr& actor);
+
+        /// What characters carry, hold and wear. The inventory of the player is what scripts and pick-ups gave it.
+        FalloutScript::ActorState& actors() { return mActors; }
+        FalloutScript::Equipment& equipment() { return mEquipment; }
 
         /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
         /// yet.
@@ -395,6 +407,13 @@ namespace OFScript
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
+        bool itemInfo(FalloutScript::FormId item, FalloutScript::ItemInfo& info) override;
+        /// The script of an item record (0 for none)
+        FalloutScript::FormId itemScript(FalloutScript::FormId item);
+        /// Runs the OnAdd, OnEquip and OnUnequip blocks of the scripts of items for what happened to the inventories
+        /// since the last frame. The script of an item runs for the item as a form (what GetContainer tells is the
+        /// holder it was last added to or worn by): the games keep an instance for each item, which this does not.
+        void raiseItemEvents();
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
         std::optional<double> derivedValue(
@@ -566,6 +585,9 @@ namespace OFScript
         FalloutScript::QuestManager mQuests;
         FalloutScript::ObjectScripts mObjects;
         FalloutScript::ActorState mActors;
+        FalloutScript::Equipment mEquipment;
+        /// Where the script of an item found it last (GetContainer)
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mItemHolders;
         FalloutScript::ActorValues mActorValues;
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
