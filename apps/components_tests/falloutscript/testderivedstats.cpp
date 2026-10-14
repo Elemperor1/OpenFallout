@@ -75,9 +75,9 @@ namespace
     TEST(FalloutScriptDerivedStatsTest, the_offsets_of_the_files_move_the_attribute_before_it_is_multiplied)
     {
         // GECK: Starting Health = END * mult + (the base + mult * offset) + the share of the level
-        const DerivedStatSettings settings = settingsOf({ { "fAVDHealthEnduranceOffset", 1 },
-            { "fAVDNPCHealthEnduranceOffset", -1 }, { "fAVDMeleeDamageStrengthOffset", -5 }, { "fAVDCritLuckBase", 3 },
-            { "fAVDCritLuckMult", 2 } });
+        const DerivedStatSettings settings
+            = settingsOf({ { "fAVDHealthEnduranceOffset", 1 }, { "fAVDNPCHealthEnduranceOffset", -1 },
+                { "fAVDMeleeDamageStrengthOffset", -5 }, { "fAVDCritLuckBase", 3 }, { "fAVDCritLuckMult", 2 } });
         EXPECT_EQ(settings.mHealthEnduranceOffset, 1);
         EXPECT_EQ(settings.mNpcHealthEnduranceOffset, -1);
         EXPECT_EQ(playerHealth(settings, 100, 5, 1), 100 + 6 * 20);
