@@ -159,6 +159,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
     falloutscript/testdialoguerules.cpp
+    falloutscript/testenableparents.cpp
     falloutscript/testmessagecommands.cpp
     falloutscript/testinterpreter.cpp
     falloutscript/testobjects.cpp

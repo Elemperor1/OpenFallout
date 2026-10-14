@@ -25,6 +25,7 @@
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/dialogue.hpp>
+#include <components/falloutscript/enableparents.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -521,6 +522,10 @@ namespace OFScript
         /// The action is done at once on the thread of the frame, and in the next frame on any other.
         void runOnMainThread(std::function<void()> action);
         void applyDisabled(FalloutScript::FormId reference, bool disabled);
+        /// Enables or disables the object alone, where it is or when its cell is loaded
+        void applyDisabledAlone(FalloutScript::FormId reference, bool disabled);
+        /// Who has whom for an enable parent, read from the records the first time it is asked for
+        const FalloutScript::EnableParents& enableParents();
         void tellPlayer(const std::string& text);
 
         /// A message with buttons that waits to be shown, or is on the screen. The buttons are the ones whose
@@ -604,6 +609,9 @@ namespace OFScript
         /// Whether scripts disabled (true) or enabled (false) objects in cells that were not loaded at the time, which
         /// holds until the cell is loaded
         std::map<FalloutScript::FormId, bool> mDisabled;
+        /// The objects that follow the state of another one (their enable parent)
+        FalloutScript::EnableParents mEnableParents;
+        bool mEnableParentsRead = false;
         /// The objects of the loaded cells by their references: the world only knows those that were put in the scene,
         /// which a disabled one never was
         std::unordered_map<FalloutScript::FormId, OFWorld::Ptr> mReferences;

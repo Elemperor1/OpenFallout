@@ -712,7 +712,7 @@ namespace OFScript
         applyDisabled(reference, disabled);
     }
 
-    void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
+    void FalloutScripts::applyDisabledAlone(FalloutScript::FormId reference, bool disabled)
     {
         const OFWorld::Ptr ptr = findReference(reference);
         if (ptr.isEmpty())
@@ -725,6 +725,37 @@ namespace OFScript
             OFBase::Environment::get().getWorld()->disable(ptr);
         else
             OFBase::Environment::get().getWorld()->enable(ptr);
+    }
+
+    void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
+    {
+        applyDisabledAlone(reference, disabled);
+        // The objects that have this one for their enable parent follow it, and theirs follow them
+        std::size_t followed = 0;
+        for (const auto& [follower, followerDisabled] : enableParents().followers(reference, disabled))
+        {
+            applyDisabledAlone(follower, followerDisabled);
+            ++followed;
+        }
+        if (followed > 0)
+            Log(Debug::Info) << "Enable parent " << std::hex << reference << std::dec << " "
+                             << (disabled ? "disabled" : "enabled") << ": " << followed << " objects follow";
+    }
+
+    const FalloutScript::EnableParents& FalloutScripts::enableParents()
+    {
+        if (mEnableParentsRead)
+            return mEnableParents;
+        mEnableParentsRead = true;
+        const auto read = [this](const auto& ref) {
+            if (!ref.mEsp.parent.isZeroOrUnset())
+                mEnableParents.add(numberOf(ref.mId), numberOf(ref.mEsp.parent),
+                    (ref.mEsp.flags & ESM4::EnableParent::Flag_Inversed) != 0);
+        };
+        mStore.get<ESM4::Reference>().forEachPlaced(read);
+        mStore.get<ESM4::ActorCharacter>().forEachPlaced(read);
+        mStore.get<ESM4::ActorCreature>().forEachPlaced(read);
+        return mEnableParents;
     }
 
     void FalloutScripts::tellPlayer(const std::string& text)

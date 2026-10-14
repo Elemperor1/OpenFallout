@@ -1141,6 +1141,7 @@ local traveller_ids = { @TRAVELLER@ }
 local crosser_ids = { @CROSSER@ }
 local traveller_object, setter_object = nil, nil
 local doomed_ids = { @DOOMED@ }
+local follower_ids, inverse_ids = { @FOLLOWER@ }, { @INVERSE@ }
 local locker_ids = { @LOCKER@ }
 local elapsed, step = 0, 0
 local scripted_object, mover_object, far_object, far_seen, defaults = nil, nil, nil, 0, 0
@@ -1176,6 +1177,9 @@ return {
                     tostring(g.@FRAMES@ > 10), tostring(g.@VICTIM_DISABLED@), tostring(g.@ACTIVATED@),
                     string.format('%d %d', math.floor(g.@DISTANCE@),
                         math.floor((scripted.position - player.position):length())))
+                -- The cubes that have the victim for their enable parent: the script disabled the victim, so the one that
+                -- is enabled with it is disabled and the one that has the flag that inverses it is enabled
+                print('OFTEST', 'object followers', tostring(find(follower_ids).enabled), tostring(find(inverse_ids).enabled))
                 scripted:activateBy(player)
                 local once = g.@ACTIVATED@
                 scripted:activateBy(player)
@@ -1314,6 +1318,8 @@ OBJECT_FROM = 4.0  # game seconds before the Lua script looks, enough for the ce
 OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SCRIPTED@", ", ".join(map(str, plugin.SCRIPTED_REF_IDS.values())))
                  .replace("@VICTIM@", ", ".join(map(str, plugin.VICTIM_REF_IDS.values())))
+                 .replace("@FOLLOWER@", ", ".join(map(str, plugin.FOLLOWER_REF_IDS.values())))
+                 .replace("@INVERSE@", ", ".join(map(str, plugin.INVERSE_REF_IDS.values())))
                  .replace("@MOVER@", ", ".join(map(str, plugin.MOVER_REF_IDS.values())))
                  .replace("@FAR@", ", ".join(map(str, plugin.FAR_MOVER_REF_IDS.values())))
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
@@ -2244,6 +2250,11 @@ def check_objects(text, scenario):
         if abs(measured - expected) > OBJECT_DISTANCE_SLACK:
             problems.append(f"GetDistance should be within {OBJECT_DISTANCE_SLACK} units of the distance Lua sees: "
                             + str(found))
+    found = one("followers")
+    if found is not None and found != ["false", "true"]:
+        problems.append("the cubes that have the cube the script disabled for their enable parent should follow it: the "
+                        "one enabled with it should be disabled and the one with the inverse flag enabled (false, "
+                        "true): " + str(found))
     found = one("activated")
     if found is not None and found != ["1", "2"]:
         problems.append("OnActivate should count each of the two activations by the player (1 then 2): " + str(found))

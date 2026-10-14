@@ -401,7 +401,7 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x92D # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x931 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -480,6 +480,12 @@ TRIGGER_YAW = math.pi / 2 # a quarter turn about z: the long side of the box run
 TRIGGER_HALF = (150.0, 20.0, 50.0) # the half sizes the record gives (x, y, z) before the turn
 SCRIPTED_PLACE = (600.0, -800.0) # where the scripted object stands, from the start of the player
 VICTIM_PLACE = (900.0, -800.0)
+# Two cubes that have the victim for their enable parent (XESP): one is enabled when the victim is, the other has the
+# flag that inverses it. The script disables the victim, and they follow it.
+FOLLOWER_REF_IDS = {"interior": 0x92E, "exterior": 0x92F}
+INVERSE_REF_IDS = {"interior": 0x930, "exterior": 0x931}
+FOLLOWER_PLACE = (300.0, -800.0)
+INVERSE_PLACE = (300.0, -1100.0)
 CELL_NAME = "OFTestCell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
@@ -730,8 +736,11 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None):
+         primitive=None, enable_parent=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if enable_parent is not None:
+        # XESP, 8 bytes: the reference that this one is enabled with, and the flags (1: the other way round)
+        subs.append(sub(b"XESP", struct.pack("<II", *enable_parent)))
     if primitive is not None:
         # XPRM, 32 bytes: the bounds, the colour, a float for the way the editor draws it and the type (1 a box)
         bounds, kind = primitive
@@ -1262,6 +1271,10 @@ def object_refs(kind, origin):
     x, y = origin
     return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
             refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
+            refr(FOLLOWER_REF_IDS[kind], CUBE_ID, (x + FOLLOWER_PLACE[0], y + FOLLOWER_PLACE[1], CUBE / 2),
+                 enable_parent=(VICTIM_REF_IDS[kind], 0)),
+            refr(INVERSE_REF_IDS[kind], CUBE_ID, (x + INVERSE_PLACE[0], y + INVERSE_PLACE[1], CUBE / 2),
+                 enable_parent=(VICTIM_REF_IDS[kind], 1)),
             refr(MOVER_REF_IDS[kind], CUBE_ID, (x + MOVER_PLACE[0], y + MOVER_PLACE[1], CUBE / 2)),
             refr(FAR_MOVER_REF_IDS[kind], CUBE_ID, (x + FAR_MOVER_PLACE[0], y + FAR_MOVER_PLACE[1], CUBE / 2)),
             refr(SLEEPER_REF_IDS[kind], CUBE_ID, (x + SLEEPER_PLACE[0], y + SLEEPER_PLACE[1], CUBE / 2)),
