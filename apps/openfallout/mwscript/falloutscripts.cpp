@@ -1684,7 +1684,9 @@ namespace OFScript
     {
         const FalloutScript::FormId reference = referenceOf(speaker);
         ESM::FormId base;
-        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+        // A talking activator speaks for a character (the intercom of Vault 101): the responses are those of the
+        // character
+        if (reference == 0 || !conditionBaseOf(reference, base) || base.isZeroOrUnset())
             return false;
         const std::lock_guard lock(mDialogueMutex);
         if (mDialogue.active())
