@@ -169,8 +169,9 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
                 // Fallout 3 and New Vegas: 136 bytes of the game data are the same in both. A few Fallout 3 records
                 // end after 120 or 124 bytes: what they lack is left as the default. A shorter record is left as it
                 // is, and what a longer one has after the 136 bytes is not decoded.
+                // The DNAM of the other games (Fallout 4 has 132 bytes of another layout) is not decoded.
                 constexpr std::uint32_t sShortestSize = 120;
-                if (subHdr.dataSize < sShortestSize)
+                if (!reader.isFalloutFile() || subHdr.dataSize < sShortestSize)
                 {
                     reader.skipSubRecordData();
                     break;

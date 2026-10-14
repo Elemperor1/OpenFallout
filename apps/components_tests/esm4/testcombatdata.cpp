@@ -26,6 +26,25 @@ namespace
     using namespace testing;
     using namespace ESM4Test;
 
+    // Loads the one record of a plugin that is a Fallout 3 file (or of the header version the caller gives), by its
+    // record only: the group headers of Fallout have another size than the synthetic plugins have.
+    template <class Record>
+    Record loadFromAPlugin(float version, std::uint32_t formVersion, std::string_view type, const std::string& data)
+    {
+        std::string hedr;
+        append<float>(hedr, version);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+        const std::string plugin = versionedRecord("TES4", 0, subRecord("HEDR", hedr), formVersion)
+            + versionedRecord(type, 1, data, formVersion);
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        EXPECT_TRUE(reader.getRecordHeader());
+        reader.getRecordData();
+        Record result;
+        result.load(reader);
+        return result;
+    }
+
     // DNAM of a weapon of Fallout 3 and New Vegas: the 136 bytes both games have, with a value in each field
     std::string weaponGameData(std::uint32_t animationType = 5, std::size_t size = 136)
     {
@@ -123,10 +142,7 @@ namespace
 
     TEST(ESM4CombatDataTest, readsTheGameDataOfAWeaponOfFallout)
     {
-        const std::vector<ESM4::Weapon> weapons
-            = loadRecords<ESM4::Weapon>("WEAP", record("WEAP", 1, weaponRecord("Rifle")));
-        ASSERT_EQ(weapons.size(), 1u);
-        const ESM4::Weapon& weapon = weapons[0];
+        const ESM4::Weapon weapon = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", weaponRecord("Rifle"));
 
         EXPECT_EQ(weapon.mData.damage, 21);
         EXPECT_EQ(weapon.mData.clipSize, 15);
@@ -168,9 +184,7 @@ namespace
 
     TEST(ESM4CombatDataTest, readsTheCriticalVatsAmmunitionAndImpactDataOfAWeapon)
     {
-        const std::vector<ESM4::Weapon> weapons
-            = loadRecords<ESM4::Weapon>("WEAP", record("WEAP", 1, weaponRecord("Rifle")));
-        const ESM4::Weapon& weapon = weapons.at(0);
+        const ESM4::Weapon weapon = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", weaponRecord("Rifle"));
 
         ASSERT_TRUE(weapon.mHasCritical);
         EXPECT_EQ(weapon.mCritical.mDamage, 12);
@@ -194,44 +208,36 @@ namespace
     TEST(ESM4CombatDataTest, readsALongerGameDataAndLeavesAShorterOne)
     {
         // New Vegas has more after the 136 bytes; the first of them are the same
-        const std::vector<ESM4::Weapon> longer = loadRecords<ESM4::Weapon>(
-            "WEAP", record("WEAP", 1, zString("EDID", "Long") + subRecord("DNAM", weaponGameData(4, 204))));
-        ASSERT_TRUE(longer.at(0).mHasGameData);
-        EXPECT_EQ(longer[0].mGame.mAnimationType, ESM4::Weapon::GameData::PistolEnergy);
-        EXPECT_FLOAT_EQ(longer[0].mGame.mFireRate, 6.f);
+        const ESM4::Weapon longer = loadFromAPlugin<ESM4::Weapon>(
+            1.34f, 15, "WEAP", zString("EDID", "Long") + subRecord("DNAM", weaponGameData(4, 204)));
+        ASSERT_TRUE(longer.mHasGameData);
+        EXPECT_EQ(longer.mGame.mAnimationType, ESM4::Weapon::GameData::PistolEnergy);
+        EXPECT_FLOAT_EQ(longer.mGame.mFireRate, 6.f);
 
-        const std::vector<ESM4::Weapon> shorter = loadRecords<ESM4::Weapon>(
-            "WEAP", record("WEAP", 1, zString("EDID", "Short") + subRecord("DNAM", weaponGameData(4, 40))));
-        EXPECT_FALSE(shorter.at(0).mHasGameData);
-        EXPECT_EQ(shorter[0].mGame.mAnimationType, ESM4::Weapon::GameData::HandToHand);
+        const ESM4::Weapon shorter = loadFromAPlugin<ESM4::Weapon>(
+            1.34f, 15, "WEAP", zString("EDID", "Short") + subRecord("DNAM", weaponGameData(4, 40)));
+        EXPECT_FALSE(shorter.mHasGameData);
+        EXPECT_EQ(shorter.mGame.mAnimationType, ESM4::Weapon::GameData::HandToHand);
 
         // Some records of Fallout 3 end after 120 bytes: the skill and the resistance are there, what follows is not
-        const std::vector<ESM4::Weapon> ending = loadRecords<ESM4::Weapon>(
-            "WEAP", record("WEAP", 1, zString("EDID", "Ending") + subRecord("DNAM", weaponGameData(3, 120))));
-        ASSERT_TRUE(ending.at(0).mHasGameData);
-        EXPECT_EQ(ending[0].mGame.mAnimationType, ESM4::Weapon::GameData::PistolBallistic);
-        EXPECT_FLOAT_EQ(ending[0].mGame.mFireRate, 6.f);
-        EXPECT_EQ(ending[0].mGame.mResist, 0xffffffffu);
-        EXPECT_FLOAT_EQ(ending[0].mGame.mSightUsage, 0.f);
+        const ESM4::Weapon ending = loadFromAPlugin<ESM4::Weapon>(
+            1.34f, 15, "WEAP", zString("EDID", "Ending") + subRecord("DNAM", weaponGameData(3, 120)));
+        ASSERT_TRUE(ending.mHasGameData);
+        EXPECT_EQ(ending.mGame.mAnimationType, ESM4::Weapon::GameData::PistolBallistic);
+        EXPECT_FLOAT_EQ(ending.mGame.mFireRate, 6.f);
+        EXPECT_EQ(ending.mGame.mResist, 0xffffffffu);
+        EXPECT_FLOAT_EQ(ending.mGame.mSightUsage, 0.f);
     }
 
-    // Loads the one record of a plugin that is a Fallout 3 file (or of the header version the caller gives), by its
-    // record only: the group headers of Fallout have another size than the synthetic plugins have.
-    template <class Record>
-    Record loadFromAPlugin(float version, std::uint32_t formVersion, std::string_view type, const std::string& data)
+    TEST(ESM4CombatDataTest, doesNotReadTheWeaponDataOfAnotherGameAsOneOfFallout)
     {
-        std::string hedr;
-        append<float>(hedr, version);
-        append<std::int32_t>(hedr, 1);
-        append<std::uint32_t>(hedr, 0x800);
-        const std::string plugin = versionedRecord("TES4", 0, subRecord("HEDR", hedr), formVersion)
-            + versionedRecord(type, 1, data, formVersion);
-        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
-        EXPECT_TRUE(reader.getRecordHeader());
-        reader.getRecordData();
-        Record result;
-        result.load(reader);
-        return result;
+        // Fallout 4 has 132 bytes of another layout in its DNAM, Skyrim has a record of another size
+        const ESM4::Weapon fallout4 = loadFromAPlugin<ESM4::Weapon>(
+            0.95f, 131, "WEAP", zString("EDID", "Four") + subRecord("DNAM", weaponGameData(4, 132)));
+        EXPECT_FALSE(fallout4.mHasGameData);
+        const ESM4::Weapon skyrim = loadFromAPlugin<ESM4::Weapon>(
+            0.94f, 43, "WEAP", zString("EDID", "Five") + subRecord("DNAM", weaponGameData(4, 136)));
+        EXPECT_FALSE(skyrim.mHasGameData);
     }
 
     TEST(ESM4CombatDataTest, readsTheRatingAndThresholdOfArmor)
