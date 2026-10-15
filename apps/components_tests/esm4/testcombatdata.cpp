@@ -221,7 +221,7 @@ namespace
 
         // Some records of Fallout 3 end after 120 bytes: the skill and the resistance are there, what follows is not
         const ESM4::Weapon ending = loadFromAPlugin<ESM4::Weapon>(
-            1.34f, 15, "WEAP", zString("EDID", "Ending") + subRecord("DNAM", weaponGameData(3, 120)));
+            0.94f, 15, "WEAP", zString("EDID", "Ending") + subRecord("DNAM", weaponGameData(3, 120)));
         ASSERT_TRUE(ending.mHasGameData);
         EXPECT_EQ(ending.mGame.mAnimationType, ESM4::Weapon::GameData::PistolBallistic);
         EXPECT_FLOAT_EQ(ending.mGame.mFireRate, 6.f);
@@ -247,7 +247,7 @@ namespace
         append<std::int16_t>(fo3, 2500);
         append<std::uint16_t>(fo3, 1);
         const ESM4::Armor first
-            = loadFromAPlugin<ESM4::Armor>(1.34f, 15, "ARMO", zString("EDID", "A") + subRecord("DNAM", fo3));
+            = loadFromAPlugin<ESM4::Armor>(0.94f, 15, "ARMO", zString("EDID", "A") + subRecord("DNAM", fo3));
         ASSERT_TRUE(first.mHasRating);
         EXPECT_FLOAT_EQ(first.mRating, 25.f);
         EXPECT_EQ(first.mDnamFlags, 1);

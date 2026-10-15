@@ -124,8 +124,9 @@ namespace
             switch (value)
             {
                 case ActorValue::health:
-                    return playerHealth(
-                        DerivedStatSettings(), actor == player ? 100 : 50, permanent(ActorValue::endurance), mLevel);
+                    if (actor == player)
+                        return playerHealth(DerivedStatSettings(), 100, permanent(ActorValue::endurance), mLevel);
+                    return npcHealth(DerivedStatSettings(), 50, permanent(ActorValue::endurance), mLevel);
                 case ActorValue::actionPoints:
                     return actionPoints(DerivedStatSettings(), permanent(ActorValue::agility));
                 default:
@@ -143,7 +144,7 @@ namespace
         ActorValues values(&records);
 
         EXPECT_EQ(values.current(player, ActorValue::health), 200);
-        EXPECT_EQ(values.current(guard, ActorValue::health), 50 + 8 * 20);
+        EXPECT_EQ(values.current(guard, ActorValue::health), 50 + 8 * 5);
         EXPECT_EQ(values.current(guard, ActorValue::actionPoints), 65 + 7 * 3);
         // what the records do not work out stays what it was
         EXPECT_EQ(values.current(guard, ActorValue::fatigue), 100);

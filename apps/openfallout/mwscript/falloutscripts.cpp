@@ -1375,20 +1375,29 @@ namespace OFScript
             default:
                 return std::nullopt;
         }
-        // The health starts from the base health of the record, which a record that has a template takes from it
+        // The health starts from the base health of the record, which a record that has a template takes from it. A
+        // levelled list in the place of the template gives one of its characters, the one that the cell shows for this
+        // reference (the chain is followed with the seed of the reference, as for the level)
         ESM::FormId base;
         if (!baseOf(actor, base) || base.isZeroOrUnset())
             return std::nullopt;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         const ESM4::FalloutStats* stats = nullptr;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats))
-                stats = &owner->mFalloutStats;
+            const OFClass::StoreWornArmorSource source(mStore);
+            const ESM4::Npc* owner
+                = ESM4::templateOwner(ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed),
+                    ESM4::Npc::Template_UseStats);
+            stats = &(owner != nullptr ? owner : npc)->mFalloutStats;
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats))
-                stats = &owner->mFalloutStats;
+            const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseStats);
+            stats = &(owner != nullptr ? owner : creature)->mFalloutStats;
         }
         if (stats == nullptr || !stats->mKnown)
             return std::nullopt;
@@ -3067,7 +3076,8 @@ namespace OFScript
         if (!dateNow(now))
             return false;
         FalloutScript::GameDate wanted = now;
-        const int whole = static_cast<int>(std::clamp(std::floor(value), -1.0e6, 1.0e6));
+        // A number that is not one is left to zero, as for the other globals
+        const int whole = std::isnan(value) ? 0 : static_cast<int>(std::clamp(std::floor(value), -1.0e6, 1.0e6));
         if (part == 0)
             wanted.mYear = whole;
         else if (part == 1)
