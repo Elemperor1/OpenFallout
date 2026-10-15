@@ -9,10 +9,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -53,6 +56,7 @@ namespace
     constexpr std::uint16_t OpDamageActorValue = 0x1181;
     constexpr std::uint16_t OpRestoreActorValue = 0x1182;
     constexpr std::uint16_t OpRewardXP = 0x1177;
+    constexpr std::uint16_t OpResetHealth = 0x1150;
 
     class NoRecords : public FalloutScript::ActorRecords
     {
@@ -395,6 +399,94 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptActorValueCommandsTest, damage_to_the_health_waits_for_a_death_or_revival_in_progress)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100)) + end());
+        std::atomic<bool> done = false;
+        std::thread script;
+        {
+            const auto held = setup.mActors.holdTransitions();
+            script = std::thread([&] {
+                setup.run(guard, builder);
+                done = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EXPECT_FALSE(done);
+            EXPECT_FALSE(setup.mActors.isDead(guard));
+        }
+        script.join();
+        EXPECT_TRUE(done);
+        EXPECT_TRUE(setup.mActors.isDead(guard));
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, a_character_is_alive_again_only_with_its_health_back)
+    {
+        Runner setup;
+        double healthWhenSeenAlive = -1;
+        std::thread probe;
+        setup.mActors.setReviveHandler([&](FormId actor) {
+            // Someone who wants to know the state as soon as the actor is alive has to wait for the health
+            probe = std::thread([&, actor] {
+                const auto held = setup.mActors.holdTransitions();
+                healthWhenSeenAlive = setup.mValues.current(actor, ActorValue::health);
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100))
+            + command(OpResurrectActor, arguments(0)) + end());
+
+        setup.run(guard, builder);
+        probe.join();
+
+        EXPECT_FALSE(setup.mActors.isDead(guard));
+        EXPECT_GT(healthWhenSeenAlive, 0);
+    }
+
+    // Whether the script gets through while a death or revival is in progress (it does not wait for the lock)
+    bool runsWhileATransitionIsHeld(const ScriptBuilder& builder)
+    {
+        Runner setup;
+        std::atomic<bool> done = false;
+        std::thread script;
+        bool ranMeanwhile = false;
+        {
+            const auto held = setup.mActors.holdTransitions();
+            script = std::thread([&] {
+                setup.run(guard, builder);
+                done = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            ranMeanwhile = done;
+        }
+        script.join();
+        return ranMeanwhile;
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, every_change_to_the_health_waits_for_a_death_or_revival_in_progress)
+    {
+        for (const std::uint16_t command : { OpSetActorValue, OpModActorValue, OpForceActorValue, OpRestoreActorValue })
+        {
+            ScriptBuilder health;
+            health.code(scriptName() + begin(BlockType::OnActivate)
+                + FalloutScriptTest::command(command, valueAndFloat(ActorValue::health, 50)) + end());
+            EXPECT_FALSE(runsWhileATransitionIsHeld(health)) << "command " << command;
+            // Another actor value has no part in a death
+            ScriptBuilder barterValue;
+            barterValue.code(scriptName() + begin(BlockType::OnActivate)
+                + FalloutScriptTest::command(command, valueAndFloat(barter, 50)) + end());
+            EXPECT_TRUE(runsWhileATransitionIsHeld(barterValue)) << "command " << command;
+        }
+        ScriptBuilder reset;
+        reset.code(scriptName() + begin(BlockType::OnActivate) + FalloutScriptTest::command(OpResetHealth, arguments(0))
+            + end());
+        EXPECT_FALSE(runsWhileATransitionIsHeld(reset));
+    }
+
     TEST(FalloutScriptActorValueCommandsTest, damage_takes_a_share_of_the_health_and_enough_of_it_kills)
     {
         Runner setup;
@@ -430,6 +522,25 @@ namespace
         EXPECT_EQ(setup.variable(guard, 6), 0);
         EXPECT_FLOAT_EQ(setup.variable(guard, 7), 1.0f);
         EXPECT_EQ(setup.variable(guard, 8), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, damage_does_not_kill_a_character_that_falls_instead)
+    {
+        Runner setup;
+        setup.mActors.setFallHandler([](FormId actor) { return actor == guard; });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100))
+            + setTo(var('s', 1), callToken(OpGetDead, arguments(0)))
+            + setTo(var('f', 2), callToken(OpGetActorValue, valueOnly(ActorValue::health))) + end());
+        builder.variable(1, 1, "dead").variable(2, 0, "health");
+
+        setup.run(guard, builder);
+
+        EXPECT_EQ(setup.variable(guard, 1), 0);
+        EXPECT_EQ(setup.variable(guard, 2), 0);
+        EXPECT_FALSE(setup.mActors.isDead(guard));
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

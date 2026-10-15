@@ -43,6 +43,9 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mHolders.clear();
         mDead.clear();
+        mKillers.clear();
+        mKillingLimbs.clear();
+        mDeaths.clear();
         mChanges.clear();
     }
 
@@ -190,15 +193,108 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    void ActorState::setDead(FormId actor, bool dead)
+    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb)
+    {
+        if (actor == 0)
+            return false;
+        const std::lock_guard transition(mTransitionMutex);
+        if (dead)
+        {
+            {
+                const std::lock_guard lock(mMutex);
+                if (!mDead.insert(actor).second)
+                    return false;
+                constexpr std::size_t mostDeaths = 1024;
+                if (mDeaths.size() < mostDeaths)
+                    mDeaths.push_back({ actor, killer });
+                if (killer != 0)
+                    mKillers[actor] = killer;
+                // A death that no blow caused has no part of the body
+                mKillingLimbs.erase(actor);
+                if (limb >= 0)
+                    mKillingLimbs[actor] = limb;
+            }
+            // The host reacts to the death as it happens, with the lock free
+            if (mDeathListener)
+                mDeathListener(actor);
+            return true;
+        }
+        const std::lock_guard lock(mMutex);
+        mKillers.erase(actor);
+        mKillingLimbs.erase(actor);
+        return mDead.erase(actor) != 0;
+    }
+
+    void ActorState::setDeathListener(std::function<void(FormId)> listener)
+    {
+        mDeathListener = std::move(listener);
+    }
+
+    std::unique_lock<std::recursive_mutex> ActorState::holdTransitions()
+    {
+        return std::unique_lock(mTransitionMutex);
+    }
+
+    void ActorState::setReviveHandler(std::function<void(FormId)> handler)
+    {
+        mReviveHandler = std::move(handler);
+    }
+
+    void ActorState::revive(FormId actor)
     {
         if (actor == 0)
             return;
+        setDead(actor, false);
+        if (mReviveHandler)
+            mReviveHandler(actor);
+    }
+
+    void ActorState::setFallHandler(std::function<bool(FormId)> handler)
+    {
+        mFallHandler = std::move(handler);
+    }
+
+    bool ActorState::falls(FormId actor)
+    {
+        return actor != 0 && mFallHandler && mFallHandler(actor);
+    }
+
+    int ActorState::killingLimb(FormId actor) const
+    {
         const std::lock_guard lock(mMutex);
-        if (dead)
-            mDead.insert(actor);
-        else
-            mDead.erase(actor);
+        const auto found = mKillingLimbs.find(actor);
+        return mDead.count(actor) != 0 && found != mKillingLimbs.end() ? found->second : -1;
+    }
+
+    FormId ActorState::killerOf(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mKillers.find(actor);
+        return found == mKillers.end() ? 0 : found->second;
+    }
+
+    std::vector<ActorState::Death> ActorState::takeDeaths()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<Death> deaths;
+        deaths.swap(mDeaths);
+        return deaths;
+    }
+
+    bool ActorState::factions(FormId actor, std::vector<std::pair<FormId, int>>& result)
+    {
+        const std::lock_guard lock(mMutex);
+        Holder& entry = holder(actor);
+        knowFactions(actor, entry);
+        if (!entry.mFactionsKnown)
+            return false;
+        result.assign(entry.mFactions.begin(), entry.mFactions.end());
+        return true;
+    }
+
+    bool ActorState::baseOf(FormId reference, FormId& base)
+    {
+        return mRecords.baseFormOf(reference, base);
     }
 
     int ActorState::deadCount(FormId base) const
@@ -304,7 +400,8 @@ namespace FalloutScript
             return base != 0 ? static_cast<double>(state.deadCount(base)) : 0.0;
         });
         interpreter.setHandler("KillActor", [&state](CallContext& call) {
-            state.setDead(call.mReference, true);
+            // The first argument, when there is one, is the killer
+            state.setDead(call.mReference, true, formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("AddToFaction", [&state](CallContext& call) {

@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ACTORS_H
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -64,7 +65,51 @@ namespace FalloutScript
         std::vector<ItemChange> takeChanges();
 
         bool isDead(FormId actor) const;
-        void setDead(FormId actor, bool dead);
+        /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
+        /// is told in takeDeaths(). True when this call changed the state: of two calls at once that kill the same
+        /// actor, only one gets true. `limb` is the part of the body the killing blow struck, -1 when none did (a
+        /// script killed the actor) or it is not known.
+        bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1);
+        /// The part of the body that the killing blow struck, -1 when the actor is alive or none did
+        int killingLimb(FormId actor) const;
+
+        /// What the host does at the moment an actor dies (setDead(true) that changed the state), once per death and
+        /// with the state unlocked (it can ask it, but not mark a death or a revival): it ends the fights of the actor
+        /// there, not when the death is told, which may be after the actor was brought back. A revival waits for the
+        /// listener of a death in progress, so it comes after the cleanup of the death. Set before scripts run.
+        void setDeathListener(std::function<void(FormId)> listener);
+        /// Holds every death and revival back for as long as the returned lock is kept, for a check that must not be
+        /// overtaken by one (whether a fight can start, whether a blow can land). The lock may be taken again by the
+        /// thread that has it, so the holder can mark a death itself.
+        std::unique_lock<std::recursive_mutex> holdTransitions();
+        /// What the host does when a character is brought back by revive(): wakes it, if it was unconscious. Set
+        /// before scripts run.
+        void setReviveHandler(std::function<void(FormId)> handler);
+        /// Brings the character back to life (and to its senses, as the host says)
+        void revive(FormId actor);
+        /// What the host says to a character whose health scripts took to nothing: true when it falls and is up again
+        /// later (an essential character) and does not die. Set before scripts run.
+        void setFallHandler(std::function<bool(FormId)> handler);
+        /// Asks the handler; false (the actor dies) when there is none
+        bool falls(FormId actor);
+        /// Who killed the actor, 0 when it is alive or the killer is not known
+        FormId killerOf(FormId actor) const;
+
+        /// An actor that died
+        struct Death
+        {
+            FormId mActor = 0;
+            FormId mKiller = 0;
+        };
+        /// The actors that died since this was last called (the first 1024 kept): the game raises their OnDeath blocks
+        /// when it is ready for scripts to run, not in the middle of one.
+        std::vector<Death> takeDeaths();
+
+        /// The factions the actor is in (the form of the faction and the rank), in the order of the forms. False when
+        /// the host can not tell yet what the record says.
+        bool factions(FormId actor, std::vector<std::pair<FormId, int>>& result);
+        /// The form the reference was made from; false when the host can not tell
+        bool baseOf(FormId reference, FormId& base);
         /// How many of the characters or creatures made from the base form are dead
         int deadCount(FormId base) const;
 
@@ -109,9 +154,17 @@ namespace FalloutScript
         /// Scripts run on more than one thread (the frame and Lua); one at a time touches this, but the characters ask
         /// whether they are dead from the thread of the frame
         mutable std::mutex mMutex;
+        /// One death or revival at a time, from the change of the state to the end of the listener
+        std::recursive_mutex mTransitionMutex;
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
+        std::map<FormId, FormId> mKillers;
+        std::map<FormId, int> mKillingLimbs;
+        std::vector<Death> mDeaths;
         std::vector<ItemChange> mChanges;
+        std::function<void(FormId)> mDeathListener;
+        std::function<void(FormId)> mReviveHandler;
+        std::function<bool(FormId)> mFallHandler;
     };
 
     /// Gives the commands about items, deaths and factions to the interpreter: AddItem, AddItemHealthPercent,

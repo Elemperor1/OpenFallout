@@ -19,6 +19,7 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "chargenbindings.hpp"
+#include "combatbindings.hpp"
 #include "context.hpp"
 #include "conversationbindings.hpp"
 #include "coremwscriptbindings.hpp"
@@ -125,6 +126,8 @@ namespace OFLua
                 "openfallout_core_chargen", [context]() { return initCoreChargenBindings(context); });
             api["messageBox"] = context.cachePackage(
                 "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
+            api["combat"] = context.cachePackage(
+                "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

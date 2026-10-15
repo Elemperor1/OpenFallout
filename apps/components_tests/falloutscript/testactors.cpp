@@ -9,8 +9,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <map>
+#include <mutex>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -281,13 +286,150 @@ namespace
         FakeRecords records;
         ActorState state(records);
 
-        state.setDead(guard, true);
+        EXPECT_TRUE(state.setDead(guard, true));
         EXPECT_TRUE(state.isDead(guard));
         EXPECT_FALSE(state.isDead(crate));
-        state.setDead(guard, false);
+        // Only the call that kills an actor that is alive says so
+        EXPECT_FALSE(state.setDead(guard, true));
+        EXPECT_TRUE(state.setDead(guard, false));
+        EXPECT_FALSE(state.setDead(guard, false));
         EXPECT_FALSE(state.isDead(guard));
-        state.setDead(0, true);
+        EXPECT_FALSE(state.setDead(0, true));
         EXPECT_FALSE(state.isDead(0));
+    }
+
+    TEST(FalloutScriptActorStateTest, the_killing_blow_is_kept_with_the_death)
+    {
+        FakeRecords records;
+        ActorState state(records);
+
+        EXPECT_EQ(state.killingLimb(guard), -1);
+        state.setDead(guard, true, 0x01000200, 3);
+        EXPECT_EQ(state.killingLimb(guard), 3);
+        // Back to life, the blow is forgotten, and a death that no blow caused has none
+        state.setDead(guard, false);
+        EXPECT_EQ(state.killingLimb(guard), -1);
+        state.setDead(guard, true);
+        EXPECT_EQ(state.killingLimb(guard), -1);
+    }
+
+    TEST(FalloutScriptActorStateTest, the_host_is_told_of_a_death_as_it_happens_and_once)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::vector<FormId> told;
+        bool deadWhenTold = false;
+        state.setDeathListener([&](FormId actor) {
+            told.push_back(actor);
+            // The state can be asked from the listener: no lock is held
+            deadWhenTold = state.isDead(actor);
+        });
+
+        state.setDead(guard, true);
+        EXPECT_THAT(told, ElementsAre(guard));
+        EXPECT_TRUE(deadWhenTold);
+        // Nothing changed, nothing is told; neither is a revival
+        state.setDead(guard, true);
+        state.setDead(guard, false);
+        EXPECT_THAT(told, ElementsAre(guard));
+        // A death after the revival is a new one, and so many deaths between two frames are all told
+        state.setDead(guard, true);
+        for (FormId actor = 0x01001000; actor < 0x01001000 + 1100; ++actor)
+            state.setDead(actor, true);
+        EXPECT_EQ(told.size(), 2u + 1100u);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_held_transition_lets_its_holder_mark_a_death_and_stops_the_others)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::vector<FormId> told;
+        state.setDeathListener([&](FormId actor) { told.push_back(actor); });
+
+        std::atomic<bool> killed = false;
+        std::thread other;
+        {
+            const auto held = state.holdTransitions();
+            // The holder may take the lock again by marking a death itself
+            state.setDead(guard, true);
+            other = std::thread([&] {
+                state.setDead(crate, true);
+                killed = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EXPECT_FALSE(killed);
+            EXPECT_FALSE(state.isDead(crate));
+        }
+        other.join();
+        EXPECT_TRUE(killed);
+        EXPECT_TRUE(state.isDead(crate));
+        EXPECT_THAT(told, ElementsAre(guard, crate));
+    }
+
+    TEST(FalloutScriptActorStateTest, a_revival_waits_for_the_cleanup_of_the_death)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::mutex mutex;
+        std::condition_variable changed;
+        bool inListener = false;
+        bool release = false;
+        bool revived = false;
+        state.setDeathListener([&](FormId) {
+            std::unique_lock lock(mutex);
+            inListener = true;
+            changed.notify_all();
+            // Nobody gets out before the test says so (or the test is lost)
+            changed.wait_for(lock, std::chrono::seconds(5), [&] { return release; });
+        });
+
+        std::thread killer([&] { state.setDead(guard, true); });
+        {
+            std::unique_lock lock(mutex);
+            ASSERT_TRUE(changed.wait_for(lock, std::chrono::seconds(5), [&] { return inListener; }));
+        }
+        // The actor is dead as soon as the state changed; the revival has to wait for the listener to end
+        EXPECT_TRUE(state.isDead(guard));
+        std::thread reviver([&] {
+            state.setDead(guard, false);
+            const std::lock_guard lock(mutex);
+            revived = true;
+            changed.notify_all();
+        });
+        {
+            std::unique_lock lock(mutex);
+            EXPECT_FALSE(changed.wait_for(lock, std::chrono::milliseconds(100), [&] { return revived; }));
+            release = true;
+            changed.notify_all();
+        }
+        killer.join();
+        reviver.join();
+        EXPECT_TRUE(revived);
+        EXPECT_FALSE(state.isDead(guard));
+    }
+
+    TEST(FalloutScriptActorStateTest, a_character_falls_only_when_the_host_says_so)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        EXPECT_FALSE(state.falls(guard));
+        state.setFallHandler([](FormId actor) { return actor == guard; });
+        EXPECT_TRUE(state.falls(guard));
+        EXPECT_FALSE(state.falls(guard + 1));
+        EXPECT_FALSE(state.falls(0));
+    }
+
+    TEST(FalloutScriptActorStateTest, a_new_game_forgets_the_killing_blows_of_the_old_one)
+    {
+        FakeRecords records;
+        ActorState state(records);
+
+        state.setDead(guard, true, 0x01000200, 3);
+        state.clear();
+        EXPECT_FALSE(state.isDead(guard));
+        // The same form dies again, by a script: it has no part of the body that a blow struck
+        state.setDead(guard, true);
+        EXPECT_EQ(state.killingLimb(guard), -1);
     }
 
     TEST(FalloutScriptActorStateTest, the_dead_are_counted_by_the_form_they_were_made_from)
@@ -440,6 +582,26 @@ namespace
         EXPECT_EQ(setup.variable(1), 0);
         EXPECT_EQ(setup.variable(2), 1);
         EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, bringing_an_actor_back_tells_the_host)
+    {
+        Runner setup;
+        std::vector<FormId> brought;
+        setup.mState.setReviveHandler([&](FormId actor) {
+            // The actor is alive again by the time the host is told
+            EXPECT_FALSE(setup.mState.isDead(actor));
+            brought.push_back(actor);
+        });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpResurrectActor, arguments(0))
+            + command(OpKillActor, arguments(0)) + command(OpResurrectActor, arguments(0)) + end());
+
+        setup.run(builder);
+
+        EXPECT_THAT(brought, ElementsAre(guard, guard));
+        EXPECT_FALSE(setup.mState.isDead(guard));
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

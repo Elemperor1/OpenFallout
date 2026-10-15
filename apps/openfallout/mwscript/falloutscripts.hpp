@@ -23,8 +23,11 @@
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/chargen.hpp>
+#include <components/falloutscript/combatcommands.hpp>
+#include <components/falloutscript/combatstate.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
+#include <components/falloutscript/damage.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/enableparents.hpp>
@@ -88,7 +91,8 @@ namespace OFScript
                                  private FalloutScript::PackageWorld,
                                  private FalloutScript::PlacementWorld,
                                  private FalloutScript::MessageWorld,
-                                 private FalloutScript::ControlsWorld
+                                 private FalloutScript::ControlsWorld,
+                                 private FalloutScript::CombatWorld
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -139,6 +143,26 @@ namespace OFScript
         /// What characters carry, hold and wear. The inventory of the player is what scripts and pick-ups gave it.
         FalloutScript::ActorState& actors() { return mActors; }
         FalloutScript::Equipment& equipment() { return mEquipment; }
+        /// Who fights whom and how the characters stand to each other
+        FalloutScript::CombatState& combat() { return mCombat; }
+
+        /// What a blow did
+        struct StrikeResult
+        {
+            bool mHit = false; // false when the blow could not be struck (no victim, victim dead, a blow at itself)
+            double mDamage = 0;
+            bool mCritical = false;
+            bool mKilled = false; // the victim is dead
+            bool mDowned = false; // the victim is essential and fell unconscious
+        };
+        /// The attacker strikes the victim with the weapon (0 for the weapon the attacker holds, or its hands): the
+        /// blow is worked out from the weapon, the skill and strength of the attacker and the armor of the victim, the
+        /// health of the victim goes down, and the victim dies, or when it is essential falls unconscious. The victim
+        /// fights back if it was at peace. The OnHit, OnHitWith and OnDeath blocks of the victim run in the next
+        /// frame. `limb` is the part of the body that was hit, -1 when not known; `roll` (0 to 100) decides whether the
+        /// blow is critical, a negative one is drawn at random. Any thread.
+        StrikeResult strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
+            FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1);
 
         /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
         /// yet.
@@ -415,6 +439,19 @@ namespace OFScript
         /// since the last frame. The script of an item runs for the item as a form (what GetContainer tells is the
         /// holder it was last added to or worn by): the games keep an instance for each item, which this does not.
         void raiseItemEvents();
+        bool detects(FalloutScript::FormId viewer, FalloutScript::FormId target) override;
+        bool essentialByRecord(FalloutScript::FormId actor) override;
+        std::optional<FalloutScript::CombatState::Relation> recordedRelation(
+            FalloutScript::FormId first, FalloutScript::FormId second) override;
+        /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none
+        FalloutScript::WeaponDamage describeWeapon(FalloutScript::FormId weapon, FalloutScript::FormId attacker);
+        const FalloutScript::DamageSettings& damageSettings();
+        /// Runs the OnHit, OnHitWith, OnDeath and OnCombatEnd blocks for what happened in the fights since the last
+        /// frame, wakes the essential characters that were down long enough, and lets the time of the fights pass
+        void raiseCombatEvents(float frametime);
+        /// A character whose health is gone: an essential one is put out of its fights and lies unconscious until it
+        /// gets up (true), any other one dies (false, nothing is done). Any thread.
+        bool fallsInsteadOfDying(FalloutScript::FormId victim);
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
         std::optional<double> derivedValue(
@@ -677,6 +714,9 @@ namespace OFScript
         /// thread of Lua: the rest of the script has to find the object it was told the number of at once
         std::mutex mMadeMutex;
         FalloutScript::FormId mMadeCount = 0;
+        /// The base each number was asked for with, kept after the world makes the object: the records say what the
+        /// object is from any thread, but the world only to the thread of the frame (under mMadeMutex)
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mMadeBases;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
@@ -708,6 +748,17 @@ namespace OFScript
         std::map<FalloutScript::FormId, double> mGlobals;
         std::mutex mDerivedSettingsMutex;
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
+        std::optional<FalloutScript::DamageSettings> mDamageSettings;
+        /// The settings of the files by their names in lower case, read when the first of them is asked for (the
+        /// caller holds mDerivedSettingsMutex)
+        const std::map<std::string, double>& gameSettingValues();
+        std::optional<std::map<std::string, double>> mGameSettingValues;
+        FalloutScript::CombatState mCombat;
+        /// The blows are rolled for from any thread
+        std::mutex mCombatRandomMutex;
+        std::mt19937 mCombatRandom;
+        /// One blow at a time reaches the health and the fights of a character
+        std::mutex mStrikeMutex;
         /// The date the world starts at (the initial values of GameYear, GameMonth and GameDay), read when the first
         /// date global is asked for
         struct CalendarStart

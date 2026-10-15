@@ -95,6 +95,7 @@ namespace ESM4
     struct Dialogue;
     struct Door;
     struct Explosion;
+    struct Faction;
     struct Flora;
     struct FormIdList;
     struct Furniture;
@@ -168,7 +169,7 @@ namespace OFWorld
             Store<ESM4::ActorValueInfo>, Store<ESM4::AIPackage>, Store<ESM4::Ammunition>, Store<ESM4::Armor>,
             Store<ESM4::ArmorAddon>, Store<ESM4::Book>, Store<ESM4::Cell>, Store<ESM4::Climate>, Store<ESM4::Clothing>,
             Store<ESM4::Container>, Store<ESM4::Creature>, Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>,
-            Store<ESM4::Door>, Store<ESM4::Explosion>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
+            Store<ESM4::Door>, Store<ESM4::Explosion>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
             Store<ESM4::FormIdList>, Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>,
             Store<ESM4::HeadPart>, Store<ESM4::Ingredient>, Store<ESM4::ItemMod>, Store<ESM4::Land>,
             Store<ESM4::LandTexture>, Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>,
