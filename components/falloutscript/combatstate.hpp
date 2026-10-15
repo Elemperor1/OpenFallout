@@ -28,6 +28,9 @@ namespace FalloutScript
         void start(FormId actor, FormId target);
         /// The actor stops fighting
         void stop(FormId actor);
+        /// The actor is out of every fight (it died or is down): it stops fighting, and so does everyone who went for
+        /// it
+        void withdraw(FormId actor);
         /// What the actor fights, 0 when it is at peace
         FormId target(FormId actor) const;
         bool inCombat(FormId actor) const { return target(actor) != 0; }
@@ -51,16 +54,17 @@ namespace FalloutScript
         void setEssential(FormId actor, bool essential);
         std::optional<bool> essential(FormId actor) const;
 
-        /// How two factions stand to each other, as SetEnemy and SetAlly say
+        /// How one faction stands to another, as SetEnemy and SetAlly say (a friend is closer than an ally)
         enum class Relation : std::uint8_t
         {
             Neutral,
             Ally,
             Enemy,
+            Friend,
         };
-        /// Sets how the first faction stands to the second and the second to the first
+        /// Sets how the first faction stands to the second; how the second stands to the first is its own say
         void setRelation(FormId first, FormId second, Relation relation);
-        /// None when no script said anything about the pair
+        /// How the first faction stands to the second: none when no script said anything about it
         std::optional<Relation> relation(FormId first, FormId second) const;
 
         /// A blow that was struck

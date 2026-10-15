@@ -20,6 +20,8 @@ namespace FalloutScript
                     return 1;
                 case CombatState::Relation::Ally:
                     return 2;
+                case CombatState::Relation::Friend:
+                    return 3;
                 case CombatState::Relation::Neutral:
                     break;
             }
@@ -30,6 +32,13 @@ namespace FalloutScript
         bool flagOrSet(const CallContext& call, std::size_t index)
         {
             return index >= call.mArguments.size() || intArgument(call, index) != 0;
+        }
+
+        /// Whether an optional flag of SetEnemy or SetAlly is given and set (1 makes the standing milder, 0 or none
+        /// keeps it)
+        bool flagGiven(const CallContext& call, std::size_t index)
+        {
+            return index < call.mArguments.size() && intArgument(call, index) != 0;
         }
 
         /// What a script said about two factions, else what the records say
@@ -61,7 +70,7 @@ namespace FalloutScript
                 const std::optional<CombatState::Relation> relation = factionRelation(combat, world, first, second);
                 if (relation == CombatState::Relation::Enemy)
                     return CombatState::Relation::Enemy;
-                if (relation == CombatState::Relation::Ally)
+                if (relation == CombatState::Relation::Ally || relation == CombatState::Relation::Friend)
                     ally = true;
             }
         return ally ? CombatState::Relation::Ally : CombatState::Relation::Neutral;
@@ -168,12 +177,25 @@ namespace FalloutScript
         interpreter.setHandler("IsEssential", essential);
         interpreter.setHandler("IsActorRefEssential", essential);
 
+        // The two flags that may follow the factions say how each stands to the other: the first how the first faction
+        // stands to the second, the second the reverse. Enemy is 0 and neutral 1 for SetEnemy, ally is 0 and friend 1
+        // for SetAlly; without flags both are 0.
         interpreter.setHandler("SetEnemy", [&combat](CallContext& call) {
-            combat.setRelation(formArgument(call, 0), formArgument(call, 1), CombatState::Relation::Enemy);
+            const FormId first = formArgument(call, 0);
+            const FormId second = formArgument(call, 1);
+            combat.setRelation(
+                first, second, flagGiven(call, 2) ? CombatState::Relation::Neutral : CombatState::Relation::Enemy);
+            combat.setRelation(
+                second, first, flagGiven(call, 3) ? CombatState::Relation::Neutral : CombatState::Relation::Enemy);
             return 0.0;
         });
         interpreter.setHandler("SetAlly", [&combat](CallContext& call) {
-            combat.setRelation(formArgument(call, 0), formArgument(call, 1), CombatState::Relation::Ally);
+            const FormId first = formArgument(call, 0);
+            const FormId second = formArgument(call, 1);
+            combat.setRelation(
+                first, second, flagGiven(call, 2) ? CombatState::Relation::Friend : CombatState::Relation::Ally);
+            combat.setRelation(
+                second, first, flagGiven(call, 3) ? CombatState::Relation::Friend : CombatState::Relation::Ally);
             return 0.0;
         });
         interpreter.setHandler("GetFactionCombatReaction", [&combat, &world](CallContext& call) {

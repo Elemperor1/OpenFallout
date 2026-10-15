@@ -1563,8 +1563,9 @@ namespace OFScript
                     case ESM4::Faction::Reaction_Enemy:
                         return Relation::Enemy;
                     case ESM4::Faction::Reaction_Ally:
-                    case ESM4::Faction::Reaction_Friend:
                         return Relation::Ally;
+                    case ESM4::Faction::Reaction_Friend:
+                        return Relation::Friend;
                     default:
                         return Relation::Neutral;
                 }
@@ -1660,9 +1661,7 @@ namespace OFScript
         }
 
         // Nobody goes for a target that is out
-        mCombat.stop(victim);
-        for (const FalloutScript::FormId pursuer : mCombat.attackersOf(victim))
-            mCombat.stop(pursuer);
+        mCombat.withdraw(victim);
         if (FalloutScript::isEssential(mCombat, mActors, *this, victim))
         {
             mCombat.setUnconscious(victim, true);
@@ -1726,8 +1725,12 @@ namespace OFScript
                     });
             }
         }
+        // However a character died (a blow, KillActor, damage to its health), its fights are over
         for (const FalloutScript::ActorState::Death& death : mActors.takeDeaths())
+        {
+            mCombat.withdraw(death.mActor);
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
+        }
         for (const FalloutScript::CombatState::Change& change : mCombat.takeChanges())
         {
             if (change.mTarget == 0)

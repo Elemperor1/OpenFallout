@@ -56,6 +56,13 @@ namespace FalloutScript
         noteChange(actor, 0, was);
     }
 
+    void CombatState::withdraw(FormId actor)
+    {
+        stop(actor);
+        for (const FormId pursuer : attackersOf(actor))
+            stop(pursuer);
+    }
+
     FormId CombatState::target(FormId actor) const
     {
         const std::lock_guard lock(mMutex);
@@ -146,7 +153,6 @@ namespace FalloutScript
             return;
         const std::lock_guard lock(mMutex);
         mRelations[{ first, second }] = relation;
-        mRelations[{ second, first }] = relation;
     }
 
     std::optional<CombatState::Relation> CombatState::relation(FormId first, FormId second) const

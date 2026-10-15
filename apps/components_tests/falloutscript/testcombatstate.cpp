@@ -111,19 +111,40 @@ namespace
         EXPECT_FALSE(*state.essential(guard));
     }
 
-    TEST(FalloutScriptCombatStateTest, how_two_factions_stand_is_the_same_both_ways)
+    TEST(FalloutScriptCombatStateTest, how_a_faction_stands_to_another_is_its_own_say_in_each_direction)
     {
         CombatState state;
         EXPECT_FALSE(state.relation(vault, gang).has_value());
         state.setRelation(vault, gang, CombatState::Relation::Enemy);
         EXPECT_EQ(state.relation(vault, gang), CombatState::Relation::Enemy);
-        EXPECT_EQ(state.relation(gang, vault), CombatState::Relation::Enemy);
+        EXPECT_FALSE(state.relation(gang, vault).has_value());
 
-        state.setRelation(gang, vault, CombatState::Relation::Ally);
-        EXPECT_EQ(state.relation(vault, gang), CombatState::Relation::Ally);
+        state.setRelation(gang, vault, CombatState::Relation::Friend);
+        EXPECT_EQ(state.relation(gang, vault), CombatState::Relation::Friend);
+        EXPECT_EQ(state.relation(vault, gang), CombatState::Relation::Enemy);
 
         state.setRelation(vault, 0, CombatState::Relation::Enemy);
         EXPECT_FALSE(state.relation(vault, 0).has_value());
+    }
+
+    TEST(FalloutScriptCombatStateTest, withdrawing_an_actor_ends_its_fight_and_those_against_it)
+    {
+        CombatState state;
+        state.start(guard, raider);
+        state.start(ghoul, guard);
+        state.start(raider, guard);
+        state.takeChanges();
+
+        state.withdraw(guard);
+
+        EXPECT_FALSE(state.inCombat(guard));
+        EXPECT_FALSE(state.inCombat(ghoul));
+        EXPECT_FALSE(state.inCombat(raider));
+        EXPECT_FALSE(state.isFought(guard));
+        // Each of the three fights that ended is told once (OnCombatEnd)
+        EXPECT_THAT(state.takeChanges(), SizeIs(3));
+        state.withdraw(guard);
+        EXPECT_THAT(state.takeChanges(), IsEmpty());
     }
 
     TEST(FalloutScriptCombatStateTest, a_hit_actor_counts_as_attacked_for_a_short_time)

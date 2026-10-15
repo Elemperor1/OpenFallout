@@ -149,6 +149,11 @@ namespace
         return arguments(2).add(refArg(first)).add(refArg(second));
     }
 
+    Bytes withFlags(std::uint16_t first, std::uint16_t second, std::int32_t one, std::int32_t other)
+    {
+        return arguments(4).add(refArg(first)).add(refArg(second)).add(intArg(one)).add(intArg(other));
+    }
+
     TEST(FalloutScriptCombatCommandsTest, a_script_starts_and_stops_a_fight)
     {
         Runner setup;
@@ -288,6 +293,41 @@ namespace
         EXPECT_EQ(setup.variable(4), 1);
         EXPECT_EQ(setup.variable(5), 0);
         EXPECT_EQ(setup.variable(6), 2);
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, the_flags_of_set_enemy_and_set_ally_say_how_each_faction_stands_to_the_other)
+    {
+        Runner setup;
+        setup.mWorld.mRecorded[{ vault, mutants }] = CombatState::Relation::Friend;
+        ScriptBuilder builder;
+        const std::uint16_t first = builder.form(vault);
+        const std::uint16_t second = builder.form(gang);
+        const std::uint16_t third = builder.form(mutants);
+        builder.code(scriptName()
+            + begin(BlockType::OnActivate)
+            // The first faction is neutral to the second, which stays an enemy of the first
+            + command(OpSetEnemy, withFlags(first, second, 1, 0))
+            + setTo(var('s', 1), callToken(OpGetFactionCombatReaction, twoArgs(first, second)))
+            + setTo(var('s', 2), callToken(OpGetFactionCombatReaction, twoArgs(second, first)))
+            // The first faction is an ally of the second, which is a friend of the first
+            + command(OpSetAlly, withFlags(first, second, 0, 1))
+            + setTo(var('s', 3), callToken(OpGetFactionCombatReaction, twoArgs(first, second)))
+            + setTo(var('s', 4), callToken(OpGetFactionCombatReaction, twoArgs(second, first)))
+            // A friend in the records is not an ally
+            + setTo(var('s', 5), callToken(OpGetFactionCombatReaction, twoArgs(first, third))) + end());
+        builder.variable(1, integerVariable, "neutral")
+            .variable(2, integerVariable, "enemy")
+            .variable(3, integerVariable, "ally")
+            .variable(4, integerVariable, "friend")
+            .variable(5, integerVariable, "recorded");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_EQ(setup.variable(2), 1);
+        EXPECT_EQ(setup.variable(3), 2);
+        EXPECT_EQ(setup.variable(4), 3);
+        EXPECT_EQ(setup.variable(5), 3);
     }
 
     TEST(FalloutScriptCombatCommandsTest, the_records_say_how_factions_stand_when_no_script_did)
