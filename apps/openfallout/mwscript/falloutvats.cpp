@@ -84,6 +84,12 @@ namespace OFScript
         return true;
     }
 
+    namespace
+    {
+        /// The share of the most action points that comes back in a second in New Vegas
+        constexpr double newVegasRestoreShare = 0.06;
+    }
+
     const FalloutScript::Vats::Rules& FalloutScripts::vatsRules()
     {
         const std::lock_guard lock(mDerivedSettingsMutex);
@@ -94,6 +100,10 @@ namespace OFScript
                 const auto found = settings.find(Misc::StringUtils::lowerCase(name));
                 return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
             });
+            // New Vegas gives back a share of the most a second (read from its executable) where Fallout 3 gives back a
+            // number of points
+            if (mGame == FalloutScript::Game::NewVegas)
+                mVatsRules->mRestoreShare = newVegasRestoreShare;
         }
         return *mVatsRules;
     }
