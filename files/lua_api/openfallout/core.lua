@@ -1451,6 +1451,7 @@
 -- @field #boolean critical
 -- @field #boolean killed
 -- @field #boolean downed
+-- @field #boolean crippled Whether the part of the body that was hit is crippled now.
 
 ---
 -- @type CombatStrike
@@ -1459,6 +1460,7 @@
 -- @field #boolean critical
 -- @field #boolean killed
 -- @field #boolean downed Whether the victim fell unconscious.
+-- @field #boolean crippled Whether the part of the body that was hit is crippled now.
 
 ---
 -- @{#Pipboy}: what the player's character is and carries, for the screens of the Pip-Boy, the level up and the loot of
@@ -1705,6 +1707,94 @@
 ---
 -- The game asks whether to load the most recent save, as it does when the player has died.
 -- @function [parent=#Pipboy] askReload
+
+---
+-- @{#Vats}: V.A.T.S., the targeting of Fallout 3 and New Vegas that stops the game for attacks at parts of the body. The
+-- player spends action points on each attack, which hits by a chance that the weapon, the skill, the distance and the
+-- part decide. Not available in load scripts.
+-- @field [parent=#core] #Vats vats
+
+---
+-- @type Vats
+
+---
+-- Whether the content is that of Fallout 3 or New Vegas.
+-- @function [parent=#Vats] available
+-- @return #boolean
+
+---
+-- What the weapon and the action points of the player allow.
+-- @function [parent=#Vats] state
+-- @return #VatsState
+
+---
+-- @type VatsState
+-- @field #boolean usable Whether V.A.T.S. can be used (the player is alive).
+-- @field #boolean open Whether the screen of V.A.T.S. is open (see setOpen).
+-- @field #number actionPoints The action points the player has.
+-- @field #number maxActionPoints
+-- @field #number cost The action points one attack with the weapon costs.
+-- @field #number range How far the weapon reaches in V.A.T.S.
+-- @field #string weapon The name of the weapon the player holds, empty for the hands.
+
+---
+-- Whether the object is a character or creature that is alive and within the reach of the weapon.
+-- @function [parent=#Vats] canTarget
+-- @param openfallout.core#GameObject target
+-- @return #boolean
+
+---
+-- What the screen shows of a target.
+-- @function [parent=#Vats] describe
+-- @param openfallout.core#GameObject target
+-- @return #VatsTargetInfo
+
+---
+-- @type VatsTargetInfo
+-- @field #string name
+-- @field #number distance How far the target is from the player, in units.
+-- @field #number health
+-- @field #number maxHealth
+
+---
+-- The parts of the body of the target that can be aimed at.
+-- @function [parent=#Vats] parts
+-- @param openfallout.core#GameObject target
+-- @return #list<#VatsPart>
+
+---
+-- @type VatsPart
+-- @field #number index The number of the part, which attack takes.
+-- @field #string name The name of the part in the body part data.
+-- @field #string target What V.A.T.S. calls the part.
+-- @field #number chance The chance in percent that an attack at the part hits.
+-- @field #number condition The condition of the part in percent (0 is crippled).
+
+---
+-- The player attacks the part of the target: the action points and a round are spent and the blow is struck when the
+-- roll is below the chance. Call it from the main thread, when the player has queued the attack.
+-- @function [parent=#Vats] attack
+-- @param openfallout.core#GameObject target
+-- @param #number part The `index` of a part.
+-- @return #VatsAttack
+
+---
+-- @type VatsAttack
+-- @field #string refused Why nothing was done: "points", "ammo", "range", "dead" or "none"; nil when the attack was made.
+-- @field #boolean hit Whether the blow struck.
+-- @field #number cost The action points spent.
+-- @field #number chance The chance in percent that was rolled against.
+-- @field #number damage
+-- @field #boolean critical
+-- @field #boolean killed
+-- @field #boolean downed
+-- @field #boolean crippled Whether the part is crippled now.
+
+---
+-- The screen of V.A.T.S. tells the engine that it is open (the action points do not come back, and `GetVATSMode`
+-- answers 1).
+-- @function [parent=#Vats] setOpen
+-- @param #boolean open
 
 ---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.

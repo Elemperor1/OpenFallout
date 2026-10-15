@@ -39,6 +39,7 @@ PLAYER: scripts/omw/falloutpipboy.lua
 PLAYER: scripts/omw/falloutloot.lua
 PLAYER: scripts/omw/falloutcraft.lua
 PLAYER: scripts/omw/falloutdeath.lua
+PLAYER: scripts/omw/falloutvats.lua
 
 # Lua console
 MENU: scripts/omw/console/menu.lua

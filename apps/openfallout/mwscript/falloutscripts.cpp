@@ -177,6 +177,7 @@ namespace OFScript
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
         , mCrafting(*this, mActors, mActorValues)
+        , mLimbs(*this, mActorValues)
         , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
@@ -224,6 +225,8 @@ namespace OFScript
                 ? 1.0
                 : 0.0;
         });
+        // V.A.T.S. is open while the screen of Lua says so
+        mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
@@ -408,6 +411,8 @@ namespace OFScript
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
         mActorValues.clear();
+        mLimbs.clear();
+        mVatsOpen = false;
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
@@ -504,6 +509,15 @@ namespace OFScript
         raiseItemEvents();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
+        // The action points of the player come back while V.A.T.S. is not open
+        if (mPlayer != 0 && !mVatsOpen)
+        {
+            namespace AV = FalloutScript::ActorValue;
+            const double gain = FalloutScript::Vats::restored(
+                vatsRules(), mActorValues.permanent(mPlayer, AV::actionPoints), frametime);
+            if (gain > 0)
+                mActorValues.restore(mPlayer, AV::actionPoints, gain);
+        }
         raiseCombatEvents(frametime);
         updateProgress(frametime);
         mQuests.update(frametime);
@@ -1750,6 +1764,10 @@ namespace OFScript
         }
         chance = mPerks.apply(Entry::enemyCriticalChance, victim, chance, towardsAttacker);
         defense.mThreshold += mPerks.apply(Entry::thresholdDefender, victim, 0.0, towardsAttacker) - thresholdTaken;
+        // A blow at a part of the body does more or less than one at the body (a head shot more); the games do not say
+        // whether this comes before the armor, here it does
+        if (limb >= 0)
+            blow.mDamage *= mLimbs.damageMultiplier(victim, limb);
         FalloutScript::HitResult hit
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
         if (attacker != 0 && damageAfterArmor)
@@ -1778,6 +1796,18 @@ namespace OFScript
         mCombat.noteHit(victim, struck);
 
         mActorValues.damage(victim, AV::health, hit.mDamage);
+        if (limb >= 0)
+        {
+            // The condition of the part goes down by what the blow did, as much as the weapon says it hurts limbs, and
+            // a perk of the attacker may change that
+            double limbDamage = hit.mDamage;
+            if (const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr)
+                if (record->mHasGameData && record->mGame.mLimbDamageMultiplier > 0)
+                    limbDamage *= record->mGame.mLimbDamageMultiplier;
+            if (attacker != 0)
+                limbDamage = mPerks.apply(Entry::limbDamage, attacker, limbDamage, towardsVictim);
+            result.mCrippled = mLimbs.hurt(victim, limb, limbDamage).mCrippled;
+        }
         // Who did the damage decides whether a kill by someone else pays the player
         if (attacker == mPlayer && attacker != 0)
         {
@@ -1881,12 +1911,13 @@ namespace OFScript
     }
 
     FalloutScripts::FireResult FalloutScripts::fire(
-        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance)
+        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance, bool ignoreCooldown)
     {
         FireResult result;
         if (attacker == 0)
             return result;
         const WeaponStats stats = weaponStats(attacker);
+        if (!ignoreCooldown)
         {
             const std::lock_guard lock(mFireMutex);
             if (mFireCooldowns.count(attacker) != 0)

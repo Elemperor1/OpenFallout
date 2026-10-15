@@ -61,6 +61,7 @@ namespace OFLua
             row["critical"] = result.mCritical;
             row["killed"] = result.mKilled;
             row["downed"] = result.mDowned;
+            row["crippled"] = result.mCrippled;
             return row;
         };
         // Whom the character fights ("" when it is at peace)
@@ -114,6 +115,7 @@ namespace OFLua
             row["critical"] = result.mStrike.mCritical;
             row["killed"] = result.mStrike.mKilled;
             row["downed"] = result.mStrike.mDowned;
+            row["crippled"] = result.mStrike.mCrippled;
             return row;
         };
         // The player draws the weapon (or puts it away), for the scripts that ask whether it is out

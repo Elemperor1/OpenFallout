@@ -462,7 +462,19 @@ ARENA_BYSTANDER_REF_ID = 0x94C
 ARENA_GRENADE_ID = 0x94D
 ARENA_GRENADE_COUNT = 2
 ARENA_GRENADE_STAGE = 12
-LAST_ID = 0x952 # the largest form ID of the plugin, which the next object ID of its header follows
+# The target of V.A.T.S.: a character like the dummy, who stands in front of the player and is not shot at by the others
+ARENA_TARGET_ID = 0x953
+ARENA_TARGET_REF_ID = 0x954
+BODY_PARTS_ID = 0x955
+ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
+# The body part data of the race (BPTD): the name of the part, what V.A.T.S. calls it (empty: it can not be aimed at), the
+# damage multiplier, the share of the health that the part stands for, the actor value of its condition (the head is the
+# condition of perception, the torso of endurance, the left arm of the left attack, the right leg of the right mobility),
+# and its own chance to be hit
+BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100), ("Head", "Head", 2.0, 50, 25, 100),
+              ("LeftArm", "Left Arm", 0.5, 25, 27, 60), ("RightLeg", "Right Leg", 0.5, 25, 30, 60),
+              ("Spine", "", 1.0, 100, -1, 100))
+LAST_ID = 0x955 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1601,10 +1613,30 @@ def race(form_id=RACE_ID, name=RACE_NAME):
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
     return record(b"RACE", form_id, [zstr(b"EDID", name), sub(b"DATA", data),
+                                     sub(b"GNAM", struct.pack("<I", BODY_PARTS_ID)),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
                                      sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
                                      *part(2, "righthand"), sub(b"FNAM")])
+
+
+def body_parts():
+    """The BPTD record the races name (GNAM): the parts of BODY_PARTS, each with its name (BPTN), node (BPNN), the name
+    V.A.T.S. shows (BPNT), the 84 bytes of BPND (damage multiplier, flags, part type, share of health, actor value of the
+    condition as a signed byte, chance to be hit) and NAM4, which ends the part."""
+    subs = [zstr(b"EDID", "OFTestBodyParts")]
+    for index, (name, target, mult, health, value, to_hit) in enumerate(BODY_PARTS):
+        data = bytearray(84)
+        struct.pack_into("<f", data, 0, mult)
+        data[5] = 1 if index == 0 else 0  # the part type: torso
+        data[6] = health
+        struct.pack_into("<b", data, 7, value)
+        data[8] = to_hit
+        subs += [zstr(b"BPTN", name), zstr(b"BPNN", "Bip01 " + name)]
+        if target:
+            subs.append(zstr(b"BPNT", target))
+        subs += [sub(b"BPND", bytes(data)), zstr(b"NAM4", "Bip01 " + name)]
+    return record(b"BPTD", BODY_PARTS_ID, subs)
 
 
 def hair():
@@ -2090,6 +2122,7 @@ def plugin():
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
+            + top_group(b"BPTD", [body_parts()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
@@ -2192,7 +2225,8 @@ def arena_quest():
     glob = {name: index[ARENA_GLOBALS[name][0]] for name in names}
     setup = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(rifle), sf.int_argument(1)),
              sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(ARENA_PLAYER_AMMO)),
-             sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle))]
+             sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle)),
+             sf.call_on(player, sf.SET_ACTOR_VALUE, sf.u16(AV_GUNS), sf.int_argument(100))]
     probe = [
         sf.set_to(sf.global_target(glob["armed"]), sf.call_token(sf.GET_EQUIPPED, sf.form_argument(rifle), reference=player)),
         sf.set_to(sf.global_target(glob["weapon_out"]), sf.call_token(sf.IS_WEAPON_OUT, reference=player)),
@@ -2233,7 +2267,9 @@ def arena_people():
     # Never starts a fight (aggression 0), has no package and no weapon, and does not run from one (confidence 4): the
     # test shoots it once, and it has to go for the player with its hands
     bystander = person(ARENA_BYSTANDER_ID, "OFTestArenaBystander", dressed=False, ai=(0, 4))
-    return [dummy, raider, bystander]
+    target = person(ARENA_TARGET_ID, "OFTestArenaTarget", dressed=False, health=ARENA_DUMMY_HEALTH,
+                    attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
+    return [dummy, raider, bystander, target]
 
 
 def arena_cell():
@@ -2247,7 +2283,8 @@ def arena_cell():
         refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(ARENA_DUMMY_REF_ID, ARENA_DUMMY_PLACE, base=ARENA_DUMMY_ID),
         achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
-        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID)])
+        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID),
+        achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID)])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
     return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])

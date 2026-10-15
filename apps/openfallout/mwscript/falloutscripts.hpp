@@ -38,6 +38,7 @@
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
+#include <components/falloutscript/limbs.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
@@ -51,6 +52,7 @@
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
+#include <components/falloutscript/vats.hpp>
 #include <components/falloutscript/voicefiles.hpp>
 
 #include <osg/Vec3f>
@@ -106,7 +108,8 @@ namespace OFScript
                                  private FalloutScript::AnimationWorld,
                                  private FalloutScript::PerkRecords,
                                  private FalloutScript::UseRecords,
-                                 private FalloutScript::RecipeRecords
+                                 private FalloutScript::RecipeRecords,
+                                 private FalloutScript::LimbRecords
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -343,6 +346,7 @@ namespace OFScript
             bool mCritical = false;
             bool mKilled = false; // the victim is dead
             bool mDowned = false; // the victim is essential and fell unconscious
+            bool mCrippled = false; // the blow crippled the part of the body it hit
         };
         /// The attacker strikes the victim with the weapon (0 for the weapon the attacker holds, or its hands): the
         /// blow is worked out from the weapon, the skill and strength of the attacker and the armor of the victim, the
@@ -382,7 +386,61 @@ namespace OFScript
         /// no health). Main thread.
         /// `chance` (0 to 1) is how likely the attack is to hit what it aims at: the player aims with the crosshair
         /// and always does, a character is not so sure of its aim.
-        FireResult fire(FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb = -1, double chance = 1.0);
+        /// `ignoreCooldown` is for an attack of V.A.T.S., which comes when the player queued it and not when the
+        /// weapon is ready.
+        FireResult fire(FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb = -1, double chance = 1.0,
+            bool ignoreCooldown = false);
+
+        /// V.A.T.S.: what the player's weapon and action points allow
+        struct VatsState
+        {
+            bool mAvailable = false; // the player has a weapon it can attack with in V.A.T.S. and is not dead
+            bool mOpen = false;
+            double mActionPoints = 0;
+            double mMaxActionPoints = 0;
+            double mCost = 0; // the action points one attack costs
+            double mRange = 0;
+            std::string mWeaponName;
+        };
+        VatsState vatsState();
+        /// A part of the body of a target that V.A.T.S. can aim at, with the chance in percent of a hit with the weapon
+        /// the player holds. The parts a body does not have for V.A.T.S. (no target name) are left out.
+        struct VatsPart
+        {
+            int mIndex = 0; // the number of the part in the body part data, which strike and GetHitLocation use
+            std::string mName;
+            std::string mTarget;
+            double mChance = 0;
+            double mCondition = 100; // in percent
+        };
+        std::vector<VatsPart> vatsParts(const OFWorld::Ptr& target);
+        /// What the screen shows of a target: its name, how far it is from the player and its health
+        struct VatsTarget
+        {
+            std::string mName;
+            double mDistance = 0;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+        };
+        VatsTarget vatsTarget(const OFWorld::Ptr& target);
+        /// Whether the target can be aimed at in V.A.T.S.: a character or creature that is alive, in reach of the
+        /// weapon
+        bool vatsCanTarget(const OFWorld::Ptr& target);
+        struct VatsAttackResult
+        {
+            /// Why nothing was done: "points", "ammo", "range", "dead", "none" (no weapon or no such part); empty when
+            /// the attack was made
+            std::string mRefused;
+            bool mHit = false;
+            double mCost = 0;
+            double mChance = 0;
+            StrikeResult mStrike;
+        };
+        /// The player attacks the part of the target in V.A.T.S.: the action points are spent, the round used up and
+        /// the blow struck when the roll is below the chance. Main thread.
+        VatsAttackResult vatsAttack(const OFWorld::Ptr& target, int part);
+        /// V.A.T.S. is open or not (GetVATSMode answers it; the screen of Lua says it)
+        void setVatsOpen(bool open);
 
         /// What a character in a fight does about it, for the AI of the actors (main thread)
         struct FightStance
@@ -732,6 +790,10 @@ namespace OFScript
         std::vector<FalloutScript::FormId> recipesOf(FalloutScript::FormId category) override;
         bool recipe(FalloutScript::FormId id, FalloutScript::Recipe& result) override;
         bool allowed(FalloutScript::FormId recipe, FalloutScript::FormId crafter) override;
+        bool bodyParts(FalloutScript::FormId actor, std::vector<FalloutScript::BodyPart>& parts) override;
+        /// What the weapon says that V.A.T.S. needs, for the weapon a character holds (the hands when none)
+        FalloutScript::Vats::Weapon vatsWeapon(FalloutScript::FormId attacker);
+        const FalloutScript::Vats::Rules& vatsRules();
         /// Brings the rules of levelling up from the settings of the files, once they can be read
         void ensureLevellingRules();
         /// Hands out the points of the levels the player reached, brings the perks up to date and lets the effects of
@@ -915,6 +977,9 @@ namespace OFScript
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
         FalloutScript::Crafting mCrafting;
+        FalloutScript::Limbs mLimbs;
+        std::atomic<bool> mVatsOpen{ false };
+        std::optional<FalloutScript::Vats::Rules> mVatsRules;
         FalloutScript::Chargen mChargen;
         /// The screen the attributes were last started for
         std::uint32_t mChargenSeeded = 0;

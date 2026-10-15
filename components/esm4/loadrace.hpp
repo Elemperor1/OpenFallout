@@ -157,6 +157,7 @@ namespace ESM4
         std::uint32_t mNumKeywords;
 
         ESM::FormId mSkin; // TES5
+        ESM::FormId mBodyPartData; // GNAM, a BPTD (FO3/FONV/TES5)
         BodyTemplate mBodyTemplate; // TES5
 
         // FIXME: there's no fixed order?
