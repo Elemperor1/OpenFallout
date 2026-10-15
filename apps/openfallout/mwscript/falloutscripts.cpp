@@ -1361,7 +1361,8 @@ namespace OFScript
     FalloutScript::FormId FalloutScripts::itemScript(FalloutScript::FormId item)
     {
         const ESM::RefId id = refId(item);
-        const auto scriptOfRecord = [](const auto* record) { return record == nullptr ? 0 : numberOf(record->mScriptId); };
+        const auto scriptOfRecord
+            = [](const auto* record) { return record == nullptr ? 0 : numberOf(record->mScriptId); };
         if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(id))
             return scriptOfRecord(weapon);
         if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))

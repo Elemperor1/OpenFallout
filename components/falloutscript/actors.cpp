@@ -284,8 +284,7 @@ namespace FalloutScript
         interpreter.setHandler("DuplicateAllItems", [&state](CallContext& call) {
             std::vector<std::pair<FormId, int>> held;
             const FormId target = formArgument(call, 0);
-            if (call.mReference == 0 || target == 0 || target == call.mReference
-                || !state.items(call.mReference, held))
+            if (call.mReference == 0 || target == 0 || target == call.mReference || !state.items(call.mReference, held))
                 return 0.0;
             for (const auto& [item, count] : held)
                 state.addItem(target, item, count);

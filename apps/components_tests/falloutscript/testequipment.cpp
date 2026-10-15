@@ -17,12 +17,12 @@ namespace
     using namespace testing;
     using namespace FalloutScriptTest;
     using FalloutScript::ActorState;
-    using FalloutScript::BipedSlot::upperBody;
     using FalloutScript::Equipment;
     using FalloutScript::FormId;
     using FalloutScript::ItemInfo;
     using FalloutScript::ItemKind;
     using FalloutScript::ObjectScripts;
+    using FalloutScript::BipedSlot::upperBody;
     namespace BlockType = FalloutScript::BlockType;
     namespace BipedSlot = FalloutScript::BipedSlot;
 
@@ -91,7 +91,8 @@ namespace
 
         Wardrobe()
         {
-            for (const FormId item : { pistol, rifle, cartridge, buckshot, vest, helmet, jumpsuit, armoredSuit, stimpak })
+            for (const FormId item :
+                { pistol, rifle, cartridge, buckshot, vest, helmet, jumpsuit, armoredSuit, stimpak })
                 mState.addItem(guard, item, 1);
         }
     };
