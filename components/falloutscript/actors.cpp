@@ -192,7 +192,7 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    bool ActorState::setDead(FormId actor, bool dead, FormId killer)
+    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb)
     {
         if (actor == 0)
             return false;
@@ -206,10 +206,20 @@ namespace FalloutScript
                 mDeaths.push_back({ actor, killer });
             if (killer != 0)
                 mKillers[actor] = killer;
+            if (limb >= 0)
+                mKillingLimbs[actor] = limb;
             return true;
         }
         mKillers.erase(actor);
+        mKillingLimbs.erase(actor);
         return mDead.erase(actor) != 0;
+    }
+
+    int ActorState::killingLimb(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mKillingLimbs.find(actor);
+        return mDead.count(actor) != 0 && found != mKillingLimbs.end() ? found->second : -1;
     }
 
     FormId ActorState::killerOf(FormId actor) const

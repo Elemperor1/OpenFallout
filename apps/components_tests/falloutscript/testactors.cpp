@@ -293,6 +293,21 @@ namespace
         EXPECT_FALSE(state.isDead(0));
     }
 
+    TEST(FalloutScriptActorStateTest, the_killing_blow_is_kept_with_the_death)
+    {
+        FakeRecords records;
+        ActorState state(records);
+
+        EXPECT_EQ(state.killingLimb(guard), -1);
+        state.setDead(guard, true, 0x01000200, 3);
+        EXPECT_EQ(state.killingLimb(guard), 3);
+        // Back to life, the blow is forgotten, and a death that no blow caused has none
+        state.setDead(guard, false);
+        EXPECT_EQ(state.killingLimb(guard), -1);
+        state.setDead(guard, true);
+        EXPECT_EQ(state.killingLimb(guard), -1);
+    }
+
     TEST(FalloutScriptActorStateTest, the_dead_are_counted_by_the_form_they_were_made_from)
     {
         FakeRecords records;

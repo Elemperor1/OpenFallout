@@ -66,8 +66,11 @@ namespace FalloutScript
         bool isDead(FormId actor) const;
         /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
         /// is told in takeDeaths(). True when this call changed the state: of two calls at once that kill the same
-        /// actor, only one gets true.
-        bool setDead(FormId actor, bool dead, FormId killer = 0);
+        /// actor, only one gets true. `limb` is the part of the body the killing blow struck, -1 when none did (a
+        /// script killed the actor) or it is not known.
+        bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1);
+        /// The part of the body that the killing blow struck, -1 when the actor is alive or none did
+        int killingLimb(FormId actor) const;
         /// Who killed the actor, 0 when it is alive or the killer is not known
         FormId killerOf(FormId actor) const;
 
@@ -133,6 +136,7 @@ namespace FalloutScript
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
         std::map<FormId, FormId> mKillers;
+        std::map<FormId, int> mKillingLimbs;
         std::vector<Death> mDeaths;
         std::vector<ItemChange> mChanges;
     };

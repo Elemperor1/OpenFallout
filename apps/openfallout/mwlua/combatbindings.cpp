@@ -74,7 +74,11 @@ namespace OFLua
             return list;
         };
         api["start"] = [](std::string_view actor, std::string_view target) {
-            scripts().combat().start(parseId(actor), parseId(target));
+            // A dead character fights no one and is not fought, and one that is out does not start a fight
+            const FormId first = parseId(actor);
+            const FormId second = parseId(target);
+            if (FalloutScript::mayStartFight(scripts().combat(), scripts().actors(), first, second))
+                scripts().combat().start(first, second);
         };
         api["stop"] = [](std::string_view actor) { scripts().combat().stop(parseId(actor)); };
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };

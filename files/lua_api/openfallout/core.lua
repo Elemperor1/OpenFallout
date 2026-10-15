@@ -1392,7 +1392,7 @@
 -- @return #list<#string>
 
 ---
--- Makes the actor fight the target.
+-- Makes the actor fight the target. Nothing happens when either is dead, or when the actor is unconscious.
 -- @function [parent=#Combat] start
 -- @param #string actor
 -- @param #string target

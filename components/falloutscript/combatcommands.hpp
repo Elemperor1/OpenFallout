@@ -30,6 +30,9 @@ namespace FalloutScript
     CombatState::Relation relationOfActors(
         CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor, FormId target);
 
+    /// Whether the actor can start a fight against the target: neither is dead and the actor is not out (unconscious)
+    bool mayStartFight(const CombatState& combat, const ActorState& actors, FormId actor, FormId target);
+
     /// Whether the character does not die of damage: a script made it so (for the character or the form it was made
     /// from) or its record says so
     bool isEssential(CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor);

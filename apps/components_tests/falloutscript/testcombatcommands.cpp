@@ -178,6 +178,29 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptCombatCommandsTest, no_fight_starts_with_the_dead_or_by_a_character_that_is_out)
+    {
+        Runner setup;
+        setup.mActors.setDead(raider, true);
+        setup.mCombat.setUnconscious(ghoul, true);
+        ScriptBuilder builder;
+        const std::uint16_t dead = builder.form(raider);
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpStartCombat, oneArg(dead))
+            + setTo(var('s', 1), callToken(OpIsInCombat, arguments(0))) + end());
+        builder.variable(1, integerVariable, "againstTheDead");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_THAT(setup.mCombat.takeChanges(), IsEmpty());
+        EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, guard, raider));
+        EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, raider, guard));
+        EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, ghoul, guard));
+        // A character that is out can still be fought
+        EXPECT_TRUE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, guard, ghoul));
+        EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, guard, guard));
+    }
+
     TEST(FalloutScriptCombatCommandsTest, a_script_tells_who_fights_the_character)
     {
         Runner setup;
@@ -473,7 +496,12 @@ namespace
         EXPECT_EQ(setup.variable(3), -1); // it lives
         EXPECT_EQ(setup.variable(4), 1);
 
+        // A death that no blow brought about has no killing blow, whatever hit the character before
         setup.mActors.setDead(guard, true, raider);
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+        EXPECT_EQ(setup.variable(3), -1);
+        setup.mActors.setDead(guard, false);
+        setup.mActors.setDead(guard, true, raider, 2);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(3), 2);
 

@@ -1634,6 +1634,11 @@ namespace OFScript
         const double bonus = attacker != 0 ? mActorValues.current(attacker, AV::meleeDamage) : 0.0;
         const FalloutScript::HitResult hit
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
+
+        // The blows come one after the other from here: a blow that comes late for a death changes nothing
+        const std::lock_guard strikeLock(mStrikeMutex);
+        if (mActors.isDead(victim))
+            return result;
         result.mHit = true;
         result.mDamage = hit.mDamage;
         result.mCritical = hit.mCritical;
@@ -1652,9 +1657,9 @@ namespace OFScript
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0)
             {
-                if (!mCombat.inCombat(victim))
+                if (!mCombat.inCombat(victim) && FalloutScript::mayStartFight(mCombat, mActors, victim, attacker))
                     mCombat.start(victim, attacker);
-                if (!mCombat.inCombat(attacker))
+                if (!mCombat.inCombat(attacker) && FalloutScript::mayStartFight(mCombat, mActors, attacker, victim))
                     mCombat.start(attacker, victim);
             }
             return result;
@@ -1672,7 +1677,7 @@ namespace OFScript
         else
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
-            result.mKilled = mActors.setDead(victim, true, attacker);
+            result.mKilled = mActors.setDead(victim, true, attacker, limb);
         }
         return result;
     }

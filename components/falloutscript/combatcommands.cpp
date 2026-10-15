@@ -76,6 +76,12 @@ namespace FalloutScript
         return ally ? CombatState::Relation::Ally : CombatState::Relation::Neutral;
     }
 
+    bool mayStartFight(const CombatState& combat, const ActorState& actors, FormId actor, FormId target)
+    {
+        return actor != 0 && target != 0 && actor != target && !actors.isDead(actor) && !actors.isDead(target)
+            && !combat.unconscious(actor);
+    }
+
     bool isEssential(CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor)
     {
         if (actor == 0)
@@ -91,8 +97,10 @@ namespace FalloutScript
 
     void addCombatCommands(Interpreter& interpreter, CombatState& combat, ActorState& actors, CombatWorld& world)
     {
-        interpreter.setHandler("StartCombat", [&combat](CallContext& call) {
-            combat.start(call.mReference, formArgument(call, 0));
+        interpreter.setHandler("StartCombat", [&combat, &actors](CallContext& call) {
+            const FormId target = formArgument(call, 0);
+            if (mayStartFight(combat, actors, call.mReference, target))
+                combat.start(call.mReference, target);
             return 0.0;
         });
         interpreter.setHandler("StopCombat", [&combat](CallContext& call) {
@@ -216,11 +224,9 @@ namespace FalloutScript
             CombatState::Hit hit;
             return call.mReference != 0 && combat.lastHit(call.mReference, hit) ? static_cast<double>(hit.mLimb) : -1.0;
         });
-        interpreter.setHandler("GetKillingBlowLimb", [&combat, &actors](CallContext& call) {
-            CombatState::Hit hit;
-            return call.mReference != 0 && actors.isDead(call.mReference) && combat.lastHit(call.mReference, hit)
-                ? static_cast<double>(hit.mLimb)
-                : -1.0;
+        // The part that the blow which killed the character struck: a death that a script brought about has none
+        interpreter.setHandler("GetKillingBlowLimb", [&actors](CallContext& call) {
+            return call.mReference != 0 ? static_cast<double>(actors.killingLimb(call.mReference)) : -1.0;
         });
         interpreter.setHandler("GetLastHitCritical", [&combat](CallContext& call) {
             CombatState::Hit hit;
