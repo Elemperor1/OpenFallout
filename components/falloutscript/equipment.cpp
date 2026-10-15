@@ -49,7 +49,15 @@ namespace FalloutScript
         if (!mRecords.startingArmor(actor, armor))
             return worn;
         worn.mSeeded = true;
+        // What was put on before the host could tell stays on, over what the character started in
         std::uint32_t covered = 0;
+        for (const FormId item : worn.mArmor)
+        {
+            ItemInfo info;
+            if (mRecords.itemInfo(item, info))
+                covered |= info.mSlots;
+        }
+        std::vector<FormId> starting;
         for (const FormId item : armor)
         {
             ItemInfo info;
@@ -59,8 +67,9 @@ namespace FalloutScript
             if ((info.mSlots & covered) != 0)
                 continue;
             covered |= info.mSlots;
-            wearArmor(actor, worn, item, info, false);
+            starting.push_back(item);
         }
+        worn.mArmor.insert(worn.mArmor.begin(), starting.begin(), starting.end());
         return worn;
     }
 

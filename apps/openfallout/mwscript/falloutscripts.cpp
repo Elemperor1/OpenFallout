@@ -24,6 +24,7 @@
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadgmst.hpp>
+#include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadmisc.hpp>
@@ -409,6 +410,8 @@ namespace OFScript
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
+            // What the blocks of the menu did to the items is told while it is open, not when it is closed
+            raiseItemEvents();
             const FalloutScript::BlockFilter filter
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
@@ -1363,6 +1366,11 @@ namespace OFScript
             info.mWeight = ingredient->mData.weight;
             return true;
         }
+        if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(id))
+        {
+            info.mWeight = mod->mData.mWeight;
+            return true;
+        }
         return false;
     }
 
@@ -1380,12 +1388,19 @@ namespace OFScript
         if (npc == nullptr || !npc->mIsFONV)
             return true;
         // What the character is shown wearing: the armor of its inventory and of the lists in it, chosen with the seed
-        // of the reference and the level that the cell uses
+        // of the reference and the level that the cell uses, of which the pieces that show are worn (one that covers
+        // no part of the body, or has no model for its sex, is not)
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         const OFClass::StoreWornArmorSource source(mStore);
-        for (const ESM4::Armor* piece : ESM4::wornArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed))
-            if (piece != nullptr)
-                armor.push_back(numberOf(piece->mId));
+        const auto chain = ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+        const ESM4::Npc* traitsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseTraits);
+        if (traitsOwner == nullptr)
+            traitsOwner = npc;
+        const bool female = (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0;
+        const ESM4::WornPieces worn
+            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed), female);
+        for (const ESM4::WornPiece& piece : worn.mPieces)
+            armor.push_back(numberOf(piece.mArmor->mId));
         return true;
     }
 
@@ -1408,6 +1423,8 @@ namespace OFScript
             return scriptOfRecord(book);
         if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(id))
             return scriptOfRecord(ingredient);
+        if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(id))
+            return scriptOfRecord(mod);
         return 0;
     }
 

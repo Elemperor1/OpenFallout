@@ -279,6 +279,23 @@ namespace
         EXPECT_THAT(setup.mEquipment.takeChanges(), IsEmpty());
     }
 
+    TEST(FalloutScriptEquipmentTest, what_was_put_on_before_the_host_could_tell_is_not_taken_off_by_the_start)
+    {
+        Wardrobe setup;
+        setup.mRecords.mStartingArmor[guard] = { vest, helmet };
+        setup.mRecords.mStartingKnown = false;
+
+        EXPECT_EQ(setup.mEquipment.equip(guard, jumpsuit), Equipment::Outcome::Equipped);
+        setup.mRecords.mStartingKnown = true;
+
+        // The jumpsuit covers what the vest does, so the vest stays in the bag, and the helmet comes before it
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(helmet, jumpsuit));
+        const std::vector<Equipment::WornChange> changes = setup.mEquipment.takeChanges();
+        ASSERT_EQ(changes.size(), 1u);
+        EXPECT_EQ(changes[0].mItem, jumpsuit);
+        EXPECT_TRUE(changes[0].mWorn);
+    }
+
     TEST(FalloutScriptEquipmentTest, a_character_the_host_can_not_tell_about_yet_is_asked_again)
     {
         Wardrobe setup;
