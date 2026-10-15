@@ -17,6 +17,8 @@ namespace FalloutScript
         mTargets.clear();
         mAlert.clear();
         mUnconscious.clear();
+        mWakeTimers.clear();
+        mWoken.clear();
         mRestrained.clear();
         mEssential.clear();
         mRelations.clear();
@@ -111,13 +113,28 @@ namespace FalloutScript
         return mAlert.count(actor) != 0;
     }
 
-    void CombatState::setUnconscious(FormId actor, bool unconscious)
+    void CombatState::setUnconscious(FormId actor, bool unconscious, float wakeAfter)
     {
         const std::lock_guard lock(mMutex);
         if (unconscious)
+        {
             mUnconscious.insert(actor);
+            if (wakeAfter > 0)
+                mWakeTimers[actor] = wakeAfter;
+        }
         else
+        {
             mUnconscious.erase(actor);
+            mWakeTimers.erase(actor);
+        }
+    }
+
+    std::vector<FormId> CombatState::takeWoken()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<FormId> woken;
+        woken.swap(mWoken);
+        return woken;
     }
 
     bool CombatState::unconscious(FormId actor) const
@@ -205,6 +222,18 @@ namespace FalloutScript
         {
             it->second -= seconds;
             it = it->second <= 0 ? mAttacked.erase(it) : std::next(it);
+        }
+        for (auto it = mWakeTimers.begin(); it != mWakeTimers.end();)
+        {
+            it->second -= seconds;
+            if (it->second <= 0)
+            {
+                mUnconscious.erase(it->first);
+                mWoken.push_back(it->first);
+                it = mWakeTimers.erase(it);
+            }
+            else
+                ++it;
         }
     }
 

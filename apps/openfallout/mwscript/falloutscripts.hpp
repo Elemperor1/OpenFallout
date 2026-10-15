@@ -754,11 +754,8 @@ namespace OFScript
         /// The blows are rolled for from any thread
         std::mutex mCombatRandomMutex;
         std::mt19937 mCombatRandom;
-        /// The essential characters that fell unconscious, with the seconds until they get up
-        std::mutex mDownedMutex;
         /// One blow at a time reaches the health and the fights of a character
         std::mutex mStrikeMutex;
-        std::map<FalloutScript::FormId, float> mDowned;
         /// The date the world starts at (the initial values of GameYear, GameMonth and GameDay), read when the first
         /// date global is asked for
         struct CalendarStart

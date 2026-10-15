@@ -147,6 +147,44 @@ namespace
         EXPECT_THAT(state.takeChanges(), IsEmpty());
     }
 
+    TEST(FalloutScriptCombatStateTest, an_unconscious_actor_gets_up_by_itself_when_the_time_has_passed)
+    {
+        CombatState state;
+        state.setUnconscious(guard, true, 15.f);
+        state.setUnconscious(raider, true);
+
+        state.advance(10.f);
+        EXPECT_TRUE(state.unconscious(guard));
+        EXPECT_THAT(state.takeWoken(), IsEmpty());
+        state.advance(6.f);
+        EXPECT_FALSE(state.unconscious(guard));
+        EXPECT_THAT(state.takeWoken(), ElementsAre(guard));
+        // Told once, and an actor with no time stays where it is
+        EXPECT_THAT(state.takeWoken(), IsEmpty());
+        state.advance(100.f);
+        EXPECT_TRUE(state.unconscious(raider));
+        EXPECT_THAT(state.takeWoken(), IsEmpty());
+    }
+
+    TEST(FalloutScriptCombatStateTest, waking_an_actor_early_cancels_the_time_it_had)
+    {
+        CombatState state;
+        state.setUnconscious(guard, true, 15.f);
+        state.setUnconscious(guard, false);
+        // Put out again by a script, with no time: the old time does not get it up
+        state.setUnconscious(guard, true);
+        state.advance(20.f);
+
+        EXPECT_TRUE(state.unconscious(guard));
+        EXPECT_THAT(state.takeWoken(), IsEmpty());
+
+        // Put out again without a time while it has one: the time it has stays
+        state.setUnconscious(raider, true, 5.f);
+        state.setUnconscious(raider, true);
+        state.advance(6.f);
+        EXPECT_THAT(state.takeWoken(), ElementsAre(raider));
+    }
+
     TEST(FalloutScriptCombatStateTest, a_hit_actor_counts_as_attacked_for_a_short_time)
     {
         CombatState state;

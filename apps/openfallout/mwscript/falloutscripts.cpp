@@ -362,10 +362,6 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
-        {
-            const std::lock_guard lock(mDownedMutex);
-            mDowned.clear();
-        }
         mItemHolders.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -1686,9 +1682,7 @@ namespace OFScript
             return false;
         // Nobody goes for a target that is out
         mCombat.withdraw(victim);
-        mCombat.setUnconscious(victim, true);
-        const std::lock_guard lock(mDownedMutex);
-        mDowned[victim] = essentialDownSeconds;
+        mCombat.setUnconscious(victim, true, essentialDownSeconds);
         return true;
     }
 
@@ -1697,27 +1691,9 @@ namespace OFScript
         namespace BlockType = FalloutScript::BlockType;
         mCombat.advance(frametime);
 
-        // Essential characters that were down long enough get up with their health back
-        std::vector<FalloutScript::FormId> risen;
-        {
-            const std::lock_guard lock(mDownedMutex);
-            for (auto it = mDowned.begin(); it != mDowned.end();)
-            {
-                it->second -= frametime;
-                if (it->second <= 0)
-                {
-                    risen.push_back(it->first);
-                    it = mDowned.erase(it);
-                }
-                else
-                    ++it;
-            }
-        }
-        for (const FalloutScript::FormId actor : risen)
-        {
-            mCombat.setUnconscious(actor, false);
+        // Essential characters that were down long enough got up (nobody woke them before) with their health back
+        for (const FalloutScript::FormId actor : mCombat.takeWoken())
             mActorValues.heal(actor, FalloutScript::ActorValue::health);
-        }
 
         // A block that names a form is for that form, or for a character made from that record
         const auto namesActor = [this](FalloutScript::FormId actor) {

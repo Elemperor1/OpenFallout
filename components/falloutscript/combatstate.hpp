@@ -44,8 +44,13 @@ namespace FalloutScript
         void setAlert(FormId actor, bool alert);
         bool alert(FormId actor) const;
 
-        void setUnconscious(FormId actor, bool unconscious);
+        /// An actor that is unconscious fights no one. With `wakeAfter` (seconds, more than 0) it gets up by itself
+        /// when the time has passed (advance(), then takeWoken()); waking it before cancels that. Making an actor that
+        /// is unconscious so again without a time leaves the time it has.
+        void setUnconscious(FormId actor, bool unconscious, float wakeAfter = 0);
         bool unconscious(FormId actor) const;
+        /// The actors that got up by themselves since this was last called
+        std::vector<FormId> takeWoken();
         void setRestrained(FormId actor, bool restrained);
         bool restrained(FormId actor) const;
 
@@ -111,6 +116,8 @@ namespace FalloutScript
         std::map<FormId, FormId> mTargets;
         std::set<FormId> mAlert;
         std::set<FormId> mUnconscious;
+        std::map<FormId, float> mWakeTimers;
+        std::vector<FormId> mWoken;
         std::set<FormId> mRestrained;
         std::map<FormId, bool> mEssential;
         std::map<std::pair<FormId, FormId>, Relation> mRelations;

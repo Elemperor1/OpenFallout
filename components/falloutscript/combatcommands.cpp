@@ -109,9 +109,7 @@ namespace FalloutScript
         });
         interpreter.setHandler("StopCombatAlarmOnActor", [&combat](CallContext& call) {
             // The alarm is over for the actor: it stops, and so does everyone who went for it
-            combat.stop(call.mReference);
-            for (const FormId attacker : combat.attackersOf(call.mReference))
-                combat.stop(attacker);
+            combat.withdraw(call.mReference);
             return 0.0;
         });
         interpreter.setHandler("IsInCombat", [&combat](CallContext& call) {
