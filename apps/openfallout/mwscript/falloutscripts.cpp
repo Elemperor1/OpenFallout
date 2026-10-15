@@ -178,6 +178,10 @@ namespace OFScript
         , mRandom(std::random_device()())
         , mCombatRandom(std::random_device()())
     {
+        // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
+        // character whose health is gone and who is essential falls instead
+        mActors.setDeathListener([this](FalloutScript::FormId actor) { mCombat.withdraw(actor); });
+        mActors.setFallHandler([this](FalloutScript::FormId actor) { return fallsInsteadOfDying(actor); });
         FalloutScript::addQuestCommands(mInterpreter, mQuests);
         FalloutScript::addObjectCommands(
             mInterpreter, mObjects, *this, [this] { return std::uniform_int_distribution<int>(0, 99)(mRandom); });
@@ -1666,21 +1670,26 @@ namespace OFScript
             return result;
         }
 
-        // Nobody goes for a target that is out
-        mCombat.withdraw(victim);
-        if (FalloutScript::isEssential(mCombat, mActors, *this, victim))
-        {
-            mCombat.setUnconscious(victim, true);
-            const std::lock_guard lock(mDownedMutex);
-            mDowned[victim] = essentialDownSeconds;
+        if (fallsInsteadOfDying(victim))
             result.mDowned = true;
-        }
         else
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
             result.mKilled = mActors.setDead(victim, true, attacker, limb);
         }
         return result;
+    }
+
+    bool FalloutScripts::fallsInsteadOfDying(FalloutScript::FormId victim)
+    {
+        if (!FalloutScript::isEssential(mCombat, mActors, *this, victim))
+            return false;
+        // Nobody goes for a target that is out
+        mCombat.withdraw(victim);
+        mCombat.setUnconscious(victim, true);
+        const std::lock_guard lock(mDownedMutex);
+        mDowned[victim] = essentialDownSeconds;
+        return true;
     }
 
     void FalloutScripts::raiseCombatEvents(float frametime)
@@ -1731,10 +1740,8 @@ namespace OFScript
                     });
             }
         }
-        // However a character died (a blow, KillActor, damage to its health), its fights are over
         for (const FalloutScript::ActorState::Death& death : mActors.takeDeaths())
         {
-            mCombat.withdraw(death.mActor);
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
         }
         for (const FalloutScript::CombatState::Change& change : mCombat.takeChanges())

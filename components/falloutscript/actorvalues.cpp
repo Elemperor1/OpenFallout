@@ -291,8 +291,9 @@ namespace FalloutScript
                     return 0.0;
                 }
                 values.damage(call.mReference, value, argument(call, 1));
-                // A character with no health left is dead
-                if (value == ActorValue::health && values.current(call.mReference, value) <= 0)
+                // A character with no health left is dead, unless it is one that falls (an essential one)
+                if (value == ActorValue::health && values.current(call.mReference, value) <= 0
+                    && !actors.falls(call.mReference))
                     actors.setDead(call.mReference, true);
                 return 0.0;
             });

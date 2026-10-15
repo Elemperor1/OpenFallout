@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ACTORS_H
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -71,6 +72,16 @@ namespace FalloutScript
         bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1);
         /// The part of the body that the killing blow struck, -1 when the actor is alive or none did
         int killingLimb(FormId actor) const;
+
+        /// What the host does at the moment an actor dies (setDead(true) that changed the state), once per death and
+        /// with no lock held: it ends the fights of the actor there, not when the death is told, which may be after the
+        /// actor was brought back. Set before scripts run.
+        void setDeathListener(std::function<void(FormId)> listener);
+        /// What the host says to a character whose health scripts took to nothing: true when it falls and is up again
+        /// later (an essential character) and does not die. Set before scripts run.
+        void setFallHandler(std::function<bool(FormId)> handler);
+        /// Asks the handler; false (the actor dies) when there is none
+        bool falls(FormId actor);
         /// Who killed the actor, 0 when it is alive or the killer is not known
         FormId killerOf(FormId actor) const;
 
@@ -139,6 +150,8 @@ namespace FalloutScript
         std::map<FormId, int> mKillingLimbs;
         std::vector<Death> mDeaths;
         std::vector<ItemChange> mChanges;
+        std::function<void(FormId)> mDeathListener;
+        std::function<bool(FormId)> mFallHandler;
     };
 
     /// Gives the commands about items, deaths and factions to the interpreter: AddItem, AddItemHealthPercent,

@@ -449,6 +449,9 @@ namespace OFScript
         /// Runs the OnHit, OnHitWith, OnDeath and OnCombatEnd blocks for what happened in the fights since the last
         /// frame, wakes the essential characters that were down long enough, and lets the time of the fights pass
         void raiseCombatEvents(float frametime);
+        /// A character whose health is gone: an essential one is put out of its fights and lies unconscious until it
+        /// gets up (true), any other one dies (false, nothing is done). Any thread.
+        bool fallsInsteadOfDying(FalloutScript::FormId victim);
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
         std::optional<double> derivedValue(

@@ -197,25 +197,46 @@ namespace FalloutScript
     {
         if (actor == 0)
             return false;
-        const std::lock_guard lock(mMutex);
         if (dead)
         {
-            if (!mDead.insert(actor).second)
-                return false;
-            constexpr std::size_t mostDeaths = 1024;
-            if (mDeaths.size() < mostDeaths)
-                mDeaths.push_back({ actor, killer });
-            if (killer != 0)
-                mKillers[actor] = killer;
-            // A death that no blow caused has no part of the body
-            mKillingLimbs.erase(actor);
-            if (limb >= 0)
-                mKillingLimbs[actor] = limb;
+            {
+                const std::lock_guard lock(mMutex);
+                if (!mDead.insert(actor).second)
+                    return false;
+                constexpr std::size_t mostDeaths = 1024;
+                if (mDeaths.size() < mostDeaths)
+                    mDeaths.push_back({ actor, killer });
+                if (killer != 0)
+                    mKillers[actor] = killer;
+                // A death that no blow caused has no part of the body
+                mKillingLimbs.erase(actor);
+                if (limb >= 0)
+                    mKillingLimbs[actor] = limb;
+            }
+            // The host reacts to the death as it happens, with the lock free
+            if (mDeathListener)
+                mDeathListener(actor);
             return true;
         }
+        const std::lock_guard lock(mMutex);
         mKillers.erase(actor);
         mKillingLimbs.erase(actor);
         return mDead.erase(actor) != 0;
+    }
+
+    void ActorState::setDeathListener(std::function<void(FormId)> listener)
+    {
+        mDeathListener = std::move(listener);
+    }
+
+    void ActorState::setFallHandler(std::function<bool(FormId)> handler)
+    {
+        mFallHandler = std::move(handler);
+    }
+
+    bool ActorState::falls(FormId actor)
+    {
+        return actor != 0 && mFallHandler && mFallHandler(actor);
     }
 
     int ActorState::killingLimb(FormId actor) const

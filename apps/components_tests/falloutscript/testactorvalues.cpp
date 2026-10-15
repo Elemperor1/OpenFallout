@@ -433,6 +433,25 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptActorValueCommandsTest, damage_does_not_kill_a_character_that_falls_instead)
+    {
+        Runner setup;
+        setup.mActors.setFallHandler([](FormId actor) { return actor == guard; });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100))
+            + setTo(var('s', 1), callToken(OpGetDead, arguments(0)))
+            + setTo(var('f', 2), callToken(OpGetActorValue, valueOnly(ActorValue::health))) + end());
+        builder.variable(1, 1, "dead").variable(2, 0, "health");
+
+        setup.run(guard, builder);
+
+        EXPECT_EQ(setup.variable(guard, 1), 0);
+        EXPECT_EQ(setup.variable(guard, 2), 0);
+        EXPECT_FALSE(setup.mActors.isDead(guard));
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
     TEST(FalloutScriptActorValueCommandsTest, a_character_killed_by_a_script_has_no_health_left)
     {
         Runner setup;

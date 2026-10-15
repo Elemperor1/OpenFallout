@@ -308,6 +308,43 @@ namespace
         EXPECT_EQ(state.killingLimb(guard), -1);
     }
 
+    TEST(FalloutScriptActorStateTest, the_host_is_told_of_a_death_as_it_happens_and_once)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::vector<FormId> told;
+        bool deadWhenTold = false;
+        state.setDeathListener([&](FormId actor) {
+            told.push_back(actor);
+            // The state can be asked from the listener: no lock is held
+            deadWhenTold = state.isDead(actor);
+        });
+
+        state.setDead(guard, true);
+        EXPECT_THAT(told, ElementsAre(guard));
+        EXPECT_TRUE(deadWhenTold);
+        // Nothing changed, nothing is told; neither is a revival
+        state.setDead(guard, true);
+        state.setDead(guard, false);
+        EXPECT_THAT(told, ElementsAre(guard));
+        // A death after the revival is a new one, and so many deaths between two frames are all told
+        state.setDead(guard, true);
+        for (FormId actor = 0x01001000; actor < 0x01001000 + 1100; ++actor)
+            state.setDead(actor, true);
+        EXPECT_EQ(told.size(), 2u + 1100u);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_character_falls_only_when_the_host_says_so)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        EXPECT_FALSE(state.falls(guard));
+        state.setFallHandler([](FormId actor) { return actor == guard; });
+        EXPECT_TRUE(state.falls(guard));
+        EXPECT_FALSE(state.falls(guard + 1));
+        EXPECT_FALSE(state.falls(0));
+    }
+
     TEST(FalloutScriptActorStateTest, a_new_game_forgets_the_killing_blows_of_the_old_one)
     {
         FakeRecords records;
