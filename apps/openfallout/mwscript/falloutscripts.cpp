@@ -426,9 +426,11 @@ namespace OFScript
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
         updateFurniture();
+        // What the items did since the last frame is told before any block of this frame runs, so that an AddItem or
+        // EquipItem of a trigger block is told in the next frame
+        raiseItemEvents();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
-        raiseItemEvents();
         mQuests.update(frametime);
         mObjects.update();
     }
@@ -1296,16 +1298,17 @@ namespace OFScript
         };
         if (base.isZeroOrUnset())
             return true;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(holder), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
-                take(owner->mInventory);
+            // The inventory is the one of the record that has it: a template that a levelled list of characters gives
+            // is followed with the seed of the reference, as the armor the character is shown wearing is
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseInventory, seed).mInventory);
             // The armor that the levelled lists of the inventory give is carried as well, as many of each piece as
             // they gave, whether the character can wear it or not (what is worn is for startingArmor to say). The
             // pieces that the inventory lists itself are in it already.
             if (npc->mIsFONV)
             {
-                const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(holder), base);
                 const OFClass::StoreWornArmorSource source(mStore);
                 for (const ESM4::ListedArmor& given :
                     ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed).mFromLists)
@@ -1324,8 +1327,7 @@ namespace OFScript
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseInventory))
-                take(owner->mInventory);
+            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed).mInventory);
         }
         else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
             take(container->mInventory);
