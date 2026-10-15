@@ -1617,8 +1617,11 @@ namespace OFScript
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
-        // The dead strike no blows
-        if (victim == 0 || victim == attacker || mActors.isDead(victim) || (attacker != 0 && mActors.isDead(attacker)))
+        // The dead and the unconscious strike no blows
+        const auto cannotStrike = [this](FalloutScript::FormId actor) {
+            return actor != 0 && (mActors.isDead(actor) || mCombat.unconscious(actor));
+        };
+        if (victim == 0 || victim == attacker || mActors.isDead(victim) || cannotStrike(attacker))
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
@@ -1638,7 +1641,7 @@ namespace OFScript
 
         // The blows come one after the other from here: a blow that comes late for a death changes nothing
         const std::lock_guard strikeLock(mStrikeMutex);
-        if (mActors.isDead(victim) || (attacker != 0 && mActors.isDead(attacker)))
+        if (mActors.isDead(victim) || cannotStrike(attacker))
             return result;
         result.mHit = true;
         result.mDamage = hit.mDamage;
@@ -1704,7 +1707,11 @@ namespace OFScript
                     || (base != 0 && block.mForm == base);
             };
         };
-        for (const FalloutScript::CombatState::HitEvent& event : mCombat.takeHits())
+        // What the scripts of this frame cause waits for the next one: the queues are taken before any block runs
+        const std::vector<FalloutScript::CombatState::HitEvent> hits = mCombat.takeHits();
+        const std::vector<FalloutScript::ActorState::Death> deaths = mActors.takeDeaths();
+        const std::vector<FalloutScript::CombatState::Change> changes = mCombat.takeChanges();
+        for (const FalloutScript::CombatState::HitEvent& event : hits)
         {
             mObjects.trigger(event.mVictim, BlockType::OnHit, event.mHit.mAttacker, namesActor(event.mHit.mAttacker));
             if (event.mHit.mWeapon != 0)
@@ -1716,11 +1723,11 @@ namespace OFScript
                     });
             }
         }
-        for (const FalloutScript::ActorState::Death& death : mActors.takeDeaths())
+        for (const FalloutScript::ActorState::Death& death : deaths)
         {
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
         }
-        for (const FalloutScript::CombatState::Change& change : mCombat.takeChanges())
+        for (const FalloutScript::CombatState::Change& change : changes)
         {
             if (change.mTarget == 0)
                 mObjects.trigger(change.mActor, BlockType::OnCombatEnd, change.mWas, namesActor(change.mWas));

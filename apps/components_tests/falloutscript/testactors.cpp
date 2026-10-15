@@ -11,6 +11,7 @@
 
 #include <map>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -332,6 +333,48 @@ namespace
         for (FormId actor = 0x01001000; actor < 0x01001000 + 1100; ++actor)
             state.setDead(actor, true);
         EXPECT_EQ(told.size(), 2u + 1100u);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_revival_waits_for_the_cleanup_of_the_death)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::mutex mutex;
+        std::condition_variable changed;
+        bool inListener = false;
+        bool release = false;
+        bool revived = false;
+        state.setDeathListener([&](FormId) {
+            std::unique_lock lock(mutex);
+            inListener = true;
+            changed.notify_all();
+            // Nobody gets out before the test says so (or the test is lost)
+            changed.wait_for(lock, std::chrono::seconds(5), [&] { return release; });
+        });
+
+        std::thread killer([&] { state.setDead(guard, true); });
+        {
+            std::unique_lock lock(mutex);
+            ASSERT_TRUE(changed.wait_for(lock, std::chrono::seconds(5), [&] { return inListener; }));
+        }
+        // The actor is dead as soon as the state changed; the revival has to wait for the listener to end
+        EXPECT_TRUE(state.isDead(guard));
+        std::thread reviver([&] {
+            state.setDead(guard, false);
+            const std::lock_guard lock(mutex);
+            revived = true;
+            changed.notify_all();
+        });
+        {
+            std::unique_lock lock(mutex);
+            EXPECT_FALSE(changed.wait_for(lock, std::chrono::milliseconds(100), [&] { return revived; }));
+            release = true;
+            changed.notify_all();
+        }
+        killer.join();
+        reviver.join();
+        EXPECT_TRUE(revived);
+        EXPECT_FALSE(state.isDead(guard));
     }
 
     TEST(FalloutScriptActorStateTest, a_character_falls_only_when_the_host_says_so)

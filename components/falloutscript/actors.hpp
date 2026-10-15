@@ -74,8 +74,9 @@ namespace FalloutScript
         int killingLimb(FormId actor) const;
 
         /// What the host does at the moment an actor dies (setDead(true) that changed the state), once per death and
-        /// with no lock held: it ends the fights of the actor there, not when the death is told, which may be after the
-        /// actor was brought back. Set before scripts run.
+        /// with the state unlocked (it can ask it, but not mark a death or a revival): it ends the fights of the actor
+        /// there, not when the death is told, which may be after the actor was brought back. A revival waits for the
+        /// listener of a death in progress, so it comes after the cleanup of the death. Set before scripts run.
         void setDeathListener(std::function<void(FormId)> listener);
         /// What the host says to a character whose health scripts took to nothing: true when it falls and is up again
         /// later (an essential character) and does not die. Set before scripts run.
@@ -144,6 +145,8 @@ namespace FalloutScript
         /// Scripts run on more than one thread (the frame and Lua); one at a time touches this, but the characters ask
         /// whether they are dead from the thread of the frame
         mutable std::mutex mMutex;
+        /// One death or revival at a time, from the change of the state to the end of the listener
+        std::mutex mTransitionMutex;
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
         std::map<FormId, FormId> mKillers;

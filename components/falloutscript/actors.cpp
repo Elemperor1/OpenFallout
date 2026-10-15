@@ -197,6 +197,7 @@ namespace FalloutScript
     {
         if (actor == 0)
             return false;
+        const std::lock_guard transition(mTransitionMutex);
         if (dead)
         {
             {
