@@ -143,6 +143,8 @@ namespace OFScript
         /// What characters carry, hold and wear. The inventory of the player is what scripts and pick-ups gave it.
         FalloutScript::ActorState& actors() { return mActors; }
         FalloutScript::Equipment& equipment() { return mEquipment; }
+        /// The reference of the player
+        FalloutScript::FormId playerReference() const { return mPlayer; }
         /// Who fights whom and how the characters stand to each other
         FalloutScript::CombatState& combat() { return mCombat; }
 
@@ -163,6 +165,65 @@ namespace OFScript
         /// blow is critical, a negative one is drawn at random. Any thread.
         StrikeResult strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
             FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1);
+
+        /// What the weapon that a character holds allows
+        struct WeaponStats
+        {
+            FalloutScript::FormId mWeapon = 0; // 0 for the hands
+            bool mMelee = true; // hands and melee weapons
+            bool mAutomatic = false;
+            double mRange = 0; // how far a blow or a shot reaches
+            double mInterval = 0.5; // the least seconds between two blows or shots
+            int mAmmoUse = 0; // rounds one attack uses, 0 for hands and melee weapons
+            FalloutScript::FormId mAmmo = 0; // the ammunition it uses, 0 for none
+            int mRounds = 0; // how many rounds the character has
+        };
+        /// Any thread.
+        WeaponStats weaponStats(FalloutScript::FormId attacker);
+
+        /// What an attack of the player or another character came to
+        struct FireResult
+        {
+            bool mFired = false; // false while the weapon is not ready again and when there is no ammunition
+            bool mOutOfAmmo = false;
+            bool mHit = false; // something was struck
+            StrikeResult mStrike; // what a character that was struck lost
+        };
+        /// The attacker attacks with the weapon it holds, at the target (empty when it struck nothing): a round is used
+        /// up, the weapon is not ready again for a time, and the target is struck as `strike` does when it is a
+        /// character or creature, and else only gets its OnHit and OnHitWith blocks run (a target that is an object has
+        /// no health). Main thread.
+        /// `chance` (0 to 1) is how likely the attack is to hit what it aims at: the player aims with the crosshair
+        /// and always does, a character is not so sure of its aim.
+        FireResult fire(FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb = -1, double chance = 1.0);
+
+        /// What a character in a fight does about it, for the AI of the actors (main thread)
+        struct FightStance
+        {
+            OFWorld::Ptr mTarget; // empty when the actor is at peace, or the fight ended (it is stopped then)
+            bool mFlee = false; // the actor runs away: its health is below what its confidence allows
+            bool mMelee = true; // the weapon it holds is a melee weapon or its hands
+            double mEngage = 0; // how far from the target it attacks from
+        };
+        /// What the actor does in the fight it is in: the target is the one the actor fights, or empty when it fights
+        /// no one, cannot fight (down, restrained, dead) or the target is gone (dead, down, disabled or not in a cell
+        /// that is loaded), and the fight is stopped then.
+        FightStance fightStance(const OFWorld::Ptr& actor);
+        /// A character that is about to fight takes the weapon that does the most damage of those it can use (a
+        /// character with no weapon and no melee weapon in its inventory fights with its hands), and draws it
+        void prepareFight(const OFWorld::Ptr& actor);
+        /// Whether the character, which is at peace, goes for the player when it sees it: from its aggression and how
+        /// its factions stand to the player. `radius` is how near the player has to be.
+        bool attacksPlayerOnSight(const OFWorld::Ptr& actor, float& radius);
+        /// The character goes for the player
+        void fightPlayer(const OFWorld::Ptr& actor);
+        /// The character attacks the target with the weapon it holds, as far as its skill allows it to hit. A
+        /// weapon that has no ammunition left is put away and the character takes another.
+        FireResult attack(const OFWorld::Ptr& attacker, const OFWorld::Ptr& target);
+        /// The character does not fight any more (it ran far enough from its target, or lost it)
+        void endFight(const OFWorld::Ptr& actor);
+        /// Whether the character may go for the player on sight at all: its aggression is more than none
+        bool isAggressive(const OFWorld::Ptr& actor);
 
         /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
         /// yet.
@@ -752,11 +813,28 @@ namespace OFScript
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)
         const std::map<std::string, double>& gameSettingValues();
+        /// The number a game setting has in the files (the names are not case sensitive), else the fallback
+        double gameSetting(std::string_view name, double fallback);
         std::optional<std::map<std::string, double>> mGameSettingValues;
         FalloutScript::CombatState mCombat;
         /// The blows are rolled for from any thread
         std::mutex mCombatRandomMutex;
         std::mt19937 mCombatRandom;
+        /// The seconds until a character can attack again
+        std::mutex mFireMutex;
+        std::map<FalloutScript::FormId, float> mFireCooldowns;
+        /// How a character behaves in a fight, from its AIDT (the record, or the template it takes it from)
+        struct FightTraits
+        {
+            int mAggression = 0;
+            int mConfidence = 2;
+            float mRadius = 0; // how near the player has to be for it to go for it; 0 when the AIDT has no radius
+        };
+        const FightTraits& fightTraitsOf(const OFWorld::Ptr& actor);
+        std::map<FalloutScript::FormId, FightTraits> mFightTraits;
+        /// How far a character sees another one (fSneakMaxDistance of the files, which is where the games stop looking
+        /// for a sneaking one; the light and the sneak skill of the target are not taken into account)
+        double sightDistance();
         /// One blow at a time reaches the health and the fights of a character
         std::mutex mStrikeMutex;
         /// The date the world starts at (the initial values of GameYear, GameMonth and GameDay), read when the first

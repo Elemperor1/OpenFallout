@@ -24,6 +24,9 @@ SAY_TO_DONE = 7
 ON_PACKAGE_START = 15 # the blocks of the events of the AI packages of a character
 ON_PACKAGE_DONE = 16
 ON_PACKAGE_CHANGE = 20
+ON_HIT = 8 # the blocks of the events of combat
+ON_DEATH = 10
+ON_START_COMBAT = 25
 ON_LOAD = 21
 ON_TRIGGER = 24 # the types of the blocks of a trigger volume
 ON_TRIGGER_ENTER = 26
@@ -110,6 +113,10 @@ SHOW_TRAIT_MENU = 0x1268
 GET_IN_CHARGEN = 0x127F
 GET_PC_IS_RACE = 0x1082
 GET_PC_IS_SEX = 0x1083
+EQUIP_ITEM = 0x10EE
+GET_EQUIPPED = 0x10B6
+IS_WEAPON_OUT = 0x1065
+IS_IN_COMBAT = 0x1121
 
 
 def u16(value):

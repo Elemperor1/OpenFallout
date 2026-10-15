@@ -11,6 +11,7 @@
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
+#include "object.hpp"
 
 namespace OFLua
 {
@@ -79,6 +80,43 @@ namespace OFLua
         };
         api["stop"] = [](std::string_view actor) { scripts().combat().stop(parseId(actor)); };
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };
+
+        // Whether the content is that of Fallout, which has combat to run (it is not for Morrowind's)
+        api["available"] = []() { return OFBase::Environment::get().getFalloutScripts() != nullptr; };
+
+        // The weapon the player holds and what it allows: the weapon ("" for the hands), whether it is a melee weapon,
+        // automatic, how far a blow or shot reaches, the least seconds between two, and the rounds the player has for
+        // it
+        api["weapon"] = [lua]() {
+            const OFScript::FalloutScripts::WeaponStats stats = scripts().weaponStats(scripts().playerReference());
+            sol::table row(lua, sol::create);
+            row["weapon"] = idText(stats.mWeapon);
+            row["melee"] = stats.mMelee;
+            row["automatic"] = stats.mAutomatic;
+            row["range"] = stats.mRange;
+            row["interval"] = stats.mInterval;
+            row["ammoUse"] = stats.mAmmoUse;
+            row["rounds"] = stats.mRounds;
+            return row;
+        };
+        // The player attacks with its weapon at the object the ray of its aim hit (nothing when it hit none): a round
+        // is used up, and a character or creature that was hit loses health. Nothing happens while the weapon is not
+        // ready again.
+        api["fire"] = [lua](sol::optional<LObject> target, sol::optional<int> limb) {
+            const OFScript::FalloutScripts::FireResult result = scripts().fire(
+                scripts().playerReference(), target ? target->ptr() : OFWorld::Ptr(), limb.value_or(-1));
+            sol::table row(lua, sol::create);
+            row["fired"] = result.mFired;
+            row["outOfAmmo"] = result.mOutOfAmmo;
+            row["hit"] = result.mHit;
+            row["damage"] = result.mStrike.mDamage;
+            row["critical"] = result.mStrike.mCritical;
+            row["killed"] = result.mStrike.mKilled;
+            row["downed"] = result.mStrike.mDowned;
+            return row;
+        };
+        // The player draws the weapon (or puts it away), for the scripts that ask whether it is out
+        api["setDrawn"] = [](bool drawn) { scripts().equipment().setWeaponDrawn(scripts().playerReference(), drawn); };
         return LuaUtil::makeReadOnly(api);
     }
 }
