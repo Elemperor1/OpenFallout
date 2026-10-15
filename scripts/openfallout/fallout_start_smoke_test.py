@@ -1436,7 +1436,7 @@ MOVING_FOOT_RAY = re.compile(r"OFTEST\trender ray (foot(?:walk|run|stand)) hit=\
 # the ray of its aim finds one) until it is dead; then the raider, who waits beyond the sight of a character, is put in
 # front of the player, and the test watches it notice the player, come within the range of its pistol and shoot. A
 # bystander (who never starts a fight, has no package and no weapon) is shot once at the same time, and the test watches it
-# go for the player.
+# go for the player. At the end the player is given two grenades, which are their own ammunition, and throws three times.
 ARENA_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
@@ -1495,7 +1495,13 @@ for second = 6, 20 do
     table.insert(steps, { second, ask })
     table.insert(steps, { second + 0.5, function() report('raider ' .. second) end })
 end
-table.insert(steps, { 21, core.quit })
+-- The grenades: the player has them in its hands, throws three times at the bystander, and the last throw is made with
+-- the hands, as the grenades are gone
+table.insert(steps, { 21, function() stage(@GRENADES@) end })
+table.insert(steps, { 22, function()
+    world.players[1]:sendEvent('OFTestArenaThrow', { target = find(@BYSTANDER@), count = 3 })
+end })
+table.insert(steps, { 25, core.quit })
 
 return {
     engineHandlers = {
@@ -1513,7 +1519,7 @@ return {
 for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES))), ("@QUEST@", plugin.ARENA_QUEST_NAME),
                       ("@RAIDER@", str(plugin.ARENA_RAIDER_REF_ID)), ("@DUMMY@", str(plugin.ARENA_DUMMY_REF_ID)),
                       ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
-                      ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)),
+                      ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -1527,9 +1533,13 @@ ARENA_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
 
 local target, shots, once = nil, 0, false
+local throwing, thrown, planned = nil, 0, 0
 
 return {
     eventHandlers = {
+        OFTestArenaThrow = function(data)
+            throwing, thrown, planned = data.target, 0, data.count
+        end,
         OFTestArenaFire = function(data)
             target = data.target
             once = data.once == true
@@ -1542,6 +1552,17 @@ return {
     },
     engineHandlers = {
         onUpdate = function()
+            if throwing and core.combat.available() then
+                -- What the weapon in the hands is before each throw: a grenade is used up by it, then the hands are left
+                local weapon = core.combat.weapon()
+                local result = core.combat.fire(throwing)
+                if result.fired then
+                    thrown = thrown + 1
+                    print('OFTEST', 'arena', 'throw', thrown, string.format('weapon=%s melee=%s rounds=%d ammoUse=%d hit=%s',
+                        weapon.weapon, tostring(weapon.melee), weapon.rounds, weapon.ammoUse, tostring(result.hit)))
+                    if thrown >= planned then throwing = nil end
+                end
+            end
             if target == nil or not core.combat.available() then return end
             local result = core.combat.fire(target)
             if result.fired then
@@ -2201,7 +2222,8 @@ def check_arena(text):
     the dummy takes the blows the player shoots at it (its OnHit block counts each, a round is used for each shot) and
     dies of them (OnDeath once, GetDead); the raider, put in front of the player, starts a fight (its OnStartCombat block
     runs, IsInCombat holds), takes its pistol from what it carries and shoots (it has fewer rounds), comes within the range
-    of the pistol, and the player loses health. A bystander who never starts a fight is shot once and goes for the player."""
+    of the pistol, and the player loses health. A bystander who never starts a fight is shot once and goes for the player.
+    The player, given two grenades, uses one up with each throw and throws the third time with its hands."""
     problems = []
     for line in text.splitlines():
         if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
@@ -2276,6 +2298,19 @@ def check_arena(text):
         if not after[1] or after[0] > 300:
             problems.append("the bystander, shot once, should be in a fight with the player and have come to it "
                             f"(distance, in combat): {after}")
+    # The grenades are their own ammunition: each throw uses one up, and the third throw is made with the hands
+    throws = re.findall(r"OFTEST\tarena\tthrow\t(\d+)\tweapon=(\S*) melee=(\w+) rounds=(-?\d+) ammoUse=(-?\d+) hit=(\w+)$",
+                        text, re.M)
+    if len(throws) != 3:
+        problems.append(f"the player should have thrown three times: {throws}")
+    else:
+        count = plugin.ARENA_GRENADE_COUNT
+        for number, (_, weapon, melee, rounds, ammo_use, hit) in enumerate(throws[:count]):
+            if weapon == "" or melee != "false" or int(rounds) != count - number or int(ammo_use) != 1:
+                problems.append(f"throw {number + 1} should be made with a grenade and {count - number} left: {throws}")
+        _, weapon, melee, rounds, ammo_use, hit = throws[count]
+        if weapon != "" or melee != "true":
+            problems.append(f"the throw after the last grenade should be made with the hands: {throws}")
     return problems
 
 

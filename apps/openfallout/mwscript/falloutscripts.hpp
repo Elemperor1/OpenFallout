@@ -296,6 +296,9 @@ namespace OFScript
 
         /// Whether the loaded content has dialogue (topics of Fallout 3 or New Vegas)
         bool hasDialogue() const;
+        /// Whether the loaded content has the weapons and characters of Fallout 3 or New Vegas, which are what the
+        /// combat here is for (the content of Morrowind has none of them)
+        bool hasCombat() const;
         /// The character talks to the player. The greeting is said (a topic given takes its place) and the conversation
         /// goes on from there, which the interface shows. False, with no conversation open, when the character has
         /// nothing to say and the player nothing to pick. A conversation that is open stays.

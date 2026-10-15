@@ -82,7 +82,7 @@ namespace OFLua
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };
 
         // Whether the content is that of Fallout, which has combat to run (it is not for Morrowind's)
-        api["available"] = []() { return OFBase::Environment::get().getFalloutScripts() != nullptr; };
+        api["available"] = []() { return scripts().hasCombat(); };
 
         // The weapon the player holds and what it allows: the weapon ("" for the hands), whether it is a melee weapon,
         // automatic, how far a blow or shot reaches, the least seconds between two, and the rounds the player has for

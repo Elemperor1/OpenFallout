@@ -379,7 +379,7 @@ RACE_TWO_NAME = "OFTestRaceTwo"
 AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test strength description."),
               AVIF_BARTER_ID: ("Barter", "Barter of the test", "The test barter description.")}
 AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
-AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
+AV_BARTER, AV_EXPLOSIVES, AV_GUNS, AV_SURVIVAL = 32, 35, 41, 44
 
 # The quest that starts a new game, as CG00 does in Fallout 3: the engine finds it by its editor ID, starts it and runs
 # its MenuMode block (the main menu counts as a menu), which sets stage 0 as long as the quest is before stage 5; the
@@ -441,7 +441,11 @@ ARENA_PLAYER_AMMO = 30
 ARENA_DUMMY_HEALTH = 5
 ARENA_BYSTANDER_ID = 0x94B
 ARENA_BYSTANDER_REF_ID = 0x94C
-LAST_ID = 0x94C # the largest form ID of the plugin, which the next object ID of its header follows
+# The grenades the player throws at the end: a weapon that is its own ammunition
+ARENA_GRENADE_ID = 0x94D
+ARENA_GRENADE_COUNT = 2
+ARENA_GRENADE_STAGE = 11
+LAST_ID = 0x94D # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2055,7 +2059,9 @@ def plugin():
             + top_group(b"AMMO", [arena_ammo()])
             + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
                                   arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
-                                               ARENA_PISTOL_RANGE, 2.0)])
+                                               ARENA_PISTOL_RANGE, 2.0),
+                                  arena_weapon(ARENA_GRENADE_ID, "OFTestArenaGrenade", ARENA_PISTOL_DAMAGE,
+                                               ARENA_PISTOL_RANGE, 2.0, grenade=True)])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
                                   trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),
                                   trait_perk(NOT_A_TRAIT_ID, "OFTestPerkNotTrait", NOT_A_TRAIT_NAME, "No trait.", False)])
@@ -2091,23 +2097,24 @@ def arena_ammo():
                                            sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
 
 
-def arena_weapon(form_id, name, damage, max_range, attacks_per_second):
-    """A WEAP record of Fallout 3 for a gun that fires one round at a time (animation type 5, the rifle of two hands):
-    DATA (value, health, weight, damage, clip) and the 136 bytes of DNAM with the ones the engine reads."""
+def arena_weapon(form_id, name, damage, max_range, attacks_per_second, grenade=False):
+    """A WEAP record of Fallout 3 for a gun that fires one round at a time (animation type 5, the rifle of two hands), or
+    for a grenade (animation type 10, which has no ammunition: the one that is thrown is used up): DATA (value, health,
+    weight, damage, clip) and the 136 bytes of DNAM with the ones the engine reads."""
     game = bytearray(136)
-    struct.pack_into("<I", game, 0, 5)  # animation type
+    struct.pack_into("<I", game, 0, 10 if grenade else 5)  # animation type
     struct.pack_into("<f", game, 4, 1.0)  # animation multiplier
     struct.pack_into("<f", game, 8, 64.0)  # reach
     game[14] = 1  # ammo use
     struct.pack_into("<f", game, 48, max_range)
     struct.pack_into("<f", game, 64, attacks_per_second)  # fire rate
     struct.pack_into("<f", game, 88, attacks_per_second)  # attacks a second
-    struct.pack_into("<I", game, 104, AV_GUNS)  # the skill
+    struct.pack_into("<I", game, 104, AV_EXPLOSIVES if grenade else AV_GUNS)  # the skill
     struct.pack_into("<I", game, 120, 0xffffffff)  # resist
     return record(b"WEAP", form_id, [
         zstr(b"EDID", name), zstr(b"FULL", name),
         sub(b"DATA", struct.pack("<iifHB", 100, 250, 5.0, damage, 12)),
-        sub(b"DNAM", bytes(game)), sub(b"NAM0", struct.pack("<I", ARENA_AMMO_ID))])
+        sub(b"DNAM", bytes(game)), *([] if grenade else [sub(b"NAM0", struct.pack("<I", ARENA_AMMO_ID))])])
 
 
 def arena_scripts():
@@ -2127,9 +2134,9 @@ def arena_scripts():
 
 def arena_quest():
     """The quest of the arena. Its first stage gives the player the rifle and its rounds and puts the rifle in its hands
-    (EquipItem); each of the other stages writes what the game knows into the globals: whether the rifle is held and out,
-    how many rounds the player has, its health, whether the dummy and the raider are dead, whether the raider fights and
-    how many rounds it has."""
+    (EquipItem), and its second the grenades the player throws at the end; each of the other stages writes what the game
+    knows into the globals: whether the rifle is held and out, how many rounds the player has, its health, whether the
+    dummy and the raider are dead, whether the raider fights and how many rounds it has."""
     sf = fallout_script
     names = ("armed", "weapon_out", "ammo", "health", "dummy_dead", "raider_dead", "raider_combat", "raider_ammo")
     forms = [PLAYER_REFERENCE, ARENA_RIFLE_ID, ARENA_AMMO_ID, ARENA_DUMMY_REF_ID, ARENA_RAIDER_REF_ID,
@@ -2150,7 +2157,12 @@ def arena_quest():
         sf.set_to(sf.global_target(glob["raider_combat"]), sf.call_token(sf.IS_IN_COMBAT, reference=raider)),
         sf.set_to(sf.global_target(glob["raider_ammo"]),
                   sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=raider))]
-    entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms)]
+    # The last stage gives the player grenades and puts them in its hands, which the test throws at the end
+    grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
+    grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
+                sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
+    entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
+               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms)]
     entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
     return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
 

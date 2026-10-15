@@ -50,11 +50,18 @@ end))
 
 local center = util.vector2(0.5, 0.5)
 
--- What the aim hits within the reach of the weapon: the object, and the part of it that was hit, from how high on it
+-- What the aim hits within the reach of the weapon: the object the camera looks at, if it is within the reach of the
+-- player. The camera is behind the player in the third person, so the ray is as much longer as the camera is away from
+-- the player, and what it hits counts when it is as near to the player as the weapon reaches (along the floor, as the
+-- characters measure it).
 local function aim(range)
     local from = camera.getPosition()
-    local to = from + camera.viewportToWorldVector(center) * range
+    local origin = self.position
+    local to = from + camera.viewportToWorldVector(center) * (range + (from - origin):length())
     local result = nearby.castRay(from, to, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
+    if result.hitObject == nil or result.hitPos == nil then return nil end
+    local away = result.hitPos - origin
+    if math.sqrt(away.x * away.x + away.y * away.y) > range then return nil end
     return result.hitObject
 end
 

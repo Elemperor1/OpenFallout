@@ -1733,6 +1733,17 @@ namespace OFScript
         return true;
     }
 
+    namespace
+    {
+        // A grenade or a mine is not fired from anything: the one that is thrown or laid is what a use takes
+        bool isUsedUp(const ESM4::Weapon::GameData& game)
+        {
+            return game.mAnimationType == ESM4::Weapon::GameData::GrenadeThrown
+                || game.mAnimationType == ESM4::Weapon::GameData::LandMine
+                || game.mAnimationType == ESM4::Weapon::GameData::MineThrown;
+        }
+    }
+
     FalloutScripts::WeaponStats FalloutScripts::weaponStats(FalloutScript::FormId attacker)
     {
         // A blow of the hands or a melee weapon reaches this far (the games take it from the reach of the weapon)
@@ -1766,7 +1777,12 @@ namespace OFScript
         stats.mAmmoUse = std::max<int>(game.mAmmoUse, 1);
         // The ammunition it was given, or else the one of the record (not a list of them)
         const FalloutScript::FormId chosen = mEquipment.ammo(attacker);
-        if (chosen != 0)
+        if (isUsedUp(game))
+        {
+            stats.mAmmo = stats.mWeapon;
+            stats.mAmmoUse = 1;
+        }
+        else if (chosen != 0)
             stats.mAmmo = chosen;
         else if (mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr)
             stats.mAmmo = record->mAmmo.toUint32();
@@ -1917,6 +1933,13 @@ namespace OFScript
                 candidate.mRounds = held.mAmmoUse > 0 ? held.mRounds : std::numeric_limits<int>::max();
                 return candidate;
             }
+            if (isUsedUp(record->mGame))
+            {
+                // The ones it carries are what it has to throw
+                candidate.mAmmoUse = 1;
+                candidate.mRounds = mActors.itemCount(self, item);
+                return candidate;
+            }
             candidate.mAmmoUse = std::max<int>(record->mGame.mAmmoUse, 1);
             // A weapon whose ammunition is no record of the files (a list of them) needs none, as it does when it is
             // fired
@@ -2017,6 +2040,11 @@ namespace OFScript
             // The weapon is empty: the character takes another, or fights with its hands
             if (weapon.mWeapon != 0)
                 mEquipment.unequip(self, weapon.mWeapon);
+            prepareFight(attacker);
+        }
+        else if (result.mFired && weapon.mWeapon != 0 && mEquipment.weapon(self) != weapon.mWeapon)
+        {
+            // The last grenade or mine was thrown: the character takes another weapon, or fights with its hands
             prepareFight(attacker);
         }
         return result;
@@ -2279,6 +2307,11 @@ namespace OFScript
     bool FalloutScripts::hasDialogue() const
     {
         return mStore.get<ESM4::Dialogue>().getSize() > 0;
+    }
+
+    bool FalloutScripts::hasCombat() const
+    {
+        return mStore.get<ESM4::Weapon>().getSize() > 0 && mStore.get<ESM4::Npc>().getSize() > 0;
     }
 
     bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic,
