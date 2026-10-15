@@ -1371,7 +1371,7 @@
 -- @param #string attacker
 -- @param #string victim
 -- @param #string weapon The weapon that is used; the one the attacker holds when it is left out or empty, or its hands.
--- @param #number limb The part of the body that is hit, -1 (the default) when it is not known.
+-- @param #number limb The type of the part of the body that is hit (0 torso, 1 and 2 head, 3 and 4 left arm, 5 and 6 right arm, 7 to 9 left leg, 10 to 12 right leg, 13 brain, 14 weapon), -1 (the default) when it is not known.
 -- @return #CombatStrike
 
 ---
@@ -1423,7 +1423,7 @@
 -- is not ready again after the last blow or shot.
 -- @function [parent=#Combat] fire
 -- @param #Object target The object the aim hit, nil when it hit none.
--- @param #number limb The part of the body that is hit, -1 (the default) when it is not known.
+-- @param #number limb The type of the part of the body that is hit (0 torso, 1 and 2 head, 3 and 4 left arm, 5 and 6 right arm, 7 to 9 left leg, 10 to 12 right leg, 13 brain, 14 weapon), -1 (the default) when it is not known.
 -- @return #CombatFire
 
 ---
@@ -1765,6 +1765,7 @@
 ---
 -- @type VatsPart
 -- @field #number index The number of the part, which attack takes.
+-- @field #number type The type of the part (0 torso, 1 and 2 head, 3 and 4 left arm, 5 and 6 right arm, 7 to 9 left leg, 10 to 12 right leg, 13 brain, 14 weapon), which is what `GetHitLocation` tells.
 -- @field #string name The name of the part in the body part data.
 -- @field #string target What V.A.T.S. calls the part.
 -- @field #number chance The chance in percent that an attack at the part hits.

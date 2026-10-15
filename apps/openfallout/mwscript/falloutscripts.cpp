@@ -1764,10 +1764,6 @@ namespace OFScript
         }
         chance = mPerks.apply(Entry::enemyCriticalChance, victim, chance, towardsAttacker);
         defense.mThreshold += mPerks.apply(Entry::thresholdDefender, victim, 0.0, towardsAttacker) - thresholdTaken;
-        // A blow at a part of the body does more or less than one at the body (a head shot more); the games do not say
-        // whether this comes before the armor, here it does
-        if (limb >= 0)
-            blow.mDamage *= mLimbs.damageMultiplier(victim, limb);
         FalloutScript::HitResult hit
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
         if (attacker != 0 && damageAfterArmor)
@@ -1776,6 +1772,13 @@ namespace OFScript
             // armor works on (the executable adds it to the damage before the armor), so it is part of that too
             hit.mDamage = std::max(mPerks.apply(Entry::weaponDamage, attacker, hit.mDamage, towardsVictim), 0.0);
         }
+        // The damage to the health: a blow at a part of the body does more or less than one at the body (a head shot
+        // more), after the armor, and only a shot or a throw does (hands and melee weapons, and a blow with no weapon,
+        // count the part as 1); a part that does not say anything (0) leaves the damage as it is
+        double dealt = hit.mDamage;
+        if (limb >= 0 && !blow.mMelee)
+            if (const double multiplier = mLimbs.damageMultiplier(victim, limb); multiplier > 0)
+                dealt *= multiplier;
 
         // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
         // a blow that comes late for a death changes nothing
@@ -1784,23 +1787,30 @@ namespace OFScript
         if (mActors.isDead(victim) || cannotStrike(attacker))
             return result;
         result.mHit = true;
-        result.mDamage = hit.mDamage;
+        result.mDamage = dealt;
         result.mCritical = hit.mCritical;
 
         FalloutScript::CombatState::Hit struck;
         struck.mAttacker = attacker;
         struck.mWeapon = weapon;
-        struck.mDamage = hit.mDamage;
+        struck.mDamage = dealt;
         struck.mCritical = hit.mCritical;
         struck.mLimb = limb;
         mCombat.noteHit(victim, struck);
 
-        mActorValues.damage(victim, AV::health, hit.mDamage);
+        mActorValues.damage(victim, AV::health, dealt);
         if (limb >= 0)
         {
-            // The condition of the part goes down by what the blow did, as much as the weapon says it hurts limbs, and
-            // a perk of the attacker may change that
-            double limbDamage = hit.mDamage;
+            // The condition of the part goes down by the damage after the armor and before the multiplier of the part,
+            // as a share of the part's health; half as much for the player, as much as the weapon says it hurts limbs,
+            // and a perk of the attacker may change that
+            double limbDamage = mLimbs.limbDamage(victim, limb, hit.mDamage);
+            if (victim == mPlayer)
+            {
+                // Half of it when the settings say nothing (fCombatPlayerLimbDamageMult of both executables)
+                constexpr double playerLimbDamageMult = 0.5;
+                limbDamage *= gameSetting("fCombatPlayerLimbDamageMult", playerLimbDamageMult);
+            }
             if (const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr)
                 if (record->mHasGameData && record->mGame.mLimbDamageMultiplier > 0)
                     limbDamage *= record->mGame.mLimbDamageMultiplier;
@@ -1812,7 +1822,7 @@ namespace OFScript
         if (attacker == mPlayer && attacker != 0)
         {
             const std::lock_guard lock(mPlayerDamageMutex);
-            mPlayerDamage[victim] += hit.mDamage;
+            mPlayerDamage[victim] += dealt;
         }
         if (mActorValues.current(victim, AV::health) > 0)
         {

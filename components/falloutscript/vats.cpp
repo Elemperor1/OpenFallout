@@ -14,9 +14,6 @@ namespace FalloutScript::Vats
         }
 
         constexpr double pi = 3.14159265358979323846;
-        /// The size of a part of the body that a shot can land on, in units: a small part is about this wide
-        constexpr double smallestPart = 5;
-        constexpr double largestPart = 25;
     }
 
     Rules rules(const Lookup& lookup)
@@ -29,6 +26,23 @@ namespace FalloutScript::Vats
         take(lookup, "fVATSStealthMult", result.mStealthMult);
         take(lookup, "fVATSHitChanceMult", result.mHitChanceMult);
         take(lookup, "fVATSSkillFactor", result.mSkillFactor);
+        take(lookup, "fVATSSpreadMult", result.mSpreadMult);
+        take(lookup, "fVATSRangeSpreadMax", result.mRangeSpreadMax);
+        take(lookup, "fVATSRangeSpreadUncertainty", result.mRangeSpreadUncertainty);
+        take(lookup, "fVATSDistanceFactor", result.mDistanceFactor);
+        take(lookup, "fVATSThrownWeaponRangeMult", result.mThrownRangeMult);
+        take(lookup, "fVATSGrenadeRangeMult", result.mGrenadeRangeMult);
+        take(lookup, "fVATSGrenadeRangeMin", result.mGrenadeRangeMin);
+        take(lookup, "fVATSGrenadeSkillFactor", result.mGrenadeSkillFactor);
+        take(lookup, "fVATSGrenadeChanceMult", result.mGrenadeChanceMult);
+        take(lookup, "fCrippledArm1HSpreadPenalty", result.mCrippledArm1H);
+        take(lookup, "fCrippledArm2HSpreadPenalty", result.mCrippledArm2H);
+        take(lookup, "fCrippledArms1HSpreadPenalty", result.mCrippledArms1H);
+        take(lookup, "fCrippledArms2HSpreadPenalty", result.mCrippledArms2H);
+        take(lookup, "fWobbleToSkillConversion", result.mWobbleToSkill);
+        take(lookup, "fMinGunSpreadValue", result.mMinSpread);
+        take(lookup, "fNPCMaxGunWobbleAngle", result.mMaxWobbleAngle);
+        take(lookup, "fWeapStrengthReqPenalty", result.mWantedPenalty);
         take(lookup, "fActionPointsAttackUnarmed", result.mUnarmed);
         take(lookup, "fActionPointsAttackOneHand", result.mOneHand);
         take(lookup, "fActionPointsAttackTwoHand", result.mTwoHand);
@@ -46,6 +60,11 @@ namespace FalloutScript::Vats
     bool isMelee(std::uint32_t animationType)
     {
         return animationType <= 2;
+    }
+
+    bool isGun(std::uint32_t animationType)
+    {
+        return animationType >= 3 && animationType <= 9;
     }
 
     double attackCost(const Rules& rules, const Weapon& weapon)
@@ -92,36 +111,79 @@ namespace FalloutScript::Vats
         return isMelee(weapon.mAnimationType) ? cost * rules.mMeleeMult : cost;
     }
 
-    double hitChance(
-        const Rules& rules, const Weapon& weapon, double partToHit, double distance, double skill, bool hidden)
+    double spreadFactor(
+        const Rules& rules, const Weapon& weapon, int arms, double strengthShort, double skillShort, double skill)
     {
-        partToHit = std::clamp(partToHit, 0.0, 100.0);
-        distance = std::max(distance, 0.0);
-        // How much the skill counts: none of it gives half the chance, all of it the whole
-        const double skillTerm
-            = std::clamp(1.0 - rules.mSkillFactor * 0.5 * (1.0 - std::clamp(skill, 0.0, 100.0) / 100.0), 0.0, 1.0);
-        double chance;
+        // The weapons held in both hands: the rifles, the handle weapons and the launchers
+        const bool twoHands = weapon.mAnimationType >= 5 && weapon.mAnimationType <= 9;
+        double sum = 0;
+        if (arms == 1)
+            sum += twoHands ? rules.mCrippledArm2H : rules.mCrippledArm1H;
+        else if (arms >= 2)
+            sum += twoHands ? rules.mCrippledArms2H : rules.mCrippledArms1H;
+        sum += std::clamp(strengthShort, 0.0, 10.0) * rules.mWantedPenalty;
+        sum += std::clamp(std::round(skillShort), 0.0, 10.0) * rules.mWantedPenalty;
+        sum *= 1.0 - rules.mWobbleToSkill * std::clamp(skill, 0.0, 100.0) * 0.01;
+        return std::max(sum, rules.mMinSpread);
+    }
+
+    double spreadDegrees(const Rules& rules, double factor)
+    {
+        return std::max(factor, 0.0) * rules.mMaxWobbleAngle;
+    }
+
+    double hitChance(const Rules& rules, const Weapon& weapon, const Shot& shot)
+    {
+        const double distance = std::max(shot.distance, 0.0);
+        const double skill = std::clamp(shot.skill, 0.0, 100.0);
+        double chance = 0;
         if (isMelee(weapon.mAnimationType))
         {
-            if (distance > rules.mMeleeMaxDistance)
+            // Within reach a blow is sure, and the part does not count
+            chance = distance <= rules.mMeleeMaxDistance ? 100.0 : 0.0;
+        }
+        else if (!isGun(weapon.mAnimationType))
+        {
+            // A thrown weapon: sure near, less and less the further it has to fly, up to twice its range
+            const double range = weapon.mRange;
+            if (distance > range * rules.mThrownRangeMult)
                 return 0.0;
-            chance = 100.0 * (partToHit / 100.0) * skillTerm;
+            const double gap = range * rules.mGrenadeRangeMult - rules.mGrenadeRangeMin;
+            const double rangeOdds = gap > 0 ? 1.0 - std::max(distance - rules.mGrenadeRangeMin, 0.0) / gap : 0.0;
+            const double armFactor = shot.arms ? 1.0 : 1.0 - rules.mCrippledArm1H;
+            const double skillCalc
+                = ((rules.mSkillFactor - 1.0) + rules.mGrenadeSkillFactor * skill / 100.0) * armFactor;
+            chance = 100.0 * (rangeOdds + skillCalc) * rules.mGrenadeChanceMult;
         }
         else
         {
-            if (weapon.mRange > 0 && distance > weapon.mRange)
+            if (weapon.mRangeFixed && distance > weapon.mRange)
                 return 0.0;
-            // The shots spread in a circle at the distance of the target; the part is a circle too, the bigger the more
-            // the part is worth. The part is hit by the share of the circle of the spread that it covers.
-            const double partRadius = smallestPart + (largestPart - smallestPart) * partToHit / 100.0;
-            const double spreadRadius = distance * std::tan(std::clamp(weapon.mSpread, 0.0, 45.0) * pi / 180.0);
-            const double covered
-                = spreadRadius <= partRadius ? 1.0 : (partRadius * partRadius) / (spreadRadius * spreadRadius);
-            const double own = weapon.mBaseChance > 0 ? weapon.mBaseChance / 100.0 : 1.0;
-            chance = 100.0 * covered * own * (partToHit / 100.0) * skillTerm;
+            // The shots fall in a circle of the spread at the distance of the target; the target is as big as its
+            // size says, and as much of its area as is hit by the circle counts
+            const double spread = std::max(weapon.mSpread + shot.extraSpread, 0.0);
+            double radius;
+            double spreadArea;
+            if (rules.mNewVegas)
+            {
+                radius = std::tan(std::min(spread * rules.mSpreadMult, 89.0) * pi / 180.0) * distance;
+                spreadArea = pi * radius * radius;
+            }
+            else
+            {
+                radius
+                    = std::tan(std::min(spread * rules.mSpreadMult + rules.mRangeSpreadUncertainty, 89.0) * pi / 180.0)
+                    * distance;
+                spreadArea = pi * std::pow(radius, rules.mDistanceFactor);
+            }
+            const double bound = shot.bound >= 1.0 ? shot.bound : 128.0;
+            double targetArea = bound * bound / 3.0;
+            if (2.0 * radius < bound)
+                targetArea *= 2.0 * radius / bound;
+            const double rangeSpread = spreadArea <= 0 ? 0.0 : std::min(targetArea / spreadArea, rules.mRangeSpreadMax);
+            chance = rules.mHitChanceMult * rangeSpread * std::clamp(shot.partToHit, 0.0, 255.0);
         }
-        chance *= rules.mHitChanceMult;
-        if (hidden)
+        if (shot.hidden)
             chance *= rules.mStealthMult;
         return std::clamp(chance, 0.0, rules.mMaxChance);
     }

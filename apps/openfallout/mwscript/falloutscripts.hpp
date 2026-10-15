@@ -407,7 +407,8 @@ namespace OFScript
         /// the player holds. The parts a body does not have for V.A.T.S. (no target name) are left out.
         struct VatsPart
         {
-            int mIndex = 0; // the number of the part in the body part data, which strike and GetHitLocation use
+            int mIndex = 0; // the number of the part in the body part data, which the screen and vatsAttack use
+            int mType = -1; // the type of the part, which strike and GetHitLocation use
             std::string mName;
             std::string mTarget;
             double mChance = 0;

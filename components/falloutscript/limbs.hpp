@@ -16,6 +16,10 @@ namespace FalloutScript
     struct BodyPart
     {
         std::string mName;
+        /// The type of the part (0 torso, 1 and 2 head, 3 and 4 left arm, 5 and 6 right arm, 7 to 9 left leg, 10 to 12
+        /// right leg, 13 brain, 14 weapon), which is what scripts call the hit location: a body has at most one part of
+        /// a type, and the games find a part by it, not by its place in the record. -1 when the record does not say.
+        int mType = -1;
         /// What VATS aims at, empty for a part it can not aim at
         std::string mTarget;
         /// The actor value that is the condition of the part, -1 for none
@@ -48,8 +52,9 @@ namespace FalloutScript
         /// The parts of the body of the actor (none when the records tell none)
         std::vector<BodyPart> partsOf(FormId actor);
 
-        /// What a blow at the part does compared to a blow at the body; 1 for a part the actor does not have (-1)
-        double damageMultiplier(FormId actor, int part);
+        /// What a blow at the part (of that type) does compared to a blow at the body; 1 for a part the actor does not
+        /// have (or -1)
+        double damageMultiplier(FormId actor, int type);
 
         struct Hurt
         {
@@ -59,17 +64,23 @@ namespace FalloutScript
             bool mCrippled = false;
         };
 
-        /// A blow of that much damage hits the part: its condition goes down by the share of the health of the part
-        /// that the damage is, and the part is crippled when nothing is left
-        Hurt hurt(FormId actor, int part, double damage);
+        /// The limb damage of a blow that does `damage` to the part (of that type): the damage as a share, in percent,
+        /// of the part's share of the base health of the actor (the damage itself for an actor with no health, none for
+        /// a part that stands for none of it)
+        double limbDamage(FormId actor, int type, double damage);
 
-        /// The condition of the part in percent
-        double condition(FormId actor, int part);
+        /// A blow of that much limb damage (limbDamage() of the armored damage, scaled) hits the part (of that type):
+        /// the condition goes down by it, and the part is crippled when nothing is left
+        Hurt hurt(FormId actor, int type, double limbDamage);
+
+        /// The condition of the part (of that type) in percent
+        double condition(FormId actor, int type);
 
         void clear();
 
     private:
         const std::vector<BodyPart>* cached(FormId actor);
+        static const BodyPart* byType(const std::vector<BodyPart>* parts, int type);
 
         LimbRecords& mRecords;
         ActorValues& mValues;

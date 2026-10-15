@@ -2660,8 +2660,9 @@ def check_arena_vats(text):
         problems.append(f"V.A.T.S. should be usable and the target in front of the player in reach: {info.group(0)}")
     if parts != "Torso,Head,Left Arm,Right Leg":
         problems.append(f"V.A.T.S. should offer the four parts the race gives a target name (not the spine): {info.group(0)}")
-    if chances != "95,95,60,60":
-        problems.append(f"the chances should be the part's own, at most 95 (full skill, no spread): {info.group(0)}")
+    if chances != "95,95,60,80":
+        problems.append("the chances should be the part's own (100, 100, 30, 40) twice over for a rifle shot at this "
+                        f"distance (the most that the area of the target counts), at most 95: {info.group(0)}")
     if float(cost) != 25 or float(points) < 75 or float(points) > float(most):
         problems.append(f"an attack with a rifle should cost 25 of the player's action points: {info.group(0)}")
     for tag, want in (("vatsscreen", "mode=Interface open=true"), ("vatsclosed", "mode=nil open=false")):

@@ -72,6 +72,7 @@ namespace OFLua
             {
                 sol::table row(lua, sol::create);
                 row["index"] = part.mIndex;
+                row["type"] = part.mType;
                 row["name"] = part.mName;
                 row["target"] = part.mTarget;
                 row["chance"] = part.mChance;

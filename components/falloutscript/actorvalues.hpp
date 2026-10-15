@@ -44,6 +44,9 @@ namespace FalloutScript
         /// Barter first, unarmed last: the 14 skills of the records (the one in the middle of the end is survival in
         /// New Vegas and the unused throwing in Fallout 3)
         constexpr int lastSkill = 45;
+        /// What hides a character from V.A.T.S. (it halves the chance to hit it): invisibility and chameleon
+        constexpr int invisibility = 48;
+        constexpr int chameleon = 49;
         /// The numbers from here are not actor values
         constexpr int count = 128;
     }

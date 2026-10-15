@@ -19,6 +19,9 @@ namespace
     constexpr FormId raider = 0x01000020;
     constexpr FormId robot = 0x01000021;
     constexpr FormId unknown = 0x01000022;
+    constexpr int torso = 0;
+    constexpr int head = 1;
+    constexpr int leftArm = 3;
     constexpr int headCondition = 25;
     constexpr int armCondition = 27;
 
@@ -40,10 +43,11 @@ namespace
         }
     };
 
-    BodyPart part(const char* name, int condition, double mult, int toHit, int healthPercent)
+    BodyPart part(const char* name, int type, int condition, double mult, int toHit, int healthPercent)
     {
         BodyPart result;
         result.mName = name;
+        result.mType = type;
         result.mTarget = name;
         result.mCondition = condition;
         result.mDamageMult = mult;
@@ -60,8 +64,9 @@ namespace
 
         Fixture()
         {
-            mRecords.mParts[raider] = { part("Torso", -1, 1.0, 95, 100), part("Head", headCondition, 2.0, 40, 50),
-                part("Left Arm", armCondition, 0.75, 60, 25) };
+            // In the order of a record, which is not the order of the types
+            mRecords.mParts[raider] = { part("Left Arm", leftArm, armCondition, 0.75, 60, 25),
+                part("Torso", torso, -1, 1.0, 95, 100), part("Head", head, headCondition, 2.0, 40, 50) };
             mValues.setBase(raider, ActorValue::health, 200);
         }
     };
@@ -71,8 +76,9 @@ namespace
         Fixture f;
         const std::vector<BodyPart> parts = f.mLimbs.partsOf(raider);
         ASSERT_EQ(parts.size(), 3u);
-        EXPECT_EQ(parts[0].mName, "Torso");
-        EXPECT_EQ(parts[1].mName, "Head");
+        EXPECT_EQ(parts[0].mName, "Left Arm");
+        EXPECT_EQ(parts[1].mName, "Torso");
+        EXPECT_EQ(parts[2].mType, head);
         EXPECT_THAT(f.mLimbs.partsOf(robot), IsEmpty());
     }
 
@@ -80,7 +86,7 @@ namespace
     {
         Fixture f;
         f.mLimbs.partsOf(raider);
-        f.mLimbs.damageMultiplier(raider, 1);
+        f.mLimbs.damageMultiplier(raider, head);
         EXPECT_EQ(f.mRecords.mAsked, 1);
     }
 
@@ -92,48 +98,69 @@ namespace
         EXPECT_EQ(f.mRecords.mAsked, 2);
     }
 
-    TEST(FalloutScriptLimbsTest, aBlowAtAPartDoesWhatItsMultiplierSays)
+    TEST(FalloutScriptLimbsTest, aPartIsFoundByItsTypeNotByItsPlaceInTheRecord)
     {
         Fixture f;
-        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, 0), 1.0);
-        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, 1), 2.0);
-        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, 2), 0.75);
+        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, torso), 1.0);
+        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, head), 2.0);
+        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, leftArm), 0.75);
         // A part the actor does not have, or none, is the body
         EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, 7), 1.0);
         EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(raider, -1), 1.0);
-        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(robot, 0), 1.0);
+        EXPECT_DOUBLE_EQ(f.mLimbs.damageMultiplier(robot, torso), 1.0);
     }
 
-    TEST(FalloutScriptLimbsTest, aPartIsHurtByTheShareOfItsHealthThatTheBlowIs)
+    TEST(FalloutScriptLimbsTest, limbDamageIsTheShareOfTheHealthOfThePartThatTheBlowIs)
     {
         Fixture f;
-        // The head stands for half of 200 health: 20 damage is a fifth of it
-        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, 1, 20);
+        // The head stands for half of 200 health: 20 damage is a fifth of it; the arm for 50, the torso for all of it
+        EXPECT_NEAR(f.mLimbs.limbDamage(raider, head, 20), 20.0, 1e-9);
+        EXPECT_NEAR(f.mLimbs.limbDamage(raider, leftArm, 20), 40.0, 1e-9);
+        EXPECT_NEAR(f.mLimbs.limbDamage(raider, torso, 20), 10.0, 1e-9);
+        // Nothing for a part the actor does not have
+        EXPECT_DOUBLE_EQ(f.mLimbs.limbDamage(raider, 9, 20), 0.0);
+    }
+
+    TEST(FalloutScriptLimbsTest, limbDamageIsTheDamageForAnActorWithoutHealthAndNothingForAPartWithoutAShare)
+    {
+        Fixture f;
+        f.mRecords.mParts[robot] = { part("Head", head, headCondition, 1.0, 40, 50), part("Wheel", 7, -1, 1.0, 40, 0) };
+        // No health at all: the damage itself
+        f.mValues.setBase(robot, ActorValue::health, 0);
+        EXPECT_DOUBLE_EQ(f.mLimbs.limbDamage(robot, head, 17), 17.0);
+        f.mValues.setBase(robot, ActorValue::health, 100);
+        EXPECT_DOUBLE_EQ(f.mLimbs.limbDamage(robot, 7, 17), 0.0);
+        EXPECT_NEAR(f.mLimbs.limbDamage(robot, head, 17), 34.0, 1e-9);
+    }
+
+    TEST(FalloutScriptLimbsTest, aPartIsHurtByTheLimbDamageItIsGiven)
+    {
+        Fixture f;
+        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, head, 20);
         EXPECT_NEAR(hurt.mCondition, 80.0, 1e-9);
         EXPECT_FALSE(hurt.mCrippled);
-        EXPECT_NEAR(f.mLimbs.condition(raider, 1), 80.0, 1e-9);
+        EXPECT_NEAR(f.mLimbs.condition(raider, head), 80.0, 1e-9);
         EXPECT_NEAR(f.mValues.current(raider, headCondition), 80.0, 1e-9);
     }
 
-    TEST(FalloutScriptLimbsTest, aPartIsCrippledWhenNothingIsLeftOfIt)
+    TEST(FalloutScriptLimbsTest, aPartIsCrippledWhenItsConditionFallsToNothing)
     {
         Fixture f;
-        EXPECT_FALSE(f.mLimbs.hurt(raider, 2, 30).mCrippled);
-        // The arm stands for a quarter of 200 health, 50: 30 and 20 are all of it
-        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, 2, 20);
+        EXPECT_FALSE(f.mLimbs.hurt(raider, leftArm, 60).mCrippled);
+        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, leftArm, 40);
         EXPECT_TRUE(hurt.mCrippled);
         EXPECT_LE(hurt.mCondition, 0.0);
         // It is told once
-        EXPECT_FALSE(f.mLimbs.hurt(raider, 2, 20).mCrippled);
+        EXPECT_FALSE(f.mLimbs.hurt(raider, leftArm, 20).mCrippled);
     }
 
     TEST(FalloutScriptLimbsTest, aPartWithoutAConditionIsNeverHurt)
     {
         Fixture f;
-        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, 0, 500);
+        const Limbs::Hurt hurt = f.mLimbs.hurt(raider, torso, 500);
         EXPECT_FALSE(hurt.mCrippled);
         EXPECT_DOUBLE_EQ(hurt.mCondition, 100.0);
-        EXPECT_DOUBLE_EQ(f.mLimbs.condition(raider, 0), 100.0);
+        EXPECT_DOUBLE_EQ(f.mLimbs.condition(raider, torso), 100.0);
         EXPECT_DOUBLE_EQ(f.mLimbs.condition(raider, 9), 100.0);
     }
 

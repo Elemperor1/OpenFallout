@@ -465,16 +465,17 @@ ARENA_GRENADE_STAGE = 12
 # The target of V.A.T.S.: a character like the dummy, who stands in front of the player and is not shot at by the others
 ARENA_TARGET_ID = 0x953
 ARENA_TARGET_REF_ID = 0x954
-BODY_PARTS_ID = 0x955
+BODY_PARTS_ID = 0x1D  # the number of the DefaultBodyPartData of the games, which every character that is not the player has
 ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
-# The body part data of the race (BPTD): the name of the part, what V.A.T.S. calls it (empty: it can not be aimed at), the
-# damage multiplier, the share of the health that the part stands for, the actor value of its condition (the head is the
-# condition of perception, the torso of endurance, the left arm of the left attack, the right leg of the right mobility),
-# and its own chance to be hit
-BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100), ("Head", "Head", 2.0, 50, 25, 100),
-              ("LeftArm", "Left Arm", 0.5, 25, 27, 60), ("RightLeg", "Right Leg", 0.5, 25, 30, 60),
-              ("Spine", "", 1.0, 100, -1, 100))
-LAST_ID = 0x955 # the largest form ID of the plugin, which the next object ID of its header follows
+# The body part data every character has (the BPTD of the games with the number 0x1D, in the first master): the name of the
+# part, what V.A.T.S. calls it (empty: it can not be aimed at), the damage multiplier, the share of the health that the part
+# stands for, the actor value of its condition (the head is the condition of perception, the torso of endurance, the left arm
+# of the left attack, the right leg of the right mobility), its own chance to be hit, and its type (0 torso, 1 head, 3 left
+# arm, 10 right leg, 13 brain), which is the hit location a script is told
+BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100, 0), ("Head", "Head", 2.0, 50, 25, 100, 1),
+              ("LeftArm", "Left Arm", 0.5, 25, 27, 30, 3), ("RightLeg", "Right Leg", 0.5, 25, 30, 40, 10),
+              ("Spine", "", 1.0, 100, -1, 100, 13))
+LAST_ID = 0x954 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1613,7 +1614,6 @@ def race(form_id=RACE_ID, name=RACE_NAME):
     skills = struct.pack("<16B", *([0] * 16))
     data = skills + struct.pack("<4fI", 1.0, 1.0, 1.0, 1.0, 1)
     return record(b"RACE", form_id, [zstr(b"EDID", name), sub(b"DATA", data),
-                                     sub(b"GNAM", struct.pack("<I", BODY_PARTS_ID)),
                                      sub(b"NAM0"), sub(b"MNAM"), *part(0, "head"), *part(1, "foot", FOOT_PART),
                                      sub(b"FGGS", struct.pack("<50f", RACE_FACE, *([0.0] * 49))), sub(b"FNAM"),
                                      sub(b"NAM1"), sub(b"MNAM"), *part(0, "upperbody"), *part(1, "lefthand"),
@@ -1621,14 +1621,14 @@ def race(form_id=RACE_ID, name=RACE_NAME):
 
 
 def body_parts():
-    """The BPTD record the races name (GNAM): the parts of BODY_PARTS, each with its name (BPTN), node (BPNN), the name
-    V.A.T.S. shows (BPNT), the 84 bytes of BPND (damage multiplier, flags, part type, share of health, actor value of the
-    condition as a signed byte, chance to be hit) and NAM4, which ends the part."""
+    """The BPTD record of every character that is not the player (the number 0x1D): the parts of BODY_PARTS, each with its
+    name (BPTN), node (BPNN), the name V.A.T.S. shows (BPNT), the 84 bytes of BPND (damage multiplier, flags, part type, share
+    of health, actor value of the condition as a signed byte, chance to be hit) and NAM4, which ends the part."""
     subs = [zstr(b"EDID", "OFTestBodyParts")]
-    for index, (name, target, mult, health, value, to_hit) in enumerate(BODY_PARTS):
+    for name, target, mult, health, value, to_hit, part_type in BODY_PARTS:
         data = bytearray(84)
         struct.pack_into("<f", data, 0, mult)
-        data[5] = 1 if index == 0 else 0  # the part type: torso
+        data[5] = part_type
         data[6] = health
         struct.pack_into("<b", data, 7, value)
         data[8] = to_hit
