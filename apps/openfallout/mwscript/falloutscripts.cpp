@@ -1300,14 +1300,27 @@ namespace OFScript
         {
             if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
                 take(owner->mInventory);
-            // The armor that a levelled list of the inventory gives is carried like the rest (it is what the character
-            // is shown wearing)
-            std::vector<FalloutScript::FormId> worn;
-            if (startingArmor(holder, worn))
-                for (const FalloutScript::FormId piece : worn)
-                    if (std::none_of(
-                            items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; }))
-                        items.emplace_back(piece, 1);
+            // The armor that the levelled lists of the inventory give is carried as well, as many of each piece as
+            // they gave, whether the character can wear it or not (what is worn is for startingArmor to say). The
+            // pieces that the inventory lists itself are in it already.
+            if (npc->mIsFONV)
+            {
+                const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(holder), base);
+                const OFClass::StoreWornArmorSource source(mStore);
+                for (const ESM4::ListedArmor& given :
+                    ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed).mFromLists)
+                {
+                    const FalloutScript::FormId piece = numberOf(given.mArmor->mId);
+                    const auto count = static_cast<std::int32_t>(std::min<std::uint32_t>(given.mCount, 0x7FFFFFFF));
+                    const auto listed = std::find_if(
+                        items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; });
+                    if (listed == items.end())
+                        items.emplace_back(piece, count);
+                    else
+                        listed->second = static_cast<std::int32_t>(
+                            std::min<std::int64_t>(std::int64_t(listed->second) + count, 0x7FFFFFFF));
+                }
+            }
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {

@@ -17,6 +17,13 @@ namespace ESM4
         // a corrupt count of billions (or lists nested in lists with counts of thousands) from holding the game up,
         // and a list with dozens of entries has given every one of them long before.
         constexpr std::uint32_t maxRollsPerCharacter = 16384;
+        // The most of a piece that a character is given (counts of nested lists multiply)
+        constexpr std::uint64_t maxCopies = 0x7FFFFFFF;
+
+        std::uint32_t multiply(std::uint64_t a, std::uint64_t b)
+        {
+            return static_cast<std::uint32_t>(std::min(a * b, maxCopies));
+        }
 
         class ArmorCollector
         {
@@ -43,13 +50,13 @@ namespace ESM4
                 {
                     if (mTrace != nullptr)
                         ++mTrace->mListsEntered;
-                    expand(id, 0, count);
+                    expand(id, 0, count, 1);
                 }
                 else if (mTrace != nullptr)
                     ++mTrace->mOtherItems;
             }
 
-            std::vector<const Armor*> take() { return std::move(mArmor); }
+            CharacterArmor take() { return CharacterArmor{ std::move(mArmor), std::move(mFromLists) }; }
 
         private:
             void add(ESM::FormId id)
@@ -59,10 +66,26 @@ namespace ESM4
                     mArmor.push_back(armor);
             }
 
+            // A piece that a list gave: it is worn like any other, and carried as many times as the lists gave it
+            void addFromList(ESM::FormId id, std::uint32_t copies)
+            {
+                add(id);
+                const Armor* armor = mSource.findArmor(id);
+                if (armor == nullptr)
+                    return;
+                const auto given = std::find_if(mFromLists.begin(), mFromLists.end(),
+                    [armor](const ListedArmor& piece) { return piece.mArmor == armor; });
+                if (given == mFromLists.end())
+                    mFromLists.push_back({ armor, copies });
+                else
+                    given->mCount = multiply(1, std::uint64_t(given->mCount) + copies);
+            }
+
             // Adds the list `count` times: a list that calculates for each item in its count gives a new roll for every
-            // item, any other gives the same entries each time, which adds no armour that is not there already. A list
-            // that uses all is rolled once, as the flag supersedes the other two.
-            void expand(ESM::FormId listId, std::size_t depth, std::uint32_t count)
+            // item, any other gives the same entries each time, which adds no armour that is not there already (but
+            // as many copies of it). A list that uses all is rolled once, as the flag supersedes the other two. The
+            // copies are those that the lists around this one multiply in.
+            void expand(ESM::FormId listId, std::size_t depth, std::uint32_t count, std::uint32_t copies)
             {
                 const LevelledItem* list = mSource.findLevelledItem(listId);
                 if (list == nullptr)
@@ -76,8 +99,9 @@ namespace ESM4
 
                 const std::uint32_t rolls
                     = list->calcEachItemInCount() && !list->useAll() ? std::max<std::uint32_t>(count, 1) : 1;
+                const std::uint32_t perRoll = rolls > 1 ? copies : multiply(copies, std::max<std::uint32_t>(count, 1));
                 for (std::uint32_t roll = 0; roll < rolls && mRollsLeft > 0; ++roll)
-                    rollOnce(*list, depth);
+                    rollOnce(*list, depth, perRoll);
             }
 
             // The chance in a hundred that the list gives nothing: the value of the global variable that the list
@@ -95,7 +119,7 @@ namespace ESM4
                 return value > 0.f ? static_cast<int>(std::lround(std::min(value, 100.f))) : 0;
             }
 
-            void rollOnce(const LevelledItem& list, std::size_t depth)
+            void rollOnce(const LevelledItem& list, std::size_t depth, std::uint32_t copies)
             {
                 if (mRollsLeft == 0)
                     return;
@@ -127,10 +151,11 @@ namespace ESM4
                     {
                         if (mTrace != nullptr)
                             ++mTrace->mArmorFromLists;
-                        add(entry.mItem);
+                        addFromList(
+                            entry.mItem, multiply(copies, static_cast<std::uint32_t>(std::max(entry.mCount, 1))));
                     }
                     else if (mSource.findLevelledItem(entry.mItem) != nullptr)
-                        expand(entry.mItem, depth + 1, static_cast<std::uint32_t>(entry.mCount));
+                        expand(entry.mItem, depth + 1, static_cast<std::uint32_t>(entry.mCount), copies);
                 }
             }
 
@@ -140,6 +165,7 @@ namespace ESM4
             WornArmorTrace* mTrace;
             std::uint32_t mRollsLeft = maxRollsPerCharacter;
             std::vector<const Armor*> mArmor;
+            std::vector<ListedArmor> mFromLists;
         };
     }
 
@@ -181,6 +207,12 @@ namespace ESM4
     }
 
     std::vector<const Armor*> wornArmor(
+        const WornArmorSource& source, const Npc& character, int playerLevel, std::uint32_t seed, WornArmorTrace* trace)
+    {
+        return characterArmor(source, character, playerLevel, seed, trace).mArmor;
+    }
+
+    CharacterArmor characterArmor(
         const WornArmorSource& source, const Npc& character, int playerLevel, std::uint32_t seed, WornArmorTrace* trace)
     {
         if (trace != nullptr)
