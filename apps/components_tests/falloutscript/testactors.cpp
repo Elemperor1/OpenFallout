@@ -308,6 +308,19 @@ namespace
         EXPECT_EQ(state.killingLimb(guard), -1);
     }
 
+    TEST(FalloutScriptActorStateTest, a_new_game_forgets_the_killing_blows_of_the_old_one)
+    {
+        FakeRecords records;
+        ActorState state(records);
+
+        state.setDead(guard, true, 0x01000200, 3);
+        state.clear();
+        EXPECT_FALSE(state.isDead(guard));
+        // The same form dies again, by a script: it has no part of the body that a blow struck
+        state.setDead(guard, true);
+        EXPECT_EQ(state.killingLimb(guard), -1);
+    }
+
     TEST(FalloutScriptActorStateTest, the_dead_are_counted_by_the_form_they_were_made_from)
     {
         FakeRecords records;

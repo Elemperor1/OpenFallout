@@ -44,6 +44,7 @@ namespace FalloutScript
         mHolders.clear();
         mDead.clear();
         mKillers.clear();
+        mKillingLimbs.clear();
         mDeaths.clear();
         mChanges.clear();
     }
@@ -206,6 +207,8 @@ namespace FalloutScript
                 mDeaths.push_back({ actor, killer });
             if (killer != 0)
                 mKillers[actor] = killer;
+            // A death that no blow caused has no part of the body
+            mKillingLimbs.erase(actor);
             if (limb >= 0)
                 mKillingLimbs[actor] = limb;
             return true;
