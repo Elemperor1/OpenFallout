@@ -408,6 +408,7 @@ namespace OFScript
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
         bool itemInfo(FalloutScript::FormId item, FalloutScript::ItemInfo& info) override;
+        bool startingArmor(FalloutScript::FormId actor, std::vector<FalloutScript::FormId>& armor) override;
         /// The script of an item record (0 for none)
         FalloutScript::FormId itemScript(FalloutScript::FormId item);
         /// Runs the OnAdd, OnEquip and OnUnequip blocks of the scripts of items for what happened to the inventories

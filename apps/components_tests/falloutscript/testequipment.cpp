@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -51,6 +52,16 @@ namespace
     public:
         std::map<FormId, std::vector<std::pair<FormId, int>>> mItems;
         std::map<FormId, ItemInfo> mInfo;
+        std::map<FormId, std::vector<FormId>> mStartingArmor;
+        bool mStartingKnown = true;
+
+        bool startingArmor(FormId actor, std::vector<FormId>& armor) override
+        {
+            if (!mStartingKnown)
+                return false;
+            armor = mStartingArmor[actor];
+            return true;
+        }
 
         bool initialItems(FormId holder, std::vector<std::pair<FormId, int>>& items) override
         {
@@ -186,6 +197,74 @@ namespace
         EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
         EXPECT_FALSE(setup.mEquipment.weaponDrawn(guard));
         EXPECT_EQ(setup.mEquipment.weaponAnimationType(guard), 0u);
+    }
+
+    TEST(FalloutScriptEquipmentTest, an_item_that_is_taken_away_is_told_as_taken_off)
+    {
+        Wardrobe setup;
+        setup.mEquipment.equip(guard, pistol);
+        setup.mEquipment.equip(guard, cartridge);
+        setup.mEquipment.equip(guard, vest);
+        setup.mEquipment.setWeaponDrawn(guard, true);
+        setup.mEquipment.takeChanges();
+
+        setup.mState.removeItem(guard, pistol, 1);
+        setup.mState.removeItem(guard, cartridge, 1);
+        setup.mState.removeItem(guard, vest, 1);
+        // Whatever looks at the character finds it out
+        EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
+
+        const std::vector<Equipment::WornChange> changes = setup.mEquipment.takeChanges();
+        ASSERT_EQ(changes.size(), 3u);
+        std::set<FormId> items;
+        for (const Equipment::WornChange& change : changes)
+        {
+            EXPECT_FALSE(change.mWorn);
+            EXPECT_EQ(change.mActor, guard);
+            items.insert(change.mItem);
+        }
+        EXPECT_THAT(items, UnorderedElementsAre(pistol, cartridge, vest));
+
+        // A weapon that comes later is not out because of the one that went
+        setup.mState.addItem(guard, pistol, 1);
+        setup.mEquipment.equip(guard, pistol);
+        EXPECT_FALSE(setup.mEquipment.weaponDrawn(guard));
+    }
+
+    TEST(FalloutScriptEquipmentTest, a_character_starts_in_the_armor_its_record_gives)
+    {
+        Wardrobe setup;
+        setup.mRecords.mStartingArmor[guard] = { vest, helmet, ghost, stimpak };
+
+        // Only armor that the character carries is worn, and none of it is an event: it was dressed from the start
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest, helmet));
+        EXPECT_TRUE(setup.mEquipment.isEquipped(guard, vest));
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 25);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.upperBodyRating(guard), 20);
+        EXPECT_THAT(setup.mEquipment.takeChanges(), IsEmpty());
+
+        // A change of clothes starts from what was worn
+        setup.mEquipment.equip(guard, jumpsuit);
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(helmet, jumpsuit));
+        const std::vector<Equipment::WornChange> changes = setup.mEquipment.takeChanges();
+        ASSERT_EQ(changes.size(), 2u);
+        EXPECT_EQ(changes[0].mItem, vest);
+        EXPECT_FALSE(changes[0].mWorn);
+    }
+
+    TEST(FalloutScriptEquipmentTest, a_character_the_host_can_not_tell_about_yet_is_asked_again)
+    {
+        Wardrobe setup;
+        setup.mRecords.mStartingArmor[guard] = { vest };
+        setup.mRecords.mStartingKnown = false;
+        EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
+
+        setup.mRecords.mStartingKnown = true;
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest));
+
+        // What was taken off does not go back on at the next look
+        setup.mEquipment.unequip(guard, vest);
+        EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
     }
 
     TEST(FalloutScriptEquipmentTest, taking_off_tells_whether_the_item_was_on)

@@ -1297,6 +1297,14 @@ namespace OFScript
         {
             if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
                 take(owner->mInventory);
+            // The armor that a levelled list of the inventory gives is carried like the rest (it is what the character
+            // is shown wearing)
+            std::vector<FalloutScript::FormId> worn;
+            if (startingArmor(holder, worn))
+                for (const FalloutScript::FormId piece : worn)
+                    if (std::none_of(
+                            items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; }))
+                        items.emplace_back(piece, 1);
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
@@ -1358,6 +1366,29 @@ namespace OFScript
         return false;
     }
 
+    bool FalloutScripts::startingArmor(FalloutScript::FormId actor, std::vector<FalloutScript::FormId>& armor)
+    {
+        // The player starts with nothing (see initialItems)
+        if (actor == mPlayer)
+            return true;
+        ESM::FormId base;
+        if (!baseOf(actor, base))
+            return false;
+        if (base.isZeroOrUnset())
+            return true;
+        const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base);
+        if (npc == nullptr || !npc->mIsFONV)
+            return true;
+        // What the character is shown wearing: the armor of its inventory and of the lists in it, chosen with the seed
+        // of the reference and the level that the cell uses
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        const OFClass::StoreWornArmorSource source(mStore);
+        for (const ESM4::Armor* piece : ESM4::wornArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed))
+            if (piece != nullptr)
+                armor.push_back(numberOf(piece->mId));
+        return true;
+    }
+
     FalloutScript::FormId FalloutScripts::itemScript(FalloutScript::FormId item)
     {
         const ESM::RefId id = refId(item);
@@ -1395,11 +1426,15 @@ namespace OFScript
                 return block.mNames != FalloutScript::BlockNames::Form || block.mForm == holder || block.mForm == base;
             });
         };
+        // Both lists are taken before a block runs, so that what the blocks do (an OnAdd that equips the item) is told
+        // at the next frame and not in this one
+        const std::vector<FalloutScript::ActorState::ItemChange> added = mActors.takeChanges();
+        const std::vector<FalloutScript::Equipment::WornChange> worn = mEquipment.takeChanges();
         // A script takes items away without a drop (RemoveItem): the OnDrop blocks run when something is dropped
-        for (const FalloutScript::ActorState::ItemChange& change : mActors.takeChanges())
+        for (const FalloutScript::ActorState::ItemChange& change : added)
             if (change.mCount > 0)
                 raise(change.mItem, change.mHolder, BlockType::OnAdd);
-        for (const FalloutScript::Equipment::WornChange& change : mEquipment.takeChanges())
+        for (const FalloutScript::Equipment::WornChange& change : worn)
             raise(change.mItem, change.mActor, change.mWorn ? BlockType::OnEquip : BlockType::OnUnequip);
     }
 

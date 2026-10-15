@@ -58,6 +58,16 @@ namespace FalloutScript
 
         /// What the item is. False when the form is no item the host knows (it counts as nothing that can be worn).
         virtual bool itemInfo(FormId item, ItemInfo& info) = 0;
+
+        /// The armor a character wears when it first appears in the world (its record lists it, or a list that the
+        /// record names gives it). False when the host can not tell yet, and it is asked again; by default a
+        /// character wears nothing until a script puts something on it.
+        virtual bool startingArmor(FormId actor, std::vector<FormId>& armor)
+        {
+            (void)actor;
+            (void)armor;
+            return true;
+        }
     };
 
     /// What characters hold and wear: one weapon and its ammunition, and any armor whose body parts do not overlap. An
@@ -101,7 +111,7 @@ namespace FalloutScript
         double upperBodyRating(FormId actor);
 
         /// Whether the weapon is out of its holster
-        bool weaponDrawn(FormId actor) const;
+        bool weaponDrawn(FormId actor);
         void setWeaponDrawn(FormId actor, bool drawn);
 
         /// What everything the character carries weighs; false when the host can not tell yet what it carries
@@ -125,10 +135,18 @@ namespace FalloutScript
             FormId mAmmo = 0;
             std::vector<FormId> mArmor; // in the order it was put on
             bool mDrawn = false;
+            bool mSeeded = false; // what the character wears at the start is in mArmor
         };
 
-        /// Takes off what the actor no longer has. The caller holds the lock.
+        /// What the actor holds and wears; a character that is looked at for the first time wears what its record says
+        /// (the changes this makes are no events: the character was dressed from the start). The caller holds the lock.
+        Worn& wornOf(FormId actor);
+
+        /// Takes off what the actor no longer has, and notes it. The caller holds the lock.
         void tidy(FormId actor, Worn& worn);
+
+        /// Puts the armor on in the place of what covers any of the same parts of the body. The caller holds the lock.
+        void wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note);
 
         void noteChange(FormId actor, FormId item, bool worn);
 

@@ -35,15 +35,64 @@ namespace FalloutScript
         return changes;
     }
 
+    Equipment::Worn& Equipment::wornOf(FormId actor)
+    {
+        Worn& worn = mWorn[actor];
+        if (worn.mSeeded || actor == 0)
+            return worn;
+        // The host may not be able to tell yet (a character made while the game runs is known to the thread of the
+        // frame only); it is asked again the next time
+        std::vector<FormId> armor;
+        if (!mRecords.startingArmor(actor, armor))
+            return worn;
+        worn.mSeeded = true;
+        for (const FormId item : armor)
+        {
+            ItemInfo info;
+            if (mRecords.itemInfo(item, info) && info.mKind == ItemKind::Armor && mState.itemCount(actor, item) > 0)
+                wearArmor(actor, worn, item, info, false);
+        }
+        return worn;
+    }
+
     void Equipment::tidy(FormId actor, Worn& worn)
     {
+        // What a script took away (RemoveItem, RemoveAllItems) or gave away is off the character, which its item
+        // hears as it does when the character takes it off
         if (worn.mWeapon != 0 && mState.itemCount(actor, worn.mWeapon) <= 0)
+        {
+            noteChange(actor, worn.mWeapon, false);
             worn.mWeapon = 0;
+            worn.mDrawn = false;
+        }
         if (worn.mAmmo != 0 && mState.itemCount(actor, worn.mAmmo) <= 0)
+        {
+            noteChange(actor, worn.mAmmo, false);
             worn.mAmmo = 0;
+        }
         worn.mArmor.erase(std::remove_if(worn.mArmor.begin(), worn.mArmor.end(),
-                              [&](FormId item) { return mState.itemCount(actor, item) <= 0; }),
+                              [&](FormId item) {
+                                  if (mState.itemCount(actor, item) > 0)
+                                      return false;
+                                  noteChange(actor, item, false);
+                                  return true;
+                              }),
             worn.mArmor.end());
+    }
+
+    void Equipment::wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note)
+    {
+        // What covers any of the same parts of the body comes off
+        const auto covers = [&](FormId other) {
+            ItemInfo otherInfo;
+            return !mRecords.itemInfo(other, otherInfo) || (otherInfo.mSlots & info.mSlots) != 0;
+        };
+        if (note)
+            for (const FormId other : worn.mArmor)
+                if (covers(other))
+                    noteChange(actor, other, false);
+        worn.mArmor.erase(std::remove_if(worn.mArmor.begin(), worn.mArmor.end(), covers), worn.mArmor.end());
+        worn.mArmor.push_back(item);
     }
 
     Equipment::Outcome Equipment::equip(FormId actor, FormId item)
@@ -57,7 +106,7 @@ namespace FalloutScript
             return Outcome::NotCarried;
 
         const std::lock_guard lock(mMutex);
-        Worn& worn = mWorn[actor];
+        Worn& worn = wornOf(actor);
         tidy(actor, worn);
         switch (info.mKind)
         {
@@ -76,21 +125,10 @@ namespace FalloutScript
                 worn.mAmmo = item;
                 break;
             case ItemKind::Armor:
-            {
                 if (std::find(worn.mArmor.begin(), worn.mArmor.end(), item) != worn.mArmor.end())
                     return Outcome::AlreadyEquipped;
-                // What covers any of the same parts of the body comes off
-                const auto covers = [&](FormId other) {
-                    ItemInfo otherInfo;
-                    return !mRecords.itemInfo(other, otherInfo) || (otherInfo.mSlots & info.mSlots) != 0;
-                };
-                for (const FormId other : worn.mArmor)
-                    if (covers(other))
-                        noteChange(actor, other, false);
-                worn.mArmor.erase(std::remove_if(worn.mArmor.begin(), worn.mArmor.end(), covers), worn.mArmor.end());
-                worn.mArmor.push_back(item);
+                wearArmor(actor, worn, item, info, true);
                 break;
-            }
             default:
                 break;
         }
@@ -100,11 +138,10 @@ namespace FalloutScript
 
     bool Equipment::unequip(FormId actor, FormId item)
     {
-        const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        if (found == mWorn.end())
+        if (actor == 0)
             return false;
-        Worn& worn = found->second;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
         tidy(actor, worn);
         if (worn.mWeapon == item)
         {
@@ -129,13 +166,10 @@ namespace FalloutScript
 
     bool Equipment::isEquipped(FormId actor, FormId item)
     {
-        if (item == 0)
+        if (item == 0 || actor == 0)
             return false;
         const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        if (found == mWorn.end())
-            return false;
-        Worn& worn = found->second;
+        Worn& worn = wornOf(actor);
         tidy(actor, worn);
         return worn.mWeapon == item || worn.mAmmo == item
             || std::find(worn.mArmor.begin(), worn.mArmor.end(), item) != worn.mArmor.end();
@@ -143,32 +177,32 @@ namespace FalloutScript
 
     FormId Equipment::weapon(FormId actor)
     {
-        const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        if (found == mWorn.end())
+        if (actor == 0)
             return 0;
-        tidy(actor, found->second);
-        return found->second.mWeapon;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        return worn.mWeapon;
     }
 
     FormId Equipment::ammo(FormId actor)
     {
-        const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        if (found == mWorn.end())
+        if (actor == 0)
             return 0;
-        tidy(actor, found->second);
-        return found->second.mAmmo;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        return worn.mAmmo;
     }
 
     std::vector<FormId> Equipment::armor(FormId actor)
     {
-        const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        if (found == mWorn.end())
+        if (actor == 0)
             return {};
-        tidy(actor, found->second);
-        return found->second.mArmor;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        return worn.mArmor;
     }
 
     std::uint32_t Equipment::weaponAnimationType(FormId actor)
@@ -225,11 +259,14 @@ namespace FalloutScript
         return true;
     }
 
-    bool Equipment::weaponDrawn(FormId actor) const
+    bool Equipment::weaponDrawn(FormId actor)
     {
+        if (actor == 0)
+            return false;
         const std::lock_guard lock(mMutex);
-        const auto found = mWorn.find(actor);
-        return found != mWorn.end() && found->second.mDrawn && found->second.mWeapon != 0;
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        return worn.mDrawn && worn.mWeapon != 0;
     }
 
     void Equipment::setWeaponDrawn(FormId actor, bool drawn)
