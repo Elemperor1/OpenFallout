@@ -1408,6 +1408,51 @@
 -- @return #boolean
 
 ---
+-- Whether the content is that of Fallout 3 or New Vegas, which has combat to run (it is not for Morrowind's).
+-- @function [parent=#Combat] available
+-- @return #boolean
+
+---
+-- The weapon the player holds and what it allows.
+-- @function [parent=#Combat] weapon
+-- @return #CombatWeapon
+
+---
+-- The player attacks with its weapon at the object that the ray of its aim hit: a round is used up when the weapon
+-- needs one, and a character or creature that was hit loses health as for `strike`. Nothing happens while the weapon
+-- is not ready again after the last blow or shot.
+-- @function [parent=#Combat] fire
+-- @param #Object target The object the aim hit, nil when it hit none.
+-- @param #number limb The part of the body that is hit, -1 (the default) when it is not known.
+-- @return #CombatFire
+
+---
+-- The player draws the weapon, or puts it away, for the scripts that ask whether it is out (`GetWeaponAnimType`,
+-- `IsWeaponOut`).
+-- @function [parent=#Combat] setDrawn
+-- @param #boolean drawn
+
+---
+-- @type CombatWeapon
+-- @field #string weapon Form id of the weapon, "" for the hands.
+-- @field #boolean melee Whether a blow reaches no further than the weapon, as a shot does.
+-- @field #boolean automatic Whether the weapon goes on firing while the button is held.
+-- @field #number range How far a blow or shot reaches, in units.
+-- @field #number interval The least seconds between two blows or shots.
+-- @field #number ammoUse The rounds that a shot uses up.
+-- @field #number rounds The rounds the player has for the weapon.
+
+---
+-- @type CombatFire
+-- @field #boolean fired Whether a blow or shot was made (not while the weapon is not ready again, or out of rounds).
+-- @field #boolean outOfAmmo Whether the weapon had no round to use.
+-- @field #boolean hit Whether a character or creature was struck.
+-- @field #number damage
+-- @field #boolean critical
+-- @field #boolean killed
+-- @field #boolean downed
+
+---
 -- @type CombatStrike
 -- @field #boolean hit Whether a blow was struck at all.
 -- @field #number damage What the blow took from the health of the victim.

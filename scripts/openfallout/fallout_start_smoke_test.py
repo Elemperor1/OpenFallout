@@ -1431,6 +1431,155 @@ MOVING_FOOT_RAY = re.compile(r"OFTEST\trender ray (foot(?:walk|run|stand)) hit=\
                              r"\tperson\t(-?[\d.]+),")
 
 
+# The arena: the quest gives the player the rifle (EquipItem), and a global script reads what the game knows after each
+# step. The player shoots the dummy (core.combat.fire at the object, the way the player script of the engine does when
+# the ray of its aim finds one) until it is dead; then the raider, who waits beyond the sight of a character, is put in
+# front of the player, and the test watches it notice the player, come within the range of its pistol and shoot. A
+# bystander (who never starts a fight, has no package and no weapon) is shot once at the same time, and the test watches it
+# go for the player. At the end the player is given two grenades, which are their own ammunition, and throws three times.
+ARENA_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
+
+local probes = { @PROBES@ }
+local used, elapsed, step = 0, 0, 0
+
+local function find(id)
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+    return ok and object:isValid() and object or nil
+end
+local function stage(number)
+    local quest = world.quests.find('@QUEST@')
+    print('OFTEST', 'arena', 'stage', number, tostring(quest ~= nil and quest:setStage(number)))
+end
+-- Asks the quest to write what the game knows into the globals (the stage runs in the next frame)
+local function ask()
+    used = used + 1
+    stage(probes[used])
+end
+local function report(tag)
+    local g = world.globals
+    local player, raider = world.players[1], find(@RAIDER@)
+    print('OFTEST', 'arena', tag, string.format(
+        'armed=%.0f out=%.0f ammo=%.0f health=%.1f dummyDead=%.0f raiderDead=%.0f raiderCombat=%.0f raiderAmmo=%.0f '
+        .. 'hits=%.0f deaths=%.0f started=%.0f raiderDistance=%s',
+        g.@ARMED@, g.@OUT@, g.@AMMO@, g.@HEALTH@, g.@DUMMY_DEAD@, g.@RAIDER_DEAD@, g.@RAIDER_COMBAT@, g.@RAIDER_AMMO@,
+        g.@HITS@, g.@DEATHS@, g.@STARTED@,
+        raider and string.format('%.0f', (raider.position - player.position):length()) or 'none'))
+    local bystander = find(@BYSTANDER@)
+    if bystander then
+        print('OFTEST', 'arena', 'bystander', tag, string.format('distance=%.0f combat=%s',
+            (bystander.position - player.position):length(),
+            tostring(core.combat.inCombat(core.getFormId('OFTest.esm', @BYSTANDER@)))))
+    end
+end
+
+local steps = {
+    { 1.0, function() stage(@SETUP@) end },
+    { 2.0, ask },
+    { 2.5, function()
+        report('armed')
+        world.players[1]:sendEvent('OFTestArenaFire', { target = find(@DUMMY@) })
+    end },
+    { 5.0, ask },
+    { 5.5, function()
+        report('shot')
+        world.players[1]:sendEvent('OFTestArenaFire', {})
+        world.players[1]:sendEvent('OFTestArenaFire', { target = find(@BYSTANDER@), once = true })
+        local raider = find(@RAIDER@)
+        if raider then raider:teleport(raider.cell, util.vector3(@COMES@)) end
+    end },
+}
+for second = 6, 20 do
+    table.insert(steps, { second, ask })
+    table.insert(steps, { second + 0.5, function() report('raider ' .. second) end })
+end
+-- The grenades: the player has them in its hands, throws three times at the bystander, and the last throw is made with
+-- the hands, as the grenades are gone
+table.insert(steps, { 21, function() stage(@GRENADES@) end })
+table.insert(steps, { 22, function()
+    world.players[1]:sendEvent('OFTestArenaThrow', { target = find(@BYSTANDER@), count = 3 })
+end })
+table.insert(steps, { 25, core.quit })
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            local next = steps[step + 1]
+            if next and elapsed >= next[1] then
+                step = step + 1
+                next[2]()
+            end
+        end,
+    },
+}
+"""
+for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES))), ("@QUEST@", plugin.ARENA_QUEST_NAME),
+                      ("@RAIDER@", str(plugin.ARENA_RAIDER_REF_ID)), ("@DUMMY@", str(plugin.ARENA_DUMMY_REF_ID)),
+                      ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
+                      ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
+                      ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
+    ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
+for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
+                   ("dummy_dead", "DUMMY_DEAD"), ("raider_dead", "RAIDER_DEAD"), ("raider_combat", "RAIDER_COMBAT"),
+                   ("raider_ammo", "RAIDER_AMMO"), ("hits", "HITS"), ("deaths", "DEATHS"), ("started", "STARTED")):
+    ARENA_SCRIPT = ARENA_SCRIPT.replace("@" + _tag + "@", plugin.ARENA_GLOBALS[_key][1])
+
+# The player script of the arena: shoots at the object it is told to, once the weapon is ready again, as the player script of
+# the engine does, and logs each shot
+ARENA_PLAYER_SCRIPT = """\
+local core = require('openfallout.core')
+
+local target, shots, once = nil, 0, false
+local throwing, thrown, planned = nil, 0, 0
+
+return {
+    eventHandlers = {
+        OFTestArenaThrow = function(data)
+            throwing, thrown, planned = data.target, 0, data.count
+        end,
+        OFTestArenaFire = function(data)
+            target = data.target
+            once = data.once == true
+            if target then
+                local weapon = core.combat.weapon()
+                print('OFTEST', 'arena', 'weapon', weapon.weapon, tostring(weapon.melee), weapon.range, weapon.interval,
+                    weapon.rounds)
+            end
+        end,
+    },
+    engineHandlers = {
+        onUpdate = function()
+            if throwing and core.combat.available() then
+                -- What the weapon in the hands is before each throw: a grenade is used up by it, then the hands are left
+                local weapon = core.combat.weapon()
+                local result = core.combat.fire(throwing)
+                if result.fired then
+                    thrown = thrown + 1
+                    print('OFTEST', 'arena', 'throw', thrown, string.format('weapon=%s melee=%s rounds=%d ammoUse=%d hit=%s',
+                        weapon.weapon, tostring(weapon.melee), weapon.rounds, weapon.ammoUse, tostring(result.hit)))
+                    if thrown >= planned then throwing = nil end
+                end
+            end
+            if target == nil or not core.combat.available() then return end
+            local result = core.combat.fire(target)
+            if result.fired then
+                shots = shots + 1
+                print('OFTEST', 'arena', once and 'bystander shot' or 'shot', shots, string.format(
+                    'hit=%s damage=%.1f killed=%s', tostring(result.hit), result.damage, tostring(result.killed)))
+                if result.killed or once then target = nil end
+            elseif result.outOfAmmo then
+                print('OFTEST', 'arena', 'out of ammunition')
+                target = nil
+            end
+        end,
+    },
+}
+"""
+
+
 def start_xvfb():
     if os.environ.get("DISPLAY"):
         return None
@@ -2065,6 +2214,103 @@ def check_triggers(text):
                             f"it is on, not walk on to the package that comes after: {later[0]}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_arena(text):
+    """The problems with the arena: the stages of the quest are set; the rifle is in the hands of the player with its rounds;
+    the dummy takes the blows the player shoots at it (its OnHit block counts each, a round is used for each shot) and
+    dies of them (OnDeath once, GetDead); the raider, put in front of the player, starts a fight (its OnStartCombat block
+    runs, IsInCombat holds), takes its pistol from what it carries and shoots (it has fewer rounds), comes within the range
+    of the pistol, and the player loses health. A bystander who never starts a fight is shot once and goes for the player.
+    The player, given two grenades, uses one up with each throw and throws the third time with its hands."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
+            problems.append(line)
+    pattern = (r"OFTEST\tarena\t(\w[\w ]*)\tarmed=(-?[\d.]+) out=(-?[\d.]+) ammo=(-?[\d.]+) health=(-?[\d.]+) "
+               r"dummyDead=(-?[\d.]+) raiderDead=(-?[\d.]+) raiderCombat=(-?[\d.]+) raiderAmmo=(-?[\d.]+) "
+               r"hits=(-?[\d.]+) deaths=(-?[\d.]+) started=(-?[\d.]+) raiderDistance=(\w+)$")
+    reports = {}
+    names = ("armed", "out", "ammo", "health", "dummy_dead", "raider_dead", "raider_combat", "raider_ammo", "hits", "deaths",
+             "started")
+    for line in text.splitlines():
+        match = re.search(pattern, line)
+        if match:
+            row = dict(zip(names, (float(value) for value in match.groups()[1:12])))
+            row["distance"] = None if match.group(13) == "none" else float(match.group(13))
+            reports[match.group(1)] = row
+    for tag in ("armed", "shot", "raider 6", "raider 20"):
+        if tag not in reports:
+            problems.append(f"no 'arena {tag}' line in the log")
+    if problems:
+        return problems
+    stages = re.findall(r"OFTEST\tarena\tstage\t(\d+)\t(\w+)$", text, re.M)
+    if any(done != "true" for _, done in stages):
+        problems.append(f"a stage of the arena quest was not set: {stages}")
+    shots = [(int(number), hit, killed) for number, hit, killed in re.findall(
+        r"OFTEST\tarena\tshot\t(\d+)\thit=(\w+) damage=[\d.]+ killed=(\w+)$", text, re.M)]
+    armed, shot = reports["armed"], reports["shot"]
+    if armed["armed"] != 1:
+        problems.append(f"the rifle should be equipped by EquipItem (GetEquipped 1): {armed}")
+    if armed["ammo"] != plugin.ARENA_PLAYER_AMMO:
+        problems.append(f"the player should have its {plugin.ARENA_PLAYER_AMMO} rounds: {armed}")
+    if armed["raider_combat"] != 0 or armed["started"] != 0 or armed["distance"] is None or armed["distance"] < 2500:
+        problems.append(f"the raider, beyond the sight of a character, should be at peace and far away: {armed}")
+    if not shots:
+        problems.append("the player should have shot at the dummy (no 'arena shot' line)")
+    elif shot["ammo"] != plugin.ARENA_PLAYER_AMMO - len(shots):
+        problems.append(f"each shot should use a round: {len(shots)} shots left {shot['ammo']} of "
+                        f"{plugin.ARENA_PLAYER_AMMO} rounds")
+    if shots and any(hit != "true" for _, hit, _ in shots):
+        problems.append(f"every shot at the dummy should hit: {shots}")
+    if not shots or shots[-1][2] != "true":
+        problems.append(f"the last shot should have killed the dummy: {shots}")
+    if shot["dummy_dead"] != 1 or shot["deaths"] != 1:
+        problems.append(f"the dummy should be dead (GetDead) and its OnDeath block should have run once: {shot}")
+    if shot["hits"] != len(shots):
+        problems.append(f"the OnHit block of the dummy should have run once for each of the {len(shots)} blows: {shot}")
+    # The raider: it notices the player, closes in, takes its pistol and shoots
+    final = reports["raider 20"]
+    if final["started"] < 1 or final["raider_combat"] != 1:
+        problems.append(f"the raider should have started a fight (OnStartCombat, IsInCombat): {final}")
+    if final["raider_dead"] != 0:
+        problems.append(f"the raider should be alive: {final}")
+    if final["distance"] is None or final["distance"] > 700:
+        problems.append("the raider should have come within the range its pistol is shot from (600 units, half of the 1200 "
+                        f"of the pistol): {final}")
+    if final["raider_ammo"] >= plugin.ARENA_RAIDER_AMMO:
+        problems.append(f"the raider should have taken its pistol and shot rounds with it: {final}")
+    if final["health"] >= armed["health"]:
+        problems.append(f"the player should have lost health to the raider: {armed['health']} before, {final['health']} after")
+    # The bystander never starts a fight, has no package and no weapon: shot once, it has to go for the player
+    shot_at = re.findall(r"OFTEST\tarena\tbystander shot\t(\d+)\thit=(\w+) damage=[\d.]+ killed=(\w+)$", text, re.M)
+    if len(shot_at) != 1 or shot_at[0][1] != "true" or shot_at[0][2] != "false":
+        problems.append(f"the bystander should be hit by one shot and survive it: {shot_at}")
+    seen = {tag: (float(distance), combat == "true") for tag, distance, combat in re.findall(
+        r"OFTEST\tarena\tbystander\t(\w[\w ]*)\tdistance=(-?\d+) combat=(\w+)$", text, re.M)}
+    if "armed" not in seen or "raider 20" not in seen:
+        problems.append(f"no 'arena bystander' lines in the log: {seen}")
+    else:
+        before, after = seen["armed"], seen["raider 20"]
+        if before[1] or before[0] < 600:
+            problems.append(f"the bystander should be at peace and at a distance before it is shot: {before}")
+        if not after[1] or after[0] > 300:
+            problems.append("the bystander, shot once, should be in a fight with the player and have come to it "
+                            f"(distance, in combat): {after}")
+    # The grenades are their own ammunition: each throw uses one up, and the third throw is made with the hands
+    throws = re.findall(r"OFTEST\tarena\tthrow\t(\d+)\tweapon=(\S*) melee=(\w+) rounds=(-?\d+) ammoUse=(-?\d+) hit=(\w+)$",
+                        text, re.M)
+    if len(throws) != 3:
+        problems.append(f"the player should have thrown three times: {throws}")
+    else:
+        count = plugin.ARENA_GRENADE_COUNT
+        for number, (_, weapon, melee, rounds, ammo_use, hit) in enumerate(throws[:count]):
+            if weapon == "" or melee != "false" or int(rounds) != count - number or int(ammo_use) != 1:
+                problems.append(f"throw {number + 1} should be made with a grenade and {count - number} left: {throws}")
+        _, weapon, melee, rounds, ammo_use, hit = throws[count]
+        if weapon != "" or melee != "true":
+            problems.append(f"the throw after the last grenade should be made with the hands: {throws}")
     return problems
 
 
@@ -2731,7 +2977,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -2761,6 +3007,10 @@ def main():
     (data / "scripts" / "dialoguehost.lua").write_text(DIALOGUE_HOST_SCRIPT, encoding="ascii")
     (data / "dialoguetest.omwscripts").write_text(
         "PLAYER: scripts/dialoguetest.lua\nGLOBAL: scripts/dialoguehost.lua\n", encoding="ascii")
+    (data / "scripts" / "arenatest.lua").write_text(ARENA_SCRIPT, encoding="ascii")
+    (data / "scripts" / "arenaplayer.lua").write_text(ARENA_PLAYER_SCRIPT, encoding="ascii")
+    (data / "arenatest.omwscripts").write_text(
+        "PLAYER: scripts/arenaplayer.lua\nGLOBAL: scripts/arenatest.lua\n", encoding="ascii")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
@@ -2869,6 +3119,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (triggers):", problem)
+        problems += found
+    if args.only in (None, "arena"):
+        home = work / "arena" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "arena" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== arena: --start", plugin.ARENA_CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.ARENA_CELL_NAME, [],
+                               "arenatest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_arena(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (arena):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

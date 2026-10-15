@@ -379,7 +379,7 @@ RACE_TWO_NAME = "OFTestRaceTwo"
 AVIF_TEXTS = {AVIF_STRENGTH_ID: ("Strength", "Strength of the test", "The test strength description."),
               AVIF_BARTER_ID: ("Barter", "Barter of the test", "The test barter description.")}
 AV_PERCEPTION, AV_ENDURANCE, AV_CHARISMA, AV_INTELLIGENCE, AV_AGILITY = 6, 7, 8, 9, 10
-AV_BARTER, AV_GUNS, AV_SURVIVAL = 32, 41, 44
+AV_BARTER, AV_EXPLOSIVES, AV_GUNS, AV_SURVIVAL = 32, 35, 41, 44
 
 # The quest that starts a new game, as CG00 does in Fallout 3: the engine finds it by its editor ID, starts it and runs
 # its MenuMode block (the main menu counts as a menu), which sets stage 0 as long as the quest is before stage 5; the
@@ -401,7 +401,51 @@ NEW_GAME_LAST_STAGE = 10
 NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
-LAST_ID = 0x931 # the largest form ID of the plugin, which the next object ID of its header follows
+# The arena: another interior cell for the tests of combat, with a rifle and a pistol, their ammunition, a dummy that
+# dies of a few shots, a raider who goes for the player, a bystander who goes for the player once it is shot, and the quest whose stages give the player the rifle and tell
+# what the game knows (so that a test can read it from Lua)
+ARENA_CELL_ID = 0x932
+ARENA_FLOOR_REF_ID = 0x933
+ARENA_MARKER_REF_ID = 0x934
+ARENA_AMMO_ID = 0x935
+ARENA_RIFLE_ID = 0x936
+ARENA_PISTOL_ID = 0x937
+ARENA_DUMMY_ID = 0x938
+ARENA_DUMMY_REF_ID = 0x939
+ARENA_RAIDER_ID = 0x93A
+ARENA_RAIDER_REF_ID = 0x93B
+ARENA_DUMMY_SCRIPT_ID = 0x93C
+ARENA_RAIDER_SCRIPT_ID = 0x93D
+ARENA_QUEST_ID = 0x93E
+ARENA_GLOBALS = {name: (0x93F + index, "OFTestArena" + name.title().replace("_", ""))
+                 for index, name in enumerate(("hits", "deaths", "started", "armed", "weapon_out", "ammo", "health",
+                                               "dummy_dead", "raider_dead", "raider_combat", "raider_ammo"))}
+ARENA_CELL_NAME = "OFTestArena"
+ARENA_QUEST_NAME = "OFTestArenaQuest"
+ARENA_SETUP_STAGE = 10
+# The stages that tell what the game knows, one for each time the test looks (a stage is set once)
+ARENA_PROBE_STAGES = tuple(range(20, 60))
+ARENA_DUMMY_PLACE = (400.0, 0.0, 0.0)
+# The bystander stands behind the player, at peace, until it is shot
+ARENA_BYSTANDER_PLACE = (0.0, -700.0, 0.0)
+# The raider starts where the player does not see it from, beyond the 2500 units that a character sees, and is put where
+# it can see the player when the test says so
+ARENA_RAIDER_PLACE = (-1800.0, 1800.0, 0.0)
+ARENA_RAIDER_COMES = (0.0, 1400.0, 0.0)
+ARENA_RIFLE_DAMAGE = 10
+ARENA_PISTOL_DAMAGE = 10
+ARENA_PISTOL_RANGE = 1200.0
+ARENA_RAIDER_AMMO = 40
+ARENA_PLAYER_AMMO = 30
+# A dummy of level 1 with one endurance and 5 health: 10 health
+ARENA_DUMMY_HEALTH = 5
+ARENA_BYSTANDER_ID = 0x94B
+ARENA_BYSTANDER_REF_ID = 0x94C
+# The grenades the player throws at the end: a weapon that is its own ammunition
+ARENA_GRENADE_ID = 0x94D
+ARENA_GRENADE_COUNT = 2
+ARENA_GRENADE_STAGE = 11
+LAST_ID = 0x94D # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1567,15 +1611,16 @@ def faction(form_id, name):
 
 
 def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=(), items=(), voice=None,
-           title="OpenFallout Test Person", script=None):
+           title="OpenFallout Test Person", script=None, health=PERSON_HEALTH, attributes=PERSON_ATTRIBUTES,
+           level=PERSON_LEVEL, ai=None):
     """A character of that race, with the skeleton of the placeholder, as a Fallout record names it (MODL), following
     the packages (in order of priority). One that is not `dressed` has no suit, hair or face."""
     # ACBS of Fallout 3 and New Vegas: flags, fatigue, barter gold, level, calc min, calc max, speed multiplier, karma,
     # disposition base, template flags (24 bytes); none of the flags is set, so the record has its own traits.
-    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, PERSON_LEVEL, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
+    acbs = struct.pack("<IHHhHHHfhH", 0, 0, 0, level, 1, 1, PERSON_SPEED, PERSON_KARMA, 0, 0)
     subs = [zstr(b"EDID", name), zstr(b"FULL", title), zstr(b"MODL", SKELETON),
             sub(b"ACBS", acbs), sub(b"RNAM", struct.pack("<I", RACE_ID)),
-            sub(b"DATA", struct.pack("<i7B", PERSON_HEALTH, *PERSON_ATTRIBUTES)),
+            sub(b"DATA", struct.pack("<i7B", health, *attributes)),
             sub(b"DNAM", struct.pack("<14B14B", *PERSON_SKILLS, *([0] * 14)))]
     if dressed:
         subs += [sub(b"CNTO", struct.pack("<II", SUIT_ID, 1)), sub(b"HNAM", struct.pack("<I", HAIR_ID)),
@@ -1587,6 +1632,10 @@ def person(form_id=NPC_ID, name=NPC_NAME, packages=(), dressed=True, factions=()
         subs.append(sub(b"VTCK", struct.pack("<I", voice)))
     if script is not None:
         subs.append(sub(b"SCRI", struct.pack("<I", script)))
+    if ai is not None:
+        # AIDT of Fallout 3 and New Vegas (20 bytes): aggression, confidence, energy, responsibility, mood, three unused,
+        # services, trained skill, maximum training, assistance, aggro radius flags, aggro radius
+        subs.append(sub(b"AIDT", struct.pack("<5B3xIbBBBi", ai[0], ai[1], 50, 50, 0, 0, -1, 0, 0, 0, 0)))
     return record(b"NPC_", form_id, subs)
 
 
@@ -1994,6 +2043,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f")
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
@@ -2004,8 +2054,14 @@ def plugin():
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
                                                  new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
-                                                 watch_script("exterior")])
-            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest()])
+                                                 watch_script("exterior"), *arena_scripts()])
+            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
+            + top_group(b"AMMO", [arena_ammo()])
+            + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
+                                  arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
+                                               ARENA_PISTOL_RANGE, 2.0),
+                                  arena_weapon(ARENA_GRENADE_ID, "OFTestArenaGrenade", ARENA_PISTOL_DAMAGE,
+                                               ARENA_PISTOL_RANGE, 2.0, grenade=True)])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
                                   trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),
                                   trait_perk(NOT_A_TRAIT_ID, "OFTestPerkNotTrait", NOT_A_TRAIT_NAME, "No trait.", False)])
@@ -2017,7 +2073,7 @@ def plugin():
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
-            + top_group(b"NPC_", [person(), *package_people(),
+            + top_group(b"NPC_", [person(), *package_people(), *arena_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
                                   person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
@@ -2032,7 +2088,114 @@ def plugin():
             + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
-            + top_group(b"CELL", [block]) + top_group(b"WRLD", worldspace()))
+            + top_group(b"CELL", [block, arena_cell()]) + top_group(b"WRLD", worldspace()))
+
+
+def arena_ammo():
+    """An AMMO record of Fallout 3: the speed, the flags, the value and the rounds of a clip (13 bytes)."""
+    return record(b"AMMO", ARENA_AMMO_ID, [zstr(b"EDID", "OFTestArenaAmmo"), zstr(b"FULL", "Test Rounds"),
+                                           sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
+
+
+def arena_weapon(form_id, name, damage, max_range, attacks_per_second, grenade=False):
+    """A WEAP record of Fallout 3 for a gun that fires one round at a time (animation type 5, the rifle of two hands), or
+    for a grenade (animation type 10, which has no ammunition: the one that is thrown is used up): DATA (value, health,
+    weight, damage, clip) and the 136 bytes of DNAM with the ones the engine reads."""
+    game = bytearray(136)
+    struct.pack_into("<I", game, 0, 10 if grenade else 5)  # animation type
+    struct.pack_into("<f", game, 4, 1.0)  # animation multiplier
+    struct.pack_into("<f", game, 8, 64.0)  # reach
+    game[14] = 1  # ammo use
+    struct.pack_into("<f", game, 48, max_range)
+    struct.pack_into("<f", game, 64, attacks_per_second)  # fire rate
+    struct.pack_into("<f", game, 88, attacks_per_second)  # attacks a second
+    struct.pack_into("<I", game, 104, AV_EXPLOSIVES if grenade else AV_GUNS)  # the skill
+    struct.pack_into("<I", game, 120, 0xffffffff)  # resist
+    return record(b"WEAP", form_id, [
+        zstr(b"EDID", name), zstr(b"FULL", name),
+        sub(b"DATA", struct.pack("<iifHB", 100, 250, 5.0, damage, 12)),
+        sub(b"DNAM", bytes(game)), *([] if grenade else [sub(b"NAM0", struct.pack("<I", ARENA_AMMO_ID))])])
+
+
+def arena_scripts():
+    """The scripts of the dummy (it counts the blows it takes and its death) and of the raider (it counts the fights it
+    starts), SCPT records of type 0 whose blocks are those of the events of combat."""
+    sf = fallout_script
+    dummy = sf.Script(0)
+    hits, deaths = (dummy.form(ARENA_GLOBALS[name][0]) for name in ("hits", "deaths"))
+    count = lambda index: sf.set_to(sf.global_target(index), sf.global_target(index) + sf.number("1") + sf.operator("+"))
+    dummy.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_HIT, count(hits)), sf.block(sf.ON_DEATH, count(deaths)))
+    raider = sf.Script(0)
+    started = raider.form(ARENA_GLOBALS["started"][0])
+    raider.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_START_COMBAT, count(started)))
+    return [record(b"SCPT", ARENA_DUMMY_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaDummyScript"), *sf.sub_records(dummy)]),
+            record(b"SCPT", ARENA_RAIDER_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaRaiderScript"), *sf.sub_records(raider)])]
+
+
+def arena_quest():
+    """The quest of the arena. Its first stage gives the player the rifle and its rounds and puts the rifle in its hands
+    (EquipItem), and its second the grenades the player throws at the end; each of the other stages writes what the game
+    knows into the globals: whether the rifle is held and out, how many rounds the player has, its health, whether the
+    dummy and the raider are dead, whether the raider fights and how many rounds it has."""
+    sf = fallout_script
+    names = ("armed", "weapon_out", "ammo", "health", "dummy_dead", "raider_dead", "raider_combat", "raider_ammo")
+    forms = [PLAYER_REFERENCE, ARENA_RIFLE_ID, ARENA_AMMO_ID, ARENA_DUMMY_REF_ID, ARENA_RAIDER_REF_ID,
+             *(ARENA_GLOBALS[name][0] for name in names)]
+    index = {form: position + 1 for position, form in enumerate(forms)}
+    player, rifle, ammo, dummy, raider = (index[form] for form in forms[:5])
+    glob = {name: index[ARENA_GLOBALS[name][0]] for name in names}
+    setup = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(rifle), sf.int_argument(1)),
+             sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(ARENA_PLAYER_AMMO)),
+             sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle))]
+    probe = [
+        sf.set_to(sf.global_target(glob["armed"]), sf.call_token(sf.GET_EQUIPPED, sf.form_argument(rifle), reference=player)),
+        sf.set_to(sf.global_target(glob["weapon_out"]), sf.call_token(sf.IS_WEAPON_OUT, reference=player)),
+        sf.set_to(sf.global_target(glob["ammo"]), sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=player)),
+        sf.set_to(sf.global_target(glob["health"]), sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_HEALTH), reference=player)),
+        sf.set_to(sf.global_target(glob["dummy_dead"]), sf.call_token(sf.GET_DEAD, reference=dummy)),
+        sf.set_to(sf.global_target(glob["raider_dead"]), sf.call_token(sf.GET_DEAD, reference=raider)),
+        sf.set_to(sf.global_target(glob["raider_combat"]), sf.call_token(sf.IS_IN_COMBAT, reference=raider)),
+        sf.set_to(sf.global_target(glob["raider_ammo"]),
+                  sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=raider))]
+    # The last stage gives the player grenades and puts them in its hands, which the test throws at the end
+    grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
+    grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
+                sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
+    entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
+               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms)]
+    entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
+    return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
+
+
+def arena_people():
+    """The dummy, the raider and the bystander: characters of a race with a skeleton, as the others are. The dummy takes no part in a fight
+    until it is shot (aggression 0, so it only fights back), has one endurance and 5 health, which is 10 health at level 1.
+    The raider is very aggressive and foolhardy, carries the pistol and its rounds, and has a skill of 29 with it."""
+    dummy = person(ARENA_DUMMY_ID, "OFTestArenaDummy", dressed=False, script=ARENA_DUMMY_SCRIPT_ID,
+                   health=ARENA_DUMMY_HEALTH, attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
+    raider = person(ARENA_RAIDER_ID, "OFTestArenaRaider", dressed=False, script=ARENA_RAIDER_SCRIPT_ID,
+                    items=[(ARENA_PISTOL_ID, 1), (ARENA_AMMO_ID, ARENA_RAIDER_AMMO)], ai=(2, 4))
+    # Never starts a fight (aggression 0), has no package and no weapon, and does not run from one (confidence 4): the
+    # test shoots it once, and it has to go for the player with its hands
+    bystander = person(ARENA_BYSTANDER_ID, "OFTestArenaBystander", dressed=False, ai=(0, 4))
+    return [dummy, raider, bystander]
+
+
+def arena_cell():
+    """The interior cell of the arena with its references: the floor, the entry marker, the dummy east of the start and the
+    raider in the far corner."""
+    xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
+    cell = record(b"CELL", ARENA_CELL_ID, [zstr(b"EDID", ARENA_CELL_NAME), zstr(b"FULL", "OpenFallout Test Arena"),
+                                           sub(b"DATA", b"\x01"), sub(b"XCLL", xcll)])
+    refs = group(struct.pack("<I", ARENA_CELL_ID), 9, [
+        refr(ARENA_FLOOR_REF_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
+        refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
+        achr(ARENA_DUMMY_REF_ID, ARENA_DUMMY_PLACE, base=ARENA_DUMMY_ID),
+        achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
+        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID)])
+    children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
+    sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
+    return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])
 
 
 def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):

@@ -32,6 +32,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadperk.hpp>
+#include <components/esm4/loadproj.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
@@ -41,6 +42,7 @@
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/falloutscript/fightai.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/falloutscript/playercontrols.hpp>
 #include <components/misc/convert.hpp>
@@ -347,6 +349,12 @@ namespace OFScript
             mPendingMade.clear();
             mMadeBases.clear();
             mMadeCount = 0;
+        }
+        // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
+        mFightTraits.clear();
+        {
+            const std::lock_guard lock(mFireMutex);
+            mFireCooldowns.clear();
         }
         mReferences.clear();
         mTriggerShapes.clear();
@@ -1186,9 +1194,9 @@ namespace OFScript
         }
 
         /// The record that has what a flag of the template says a character takes from its template (its stats, its
-        /// inventory): the end of its chain of templates. A levelled list in the place of a template gives one of its
-        /// characters, the one that the cell shows for this reference (the chain is followed with the seed of the
-        /// reference, as for the level). The record itself when the chain ends without a record that has them.
+        /// inventory, its AI data): the end of its chain of templates. A levelled list in the place of a template gives
+        /// one of its characters, the one that the cell shows for this reference (the chain is followed with the seed
+        /// of the reference, as for the level). The record itself when the chain ends without a record that has them.
         const ESM4::Npc& templateRecordOf(
             const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint16_t flag, std::uint32_t seed)
         {
@@ -1510,13 +1518,12 @@ namespace OFScript
         return true;
     }
 
-    namespace
+    double FalloutScripts::gameSetting(std::string_view name, double fallback)
     {
-        /// How far a character sees another one (units): the games work it out from the sneak of the target and the
-        /// light, which nothing here knows yet, and stop at a distance that is a guess
-        constexpr double sightRange = 3000.0;
-        /// How long an essential character lies unconscious before it gets up (seconds)
-        constexpr float essentialDownSeconds = 15.f;
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        const std::map<std::string, double>& settings = gameSettingValues();
+        const auto found = settings.find(Misc::StringUtils::lowerCase(name));
+        return found != settings.end() ? found->second : fallback;
     }
 
     bool FalloutScripts::detects(FalloutScript::FormId viewer, FalloutScript::FormId target)
@@ -1528,7 +1535,18 @@ namespace OFScript
         if (mCombat.target(viewer) == target)
             return true;
         double apart = 0;
-        return distance(viewer, target, apart) && apart <= sightRange;
+        return distance(viewer, target, apart) && apart <= sightDistance();
+    }
+
+    double FalloutScripts::sightDistance()
+    {
+        // The games work how far a character sees from the sneak of the target and the light, which nothing here knows
+        // yet: they stop looking for a sneaking one at fSneakMaxDistance
+        constexpr double defaultDistance = 2500.0;
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        const std::map<std::string, double>& settings = gameSettingValues();
+        const auto found = settings.find("fsneakmaxdistance");
+        return found != settings.end() && found->second > 0 ? found->second : defaultDistance;
     }
 
     bool FalloutScripts::essentialByRecord(FalloutScript::FormId actor)
@@ -1596,6 +1614,21 @@ namespace OFScript
             // Bare hands: the records have no weapon for a fist here, so it does a point and the strength bonus
             damage.mDamage = 1;
             damage.mMelee = true;
+            // A creature fights with the attack of its record, and its combat skill is its skill
+            ESM::FormId base;
+            if (attacker != 0 && baseOf(attacker, base) && !base.isZeroOrUnset())
+                if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+                {
+                    const ESM4::FalloutStats& stats = statsRecordOf(
+                        mStore, *creature, OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(attacker), base))
+                                                          .mFalloutStats;
+                    if (stats.mKnown)
+                    {
+                        damage.mDamage = std::max<double>(stats.mDamage, 1.0);
+                        damage.mSkill = stats.mCombatSkill;
+                        return damage;
+                    }
+                }
         }
         else
         {
@@ -1692,25 +1725,363 @@ namespace OFScript
         if (!FalloutScript::isEssential(mCombat, mActors, *this, victim))
             return false;
         // The character is out before the fights end, so none starts in between, and no death or revival comes
-        // between the two steps
+        // between the two steps. How long an essential character lies unconscious before it gets up is
+        // fEssentialDeathTime (read from the executables of both games: 10 seconds).
         const auto transitions = mActors.holdTransitions();
-        mCombat.setUnconscious(victim, true, essentialDownSeconds);
+        mCombat.setUnconscious(victim, true, static_cast<float>(gameSetting("fEssentialDeathTime", 10.0)));
         mCombat.withdraw(victim);
         return true;
+    }
+
+    namespace
+    {
+        // A grenade or a mine is not fired from anything: the one that is thrown or laid is what a use takes
+        bool isUsedUp(const ESM4::Weapon::GameData& game)
+        {
+            return game.mAnimationType == ESM4::Weapon::GameData::GrenadeThrown
+                || game.mAnimationType == ESM4::Weapon::GameData::LandMine
+                || game.mAnimationType == ESM4::Weapon::GameData::MineThrown;
+        }
+    }
+
+    FalloutScripts::WeaponStats FalloutScripts::weaponStats(FalloutScript::FormId attacker)
+    {
+        // A blow of the hands or a melee weapon reaches this far (the games take it from the reach of the weapon)
+        constexpr double meleeReach = 130;
+        WeaponStats stats;
+        stats.mWeapon = attacker != 0 ? mEquipment.weapon(attacker) : 0;
+        const ESM4::Weapon* record
+            = stats.mWeapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon)) : nullptr;
+        if (record == nullptr || !record->mHasGameData)
+        {
+            stats.mRange = meleeReach;
+            return stats;
+        }
+        const ESM4::Weapon::GameData& game = record->mGame;
+        stats.mMelee = game.mAnimationType <= ESM4::Weapon::GameData::Melee2Hand;
+        stats.mAutomatic = (game.mFlags1 & ESM4::Weapon::GameData::Automatic) != 0;
+        // The time between two attacks: the fire rate of an automatic weapon, else its attacks a second (the games'
+        // numbers: the BB gun 0.75, which is 1.33 seconds)
+        const double perSecond = stats.mAutomatic ? std::max<double>(game.mFireRate, game.mAttacksPerSecond)
+                                                  : static_cast<double>(game.mAttacksPerSecond);
+        stats.mInterval = perSecond > 0 ? 1.0 / perSecond : 0.5;
+        if (stats.mMelee)
+        {
+            stats.mRange = meleeReach * std::max<double>(game.mReach, 1.0);
+            return stats;
+        }
+        // The shots are not flown: a weapon reaches as far as its projectile does
+        stats.mRange = std::max<double>(game.mMaxRange, 0.0);
+        if (const ESM4::Projectile* projectile = mStore.get<ESM4::Projectile>().search(game.mProjectile))
+            stats.mRange = std::max<double>(projectile->gameData().mRange, stats.mRange);
+        stats.mAmmoUse = std::max<int>(game.mAmmoUse, 1);
+        // The ammunition it was given, or else the one of the record (not a list of them)
+        const FalloutScript::FormId chosen = mEquipment.ammo(attacker);
+        if (isUsedUp(game))
+        {
+            stats.mAmmo = stats.mWeapon;
+            stats.mAmmoUse = 1;
+        }
+        else if (chosen != 0)
+            stats.mAmmo = chosen;
+        else if (mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr)
+            stats.mAmmo = record->mAmmo.toUint32();
+        if (stats.mAmmo != 0)
+            stats.mRounds = mActors.itemCount(attacker, stats.mAmmo);
+        else
+            stats.mAmmoUse = 0;
+        return stats;
+    }
+
+    FalloutScripts::FireResult FalloutScripts::fire(
+        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance)
+    {
+        FireResult result;
+        if (attacker == 0)
+            return result;
+        const WeaponStats stats = weaponStats(attacker);
+        {
+            const std::lock_guard lock(mFireMutex);
+            if (mFireCooldowns.count(attacker) != 0)
+                return result;
+        }
+        if (stats.mAmmoUse > 0)
+        {
+            if (stats.mRounds < stats.mAmmoUse)
+            {
+                result.mOutOfAmmo = true;
+                return result;
+            }
+            mActors.removeItem(attacker, stats.mAmmo, stats.mAmmoUse);
+        }
+        result.mFired = true;
+        {
+            const std::lock_guard lock(mFireMutex);
+            mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
+        }
+        const FalloutScript::FormId victim = target.isEmpty() ? 0 : scriptReferenceOf(target);
+        if (victim == 0 || victim == attacker)
+            return result;
+        if (chance < 1.0)
+        {
+            // The shot went wide
+            const std::lock_guard lock(mCombatRandomMutex);
+            if (std::uniform_real_distribution<double>(0.0, 1.0)(mCombatRandom) >= chance)
+                return result;
+        }
+        result.mHit = true;
+        if (victim == mPlayer || isCharacterOrCreature(target))
+        {
+            result.mStrike = strike(attacker, victim, stats.mWeapon, limb);
+            return result;
+        }
+        // An object has no health, but its script hears of the blow
+        FalloutScript::CombatState::Hit struck;
+        struck.mAttacker = attacker;
+        struck.mWeapon = stats.mWeapon;
+        struck.mLimb = limb;
+        mCombat.noteHit(victim, struck);
+        return result;
+    }
+
+    const FalloutScripts::FightTraits& FalloutScripts::fightTraitsOf(const OFWorld::Ptr& actor)
+    {
+        static const FightTraits unaggressive;
+        const FalloutScript::FormId reference = scriptReferenceOf(actor);
+        if (reference == 0)
+            return unaggressive;
+        const auto found = mFightTraits.find(reference);
+        if (found != mFightTraits.end())
+            return found->second;
+        FightTraits traits;
+        const auto read = [&traits](const ESM4::FalloutAIData& ai) {
+            if (!ai.mKnown)
+                return;
+            traits.mAggression = ai.mAggression;
+            traits.mConfidence = ai.mConfidence;
+            if ((ai.mAggroRadiusFlags & 1) != 0 && ai.mAggroRadius > 0)
+                traits.mRadius = static_cast<float>(ai.mAggroRadius);
+        };
+        ESM::FormId base;
+        if (baseOf(reference, base) && !base.isZeroOrUnset())
+        {
+            // The AI data are part of the template that a record takes them from
+            const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), base);
+            if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+                read(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseAIData, seed).mFalloutAI);
+            else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+                read(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseAIData, seed).mFalloutAI);
+        }
+        return mFightTraits.emplace(reference, traits).first->second;
+    }
+
+    FalloutScripts::FightStance FalloutScripts::fightStance(const OFWorld::Ptr& actor)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        FightStance stance;
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        if (self == 0)
+            return stance;
+        const FalloutScript::FormId targetId = mCombat.target(self);
+        if (targetId == 0)
+            return stance;
+        // A character that is down fights no more, though the fight is not over for the one it fights
+        if (mActors.isDead(self) || mCombat.unconscious(self) || mCombat.restrained(self))
+            return stance;
+        OFBase::World& world = *OFBase::Environment::get().getWorld();
+        const OFWorld::Ptr target = targetId == mPlayer ? world.getPlayerPtr() : findReference(targetId);
+        if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(targetId)
+            || mCombat.unconscious(targetId))
+        {
+            // Nobody goes for a target that is gone
+            mCombat.stop(self);
+            return stance;
+        }
+        stance.mTarget = target;
+        const WeaponStats weapon = weaponStats(self);
+        stance.mMelee = weapon.mMelee;
+        stance.mEngage = FalloutScript::FightAI::engageDistance(weapon.mMelee, weapon.mRange);
+        const double health = mActorValues.permanent(self, AV::health);
+        const double share = health > 0 ? std::clamp(mActorValues.current(self, AV::health) / health, 0.0, 1.0) : 1.0;
+        stance.mFlee = FalloutScript::FightAI::runsAway(fightTraitsOf(actor).mConfidence, share);
+        return stance;
+    }
+
+    void FalloutScripts::prepareFight(const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        // Only a character carries weapons around; a creature fights with what it has
+        if (self == 0 || self == mPlayer || actor.getType() != ESM4::Npc::sRecordId)
+            return;
+        const WeaponStats held = weaponStats(self);
+        // What the weapon is worth for a fight, and whether the character has the rounds for it
+        const auto describe
+            = [&](FalloutScript::FormId item) -> std::optional<FalloutScript::FightAI::WeaponCandidate> {
+            const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(item));
+            if (record == nullptr || !record->mHasGameData)
+                return std::nullopt;
+            FalloutScript::FightAI::WeaponCandidate candidate;
+            candidate.mWeapon = item;
+            candidate.mDamage = record->mData.damage;
+            candidate.mMelee = record->mGame.mAnimationType <= ESM4::Weapon::GameData::Melee2Hand;
+            if (candidate.mMelee)
+                return candidate;
+            if (item == held.mWeapon)
+            {
+                // The weapon in the hands has the ammunition it was given, which may not be the one of the record
+                candidate.mAmmoUse = std::max(held.mAmmoUse, 1);
+                candidate.mRounds = held.mAmmoUse > 0 ? held.mRounds : std::numeric_limits<int>::max();
+                return candidate;
+            }
+            if (isUsedUp(record->mGame))
+            {
+                // The ones it carries are what it has to throw
+                candidate.mAmmoUse = 1;
+                candidate.mRounds = mActors.itemCount(self, item);
+                return candidate;
+            }
+            candidate.mAmmoUse = std::max<int>(record->mGame.mAmmoUse, 1);
+            // A weapon whose ammunition is no record of the files (a list of them) needs none, as it does when it is
+            // fired
+            candidate.mRounds = mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr
+                ? mActors.itemCount(self, record->mAmmo.toUint32())
+                : std::numeric_limits<int>::max();
+            return candidate;
+        };
+        // The weapon in the hands takes part in the choice, first so that it stays in the hands when another does as
+        // much damage
+        std::vector<FalloutScript::FightAI::WeaponCandidate> candidates;
+        if (held.mWeapon != 0)
+            if (const auto candidate = describe(held.mWeapon))
+                candidates.push_back(*candidate);
+        std::vector<std::pair<FalloutScript::FormId, int>> items;
+        if (mActors.items(self, items))
+            for (const auto& [item, count] : items)
+                if (count > 0 && item != held.mWeapon)
+                    if (const auto candidate = describe(item))
+                        candidates.push_back(*candidate);
+        if (const FalloutScript::FormId best = FalloutScript::FightAI::bestWeapon(candidates); best != 0)
+        {
+            if (best != held.mWeapon)
+            {
+                // The ammunition the record names is used, not one that was chosen for an earlier weapon
+                if (const FalloutScript::FormId chosen = mEquipment.ammo(self); chosen != 0)
+                    mEquipment.unequip(self, chosen);
+                mEquipment.equip(self, best);
+            }
+        }
+        else if (held.mWeapon != 0)
+            mEquipment.unequip(self, held.mWeapon);
+        mEquipment.setWeaponDrawn(self, true);
+    }
+
+    bool FalloutScripts::isAggressive(const OFWorld::Ptr& actor)
+    {
+        return fightTraitsOf(actor).mAggression != FalloutScript::FightAI::Aggression::unaggressive;
+    }
+
+    bool FalloutScripts::fighting(const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        return self != 0 && mCombat.target(self) != 0;
+    }
+
+    bool FalloutScripts::attacksPlayerOnSight(const OFWorld::Ptr& actor, float& radius)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        if (self == 0 || self == mPlayer || mActors.isDead(self) || mActors.isDead(mPlayer) || mCombat.unconscious(self)
+            || mCombat.restrained(self) || mCombat.inCombat(self))
+            return false;
+        const FightTraits& traits = fightTraitsOf(actor);
+        if (traits.mAggression == FalloutScript::FightAI::Aggression::unaggressive)
+            return false;
+        // A character that would run from a fight does not start one
+        const double health = mActorValues.permanent(self, AV::health);
+        const double share = health > 0 ? std::clamp(mActorValues.current(self, AV::health) / health, 0.0, 1.0) : 1.0;
+        if (FalloutScript::FightAI::runsAway(traits.mConfidence, share))
+            return false;
+        using Standing = FalloutScript::FightAI::Standing;
+        Standing standing = Standing::Neutral;
+        switch (FalloutScript::relationOfActors(mCombat, mActors, *this, self, mPlayer))
+        {
+            case FalloutScript::CombatState::Relation::Enemy:
+                standing = Standing::Enemy;
+                break;
+            case FalloutScript::CombatState::Relation::Ally:
+            case FalloutScript::CombatState::Relation::Friend:
+                standing = Standing::Ally;
+                break;
+            case FalloutScript::CombatState::Relation::Neutral:
+                break;
+        }
+        if (!FalloutScript::FightAI::attacksOnSight(traits.mAggression, standing))
+            return false;
+        radius = traits.mRadius > 0.f ? traits.mRadius : static_cast<float>(sightDistance());
+        return true;
+    }
+
+    void FalloutScripts::fightPlayer(const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        FalloutScript::startFight(mCombat, mActors, self, mPlayer);
+    }
+
+    FalloutScripts::FireResult FalloutScripts::attack(const OFWorld::Ptr& attacker, const OFWorld::Ptr& target)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(attacker);
+        if (self == 0)
+            return FireResult();
+        const WeaponStats weapon = weaponStats(self);
+        const double skill = describeWeapon(weapon.mWeapon, self).mSkill;
+        const FireResult result = fire(self, target, -1, FalloutScript::FightAI::hitChance(skill));
+        if (result.mOutOfAmmo)
+        {
+            // The weapon is empty: the character takes another, or fights with its hands
+            if (weapon.mWeapon != 0)
+                mEquipment.unequip(self, weapon.mWeapon);
+            prepareFight(attacker);
+        }
+        else if (result.mFired && weapon.mWeapon != 0 && mEquipment.weapon(self) != weapon.mWeapon)
+        {
+            // The last grenade or mine was thrown: the character takes another weapon, or fights with its hands
+            prepareFight(attacker);
+        }
+        return result;
+    }
+
+    void FalloutScripts::endFight(const OFWorld::Ptr& actor)
+    {
+        if (const FalloutScript::FormId self = scriptReferenceOf(actor); self != 0)
+            mCombat.stop(self);
     }
 
     void FalloutScripts::raiseCombatEvents(float frametime)
     {
         namespace BlockType = FalloutScript::BlockType;
         {
+            const std::lock_guard lock(mFireMutex);
+            for (auto it = mFireCooldowns.begin(); it != mFireCooldowns.end();)
+            {
+                it->second -= frametime;
+                it = it->second <= 0 ? mFireCooldowns.erase(it) : std::next(it);
+            }
+        }
+        {
             // A character that wakes has its health back before any blow or fight can see it up: both steps are one
             // transition
             const auto transitions = mActors.holdTransitions();
             mCombat.advance(frametime);
 
-            // Essential characters that were down long enough got up (nobody woke them before) with their health back
+            // Essential characters that were down long enough got up (nobody woke them before) with a share of their
+            // health (fEssentialHealthPercentReGain, 0.3 in the executables)
             for (const FalloutScript::FormId actor : mCombat.takeWoken())
-                mActorValues.heal(actor, FalloutScript::ActorValue::health);
+            {
+                namespace AV = FalloutScript::ActorValue;
+                const double regained = std::clamp(gameSetting("fEssentialHealthPercentReGain", 0.3), 0.0, 1.0);
+                mActorValues.heal(actor, AV::health);
+                mActorValues.damage(actor, AV::health, mActorValues.permanent(actor, AV::health) * (1.0 - regained));
+            }
         }
 
         // A block that names a form is for that form, or for a character made from that record
@@ -1746,8 +2117,15 @@ namespace OFScript
         {
             if (change.mTarget == 0)
                 mObjects.trigger(change.mActor, BlockType::OnCombatEnd, change.mWas, namesActor(change.mWas));
-            else if (change.mWas == 0)
-                mObjects.trigger(change.mActor, BlockType::OnStartCombat, change.mTarget, namesActor(change.mTarget));
+            else
+            {
+                // A character that was hit, or told to fight, fights whatever its aggression is: it gets a mind to do
+                // it
+                evaluatePackage(change.mActor);
+                if (change.mWas == 0)
+                    mObjects.trigger(
+                        change.mActor, BlockType::OnStartCombat, change.mTarget, namesActor(change.mTarget));
+            }
         }
     }
 
@@ -1929,6 +2307,11 @@ namespace OFScript
     bool FalloutScripts::hasDialogue() const
     {
         return mStore.get<ESM4::Dialogue>().getSize() > 0;
+    }
+
+    bool FalloutScripts::hasCombat() const
+    {
+        return mStore.get<ESM4::Weapon>().getSize() > 0 && mStore.get<ESM4::Npc>().getSize() > 0;
     }
 
     bool FalloutScripts::sayTopic(FalloutScript::FormId reference, FalloutScript::FormId topic,
