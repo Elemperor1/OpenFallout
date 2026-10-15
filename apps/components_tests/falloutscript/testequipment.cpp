@@ -231,6 +231,23 @@ namespace
         EXPECT_FALSE(setup.mEquipment.weaponDrawn(guard));
     }
 
+    TEST(FalloutScriptEquipmentTest, an_item_that_is_taken_away_is_told_even_when_nothing_asks_about_the_character)
+    {
+        Wardrobe setup;
+        setup.mEquipment.equip(guard, pistol);
+        setup.mEquipment.equip(guard, vest);
+        setup.mEquipment.takeChanges();
+
+        setup.mState.removeItem(guard, pistol, 1);
+        setup.mState.removeItem(guard, vest, 1);
+
+        const std::vector<Equipment::WornChange> changes = setup.mEquipment.takeChanges();
+        ASSERT_EQ(changes.size(), 2u);
+        for (const Equipment::WornChange& change : changes)
+            EXPECT_FALSE(change.mWorn);
+        EXPECT_THAT(setup.mEquipment.takeChanges(), IsEmpty());
+    }
+
     TEST(FalloutScriptEquipmentTest, a_character_starts_in_the_armor_its_record_gives)
     {
         Wardrobe setup;
@@ -250,6 +267,16 @@ namespace
         ASSERT_EQ(changes.size(), 2u);
         EXPECT_EQ(changes[0].mItem, vest);
         EXPECT_FALSE(changes[0].mWorn);
+    }
+
+    TEST(FalloutScriptEquipmentTest, a_character_starts_in_the_first_of_the_armor_that_covers_the_same_parts)
+    {
+        Wardrobe setup;
+        setup.mRecords.mStartingArmor[guard] = { jumpsuit, helmet, vest, armoredSuit };
+
+        // As in the model it is shown in: what comes first keeps its place, what overlaps it is carried and not worn
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(jumpsuit, helmet));
+        EXPECT_THAT(setup.mEquipment.takeChanges(), IsEmpty());
     }
 
     TEST(FalloutScriptEquipmentTest, a_character_the_host_can_not_tell_about_yet_is_asked_again)

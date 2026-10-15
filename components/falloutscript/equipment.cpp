@@ -30,6 +30,9 @@ namespace FalloutScript
     std::vector<Equipment::WornChange> Equipment::takeChanges()
     {
         const std::lock_guard lock(mMutex);
+        // What a script took away since nothing asked about the character is off it now, so its item hears of it
+        for (auto& [actor, worn] : mWorn)
+            tidy(actor, worn);
         std::vector<WornChange> changes;
         changes.swap(mChanges);
         return changes;
@@ -46,11 +49,17 @@ namespace FalloutScript
         if (!mRecords.startingArmor(actor, armor))
             return worn;
         worn.mSeeded = true;
+        std::uint32_t covered = 0;
         for (const FormId item : armor)
         {
             ItemInfo info;
-            if (mRecords.itemInfo(item, info) && info.mKind == ItemKind::Armor && mState.itemCount(actor, item) > 0)
-                wearArmor(actor, worn, item, info, false);
+            if (!mRecords.itemInfo(item, info) || info.mKind != ItemKind::Armor || mState.itemCount(actor, item) <= 0)
+                continue;
+            // The first piece to cover a part of the body is the one worn, as in the model the character is shown in
+            if ((info.mSlots & covered) != 0)
+                continue;
+            covered |= info.mSlots;
+            wearArmor(actor, worn, item, info, false);
         }
         return worn;
     }
