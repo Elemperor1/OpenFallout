@@ -27,6 +27,10 @@ namespace EsmTool
     // list, read in that order, and prints one report.
     int packagesTes4(const Arguments& info);
 
+    // Counts the combat data (weapons, ammunition, projectiles, explosions, armour, behaviour in a fight, potions) of
+    // every Fallout file named in info.inputFiles, read in that order, and prints one report.
+    int combatTes4(const Arguments& info);
+
     // Counts how the creatures of every Fallout file named in info.inputFiles are made (model, body models and
     // animation files), read in that order, and prints one report.
     int creaturesTes4(const Arguments& info);

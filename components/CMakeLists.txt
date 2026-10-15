@@ -206,6 +206,7 @@ add_component_dir (esm4
     censusreading
     common
     conditionparams
+    combatcensus
     creaturecensus
     destruction
     dialogue
@@ -361,7 +362,7 @@ add_component_dir (esm4
 )
 
 add_component_dir (falloutscript
-    actors actortraits actorvalues chargen commandtable conditions dialogue enableparents formlists furniture messagecommands messagetext objectcommands objects packagecommands placementcommands playercontrols playerprogress referencestate script interpreter quests triggervolumes vanillacommands voicefiles
+    actors actortraits actorvalues calendar chargen commandtable conditions derivedstats dialogue enableparents formlists furniture messagecommands messagetext objectcommands objects packagecommands placementcommands playercontrols playerprogress referencestate script interpreter quests triggervolumes vanillacommands voicefiles
     )
 
 add_component_dir (misc

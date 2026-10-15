@@ -206,7 +206,8 @@ namespace ESM4
         std::vector<ESM::FormId> mSpell;
         ESM::FormId mScriptId;
 
-        AIData mAIData;
+        AIData mAIData{};
+        FalloutAIData mFalloutAI; // AIDT of Fallout 3 and New Vegas
         std::vector<ESM::FormId> mAIPackages; // seems to be in priority order, 0 = highest priority
         ActorBaseConfig mBaseConfig; // union
         ActorFaction mFaction; // the last SNAM, mFactions has them all

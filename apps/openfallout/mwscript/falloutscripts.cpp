@@ -19,6 +19,7 @@
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
+#include <components/esm4/loadgmst.hpp>
 #include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
@@ -331,6 +332,10 @@ namespace OFScript
         {
             const std::lock_guard lock(mFurnitureMutex);
             mFurniture.clear();
+        }
+        {
+            const std::lock_guard lock(mCalendarMutex);
+            mCalendarShift = 0;
         }
         mActors.clear();
         mActorValues.clear();
@@ -1130,6 +1135,29 @@ namespace OFScript
             return record;
         }
 
+        /// The record that has the stats of a character, which is the end of its chain of templates. A levelled list in
+        /// the place of a template gives one of its characters, the one that the cell shows for this reference (the
+        /// chain is followed with the seed of the reference, as for the level). The record itself when the chain ends
+        /// without a record that has them.
+        const ESM4::Npc& statsRecordOf(const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint32_t seed)
+        {
+            const OFClass::StoreWornArmorSource source(store);
+            const ESM4::Npc* owner = ESM4::templateOwner(
+                ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), ESM4::Npc::Template_UseStats);
+            return owner != nullptr ? *owner : npc;
+        }
+
+        /// As above, for a creature
+        const ESM4::Creature& statsRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint32_t seed)
+        {
+            const OFClass::StoreCreatureSource source(store);
+            const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseStats);
+            return owner != nullptr ? *owner : creature;
+        }
+
         /// The attributes of DATA, which are the actor values from strength to luck
         void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
         {
@@ -1296,27 +1324,101 @@ namespace OFScript
         // The attributes, the speed and the karma are the values of the record. Its health, fatigue and skills look
         // like the base of a sum (most characters have 50 or 10 health, 50 fatigue and 5 in barter there), which the
         // games add to by formulas that are not known here, so those keep the starting values.
-        // A record that takes its stats from a template has those of the template, and the starting values when the
-        // template can not be followed (it is a levelled list of characters).
+        // A record that takes its stats from a template has those of the template (a levelled list in the place of
+        // one gives a character of it).
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            const ESM4::Npc* stats = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats);
-            if (stats == nullptr || !stats->mIsFONV)
+            const ESM4::Npc& stats = statsRecordOf(mStore, *npc, seed);
+            if (!stats.mIsFONV)
                 return true;
-            if (stats->mFalloutStats.mKnown)
-                addAttributes(values, stats->mFalloutStats);
-            addConfig(values, stats->mBaseConfig);
+            if (stats.mFalloutStats.mKnown)
+                addAttributes(values, stats.mFalloutStats);
+            addConfig(values, stats.mBaseConfig);
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            const ESM4::Creature* stats = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats);
-            if (stats == nullptr || !stats->mIsFONV)
+            const ESM4::Creature& stats = statsRecordOf(mStore, *creature, seed);
+            if (!stats.mIsFONV)
                 return true;
-            if (stats->mFalloutStats.mKnown)
-                addAttributes(values, stats->mFalloutStats);
-            addConfig(values, stats->mBaseConfig);
+            if (stats.mFalloutStats.mKnown)
+                addAttributes(values, stats.mFalloutStats);
+            addConfig(values, stats.mBaseConfig);
         }
         return true;
+    }
+
+    const FalloutScript::DerivedStatSettings& FalloutScripts::derivedSettings()
+    {
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        if (!mDerivedSettings)
+        {
+            // The settings of the files by their names (the names of settings are not case sensitive)
+            std::map<std::string, double> settings;
+            for (const ESM4::GameSetting& setting : mStore.get<ESM4::GameSetting>())
+            {
+                const auto number = std::visit(
+                    [](const auto& value) -> std::optional<double> {
+                        using Type = std::decay_t<decltype(value)>;
+                        if constexpr (std::is_arithmetic_v<Type>)
+                            return static_cast<double>(value);
+                        else
+                            return std::nullopt;
+                    },
+                    setting.mData);
+                if (number)
+                    settings[Misc::StringUtils::lowerCase(setting.mEditorId)] = *number;
+            }
+            mDerivedSettings = FalloutScript::DerivedStatSettings::fromGameSettings(
+                [&settings](std::string_view name) -> std::optional<double> {
+                    const auto found = settings.find(Misc::StringUtils::lowerCase(name));
+                    return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
+                });
+        }
+        return *mDerivedSettings;
+    }
+
+    std::optional<double> FalloutScripts::derivedValue(
+        FalloutScript::FormId actor, int value, const std::function<double(int)>& permanent)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        namespace Derived = FalloutScript::DerivedStats;
+        const FalloutScript::DerivedStatSettings& settings = derivedSettings();
+        switch (value)
+        {
+            case AV::actionPoints:
+                return Derived::actionPoints(settings, permanent(AV::agility));
+            case AV::carryWeight:
+                return Derived::carryWeight(settings, permanent(AV::strength));
+            case AV::criticalChance:
+                return Derived::criticalChance(settings, permanent(AV::luck));
+            case AV::meleeDamage:
+                return Derived::meleeDamage(settings, permanent(AV::strength));
+            case AV::health:
+                break;
+            default:
+                return std::nullopt;
+        }
+        // The health starts from the base health of the record, which a record that has a template takes from it. A
+        // levelled list in the place of the template gives one of its characters, the one that the cell shows for this
+        // reference (the chain is followed with the seed of the reference, as for the level)
+        ESM::FormId base;
+        if (!baseOf(actor, base) || base.isZeroOrUnset())
+            return std::nullopt;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        const ESM4::FalloutStats* stats = nullptr;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+            stats = &statsRecordOf(mStore, *npc, seed).mFalloutStats;
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+            stats = &statsRecordOf(mStore, *creature, seed).mFalloutStats;
+        if (stats == nullptr || !stats->mKnown)
+            return std::nullopt;
+        const double endurance = permanent(AV::endurance);
+        if (actor == mPlayer)
+            return Derived::playerHealth(settings, stats->mHealth, endurance, mProgress.level());
+        int level = 1;
+        levelOf(actor, mProgress.level(), level);
+        return Derived::npcHealth(settings, stats->mHealth, endurance, level);
     }
 
     void FalloutScripts::forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const
@@ -2909,6 +3011,100 @@ namespace OFScript
         return world != nullptr ? world->getGlobalFloat(OFWorld::Globals::sDaysPassed) : 0.0;
     }
 
+    namespace
+    {
+        /// The games count the months from 0 (the GECK documents GameMonth as 0 to 11)
+        constexpr int calendarMonthBase = 0;
+        /// A new game of the world starts counting its days at 1
+        constexpr double newGameDaysPassed = 1.0;
+
+        /// 0 for GameYear, 1 for GameMonth, 2 for GameDay, -1 for any other global
+        int datePartOf(std::string_view editorId)
+        {
+            if (Misc::StringUtils::ciEqual(editorId, "GameYear"))
+                return 0;
+            if (Misc::StringUtils::ciEqual(editorId, "GameMonth"))
+                return 1;
+            if (Misc::StringUtils::ciEqual(editorId, "GameDay"))
+                return 2;
+            return -1;
+        }
+    }
+
+    bool FalloutScripts::dateNow(FalloutScript::GameDate& date)
+    {
+        if (!mCalendarStart)
+        {
+            CalendarStart start;
+            bool year = false;
+            bool month = false;
+            bool day = false;
+            for (const ESM4::GlobalVariable& global : mStore.get<ESM4::GlobalVariable>())
+            {
+                switch (datePartOf(global.mEditorId))
+                {
+                    case 0:
+                        year = true;
+                        start.mDate.mYear = static_cast<int>(global.mValue);
+                        break;
+                    case 1:
+                        month = true;
+                        start.mDate.mMonth = static_cast<int>(global.mValue);
+                        break;
+                    case 2:
+                        day = true;
+                        start.mDate.mDay = static_cast<int>(global.mValue);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            // Files that do not have the three globals (or are not loaded yet) have no date, and are asked again
+            if (!year || !month || !day)
+                return false;
+            mCalendarStart = start;
+        }
+        const OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr)
+            return false;
+        // The days of the world pass from the new game's day, whatever the record of GameDaysPassed starts at
+        // (a script can have stored a number that is not finite in it, which counts as no days)
+        double passed = world->getGlobalFloat(OFWorld::Globals::sDaysPassed) - newGameDaysPassed;
+        if (!std::isfinite(passed))
+            passed = 0;
+        const FalloutScript::Calendar calendar(calendarMonthBase);
+        date = calendar.dateOf(calendar.dayNumber(mCalendarStart->mDate)
+            + static_cast<long long>(std::clamp(std::floor(passed), 0.0, 1.0e9)) + mCalendarShift);
+        return true;
+    }
+
+    bool FalloutScripts::currentDate(FalloutScript::GameDate& date)
+    {
+        const std::lock_guard lock(mCalendarMutex);
+        return dateNow(date);
+    }
+
+    bool FalloutScripts::setDate(int part, double value)
+    {
+        const std::lock_guard lock(mCalendarMutex);
+        FalloutScript::GameDate now;
+        if (!dateNow(now))
+            return false;
+        FalloutScript::GameDate wanted = now;
+        // A number that is not one is left to zero, as for the other globals
+        const int whole = std::isnan(value) ? 0 : static_cast<int>(std::clamp(std::floor(value), -1.0e6, 1.0e6));
+        if (part == 0)
+            wanted.mYear = whole;
+        else if (part == 1)
+            wanted.mMonth = whole;
+        else
+            wanted.mDay = whole;
+        const FalloutScript::Calendar calendar(calendarMonthBase);
+        // The date goes on from the one the script gave; a day that does not exist in its month is the nearest one
+        mCalendarShift += calendar.dayNumber(wanted) - calendar.dayNumber(now);
+        return true;
+    }
+
     bool FalloutScripts::getGlobal(FalloutScript::FormId global, double& value)
     {
         const ESM4::GlobalVariable* record = mStore.get<ESM4::GlobalVariable>().search(refId(global));
@@ -2919,6 +3115,16 @@ namespace OFScript
             if (const OFBase::World* world = OFBase::Environment::get().getWorld())
             {
                 value = world->getGlobalFloat(*clock);
+                return true;
+            }
+        }
+        // The date moves with the days that pass; a script that sets it moves the date to the one it gives
+        if (const int part = datePartOf(record->mEditorId); part >= 0)
+        {
+            FalloutScript::GameDate date;
+            if (currentDate(date))
+            {
+                value = part == 0 ? date.mYear : part == 1 ? date.mMonth : date.mDay;
                 return true;
             }
         }
@@ -2940,6 +3146,8 @@ namespace OFScript
                 return true;
             }
         }
+        if (const int part = datePartOf(record->mEditorId); part >= 0 && setDate(part, value))
+            return true;
         mGlobals[global] = fitToType(record->mType, value);
         return true;
     }

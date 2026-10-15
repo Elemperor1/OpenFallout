@@ -181,6 +181,13 @@ namespace ESM4
         std::vector<ESM::FormId> mAddOns; // TES5 ARMA
         Data mData;
 
+        /// DNAM of Fallout 3 and New Vegas, absent from a record without one: the armor rating (what the games show),
+        /// the flags that go with it, and the damage threshold (New Vegas only)
+        bool mHasRating = false;
+        float mRating = 0.f;
+        std::uint16_t mDnamFlags = 0;
+        float mDamageThreshold = 0.f;
+
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
 

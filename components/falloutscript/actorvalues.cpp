@@ -39,6 +39,28 @@ namespace FalloutScript
         return 0;
     }
 
+    bool ActorValues::isDerived(int value)
+    {
+        switch (value)
+        {
+            case ActorValue::actionPoints:
+            case ActorValue::carryWeight:
+            case ActorValue::criticalChance:
+            case ActorValue::health:
+            case ActorValue::meleeDamage:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    double ActorValues::permanentOf(FormId actor, int value) const
+    {
+        const auto found = mEntries.find({ actor, value });
+        return found == mEntries.end() ? startOf(actor, value)
+                                       : baseOf(actor, found->second, value) + found->second.mModifier;
+    }
+
     double ActorValues::startOf(FormId actor, int value) const
     {
         if (mRecords != nullptr)
@@ -61,6 +83,14 @@ namespace FalloutScript
                 const auto found = known->second.find(value);
                 if (found != known->second.end())
                     return found->second;
+            }
+            // What the games work out follows the values it comes from, which a script or a level may change
+            if (isDerived(value))
+            {
+                const std::optional<double> derived = mRecords->derivedValue(
+                    actor, value, [this, actor](int other) { return bounded(permanentOf(actor, other)); });
+                if (derived)
+                    return bounded(*derived);
             }
         }
         return startingValue(value);
@@ -88,9 +118,7 @@ namespace FalloutScript
     double ActorValues::permanent(FormId actor, int value) const
     {
         const std::lock_guard lock(mMutex);
-        const auto found = mEntries.find({ actor, value });
-        return found == mEntries.end() ? startOf(actor, value)
-                                       : baseOf(actor, found->second, value) + found->second.mModifier;
+        return permanentOf(actor, value);
     }
 
     double ActorValues::current(FormId actor, int value) const

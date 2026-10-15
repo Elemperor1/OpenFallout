@@ -72,6 +72,12 @@ Allowed modes:
          type, schedule and location, and the packages that their characters
          list. Give the files in load order, masters first. Prints no record
          contents.
+  combat Counts the combat data of one or more Fallout 3 or New Vegas files:
+         weapons by how they are held and fired, ammunition, projectiles,
+         explosions, armour ratings, how characters and creatures behave in a
+         fight, and potions with their effects, with the values that no game could
+         mean. Give the files in load order, masters first. Prints no record
+         contents.
   creatures Counts how the creatures of one or more Fallout 3 or New Vegas
          files are made: the kind of creature, the model, the models of the
          body and the animation files they list, with a few example file names.
@@ -190,7 +196,7 @@ Allowed options)");
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"
                 || info.mode == "survey" || info.mode == "references" || info.mode == "equipment"
-                || info.mode == "packages" || info.mode == "creatures" || info.mode == "worn"
+                || info.mode == "packages" || info.mode == "combat" || info.mode == "creatures" || info.mode == "worn"
                 || info.mode == "scriptcode" || info.mode == "dialogue"))
         {
             std::cout << "\nERROR: invalid mode \"" << info.mode << "\"\n\n" << desc << finalText << std::endl;
@@ -215,8 +221,8 @@ Allowed options)");
         const auto& inputFiles = variables["input-file"].as<Files::MaybeQuotedPathContainer>();
         // Only a survey or a count takes any number of files, the other modes take an input file and an output file.
         if (info.mode != "survey" && info.mode != "references" && info.mode != "equipment" && info.mode != "packages"
-            && info.mode != "creatures" && info.mode != "worn" && info.mode != "scriptcode" && info.mode != "dialogue"
-            && inputFiles.size() > 2)
+            && info.mode != "combat" && info.mode != "creatures" && info.mode != "worn" && info.mode != "scriptcode"
+            && info.mode != "dialogue" && inputFiles.size() > 2)
         {
             std::cout << "\nERROR: more than two files specified\n\n";
             std::cout << desc << finalText << std::endl;
@@ -275,6 +281,8 @@ int main(int argc, char** argv)
             return equipmentTes4(info);
         else if (info.mode == "packages")
             return packagesTes4(info);
+        else if (info.mode == "combat")
+            return combatTes4(info);
         else if (info.mode == "creatures")
             return creaturesTes4(info);
         else if (info.mode == "worn")

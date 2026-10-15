@@ -82,6 +82,21 @@ void ESM4::Potion::load(ESM4::Reader& reader)
                 reader.adjustFormId(mItem.withdrawl);
                 reader.adjustFormId(mItem.sound);
                 break;
+            case ESM::fourCC("EFID"):
+                reader.getFormId(mEffects.emplace_back().mBaseEffect);
+                break;
+            case ESM::fourCC("EFIT"):
+                // The effect that has an EFID and no EFIT yet gets it, else the effect has no base effect
+                if (subHdr.dataSize != sizeof(EffectData))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                if (mEffects.empty() || mEffects.back().mHasData)
+                    mEffects.emplace_back();
+                reader.get(mEffects.back().mData);
+                mEffects.back().mHasData = true;
+                break;
             case ESM::fourCC("YNAM"):
                 reader.getFormId(mPickUpSound);
                 break;
@@ -92,8 +107,6 @@ void ESM4::Potion::load(ESM4::Reader& reader)
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
-            case ESM::fourCC("EFID"):
-            case ESM::fourCC("EFIT"):
             case ESM::fourCC("CTDA"):
             case ESM::fourCC("KSIZ"):
             case ESM::fourCC("KWDA"):

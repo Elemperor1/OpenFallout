@@ -34,6 +34,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "effectlist.hpp"
+
 #include "effect.hpp" // FormId, ScriptEffect
 
 namespace ESM4
@@ -78,6 +80,7 @@ namespace ESM4
 
         Data mData;
         EnchantedItem mItem;
+        std::vector<EffectEntry> mEffects; // EFID and EFIT (the conditions of the effects, CTDA, are not read)
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

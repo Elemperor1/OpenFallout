@@ -1,10 +1,53 @@
 #include "loadproj.hpp"
 
+#include <cstring>
+
 #include "reader.hpp"
 #include "recordreader.hpp"
 
 namespace ESM4
 {
+    namespace
+    {
+        template <class T>
+        T field(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+        {
+            T value{};
+            if (offset + sizeof(T) <= bytes.size())
+                std::memcpy(&value, bytes.data() + offset, sizeof(T));
+            return value;
+        }
+
+        ESM::FormId formId(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+        {
+            return ESM::FormId::fromUint32(field<std::uint32_t>(bytes, offset));
+        }
+    }
+
+    Projectile::GameData Projectile::gameData() const
+    {
+        GameData data;
+        data.mFlags = field<std::uint16_t>(mData, 0);
+        data.mType = field<std::uint16_t>(mData, 2);
+        data.mGravity = field<float>(mData, 4);
+        data.mSpeed = field<float>(mData, 8);
+        data.mRange = field<float>(mData, 12);
+        data.mLight = formId(mData, 16);
+        data.mMuzzleFlashLight = formId(mData, 20);
+        data.mTracerChance = field<float>(mData, 24);
+        data.mProximityFuse = field<float>(mData, 28);
+        data.mFuseTimer = field<float>(mData, 32);
+        data.mExplosion = formId(mData, 36);
+        data.mSound = formId(mData, 40);
+        data.mMuzzleFlashDuration = field<float>(mData, 44);
+        data.mFadeDuration = field<float>(mData, 48);
+        data.mImpactForce = field<float>(mData, 52);
+        data.mCountdownSound = formId(mData, 56);
+        data.mDisableSound = formId(mData, 60);
+        data.mDefaultWeaponSource = formId(mData, 64);
+        return data;
+    }
+
     void Projectile::load(Reader& reader)
     {
         mId = reader.getFormIdFromHeader();
