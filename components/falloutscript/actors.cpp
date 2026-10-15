@@ -192,27 +192,24 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    void ActorState::setDead(FormId actor, bool dead, FormId killer)
+    bool ActorState::setDead(FormId actor, bool dead, FormId killer)
     {
         if (actor == 0)
-            return;
+            return false;
         const std::lock_guard lock(mMutex);
         if (dead)
         {
-            if (mDead.insert(actor).second)
-            {
-                constexpr std::size_t mostDeaths = 1024;
-                if (mDeaths.size() < mostDeaths)
-                    mDeaths.push_back({ actor, killer });
-                if (killer != 0)
-                    mKillers[actor] = killer;
-            }
+            if (!mDead.insert(actor).second)
+                return false;
+            constexpr std::size_t mostDeaths = 1024;
+            if (mDeaths.size() < mostDeaths)
+                mDeaths.push_back({ actor, killer });
+            if (killer != 0)
+                mKillers[actor] = killer;
+            return true;
         }
-        else
-        {
-            mDead.erase(actor);
-            mKillers.erase(actor);
-        }
+        mKillers.erase(actor);
+        return mDead.erase(actor) != 0;
     }
 
     FormId ActorState::killerOf(FormId actor) const

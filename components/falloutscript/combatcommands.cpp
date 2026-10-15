@@ -143,8 +143,13 @@ namespace FalloutScript
         });
 
         interpreter.setHandler("SetUnconscious", [&combat](CallContext& call) {
-            if (call.mReference != 0)
-                combat.setUnconscious(call.mReference, intArgument(call, 0) != 0);
+            if (call.mReference == 0)
+                return 0.0;
+            const bool out = intArgument(call, 0) != 0;
+            combat.setUnconscious(call.mReference, out);
+            // A character that is out is out of its fights, as one that is knocked down by a blow is
+            if (out)
+                combat.withdraw(call.mReference);
             return 0.0;
         });
         interpreter.setHandler("GetUnconscious", [&combat](CallContext& call) {

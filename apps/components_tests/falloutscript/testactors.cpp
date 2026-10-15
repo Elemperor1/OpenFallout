@@ -281,12 +281,15 @@ namespace
         FakeRecords records;
         ActorState state(records);
 
-        state.setDead(guard, true);
+        EXPECT_TRUE(state.setDead(guard, true));
         EXPECT_TRUE(state.isDead(guard));
         EXPECT_FALSE(state.isDead(crate));
-        state.setDead(guard, false);
+        // Only the call that kills an actor that is alive says so
+        EXPECT_FALSE(state.setDead(guard, true));
+        EXPECT_TRUE(state.setDead(guard, false));
+        EXPECT_FALSE(state.setDead(guard, false));
         EXPECT_FALSE(state.isDead(guard));
-        state.setDead(0, true);
+        EXPECT_FALSE(state.setDead(0, true));
         EXPECT_FALSE(state.isDead(0));
     }
 

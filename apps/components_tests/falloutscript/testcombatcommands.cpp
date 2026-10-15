@@ -231,6 +231,24 @@ namespace
         EXPECT_EQ(setup.variable(2), 0);
     }
 
+    TEST(FalloutScriptCombatCommandsTest, a_character_that_is_put_out_leaves_its_fights)
+    {
+        Runner setup;
+        setup.mCombat.start(guard, raider);
+        setup.mCombat.start(ghoul, guard);
+        setup.mCombat.takeChanges();
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpSetUnconscious, arguments(1).add(intArg(1))) + end());
+
+        setup.run(builder);
+
+        EXPECT_TRUE(setup.mCombat.unconscious(guard));
+        EXPECT_FALSE(setup.mCombat.inCombat(guard));
+        EXPECT_FALSE(setup.mCombat.inCombat(ghoul));
+        EXPECT_THAT(setup.mCombat.takeChanges(), SizeIs(2));
+    }
+
     TEST(FalloutScriptCombatCommandsTest, alert_unconscious_and_restrained_can_be_set_and_asked)
     {
         Runner setup;

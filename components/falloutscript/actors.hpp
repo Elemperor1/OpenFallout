@@ -65,8 +65,9 @@ namespace FalloutScript
 
         bool isDead(FormId actor) const;
         /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
-        /// is told in takeDeaths().
-        void setDead(FormId actor, bool dead, FormId killer = 0);
+        /// is told in takeDeaths(). True when this call changed the state: of two calls at once that kill the same
+        /// actor, only one gets true.
+        bool setDead(FormId actor, bool dead, FormId killer = 0);
         /// Who killed the actor, 0 when it is alive or the killer is not known
         FormId killerOf(FormId actor) const;
 

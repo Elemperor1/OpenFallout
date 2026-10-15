@@ -1671,8 +1671,8 @@ namespace OFScript
         }
         else
         {
-            mActors.setDead(victim, true, attacker);
-            result.mKilled = true;
+            // Of two blows that kill at once, the one that marks the death is the killing blow
+            result.mKilled = mActors.setDead(victim, true, attacker);
         }
         return result;
     }
