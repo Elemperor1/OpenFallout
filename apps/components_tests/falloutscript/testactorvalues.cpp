@@ -56,6 +56,7 @@ namespace
     constexpr std::uint16_t OpDamageActorValue = 0x1181;
     constexpr std::uint16_t OpRestoreActorValue = 0x1182;
     constexpr std::uint16_t OpRewardXP = 0x1177;
+    constexpr std::uint16_t OpResetHealth = 0x1150;
 
     class NoRecords : public FalloutScript::ActorRecords
     {
@@ -444,6 +445,46 @@ namespace
 
         EXPECT_FALSE(setup.mActors.isDead(guard));
         EXPECT_GT(healthWhenSeenAlive, 0);
+    }
+
+    // Whether the script gets through while a death or revival is in progress (it does not wait for the lock)
+    bool runsWhileATransitionIsHeld(const ScriptBuilder& builder)
+    {
+        Runner setup;
+        std::atomic<bool> done = false;
+        std::thread script;
+        bool ranMeanwhile = false;
+        {
+            const auto held = setup.mActors.holdTransitions();
+            script = std::thread([&] {
+                setup.run(guard, builder);
+                done = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            ranMeanwhile = done;
+        }
+        script.join();
+        return ranMeanwhile;
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, every_change_to_the_health_waits_for_a_death_or_revival_in_progress)
+    {
+        for (const std::uint16_t command : { OpSetActorValue, OpModActorValue, OpForceActorValue, OpRestoreActorValue })
+        {
+            ScriptBuilder health;
+            health.code(scriptName() + begin(BlockType::OnActivate)
+                + FalloutScriptTest::command(command, valueAndFloat(ActorValue::health, 50)) + end());
+            EXPECT_FALSE(runsWhileATransitionIsHeld(health)) << "command " << command;
+            // Another actor value has no part in a death
+            ScriptBuilder barterValue;
+            barterValue.code(scriptName() + begin(BlockType::OnActivate)
+                + FalloutScriptTest::command(command, valueAndFloat(barter, 50)) + end());
+            EXPECT_TRUE(runsWhileATransitionIsHeld(barterValue)) << "command " << command;
+        }
+        ScriptBuilder reset;
+        reset.code(scriptName() + begin(BlockType::OnActivate) + FalloutScriptTest::command(OpResetHealth, arguments(0))
+            + end());
+        EXPECT_FALSE(runsWhileATransitionIsHeld(reset));
     }
 
     TEST(FalloutScriptActorValueCommandsTest, damage_takes_a_share_of_the_health_and_enough_of_it_kills)

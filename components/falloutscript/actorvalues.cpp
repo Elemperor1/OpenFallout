@@ -229,6 +229,11 @@ namespace FalloutScript
             return value == ActorValue::health && actors.isDead(call.mReference) ? std::min(current, 0.0) : current;
         };
 
+        // A change to the health is ordered against the blows, deaths and revivals that check it
+        const auto healthGuard = [&actors](int value) {
+            return value == ActorValue::health ? actors.holdTransitions() : std::unique_lock<std::recursive_mutex>();
+        };
+
         interpreter.setHandler("GetActorValue", [currentOf](CallContext& call) {
             const int value = intArgument(call, 0);
             return call.mReference != 0 && ActorValues::isValid(value) ? currentOf(call, value) : 0.0;
@@ -248,32 +253,36 @@ namespace FalloutScript
                 return isPlayersProgress(call, value) ? static_cast<double>(progressValue(value))
                                                       : values.permanent(call.mReference, value);
             });
-        interpreter.setHandler(
-            "SetActorValue", [&values, isPlayersProgress, progressValue, rewardProgress](CallContext& call) {
+        interpreter.setHandler("SetActorValue",
+            [&values, isPlayersProgress, progressValue, rewardProgress, healthGuard](CallContext& call) {
                 const int value = intArgument(call, 0);
                 if (call.mReference == 0 || !ActorValues::isValid(value))
                     return 0.0;
+                const auto guard = healthGuard(value);
                 if (isPlayersProgress(call, value))
                     rewardProgress(value, whole(argument(call, 1) - progressValue(value)));
                 else
                     values.setBase(call.mReference, value, argument(call, 1));
                 return 0.0;
             });
-        interpreter.setHandler("ModActorValue", [&values, isPlayersProgress, rewardProgress](CallContext& call) {
-            const int value = intArgument(call, 0);
-            if (call.mReference == 0 || !ActorValues::isValid(value))
-                return 0.0;
-            if (isPlayersProgress(call, value))
-                rewardProgress(value, whole(argument(call, 1)));
-            else
-                values.modify(call.mReference, value, argument(call, 1));
-            return 0.0;
-        });
         interpreter.setHandler(
-            "ForceActorValue", [&values, isPlayersProgress, progressValue, rewardProgress](CallContext& call) {
+            "ModActorValue", [&values, isPlayersProgress, rewardProgress, healthGuard](CallContext& call) {
                 const int value = intArgument(call, 0);
                 if (call.mReference == 0 || !ActorValues::isValid(value))
                     return 0.0;
+                const auto guard = healthGuard(value);
+                if (isPlayersProgress(call, value))
+                    rewardProgress(value, whole(argument(call, 1)));
+                else
+                    values.modify(call.mReference, value, argument(call, 1));
+                return 0.0;
+            });
+        interpreter.setHandler("ForceActorValue",
+            [&values, isPlayersProgress, progressValue, rewardProgress, healthGuard](CallContext& call) {
+                const int value = intArgument(call, 0);
+                if (call.mReference == 0 || !ActorValues::isValid(value))
+                    return 0.0;
+                const auto guard = healthGuard(value);
                 if (isPlayersProgress(call, value))
                     rewardProgress(value, whole(argument(call, 1) - progressValue(value)));
                 else
@@ -303,11 +312,14 @@ namespace FalloutScript
                     actors.setDead(call.mReference, true);
                 return 0.0;
             });
-        interpreter.setHandler("RestoreActorValue", [&values, isPlayersProgress](CallContext& call) {
+        interpreter.setHandler("RestoreActorValue", [&values, isPlayersProgress, healthGuard](CallContext& call) {
             const int value = intArgument(call, 0);
             // Nothing is damaged in what the story rewards, so there is nothing to take back
             if (call.mReference != 0 && ActorValues::isValid(value) && !isPlayersProgress(call, value))
+            {
+                const auto guard = healthGuard(value);
                 values.restore(call.mReference, value, argument(call, 1));
+            }
             return 0.0;
         });
 
@@ -322,9 +334,12 @@ namespace FalloutScript
             return std::clamp(values.current(call.mReference, ActorValue::health) / most, 0.0, 1.0);
         });
         // The health of the character is all there is again; a character that is dead stays so (ResurrectActor)
-        interpreter.setHandler("ResetHealth", [&values](CallContext& call) {
+        interpreter.setHandler("ResetHealth", [&values, &actors](CallContext& call) {
             if (call.mReference != 0)
+            {
+                const auto transitions = actors.holdTransitions();
                 values.heal(call.mReference, ActorValue::health);
+            }
             return 0.0;
         });
         interpreter.setHandler("ResurrectActor", [&values, &actors](CallContext& call) {
