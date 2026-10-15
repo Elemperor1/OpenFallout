@@ -101,7 +101,8 @@ namespace OFLua
         };
         // The player attacks with its weapon at the object the ray of its aim hit (nothing when it hit none): a round
         // is used up, and a character or creature that was hit loses health. Nothing happens while the weapon is not
-        // ready again.
+        // ready again. How far the shot goes is up to the aim: the ray is as long as the range of the weapon
+        // (combat.weapon().range), and the object it hit is what is passed here.
         api["fire"] = [lua](sol::optional<LObject> target, sol::optional<int> limb) {
             const OFScript::FalloutScripts::FireResult result = scripts().fire(
                 scripts().playerReference(), target ? target->ptr() : OFWorld::Ptr(), limb.value_or(-1));

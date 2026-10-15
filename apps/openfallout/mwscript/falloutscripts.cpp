@@ -350,6 +350,12 @@ namespace OFScript
             mMadeBases.clear();
             mMadeCount = 0;
         }
+        // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
+        mFightTraits.clear();
+        {
+            const std::lock_guard lock(mFireMutex);
+            mFireCooldowns.clear();
+        }
         mReferences.clear();
         mTriggerShapes.clear();
         mTriggers.clear();
