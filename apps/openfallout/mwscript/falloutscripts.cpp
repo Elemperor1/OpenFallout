@@ -1157,27 +1157,34 @@ namespace OFScript
             return record;
         }
 
-        /// The record that has the stats of a character, which is the end of its chain of templates. A levelled list in
-        /// the place of a template gives one of its characters, the one that the cell shows for this reference (the
-        /// chain is followed with the seed of the reference, as for the level). The record itself when the chain ends
-        /// without a record that has them.
-        const ESM4::Npc& statsRecordOf(const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint32_t seed)
+        /// The record that has what a flag of the template says a character takes from its template (its stats, its
+        /// inventory): the end of its chain of templates. A levelled list in the place of a template gives one of its
+        /// characters, the one that the cell shows for this reference (the chain is followed with the seed of the
+        /// reference, as for the level). The record itself when the chain ends without a record that has them.
+        const ESM4::Npc& templateRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint16_t flag, std::uint32_t seed)
         {
             const OFClass::StoreWornArmorSource source(store);
-            const ESM4::Npc* owner = ESM4::templateOwner(
-                ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), ESM4::Npc::Template_UseStats);
+            const ESM4::Npc* owner
+                = ESM4::templateOwner(ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
             return owner != nullptr ? *owner : npc;
         }
 
         /// As above, for a creature
-        const ESM4::Creature& statsRecordOf(
-            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint32_t seed)
+        const ESM4::Creature& templateRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint16_t flag, std::uint32_t seed)
         {
             const OFClass::StoreCreatureSource source(store);
             const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed),
-                ESM4::Creature::Template_UseStats);
+                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
             return owner != nullptr ? *owner : creature;
+        }
+
+        /// The record that has the stats of a character
+        template <class Record>
+        const Record& statsRecordOf(const OFWorld::ESMStore& store, const Record& record, std::uint32_t seed)
+        {
+            return templateRecordOf(store, record, Record::Template_UseStats, seed);
         }
 
         /// The attributes of DATA, which are the actor values from strength to luck
