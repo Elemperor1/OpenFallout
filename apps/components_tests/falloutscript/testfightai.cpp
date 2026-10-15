@@ -80,6 +80,12 @@ namespace
         // a weapon that does nothing is no weapon; the hands are used then
         weapons = { { 0x12, 0, true, -1, 1 } };
         EXPECT_EQ(bestWeapon(weapons), 0u);
+
+        // the first of two that do as much stays: the one in the hands is listed first
+        weapons = { { 0x13, 10, true, -1, 1 }, { 0x14, 10, true, -1, 1 } };
+        EXPECT_EQ(bestWeapon(weapons), 0x13u);
+        weapons = { { 0x14, 10, true, -1, 1 }, { 0x13, 10, true, -1, 1 } };
+        EXPECT_EQ(bestWeapon(weapons), 0x14u);
     }
 
     TEST(FalloutScriptFightAiTest, the_chance_to_hit_follows_the_skill_between_limits)

@@ -402,7 +402,7 @@ NEW_GAME_BUTTONS = ("First choice", "Second choice")
 NEW_GAME_NAME = "Autoplay" # the name autoplay.lua gives the character
 
 # The arena: another interior cell for the tests of combat, with a rifle and a pistol, their ammunition, a dummy that
-# dies of a few shots, a raider who goes for the player, and the quest whose stages give the player the rifle and tell
+# dies of a few shots, a raider who goes for the player, a bystander who goes for the player once it is shot, and the quest whose stages give the player the rifle and tell
 # what the game knows (so that a test can read it from Lua)
 ARENA_CELL_ID = 0x932
 ARENA_FLOOR_REF_ID = 0x933
@@ -426,6 +426,8 @@ ARENA_SETUP_STAGE = 10
 # The stages that tell what the game knows, one for each time the test looks (a stage is set once)
 ARENA_PROBE_STAGES = tuple(range(20, 60))
 ARENA_DUMMY_PLACE = (400.0, 0.0, 0.0)
+# The bystander stands behind the player, at peace, until it is shot
+ARENA_BYSTANDER_PLACE = (0.0, -700.0, 0.0)
 # The raider starts where the player does not see it from, beyond the 2500 units that a character sees, and is put where
 # it can see the player when the test says so
 ARENA_RAIDER_PLACE = (-1800.0, 1800.0, 0.0)
@@ -437,7 +439,9 @@ ARENA_RAIDER_AMMO = 40
 ARENA_PLAYER_AMMO = 30
 # A dummy of level 1 with one endurance and 5 health: 10 health
 ARENA_DUMMY_HEALTH = 5
-LAST_ID = 0x94A # the largest form ID of the plugin, which the next object ID of its header follows
+ARENA_BYSTANDER_ID = 0x94B
+ARENA_BYSTANDER_REF_ID = 0x94C
+LAST_ID = 0x94C # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2152,14 +2156,17 @@ def arena_quest():
 
 
 def arena_people():
-    """The dummy and the raider: characters of a race with a skeleton, as the others are. The dummy takes no part in a fight
+    """The dummy, the raider and the bystander: characters of a race with a skeleton, as the others are. The dummy takes no part in a fight
     until it is shot (aggression 0, so it only fights back), has one endurance and 5 health, which is 10 health at level 1.
     The raider is very aggressive and foolhardy, carries the pistol and its rounds, and has a skill of 29 with it."""
     dummy = person(ARENA_DUMMY_ID, "OFTestArenaDummy", dressed=False, script=ARENA_DUMMY_SCRIPT_ID,
                    health=ARENA_DUMMY_HEALTH, attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
     raider = person(ARENA_RAIDER_ID, "OFTestArenaRaider", dressed=False, script=ARENA_RAIDER_SCRIPT_ID,
                     items=[(ARENA_PISTOL_ID, 1), (ARENA_AMMO_ID, ARENA_RAIDER_AMMO)], ai=(2, 4))
-    return [dummy, raider]
+    # Never starts a fight (aggression 0), has no package and no weapon, and does not run from one (confidence 4): the
+    # test shoots it once, and it has to go for the player with its hands
+    bystander = person(ARENA_BYSTANDER_ID, "OFTestArenaBystander", dressed=False, ai=(0, 4))
+    return [dummy, raider, bystander]
 
 
 def arena_cell():
@@ -2172,7 +2179,8 @@ def arena_cell():
         refr(ARENA_FLOOR_REF_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(ARENA_DUMMY_REF_ID, ARENA_DUMMY_PLACE, base=ARENA_DUMMY_ID),
-        achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID)])
+        achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
+        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID)])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
     return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])

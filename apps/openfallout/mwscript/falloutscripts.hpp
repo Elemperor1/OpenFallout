@@ -224,6 +224,9 @@ namespace OFScript
         void endFight(const OFWorld::Ptr& actor);
         /// Whether the character may go for the player on sight at all: its aggression is more than none
         bool isAggressive(const OFWorld::Ptr& actor);
+        /// Whether the character has a target: it needs a mind to fight whatever its aggression is (a blow or a script
+        /// can start a fight with a character that never starts one)
+        bool fighting(const OFWorld::Ptr& actor);
 
         /// Whether a script killed the character or creature (and none brought it back). Nothing else in the game kills
         /// yet.

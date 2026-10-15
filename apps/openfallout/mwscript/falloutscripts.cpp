@@ -1892,48 +1892,69 @@ namespace OFScript
         if (self == 0 || self == mPlayer || actor.getType() != ESM4::Npc::sRecordId)
             return;
         const WeaponStats held = weaponStats(self);
-        const bool usable = held.mWeapon != 0 && (held.mMelee || held.mAmmoUse == 0 || held.mRounds >= held.mAmmoUse);
-        if (!usable)
+        // What the weapon is worth for a fight, and whether the character has the rounds for it
+        const auto describe
+            = [&](FalloutScript::FormId item) -> std::optional<FalloutScript::FightAI::WeaponCandidate> {
+            const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(item));
+            if (record == nullptr || !record->mHasGameData)
+                return std::nullopt;
+            FalloutScript::FightAI::WeaponCandidate candidate;
+            candidate.mWeapon = item;
+            candidate.mDamage = record->mData.damage;
+            candidate.mMelee = record->mGame.mAnimationType <= ESM4::Weapon::GameData::Melee2Hand;
+            if (candidate.mMelee)
+                return candidate;
+            if (item == held.mWeapon)
+            {
+                // The weapon in the hands has the ammunition it was given, which may not be the one of the record
+                candidate.mAmmoUse = std::max(held.mAmmoUse, 1);
+                candidate.mRounds = held.mAmmoUse > 0 ? held.mRounds : std::numeric_limits<int>::max();
+                return candidate;
+            }
+            candidate.mAmmoUse = std::max<int>(record->mGame.mAmmoUse, 1);
+            // A weapon whose ammunition is no record of the files (a list of them) needs none, as it does when it is
+            // fired
+            candidate.mRounds = mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr
+                ? mActors.itemCount(self, record->mAmmo.toUint32())
+                : std::numeric_limits<int>::max();
+            return candidate;
+        };
+        // The weapon in the hands takes part in the choice, first so that it stays in the hands when another does as
+        // much damage
+        std::vector<FalloutScript::FightAI::WeaponCandidate> candidates;
+        if (held.mWeapon != 0)
+            if (const auto candidate = describe(held.mWeapon))
+                candidates.push_back(*candidate);
+        std::vector<std::pair<FalloutScript::FormId, int>> items;
+        if (mActors.items(self, items))
+            for (const auto& [item, count] : items)
+                if (count > 0 && item != held.mWeapon)
+                    if (const auto candidate = describe(item))
+                        candidates.push_back(*candidate);
+        if (const FalloutScript::FormId best = FalloutScript::FightAI::bestWeapon(candidates); best != 0)
         {
-            std::vector<std::pair<FalloutScript::FormId, int>> items;
-            std::vector<FalloutScript::FightAI::WeaponCandidate> candidates;
-            if (mActors.items(self, items))
-                for (const auto& [item, count] : items)
-                {
-                    const ESM4::Weapon* record = count > 0 ? mStore.get<ESM4::Weapon>().search(refId(item)) : nullptr;
-                    if (record == nullptr || !record->mHasGameData)
-                        continue;
-                    FalloutScript::FightAI::WeaponCandidate candidate;
-                    candidate.mWeapon = item;
-                    candidate.mDamage = record->mData.damage;
-                    candidate.mMelee = record->mGame.mAnimationType <= ESM4::Weapon::GameData::Melee2Hand;
-                    if (!candidate.mMelee)
-                    {
-                        candidate.mAmmoUse = std::max<int>(record->mGame.mAmmoUse, 1);
-                        // A weapon whose ammunition is no record of the files (a list of them) needs none, as it does
-                        // when it is fired
-                        candidate.mRounds = mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr
-                            ? mActors.itemCount(self, record->mAmmo.toUint32())
-                            : std::numeric_limits<int>::max();
-                    }
-                    candidates.push_back(candidate);
-                }
-            if (const FalloutScript::FormId best = FalloutScript::FightAI::bestWeapon(candidates); best != 0)
+            if (best != held.mWeapon)
             {
                 // The ammunition the record names is used, not one that was chosen for an earlier weapon
                 if (const FalloutScript::FormId chosen = mEquipment.ammo(self); chosen != 0)
                     mEquipment.unequip(self, chosen);
                 mEquipment.equip(self, best);
             }
-            else if (held.mWeapon != 0)
-                mEquipment.unequip(self, held.mWeapon);
         }
+        else if (held.mWeapon != 0)
+            mEquipment.unequip(self, held.mWeapon);
         mEquipment.setWeaponDrawn(self, true);
     }
 
     bool FalloutScripts::isAggressive(const OFWorld::Ptr& actor)
     {
         return fightTraitsOf(actor).mAggression != FalloutScript::FightAI::Aggression::unaggressive;
+    }
+
+    bool FalloutScripts::fighting(const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        return self != 0 && mCombat.target(self) != 0;
     }
 
     bool FalloutScripts::attacksPlayerOnSight(const OFWorld::Ptr& actor, float& radius)
@@ -2062,8 +2083,15 @@ namespace OFScript
         {
             if (change.mTarget == 0)
                 mObjects.trigger(change.mActor, BlockType::OnCombatEnd, change.mWas, namesActor(change.mWas));
-            else if (change.mWas == 0)
-                mObjects.trigger(change.mActor, BlockType::OnStartCombat, change.mTarget, namesActor(change.mTarget));
+            else
+            {
+                // A character that was hit, or told to fight, fights whatever its aggression is: it gets a mind to do
+                // it
+                evaluatePackage(change.mActor);
+                if (change.mWas == 0)
+                    mObjects.trigger(
+                        change.mActor, BlockType::OnStartCombat, change.mTarget, namesActor(change.mTarget));
+            }
         }
     }
 

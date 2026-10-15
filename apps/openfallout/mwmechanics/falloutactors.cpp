@@ -239,12 +239,13 @@ namespace OFMechanics
             return scripts != nullptr ? scripts->scriptPackages(ptr) : std::vector<const ESM4::AIPackage*>();
         }
 
-        /// Whether a character goes for the player when it sees it, so that it needs a mind though it has no package
+        /// Whether a character goes for the player when it sees it, or fights already (a blow or a script started a
+        /// fight with one that never starts one), so that it needs a mind though it has no package
         bool mayFight(const OFWorld::Ptr& ptr)
         {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             return scripts != nullptr && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr()
-                && scripts->isAggressive(ptr);
+                && (scripts->isAggressive(ptr) || scripts->fighting(ptr));
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -433,8 +434,8 @@ namespace OFMechanics
         const auto found = mMinds.find(ptr.mRef);
         if (found == mMinds.end())
         {
-            // A character with no packages of its own has no mind until a script gives it one
-            if (scriptPackagesOf(ptr).empty())
+            // A character with no packages of its own has no mind until a script gives it one, or it has to fight
+            if (scriptPackagesOf(ptr).empty() && !mayFight(ptr))
                 return;
             makeMind(ptr).mReview = 0.f;
             return;

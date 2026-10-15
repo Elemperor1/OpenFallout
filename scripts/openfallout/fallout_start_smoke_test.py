@@ -1434,7 +1434,9 @@ MOVING_FOOT_RAY = re.compile(r"OFTEST\trender ray (foot(?:walk|run|stand)) hit=\
 # The arena: the quest gives the player the rifle (EquipItem), and a global script reads what the game knows after each
 # step. The player shoots the dummy (core.combat.fire at the object, the way the player script of the engine does when
 # the ray of its aim finds one) until it is dead; then the raider, who waits beyond the sight of a character, is put in
-# front of the player, and the test watches it notice the player, come within the range of its pistol and shoot.
+# front of the player, and the test watches it notice the player, come within the range of its pistol and shoot. A
+# bystander (who never starts a fight, has no package and no weapon) is shot once at the same time, and the test watches it
+# go for the player.
 ARENA_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
@@ -1465,6 +1467,12 @@ local function report(tag)
         g.@ARMED@, g.@OUT@, g.@AMMO@, g.@HEALTH@, g.@DUMMY_DEAD@, g.@RAIDER_DEAD@, g.@RAIDER_COMBAT@, g.@RAIDER_AMMO@,
         g.@HITS@, g.@DEATHS@, g.@STARTED@,
         raider and string.format('%.0f', (raider.position - player.position):length()) or 'none'))
+    local bystander = find(@BYSTANDER@)
+    if bystander then
+        print('OFTEST', 'arena', 'bystander', tag, string.format('distance=%.0f combat=%s',
+            (bystander.position - player.position):length(),
+            tostring(core.combat.inCombat(core.getFormId('OFTest.esm', @BYSTANDER@)))))
+    end
 end
 
 local steps = {
@@ -1478,6 +1486,7 @@ local steps = {
     { 5.5, function()
         report('shot')
         world.players[1]:sendEvent('OFTestArenaFire', {})
+        world.players[1]:sendEvent('OFTestArenaFire', { target = find(@BYSTANDER@), once = true })
         local raider = find(@RAIDER@)
         if raider then raider:teleport(raider.cell, util.vector3(@COMES@)) end
     end },
@@ -1503,6 +1512,7 @@ return {
 """
 for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES))), ("@QUEST@", plugin.ARENA_QUEST_NAME),
                       ("@RAIDER@", str(plugin.ARENA_RAIDER_REF_ID)), ("@DUMMY@", str(plugin.ARENA_DUMMY_REF_ID)),
+                      ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
@@ -1516,12 +1526,13 @@ for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), 
 ARENA_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
 
-local target, shots = nil, 0
+local target, shots, once = nil, 0, false
 
 return {
     eventHandlers = {
         OFTestArenaFire = function(data)
             target = data.target
+            once = data.once == true
             if target then
                 local weapon = core.combat.weapon()
                 print('OFTEST', 'arena', 'weapon', weapon.weapon, tostring(weapon.melee), weapon.range, weapon.interval,
@@ -1535,9 +1546,9 @@ return {
             local result = core.combat.fire(target)
             if result.fired then
                 shots = shots + 1
-                print('OFTEST', 'arena', 'shot', shots, string.format('hit=%s damage=%.1f killed=%s', tostring(result.hit),
-                    result.damage, tostring(result.killed)))
-                if result.killed then target = nil end
+                print('OFTEST', 'arena', once and 'bystander shot' or 'shot', shots, string.format(
+                    'hit=%s damage=%.1f killed=%s', tostring(result.hit), result.damage, tostring(result.killed)))
+                if result.killed or once then target = nil end
             elseif result.outOfAmmo then
                 print('OFTEST', 'arena', 'out of ammunition')
                 target = nil
@@ -2190,7 +2201,7 @@ def check_arena(text):
     the dummy takes the blows the player shoots at it (its OnHit block counts each, a round is used for each shot) and
     dies of them (OnDeath once, GetDead); the raider, put in front of the player, starts a fight (its OnStartCombat block
     runs, IsInCombat holds), takes its pistol from what it carries and shoots (it has fewer rounds), comes within the range
-    of the pistol, and the player loses health."""
+    of the pistol, and the player loses health. A bystander who never starts a fight is shot once and goes for the player."""
     problems = []
     for line in text.splitlines():
         if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
@@ -2250,6 +2261,21 @@ def check_arena(text):
         problems.append(f"the raider should have taken its pistol and shot rounds with it: {final}")
     if final["health"] >= armed["health"]:
         problems.append(f"the player should have lost health to the raider: {armed['health']} before, {final['health']} after")
+    # The bystander never starts a fight, has no package and no weapon: shot once, it has to go for the player
+    shot_at = re.findall(r"OFTEST\tarena\tbystander shot\t(\d+)\thit=(\w+) damage=[\d.]+ killed=(\w+)$", text, re.M)
+    if len(shot_at) != 1 or shot_at[0][1] != "true" or shot_at[0][2] != "false":
+        problems.append(f"the bystander should be hit by one shot and survive it: {shot_at}")
+    seen = {tag: (float(distance), combat == "true") for tag, distance, combat in re.findall(
+        r"OFTEST\tarena\tbystander\t(\w[\w ]*)\tdistance=(-?\d+) combat=(\w+)$", text, re.M)}
+    if "armed" not in seen or "raider 20" not in seen:
+        problems.append(f"no 'arena bystander' lines in the log: {seen}")
+    else:
+        before, after = seen["armed"], seen["raider 20"]
+        if before[1] or before[0] < 600:
+            problems.append(f"the bystander should be at peace and at a distance before it is shot: {before}")
+        if not after[1] or after[0] > 300:
+            problems.append("the bystander, shot once, should be in a fight with the player and have come to it "
+                            f"(distance, in combat): {after}")
     return problems
 
 
