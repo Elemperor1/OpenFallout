@@ -345,6 +345,7 @@ namespace OFScript
         {
             const std::lock_guard lock(mMadeMutex);
             mPendingMade.clear();
+            mMadeBases.clear();
             mMadeCount = 0;
         }
         mReferences.clear();
@@ -1150,6 +1151,23 @@ namespace OFScript
 
     namespace
     {
+        /// What the world made an object of: the base of a character, creature or container, else the form it is a
+        /// reference to. Unset for an object that is none of those.
+        ESM::FormId baseOfObject(const OFWorld::Ptr& ptr)
+        {
+            if (ptr.getType() == ESM4::Npc::sRecordId)
+                return ptr.get<ESM4::Npc>()->mBase->mId;
+            if (ptr.getType() == ESM4::Creature::sRecordId)
+                return ptr.get<ESM4::Creature>()->mBase->mId;
+            if (ptr.getType() == ESM4::Container::sRecordId)
+                return ptr.get<ESM4::Container>()->mBase->mId;
+            // getRefId gives a copy: the pointer into it needs the copy to stay alive
+            const ESM::RefId id = ptr.getCellRef().getRefId();
+            if (const ESM::FormId* placed = id.getIf<ESM::FormId>())
+                return *placed;
+            return ESM::FormId();
+        }
+
         /// The record that a character or creature takes something from, which is the first of its templates that does
         /// not: the flag says what is taken. Null when a template is not a record of the same kind (a levelled list
         /// of characters), which can not be followed here.
@@ -1242,12 +1260,12 @@ namespace OFScript
     bool FalloutScripts::baseOf(FalloutScript::FormId reference, ESM::FormId& base)
     {
         base = ESM::FormId();
-        // An object that PlaceAtMe asked for is of the base it was asked for, until the world makes it
+        // An object that PlaceAtMe asked for is of the base it was asked for, before and after the world makes it
         {
             const std::lock_guard lock(mMadeMutex);
-            if (const auto asked = mPendingMade.find(reference); asked != mPendingMade.end())
+            if (const auto asked = mMadeBases.find(reference); asked != mMadeBases.end())
             {
-                base = ESM::FormId::fromUint32(asked->second.mBase);
+                base = ESM::FormId::fromUint32(asked->second);
                 return true;
             }
         }
@@ -1283,19 +1301,7 @@ namespace OFScript
             const OFWorld::Ptr ptr = findReference(reference);
             if (ptr.isEmpty())
                 return false;
-            if (ptr.getType() == ESM4::Npc::sRecordId)
-                base = ptr.get<ESM4::Npc>()->mBase->mId;
-            else if (ptr.getType() == ESM4::Creature::sRecordId)
-                base = ptr.get<ESM4::Creature>()->mBase->mId;
-            else if (ptr.getType() == ESM4::Container::sRecordId)
-                base = ptr.get<ESM4::Container>()->mBase->mId;
-            else
-            {
-                // getRefId gives a copy: the pointer into it needs the copy to stay alive
-                const ESM::RefId id = ptr.getCellRef().getRefId();
-                if (const ESM::FormId* placed = id.getIf<ESM::FormId>())
-                    base = *placed;
-            }
+            base = baseOfObject(ptr);
         }
         return true;
     }
@@ -3223,6 +3229,7 @@ namespace OFScript
                 // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
                 mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
                     static_cast<float>(distance), near };
+                mMadeBases[id] = base;
                 if (first == 0)
                     first = id;
             }
@@ -3257,6 +3264,12 @@ namespace OFScript
             mMade[id] = number;
             mMadeIds[number] = id;
             mReferences[id] = placed;
+            // What the world made of the base (a levelled list gives a character), which any thread can ask for
+            if (const ESM::FormId actual = baseOfObject(placed); actual.hasContentFile())
+            {
+                const std::lock_guard lock(mMadeMutex);
+                mMadeBases[id] = actual.toUint32();
+            }
             // An actor that is made sets triggers off like those of the cells (when its cell is loaded again, the cell
             // tells of it)
             if (isCharacterOrCreature(placed))

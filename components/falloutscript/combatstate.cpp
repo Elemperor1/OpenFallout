@@ -60,6 +60,9 @@ namespace FalloutScript
         const FormId was = current;
         current = target;
         noteChange(actor, target, was);
+        // The one it fought is out of its last fight if nobody else fights it
+        if (was != 0)
+            settleAttacked(was);
     }
 
     bool CombatState::startUnlessOut(FormId actor, FormId target)
@@ -75,6 +78,8 @@ namespace FalloutScript
             const FormId was = current;
             current = target;
             noteChange(actor, target, was);
+            if (was != 0)
+                settleAttacked(was);
         }
         return true;
     }

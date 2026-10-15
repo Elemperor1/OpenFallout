@@ -265,6 +265,33 @@ namespace
         EXPECT_FALSE(state.attacked(guard));
     }
 
+    TEST(FalloutScriptCombatStateTest, a_character_is_not_attacked_any_more_when_the_attacker_turns_to_another)
+    {
+        CombatState state;
+        CombatState::Hit hit;
+        hit.mAttacker = raider;
+        state.start(raider, guard);
+        state.noteHit(guard, hit);
+        EXPECT_TRUE(state.attacked(guard));
+
+        // The raider fights the ghoul now: the guard is in no fight
+        state.start(raider, ghoul);
+        EXPECT_FALSE(state.attacked(guard));
+
+        // The same when the fight starts unless the raider is out
+        state.start(raider, guard);
+        state.noteHit(guard, hit);
+        ASSERT_TRUE(state.startUnlessOut(raider, ghoul));
+        EXPECT_FALSE(state.attacked(guard));
+
+        // Not while somebody else fights the guard
+        state.start(raider, guard);
+        state.start(ghoul, guard);
+        state.noteHit(guard, hit);
+        state.start(raider, ghoul);
+        EXPECT_TRUE(state.attacked(guard));
+    }
+
     TEST(FalloutScriptCombatStateTest, the_blows_of_each_attacker_are_counted)
     {
         CombatState state;

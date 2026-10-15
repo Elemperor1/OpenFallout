@@ -714,6 +714,9 @@ namespace OFScript
         /// thread of Lua: the rest of the script has to find the object it was told the number of at once
         std::mutex mMadeMutex;
         FalloutScript::FormId mMadeCount = 0;
+        /// The base each number was asked for with, kept after the world makes the object: the records say what the
+        /// object is from any thread, but the world only to the thread of the frame (under mMadeMutex)
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mMadeBases;
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
