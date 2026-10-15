@@ -119,9 +119,9 @@ namespace FalloutScript
             return static_cast<double>(call.mReference != 0 ? combat.target(call.mReference) : 0);
         });
         interpreter.setHandler("IsCombatTarget", [&combat](CallContext& call) {
-            // The reference is what the other actor fights
+            // The other actor is what the reference fights (the wording of the wiki; the executable is not read)
             const FormId other = formArgument(call, 0);
-            return call.mReference != 0 && other != 0 && combat.target(other) == call.mReference ? 1.0 : 0.0;
+            return call.mReference != 0 && other != 0 && combat.target(call.mReference) == other ? 1.0 : 0.0;
         });
         interpreter.setHandler("GetDetected", [&world](CallContext& call) {
             const FormId target = formArgument(call, 0);
@@ -235,15 +235,15 @@ namespace FalloutScript
             const FormId killer = formArgument(call, 0);
             return call.mReference != 0 && killer != 0 && actors.killerOf(call.mReference) == killer ? 1.0 : 0.0;
         });
-        // The last blow came from someone on its side
+        // The number of blows that came from someone on its side
         interpreter.setHandler("GetFriendHit", [&combat, &actors, &world](CallContext& call) {
-            CombatState::Hit hit;
-            if (call.mReference == 0 || !combat.lastHit(call.mReference, hit) || hit.mAttacker == 0)
+            if (call.mReference == 0)
                 return 0.0;
-            return relationOfActors(combat, actors, world, call.mReference, hit.mAttacker)
-                    == CombatState::Relation::Ally
-                ? 1.0
-                : 0.0;
+            int friendly = 0;
+            for (const auto& [attacker, count] : combat.hitsTaken(call.mReference))
+                if (relationOfActors(combat, actors, world, call.mReference, attacker) == CombatState::Relation::Ally)
+                    friendly += count;
+            return static_cast<double>(friendly);
         });
     }
 }

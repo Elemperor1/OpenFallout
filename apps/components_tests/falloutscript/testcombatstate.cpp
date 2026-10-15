@@ -2,6 +2,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <utility>
 
 namespace
 {
@@ -210,6 +211,55 @@ namespace
         EXPECT_TRUE(last.mCritical);
         EXPECT_EQ(last.mLimb, 3);
         EXPECT_FALSE(state.lastHit(raider, last));
+    }
+
+    TEST(FalloutScriptCombatStateTest, a_character_stays_attacked_as_long_as_it_is_in_a_fight)
+    {
+        CombatState state;
+        CombatState::Hit hit;
+        hit.mAttacker = raider;
+        state.start(raider, guard);
+        state.noteHit(guard, hit);
+
+        // The time does not end it while the fight goes on, whoever started it
+        state.advance(10.f);
+        EXPECT_TRUE(state.attacked(guard));
+        // It ends when the character is out of its last fight
+        state.stop(raider);
+        EXPECT_FALSE(state.attacked(guard));
+
+        state.start(guard, raider);
+        state.noteHit(guard, hit);
+        state.advance(10.f);
+        EXPECT_TRUE(state.attacked(guard));
+        state.withdraw(raider);
+        EXPECT_FALSE(state.attacked(guard));
+
+        // Another fight keeps it attacked
+        state.start(guard, raider);
+        state.start(ghoul, guard);
+        state.noteHit(guard, hit);
+        state.stop(guard);
+        EXPECT_TRUE(state.attacked(guard));
+        state.stop(ghoul);
+        EXPECT_FALSE(state.attacked(guard));
+    }
+
+    TEST(FalloutScriptCombatStateTest, the_blows_of_each_attacker_are_counted)
+    {
+        CombatState state;
+        CombatState::Hit first;
+        first.mAttacker = raider;
+        CombatState::Hit second;
+        second.mAttacker = ghoul;
+        state.noteHit(guard, first);
+        state.noteHit(guard, second);
+        state.noteHit(guard, first);
+        state.noteHit(guard, {});
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 2), std::make_pair(ghoul, 1)));
+        EXPECT_THAT(state.hitsTaken(raider), IsEmpty());
+        state.clear();
+        EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
     }
 
     TEST(FalloutScriptCombatStateTest, the_blows_are_told_once_in_the_order_they_were_struck)

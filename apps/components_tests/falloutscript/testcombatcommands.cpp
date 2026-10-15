@@ -201,10 +201,10 @@ namespace
         EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, guard, guard));
     }
 
-    TEST(FalloutScriptCombatCommandsTest, a_script_tells_who_fights_the_character)
+    TEST(FalloutScriptCombatCommandsTest, a_script_tells_whom_the_character_fights)
     {
         Runner setup;
-        setup.mCombat.start(raider, guard);
+        setup.mCombat.start(guard, raider);
         ScriptBuilder builder;
         const std::uint16_t enemy = builder.form(raider);
         const std::uint16_t stranger = builder.form(ghoul);
@@ -529,7 +529,7 @@ namespace
         EXPECT_EQ(setup.variable(2), 0);
     }
 
-    TEST(FalloutScriptCombatCommandsTest, a_blow_from_a_friend_is_told)
+    TEST(FalloutScriptCombatCommandsTest, the_blows_from_friends_are_counted)
     {
         Runner setup;
         setup.mWorld.mFactions[ghoul] = { { vault, 2 } };
@@ -544,10 +544,14 @@ namespace
         setup.run(builder);
         EXPECT_EQ(setup.variable(1), 1);
 
+        // The blows of someone else do not count, and the blows of friends add up
         CombatState::Hit byRaider;
         byRaider.mAttacker = raider;
         setup.mCombat.noteHit(guard, byRaider);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
-        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_EQ(setup.variable(1), 1);
+        setup.mCombat.noteHit(guard, byFriend);
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+        EXPECT_EQ(setup.variable(1), 2);
     }
 }

@@ -81,10 +81,13 @@ namespace FalloutScript
             bool mCritical = false;
             int mLimb = -1; // the part of the body, -1 when not known
         };
-        /// A blow was struck at the actor: it counts as attacked for a short time (GetAttacked), and the blow is the
-        /// last one it took. The time passes with advance().
+        /// A blow was struck at the actor: it counts as attacked (GetAttacked) for as long as it is in a fight, and
+        /// the blow is the last one it took and one more that its attacker struck (hitsTaken). An actor that is in no
+        /// fight stays attacked for a short time that passes with advance().
         void noteHit(FormId victim, const Hit& hit);
         bool attacked(FormId actor) const;
+        /// How many blows each attacker struck at the actor since the start of the game
+        std::vector<std::pair<FormId, int>> hitsTaken(FormId victim) const;
         /// The last blow the actor took, false when it took none
         bool lastHit(FormId actor, Hit& hit) const;
         void advance(float seconds);
@@ -111,6 +114,10 @@ namespace FalloutScript
 
     private:
         void noteChange(FormId actor, FormId target, FormId was);
+        /// Whether the actor fights or is fought (the caller holds the lock)
+        bool inFight(FormId actor) const;
+        /// An actor that left its last fight is not attacked any more (the caller holds the lock)
+        void settleAttacked(FormId actor);
 
         mutable std::mutex mMutex;
         std::map<FormId, FormId> mTargets;
@@ -121,7 +128,8 @@ namespace FalloutScript
         std::set<FormId> mRestrained;
         std::map<FormId, bool> mEssential;
         std::map<std::pair<FormId, FormId>, Relation> mRelations;
-        std::map<FormId, float> mAttacked; // the seconds left of being attacked
+        std::map<FormId, float> mAttacked; // the seconds left of being attacked while in no fight
+        std::map<FormId, std::map<FormId, int>> mHitCounts;
         std::map<FormId, Hit> mLastHits;
         std::vector<HitEvent> mHitEvents;
         std::vector<Change> mChanges;

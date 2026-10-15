@@ -6,7 +6,7 @@ namespace FalloutScript
 {
     namespace
     {
-        /// How long a character counts as attacked after a blow
+        /// How long a character that is in no fight counts as attacked after a blow
         constexpr float attackedSeconds = 2.f;
         constexpr std::size_t mostChanges = 1024;
     }
@@ -23,6 +23,7 @@ namespace FalloutScript
         mEssential.clear();
         mRelations.clear();
         mAttacked.clear();
+        mHitCounts.clear();
         mLastHits.clear();
         mHitEvents.clear();
         mChanges.clear();
@@ -32,6 +33,19 @@ namespace FalloutScript
     {
         if (mChanges.size() < mostChanges)
             mChanges.push_back({ actor, target, was });
+    }
+
+    bool CombatState::inFight(FormId actor) const
+    {
+        return mTargets.count(actor) != 0 || std::any_of(mTargets.begin(), mTargets.end(), [actor](const auto& entry) {
+            return entry.second == actor;
+        });
+    }
+
+    void CombatState::settleAttacked(FormId actor)
+    {
+        if (!inFight(actor))
+            mAttacked.erase(actor);
     }
 
     void CombatState::start(FormId actor, FormId target)
@@ -56,22 +70,31 @@ namespace FalloutScript
         const FormId was = found->second;
         mTargets.erase(found);
         noteChange(actor, 0, was);
+        settleAttacked(actor);
+        settleAttacked(was);
     }
 
     void CombatState::withdraw(FormId actor)
     {
         // In one go: a fight that starts against the character while it is withdrawn from the others would be left
         const std::lock_guard lock(mMutex);
+        std::vector<FormId> left;
         for (auto it = mTargets.begin(); it != mTargets.end();)
         {
             if (it->first == actor || it->second == actor)
             {
                 noteChange(it->first, 0, it->second);
+                left.push_back(it->first);
+                left.push_back(it->second);
                 it = mTargets.erase(it);
             }
             else
                 ++it;
         }
+        // Those who left their last fight are not attacked any more
+        for (const FormId gone : left)
+            settleAttacked(gone);
+        settleAttacked(actor);
     }
 
     FormId CombatState::target(FormId actor) const
@@ -194,6 +217,8 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mAttacked[victim] = attackedSeconds;
+        if (hit.mAttacker != 0)
+            ++mHitCounts[victim][hit.mAttacker];
         mLastHits[victim] = hit;
         if (mHitEvents.size() < mostChanges)
             mHitEvents.push_back({ victim, hit });
@@ -203,6 +228,15 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         return mAttacked.count(actor) != 0;
+    }
+
+    std::vector<std::pair<FormId, int>> CombatState::hitsTaken(FormId victim) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mHitCounts.find(victim);
+        if (found == mHitCounts.end())
+            return {};
+        return { found->second.begin(), found->second.end() };
     }
 
     bool CombatState::lastHit(FormId actor, Hit& hit) const
@@ -220,6 +254,12 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         for (auto it = mAttacked.begin(); it != mAttacked.end();)
         {
+            // In a fight, it stays attacked until the fight is over
+            if (inFight(it->first))
+            {
+                ++it;
+                continue;
+            }
             it->second -= seconds;
             it = it->second <= 0 ? mAttacked.erase(it) : std::next(it);
         }
