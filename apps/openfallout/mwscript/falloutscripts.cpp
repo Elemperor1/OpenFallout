@@ -1803,7 +1803,7 @@ namespace OFScript
         {
             // The condition of the part goes down by the damage after the armor and before the multiplier of the part,
             // as a share of the part's health; half as much for the player, as much as the weapon says it hurts limbs,
-            // and a perk of the attacker may change that
+            // and a perk of the one that is hurt may change that (its limbs take half with Adamantium Skeleton)
             double limbDamage = mLimbs.limbDamage(victim, limb, hit.mDamage);
             if (victim == mPlayer)
             {
@@ -1814,8 +1814,7 @@ namespace OFScript
             if (const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr)
                 if (record->mHasGameData && record->mGame.mLimbDamageMultiplier > 0)
                     limbDamage *= record->mGame.mLimbDamageMultiplier;
-            if (attacker != 0)
-                limbDamage = mPerks.apply(Entry::limbDamage, attacker, limbDamage, towardsVictim);
+            limbDamage = mPerks.apply(Entry::limbDamage, victim, limbDamage, towardsAttacker);
             result.mCrippled = mLimbs.hurt(victim, limb, limbDamage).mCrippled;
         }
         // Who did the damage decides whether a kill by someone else pays the player
