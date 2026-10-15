@@ -12,7 +12,11 @@
 #include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadalch.hpp>
+#include <components/esm4/loadammo.hpp>
+#include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadavif.hpp>
+#include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
@@ -20,7 +24,10 @@
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadgmst.hpp>
+#include <components/esm4/loadimod.hpp>
+#include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/loadperk.hpp>
@@ -30,6 +37,7 @@
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadvtyp.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/messagetext.hpp>
@@ -157,6 +165,7 @@ namespace OFScript
         , mQuests(mInterpreter, *this)
         , mObjects(mInterpreter, [this](FalloutScript::FormId id) { return findScript(id); })
         , mActors(*this)
+        , mEquipment(*this, mActors)
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
@@ -175,6 +184,12 @@ namespace OFScript
         FalloutScript::addMessageCommands(mInterpreter, *this);
         FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
+        FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
+        // The container of an item is the holder its script was last run for
+        mInterpreter.setHandler("GetContainer", [this](FalloutScript::CallContext& call) {
+            const auto found = mItemHolders.find(call.mReference);
+            return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
+        });
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
@@ -338,6 +353,8 @@ namespace OFScript
             mCalendarShift = 0;
         }
         mActors.clear();
+        mEquipment.clear();
+        mItemHolders.clear();
         mActorValues.clear();
         mReferenceState.clear();
         mFormLists.clear();
@@ -393,6 +410,8 @@ namespace OFScript
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
+            // What the blocks of the menu did to the items is told while it is open, not when it is closed
+            raiseItemEvents();
             const FalloutScript::BlockFilter filter
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
@@ -407,6 +426,9 @@ namespace OFScript
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
         updateFurniture();
+        // What the items did since the last frame is told before any block of this frame runs, so that an AddItem or
+        // EquipItem of a trigger block is told in the next frame
+        raiseItemEvents();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
         mQuests.update(frametime);
@@ -1135,27 +1157,34 @@ namespace OFScript
             return record;
         }
 
-        /// The record that has the stats of a character, which is the end of its chain of templates. A levelled list in
-        /// the place of a template gives one of its characters, the one that the cell shows for this reference (the
-        /// chain is followed with the seed of the reference, as for the level). The record itself when the chain ends
-        /// without a record that has them.
-        const ESM4::Npc& statsRecordOf(const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint32_t seed)
+        /// The record that has what a flag of the template says a character takes from its template (its stats, its
+        /// inventory): the end of its chain of templates. A levelled list in the place of a template gives one of its
+        /// characters, the one that the cell shows for this reference (the chain is followed with the seed of the
+        /// reference, as for the level). The record itself when the chain ends without a record that has them.
+        const ESM4::Npc& templateRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint16_t flag, std::uint32_t seed)
         {
             const OFClass::StoreWornArmorSource source(store);
-            const ESM4::Npc* owner = ESM4::templateOwner(
-                ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), ESM4::Npc::Template_UseStats);
+            const ESM4::Npc* owner
+                = ESM4::templateOwner(ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
             return owner != nullptr ? *owner : npc;
         }
 
         /// As above, for a creature
-        const ESM4::Creature& statsRecordOf(
-            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint32_t seed)
+        const ESM4::Creature& templateRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint16_t flag, std::uint32_t seed)
         {
             const OFClass::StoreCreatureSource source(store);
             const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed),
-                ESM4::Creature::Template_UseStats);
+                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
             return owner != nullptr ? *owner : creature;
+        }
+
+        /// The record that has the stats of a character
+        template <class Record>
+        const Record& statsRecordOf(const OFWorld::ESMStore& store, const Record& record, std::uint32_t seed)
+        {
+            return templateRecordOf(store, record, Record::Template_UseStats, seed);
         }
 
         /// The attributes of DATA, which are the actor values from strength to luck
@@ -1276,18 +1305,192 @@ namespace OFScript
         };
         if (base.isZeroOrUnset())
             return true;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(holder), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseInventory))
-                take(owner->mInventory);
+            // The inventory is the one of the record that has it: a template that a levelled list of characters gives
+            // is followed with the seed of the reference, as the armor the character is shown wearing is
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseInventory, seed).mInventory);
+            // The armor that the levelled lists of the inventory give is carried as well, as many of each piece as
+            // they gave, whether the character can wear it or not (what is worn is for startingArmor to say). The
+            // pieces that the inventory lists itself are in it already.
+            if (npc->mIsFONV)
+            {
+                const OFClass::StoreWornArmorSource source(mStore);
+                for (const ESM4::ListedArmor& given :
+                    ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed).mFromLists)
+                {
+                    const FalloutScript::FormId piece = numberOf(given.mArmor->mId);
+                    const auto count = static_cast<std::int32_t>(std::min<std::uint32_t>(given.mCount, 0x7FFFFFFF));
+                    const auto listed = std::find_if(
+                        items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; });
+                    if (listed == items.end())
+                        items.emplace_back(piece, count);
+                    else
+                        listed->second = static_cast<std::int32_t>(
+                            std::min<std::int64_t>(std::int64_t(listed->second) + count, 0x7FFFFFFF));
+                }
+            }
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseInventory))
-                take(owner->mInventory);
+            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed).mInventory);
         }
         else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
             take(container->mInventory);
+        return true;
+    }
+
+    bool FalloutScripts::itemInfo(FalloutScript::FormId item, FalloutScript::ItemInfo& info)
+    {
+        const ESM::RefId id = refId(item);
+        info = FalloutScript::ItemInfo();
+        if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Weapon;
+            info.mAnimationType = weapon->mHasGameData ? weapon->mGame.mAnimationType : 0;
+            info.mWeight = weapon->mData.weight;
+            return true;
+        }
+        if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Armor;
+            info.mSlots = armor->mArmorFlags;
+            info.mRating = armor->mHasRating ? armor->mRating : 0.0;
+            info.mThreshold = armor->mDamageThreshold;
+            info.mWeight = armor->mData.weight;
+            return true;
+        }
+        if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Ammo;
+            info.mWeight = ammo->mData.mWeight;
+            return true;
+        }
+        if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(id))
+        {
+            info.mKind = FalloutScript::ItemKind::Aid;
+            info.mWeight = potion->mData.weight;
+            return true;
+        }
+        if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(id))
+        {
+            info.mWeight = misc->mData.weight;
+            return true;
+        }
+        if (const ESM4::Book* book = mStore.get<ESM4::Book>().search(id))
+        {
+            info.mWeight = book->mData.weight;
+            return true;
+        }
+        if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(id))
+        {
+            info.mWeight = ingredient->mData.weight;
+            return true;
+        }
+        if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(id))
+        {
+            info.mWeight = mod->mData.mWeight;
+            return true;
+        }
+        return false;
+    }
+
+    bool FalloutScripts::startingArmor(FalloutScript::FormId actor, std::vector<FalloutScript::FormId>& armor)
+    {
+        // The player starts with nothing (see initialItems)
+        if (actor == mPlayer)
+            return true;
+        ESM::FormId base;
+        if (!baseOf(actor, base))
+            return false;
+        if (base.isZeroOrUnset())
+            return true;
+        const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base);
+        if (npc == nullptr || !npc->mIsFONV)
+            return true;
+        // What the character is shown wearing: the armor of its inventory and of the lists in it, chosen with the seed
+        // of the reference and the level that the cell uses, of which the pieces that show are worn (one that covers
+        // no part of the body, or has no model for its sex, is not)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        const OFClass::StoreWornArmorSource source(mStore);
+        const auto chain = ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+        const ESM4::Npc* traitsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseTraits);
+        if (traitsOwner == nullptr)
+            traitsOwner = npc;
+        const bool female = (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0;
+        const ESM4::WornPieces worn
+            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed), female);
+        for (const ESM4::WornPiece& piece : worn.mPieces)
+            armor.push_back(numberOf(piece.mArmor->mId));
+        return true;
+    }
+
+    FalloutScript::FormId FalloutScripts::itemScript(FalloutScript::FormId item)
+    {
+        const ESM::RefId id = refId(item);
+        const auto scriptOfRecord
+            = [](const auto* record) { return record == nullptr ? 0 : numberOf(record->mScriptId); };
+        if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(id))
+            return scriptOfRecord(weapon);
+        if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))
+            return scriptOfRecord(armor);
+        if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
+            return numberOf(ammo->mScript);
+        if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(id))
+            return scriptOfRecord(potion);
+        if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(id))
+            return scriptOfRecord(misc);
+        if (const ESM4::Book* book = mStore.get<ESM4::Book>().search(id))
+            return scriptOfRecord(book);
+        if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(id))
+            return scriptOfRecord(ingredient);
+        if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(id))
+            return scriptOfRecord(mod);
+        return 0;
+    }
+
+    void FalloutScripts::raiseItemEvents()
+    {
+        namespace BlockType = FalloutScript::BlockType;
+        const auto raise = [this](FalloutScript::FormId item, FalloutScript::FormId holder, std::uint16_t blockType) {
+            const FalloutScript::FormId script = itemScript(item);
+            if (script == 0 || mObjects.add(item, script) == nullptr)
+                return;
+            mItemHolders[item] = holder;
+            // A block that names a container is for that container, or for a character made from that record
+            FalloutScript::FormId base = 0;
+            baseFormOf(holder, base);
+            mObjects.trigger(item, blockType, holder, [holder, base](const FalloutScript::Block& block) {
+                return block.mNames != FalloutScript::BlockNames::Form || block.mForm == holder || block.mForm == base;
+            });
+        };
+        // Both lists are taken before a block runs, so that what the blocks do (an OnAdd that equips the item) is told
+        // at the next frame and not in this one
+        const std::vector<FalloutScript::ActorState::ItemChange> added = mActors.takeChanges();
+        const std::vector<FalloutScript::Equipment::WornChange> worn = mEquipment.takeChanges();
+        // A script takes items away without a drop (RemoveItem): the OnDrop blocks run when something is dropped
+        for (const FalloutScript::ActorState::ItemChange& change : added)
+            if (change.mCount > 0)
+                raise(change.mItem, change.mHolder, BlockType::OnAdd);
+        for (const FalloutScript::Equipment::WornChange& change : worn)
+            raise(change.mItem, change.mActor, change.mWorn ? BlockType::OnEquip : BlockType::OnUnequip);
+    }
+
+    bool FalloutScripts::pickUp(const OFWorld::Ptr& item, const OFWorld::Ptr& actor)
+    {
+        const FalloutScript::FormId reference = referenceOf(item);
+        const FalloutScript::FormId holder
+            = actor == OFBase::Environment::get().getWorld()->getPlayerPtr() ? mPlayer : referenceOf(actor);
+        ESM::FormId base;
+        if (reference == 0 || holder == 0 || !baseOf(reference, base) || base.isZeroOrUnset())
+            return false;
+        const FalloutScript::FormId form = numberOf(base);
+        FalloutScript::ItemInfo info;
+        if (!itemInfo(form, info))
+            return false;
+        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1));
+        setDisabled(reference, true);
         return true;
     }
 

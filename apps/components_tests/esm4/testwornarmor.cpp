@@ -295,6 +295,80 @@ namespace
         EXPECT_EQ(trace.mListsEntered, 1u);
     }
 
+    std::map<std::uint32_t, std::uint32_t> counts(const std::vector<ESM4::ListedArmor>& given)
+    {
+        std::map<std::uint32_t, std::uint32_t> result;
+        for (const ESM4::ListedArmor& piece : given)
+            result[piece.mArmor->mId.mIndex] += piece.mCount;
+        return result;
+    }
+
+    TEST(ESM4WornArmorTest, countsEveryPieceThatListsGiveWhetherItCanBeWornOrNot)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, upperBody); // covers what the first piece does
+        source.addArmor(0x1003, hat);
+        source.addList(0x1010, { { 1, 0x1002 }, { 1, 0x1003 } }, 0x04);
+        source.mLevelledItems.at(id(0x1010)).mLvlObject[1].count = 4;
+        const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1001, 0x1010 });
+
+        const ESM4::CharacterArmor armor = ESM4::characterArmor(source, npc, playerLevel, 1);
+
+        // all three are candidates for wearing; what the lists gave is counted by itself, and the piece that the
+        // inventory lists is only in the first (its entry has the count)
+        EXPECT_THAT(ids(armor.mArmor), UnorderedElementsAre(0x1001u, 0x1002u, 0x1003u));
+        EXPECT_THAT(counts(armor.mFromLists), UnorderedElementsAre(Pair(0x1002u, 1u), Pair(0x1003u, 4u)));
+    }
+
+    TEST(ESM4WornArmorTest, addsUpAPieceThatTwoListsGive)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addList(0x1010, { { 1, 0x1001 } });
+        source.addList(0x1011, { { 1, 0x1001 } });
+        const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010, 0x1011 });
+
+        const ESM4::CharacterArmor armor = ESM4::characterArmor(source, npc, playerLevel, 1);
+
+        ASSERT_EQ(armor.mArmor.size(), 1u);
+        EXPECT_THAT(counts(armor.mFromLists), ElementsAre(Pair(0x1001u, 2u)));
+    }
+
+    TEST(ESM4WornArmorTest, aListInTheInventoryWithACountGivesItsEntriesThatManyTimes)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, hat);
+        // a list that gives all of its entries, and one that rolls once for each item of its count
+        source.addList(0x1010, { { 1, 0x1001 }, { 1, 0x1002 } }, 0x04);
+        source.addList(0x1011, { { 1, 0x1001 } }, 0x02);
+        ESM4::Npc& all = source.addNpc(0x2001, { 0x1010 });
+        all.mInventory[0].count = 3;
+        ESM4::Npc& each = source.addNpc(0x2002, { 0x1011 });
+        each.mInventory[0].count = 3;
+
+        EXPECT_THAT(counts(ESM4::characterArmor(source, all, playerLevel, 1).mFromLists),
+            UnorderedElementsAre(Pair(0x1001u, 3u), Pair(0x1002u, 3u)));
+        // three rolls, each giving the one entry once
+        EXPECT_THAT(
+            counts(ESM4::characterArmor(source, each, playerLevel, 1).mFromLists), ElementsAre(Pair(0x1001u, 3u)));
+    }
+
+    TEST(ESM4WornArmorTest, countsOfNestedListsMultiply)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addList(0x1011, { { 1, 0x1001 } });
+        source.mLevelledItems.at(id(0x1011)).mLvlObject[0].count = 5;
+        source.addList(0x1010, { { 1, 0x1011 } });
+        source.mLevelledItems.at(id(0x1010)).mLvlObject[0].count = 2;
+        const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010 });
+
+        EXPECT_THAT(
+            counts(ESM4::characterArmor(source, npc, playerLevel, 1).mFromLists), ElementsAre(Pair(0x1001u, 10u)));
+    }
+
     TEST(ESM4WornArmorTest, aListGivesNothingByChanceOrWhenNoEntryIsAtOrBelowTheLevel)
     {
         TestSource source;

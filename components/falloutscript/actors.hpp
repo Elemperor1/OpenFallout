@@ -48,6 +48,20 @@ namespace FalloutScript
         void addItem(FormId holder, FormId item, int count);
         /// Takes away up to `count` of the item (all it has when it has fewer) and tells how many it took
         int removeItem(FormId holder, FormId item, int count);
+        /// Everything the holder has (the form of the item and how many, in the order of the forms). False when the
+        /// host can not tell yet what the record holds, for a reference in a cell that is not loaded.
+        bool items(FormId holder, std::vector<std::pair<FormId, int>>& result);
+
+        /// A change that a script made to what a holder has: a positive count was added, a negative one taken away
+        struct ItemChange
+        {
+            FormId mHolder = 0;
+            FormId mItem = 0;
+            int mCount = 0;
+        };
+        /// The changes since this was last called (the first of them kept at most 4096): the game raises the events
+        /// of the items (OnAdd, OnDrop) from them when it is ready for scripts to run, not in the middle of one.
+        std::vector<ItemChange> takeChanges();
 
         bool isDead(FormId actor) const;
         void setDead(FormId actor, bool dead);
@@ -87,6 +101,8 @@ namespace FalloutScript
 
         Holder& holder(FormId id) { return mHolders[id]; }
         void knowItems(FormId id, Holder& entry);
+        /// The caller holds the lock
+        void noteChange(FormId holder, FormId item, int count);
         void knowFactions(FormId id, Holder& entry);
 
         ActorRecords& mRecords;
@@ -95,12 +111,13 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
+        std::vector<ItemChange> mChanges;
     };
 
-    /// Gives the commands about items, deaths and factions to the interpreter: AddItem, RemoveItem, GetItemCount,
-    /// GetDead, GetDeadCount, KillActor, AddToFaction, RemoveFromFaction, SetFactionRank, GetInFaction and
-    /// GetFactionRank (the commands about the health of a character are with the actor values). Those that the command
-    /// table does not have are left out.
+    /// Gives the commands about items, deaths and factions to the interpreter: AddItem, AddItemHealthPercent,
+    /// RemoveItem, RemoveAllItems, DuplicateAllItems, GetItemCount, GetDead, GetDeadCount, KillActor, AddToFaction,
+    /// RemoveFromFaction, SetFactionRank, GetInFaction and GetFactionRank (the commands about the health of a
+    /// character are with the actor values). Those that the command table does not have are left out.
     class Interpreter;
     void addActorCommands(Interpreter& interpreter, ActorState& state);
 }

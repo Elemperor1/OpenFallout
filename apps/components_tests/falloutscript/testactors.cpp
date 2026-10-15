@@ -43,6 +43,8 @@ namespace
     constexpr std::uint16_t OpGetInFaction = 0x1047;
     constexpr std::uint16_t OpGetFactionRank = 0x1049;
     constexpr std::uint16_t OpRemoveItem = 0x1052;
+    constexpr std::uint16_t OpRemoveAllItems = 0x10AD;
+    constexpr std::uint16_t OpDuplicateAllItems = 0x114B;
     constexpr std::uint16_t OpSetFactionRank = 0x1089;
     constexpr std::uint16_t OpKillActor = 0x108B;
     constexpr std::uint16_t OpResurrectActor = 0x108C;
@@ -327,6 +329,52 @@ namespace
         EXPECT_EQ(state.factionRank(guard, legion), -1);
     }
 
+    TEST(FalloutScriptActorStateTest, a_holder_lists_what_it_has_and_the_changes_are_told_once)
+    {
+        FakeRecords records;
+        records.mItems[guard] = { { caps, 40 } };
+        ActorState state(records);
+
+        std::vector<std::pair<FormId, int>> items;
+        ASSERT_TRUE(state.items(guard, items));
+        EXPECT_THAT(items, ElementsAre(std::make_pair(caps, 40)));
+        // Reading the record is no change
+        EXPECT_THAT(state.takeChanges(), IsEmpty());
+
+        state.addItem(guard, stimpak, 2);
+        state.removeItem(guard, caps, 100);
+        state.removeItem(guard, ncr, 1);
+
+        const std::vector<ActorState::ItemChange> changes = state.takeChanges();
+        ASSERT_EQ(changes.size(), 2u);
+        EXPECT_EQ(changes[0].mItem, stimpak);
+        EXPECT_EQ(changes[0].mCount, 2);
+        EXPECT_EQ(changes[1].mItem, caps);
+        // Only what the holder had can be taken away
+        EXPECT_EQ(changes[1].mCount, -40);
+        EXPECT_EQ(changes[1].mHolder, guard);
+        EXPECT_THAT(state.takeChanges(), IsEmpty());
+
+        ASSERT_TRUE(state.items(guard, items));
+        EXPECT_THAT(items, ElementsAre(std::make_pair(stimpak, 2)));
+    }
+
+    TEST(FalloutScriptActorStateTest, a_holder_that_is_not_known_yet_has_no_list)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(crate);
+        ActorState state(records);
+
+        std::vector<std::pair<FormId, int>> items;
+        EXPECT_FALSE(state.items(crate, items));
+        state.addItem(crate, caps, 5);
+        EXPECT_FALSE(state.items(crate, items));
+
+        records.mUnknown.clear();
+        ASSERT_TRUE(state.items(crate, items));
+        EXPECT_THAT(items, ElementsAre(std::make_pair(caps, 5)));
+    }
+
     TEST(FalloutScriptActorCommandsTest, a_script_adds_and_removes_items_and_counts_them)
     {
         Runner setup;
@@ -343,6 +391,35 @@ namespace
 
         EXPECT_EQ(setup.variable(1), 7);
         EXPECT_EQ(setup.variable(2), 5);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, a_script_moves_and_copies_all_items_to_another_holder)
+    {
+        Runner setup;
+        setup.mRecords.mItems[guard] = { { caps, 10 }, { stimpak, 2 } };
+        ScriptBuilder builder;
+        const std::uint16_t other = builder.form(player);
+        const std::uint16_t chest = builder.form(crate);
+        const std::uint16_t money = builder.form(caps);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDuplicateAllItems, arguments(1).add(refArg(chest)))
+            + setTo(var('s', 1), callToken(OpGetItemCount, arguments(1).add(refArg(money))))
+            + setTo(var('s', 2), callToken(OpGetItemCount, arguments(1).add(refArg(money)), chest))
+            + command(OpRemoveAllItems, arguments(1).add(refArg(other)))
+            + setTo(var('s', 3), callToken(OpGetItemCount, arguments(1).add(refArg(money))))
+            + setTo(var('s', 4), callToken(OpGetItemCount, arguments(1).add(refArg(money)), other)) + end());
+        builder.variable(1, integerVariable, "kept")
+            .variable(2, integerVariable, "copied")
+            .variable(3, integerVariable, "left")
+            .variable(4, integerVariable, "moved");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 10);
+        EXPECT_EQ(setup.variable(2), 10);
+        EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_EQ(setup.variable(4), 10);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
