@@ -1135,6 +1135,29 @@ namespace OFScript
             return record;
         }
 
+        /// The record that has the stats of a character, which is the end of its chain of templates. A levelled list in
+        /// the place of a template gives one of its characters, the one that the cell shows for this reference (the
+        /// chain is followed with the seed of the reference, as for the level). The record itself when the chain ends
+        /// without a record that has them.
+        const ESM4::Npc& statsRecordOf(const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint32_t seed)
+        {
+            const OFClass::StoreWornArmorSource source(store);
+            const ESM4::Npc* owner = ESM4::templateOwner(
+                ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), ESM4::Npc::Template_UseStats);
+            return owner != nullptr ? *owner : npc;
+        }
+
+        /// As above, for a creature
+        const ESM4::Creature& statsRecordOf(
+            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint32_t seed)
+        {
+            const OFClass::StoreCreatureSource source(store);
+            const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
+                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::Creature::Template_UseStats);
+            return owner != nullptr ? *owner : creature;
+        }
+
         /// The attributes of DATA, which are the actor values from strength to luck
         void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
         {
@@ -1301,25 +1324,26 @@ namespace OFScript
         // The attributes, the speed and the karma are the values of the record. Its health, fatigue and skills look
         // like the base of a sum (most characters have 50 or 10 health, 50 fatigue and 5 in barter there), which the
         // games add to by formulas that are not known here, so those keep the starting values.
-        // A record that takes its stats from a template has those of the template, and the starting values when the
-        // template can not be followed (it is a levelled list of characters).
+        // A record that takes its stats from a template has those of the template (a levelled list in the place of
+        // one gives a character of it).
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            const ESM4::Npc* stats = templateOwner(mStore, npc, ESM4::Npc::Template_UseStats);
-            if (stats == nullptr || !stats->mIsFONV)
+            const ESM4::Npc& stats = statsRecordOf(mStore, *npc, seed);
+            if (!stats.mIsFONV)
                 return true;
-            if (stats->mFalloutStats.mKnown)
-                addAttributes(values, stats->mFalloutStats);
-            addConfig(values, stats->mBaseConfig);
+            if (stats.mFalloutStats.mKnown)
+                addAttributes(values, stats.mFalloutStats);
+            addConfig(values, stats.mBaseConfig);
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            const ESM4::Creature* stats = templateOwner(mStore, creature, ESM4::Creature::Template_UseStats);
-            if (stats == nullptr || !stats->mIsFONV)
+            const ESM4::Creature& stats = statsRecordOf(mStore, *creature, seed);
+            if (!stats.mIsFONV)
                 return true;
-            if (stats->mFalloutStats.mKnown)
-                addAttributes(values, stats->mFalloutStats);
-            addConfig(values, stats->mBaseConfig);
+            if (stats.mFalloutStats.mKnown)
+                addAttributes(values, stats.mFalloutStats);
+            addConfig(values, stats.mBaseConfig);
         }
         return true;
     }
@@ -1384,21 +1408,9 @@ namespace OFScript
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         const ESM4::FalloutStats* stats = nullptr;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-        {
-            const OFClass::StoreWornArmorSource source(mStore);
-            const ESM4::Npc* owner
-                = ESM4::templateOwner(ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed),
-                    ESM4::Npc::Template_UseStats);
-            stats = &(owner != nullptr ? owner : npc)->mFalloutStats;
-        }
+            stats = &statsRecordOf(mStore, *npc, seed).mFalloutStats;
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-        {
-            const OFClass::StoreCreatureSource source(mStore);
-            const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
-                ESM4::Creature::Template_UseStats);
-            stats = &(owner != nullptr ? owner : creature)->mFalloutStats;
-        }
+            stats = &statsRecordOf(mStore, *creature, seed).mFalloutStats;
         if (stats == nullptr || !stats->mKnown)
             return std::nullopt;
         const double endurance = permanent(AV::endurance);
@@ -3056,10 +3068,13 @@ namespace OFScript
         if (world == nullptr)
             return false;
         // The days of the world pass from the new game's day, whatever the record of GameDaysPassed starts at
-        const double passed = world->getGlobalFloat(OFWorld::Globals::sDaysPassed) - newGameDaysPassed;
+        // (a script can have stored a number that is not finite in it, which counts as no days)
+        double passed = world->getGlobalFloat(OFWorld::Globals::sDaysPassed) - newGameDaysPassed;
+        if (!std::isfinite(passed))
+            passed = 0;
         const FalloutScript::Calendar calendar(calendarMonthBase);
         date = calendar.dateOf(calendar.dayNumber(mCalendarStart->mDate)
-            + static_cast<long long>(std::floor(std::max(passed, 0.0))) + mCalendarShift);
+            + static_cast<long long>(std::clamp(std::floor(passed), 0.0, 1.0e9)) + mCalendarShift);
         return true;
     }
 

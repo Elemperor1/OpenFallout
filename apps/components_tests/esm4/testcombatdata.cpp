@@ -448,21 +448,22 @@ namespace
         stats[8] = 14;
 
         // A Fallout file: its records and groups have the headers of Fallout, 24 bytes
-        const auto fo = [](std::string_view type, std::uint32_t id, std::string_view data, std::uint32_t flags = 0) {
-            std::string result(type);
-            append<std::uint32_t>(result, static_cast<std::uint32_t>(data.size()));
-            append<std::uint32_t>(result, flags);
-            append<std::uint32_t>(result, id);
-            append<std::uint32_t>(result, 0); // revision
-            append<std::uint16_t>(result, 15); // form version
-            append<std::uint16_t>(result, 0);
-            result.append(data);
-            return result;
-        };
-        const auto group = [](std::string_view type, std::string_view children) {
+        const auto fo
+            = [](std::string_view recordType, std::uint32_t id, std::string_view data, std::uint32_t recordFlags = 0) {
+                  std::string result(recordType);
+                  append<std::uint32_t>(result, static_cast<std::uint32_t>(data.size()));
+                  append<std::uint32_t>(result, recordFlags);
+                  append<std::uint32_t>(result, id);
+                  append<std::uint32_t>(result, 0); // revision
+                  append<std::uint16_t>(result, 15); // form version
+                  append<std::uint16_t>(result, 0);
+                  result.append(data);
+                  return result;
+              };
+        const auto group = [](std::string_view label, std::string_view children) {
             std::string result("GRUP");
             append<std::uint32_t>(result, static_cast<std::uint32_t>(24 + children.size()));
-            result.append(type);
+            result.append(label);
             append<std::int32_t>(result, 0); // top level group
             append<std::uint16_t>(result, 0); // stamp
             append<std::uint16_t>(result, 0);
