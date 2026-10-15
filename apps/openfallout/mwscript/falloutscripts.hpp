@@ -28,6 +28,7 @@
 #include <components/falloutscript/combatstate.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
+#include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/dialogue.hpp>
@@ -104,7 +105,8 @@ namespace OFScript
                                  private FalloutScript::CombatWorld,
                                  private FalloutScript::AnimationWorld,
                                  private FalloutScript::PerkRecords,
-                                 private FalloutScript::UseRecords
+                                 private FalloutScript::UseRecords,
+                                 private FalloutScript::RecipeRecords
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -276,6 +278,52 @@ namespace OFScript
         std::optional<Loot> loot();
         /// The player is done with what it had open
         void closeLoot();
+
+        /// The menu of recipes the player has open at a workbench, a reloading bench or a campfire (ShowRecipeMenu):
+        /// the category, its name, and a number that is another for each time a menu is opened. Nothing when none is.
+        struct RecipeMenu
+        {
+            FalloutScript::FormId mCategory = 0;
+            std::string mName;
+            int mSerial = 0;
+        };
+        std::optional<RecipeMenu> recipeMenu();
+        /// What a recipe takes or gives, and how many of it the player has
+        struct RecipeItem
+        {
+            FalloutScript::FormId mItem = 0;
+            std::string mName;
+            int mCount = 0;
+            int mHave = 0;
+        };
+        /// A recipe of the open menu as the player sees it
+        struct RecipeLine
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            FalloutScript::FormId mSubCategory = 0;
+            std::string mSubCategoryName;
+            /// "ready", "skill" (the skill is too low) or "items" (some ingredient is short)
+            std::string mStatus;
+            /// The actor value of the skill, -1 for none, the level of it the recipe needs and the skill of the player
+            int mSkill = -1;
+            int mLevel = 0;
+            double mSkillValue = 0;
+            std::vector<RecipeItem> mIngredients;
+            std::vector<RecipeItem> mOutputs;
+        };
+        /// The recipes of the open menu that the player may use (none when no menu is open)
+        std::vector<RecipeLine> recipeLines();
+        /// The player makes the recipe of the open menu: "made", or why not ("skill", "items"); empty for a recipe that
+        /// is not in the menu
+        std::string craftRecipe(FalloutScript::FormId recipe);
+        /// The player is done with the menu
+        void closeRecipes();
+        /// A script shows the player the recipes of a category (ShowRecipeMenu); false for a form that is no category
+        bool openRecipes(FalloutScript::FormId category);
+        /// The name of an item (a weapon, armor, ammunition, aid item, book, key, item mod, ingredient, other thing
+        /// that is carried), its editor id when it has none; empty for a form that is none
+        std::string itemName(FalloutScript::FormId item);
 
         /// The 3D of an object that holds animations of its own is built (a door, a switch): an object that rests open
         /// starts so
@@ -681,6 +729,9 @@ namespace OFScript
         bool abilityEffects(FalloutScript::FormId ability, std::vector<FalloutScript::AbilityEffect>& effects) override;
         bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
         bool book(FalloutScript::FormId item, FalloutScript::BookInfo& result) override;
+        std::vector<FalloutScript::FormId> recipesOf(FalloutScript::FormId category) override;
+        bool recipe(FalloutScript::FormId id, FalloutScript::Recipe& result) override;
+        bool allowed(FalloutScript::FormId recipe, FalloutScript::FormId crafter) override;
         /// Brings the rules of levelling up from the settings of the files, once they can be read
         void ensureLevellingRules();
         /// Hands out the points of the levels the player reached, brings the perks up to date and lets the effects of
@@ -863,6 +914,7 @@ namespace OFScript
         FalloutScript::PlayerProgress mProgress;
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
+        FalloutScript::Crafting mCrafting;
         FalloutScript::Chargen mChargen;
         /// The screen the attributes were last started for
         std::uint32_t mChargenSeeded = 0;
@@ -1006,6 +1058,10 @@ namespace OFScript
         std::mutex mLootMutex;
         std::optional<Loot> mLoot;
         int mLootSerial = 0;
+        /// The menu of recipes the player has open, under mRecipeMutex
+        std::mutex mRecipeMutex;
+        std::optional<RecipeMenu> mRecipeMenu;
+        int mRecipeSerial = 0;
         FalloutScript::CombatState mCombat;
         /// Whether the doors and switches are open, and the animations they play for it
         FalloutScript::OpenStates mOpenStates;

@@ -176,6 +176,7 @@ namespace OFScript
         , mFormLists(*this)
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
+        , mCrafting(*this, mActors, mActorValues)
         , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
@@ -216,6 +217,13 @@ namespace OFScript
         });
         // The games have a mode of play that has no counterpart here
         mInterpreter.setHandler("IsHardcore", [](FalloutScript::CallContext&) { return 0.0; });
+        // The menu of a workbench, a reloading bench or a campfire is for the player; the screen shows it
+        mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
+            return (call.mReference == 0 || call.mReference == mPlayer)
+                    && openRecipes(FalloutScript::formArgument(call, 0))
+                ? 1.0
+                : 0.0;
+        });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
@@ -406,6 +414,10 @@ namespace OFScript
         {
             const std::lock_guard lock(mLootMutex);
             mLoot.reset();
+        }
+        {
+            const std::lock_guard lock(mRecipeMutex);
+            mRecipeMenu.reset();
         }
         mPerks.clear();
         mItemUse.clear();

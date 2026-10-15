@@ -155,6 +155,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testchargen.cpp
     falloutscript/testcombatcommands.cpp
     falloutscript/testcombatstate.cpp
+    falloutscript/testcrafting.cpp
     falloutscript/testdamage.cpp
     falloutscript/testderivedstats.cpp
     falloutscript/testequipment.cpp

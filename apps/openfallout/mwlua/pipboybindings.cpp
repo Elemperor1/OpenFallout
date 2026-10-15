@@ -249,6 +249,56 @@ namespace OFLua
         };
         api["closeLoot"] = []() { scripts().closeLoot(); };
 
+        // The menu of recipes a script showed (a workbench, a reloading bench, a campfire): the category, its name, a
+        // number that is another for each time a menu opens, and the recipes the player may use with what each takes
+        // and gives; nothing when no menu is open
+        api["recipes"] = [lua]() -> sol::object {
+            const auto menu = scripts().recipeMenu();
+            if (!menu)
+                return sol::nil;
+            const auto itemRows = [&lua](const std::vector<OFScript::FalloutScripts::RecipeItem>& items) {
+                sol::table rows(lua, sol::create);
+                int index = 1;
+                for (const OFScript::FalloutScripts::RecipeItem& item : items)
+                {
+                    sol::table row(lua, sol::create);
+                    row["id"] = idText(item.mItem);
+                    row["name"] = item.mName;
+                    row["count"] = item.mCount;
+                    row["have"] = item.mHave;
+                    rows[index++] = row;
+                }
+                return rows;
+            };
+            sol::table recipes(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::RecipeLine& line : scripts().recipeLines())
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idText(line.mId);
+                row["name"] = line.mName;
+                row["subCategory"] = idText(line.mSubCategory);
+                row["subCategoryName"] = line.mSubCategoryName;
+                row["status"] = line.mStatus;
+                row["skill"] = line.mSkill;
+                row["level"] = line.mLevel;
+                row["skillValue"] = line.mSkillValue;
+                row["ingredients"] = itemRows(line.mIngredients);
+                row["outputs"] = itemRows(line.mOutputs);
+                recipes[index++] = row;
+            }
+            sol::table result(lua, sol::create);
+            result["category"] = idText(menu->mCategory);
+            result["name"] = menu->mName;
+            result["serial"] = menu->mSerial;
+            result["recipes"] = recipes;
+            return result;
+        };
+        // The player makes a recipe of the open menu: "made", or "skill" or "items" for what is short; "" for a recipe
+        // that is not in the menu
+        api["craft"] = [](std::string_view recipe) { return scripts().craftRecipe(parseId(recipe)); };
+        api["closeRecipes"] = []() { scripts().closeRecipes(); };
+
         // The levels the player reached since this was last called: the level, the skill points it gave and whether
         // it gave a perk
         api["takeLevelUps"] = [lua]() {

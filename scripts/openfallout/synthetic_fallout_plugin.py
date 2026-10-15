@@ -426,6 +426,20 @@ ARENA_SETUP_STAGE = 10
 ARENA_LEVEL_STAGE = 11  # rewards the experience of the levels 2 and 3
 ARENA_LEVEL_XP = 600
 ARENA_DUMMY_ITEM_COUNT = 5  # rounds the dummy carries, for the loot window
+# The bench of the arena (New Vegas crafting): a category with a sub-category, a recipe the player can make (it takes
+# scrap and gives rounds) and one that needs more skill than the player has; the stage gives the scrap and shows the menu
+ARENA_CRAFT_STAGE = 13
+ARENA_CATEGORY_ID = 0x94E
+ARENA_SUB_CATEGORY_ID = 0x94F
+ARENA_RECIPE_ID = 0x950
+ARENA_RECIPE_HARD_ID = 0x951
+ARENA_SCRAP_ID = 0x952
+ARENA_CATEGORY_NAME = "Test Bench"
+ARENA_SUB_CATEGORY_NAME = "Ammo"
+ARENA_SCRAP_GIVEN = 3
+ARENA_RECIPE_SCRAP = 2
+ARENA_RECIPE_ROUNDS = 7
+ARENA_RECIPE_SKILL = 32  # barter, the first of the skills
 # The stages that tell what the game knows, one for each time the test looks (a stage is set once)
 ARENA_PROBE_STAGES = tuple(range(20, 60))
 ARENA_DUMMY_PLACE = (400.0, 0.0, 0.0)
@@ -448,7 +462,7 @@ ARENA_BYSTANDER_REF_ID = 0x94C
 ARENA_GRENADE_ID = 0x94D
 ARENA_GRENADE_COUNT = 2
 ARENA_GRENADE_STAGE = 12
-LAST_ID = 0x94D # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x952 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2060,6 +2074,9 @@ def plugin():
                                                  watch_script("exterior"), *arena_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
             + top_group(b"AMMO", [arena_ammo()])
+            + top_group(b"MISC", [arena_scrap()])
+            + top_group(b"RCCT", arena_categories())
+            + top_group(b"RCPE", arena_recipes())
             + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
                                   arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
                                                ARENA_PISTOL_RANGE, 2.0),
@@ -2098,6 +2115,32 @@ def arena_ammo():
     """An AMMO record of Fallout 3: the speed, the flags, the value and the rounds of a clip (13 bytes)."""
     return record(b"AMMO", ARENA_AMMO_ID, [zstr(b"EDID", "OFTestArenaAmmo"), zstr(b"FULL", "Test Rounds"),
                                            sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
+
+
+def arena_scrap():
+    """A MISC item of Fallout 3: the value and the weight (8 bytes)."""
+    return record(b"MISC", ARENA_SCRAP_ID, [zstr(b"EDID", "OFTestArenaScrap"), zstr(b"FULL", "Test Scrap"),
+                                            sub(b"DATA", struct.pack("<if", 3, 1.0))])
+
+
+def arena_categories():
+    """The category of the bench and its sub-category (RCCT of New Vegas: names and a byte of flags)."""
+    return [record(b"RCCT", ARENA_CATEGORY_ID, [zstr(b"EDID", "OFTestArenaBench"), zstr(b"FULL", ARENA_CATEGORY_NAME),
+                                                sub(b"DATA", bytes([0]))]),
+            record(b"RCCT", ARENA_SUB_CATEGORY_ID, [zstr(b"EDID", "OFTestArenaBenchAmmo"),
+                                                    zstr(b"FULL", ARENA_SUB_CATEGORY_NAME), sub(b"DATA", bytes([1]))])]
+
+
+def arena_recipes():
+    """The recipes of the bench (RCPE of New Vegas): DATA (skill, level, category, sub-category), then the ingredients
+    (RCIL, RCQY) and the results (RCOD, RCQY). The first needs a skill of 1, which the player has, the second 100."""
+    def recipe(form_id, name, level):
+        return record(b"RCPE", form_id, [
+            zstr(b"EDID", "OFTestArena" + name), zstr(b"FULL", "Make " + name),
+            sub(b"DATA", struct.pack("<IIII", ARENA_RECIPE_SKILL, level, ARENA_CATEGORY_ID, ARENA_SUB_CATEGORY_ID)),
+            sub(b"RCIL", struct.pack("<I", ARENA_SCRAP_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_SCRAP)),
+            sub(b"RCOD", struct.pack("<I", ARENA_AMMO_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_ROUNDS))])
+    return [recipe(ARENA_RECIPE_ID, "Rounds", 1), recipe(ARENA_RECIPE_HARD_ID, "Better Rounds", 100)]
 
 
 def arena_weapon(form_id, name, damage, max_range, attacks_per_second, grenade=False):
@@ -2160,14 +2203,20 @@ def arena_quest():
         sf.set_to(sf.global_target(glob["raider_combat"]), sf.call_token(sf.IS_IN_COMBAT, reference=raider)),
         sf.set_to(sf.global_target(glob["raider_ammo"]),
                   sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=raider))]
-    # The stages that follow give the player experience (for two levels) and grenades, which it throws at the end
+    # The stages that follow give the player experience (for two levels), scrap for the bench, and grenades, which it
+    # throws at the end
     grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
     grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
                 sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
+    # The scrap is given and the menu of the bench is shown, as the script of a workbench does
+    craft_forms = [PLAYER_REFERENCE, ARENA_SCRAP_ID, ARENA_CATEGORY_ID]
+    craft = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_SCRAP_GIVEN)),
+             sf.call(sf.SHOW_RECIPE_MENU, sf.form_argument(3))]
     entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
                (ARENA_LEVEL_STAGE, "The player gains experience.", 0, [],
                 [sf.call(sf.REWARD_XP, sf.int_argument(ARENA_LEVEL_XP))], forms),
-               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms)]
+               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms),
+               (ARENA_CRAFT_STAGE, "The bench is used.", 0, [], craft, craft_forms)]
     entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
     return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
 

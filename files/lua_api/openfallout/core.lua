@@ -1623,6 +1623,50 @@
 -- @param #boolean opened
 
 ---
+-- The menu of recipes that a script showed (`ShowRecipeMenu` of a workbench, a reloading bench or a campfire in New
+-- Vegas): the category and its name, a number that is another for each time a menu opens, and the recipes the player may
+-- use (those with a perk or a note it lacks are left out).
+-- @function [parent=#Pipboy] recipes
+-- @return #PipboyRecipes Nil when no menu is open.
+
+---
+-- @type PipboyRecipes
+-- @field #string category Form id of the category.
+-- @field #string name
+-- @field #number serial
+-- @field #list<#PipboyRecipe> recipes
+
+---
+-- @type PipboyRecipe
+-- @field #string id
+-- @field #string name
+-- @field #string subCategory Form id of the sub-category (Aid, Ammo, Weapons, ...), "" for none.
+-- @field #string subCategoryName
+-- @field #string status "ready", "skill" (the skill is too low) or "items" (an ingredient is short).
+-- @field #number skill The number of the skill, -1 for none.
+-- @field #number level The level of the skill that is needed.
+-- @field #number skillValue The skill of the player.
+-- @field #list<#PipboyRecipeItem> ingredients
+-- @field #list<#PipboyRecipeItem> outputs
+
+---
+-- @type PipboyRecipeItem
+-- @field #string id
+-- @field #string name
+-- @field #number count How many the recipe takes or gives.
+-- @field #number have How many the player has.
+
+---
+-- The player makes a recipe of the open menu: the ingredients are taken and the results given.
+-- @function [parent=#Pipboy] craft
+-- @param #string recipe
+-- @return #string "made", "skill" or "items" for what is short; "" for a recipe that is not in the menu.
+
+---
+-- The player is done with the menu of recipes.
+-- @function [parent=#Pipboy] closeRecipes
+
+---
 -- The levels the player reached since this was last called.
 -- @function [parent=#Pipboy] takeLevelUps
 -- @return #list<#PipboyLevelUp>

@@ -1542,6 +1542,14 @@ return {
             end
         end,
     },
+    eventHandlers = {
+        -- The player script asks for the bench when it is done with the level up: a script gives it the scrap and shows
+        -- the menu of the bench
+        OFTestArenaCraftNow = function()
+            stage(@CRAFT@)
+            world.players[1]:sendEvent('OFTestArenaCraft', {})
+        end,
+    },
 }
 """
 for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES))), ("@QUEST@", plugin.ARENA_QUEST_NAME),
@@ -1549,6 +1557,7 @@ for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES)
                       ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
+                      ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -1571,6 +1580,8 @@ local lootFrames = nil
 local levelFrames = nil
 local levelSeen = 0
 local levelEscape = nil
+-- Frames since the bench was asked for
+local craftFrames = nil
 
 return {
     eventHandlers = {
@@ -1596,6 +1607,9 @@ return {
         end,
         OFTestArenaLevel = function()
             levelFrames = 0
+        end,
+        OFTestArenaCraft = function()
+            craftFrames = 0
         end,
         OFTestArenaFire = function(data)
             target = data.target
@@ -1677,6 +1691,42 @@ return {
                 elseif levelEscape == 120 then
                     print('OFTEST', 'arena', 'levelgone', 'mode=' .. tostring(I.UI.getMode()))
                     levelEscape = nil
+                    core.sendGlobalEvent('OFTestArenaCraftNow', {})
+                end
+            end
+            if craftFrames then
+                craftFrames = craftFrames + 1
+                if craftFrames == 10 then
+                    craftFrames = nil
+                    local pipboy = core.pipboy
+                    local menu = pipboy.recipes()
+                    if not menu then
+                        print('OFTEST', 'arena', 'recipes', 'none')
+                    else
+                        local statuses, ready, hard = {}, nil, nil
+                        for _, recipe in ipairs(menu.recipes) do
+                            statuses[#statuses + 1] = recipe.status
+                            if recipe.status == 'ready' then ready = recipe elseif recipe.status == 'skill' then hard = recipe end
+                        end
+                        local ingredient = ready and ready.ingredients[1]
+                        print('OFTEST', 'arena', 'recipes', string.format('name=%s mode=%s count=%d statuses=%s scrap=%s',
+                            menu.name, tostring(I.UI.getMode()), #menu.recipes, table.concat(statuses, ','),
+                            ingredient and string.format('%d/%d', ingredient.have, ingredient.count) or 'none'))
+                        local function count(id)
+                            for _, item in ipairs(pipboy.items()) do
+                                if item.id == id then return item.count end
+                            end
+                            return 0
+                        end
+                        local rounds = ready and ready.outputs[1].id or ''
+                        local before = count(rounds)
+                        local made = ready and pipboy.craft(ready.id) or 'none'
+                        local denied = hard and pipboy.craft(hard.id) or 'none'
+                        local again = ready and pipboy.craft(ready.id) or 'none'
+                        print('OFTEST', 'arena', 'craft', string.format('made=%s denied=%s again=%s gained=%d', made, denied,
+                            again, count(rounds) - before))
+                        pipboy.closeRecipes()
+                    end
                 end
             end
         end,
@@ -2497,6 +2547,19 @@ def check_arena_screens(text):
             problems.append(f"the points of the level up should all have been given: {level_back.group(0)}")
     if "OFTEST\tarena\tlevelgone\tmode=nil" not in text:
         problems.append("the screen of the level up should be gone once every point was given")
+    recipes = re.search(r"OFTEST\tarena\trecipes\t(.*)$", text, re.M)
+    want = (f"name={plugin.ARENA_CATEGORY_NAME} mode=Interface count=2 statuses=ready,skill "
+            f"scrap={plugin.ARENA_SCRAP_GIVEN}/{plugin.ARENA_RECIPE_SCRAP}")
+    if not recipes or recipes.group(1) != want:
+        problems.append("the script of the bench should have shown the menu of recipes in a window that stops the game, "
+                        f"with the recipe the player can make and the one it lacks the skill for: want '{want}', "
+                        f"found '{recipes.group(1) if recipes else 'no line'}'")
+    craft = re.search(r"OFTEST\tarena\tcraft\t(.*)$", text, re.M)
+    want = f"made=made denied=skill again=items gained={plugin.ARENA_RECIPE_ROUNDS}"
+    if not craft or craft.group(1) != want:
+        problems.append("making the first recipe should take its scrap and give its rounds, the recipe of too much skill "
+                        f"should be denied, and a second making should lack scrap: want '{want}', found "
+                        f"'{craft.group(1) if craft else 'no line'}'")
     return problems
 
 
