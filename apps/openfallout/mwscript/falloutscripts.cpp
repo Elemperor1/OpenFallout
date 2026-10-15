@@ -1617,7 +1617,8 @@ namespace OFScript
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
-        if (victim == 0 || victim == attacker || mActors.isDead(victim))
+        // The dead strike no blows
+        if (victim == 0 || victim == attacker || mActors.isDead(victim) || (attacker != 0 && mActors.isDead(attacker)))
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
@@ -1637,7 +1638,7 @@ namespace OFScript
 
         // The blows come one after the other from here: a blow that comes late for a death changes nothing
         const std::lock_guard strikeLock(mStrikeMutex);
-        if (mActors.isDead(victim))
+        if (mActors.isDead(victim) || (attacker != 0 && mActors.isDead(attacker)))
             return result;
         result.mHit = true;
         result.mDamage = hit.mDamage;

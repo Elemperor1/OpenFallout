@@ -58,9 +58,18 @@ namespace FalloutScript
 
     void CombatState::withdraw(FormId actor)
     {
-        stop(actor);
-        for (const FormId pursuer : attackersOf(actor))
-            stop(pursuer);
+        // In one go: a fight that starts against the character while it is withdrawn from the others would be left
+        const std::lock_guard lock(mMutex);
+        for (auto it = mTargets.begin(); it != mTargets.end();)
+        {
+            if (it->first == actor || it->second == actor)
+            {
+                noteChange(it->first, 0, it->second);
+                it = mTargets.erase(it);
+            }
+            else
+                ++it;
+        }
     }
 
     FormId CombatState::target(FormId actor) const
