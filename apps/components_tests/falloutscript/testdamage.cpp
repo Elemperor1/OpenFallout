@@ -77,7 +77,7 @@ namespace
         EXPECT_DOUBLE_EQ(result.mDamage, 32);
     }
 
-    TEST(FalloutScriptDamageTest, the_critical_bonus_is_not_taken_by_armor)
+    TEST(FalloutScriptDamageTest, armor_works_on_the_critical_bonus_too)
     {
         WeaponDamage weapon;
         weapon.mDamage = 40;
@@ -85,8 +85,8 @@ namespace
         Defense defense;
         defense.mThreshold = 10;
         defense.mResistance = 50;
-        // (40 - 10) * 0.5 = 15, and the bonus on top
-        EXPECT_DOUBLE_EQ(hit(weapon, defense, alwaysCritical, 10).mDamage, 25);
+        // (40 + 10 - 10) * 0.5 = 20, and without the bonus (40 - 10) * 0.5 = 15
+        EXPECT_DOUBLE_EQ(hit(weapon, defense, alwaysCritical, 10).mDamage, 20);
         EXPECT_DOUBLE_EQ(hit(weapon, defense, noCritical, 10).mDamage, 15);
     }
 

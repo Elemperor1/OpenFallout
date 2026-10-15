@@ -322,7 +322,7 @@ namespace FalloutScript
             return 0.0;
         });
         interpreter.setHandler("ResurrectActor", [&values, &actors](CallContext& call) {
-            actors.setDead(call.mReference, false);
+            actors.revive(call.mReference);
             values.heal(call.mReference, ActorValue::health);
             return 0.0;
         });

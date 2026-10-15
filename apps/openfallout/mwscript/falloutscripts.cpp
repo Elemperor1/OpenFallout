@@ -181,6 +181,7 @@ namespace OFScript
         // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
         // character whose health is gone and who is essential falls instead
         mActors.setDeathListener([this](FalloutScript::FormId actor) { mCombat.withdraw(actor); });
+        mActors.setReviveHandler([this](FalloutScript::FormId actor) { mCombat.setUnconscious(actor, false); });
         mActors.setFallHandler([this](FalloutScript::FormId actor) { return fallsInsteadOfDying(actor); });
         FalloutScript::addQuestCommands(mInterpreter, mQuests);
         FalloutScript::addObjectCommands(
@@ -1572,9 +1573,8 @@ namespace OFScript
             }
             return std::nullopt;
         };
-        if (const std::optional<Relation> relation = reactionOf(first, second))
-            return relation;
-        return reactionOf(second, first);
+        // The record of a faction says how it stands to the other, not the other way round
+        return reactionOf(first, second);
     }
 
     FalloutScript::WeaponDamage FalloutScripts::describeWeapon(
@@ -1639,8 +1639,10 @@ namespace OFScript
         const FalloutScript::HitResult hit
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
 
-        // The blows come one after the other from here: a blow that comes late for a death changes nothing
+        // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
+        // a blow that comes late for a death changes nothing
         const std::lock_guard strikeLock(mStrikeMutex);
+        const auto transitions = mActors.holdTransitions();
         if (mActors.isDead(victim) || cannotStrike(attacker))
             return result;
         result.mHit = true;
@@ -1661,10 +1663,10 @@ namespace OFScript
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0)
             {
-                if (!mCombat.inCombat(victim) && FalloutScript::mayStartFight(mCombat, mActors, victim, attacker))
-                    mCombat.start(victim, attacker);
-                if (!mCombat.inCombat(attacker) && FalloutScript::mayStartFight(mCombat, mActors, attacker, victim))
-                    mCombat.start(attacker, victim);
+                if (!mCombat.inCombat(victim))
+                    FalloutScript::startFight(mCombat, mActors, victim, attacker);
+                if (!mCombat.inCombat(attacker))
+                    FalloutScript::startFight(mCombat, mActors, attacker, victim);
             }
             return result;
         }

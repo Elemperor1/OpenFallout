@@ -9,6 +9,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <set>
 #include <thread>
@@ -335,6 +337,33 @@ namespace
         EXPECT_EQ(told.size(), 2u + 1100u);
     }
 
+    TEST(FalloutScriptActorStateTest, a_held_transition_lets_its_holder_mark_a_death_and_stops_the_others)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        std::vector<FormId> told;
+        state.setDeathListener([&](FormId actor) { told.push_back(actor); });
+
+        std::atomic<bool> killed = false;
+        std::thread other;
+        {
+            const auto held = state.holdTransitions();
+            // The holder may take the lock again by marking a death itself
+            state.setDead(guard, true);
+            other = std::thread([&] {
+                state.setDead(crate, true);
+                killed = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EXPECT_FALSE(killed);
+            EXPECT_FALSE(state.isDead(crate));
+        }
+        other.join();
+        EXPECT_TRUE(killed);
+        EXPECT_TRUE(state.isDead(crate));
+        EXPECT_THAT(told, ElementsAre(guard, crate));
+    }
+
     TEST(FalloutScriptActorStateTest, a_revival_waits_for_the_cleanup_of_the_death)
     {
         FakeRecords records;
@@ -551,6 +580,26 @@ namespace
         EXPECT_EQ(setup.variable(1), 0);
         EXPECT_EQ(setup.variable(2), 1);
         EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, bringing_an_actor_back_tells_the_host)
+    {
+        Runner setup;
+        std::vector<FormId> brought;
+        setup.mState.setReviveHandler([&](FormId actor) {
+            // The actor is alive again by the time the host is told
+            EXPECT_FALSE(setup.mState.isDead(actor));
+            brought.push_back(actor);
+        });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpResurrectActor, arguments(0))
+            + command(OpKillActor, arguments(0)) + command(OpResurrectActor, arguments(0)) + end());
+
+        setup.run(builder);
+
+        EXPECT_THAT(brought, ElementsAre(guard, guard));
+        EXPECT_FALSE(setup.mState.isDead(guard));
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

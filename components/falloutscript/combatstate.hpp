@@ -26,6 +26,9 @@ namespace FalloutScript
         /// The actor fights the target from now on, and no one else. A target that is the actor itself, or none, is
         /// no fight.
         void start(FormId actor, FormId target);
+        /// The same, unless the actor is unconscious (checked with the lock held, so a character that is put out
+        /// meanwhile does not start); true when it started or already fought the target
+        bool startUnlessOut(FormId actor, FormId target);
         /// The actor stops fighting
         void stop(FormId actor);
         /// The actor is out of every fight (it died or is down): it stops fighting, and so does everyone who went for

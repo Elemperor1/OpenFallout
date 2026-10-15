@@ -62,7 +62,7 @@ namespace FalloutScript
 
     struct HitResult
     {
-        /// What the character loses: the blow after the armor, and the critical bonus, which armor does not take
+        /// What the character loses: the blow and the bonus of a critical hit, after the armor
         double mDamage = 0;
         bool mCritical = false;
     };

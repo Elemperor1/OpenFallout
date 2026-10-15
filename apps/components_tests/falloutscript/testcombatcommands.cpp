@@ -201,6 +201,35 @@ namespace
         EXPECT_FALSE(FalloutScript::mayStartFight(setup.mCombat, setup.mActors, guard, guard));
     }
 
+    TEST(FalloutScriptCombatCommandsTest, a_fight_starts_only_when_the_actor_may_fight_the_target)
+    {
+        Runner setup;
+        setup.mActors.setDead(raider, true);
+        setup.mCombat.setUnconscious(ghoul, true);
+
+        EXPECT_FALSE(FalloutScript::startFight(setup.mCombat, setup.mActors, guard, raider));
+        EXPECT_FALSE(FalloutScript::startFight(setup.mCombat, setup.mActors, raider, guard));
+        EXPECT_FALSE(FalloutScript::startFight(setup.mCombat, setup.mActors, ghoul, guard));
+        EXPECT_FALSE(FalloutScript::startFight(setup.mCombat, setup.mActors, guard, guard));
+        EXPECT_FALSE(setup.mCombat.inCombat(guard));
+        EXPECT_FALSE(setup.mCombat.inCombat(ghoul));
+
+        EXPECT_TRUE(FalloutScript::startFight(setup.mCombat, setup.mActors, guard, ghoul));
+        EXPECT_EQ(setup.mCombat.target(guard), ghoul);
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, bringing_an_actor_back_wakes_it)
+    {
+        Runner setup;
+        setup.mActors.setReviveHandler([&](FormId actor) { setup.mCombat.setUnconscious(actor, false); });
+        setup.mCombat.setUnconscious(raider, true);
+
+        setup.mActors.revive(raider);
+
+        EXPECT_FALSE(setup.mCombat.unconscious(raider));
+        EXPECT_TRUE(FalloutScript::startFight(setup.mCombat, setup.mActors, raider, guard));
+    }
+
     TEST(FalloutScriptCombatCommandsTest, a_script_tells_whom_the_character_fights)
     {
         Runner setup;

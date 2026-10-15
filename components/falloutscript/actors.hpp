@@ -78,6 +78,15 @@ namespace FalloutScript
         /// there, not when the death is told, which may be after the actor was brought back. A revival waits for the
         /// listener of a death in progress, so it comes after the cleanup of the death. Set before scripts run.
         void setDeathListener(std::function<void(FormId)> listener);
+        /// Holds every death and revival back for as long as the returned lock is kept, for a check that must not be
+        /// overtaken by one (whether a fight can start, whether a blow can land). The lock may be taken again by the
+        /// thread that has it, so the holder can mark a death itself.
+        std::unique_lock<std::recursive_mutex> holdTransitions();
+        /// What the host does when a character is brought back by revive(): wakes it, if it was unconscious. Set
+        /// before scripts run.
+        void setReviveHandler(std::function<void(FormId)> handler);
+        /// Brings the character back to life (and to its senses, as the host says)
+        void revive(FormId actor);
         /// What the host says to a character whose health scripts took to nothing: true when it falls and is up again
         /// later (an essential character) and does not die. Set before scripts run.
         void setFallHandler(std::function<bool(FormId)> handler);
@@ -146,7 +155,7 @@ namespace FalloutScript
         /// whether they are dead from the thread of the frame
         mutable std::mutex mMutex;
         /// One death or revival at a time, from the change of the state to the end of the listener
-        std::mutex mTransitionMutex;
+        std::recursive_mutex mTransitionMutex;
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
         std::map<FormId, FormId> mKillers;
@@ -154,6 +163,7 @@ namespace FalloutScript
         std::vector<Death> mDeaths;
         std::vector<ItemChange> mChanges;
         std::function<void(FormId)> mDeathListener;
+        std::function<void(FormId)> mReviveHandler;
         std::function<bool(FormId)> mFallHandler;
     };
 

@@ -61,6 +61,23 @@ namespace FalloutScript
         noteChange(actor, target, was);
     }
 
+    bool CombatState::startUnlessOut(FormId actor, FormId target)
+    {
+        if (actor == 0 || target == 0 || actor == target)
+            return false;
+        const std::lock_guard lock(mMutex);
+        if (mUnconscious.count(actor) != 0)
+            return false;
+        FormId& current = mTargets[actor];
+        if (current != target)
+        {
+            const FormId was = current;
+            current = target;
+            noteChange(actor, target, was);
+        }
+        return true;
+    }
+
     void CombatState::stop(FormId actor)
     {
         const std::lock_guard lock(mMutex);

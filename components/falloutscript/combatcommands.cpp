@@ -82,6 +82,12 @@ namespace FalloutScript
             && !combat.unconscious(actor);
     }
 
+    bool startFight(CombatState& combat, ActorState& actors, FormId actor, FormId target)
+    {
+        const auto transitions = actors.holdTransitions();
+        return mayStartFight(combat, actors, actor, target) && combat.startUnlessOut(actor, target);
+    }
+
     bool isEssential(CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor)
     {
         if (actor == 0)
@@ -98,9 +104,7 @@ namespace FalloutScript
     void addCombatCommands(Interpreter& interpreter, CombatState& combat, ActorState& actors, CombatWorld& world)
     {
         interpreter.setHandler("StartCombat", [&combat, &actors](CallContext& call) {
-            const FormId target = formArgument(call, 0);
-            if (mayStartFight(combat, actors, call.mReference, target))
-                combat.start(call.mReference, target);
+            startFight(combat, actors, call.mReference, formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("StopCombat", [&combat](CallContext& call) {

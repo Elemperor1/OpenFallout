@@ -37,6 +37,26 @@ namespace
         EXPECT_FALSE(state.isFought(ghoul));
     }
 
+    TEST(FalloutScriptCombatStateTest, a_fight_starts_unless_the_actor_is_out)
+    {
+        CombatState state;
+        EXPECT_TRUE(state.startUnlessOut(guard, raider));
+        EXPECT_EQ(state.target(guard), raider);
+        // Again against the same target, and a new one
+        EXPECT_TRUE(state.startUnlessOut(guard, raider));
+        EXPECT_TRUE(state.startUnlessOut(guard, ghoul));
+        EXPECT_EQ(state.target(guard), ghoul);
+        EXPECT_FALSE(state.startUnlessOut(guard, guard));
+        EXPECT_FALSE(state.startUnlessOut(guard, 0));
+        EXPECT_FALSE(state.startUnlessOut(0, guard));
+
+        state.setUnconscious(raider, true);
+        EXPECT_FALSE(state.startUnlessOut(raider, guard));
+        EXPECT_FALSE(state.inCombat(raider));
+        // Someone who is out can still be fought
+        EXPECT_TRUE(state.startUnlessOut(guard, raider));
+    }
+
     TEST(FalloutScriptCombatStateTest, no_one_fights_itself_or_nothing)
     {
         CombatState state;

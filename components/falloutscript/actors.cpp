@@ -230,6 +230,25 @@ namespace FalloutScript
         mDeathListener = std::move(listener);
     }
 
+    std::unique_lock<std::recursive_mutex> ActorState::holdTransitions()
+    {
+        return std::unique_lock(mTransitionMutex);
+    }
+
+    void ActorState::setReviveHandler(std::function<void(FormId)> handler)
+    {
+        mReviveHandler = std::move(handler);
+    }
+
+    void ActorState::revive(FormId actor)
+    {
+        if (actor == 0)
+            return;
+        setDead(actor, false);
+        if (mReviveHandler)
+            mReviveHandler(actor);
+    }
+
     void ActorState::setFallHandler(std::function<bool(FormId)> handler)
     {
         mFallHandler = std::move(handler);

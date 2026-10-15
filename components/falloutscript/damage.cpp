@@ -46,6 +46,10 @@ namespace FalloutScript
         if (weapon.mMelee && settings.mMeleeStrengthBonus)
             blow += std::max(meleeBonus, 0.0);
 
+        // The bonus of a critical blow is part of what the armor works on
+        if (result.mCritical)
+            blow += std::max(weapon.mCriticalDamage, 0.0);
+
         // The threshold takes away points, but never more than what leaves a share of the blow
         const double floor = blow * std::clamp(settings.mMinimumThroughThreshold, 0.0, 1.0);
         double through = blow;
@@ -54,9 +58,6 @@ namespace FalloutScript
         // Then the resistance takes a share
         const double resisted = std::clamp(defense.mResistance, 0.0, settings.mMaxResistance) / 100.0;
         blow = through * (1.0 - resisted);
-        // The bonus of a critical blow is not for armor to take
-        if (result.mCritical)
-            blow += std::max(weapon.mCriticalDamage, 0.0);
         result.mDamage = std::max(blow, 0.0);
         return result;
     }
