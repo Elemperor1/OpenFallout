@@ -579,8 +579,14 @@ namespace
         setup.mCombat.noteHit(guard, byRaider);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(1), 1);
+        setup.mCombat.advance(1.f);
         setup.mCombat.noteHit(guard, byFriend);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(1), 2);
+
+        // The blows expire
+        setup.mCombat.advance(11.f);
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+        EXPECT_EQ(setup.variable(1), 0);
     }
 }

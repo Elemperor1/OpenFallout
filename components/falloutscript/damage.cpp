@@ -21,6 +21,8 @@ namespace FalloutScript
         take("fDamageGunWeapCondMult", settings.mGunConditionMult);
         take("fDamageMeleeWeapCondBase", settings.mMeleeConditionBase);
         take("fDamageMeleeWeapCondMult", settings.mMeleeConditionMult);
+        take("fFriendHitTimer", settings.mFriendHitSeconds);
+        take("fFriendMinimumLastHitTime", settings.mFriendHitSpacingSeconds);
         return settings;
     }
 

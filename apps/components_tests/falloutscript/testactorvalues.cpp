@@ -9,10 +9,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -393,6 +396,29 @@ namespace
 
         EXPECT_EQ(setup.variable(guard, 1), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorValueCommandsTest, damage_to_the_health_waits_for_a_death_or_revival_in_progress)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100)) + end());
+        std::atomic<bool> done = false;
+        std::thread script;
+        {
+            const auto held = setup.mActors.holdTransitions();
+            script = std::thread([&] {
+                setup.run(guard, builder);
+                done = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EXPECT_FALSE(done);
+            EXPECT_FALSE(setup.mActors.isDead(guard));
+        }
+        script.join();
+        EXPECT_TRUE(done);
+        EXPECT_TRUE(setup.mActors.isDead(guard));
     }
 
     TEST(FalloutScriptActorValueCommandsTest, damage_takes_a_share_of_the_health_and_enough_of_it_kills)

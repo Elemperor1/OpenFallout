@@ -290,10 +290,16 @@ namespace FalloutScript
                     rewardProgress(value, -whole(argument(call, 1)));
                     return 0.0;
                 }
+                if (value != ActorValue::health)
+                {
+                    values.damage(call.mReference, value, argument(call, 1));
+                    return 0.0;
+                }
+                // No blow comes between the damage to the health and the death or fall that follows
+                const auto transitions = actors.holdTransitions();
                 values.damage(call.mReference, value, argument(call, 1));
                 // A character with no health left is dead, unless it is one that falls (an essential one)
-                if (value == ActorValue::health && values.current(call.mReference, value) <= 0
-                    && !actors.falls(call.mReference))
+                if (values.current(call.mReference, value) <= 0 && !actors.falls(call.mReference))
                     actors.setDead(call.mReference, true);
                 return 0.0;
             });

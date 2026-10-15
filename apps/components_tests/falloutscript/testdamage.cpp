@@ -152,7 +152,7 @@ namespace
     {
         const std::map<std::string, double> values{ { "fMaxArmorRating", 75 }, { "fDamageSkillBase", 1 },
             { "fDamageSkillMult", 0 }, { "fDamageGunWeapCondBase", 0.7 }, { "fDamageMeleeWeapCondMult", 0.25 },
-            { "fMinDamMultiplier", 0.1 } };
+            { "fMinDamMultiplier", 0.1 }, { "fFriendHitTimer", 20 } };
         const DamageSettings settings
             = DamageSettings::fromGameSettings([&values](std::string_view name) -> std::optional<double> {
                   const auto found = values.find(std::string(name));
@@ -168,8 +168,11 @@ namespace
         EXPECT_DOUBLE_EQ(settings.mGunConditionMult, 0.34);
         EXPECT_DOUBLE_EQ(settings.mMeleeConditionBase, 0.5);
         EXPECT_DOUBLE_EQ(settings.mMeleeConditionMult, 0.25);
+        EXPECT_DOUBLE_EQ(settings.mFriendHitSeconds, 20);
+        EXPECT_DOUBLE_EQ(settings.mFriendHitSpacingSeconds, 0.5);
 
         EXPECT_DOUBLE_EQ(DamageSettings::fromGameSettings({}).mMaxResistance, 85);
         EXPECT_DOUBLE_EQ(DamageSettings::fromGameSettings({}).mMinimumThroughThreshold, 0.2);
+        EXPECT_DOUBLE_EQ(DamageSettings::fromGameSettings({}).mFriendHitSeconds, 10);
     }
 }

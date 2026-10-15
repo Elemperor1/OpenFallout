@@ -30,6 +30,10 @@ namespace FalloutScript
         double mGunConditionMult = 0.34;
         double mMeleeConditionBase = 0.5;
         double mMeleeConditionMult = 0.5;
+        /// How long a blow from a friend counts for GetFriendHit, and the least time between two that count
+        /// (fFriendHitTimer, fFriendMinimumLastHitTime)
+        double mFriendHitSeconds = 10;
+        double mFriendHitSpacingSeconds = 0.5;
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 

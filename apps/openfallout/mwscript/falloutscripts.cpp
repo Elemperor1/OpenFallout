@@ -1685,9 +1685,11 @@ namespace OFScript
     {
         if (!FalloutScript::isEssential(mCombat, mActors, *this, victim))
             return false;
-        // Nobody goes for a target that is out
-        mCombat.withdraw(victim);
+        // The character is out before the fights end, so none starts in between, and no death or revival comes
+        // between the two steps
+        const auto transitions = mActors.holdTransitions();
         mCombat.setUnconscious(victim, true, essentialDownSeconds);
+        mCombat.withdraw(victim);
         return true;
     }
 
@@ -1846,6 +1848,7 @@ namespace OFScript
                     const auto found = settings.find(Misc::StringUtils::lowerCase(name));
                     return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
                 });
+            mCombat.setFriendHitRules(mDamageSettings->mFriendHitSeconds, mDamageSettings->mFriendHitSpacingSeconds);
         }
         return *mDamageSettings;
     }

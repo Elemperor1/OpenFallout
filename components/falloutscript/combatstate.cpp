@@ -23,7 +23,8 @@ namespace FalloutScript
         mEssential.clear();
         mRelations.clear();
         mAttacked.clear();
-        mHitCounts.clear();
+        mHitTimes.clear();
+        mClock = 0;
         mLastHits.clear();
         mHitEvents.clear();
         mChanges.clear();
@@ -235,7 +236,12 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mAttacked[victim] = attackedSeconds;
         if (hit.mAttacker != 0)
-            ++mHitCounts[victim][hit.mAttacker];
+        {
+            std::vector<double>& times = mHitTimes[victim][hit.mAttacker];
+            std::erase_if(times, [this](double time) { return mClock - time >= mHitLife; });
+            if (times.empty() || mClock - times.back() >= mHitSpacing)
+                times.push_back(mClock);
+        }
         mLastHits[victim] = hit;
         if (mHitEvents.size() < mostChanges)
             mHitEvents.push_back({ victim, hit });
@@ -250,10 +256,23 @@ namespace FalloutScript
     std::vector<std::pair<FormId, int>> CombatState::hitsTaken(FormId victim) const
     {
         const std::lock_guard lock(mMutex);
-        const auto found = mHitCounts.find(victim);
-        if (found == mHitCounts.end())
-            return {};
-        return { found->second.begin(), found->second.end() };
+        std::vector<std::pair<FormId, int>> result;
+        const auto found = mHitTimes.find(victim);
+        if (found == mHitTimes.end())
+            return result;
+        for (const auto& [attacker, times] : found->second)
+            if (const auto count
+                = std::count_if(times.begin(), times.end(), [this](double time) { return mClock - time < mHitLife; });
+                count > 0)
+                result.emplace_back(attacker, static_cast<int>(count));
+        return result;
+    }
+
+    void CombatState::setFriendHitRules(double lifeSeconds, double spacingSeconds)
+    {
+        const std::lock_guard lock(mMutex);
+        mHitLife = std::max(lifeSeconds, 0.0);
+        mHitSpacing = std::max(spacingSeconds, 0.0);
     }
 
     bool CombatState::lastHit(FormId actor, Hit& hit) const
@@ -269,6 +288,17 @@ namespace FalloutScript
     void CombatState::advance(float seconds)
     {
         const std::lock_guard lock(mMutex);
+        mClock += seconds;
+        // Blows that expired are forgotten
+        for (auto victim = mHitTimes.begin(); victim != mHitTimes.end();)
+        {
+            for (auto attacker = victim->second.begin(); attacker != victim->second.end();)
+            {
+                std::erase_if(attacker->second, [this](double time) { return mClock - time >= mHitLife; });
+                attacker = attacker->second.empty() ? victim->second.erase(attacker) : std::next(attacker);
+            }
+            victim = victim->second.empty() ? mHitTimes.erase(victim) : std::next(victim);
+        }
         for (auto it = mAttacked.begin(); it != mAttacked.end();)
         {
             // In a fight, it stays attacked until the fight is over

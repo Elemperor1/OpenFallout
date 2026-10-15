@@ -89,8 +89,13 @@ namespace FalloutScript
         /// fight stays attacked for a short time that passes with advance().
         void noteHit(FormId victim, const Hit& hit);
         bool attacked(FormId actor) const;
-        /// How many blows each attacker struck at the actor since the start of the game
+        /// How many blows each attacker struck at the actor that have not expired: a blow counts only when the
+        /// attacker's last counted blow at the actor is longer ago than the spacing, and expires after the life of a
+        /// hit (setFriendHitRules). The time is that of advance().
         std::vector<std::pair<FormId, int>> hitsTaken(FormId victim) const;
+        /// fFriendHitTimer (the seconds a counted blow lasts, 10 in the games) and fFriendMinimumLastHitTime (the
+        /// seconds between two counted blows of one attacker, 0.5)
+        void setFriendHitRules(double lifeSeconds, double spacingSeconds);
         /// The last blow the actor took, false when it took none
         bool lastHit(FormId actor, Hit& hit) const;
         void advance(float seconds);
@@ -132,7 +137,11 @@ namespace FalloutScript
         std::map<FormId, bool> mEssential;
         std::map<std::pair<FormId, FormId>, Relation> mRelations;
         std::map<FormId, float> mAttacked; // the seconds left of being attacked while in no fight
-        std::map<FormId, std::map<FormId, int>> mHitCounts;
+        /// The times (on the clock of advance()) of the counted blows, by victim and attacker
+        std::map<FormId, std::map<FormId, std::vector<double>>> mHitTimes;
+        double mClock = 0;
+        double mHitLife = 10;
+        double mHitSpacing = 0.5;
         std::map<FormId, Hit> mLastHits;
         std::vector<HitEvent> mHitEvents;
         std::vector<Change> mChanges;

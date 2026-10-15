@@ -274,12 +274,38 @@ namespace
         second.mAttacker = ghoul;
         state.noteHit(guard, first);
         state.noteHit(guard, second);
+        state.advance(1.f);
         state.noteHit(guard, first);
         state.noteHit(guard, {});
         EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 2), std::make_pair(ghoul, 1)));
         EXPECT_THAT(state.hitsTaken(raider), IsEmpty());
         state.clear();
         EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
+    }
+
+    TEST(FalloutScriptCombatStateTest, a_blow_counts_only_after_the_spacing_and_expires_after_its_life)
+    {
+        CombatState state;
+        state.setFriendHitRules(10, 0.5);
+        CombatState::Hit blow;
+        blow.mAttacker = raider;
+        state.noteHit(guard, blow);
+        // Too soon after the one that counted (a burst of pellets is one blow)
+        state.advance(0.25f);
+        state.noteHit(guard, blow);
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
+        state.advance(0.5f);
+        state.noteHit(guard, blow);
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 2)));
+
+        // The first expires 10 seconds after it, the second 0.75 seconds later
+        state.advance(9.5f);
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
+        state.advance(0.75f);
+        EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
+        // Counting starts afresh
+        state.noteHit(guard, blow);
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
     }
 
     TEST(FalloutScriptCombatStateTest, the_blows_are_told_once_in_the_order_they_were_struck)
