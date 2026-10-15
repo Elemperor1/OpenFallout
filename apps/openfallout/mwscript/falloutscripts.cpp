@@ -1696,11 +1696,16 @@ namespace OFScript
     void FalloutScripts::raiseCombatEvents(float frametime)
     {
         namespace BlockType = FalloutScript::BlockType;
-        mCombat.advance(frametime);
+        {
+            // A character that wakes has its health back before any blow or fight can see it up: both steps are one
+            // transition
+            const auto transitions = mActors.holdTransitions();
+            mCombat.advance(frametime);
 
-        // Essential characters that were down long enough got up (nobody woke them before) with their health back
-        for (const FalloutScript::FormId actor : mCombat.takeWoken())
-            mActorValues.heal(actor, FalloutScript::ActorValue::health);
+            // Essential characters that were down long enough got up (nobody woke them before) with their health back
+            for (const FalloutScript::FormId actor : mCombat.takeWoken())
+                mActorValues.heal(actor, FalloutScript::ActorValue::health);
+        }
 
         // A block that names a form is for that form, or for a character made from that record
         const auto namesActor = [this](FalloutScript::FormId actor) {

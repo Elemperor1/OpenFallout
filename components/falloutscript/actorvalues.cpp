@@ -328,6 +328,8 @@ namespace FalloutScript
             return 0.0;
         });
         interpreter.setHandler("ResurrectActor", [&values, &actors](CallContext& call) {
+            // Alive again and with its health back in one step: no blow comes in between
+            const auto transitions = actors.holdTransitions();
             actors.revive(call.mReference);
             values.heal(call.mReference, ActorValue::health);
             return 0.0;

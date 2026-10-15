@@ -9,8 +9,11 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -299,6 +302,31 @@ namespace
         EXPECT_FALSE(setup.mCombat.inCombat(guard));
         EXPECT_FALSE(setup.mCombat.inCombat(ghoul));
         EXPECT_THAT(setup.mCombat.takeChanges(), SizeIs(2));
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, putting_a_character_out_waits_for_a_death_or_revival_in_progress)
+    {
+        Runner setup;
+        setup.mCombat.start(guard, raider);
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpSetUnconscious, arguments(1).add(intArg(1))) + end());
+        std::atomic<bool> done = false;
+        std::thread script;
+        {
+            const auto held = setup.mActors.holdTransitions();
+            script = std::thread([&] {
+                setup.run(builder);
+                done = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            EXPECT_FALSE(done);
+            EXPECT_FALSE(setup.mCombat.unconscious(guard));
+        }
+        script.join();
+        EXPECT_TRUE(done);
+        EXPECT_TRUE(setup.mCombat.unconscious(guard));
+        EXPECT_FALSE(setup.mCombat.inCombat(guard));
     }
 
     TEST(FalloutScriptCombatCommandsTest, alert_unconscious_and_restrained_can_be_set_and_asked)

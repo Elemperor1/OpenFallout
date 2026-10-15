@@ -421,6 +421,31 @@ namespace
         EXPECT_TRUE(setup.mActors.isDead(guard));
     }
 
+    TEST(FalloutScriptActorValueCommandsTest, a_character_is_alive_again_only_with_its_health_back)
+    {
+        Runner setup;
+        double healthWhenSeenAlive = -1;
+        std::thread probe;
+        setup.mActors.setReviveHandler([&](FormId actor) {
+            // Someone who wants to know the state as soon as the actor is alive has to wait for the health
+            probe = std::thread([&, actor] {
+                const auto held = setup.mActors.holdTransitions();
+                healthWhenSeenAlive = setup.mValues.current(actor, ActorValue::health);
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDamageActorValue, valueAndFloat(ActorValue::health, 100))
+            + command(OpResurrectActor, arguments(0)) + end());
+
+        setup.run(guard, builder);
+        probe.join();
+
+        EXPECT_FALSE(setup.mActors.isDead(guard));
+        EXPECT_GT(healthWhenSeenAlive, 0);
+    }
+
     TEST(FalloutScriptActorValueCommandsTest, damage_takes_a_share_of_the_health_and_enough_of_it_kills)
     {
         Runner setup;
