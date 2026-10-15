@@ -1185,6 +1185,7 @@ template class OFWorld::TypedDynamicStore<ESM4::DialogInfo>;
 template class OFWorld::TypedDynamicStore<ESM4::Dialogue>;
 template class OFWorld::TypedDynamicStore<ESM4::Door>;
 template class OFWorld::TypedDynamicStore<ESM4::Explosion>;
+template class OFWorld::TypedDynamicStore<ESM4::Faction>;
 template class OFWorld::TypedDynamicStore<ESM4::Flora>;
 template class OFWorld::TypedDynamicStore<ESM4::FormIdList>;
 template class OFWorld::TypedDynamicStore<ESM4::Furniture>;

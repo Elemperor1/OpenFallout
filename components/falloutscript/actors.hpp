@@ -64,7 +64,27 @@ namespace FalloutScript
         std::vector<ItemChange> takeChanges();
 
         bool isDead(FormId actor) const;
-        void setDead(FormId actor, bool dead);
+        /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
+        /// is told in takeDeaths().
+        void setDead(FormId actor, bool dead, FormId killer = 0);
+        /// Who killed the actor, 0 when it is alive or the killer is not known
+        FormId killerOf(FormId actor) const;
+
+        /// An actor that died
+        struct Death
+        {
+            FormId mActor = 0;
+            FormId mKiller = 0;
+        };
+        /// The actors that died since this was last called (the first 1024 kept): the game raises their OnDeath blocks
+        /// when it is ready for scripts to run, not in the middle of one.
+        std::vector<Death> takeDeaths();
+
+        /// The factions the actor is in (the form of the faction and the rank), in the order of the forms. False when
+        /// the host can not tell yet what the record says.
+        bool factions(FormId actor, std::vector<std::pair<FormId, int>>& result);
+        /// The form the reference was made from; false when the host can not tell
+        bool baseOf(FormId reference, FormId& base);
         /// How many of the characters or creatures made from the base form are dead
         int deadCount(FormId base) const;
 
@@ -111,6 +131,8 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::map<FormId, Holder> mHolders;
         std::set<FormId> mDead;
+        std::map<FormId, FormId> mKillers;
+        std::vector<Death> mDeaths;
         std::vector<ItemChange> mChanges;
     };
 

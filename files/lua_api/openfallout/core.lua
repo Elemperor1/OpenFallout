@@ -1356,6 +1356,66 @@
 -- @field #list<#string> buttons
 
 ---
+-- @{#Combat}: the fights of the characters of Fallout 3 or New Vegas, as the scripts of the game see them. The
+-- characters are told by their form ids, as `core.getFormId` writes one ("" for none). Not available in
+-- load scripts.
+-- @field [parent=#core] #Combat combat
+
+---
+-- @type Combat
+
+---
+-- The attacker strikes the victim: the blow is rolled and its damage worked out from the weapon, the skills and the
+-- armor, taken from the health of the victim, and the events of the scripts (OnHit, OnHitWith, OnDeath) are raised.
+-- @function [parent=#Combat] strike
+-- @param #string attacker
+-- @param #string victim
+-- @param #string weapon The weapon that is used; the one the attacker holds when it is left out or empty, or its hands.
+-- @param #number limb The part of the body that is hit, -1 (the default) when it is not known.
+-- @return #CombatStrike
+
+---
+-- Whom the character fights.
+-- @function [parent=#Combat] target
+-- @param #string actor
+-- @return #string The target, "" when the character is at peace.
+
+---
+-- @function [parent=#Combat] inCombat
+-- @param #string actor
+-- @return #boolean
+
+---
+-- The characters that fight the target.
+-- @function [parent=#Combat] attackers
+-- @param #string target
+-- @return #list<#string>
+
+---
+-- Makes the actor fight the target.
+-- @function [parent=#Combat] start
+-- @param #string actor
+-- @param #string target
+
+---
+-- Makes the actor stop fighting.
+-- @function [parent=#Combat] stop
+-- @param #string actor
+
+---
+-- @function [parent=#Combat] isDead
+-- @param #string actor
+-- @return #boolean
+
+---
+-- @type CombatStrike
+-- @field #boolean hit Whether a blow was struck at all.
+-- @field #number damage What the blow took from the health of the victim.
+-- @field #boolean critical
+-- @field #boolean killed
+-- @field #boolean downed Whether the victim fell unconscious.
+
+---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
 -- @type DialogueRecord
 -- @field #string id Record identifier

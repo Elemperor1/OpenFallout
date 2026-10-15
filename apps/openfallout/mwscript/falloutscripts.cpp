@@ -20,6 +20,7 @@
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
@@ -175,6 +176,7 @@ namespace OFScript
         , mPlayer(player)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
+        , mCombatRandom(std::random_device()())
     {
         FalloutScript::addQuestCommands(mInterpreter, mQuests);
         FalloutScript::addObjectCommands(
@@ -185,6 +187,7 @@ namespace OFScript
         FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
+        FalloutScript::addCombatCommands(mInterpreter, mCombat, mActors, *this);
         // The container of an item is the holder its script was last run for
         mInterpreter.setHandler("GetContainer", [this](FalloutScript::CallContext& call) {
             const auto found = mItemHolders.find(call.mReference);
@@ -354,6 +357,11 @@ namespace OFScript
         }
         mActors.clear();
         mEquipment.clear();
+        mCombat.clear();
+        {
+            const std::lock_guard lock(mDownedMutex);
+            mDowned.clear();
+        }
         mItemHolders.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -431,6 +439,7 @@ namespace OFScript
         raiseItemEvents();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
+        raiseCombatEvents(frametime);
         mQuests.update(frametime);
         mObjects.update();
     }
@@ -1494,6 +1503,240 @@ namespace OFScript
         return true;
     }
 
+    namespace
+    {
+        /// How far a character sees another one (units): the games work it out from the sneak of the target and the
+        /// light, which nothing here knows yet, and stop at a distance that is a guess
+        constexpr double sightRange = 3000.0;
+        /// How long an essential character lies unconscious before it gets up (seconds)
+        constexpr float essentialDownSeconds = 15.f;
+    }
+
+    bool FalloutScripts::detects(FalloutScript::FormId viewer, FalloutScript::FormId target)
+    {
+        if (viewer == 0 || target == 0 || mActors.isDead(viewer) || mActors.isDead(target)
+            || mCombat.unconscious(viewer))
+            return false;
+        // Whoever fights the target knows where it is
+        if (mCombat.target(viewer) == target)
+            return true;
+        double apart = 0;
+        return distance(viewer, target, apart) && apart <= sightRange;
+    }
+
+    bool FalloutScripts::essentialByRecord(FalloutScript::FormId actor)
+    {
+        ESM::FormId base;
+        if (actor == 0 || actor == mPlayer || !baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        // The flag is part of the base data, which a template can give
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseBaseData);
+            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Essential) != 0;
+        }
+        if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseBaseData);
+            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Creature::FO3_Essential) != 0;
+        }
+        return false;
+    }
+
+    std::optional<FalloutScript::CombatState::Relation> FalloutScripts::recordedRelation(
+        FalloutScript::FormId first, FalloutScript::FormId second)
+    {
+        using Relation = FalloutScript::CombatState::Relation;
+        // What the faction says about the other: the reaction of its members to a fight that involves it
+        const auto reactionOf
+            = [this](FalloutScript::FormId from, FalloutScript::FormId to) -> std::optional<Relation> {
+            const ESM4::Faction* faction = mStore.get<ESM4::Faction>().search(refId(from));
+            if (faction == nullptr)
+                return std::nullopt;
+            const ESM::FormId target = ESM::FormId::fromUint32(to);
+            for (const ESM4::Faction::Relation& relation : faction->mRelations)
+            {
+                if (relation.mTarget != target)
+                    continue;
+                switch (relation.mGroupCombatReaction)
+                {
+                    case ESM4::Faction::Reaction_Enemy:
+                        return Relation::Enemy;
+                    case ESM4::Faction::Reaction_Ally:
+                    case ESM4::Faction::Reaction_Friend:
+                        return Relation::Ally;
+                    default:
+                        return Relation::Neutral;
+                }
+            }
+            return std::nullopt;
+        };
+        if (const std::optional<Relation> relation = reactionOf(first, second))
+            return relation;
+        return reactionOf(second, first);
+    }
+
+    FalloutScript::WeaponDamage FalloutScripts::describeWeapon(
+        FalloutScript::FormId weapon, FalloutScript::FormId attacker)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        FalloutScript::WeaponDamage damage;
+        const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr;
+        // The skill of the hands is unarmed
+        int skill = AV::lastSkill;
+        if (record == nullptr)
+        {
+            // Bare hands: the records have no weapon for a fist here, so it does a point and the strength bonus
+            damage.mDamage = 1;
+            damage.mMelee = true;
+        }
+        else
+        {
+            damage.mDamage = record->mData.damage;
+            if (record->mHasCritical)
+            {
+                damage.mCriticalDamage = record->mCritical.mDamage;
+                damage.mCriticalChanceMultiplier = record->mCritical.mChanceMultiplier;
+            }
+            if (record->mHasGameData)
+            {
+                damage.mMelee = record->mGame.mAnimationType <= ESM4::Weapon::GameData::Melee2Hand;
+                skill = static_cast<int>(record->mGame.mSkill);
+            }
+            else
+                skill = -1;
+        }
+        if (attacker != 0 && skill >= AV::firstSkill && skill <= AV::lastSkill)
+            damage.mSkill = mActorValues.current(attacker, skill);
+        return damage;
+    }
+
+    FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
+        FalloutScript::FormId weapon, int limb, double roll)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        StrikeResult result;
+        if (victim == 0 || victim == attacker || mActors.isDead(victim))
+            return result;
+        if (weapon == 0 && attacker != 0)
+            weapon = mEquipment.weapon(attacker);
+        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker);
+        if (roll < 0)
+        {
+            const std::lock_guard lock(mCombatRandomMutex);
+            roll = std::uniform_real_distribution<double>(0.0, 100.0)(mCombatRandom);
+        }
+        FalloutScript::Defense defense;
+        defense.mThreshold = mEquipment.damageThreshold(victim);
+        defense.mResistance = mEquipment.armorRating(victim);
+        const double chance = attacker != 0 ? mActorValues.current(attacker, AV::criticalChance) : 0.0;
+        const double bonus = attacker != 0 ? mActorValues.current(attacker, AV::meleeDamage) : 0.0;
+        const FalloutScript::HitResult hit
+            = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
+        result.mHit = true;
+        result.mDamage = hit.mDamage;
+        result.mCritical = hit.mCritical;
+
+        FalloutScript::CombatState::Hit struck;
+        struck.mAttacker = attacker;
+        struck.mWeapon = weapon;
+        struck.mDamage = hit.mDamage;
+        struck.mCritical = hit.mCritical;
+        struck.mLimb = limb;
+        mCombat.noteHit(victim, struck);
+
+        mActorValues.damage(victim, AV::health, hit.mDamage);
+        if (mActorValues.current(victim, AV::health) > 0)
+        {
+            // A character that is hit fights back, and the attacker is in the fight too
+            if (attacker != 0)
+            {
+                if (!mCombat.inCombat(victim))
+                    mCombat.start(victim, attacker);
+                if (!mCombat.inCombat(attacker))
+                    mCombat.start(attacker, victim);
+            }
+            return result;
+        }
+
+        // Nobody goes for a target that is out
+        mCombat.stop(victim);
+        for (const FalloutScript::FormId pursuer : mCombat.attackersOf(victim))
+            mCombat.stop(pursuer);
+        if (FalloutScript::isEssential(mCombat, mActors, *this, victim))
+        {
+            mCombat.setUnconscious(victim, true);
+            const std::lock_guard lock(mDownedMutex);
+            mDowned[victim] = essentialDownSeconds;
+            result.mDowned = true;
+        }
+        else
+        {
+            mActors.setDead(victim, true, attacker);
+            result.mKilled = true;
+        }
+        return result;
+    }
+
+    void FalloutScripts::raiseCombatEvents(float frametime)
+    {
+        namespace BlockType = FalloutScript::BlockType;
+        mCombat.advance(frametime);
+
+        // Essential characters that were down long enough get up with their health back
+        std::vector<FalloutScript::FormId> risen;
+        {
+            const std::lock_guard lock(mDownedMutex);
+            for (auto it = mDowned.begin(); it != mDowned.end();)
+            {
+                it->second -= frametime;
+                if (it->second <= 0)
+                {
+                    risen.push_back(it->first);
+                    it = mDowned.erase(it);
+                }
+                else
+                    ++it;
+            }
+        }
+        for (const FalloutScript::FormId actor : risen)
+        {
+            mCombat.setUnconscious(actor, false);
+            mActorValues.heal(actor, FalloutScript::ActorValue::health);
+        }
+
+        // A block that names a form is for that form, or for a character made from that record
+        const auto namesActor = [this](FalloutScript::FormId actor) {
+            FalloutScript::FormId base = 0;
+            baseFormOf(actor, base);
+            return [actor, base](const FalloutScript::Block& block) {
+                return block.mNames != FalloutScript::BlockNames::Form || block.mForm == actor
+                    || (base != 0 && block.mForm == base);
+            };
+        };
+        for (const FalloutScript::CombatState::HitEvent& event : mCombat.takeHits())
+        {
+            mObjects.trigger(event.mVictim, BlockType::OnHit, event.mHit.mAttacker, namesActor(event.mHit.mAttacker));
+            if (event.mHit.mWeapon != 0)
+            {
+                const FalloutScript::FormId weapon = event.mHit.mWeapon;
+                mObjects.trigger(event.mVictim, BlockType::OnHitWith, event.mHit.mAttacker,
+                    [weapon](const FalloutScript::Block& block) {
+                        return block.mNames != FalloutScript::BlockNames::Form || block.mForm == weapon;
+                    });
+            }
+        }
+        for (const FalloutScript::ActorState::Death& death : mActors.takeDeaths())
+            mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
+        for (const FalloutScript::CombatState::Change& change : mCombat.takeChanges())
+        {
+            if (change.mTarget == 0)
+                mObjects.trigger(change.mActor, BlockType::OnCombatEnd, change.mWas, namesActor(change.mWas));
+            else if (change.mWas == 0)
+                mObjects.trigger(change.mActor, BlockType::OnStartCombat, change.mTarget, namesActor(change.mTarget));
+        }
+    }
+
     bool FalloutScripts::initialFactions(
         FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions)
     {
@@ -1551,10 +1794,9 @@ namespace OFScript
         return true;
     }
 
-    const FalloutScript::DerivedStatSettings& FalloutScripts::derivedSettings()
+    const std::map<std::string, double>& FalloutScripts::gameSettingValues()
     {
-        const std::lock_guard lock(mDerivedSettingsMutex);
-        if (!mDerivedSettings)
+        if (!mGameSettingValues)
         {
             // The settings of the files by their names (the names of settings are not case sensitive)
             std::map<std::string, double> settings;
@@ -1572,6 +1814,17 @@ namespace OFScript
                 if (number)
                     settings[Misc::StringUtils::lowerCase(setting.mEditorId)] = *number;
             }
+            mGameSettingValues = std::move(settings);
+        }
+        return *mGameSettingValues;
+    }
+
+    const FalloutScript::DerivedStatSettings& FalloutScripts::derivedSettings()
+    {
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        if (!mDerivedSettings)
+        {
+            const std::map<std::string, double>& settings = gameSettingValues();
             mDerivedSettings = FalloutScript::DerivedStatSettings::fromGameSettings(
                 [&settings](std::string_view name) -> std::optional<double> {
                     const auto found = settings.find(Misc::StringUtils::lowerCase(name));
@@ -1579,6 +1832,21 @@ namespace OFScript
                 });
         }
         return *mDerivedSettings;
+    }
+
+    const FalloutScript::DamageSettings& FalloutScripts::damageSettings()
+    {
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        if (!mDamageSettings)
+        {
+            const std::map<std::string, double>& settings = gameSettingValues();
+            mDamageSettings = FalloutScript::DamageSettings::fromGameSettings(
+                [&settings](std::string_view name) -> std::optional<double> {
+                    const auto found = settings.find(Misc::StringUtils::lowerCase(name));
+                    return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
+                });
+        }
+        return *mDamageSettings;
     }
 
     std::optional<double> FalloutScripts::derivedValue(
@@ -1610,12 +1878,19 @@ namespace OFScript
             return std::nullopt;
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         const ESM4::FalloutStats* stats = nullptr;
+        bool isCreature = false;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
             stats = &statsRecordOf(mStore, *npc, seed).mFalloutStats;
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            isCreature = true;
             stats = &statsRecordOf(mStore, *creature, seed).mFalloutStats;
+        }
         if (stats == nullptr || !stats->mKnown)
             return std::nullopt;
+        // A creature has the health of its record (the radroach of the Vault 101 tutorial 5, two blows of a BB gun)
+        if (isCreature)
+            return std::max<double>(stats->mHealth, 1.0);
         const double endurance = permanent(AV::endurance);
         if (actor == mPlayer)
             return Derived::playerHealth(settings, stats->mHealth, endurance, mProgress.level());

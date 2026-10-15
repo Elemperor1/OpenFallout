@@ -147,10 +147,10 @@ namespace FalloutScript
 
     /// Gives the commands about actor values to the interpreter: GetActorValue, GetBaseActorValue,
     /// GetPermanentActorValue, SetActorValue, ModActorValue, ForceActorValue, DamageActorValue and RestoreActorValue,
-    /// and those that depend on the health of a character: GetHealthPercentage and ResurrectActor (a character that
-    /// comes back has all its health), GetWeaponHealthPerc, and GetLevel. Karma and experience of the player are the
-    /// ones that PlayerProgress keeps, and a character whose health is damaged to nothing is dead for ActorState. Those
-    /// that the command table does not have are left out.
+    /// and those that depend on the health of a character: GetHealthPercentage, ResetHealth and ResurrectActor (a
+    /// character that comes back has all its health), GetWeaponHealthPerc, and GetLevel. Karma and experience of the
+    /// player are the ones that PlayerProgress keeps, and a character whose health is damaged to nothing is dead for
+    /// ActorState. Those that the command table does not have are left out.
     void addActorValueCommands(
         Interpreter& interpreter, ActorValues& values, ActorState& actors, PlayerProgress& progress);
 }

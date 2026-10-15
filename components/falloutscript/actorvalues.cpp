@@ -314,6 +314,12 @@ namespace FalloutScript
                 return 0.0;
             return std::clamp(values.current(call.mReference, ActorValue::health) / most, 0.0, 1.0);
         });
+        // The health of the character is all there is again; a character that is dead stays so (ResurrectActor)
+        interpreter.setHandler("ResetHealth", [&values](CallContext& call) {
+            if (call.mReference != 0)
+                values.heal(call.mReference, ActorValue::health);
+            return 0.0;
+        });
         interpreter.setHandler("ResurrectActor", [&values, &actors](CallContext& call) {
             actors.setDead(call.mReference, false);
             values.heal(call.mReference, ActorValue::health);

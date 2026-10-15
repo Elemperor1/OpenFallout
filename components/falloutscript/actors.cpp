@@ -43,6 +43,8 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mHolders.clear();
         mDead.clear();
+        mKillers.clear();
+        mDeaths.clear();
         mChanges.clear();
     }
 
@@ -190,15 +192,58 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    void ActorState::setDead(FormId actor, bool dead)
+    void ActorState::setDead(FormId actor, bool dead, FormId killer)
     {
         if (actor == 0)
             return;
         const std::lock_guard lock(mMutex);
         if (dead)
-            mDead.insert(actor);
+        {
+            if (mDead.insert(actor).second)
+            {
+                constexpr std::size_t mostDeaths = 1024;
+                if (mDeaths.size() < mostDeaths)
+                    mDeaths.push_back({ actor, killer });
+                if (killer != 0)
+                    mKillers[actor] = killer;
+            }
+        }
         else
+        {
             mDead.erase(actor);
+            mKillers.erase(actor);
+        }
+    }
+
+    FormId ActorState::killerOf(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mKillers.find(actor);
+        return found == mKillers.end() ? 0 : found->second;
+    }
+
+    std::vector<ActorState::Death> ActorState::takeDeaths()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<Death> deaths;
+        deaths.swap(mDeaths);
+        return deaths;
+    }
+
+    bool ActorState::factions(FormId actor, std::vector<std::pair<FormId, int>>& result)
+    {
+        const std::lock_guard lock(mMutex);
+        Holder& entry = holder(actor);
+        knowFactions(actor, entry);
+        if (!entry.mFactionsKnown)
+            return false;
+        result.assign(entry.mFactions.begin(), entry.mFactions.end());
+        return true;
+    }
+
+    bool ActorState::baseOf(FormId reference, FormId& base)
+    {
+        return mRecords.baseFormOf(reference, base);
     }
 
     int ActorState::deadCount(FormId base) const
@@ -304,7 +349,8 @@ namespace FalloutScript
             return base != 0 ? static_cast<double>(state.deadCount(base)) : 0.0;
         });
         interpreter.setHandler("KillActor", [&state](CallContext& call) {
-            state.setDead(call.mReference, true);
+            // The first argument, when there is one, is the killer
+            state.setDead(call.mReference, true, formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("AddToFaction", [&state](CallContext& call) {
