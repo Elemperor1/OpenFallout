@@ -18,6 +18,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/packageschedule.hpp>
+#include <components/falloutscript/fightai.hpp>
 #include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -85,6 +86,18 @@ namespace OFMechanics
         // A follower that runs does so at this speed when its animation does not say, units a second
         constexpr float defaultRunSpeed = 300.f;
         constexpr float fastestRunSpeed = 800.f;
+        // How often a character at peace looks for the player to go for, in seconds
+        constexpr float sightInterval = 0.5f;
+        // Characters see each other from this far above their feet
+        constexpr float eyeHeight = 110.f;
+        // A character that goes for its target stops at this share of the distance it attacks from, so that it does not
+        // start again at once when the target steps back
+        constexpr float engageShare = 0.9f;
+        // A character that goes for its target asks for a new path when the target has gone this far from the end of
+        // the path
+        constexpr float fightRepathDistance = 60.f;
+        // A character that runs away goes this far at a time, in the direction away from the one it runs from
+        constexpr float fleeStep = 600.f;
 
         enum class Walk
         {
@@ -145,9 +158,12 @@ namespace OFMechanics
         float mFacing = 0.f; // which way it faces when it gets there
 
         bool mAgent = false; // the navigator has been told of an actor of its size, so that it makes a mesh for it
+        float mSight = 0.f; // seconds until it looks for the player to go for
+        bool mFighting = false; // it was in a fight the last time it was looked at
         float mReview = 0.f; // seconds until the packages are looked at again
         float mWait = 0.f; // seconds to stand still before it does anything else
         bool mWalking = false; // it goes to mDestination
+        bool mFleeing = false; // mDestination is a place to run to from the target of its fight, not the target
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
@@ -181,6 +197,7 @@ namespace OFMechanics
         {
             // Actors that load together do not all look at their packages in the same frame
             mReview = reviewInterval * static_cast<float>(mRandom.below(1000)) / 1000.f;
+            mSight = sightInterval * static_cast<float>((seed >> 20) % 1000) / 1000.f;
         }
 
         osg::Vec3f position() const { return mPtr.getRefData().getPosition().asVec3(); }
@@ -221,6 +238,15 @@ namespace OFMechanics
         {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             return scripts != nullptr ? scripts->scriptPackages(ptr) : std::vector<const ESM4::AIPackage*>();
+        }
+
+        /// Whether a character goes for the player when it sees it, or fights already (a blow or a script started a
+        /// fight with one that never starts one), so that it needs a mind though it has no package
+        bool mayFight(const OFWorld::Ptr& ptr)
+        {
+            OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            return scripts != nullptr && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr()
+                && (scripts->isAggressive(ptr) || scripts->fighting(ptr));
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -345,6 +371,7 @@ namespace OFMechanics
         void stopWalking(FalloutActors::Mind& mind)
         {
             mind.mWalking = false;
+            mind.mFleeing = false;
             mind.mWaypoints.clear();
             mind.mStuck = 0.f;
             mind.mYielded = false;
@@ -384,7 +411,7 @@ namespace OFMechanics
             return;
         // A command from a script outlives the cell: the character takes it up again when the cell is loaded
         const auto command = mCommands.find(ptr.getCellRef().getRefNum());
-        if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty())
+        if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty() && !mayFight(ptr))
             return;
         Mind& mind = makeMind(ptr);
         if (command != mCommands.end())
@@ -409,8 +436,8 @@ namespace OFMechanics
         const auto found = mMinds.find(ptr.mRef);
         if (found == mMinds.end())
         {
-            // A character with no packages of its own has no mind until a script gives it one
-            if (scriptPackagesOf(ptr).empty())
+            // A character with no packages of its own has no mind until a script gives it one, or it has to fight
+            if (scriptPackagesOf(ptr).empty() && !mayFight(ptr))
                 return;
             makeMind(ptr).mReview = 0.f;
             return;
@@ -1126,6 +1153,139 @@ namespace OFMechanics
             Log(Debug::Info) << "Package " << package->mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
                              << ": it talks to " << (mind.mFollowing.mPlayer ? "the player" : "a character");
         }
+
+        /// Whether nothing of the world is between the eyes of one character and those of the other
+        bool canSee(OFBase::World& world, const osg::Vec3f& from, const osg::Vec3f& to)
+        {
+            const osg::Vec3f eyes(from.x(), from.y(), from.z() + eyeHeight);
+            const osg::Vec3f goal(to.x(), to.y(), to.z() + eyeHeight);
+            const float apart = (goal - eyes).length();
+            return apart < 1.f || world.getDistToNearestRayHit(eyes, goal - eyes, apart) >= apart - 1.f;
+        }
+
+        /// A character that fights goes for its target, attacks it from where its weapon reaches, or runs away from it.
+        /// A character at peace that goes for the player on sight starts a fight. True when the fight takes the
+        /// character's frame, so that the packages wait.
+        bool fight(const Frame& frame, FalloutActors::Mind& mind, float duration)
+        {
+            OFScript::FalloutScripts& scripts = *frame.mScripts;
+            const OFWorld::Ptr player = frame.mWorld.getPlayerPtr();
+            if (mind.mPtr == player)
+                return false;
+            // The packages go on where they were left once the fight is over: the character goes back to its place
+            const auto over = [&mind] {
+                mind.mFighting = false;
+                stopWalking(mind);
+                mind.mAtGoal = false;
+                mind.mWait = 0.f;
+                mind.mReview = 0.f;
+            };
+
+            OFScript::FalloutScripts::FightStance stance = scripts.fightStance(mind.mPtr);
+            if (stance.mTarget.isEmpty())
+            {
+                if (mind.mFighting)
+                    over();
+                // A character that is at peace looks for the player now and then
+                mind.mSight -= duration;
+                if (mind.mSight > 0.f)
+                    return false;
+                mind.mSight = sightInterval;
+                float radius = 0.f;
+                if (!sharesSpace(mind.mPtr, player) || !scripts.attacksPlayerOnSight(mind.mPtr, radius))
+                    return false;
+                if (distanceByFloor(mind.position(), frame.mPlayer) > radius
+                    || !canSee(frame.mWorld, mind.position(), frame.mPlayer))
+                    return false;
+                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " sees the player and goes for it";
+                scripts.fightPlayer(mind.mPtr);
+                stance = scripts.fightStance(mind.mPtr);
+                if (stance.mTarget.isEmpty())
+                    return false;
+            }
+            if (!sharesSpace(mind.mPtr, stance.mTarget))
+            {
+                // The target is somewhere it can not go to
+                scripts.endFight(mind.mPtr);
+                over();
+                return false;
+            }
+            if (!mind.mFighting)
+            {
+                mind.mFighting = true;
+                stopWalking(mind);
+                scripts.prepareFight(mind.mPtr);
+            }
+
+            const osg::Vec3f target = stance.mTarget.getRefData().getPosition().asVec3();
+            const float away = distanceByFloor(mind.position(), target);
+            const bool visible = canSee(frame.mWorld, mind.position(), target);
+            const float arrival = visible ? static_cast<float>(stance.mEngage) * engageShare : 0.f;
+            const float heading = std::atan2(target.x() - mind.position().x(), target.y() - mind.position().y());
+            switch (FalloutScript::FightAI::decide(away, stance.mEngage, visible, stance.mFlee))
+            {
+                case FalloutScript::FightAI::Move::Approach:
+                {
+                    if (!mind.mWalking || mind.mFleeing
+                        || distanceAcross(target, mind.mDestination) > fightRepathDistance)
+                    {
+                        mind.mWaypoints.clear();
+                        mind.mDestination = target;
+                        mind.mFleeing = false;
+                    }
+                    switch (walkTo(frame, mind, mind.mDestination, duration, arrival, true))
+                    {
+                        case Walk::Arrived:
+                        case Walk::Failed:
+                            stopWalking(mind);
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                }
+                case FalloutScript::FightAI::Move::Retreat:
+                {
+                    // A character that was going for the target and loses its nerve turns away at once, not when the
+                    // walk to the target is over
+                    if (!mind.mWalking || !mind.mFleeing)
+                    {
+                        mind.mWaypoints.clear();
+                        mind.mFleeing = true;
+                        osg::Vec3f direction = mind.position() - target;
+                        direction.z() = 0.f;
+                        if (direction.length2() < 1.f)
+                            direction = osg::Vec3f(-std::sin(heading), -std::cos(heading), 0.f);
+                        direction.normalize();
+                        mind.mDestination = mind.position() + direction * fleeStep;
+                    }
+                    switch (walkTo(frame, mind, mind.mDestination, duration, 0.f, true))
+                    {
+                        case Walk::Arrived:
+                        case Walk::Failed:
+                            stopWalking(mind);
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                }
+                case FalloutScript::FightAI::Move::Hold:
+                    if (mind.mWalking)
+                        stopWalking(mind);
+                    if (stance.mFlee)
+                    {
+                        // It is far enough away: the fight is over for it
+                        scripts.endFight(mind.mPtr);
+                        over();
+                        return false;
+                    }
+                    faceToward(frame, mind, heading, duration);
+                    scripts.attack(mind.mPtr, stance.mTarget);
+                    break;
+            }
+            return true;
+        }
     }
 
     void FalloutActors::update(float duration)
@@ -1164,8 +1324,13 @@ namespace OFMechanics
             if (frame.mScripts != nullptr && frame.mScripts->isDead(mind.mPtr))
             {
                 stopWalking(mind);
+                mind.mFighting = false;
                 continue;
             }
+
+            // A fight comes before the packages
+            if (frame.mScripts != nullptr && fight(frame, mind, duration))
+                continue;
 
             mind.mReview -= duration;
             if (mind.mReview <= 0.f)
