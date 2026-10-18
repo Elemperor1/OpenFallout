@@ -17,8 +17,11 @@
 #include <components/esm/luascripts.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
+#include <components/esm4/loadcont.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadnpc.hpp>
 
 #include <components/settings/values.hpp>
 
@@ -643,6 +646,10 @@ namespace OFLua
                 if (!object.getCellRef().getTeleport())
                     scripts->activateDoor(object);
             }
+            // A container of Fallout, or a character that is dead, opens for the player to take things from
+            else if (object.getType() == ESM4::Container::sRecordId || object.getType() == ESM4::Npc::sRecordId
+                || object.getType() == ESM4::Creature::sRecordId)
+                scripts->openContainer(object, actor);
             // An item of Fallout that an actor activates goes into its inventory
             else
                 scripts->pickUp(object, actor);

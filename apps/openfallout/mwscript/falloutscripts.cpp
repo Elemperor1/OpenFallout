@@ -174,10 +174,13 @@ namespace OFScript
         , mActorValues(this)
         , mReferenceState(*this)
         , mFormLists(*this)
+        , mPerks(*this, mProgress, mActorValues)
+        , mItemUse(*this, mActors, mActorValues, mProgress)
         , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
         , mPlayer(player)
+        , mGame(game)
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
         , mCombatRandom(std::random_device()())
@@ -206,6 +209,13 @@ namespace OFScript
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
+        // The perks that change what experience is gained apply to what scripts reward as well
+        mInterpreter.setHandler("RewardXP", [this](FalloutScript::CallContext& call) {
+            rewardExperience(FalloutScript::intArgument(call, 0));
+            return 0.0;
+        });
+        // The games have a mode of play that has no counterpart here
+        mInterpreter.setHandler("IsHardcore", [](FalloutScript::CallContext&) { return 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
@@ -278,6 +288,15 @@ namespace OFScript
                 : 0.0;
         });
         FalloutScript::addConditionFunctions(mConditions);
+        // Perks and the effects of items look at the conditions of their records, about the character who has them
+        const auto conditionsHold
+            = [this](const std::vector<ESM4::TargetCondition>& conditions,
+                  const FalloutScript::ConditionContext& context) { return mConditions.holds(conditions, context); };
+        mPerks.setConditions(conditionsHold);
+        mPerks.setQuestSetter([this](FalloutScript::FormId quest, int stage) { mQuests.setStage(quest, stage); });
+        mItemUse.setConditions(conditionsHold);
+        mItemUse.setPerks(&mPerks);
+        mItemUse.setPlayer(player);
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
             return mConditions.holds(conditions, FalloutScript::ConditionContext());
@@ -382,6 +401,21 @@ namespace OFScript
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
+        {
+            const std::lock_guard lock(mLootMutex);
+            mLoot.reset();
+        }
+        mPerks.clear();
+        mItemUse.clear();
+        mPerkOwners.clear();
+        {
+            const std::lock_guard lock(mLevelUpMutex);
+            mLevelUps.clear();
+        }
+        {
+            const std::lock_guard lock(mPlayerDamageMutex);
+            mPlayerDamage.clear();
+        }
         mChargen.clear();
         mChargenSeeded = 0;
         mObjects.clear();
@@ -435,6 +469,7 @@ namespace OFScript
             mObjects.setSecondsPassed(frametime);
             // What the blocks of the menu did to the items is told while it is open, not when it is closed
             raiseItemEvents();
+            updateProgress(0);
             const FalloutScript::BlockFilter filter
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
@@ -456,6 +491,7 @@ namespace OFScript
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
         raiseCombatEvents(frametime);
+        updateProgress(frametime);
         mQuests.update(frametime);
         mObjects.update();
     }
@@ -1670,7 +1706,7 @@ namespace OFScript
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
-        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker);
+        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker);
         if (roll < 0)
         {
             const std::lock_guard lock(mCombatRandomMutex);
@@ -1679,10 +1715,37 @@ namespace OFScript
         FalloutScript::Defense defense;
         defense.mThreshold = mEquipment.damageThreshold(victim);
         defense.mResistance = mEquipment.armorRating(victim);
-        const double chance = attacker != 0 ? mActorValues.current(attacker, AV::criticalChance) : 0.0;
+        double chance = attacker != 0 ? mActorValues.current(attacker, AV::criticalChance) : 0.0;
         const double bonus = attacker != 0 ? mActorValues.current(attacker, AV::meleeDamage) : 0.0;
-        const FalloutScript::HitResult hit
+        // What the perks of the two change: the attacker's the damage and the chance of a critical hit, the
+        // defender's the chance of a critical hit against it, and the threshold of the armor (the points that the
+        // perks of the attacker take off it and those that the perks of the defender add, both start at 0). The damage
+        // is changed when the blow is built in Fallout 3, after the armor in New Vegas.
+        namespace Entry = FalloutScript::EntryPoint;
+        const bool damageAfterArmor = mGame == FalloutScript::Game::NewVegas;
+        const FalloutScript::PerkEngine::Context towardsVictim{ victim, weapon };
+        const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, weapon };
+        double thresholdTaken = 0;
+        if (attacker != 0)
+        {
+            if (!damageAfterArmor)
+                blow.mDamage = mPerks.apply(Entry::weaponDamage, attacker, blow.mDamage, towardsVictim);
+            blow.mCriticalDamage = mPerks.apply(Entry::criticalDamage, attacker, blow.mCriticalDamage, towardsVictim);
+            chance = mPerks.apply(Entry::criticalChance, attacker, chance, towardsVictim);
+            thresholdTaken = mPerks.apply(Entry::thresholdAttacker, attacker, 0.0, towardsVictim);
+        }
+        chance = mPerks.apply(Entry::enemyCriticalChance, victim, chance, towardsAttacker);
+        defense.mThreshold += mPerks.apply(Entry::thresholdDefender, victim, 0.0, towardsAttacker) - thresholdTaken;
+        FalloutScript::HitResult hit
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
+        if (attacker != 0 && damageAfterArmor)
+        {
+            // The perks work on what is left after the armor, and the bonus of a critical blow comes after them
+            const double criticalBonus = hit.mCritical ? std::max(blow.mCriticalDamage, 0.0) : 0.0;
+            const double armored = std::max(hit.mDamage - criticalBonus, 0.0);
+            hit.mDamage
+                = std::max(mPerks.apply(Entry::weaponDamage, attacker, armored, towardsVictim), 0.0) + criticalBonus;
+        }
 
         // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
         // a blow that comes late for a death changes nothing
@@ -1703,6 +1766,12 @@ namespace OFScript
         mCombat.noteHit(victim, struck);
 
         mActorValues.damage(victim, AV::health, hit.mDamage);
+        // Who did the damage decides whether a kill by someone else pays the player
+        if (attacker == mPlayer && attacker != 0)
+        {
+            const std::lock_guard lock(mPlayerDamageMutex);
+            mPlayerDamage[victim] += hit.mDamage;
+        }
         if (mActorValues.current(victim, AV::health) > 0)
         {
             // A character that is hit fights back, and the attacker is in the fight too
@@ -2120,6 +2189,7 @@ namespace OFScript
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
+            awardKillExperience(death.mActor, death.mKiller == mPlayer);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {

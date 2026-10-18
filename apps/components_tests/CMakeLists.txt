@@ -160,6 +160,10 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp
     falloutscript/testformlists.cpp
+    falloutscript/testitemuse.cpp
+    falloutscript/testlevelling.cpp
+    falloutscript/testpipboy.cpp
+    falloutscript/testperks.cpp
     falloutscript/testfurniture.cpp
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp

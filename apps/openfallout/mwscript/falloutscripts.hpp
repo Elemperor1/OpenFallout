@@ -36,10 +36,13 @@
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/interpreter.hpp>
+#include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/packagecommands.hpp>
+#include <components/falloutscript/perks.hpp>
+#include <components/falloutscript/pipboy.hpp>
 #include <components/falloutscript/placementcommands.hpp>
 #include <components/falloutscript/playercontrols.hpp>
 #include <components/falloutscript/playerprogress.hpp>
@@ -99,7 +102,9 @@ namespace OFScript
                                  private FalloutScript::MessageWorld,
                                  private FalloutScript::ControlsWorld,
                                  private FalloutScript::CombatWorld,
-                                 private FalloutScript::AnimationWorld
+                                 private FalloutScript::AnimationWorld,
+                                 private FalloutScript::PerkRecords,
+                                 private FalloutScript::UseRecords
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -150,10 +155,122 @@ namespace OFScript
         /// What characters carry, hold and wear. The inventory of the player is what scripts and pick-ups gave it.
         FalloutScript::ActorState& actors() { return mActors; }
         FalloutScript::Equipment& equipment() { return mEquipment; }
+        FalloutScript::ActorValues& actorValues() { return mActorValues; }
         /// The reference of the player
         FalloutScript::FormId playerReference() const { return mPlayer; }
         /// Who fights whom and how the characters stand to each other
         FalloutScript::CombatState& combat() { return mCombat; }
+        /// What the player has earned and the perks of the characters
+        FalloutScript::PlayerProgress& progress() { return mProgress; }
+        FalloutScript::PerkEngine& perkEngine() { return mPerks; }
+        FalloutScript::ItemUse& itemUse() { return mItemUse; }
+
+        /// The character uses an item that is used up (an aid item, a book); a weapon or armor is for equipment().
+        /// The player is told what it did. Any thread.
+        FalloutScript::ItemUse::Result useItem(FalloutScript::FormId actor, FalloutScript::FormId item);
+        /// The levels the player reached whose points have been handed out and that the interface has not shown yet
+        std::vector<FalloutScript::PlayerProgress::LevelUp> takeLevelUps();
+        /// The value of a game setting (GMST) by its editor id, none when the files have no such setting
+        std::optional<double> gameSetting(std::string_view name);
+        /// The text of a game setting, empty when the files have none
+        std::string gameSettingText(std::string_view name);
+
+        /// An item of an inventory, as the Pip-Boy lists it
+        struct PipboyItem
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            int mCount = 0;
+            double mWeight = 0;
+            int mValue = 0;
+            FalloutScript::Pipboy::ItemCategory mCategory = FalloutScript::Pipboy::ItemCategory::Misc;
+            bool mEquipped = false;
+            /// A weapon: the damage of a blow of the record; armor: its rating and damage threshold
+            double mDamage = 0;
+            double mRating = 0;
+            double mThreshold = 0;
+        };
+        /// What a holder carries, the items the host knows by name, in the order the holder got them
+        std::vector<PipboyItem> pipboyItems(FalloutScript::FormId holder);
+        /// What the player's character is and has, for the status tab
+        struct PipboyStats
+        {
+            int mLevel = 1;
+            int mExperience = 0;
+            int mLevelStart = 0;
+            int mNextLevel = 0;
+            int mKarma = 0;
+            std::string mKarmaTitle;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+            double mActionPoints = 0;
+            double mMaxActionPoints = 0;
+            double mWeight = 0;
+            double mMaxWeight = 0;
+            int mCaps = 0;
+            int mSkillPoints = 0;
+            int mPerkPoints = 0;
+            double mArmorRating = 0;
+            double mThreshold = 0;
+        };
+        PipboyStats pipboyStats();
+        /// The quests the player is following with what is left to do, for the data tab
+        struct PipboyObjective
+        {
+            std::string mText;
+            bool mCompleted = false;
+        };
+        struct PipboyQuest
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            bool mCompleted = false;
+            std::vector<PipboyObjective> mObjectives;
+        };
+        std::vector<PipboyQuest> pipboyQuests();
+        /// The perks of the player with their ranks, and those it can choose from when it has a perk to spend
+        struct PipboyPerk
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            std::string mDescription;
+            int mRank = 0;
+            int mRanks = 1;
+            /// The perks of the level-up list that cannot be chosen yet are shown dimmed
+            bool mAvailable = true;
+        };
+        std::vector<PipboyPerk> pipboyPerks();
+        std::vector<PipboyPerk> pipboyOfferedPerks();
+        /// Spends skill points on a skill (the skill stays at most 100); the points spent, 0 when none could be
+        int spendSkillPoints(int skill, int points);
+        /// Takes skill points back from a skill (the screen of the level up does when the player takes back what it
+        /// gave on that screen); the points given back, 0 when none could be
+        int refundSkillPoints(int skill, int points);
+        /// Spends the perk point on a perk the player is offered; false when it is not
+        bool choosePerk(FalloutScript::FormId perk);
+        /// The player does with the item what its kind asks (wear a weapon, armor or ammunition, or take it off again,
+        /// use up an aid item or read a book); the words that tell what happened, empty when nothing did
+        std::string useItemFromList(FalloutScript::FormId item);
+        /// The player puts items on the floor in front of it
+        int dropItem(FalloutScript::FormId item, int count);
+        /// Items go from one holder to another (a container); the count that moved
+        int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count);
+        /// The player opens or closes a container, for the scripts that hear of it (OnOpen, OnClose)
+        void containerOpened(FalloutScript::FormId container, bool opened);
+        /// The player activates a container or a character that is dead: its things can be taken. False when the
+        /// object has nothing to open (the player is told when it is locked, and that opens nothing either).
+        bool openContainer(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// What the player has open to take things from: the holder, its name, and a number that is another for each
+        /// time something is opened. Nothing when nothing is open.
+        struct Loot
+        {
+            FalloutScript::FormId mHolder = 0;
+            std::string mName;
+            int mSerial = 0;
+        };
+        std::optional<Loot> loot();
+        /// The player is done with what it had open
+        void closeLoot();
 
         /// The 3D of an object that holds animations of its own is built (a door, a switch): an object that rests open
         /// starts so
@@ -554,6 +671,21 @@ namespace OFScript
         const FalloutScript::DerivedStatSettings& derivedSettings();
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
+        bool perk(FalloutScript::FormId perk, FalloutScript::PerkInfo& info) override;
+        std::vector<FalloutScript::FormId> perks() override;
+        bool abilityEffects(FalloutScript::FormId ability, std::vector<FalloutScript::AbilityEffect>& effects) override;
+        bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
+        bool book(FalloutScript::FormId item, FalloutScript::BookInfo& result) override;
+        /// Brings the rules of levelling up from the settings of the files, once they can be read
+        void ensureLevellingRules();
+        /// Hands out the points of the levels the player reached, brings the perks up to date and lets the effects of
+        /// the items that last go on
+        void updateProgress(float frametime);
+        /// The experience of a kill: the player killed the character (or did enough of the damage that someone else
+        /// killed it with)
+        void awardKillExperience(FalloutScript::FormId victim, bool byPlayer);
+        /// Experience is rewarded to the player; the perks that change what is gained apply
+        void rewardExperience(int amount);
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
         FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
         FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
@@ -724,6 +856,8 @@ namespace OFScript
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
+        FalloutScript::PerkEngine mPerks;
+        FalloutScript::ItemUse mItemUse;
         FalloutScript::Chargen mChargen;
         /// The screen the attributes were last started for
         std::uint32_t mChargenSeeded = 0;
@@ -747,6 +881,17 @@ namespace OFScript
         /// The speakers and topics that sayTopic has logged (the first time is logged), under mDialogueMutex
         std::set<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mSayLogged;
         FalloutScript::FormId mPlayer;
+        FalloutScript::Game mGame;
+        /// The characters whose perks have been brought up to date (to take back the effects of those they lost)
+        std::set<FalloutScript::FormId> mPerkOwners;
+        /// Whether the rules of levelling up have been read from the settings of the files
+        std::atomic<bool> mLevellingRulesSet{ false };
+        /// The levels that were reached and not shown yet
+        std::mutex mLevelUpMutex;
+        std::deque<FalloutScript::PlayerProgress::LevelUp> mLevelUps;
+        /// How much damage the player did to each character it fought, which the experience of a kill depends on
+        std::mutex mPlayerDamageMutex;
+        std::map<FalloutScript::FormId, double> mPlayerDamage;
         std::thread::id mMainThread;
         /// What other threads asked the world for, and the state of the objects among it that scripts must see at once
         std::mutex mDeferredMutex;
@@ -849,6 +994,12 @@ namespace OFScript
         /// The number a game setting has in the files (the names are not case sensitive), else the fallback
         double gameSetting(std::string_view name, double fallback);
         std::optional<std::map<std::string, double>> mGameSettingValues;
+        /// The settings that are texts, by name (under mDerivedSettingsMutex as well)
+        std::optional<std::map<std::string, std::string>> mGameSettingTexts;
+        /// What the player has open to take things from, under mLootMutex
+        std::mutex mLootMutex;
+        std::optional<Loot> mLoot;
+        int mLootSerial = 0;
         FalloutScript::CombatState mCombat;
         /// Whether the doors and switches are open, and the animations they play for it
         FalloutScript::OpenStates mOpenStates;

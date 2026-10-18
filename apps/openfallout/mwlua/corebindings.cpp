@@ -29,6 +29,7 @@
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
 #include "messagebindings.hpp"
+#include "pipboybindings.hpp"
 #include "regionbindings.hpp"
 #include "soundbindings.hpp"
 #include "stats.hpp"
@@ -128,6 +129,8 @@ namespace OFLua
                 "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
             api["combat"] = context.cachePackage(
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
+            api["pipboy"] = context.cachePackage(
+                "openfallout_core_pipboy", [context]() { return initCorePipboyBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

@@ -86,6 +86,8 @@ namespace FalloutScript
 
         bool known(FormId quest) const { return mQuests.count(quest) != 0; }
         const QuestState* state(FormId quest) const;
+        /// Calls the function for every quest with what the player has done in it, in the order of the form ids
+        void forEachState(const std::function<void(FormId, const QuestState&)>& function) const;
         /// The quest with the editor id (the case does not matter), or 0 when there is none (or the editor id is empty)
         FormId findByEditorId(std::string_view editorId) const;
 

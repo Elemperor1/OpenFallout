@@ -332,8 +332,24 @@ local function lookFoot(name)
     end), pos + util.vector3(%s), pos + util.vector3(%s))
 end
 
+-- Frames the screen of the Pip-Boy or the level up has been on
+local screenFrames = 0
+
 return {
     engineHandlers = {
+        -- A script of the test rewards experience, and the screen of the level up stops the game until the player is done
+        -- with it: the test closes it after some frames (frames go on while the game is stopped)
+        onFrame = function()
+            if I.UI.getMode() ~= 'Interface' then
+                screenFrames = 0
+            else
+                screenFrames = screenFrames + 1
+                if screenFrames > 10 then
+                    I.UI.removeMode('Interface')
+                    screenFrames = 0
+                end
+            end
+        end,
         onUpdate = function(dt)
             elapsed = elapsed + dt
             if startPos == nil then startPos = self.position end
@@ -1483,12 +1499,24 @@ local steps = {
         world.players[1]:sendEvent('OFTestArenaFire', { target = find(@DUMMY@) })
     end },
     { 5.0, ask },
+    { 5.2, function()
+        -- The dead dummy is activated: its things can be taken (the player script says what it was shown)
+        local dummy = find(@DUMMY@)
+        if dummy then dummy:activateBy(world.players[1]) end
+        world.players[1]:sendEvent('OFTestArenaLoot', {})
+    end },
     { 5.5, function()
         report('shot')
+        world.players[1]:sendEvent('OFTestArenaPipboy', {})
         world.players[1]:sendEvent('OFTestArenaFire', {})
         world.players[1]:sendEvent('OFTestArenaFire', { target = find(@BYSTANDER@), once = true })
         local raider = find(@RAIDER@)
         if raider then raider:teleport(raider.cell, util.vector3(@COMES@)) end
+    end },
+    { 5.8, function()
+        -- Experience for two levels: the level up screen opens by itself
+        stage(@LEVEL@)
+        world.players[1]:sendEvent('OFTestArenaLevel', {})
     end },
 }
 for second = 6, 20 do
@@ -1520,6 +1548,7 @@ for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES)
                       ("@RAIDER@", str(plugin.ARENA_RAIDER_REF_ID)), ("@DUMMY@", str(plugin.ARENA_DUMMY_REF_ID)),
                       ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
+                      ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -1531,14 +1560,41 @@ for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), 
 # the engine does, and logs each shot
 ARENA_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
 
 local target, shots, once = nil, 0, false
 local throwing, thrown, planned = nil, 0, 0
+-- Frames since the Pip-Boy was asked for, to say what the screen is after it had a few to open
+local pipboyFrames = nil
+local lootFrames = nil
+-- Frames since the level up was asked for, and since its screen was seen
+local levelFrames = nil
+local levelSeen = 0
 
 return {
     eventHandlers = {
         OFTestArenaThrow = function(data)
             throwing, thrown, planned = data.target, 0, data.count
+        end,
+        OFTestArenaPipboy = function()
+            local pipboy = core.pipboy
+            local stats = pipboy.stats()
+            local equipped, items = 0, pipboy.items()
+            for _, item in ipairs(items) do
+                if item.equipped then equipped = equipped + 1 end
+            end
+            print('OFTEST', 'arena', 'pipboy', string.format(
+                'level=%d experience=%d title=%s health=%.0f/%.0f items=%d equipped=%d attributes=%d skills=%d perks=%d',
+                stats.level, stats.experience, stats.karmaTitle, stats.health, stats.maxHealth, #items, equipped,
+                #pipboy.attributes(), #pipboy.skills(), #pipboy.perks()))
+            I.UI.setMode('Interface', { windows = { 'Inventory' } })
+            pipboyFrames = 0
+        end,
+        OFTestArenaLoot = function()
+            lootFrames = 0
+        end,
+        OFTestArenaLevel = function()
+            levelFrames = 0
         end,
         OFTestArenaFire = function(data)
             target = data.target
@@ -1551,6 +1607,52 @@ return {
         end,
     },
     engineHandlers = {
+        -- Called in the frames while a screen stops the game as well
+        onFrame = function()
+            if pipboyFrames then
+                pipboyFrames = pipboyFrames + 1
+                if pipboyFrames == 5 then
+                    print('OFTEST', 'arena', 'mode', tostring(I.UI.getMode()))
+                    I.UI.removeMode('Interface')
+                    pipboyFrames = nil
+                end
+            end
+            if lootFrames then
+                lootFrames = lootFrames + 1
+                if lootFrames == 5 then
+                    local loot = core.pipboy.loot()
+                    local items, count = loot and core.pipboy.items(loot.holder) or {}, 0
+                    for _, item in ipairs(items) do count = count + item.count end
+                    print('OFTEST', 'arena', 'loot', loot and string.format('mode=%s items=%d count=%d',
+                        tostring(I.UI.getMode()), #items, count) or 'none')
+                    core.pipboy.closeLoot()
+                    lootFrames = nil
+                end
+            end
+            if levelFrames then
+                levelFrames = levelFrames + 1
+                -- The screen of the level up opens by itself when the engine has told of the levels
+                if I.UI.getMode() == 'Interface' or levelFrames > 1500 then
+                    levelSeen = levelSeen + 1
+                end
+                if levelSeen == 5 then
+                    local stats = core.pipboy.stats()
+                    local mode = tostring(I.UI.getMode())
+                    local spent = core.pipboy.spendSkillPoints(32, math.min(stats.skillPoints, 3))
+                    local after = core.pipboy.stats()
+                    -- The screen takes back a point that it gave (Reset, the minus of a skill)
+                    local refunded = core.pipboy.refundSkillPoints(32, 1)
+                    local back = core.pipboy.stats()
+                    print('OFTEST', 'arena', 'levelup', string.format(
+                        'mode=%s level=%d skillPoints=%d perkPoints=%d spent=%d skillPointsAfter=%d refunded=%d '
+                        .. 'skillPointsBack=%d',
+                        mode, stats.level, stats.skillPoints, stats.perkPoints, spent, after.skillPoints, refunded,
+                        back.skillPoints))
+                    I.UI.removeMode('Interface')
+                    levelFrames = nil
+                end
+            end
+        end,
         onUpdate = function()
             if throwing and core.combat.available() then
                 -- What the weapon in the hands is before each throw: a grenade is used up by it, then the hands are left
@@ -2311,6 +2413,49 @@ def check_arena(text):
         _, weapon, melee, rounds, ammo_use, hit = throws[count]
         if weapon != "" or melee != "true":
             problems.append(f"the throw after the last grenade should be made with the hands: {throws}")
+    problems += check_arena_screens(text)
+    return problems
+
+
+def check_arena_screens(text):
+    """The problems with the screens of the arena: the Pip-Boy tells what the character is and carries (the experience of
+    the kill, the rifle held, the seven attributes and thirteen skills) and opens its window; the dead dummy is looted (the
+    rounds it carries are shown in a window that stops the game); the experience of two levels opens the screen of the level
+    up, which has points to spend on a skill."""
+    problems = []
+    pipboy = re.search(r"OFTEST\tarena\tpipboy\tlevel=(\d+) experience=(\d+) title=(.*?) health=([\d.]+)/([\d.]+) items=(\d+) "
+                       r"equipped=(\d+) attributes=(\d+) skills=(\d+) perks=(\d+)$", text, re.M)
+    if not pipboy:
+        problems.append("no 'arena pipboy' line in the log (core.pipboy did not tell what the character is)")
+    else:
+        level, experience, _, health, most, items, equipped, attributes, skills, _ = pipboy.groups()
+        if int(level) != 1 or int(experience) < 1:
+            problems.append(f"the kill of the dummy should have given experience at level 1: {pipboy.group(0)}")
+        if float(health) <= 0 or float(most) < float(health):
+            problems.append(f"the player should have health: {pipboy.group(0)}")
+        if int(items) < 2 or int(equipped) < 1:
+            problems.append(f"the Pip-Boy should list the rifle (held) and its rounds: {pipboy.group(0)}")
+        if int(attributes) != 7 or int(skills) != 13:
+            problems.append(f"the Pip-Boy should list 7 attributes and 13 skills: {pipboy.group(0)}")
+    if not re.search(r"OFTEST\tarena\tmode\tInterface$", text, re.M):
+        problems.append("the Pip-Boy should have opened the window that stops the game (mode Interface)")
+    loot = re.search(r"OFTEST\tarena\tloot\t(.*)$", text, re.M)
+    if not loot or loot.group(1) != f"mode=Interface items=1 count={plugin.ARENA_DUMMY_ITEM_COUNT}":
+        problems.append("the dead dummy should have been looted in a window that stops the game, with the "
+                        f"{plugin.ARENA_DUMMY_ITEM_COUNT} rounds it carries: {loot.group(1) if loot else 'no line'}")
+    level_up = re.search(r"OFTEST\tarena\tlevelup\tmode=(\w+) level=(\d+) skillPoints=(\d+) perkPoints=(\d+) spent=(\d+) "
+                         r"skillPointsAfter=(\d+) refunded=(\d+) skillPointsBack=(\d+)$", text, re.M)
+    if not level_up:
+        problems.append("no 'arena levelup' line in the log")
+    else:
+        mode, level, points, _, spent, after, refunded, back = level_up.groups()
+        if mode != "Interface" or int(level) < 2:
+            problems.append(f"the experience should have raised the level and opened the screen of the level up: "
+                            f"{level_up.group(0)}")
+        if int(points) < 1 or int(spent) < 1 or int(after) != int(points) - int(spent):
+            problems.append(f"the level up should have given skill points that can be spent on a skill: {level_up.group(0)}")
+        if int(refunded) != 1 or int(back) != int(after) + 1:
+            problems.append(f"a point spent on a skill should be taken back by one refund: {level_up.group(0)}")
     return problems
 
 

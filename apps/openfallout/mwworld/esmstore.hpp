@@ -85,6 +85,7 @@ namespace ESM4
     struct Ammunition;
     struct Armor;
     struct ArmorAddon;
+    struct BodyPartData;
     struct Book;
     struct Cell;
     struct Climate;
@@ -105,6 +106,7 @@ namespace ESM4
     struct HeadPart;
     struct Ingredient;
     struct ItemMod;
+    struct Key;
     struct Land;
     struct LandTexture;
     struct LevelledCreature;
@@ -112,9 +114,11 @@ namespace ESM4
     struct LevelledNpc;
     struct Light;
     struct LightingTemplate;
+    struct MagicEffect;
     struct Message;
     struct MiscItem;
     struct MovableStatic;
+    struct Note;
     struct Npc;
     struct Outfit;
     struct Perk;
@@ -122,10 +126,13 @@ namespace ESM4
     struct Projectile;
     struct Quest;
     struct Race;
+    struct Recipe;
+    struct RecipeCategory;
     struct Reference;
     struct Script;
     struct Sound;
     struct SoundReference;
+    struct Spell;
     struct Static;
     struct StaticCollection;
     struct TalkingActivator;
@@ -167,19 +174,21 @@ namespace OFWorld
 
             Store<ESM4::Activator>, Store<ESM4::ActorCharacter>, Store<ESM4::ActorCreature>,
             Store<ESM4::ActorValueInfo>, Store<ESM4::AIPackage>, Store<ESM4::Ammunition>, Store<ESM4::Armor>,
-            Store<ESM4::ArmorAddon>, Store<ESM4::Book>, Store<ESM4::Cell>, Store<ESM4::Climate>, Store<ESM4::Clothing>,
-            Store<ESM4::Container>, Store<ESM4::Creature>, Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>,
-            Store<ESM4::Door>, Store<ESM4::Explosion>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
-            Store<ESM4::FormIdList>, Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>,
-            Store<ESM4::HeadPart>, Store<ESM4::Ingredient>, Store<ESM4::ItemMod>, Store<ESM4::Land>,
+            Store<ESM4::ArmorAddon>, Store<ESM4::BodyPartData>, Store<ESM4::Book>, Store<ESM4::Cell>,
+            Store<ESM4::Climate>, Store<ESM4::Clothing>, Store<ESM4::Container>, Store<ESM4::Creature>,
+            Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>, Store<ESM4::Door>, Store<ESM4::Explosion>,
+            Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>, Store<ESM4::FormIdList>,
+            Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>, Store<ESM4::HeadPart>,
+            Store<ESM4::Ingredient>, Store<ESM4::ItemMod>, Store<ESM4::Key>, Store<ESM4::Land>,
             Store<ESM4::LandTexture>, Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>,
-            Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>, Store<ESM4::Message>,
-            Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>, Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>,
-            Store<ESM4::Potion>, Store<ESM4::Projectile>, Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Reference>,
-            Store<ESM4::Script>, Store<ESM4::Sound>, Store<ESM4::SoundReference>, Store<ESM4::Static>,
-            Store<ESM4::StaticCollection>, Store<ESM4::TalkingActivator>, Store<ESM4::Terminal>,
-            Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::VoiceType>, Store<ESM4::Water>, Store<ESM4::Weapon>,
-            Store<ESM4::Weather>, Store<ESM4::World>>;
+            Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>, Store<ESM4::MagicEffect>,
+            Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>, Store<ESM4::Note>,
+            Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>, Store<ESM4::Potion>, Store<ESM4::Projectile>,
+            Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Recipe>, Store<ESM4::RecipeCategory>,
+            Store<ESM4::Reference>, Store<ESM4::Script>, Store<ESM4::Sound>, Store<ESM4::SoundReference>,
+            Store<ESM4::Spell>, Store<ESM4::Static>, Store<ESM4::StaticCollection>, Store<ESM4::TalkingActivator>,
+            Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::VoiceType>,
+            Store<ESM4::Water>, Store<ESM4::Weapon>, Store<ESM4::Weather>, Store<ESM4::World>>;
 
     private:
         template <typename T>
