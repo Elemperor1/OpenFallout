@@ -367,6 +367,30 @@ namespace
         EXPECT_EQ(potion.mEffects[1].mBaseEffect.toUint32(), 0x00010091u);
     }
 
+    TEST(ESM4CombatDataTest, readsTheConditionsOfTheEffectsOfAPotion)
+    {
+        std::string effect;
+        append<std::uint32_t>(effect, 30); // magnitude
+        append<std::uint32_t>(effect, 0); // area
+        append<std::uint32_t>(effect, 10); // duration
+        append<std::uint32_t>(effect, 0); // range
+        append<std::int32_t>(effect, 16); // actor value
+        // The conditions follow the effect they are for; the second effect has none
+        const std::vector<ESM4::Potion> potions = loadRecords<ESM4::Potion>("ALCH",
+            record("ALCH", 1,
+                zString("EDID", "Stimpak") + valueSubRecord<std::uint32_t>("EFID", 0x00010090)
+                    + subRecord("EFIT", effect) + subRecord("CTDA", conditionData(0x40, 2.5f, 14, 0x00010005))
+                    + subRecord("CTDA", conditionData(0x60, 2.5f, 15, 0x00010006))
+                    + valueSubRecord<std::uint32_t>("EFID", 0x00010091) + subRecord("EFIT", effect)));
+        const ESM4::Potion& potion = potions.at(0);
+
+        ASSERT_EQ(potion.mEffects.size(), 2u);
+        ASSERT_EQ(potion.mEffects[0].mConditions.size(), 2u);
+        EXPECT_EQ(potion.mEffects[0].mConditions[0].functionIndex, 14u);
+        EXPECT_EQ(potion.mEffects[0].mConditions[1].reference, 0x00010006u);
+        EXPECT_TRUE(potion.mEffects[1].mConditions.empty());
+    }
+
     TEST(ESM4CombatDataTest, decodesTheDataOfAProjectile)
     {
         // The explosion, two lights, three sounds and the default weapon source are form IDs

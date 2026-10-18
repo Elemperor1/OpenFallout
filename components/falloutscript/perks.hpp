@@ -98,6 +98,8 @@ namespace FalloutScript
     {
         int mActorValue = 0;
         double mMagnitude = 0;
+        /// The effect holds while these conditions do for the character (none: always)
+        std::vector<ESM4::TargetCondition> mConditions;
     };
 
     /// Where the game finds the perks
@@ -199,6 +201,8 @@ namespace FalloutScript
         {
             int mRank = 0;
             std::vector<AbilityEffect> mEffects;
+            /// For each effect, whether it is added to the actor value now (its conditions hold)
+            std::vector<bool> mOn;
         };
         std::map<std::pair<FormId, FormId>, Applied> mApplied;
     };

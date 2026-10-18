@@ -380,7 +380,7 @@ namespace
         ability.mAbility = abilityOfStrongBack;
         info.mEntries = { ability };
         f.mRecords.mPerks[strongBack] = info;
-        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
+        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50, {} } };
 
         const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
         f.mProgress.addPerk(thePlayer, strongBack);
@@ -407,7 +407,7 @@ namespace
             ability.mAbility = abilityOfStrongBack;
             info.mEntries = { ability };
             f.mRecords.mPerks[strongBack] = info;
-            f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
+            f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50, {} } };
             f.mProgress.addPerk(thePlayer, strongBack);
             const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
 
@@ -444,7 +444,7 @@ namespace
         ability.mAbility = abilityOfStrongBack;
         strong.mEntries = { ability };
         f.mRecords.mPerks[strongBack] = strong;
-        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
+        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50, {} } };
 
         // The stage runs a script that gives another perk and refreshes (the stage is set with nothing held)
         f.mEngine.setQuestSetter([&](FormId, int) {
@@ -455,6 +455,68 @@ namespace
         f.mProgress.addPerk(thePlayer, quester);
         f.mEngine.refresh(thePlayer);
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before + 50);
+    }
+
+    TEST(FalloutScriptPerksTest, anAbilityEffectWithConditionsHoldsOnlyWhileTheyDo)
+    {
+        Fixture f;
+        PerkInfo info = perk(strongBack, "Strong Back", 8);
+        PerkEntry ability;
+        ability.mType = PerkEntry::Ability;
+        ability.mAbility = abilityOfStrongBack;
+        info.mEntries = { ability };
+        f.mRecords.mPerks[strongBack] = info;
+        FalloutScript::AbilityEffect effect;
+        effect.mActorValue = ActorValue::carryWeight;
+        effect.mMagnitude = 50;
+        effect.mConditions.resize(1);
+        f.mRecords.mAbilities[abilityOfStrongBack] = { effect };
+        bool holds = false;
+        f.mEngine.setConditions([&](const auto& conditions, const ConditionContext& context) {
+            EXPECT_EQ(context.mSubject, thePlayer);
+            EXPECT_EQ(conditions.size(), 1u);
+            return holds;
+        });
+
+        const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
+        f.mProgress.addPerk(thePlayer, strongBack);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
+        holds = true;
+        f.mEngine.refresh(thePlayer);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before + 50);
+        holds = false;
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
+
+        // what holds when the perk goes is taken back with it
+        holds = true;
+        f.mEngine.refresh(thePlayer);
+        f.mProgress.removePerk(thePlayer, strongBack);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
+    }
+
+    TEST(FalloutScriptPerksTest, anAbilityEffectWithConditionsHasNoEffectWithoutAWayToTellThem)
+    {
+        Fixture f;
+        PerkInfo info = perk(strongBack, "Strong Back", 8);
+        PerkEntry ability;
+        ability.mType = PerkEntry::Ability;
+        ability.mAbility = abilityOfStrongBack;
+        info.mEntries = { ability };
+        f.mRecords.mPerks[strongBack] = info;
+        FalloutScript::AbilityEffect effect;
+        effect.mActorValue = ActorValue::carryWeight;
+        effect.mMagnitude = 50;
+        effect.mConditions.resize(1);
+        f.mRecords.mAbilities[abilityOfStrongBack] = { effect };
+
+        const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
+        f.mProgress.addPerk(thePlayer, strongBack);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
     }
 
     TEST(FalloutScriptPerksTest, aHigherRankReplacesTheAbilityOfTheRankBefore)
@@ -470,8 +532,8 @@ namespace
         second.mRank = 1;
         info.mEntries = { first, second };
         f.mRecords.mPerks[strongBack] = info;
-        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
-        f.mRecords.mAbilities[abilityOfStrongBack + 1] = { { ActorValue::carryWeight, 120 } };
+        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50, {} } };
+        f.mRecords.mAbilities[abilityOfStrongBack + 1] = { { ActorValue::carryWeight, 120, {} } };
 
         const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
         f.mProgress.addPerk(thePlayer, strongBack);

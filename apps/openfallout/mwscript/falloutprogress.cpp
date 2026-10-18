@@ -143,8 +143,11 @@ namespace OFScript
                 continue;
             // The magnitude has no sign: a detrimental effect takes away what a beneficial one gives (as in an item)
             const double magnitude = static_cast<double>(entry.mData.mMagnitude);
-            effects.push_back(
-                { value, (effect->mData.mEffectFlags & effectDetrimental) != 0 ? -magnitude : magnitude });
+            FalloutScript::AbilityEffect made;
+            made.mActorValue = value;
+            made.mMagnitude = (effect->mData.mEffectFlags & effectDetrimental) != 0 ? -magnitude : magnitude;
+            made.mConditions = entry.mConditions;
+            effects.push_back(std::move(made));
         }
         return true;
     }

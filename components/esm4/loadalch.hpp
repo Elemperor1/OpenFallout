@@ -80,7 +80,7 @@ namespace ESM4
 
         Data mData;
         EnchantedItem mItem;
-        std::vector<EffectEntry> mEffects; // EFID and EFIT (the conditions of the effects, CTDA, are not read)
+        std::vector<EffectEntry> mEffects; // EFID, EFIT and the conditions of each effect (CTDA)
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

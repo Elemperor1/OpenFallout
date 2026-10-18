@@ -244,8 +244,9 @@ namespace FalloutScript
                 applied = std::move(mApplied[key]);
                 mApplied.erase(key);
             }
-            for (const AbilityEffect& effect : applied.mEffects)
-                mValues.modify(owner, effect.mActorValue, -effect.mMagnitude);
+            for (std::size_t i = 0; i < applied.mEffects.size(); ++i)
+                if (applied.mOn[i])
+                    mValues.modify(owner, applied.mEffects[i].mActorValue, -applied.mEffects[i].mMagnitude);
         }
 
         // The quest stages that a perk sets are set when the refresh is done, with nothing held: setting a stage may
@@ -279,13 +280,55 @@ namespace FalloutScript
                 else if (entry.mType == PerkEntry::QuestStage && entry.mQuest != 0)
                     stages.emplace_back(entry.mQuest, entry.mStage);
             }
-            for (const AbilityEffect& effect : applied.mEffects)
-                mValues.modify(owner, effect.mActorValue, effect.mMagnitude);
+            // Nothing is added yet: the effects are added below, when their conditions hold
+            applied.mOn.assign(applied.mEffects.size(), false);
             {
                 const std::lock_guard lock(mMutex);
                 mApplied[{ owner, perk }] = std::move(applied);
             }
             pendingStages.insert(pendingStages.end(), stages.begin(), stages.end());
+        }
+
+        // An effect with conditions is added while they hold and taken back when they stop holding
+        ConditionCheck check;
+        std::vector<FormId> held;
+        {
+            const std::lock_guard lock(mMutex);
+            check = mConditions;
+            for (const auto& [key, applied] : mApplied)
+                if (key.first == owner)
+                    held.push_back(key.second);
+        }
+        for (const FormId perk : held)
+        {
+            Applied applied;
+            {
+                const std::lock_guard lock(mMutex);
+                applied = mApplied[{ owner, perk }];
+            }
+            bool changed = false;
+            for (std::size_t i = 0; i < applied.mEffects.size(); ++i)
+            {
+                const AbilityEffect& effect = applied.mEffects[i];
+                // With no way to tell a condition, it does not hold
+                bool holds = effect.mConditions.empty();
+                if (!holds && check)
+                {
+                    ConditionContext context;
+                    context.mSubject = owner;
+                    holds = check(effect.mConditions, context);
+                }
+                if (holds == applied.mOn[i])
+                    continue;
+                mValues.modify(owner, effect.mActorValue, holds ? effect.mMagnitude : -effect.mMagnitude);
+                applied.mOn[i] = holds;
+                changed = true;
+            }
+            if (changed)
+            {
+                const std::lock_guard lock(mMutex);
+                mApplied[{ owner, perk }].mOn = applied.mOn;
+            }
         }
 
         std::function<void(FormId, int)> setter;

@@ -131,7 +131,10 @@ namespace FalloutScript
         {
             // A boost that holds while the effect lasts (a drop, for a detrimental one)
             active.mTemporary = true;
-            active.mMagnitude = effect.mDetrimental ? -effect.mMagnitude : effect.mMagnitude;
+            // A level (radiation, thirst, hunger, sleep) goes up when it is hurt: the drop of a detrimental effect is
+            // a rise of the level
+            active.mMagnitude
+                = effect.mDetrimental == isLevelValue(effect.mActorValue) ? effect.mMagnitude : -effect.mMagnitude;
             if (effect.mActorValue == ActorValue::health && active.mMagnitude < 0)
             {
                 // A drop of the health can take all of it: no blow comes between the drop and the death or fall
@@ -296,6 +299,14 @@ namespace FalloutScript
             bool mDetrimental;
         };
         std::vector<Step> steps;
+        // A change that held while an effect lasted, which is taken back now
+        struct Expiry
+        {
+            FormId mActor;
+            int mActorValue;
+            double mMagnitude;
+        };
+        std::vector<Expiry> expired;
         PerkEngine* perks = nullptr;
         FormId player = 0;
         {
@@ -310,13 +321,25 @@ namespace FalloutScript
                         active.mMagnitude < 0 });
                 active.mRemaining -= seconds;
                 if (active.mRemaining <= 0 && active.mTemporary)
-                    mValues.modify(active.mActor, active.mActorValue, -active.mMagnitude);
+                    expired.push_back({ active.mActor, active.mActorValue, active.mMagnitude });
             }
             mActive.erase(
                 std::remove_if(mActive.begin(), mActive.end(), [](const Active& a) { return a.mRemaining <= 0; }),
                 mActive.end());
         }
         // A death that comes of it is handled with the lock free: the host reacts to it
+        for (const Expiry& expiry : expired)
+        {
+            if (expiry.mActorValue == ActorValue::health && expiry.mMagnitude > 0)
+            {
+                // A character that lived on the health a boost gave dies, or falls, when the boost ends
+                const auto transitions = mState.holdTransitions();
+                mValues.modify(expiry.mActor, expiry.mActorValue, -expiry.mMagnitude);
+                dieIfSpent(expiry.mActor);
+            }
+            else
+                mValues.modify(expiry.mActor, expiry.mActorValue, -expiry.mMagnitude);
+        }
         for (const Step& step : steps)
             instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental);
 

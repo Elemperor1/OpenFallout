@@ -313,6 +313,42 @@ namespace
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), dead);
     }
 
+    TEST(FalloutScriptItemUseTest, aCharacterThatLivedOnATemporaryHealthBoostDiesWhenItEnds)
+    {
+        Fixture f;
+        const double full = f.mValues.current(victim, ActorValue::health);
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 50, 10, false, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_EQ(f.mValues.current(victim, ActorValue::health), full + 50);
+        // the health left is only what the boost gave
+        f.mValues.damage(victim, ActorValue::health, full + 25);
+        EXPECT_FALSE(f.mState.isDead(victim));
+        f.mUse.update(5);
+        EXPECT_FALSE(f.mState.isDead(victim));
+        f.mUse.update(6);
+        EXPECT_TRUE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, aTemporaryChangeOfALevelFollowsTheRuleOfLevels)
+    {
+        Fixture f;
+        f.mValues.setBase(thePlayer, radiationLevel, 50);
+        // a beneficial effect lowers the level while it lasts, a detrimental one raises it
+        f.mRecords.mConsumables[nukaCola].mEffects = { effect(radiationLevel, 20, 10, false, true) };
+        f.mUse.use(thePlayer, nukaCola);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 30);
+        f.mUse.update(11);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 50);
+
+        f.mState.addItem(thePlayer, nukaCola, 1);
+        f.mRecords.mConsumables[nukaCola].mEffects = { effect(radiationLevel, 20, 10, true, true) };
+        f.mUse.use(thePlayer, nukaCola);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 70);
+        f.mUse.update(11);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 50);
+    }
+
     TEST(FalloutScriptItemUseTest, healingStopsAtFullHealth)
     {
         Fixture f;
