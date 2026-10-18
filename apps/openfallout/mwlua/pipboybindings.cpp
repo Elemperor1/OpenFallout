@@ -24,7 +24,10 @@ namespace OFLua
 
         OFScript::FalloutScripts& scripts()
         {
-            return *OFBase::Environment::get().getFalloutScripts();
+            OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts();
+            if (host == nullptr)
+                throw std::runtime_error("core.pipboy is only available with the content of Fallout 3 and New Vegas");
+            return *host;
         }
 
         std::string idText(FormId id)

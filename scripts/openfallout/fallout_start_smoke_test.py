@@ -2476,8 +2476,9 @@ def check_arena_screens(text):
         problems.append("no 'arena levelup' line in the log")
     else:
         mode, level, points, _, spent, after, refunded, back = level_up.groups()
-        if mode != "Interface" or int(level) < 2:
-            problems.append(f"the experience should have raised the level and opened the screen of the level up: "
+        # The 600 experience of the arena (and the kill) reach the levels 2 and 3
+        if mode != "Interface" or int(level) != 3:
+            problems.append(f"the experience should have raised the level to 3 and opened the screen of the level up: "
                             f"{level_up.group(0)}")
         if int(points) < 1 or int(spent) < 1 or int(after) != int(points) - int(spent):
             problems.append(f"the level up should have given skill points that can be spent on a skill: {level_up.group(0)}")

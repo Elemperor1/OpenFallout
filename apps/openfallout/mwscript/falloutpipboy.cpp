@@ -72,7 +72,8 @@ namespace OFScript
             return rows;
         for (const auto& [id, count] : items)
         {
-            if (count <= 0 || id == masterForm(capsNumber))
+            // The caps of the player are on the status line; those of a container or a corpse are there to take
+            if (count <= 0 || (holder == mPlayer && id == masterForm(capsNumber)))
                 continue;
             const ESM::RefId record = refId(id);
             PipboyItem row;
