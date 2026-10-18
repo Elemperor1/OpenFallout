@@ -623,17 +623,21 @@ namespace
         EXPECT_EQ(f.mProgress.miscStat(15), 1);
     }
 
-    TEST(FalloutScriptItemUseTest, aSkillBookGivesWhatTheRulesSayAndStopsAtTheCap)
+    TEST(FalloutScriptItemUseTest, aSkillBookGivesWhatTheRulesSayAndIsNotTurnedAwayAtAHundred)
     {
         Fixture f;
-        f.mUse.setBookRules(100, 3);
+        f.mUse.setBookRules(3);
         f.mValues.setBase(thePlayer, smallGuns, 98);
-        const ItemUse::Result nearCap = f.mUse.use(thePlayer, guns);
-        EXPECT_EQ(nearCap.mGained, 2);
-        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 100);
-        const ItemUse::Result atCap = f.mUse.use(thePlayer, guns);
-        EXPECT_EQ(atCap.mOutcome, ItemUse::Outcome::NothingToLearn);
-        EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 1);
+        const ItemUse::Result first = f.mUse.use(thePlayer, guns);
+        EXPECT_EQ(first.mGained, 3);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 101);
+        // The skill is read as 100 at most, so the book that is read now still adds to what is stored
+        EXPECT_EQ(f.mValues.current(thePlayer, smallGuns), 100);
+        const ItemUse::Result second = f.mUse.use(thePlayer, guns);
+        EXPECT_EQ(second.mOutcome, ItemUse::Outcome::Read);
+        EXPECT_EQ(second.mGained, 3);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 104);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 0);
     }
 
     TEST(FalloutScriptItemUseTest, booksReadAtTheSameTimeAllRaiseTheSkill)

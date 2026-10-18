@@ -60,10 +60,9 @@ namespace FalloutScript
         mRandom = std::move(random);
     }
 
-    void ItemUse::setBookRules(double skillCap, double points)
+    void ItemUse::setBookRules(double points)
     {
         const std::lock_guard lock(mMutex);
-        mSkillCap = skillCap;
         mBookPoints = points;
     }
 
@@ -197,7 +196,6 @@ namespace FalloutScript
 
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
         PerkEngine* perks = nullptr;
-        double skillCap = 100;
         double bookPoints = 1;
         bool durationNeedsAddiction = false;
         FormId player = 0;
@@ -205,7 +203,6 @@ namespace FalloutScript
             const std::lock_guard lock(mMutex);
             check = mConditions;
             perks = mPerks;
-            skillCap = mSkillCap;
             bookPoints = mBookPoints;
             durationNeedsAddiction = mChemDurationNeedsAddiction;
             player = mPlayer;
@@ -299,18 +296,13 @@ namespace FalloutScript
             // Two books read at the same time add up: the skill is read, raised and written by one at a time
             const std::lock_guard reading(mBookMutex);
             const double skill = mValues.base(actor, book.mSkill);
-            if (skill >= skillCap)
-            {
-                result.mOutcome = Outcome::NothingToLearn;
-                return result;
-            }
             // The same as for an aid item: the call that takes the book is the one that reads it
             if (mState.removeItem(actor, item, 1) < 1)
                 return result;
             double points = bookPoints;
             if (perks != nullptr)
                 points = perks->apply(EntryPoint::bookSkillPoints, actor, points);
-            const double gained = std::min(points, skillCap - skill);
+            const double gained = std::max(points, 0.0);
             mValues.setBase(actor, book.mSkill, skill + gained);
             result.mOutcome = Outcome::Read;
             result.mGained = gained;

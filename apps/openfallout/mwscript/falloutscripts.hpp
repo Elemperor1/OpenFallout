@@ -811,9 +811,8 @@ namespace OFScript
         /// Hands out the points of the levels the player reached, brings the perks up to date and lets the effects of
         /// the items that last go on
         void updateProgress(float frametime);
-        /// The experience of a kill: the player killed the character (or did enough of the damage that someone else
-        /// killed it with)
-        void awardKillExperience(FalloutScript::FormId victim, bool byPlayer);
+        /// The experience of a kill: the player did enough of the damage that killed the character
+        void awardKillExperience(FalloutScript::FormId victim);
         /// Experience is rewarded to the player; the perks that change what is gained apply
         void rewardExperience(int amount);
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;

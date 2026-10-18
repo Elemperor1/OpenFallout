@@ -83,8 +83,6 @@ namespace FalloutScript
             Consumed,
             /// A book was read: a skill book is used up, another book stays
             Read,
-            /// A skill book that teaches nothing, the skill being at its highest
-            NothingToLearn,
         };
 
         struct Result
@@ -114,8 +112,10 @@ namespace FalloutScript
         void setRandom(std::function<double()> random);
         /// The player, whose counters of the Pip-Boy count what is used
         void setPlayer(FormId player);
-        /// The skill a book can raise to and the points a book gives when no perk changes them
-        void setBookRules(double skillCap, double points);
+        /// The points a book gives when no perk changes them. A skill book is never refused: the executables turn it
+        /// away only at 200 of a skill that is read as 100 at most, so one read at 100 adds points that show only
+        /// when a penalty takes the shown value down
+        void setBookRules(double points);
         /// Whether the perks that make the effects of a chem last longer (entry point 25) work only on an item that
         /// can make one addicted, as in Fallout 3; New Vegas lets them work on every effect that is not hostile
         void setChemDurationNeedsAddiction(bool needsAddiction);
@@ -159,7 +159,6 @@ namespace FalloutScript
         PerkEngine* mPerks = nullptr;
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> mConditions;
         std::function<double()> mRandom;
-        double mSkillCap = 100;
         double mBookPoints = 1;
         bool mChemDurationNeedsAddiction = false;
         FormId mPlayer = 0;

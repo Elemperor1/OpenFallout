@@ -1302,6 +1302,9 @@ namespace OFScript
             return templateRecordOf(store, record, Record::Template_UseStats, seed);
         }
 
+        /// The weapon "Fists" of the files of both games, which the executables take for a blow that has no weapon
+        constexpr FalloutScript::FormId fistsForm = 0x1F4;
+
         /// The attributes of DATA, which are the actor values from strength to luck
         void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
         {
@@ -1459,7 +1462,8 @@ namespace OFScript
         {
             info.mKind = FalloutScript::ItemKind::Armor;
             info.mSlots = armor->mArmorFlags;
-            info.mRating = armor->mHasRating ? armor->mRating : 0.0;
+            // The rating of a piece is a whole number: the executables cut the fraction off (a rating of 45.5 is 45)
+            info.mRating = armor->mHasRating ? std::trunc(armor->mRating) : 0.0;
             info.mThreshold = armor->mDamageThreshold;
             info.mWeight = armor->mData.weight;
             return true;
@@ -1690,7 +1694,8 @@ namespace OFScript
         int skill = AV::lastSkill;
         if (record == nullptr)
         {
-            // Bare hands: the records have no weapon for a fist here, so it does a point and the strength bonus
+            // Bare hands are the weapon "Fists" of the files (form 0x1F4), which the executables take for a blow that
+            // has no weapon. A file without it: a point and the strength bonus.
             damage.mDamage = 1;
             damage.mMelee = true;
             // A creature fights with the attack of its record, and its combat skill is its skill
@@ -1708,8 +1713,9 @@ namespace OFScript
                         return damage;
                     }
                 }
+            record = mStore.get<ESM4::Weapon>().search(refId(fistsForm));
         }
-        else
+        if (record != nullptr)
         {
             damage.mDamage = record->mData.damage;
             if (record->mHasCritical)
@@ -1760,8 +1766,11 @@ namespace OFScript
         // is changed when the blow is built in Fallout 3, after the armor in New Vegas.
         namespace Entry = FalloutScript::EntryPoint;
         const bool damageAfterArmor = mGame == FalloutScript::Game::NewVegas;
-        const FalloutScript::PerkEngine::Context towardsVictim{ victim, weapon };
-        const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, weapon };
+        // The perks see the weapon "Fists" in the place of none, as the executables take it for a blow without a weapon
+        const FalloutScript::FormId perkWeapon
+            = weapon != 0 || mStore.get<ESM4::Weapon>().search(refId(fistsForm)) == nullptr ? weapon : fistsForm;
+        const FalloutScript::PerkEngine::Context towardsVictim{ victim, perkWeapon };
+        const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, perkWeapon };
         double thresholdTaken = 0;
         if (attacker != 0)
         {
@@ -1781,6 +1790,10 @@ namespace OFScript
             // armor works on (the executable adds it to the damage before the armor), so it is part of that too
             hit.mDamage = std::max(mPerks.apply(Entry::weaponDamage, attacker, hit.mDamage, towardsVictim), 0.0);
         }
+        // A player who is in V.A.T.S. takes only a share of a blow (fVATSPlayerDamageMult: 0.75 in New Vegas, 0.1 in
+        // Fallout 3), after the armor and before the part of the body
+        if (victim == mPlayer && mVatsOpen)
+            hit.mDamage *= std::max(gameSetting("fVATSPlayerDamageMult", 1.0), 0.0);
         // The damage to the health: a blow at a part of the body does more or less than one at the body (a head shot
         // more), after the armor, and only a shot or a throw does (hands and melee weapons, and a blow with no weapon,
         // count the part as 1); a part that does not say anything (0) leaves the damage as it is
@@ -2308,7 +2321,7 @@ namespace OFScript
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
-            awardKillExperience(death.mActor, death.mKiller == mPlayer);
+            awardKillExperience(death.mActor);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -2452,6 +2465,8 @@ namespace OFScript
                     return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
                 });
             mCombat.setFriendHitRules(mDamageSettings->mFriendHitSeconds, mDamageSettings->mFriendHitSpacingSeconds);
+            // The armor of Fallout 3 has no floor that keeps a share of the blow
+            mDamageSettings->mMinimumDamage = mGame == FalloutScript::Game::NewVegas;
         }
         return *mDamageSettings;
     }

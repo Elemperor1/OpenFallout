@@ -20,6 +20,16 @@ namespace FalloutScript
             return std::isnan(amount) ? 0.0 : std::clamp(amount, -farthest, farthest);
         }
 
+        /// What the games show and use of an actor value. A skill is read from 0 to 100 whatever is stored (books,
+        /// bobbleheads and ModActorValue add past 100 and a penalty takes the shown value down again); the two slots
+        /// that no menu shows (Big Guns in New Vegas, throwing in Fallout 3) are read the same here.
+        double shown(int value, double amount)
+        {
+            if (value >= ActorValue::firstSkill && value <= ActorValue::lastSkill)
+                return std::clamp(amount, 0.0, 100.0);
+            return amount;
+        }
+
         int whole(double amount)
         {
             return static_cast<int>(std::clamp(std::trunc(bounded(amount)), -2147483648.0, 2147483647.0));
@@ -118,7 +128,7 @@ namespace FalloutScript
     double ActorValues::permanent(FormId actor, int value) const
     {
         const std::lock_guard lock(mMutex);
-        return permanentOf(actor, value);
+        return shown(value, permanentOf(actor, value));
     }
 
     double ActorValues::current(FormId actor, int value) const
@@ -126,9 +136,9 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         const auto found = mEntries.find({ actor, value });
         if (found == mEntries.end())
-            return startOf(actor, value);
+            return shown(value, startOf(actor, value));
         const Entry& entry = found->second;
-        return baseOf(actor, entry, value) + entry.mModifier - entry.mDamage;
+        return shown(value, baseOf(actor, entry, value) + entry.mModifier - entry.mDamage);
     }
 
     void ActorValues::setBase(FormId actor, int value, double amount)
