@@ -20,6 +20,7 @@
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
@@ -69,6 +70,7 @@
 #include "../mwclass/esm4sources.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
+#include "../mwrender/animation.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -195,6 +197,7 @@ namespace OFScript
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
         FalloutScript::addCombatCommands(mInterpreter, mCombat, mActors, *this);
+        FalloutScript::addAnimationCommands(mInterpreter, mOpenStates, *this, game);
         // The container of an item is the holder its script was last run for
         mInterpreter.setHandler("GetContainer", [this](FalloutScript::CallContext& call) {
             const auto found = mItemHolders.find(call.mReference);
@@ -372,6 +375,8 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
+        mOpenStates.clear();
+        mDoorsWithoutCollision.clear();
         mItemHolders.clear();
         mActorValues.clear();
         mReferenceState.clear();
@@ -444,6 +449,7 @@ namespace OFScript
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
         updateFurniture();
+        updateDoors();
         // What the items did since the last frame is told before any block of this frame runs, so that an AddItem or
         // EquipItem of a trigger block is told in the next frame
         raiseItemEvents();
@@ -2112,6 +2118,8 @@ namespace OFScript
         for (const FalloutScript::ActorState::Death& death : deaths)
         {
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
+            // One that fought nobody and had no package has no mind yet, and its body falls by it
+            evaluatePackage(death.mActor);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -3128,6 +3136,130 @@ namespace OFScript
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
                          << (place ? " (put there)" : "");
         return true;
+    }
+
+    OFRender::ObjectAnimation* FalloutScripts::objectAnimationOf(FalloutScript::FormId reference)
+    {
+        // The scene is the business of the thread of the frame
+        if (reference == 0 || std::this_thread::get_id() != mMainThread)
+            return nullptr;
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (ptr.isEmpty() || !ptr.isInCell() || ptr.getRefData().getBaseNode() == nullptr)
+            return nullptr;
+        return dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(ptr));
+    }
+
+    bool FalloutScripts::hasGroup(FalloutScript::FormId reference, std::string_view group)
+    {
+        const OFRender::ObjectAnimation* animation = objectAnimationOf(reference);
+        return animation != nullptr && !animation->findGroup(group).empty();
+    }
+
+    bool FalloutScripts::playGroup(FalloutScript::FormId reference, std::string_view group, bool restart)
+    {
+        if (std::this_thread::get_id() != mMainThread)
+        {
+            runOnMainThread(
+                [this, reference, name = std::string(group), restart] { playGroup(reference, name, restart); });
+            return true;
+        }
+        OFRender::ObjectAnimation* animation = objectAnimationOf(reference);
+        if (animation == nullptr || !animation->playScripted(group, false, restart))
+            return false;
+        // A door shows what it is told to, so its state follows the group, whoever plays it (the state being set, an
+        // activation or a script). A door that opens lets what is at it through: it has no collision until it is
+        // closed again.
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (ptr.getType() == ESM4::Door::sRecordId)
+        {
+            const bool opens = Misc::StringUtils::ciEqual(group, "Open");
+            if (opens || Misc::StringUtils::ciEqual(group, "Close"))
+            {
+                mOpenStates.rest(reference, opens);
+                if (opens)
+                {
+                    OFBase::Environment::get().getWorld()->setObjectCollision(ptr, false);
+                    mDoorsWithoutCollision.insert(reference);
+                }
+            }
+        }
+        return true;
+    }
+
+    bool FalloutScripts::isGroupPlaying(FalloutScript::FormId reference, std::string_view group)
+    {
+        const OFRender::ObjectAnimation* animation = objectAnimationOf(reference);
+        return animation != nullptr && animation->isScriptedPlaying(group);
+    }
+
+    void FalloutScripts::settleDoor(const OFWorld::Ptr& door, FalloutScript::FormId reference)
+    {
+        if (door.getType() != ESM4::Door::sRecordId || mOpenStates.knows(reference))
+            return;
+        const ESM4::Reference* record = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+        if (record != nullptr && record->mOpenByDefault)
+            mOpenStates.rest(reference, true);
+    }
+
+    void FalloutScripts::objectInserted(const OFWorld::Ptr& object)
+    {
+        const FalloutScript::FormId reference = referenceOf(object);
+        if (reference == 0)
+            return;
+        settleDoor(object, reference);
+        if (!mOpenStates.restsOpen(reference))
+            return;
+        // A door that rests open is loaded without its collision, which it gets back when it is closed
+        if (object.getType() == ESM4::Door::sRecordId && !hasCollision(object))
+            mDoorsWithoutCollision.insert(reference);
+        if (auto* animation
+            = dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(object)))
+            animation->playScripted("Open", true);
+    }
+
+    bool FalloutScripts::hasCollision(const OFWorld::Ptr& object)
+    {
+        if (object.getType() != ESM4::Door::sRecordId)
+            return true;
+        const FalloutScript::FormId reference = referenceOf(object);
+        if (reference == 0)
+            return true;
+        settleDoor(object, reference);
+        if (!mOpenStates.restsOpen(reference))
+            return true;
+        // A door that cannot show itself open keeps its collision
+        const auto* animation
+            = dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(object));
+        return animation == nullptr || animation->findGroup("Open").empty();
+    }
+
+    void FalloutScripts::activateDoor(const OFWorld::Ptr& door)
+    {
+        const FalloutScript::FormId reference = referenceOf(door);
+        if (reference != 0)
+            mOpenStates.toggle(reference, *this);
+    }
+
+    void FalloutScripts::updateDoors()
+    {
+        for (auto door = mDoorsWithoutCollision.begin(); door != mDoorsWithoutCollision.end();)
+        {
+            const OFWorld::Ptr ptr = findReference(*door);
+            // A door that is not in the scene any more has its collision given by whether it is open when it comes back
+            if (ptr.isEmpty() || !ptr.isInCell() || ptr.getRefData().getBaseNode() == nullptr)
+            {
+                door = mDoorsWithoutCollision.erase(door);
+                continue;
+            }
+            const OFRender::ObjectAnimation* animation = objectAnimationOf(*door);
+            if (mOpenStates.restsOpen(*door) || (animation != nullptr && animation->isScriptedPlaying("Close")))
+            {
+                ++door;
+                continue;
+            }
+            OFBase::Environment::get().getWorld()->setObjectCollision(ptr, true);
+            door = mDoorsWithoutCollision.erase(door);
+        }
     }
 
     void FalloutScripts::activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture)

@@ -308,6 +308,8 @@ namespace OFWorld
 
         void disable(const Ptr& ptr) override;
 
+        void setObjectCollision(const Ptr& ptr, bool enabled) override;
+
         void advanceTime(double hours, bool incremental = false) override;
         ///< Advance in-game time.
 

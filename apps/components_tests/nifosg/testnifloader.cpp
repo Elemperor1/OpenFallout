@@ -1,11 +1,14 @@
 #include "../nif/node.hpp"
+#include "../nif/sequence.hpp"
 
 #include <components/nif/node.hpp>
 #include <components/nif/property.hpp>
 #include <components/nifosg/nifloader.hpp>
 #include <components/resource/bgsmfilemanager.hpp>
 #include <components/resource/imagemanager.hpp>
+#include <components/sceneutil/keyframe.hpp>
 #include <components/sceneutil/serialize.hpp>
+#include <components/sceneutil/userdata.hpp>
 #include <components/vfs/manager.hpp>
 
 #include <gmock/gmock.h>
@@ -290,4 +293,128 @@ osg::Group {
 
     INSTANTIATE_TEST_SUITE_P(
         Params, NifOsgLoaderBSLightingShaderPrefixTest, ValuesIn(NifOsgLoaderBSLightingShaderPrefixTest::sParams));
+    // A door or a switch holds its animations in the file and a script plays them by name (Open, Close).
+    struct NifOsgLoaderEmbeddedSequencesTest : Test, BaseNifOsgLoaderTest
+    {
+        Nif::NiNode mRoot;
+        Nif::NiNode mGear;
+        Nif::NiControllerManager mManager;
+        Nif::NiKeyframeController mGearController;
+        Nif::NIFFile mFile{ testNif };
+
+        NifOsgLoaderEmbeddedSequencesTest()
+        {
+            init(mRoot);
+            mRoot.mRecordType = Nif::RC_NiNode;
+            mRoot.mName = "Door";
+            init(mGear);
+            mGear.mRecordType = Nif::RC_NiNode;
+            mGear.mName = "Gear";
+            mRoot.mChildren = Nif::NiAVObjectList{ Nif::NiAVObjectPtr(&mGear) };
+            mGear.mParents.push_back(&mRoot);
+
+            init(mManager);
+            mManager.mRecordType = Nif::RC_NiControllerManager;
+            mManager.mCumulative = false;
+            mManager.mObjectPalette = Nif::NiDefaultAVObjectPalettePtr(nullptr);
+            mRoot.mController = Nif::NiTimeControllerPtr(&mManager);
+
+            init(mGearController);
+            mGearController.mRecordType = Nif::RC_NiKeyframeController;
+            mGearController.mManagerControlled = true;
+            mGearController.mData = Nif::NiKeyframeDataPtr(nullptr);
+            mGearController.mInterpolator = Nif::NiInterpolatorPtr(nullptr);
+            mGear.mController = Nif::NiTimeControllerPtr(&mGearController);
+
+            mFile.mRoots.push_back(&mRoot);
+        }
+
+        void addSequenceToManager(const std::string& name, float stop)
+        {
+            auto& sequence
+                = Nif::Testing::addSequence(mFile, name, 0.f, stop, Nif::NiTimeController::ExtrapolationMode::Constant,
+                    { { "Gear", { { 0.f, osg::Vec3f(0, 0, 0) }, { stop, osg::Vec3f(0, 0, 10) } } } });
+            mManager.mSequences.push_back(Nif::RecordPtrT<Nif::NiControllerSequence>(&sequence));
+        }
+
+        const SceneUtil::EmbeddedSequences* sequencesOf(osg::Node& root)
+        {
+            return SceneUtil::findUserData<SceneUtil::EmbeddedSequences>(root);
+        }
+
+        static const osg::Node* find(const osg::Node& node, const std::string& name)
+        {
+            if (node.getName() == name)
+                return &node;
+            if (const osg::Group* group = node.asGroup())
+                for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+                    if (const osg::Node* found = find(*group->getChild(i), name))
+                        return found;
+            return nullptr;
+        }
+    };
+
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, keepsTheSequencesOfTheManagerAsGroupsOfTheirNames)
+    {
+        addSequenceToManager("Open", 5.f);
+        addSequenceToManager("Close", 4.f);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const SceneUtil::EmbeddedSequences* sequences = sequencesOf(*result);
+        ASSERT_NE(sequences, nullptr);
+        ASSERT_EQ(sequences->size(), 2u);
+        EXPECT_THAT((*sequences)[0]->mTextKeys.getGroups(), ElementsAre("open"));
+        EXPECT_THAT((*sequences)[1]->mTextKeys.getGroups(), ElementsAre("close"));
+        EXPECT_EQ((*sequences)[0]->mTextKeys.begin()->first, 0.f);
+        EXPECT_EQ((*sequences)[0]->mTextKeys.rbegin()->first, 5.f);
+        EXPECT_EQ((*sequences)[1]->mTextKeys.rbegin()->first, 4.f);
+        EXPECT_EQ((*sequences)[0]->mKeyframeControllers.count("Gear"), 1u);
+    }
+
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, keepsOnlyTheFirstOfSequencesOfOneName)
+    {
+        addSequenceToManager("Open", 5.f);
+        addSequenceToManager("open", 9.f);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const SceneUtil::EmbeddedSequences* sequences = sequencesOf(*result);
+        ASSERT_NE(sequences, nullptr);
+        ASSERT_EQ(sequences->size(), 1u);
+        EXPECT_EQ((*sequences)[0]->mTextKeys.rbegin()->first, 5.f);
+    }
+
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, takesTheSequencesOfAManagerThatIsNotActive)
+    {
+        addSequenceToManager("Open", 5.f);
+        mManager.mFlags = 0;
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const SceneUtil::EmbeddedSequences* sequences = sequencesOf(*result);
+        ASSERT_NE(sequences, nullptr);
+        EXPECT_EQ(sequences->size(), 1u);
+    }
+
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, addsNothingForAFileWithoutAManager)
+    {
+        mRoot.mController = Nif::NiTimeControllerPtr(nullptr);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        EXPECT_EQ(sequencesOf(*result), nullptr);
+    }
+
+    // The nodes that a sequence moves must stay nodes of their own and not be merged into their parent.
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, keepsTheNodeThatTheManagerMoves)
+    {
+        addSequenceToManager("Open", 5.f);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const osg::Node* gear = find(*result, "Gear");
+        ASSERT_NE(gear, nullptr);
+        EXPECT_EQ(gear->getDataVariance(), osg::Object::DYNAMIC);
+    }
 }

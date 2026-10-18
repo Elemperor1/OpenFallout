@@ -186,6 +186,9 @@ namespace OFWorld
         void removeObjectFromScene(const Ptr& ptr, bool keepActive = false);
         ///< Remove an object from the scene, but not from the world model.
 
+        void setObjectCollision(const Ptr& ptr, bool enabled);
+        ///< Take the collision of an object that is in the scene away, or give it back (a door that is open)
+
         void addPostponedPhysicsObjects();
 
         void removeFromPagedRefs(const Ptr& ptr);

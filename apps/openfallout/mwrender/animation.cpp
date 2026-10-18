@@ -28,6 +28,7 @@
 #include <components/esm3/loadnpc.hpp>
 #include <components/esm3/loadrace.hpp>
 #include <components/esm4/loadligh.hpp>
+#include <components/falloutscript/animgroups.hpp>
 
 #include <components/misc/constants.hpp>
 #include <components/misc/pathhelpers.hpp>
@@ -44,6 +45,7 @@
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/sceneutil/skeleton.hpp>
 #include <components/sceneutil/statesetupdater.hpp>
+#include <components/sceneutil/userdata.hpp>
 #include <components/sceneutil/util.hpp>
 #include <components/sceneutil/visitor.hpp>
 
@@ -671,6 +673,38 @@ namespace OFRender
         if (keyframes == nullptr || keyframes->mTextKeys.empty() || keyframes->mKeyframeControllers.empty())
             return nullptr;
 
+        return addKeyframeSource(std::move(keyframes), kfname, baseModel);
+    }
+
+    namespace
+    {
+        const SceneUtil::EmbeddedSequences* findEmbeddedSequences(osg::Node& node)
+        {
+            if (const SceneUtil::EmbeddedSequences* found = SceneUtil::findUserData<SceneUtil::EmbeddedSequences>(node))
+                return found;
+            if (osg::Group* group = node.asGroup())
+                for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+                    if (const SceneUtil::EmbeddedSequences* found = findEmbeddedSequences(*group->getChild(i)))
+                        return found;
+            return nullptr;
+        }
+    }
+
+    void Animation::addEmbeddedAnimSources(VFS::Path::NormalizedView model)
+    {
+        if (!mObjectRoot)
+            return;
+        const SceneUtil::EmbeddedSequences* sequences = findEmbeddedSequences(*mObjectRoot);
+        if (sequences == nullptr)
+            return;
+        for (const osg::ref_ptr<const SceneUtil::KeyframeHolder>& sequence : *sequences)
+            addKeyframeSource(sequence, model, std::string(model.value()));
+    }
+
+    std::shared_ptr<Animation::AnimSource> Animation::addKeyframeSource(
+        osg::ref_ptr<const SceneUtil::KeyframeHolder> keyframes, VFS::Path::NormalizedView kfname,
+        const std::string& baseModel)
+    {
         std::shared_ptr<AnimSource> animsrc = std::make_shared<AnimSource>();
 
         animsrc->mKeyframes = std::move(keyframes);
@@ -2085,8 +2119,31 @@ namespace OFRender
 
     // --------------------------------------------------------------------------------
 
+    /// The time of the animations of an object moves with the frames of the scene
+    class ObjectAnimation::AdvanceCallback : public SceneUtil::NodeCallback<AdvanceCallback>
+    {
+    public:
+        explicit AdvanceCallback(ObjectAnimation& animation)
+            : mAnimation(&animation)
+        {
+        }
+
+        void operator()(osg::Node* node, osg::NodeVisitor* nv)
+        {
+            const double now = nv->getFrameStamp()->getSimulationTime();
+            if (mLastTime >= 0.0)
+                mAnimation->advance(static_cast<float>(std::max(0.0, now - mLastTime)));
+            mLastTime = now;
+            traverse(node, nv);
+        }
+
+    private:
+        ObjectAnimation* mAnimation;
+        double mLastTime = -1.0;
+    };
+
     ObjectAnimation::ObjectAnimation(const OFWorld::Ptr& ptr, const std::string& model,
-        Resource::ResourceSystem* resourceSystem, bool animated, bool allowLight)
+        Resource::ResourceSystem* resourceSystem, bool animated, bool allowLight, bool embedded)
         : Animation(ptr, osg::ref_ptr<osg::Group>(ptr.getRefData().getBaseNode()), resourceSystem)
     {
         if (!model.empty())
@@ -2094,6 +2151,19 @@ namespace OFRender
             setObjectRoot(model, false, false, false);
             if (animated)
                 addAnimSource(model, model);
+            if (embedded)
+                addEmbeddedAnimSources(VFS::Path::toNormalized(model));
+            if (!mAnimSources.empty() && embedded)
+            {
+                // What an object does by itself, as long as it is there (a fan that turns, a flag in the wind): the
+                // games start the groups Idle and SpecialIdle of its model when it is loaded
+                for (const char* group : { "idle", "specialidle" })
+                    if (hasAnimation(group))
+                        play(group, AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false, 1.f,
+                            "start", "stop", 0.f, ~0u, false);
+                mAdvanceCallback = new AdvanceCallback(*this);
+                mInsert->addUpdateCallback(mAdvanceCallback);
+            }
 
             if (!ptr.getClass().getEnchantment(ptr).empty())
                 mGlowUpdater = SceneUtil::addEnchantedGlow(
@@ -2122,6 +2192,53 @@ namespace OFRender
         {
             harvest(ptr);
         }
+    }
+
+    ObjectAnimation::~ObjectAnimation()
+    {
+        if (mAdvanceCallback != nullptr)
+            mInsert->removeUpdateCallback(mAdvanceCallback);
+    }
+
+    std::string ObjectAnimation::findGroup(std::string_view name) const
+    {
+        const std::string lower = Misc::StringUtils::lowerCase(name);
+        if (hasAnimation(lower))
+            return lower;
+        // The first of the variants in the order of their names, so that the same one is always taken
+        std::string found;
+        for (const std::string_view group : mSupportedAnimations)
+            if (FalloutScript::isGroupVariant(group, lower) && (found.empty() || group < found))
+                found = group;
+        return found;
+    }
+
+    bool ObjectAnimation::playScripted(std::string_view name, bool atEnd, bool restart)
+    {
+        const std::string group = findGroup(name);
+        if (group.empty())
+            return false;
+        const bool active = getInfo(group, nullptr, nullptr, nullptr);
+        if (active && !restart && !atEnd)
+        {
+            mScriptedGroup = group;
+            return true;
+        }
+        // A group that plays already is not started again by play: it ends first
+        if (active)
+            disable(group);
+        play(group, AnimPriority(OFMechanics::Priority_Scripted), OFRender::BlendMask_All, !atEnd, 1.f, "start", "stop",
+            atEnd ? 1.f : 0.f, 0, false);
+        mScriptedGroup = group;
+        return true;
+    }
+
+    bool ObjectAnimation::isScriptedPlaying(std::string_view name) const
+    {
+        if (name.empty())
+            return !mScriptedGroup.empty() && isPlaying(mScriptedGroup);
+        const std::string group = findGroup(name);
+        return !group.empty() && isPlaying(group);
     }
 
     void ObjectAnimation::harvest(const OFWorld::Ptr& ptr)

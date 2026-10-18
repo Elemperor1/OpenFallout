@@ -245,6 +245,13 @@ void ESM4::Reference::load(ESM4::Reader& reader)
                 // std::cout << "REFR SCRO : " << formIdToString(sid) << std::endl;// FIXME
                 break;
             }
+            case ESM::fourCC("ONAM"):
+                // Fallout 3 and New Vegas: an empty subrecord on a door that starts open
+                if (subHdr.dataSize == 0)
+                    mOpenByDefault = true;
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("XLOC"):
             {
                 mIsLocked = true;
@@ -317,7 +324,6 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             //
             case ESM::fourCC("XPCI"): // formId
             case ESM::fourCC("XLCM"):
-            case ESM::fourCC("ONAM"):
             case ESM::fourCC("VMAD"):
             case ESM::fourCC("INAM"):
             case ESM::fourCC("PDTO"):

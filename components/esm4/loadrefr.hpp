@@ -128,6 +128,8 @@ namespace ESM4
         TeleportDest mDoor;
         bool mIsLocked = false;
         std::int8_t mLockLevel = 0;
+        /// Fallout: a door that is open until something closes it (the empty subrecord ONAM)
+        bool mOpenByDefault = false;
         ESM::FormId mKey;
 
         ESM::FormId mTargetRef;

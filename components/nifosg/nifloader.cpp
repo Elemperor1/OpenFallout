@@ -1,6 +1,7 @@
 #include "nifloader.hpp"
 
 #include <mutex>
+#include <set>
 #include <string_view>
 
 #include <osg/Array>
@@ -52,6 +53,7 @@
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/extradata.hpp>
 #include <components/sceneutil/fog.hpp>
+#include <components/sceneutil/keyframe.hpp>
 #include <components/sceneutil/material.hpp>
 #include <components/sceneutil/morphgeometry.hpp>
 #include <components/sceneutil/riggeometry.hpp>
@@ -336,6 +338,9 @@ namespace NifOsg
         // This is used to queue look-at controllers whose target nodes may not have been created yet.
         mutable std::vector<std::pair<unsigned int, osg::ref_ptr<LookAtController>>> mLookAtQueue;
 
+        // The animation sequences that the managers of the file list; the sequences become the groups of the model
+        mutable std::vector<const Nif::NiControllerSequence*> mEmbeddedSequences;
+
         /// The animation of a file of Oblivion and later: a sequence that names the nodes it drives and, for each, an
         /// interpolator with its keys. The engine's animation system plays a group of text keys, "<group>: start" and
         /// "<group>: stop" between which the time runs, so the sequence is made one: the group is the name of the file
@@ -389,6 +394,24 @@ namespace NifOsg
                     Log(Debug::Verbose) << "Controller " << block.mNodeName << " present more than once in " << filename
                                         << ", ignoring later version";
             }
+        }
+
+        /// The sequences that the managers of the file list, each as a group of its own named after it (the file
+        /// plays them one at a time, as the game does when a script plays a group: Open, Close, Forward). A sequence
+        /// that moves no node is kept for its length and its text keys.
+        SceneUtil::EmbeddedSequences loadEmbeddedSequences(const Nif::FileView& nif) const
+        {
+            SceneUtil::EmbeddedSequences sequences;
+            std::set<std::string> names;
+            for (const Nif::NiControllerSequence* seq : mEmbeddedSequences)
+            {
+                if (seq->mName.empty() || !names.insert(Misc::StringUtils::lowerCase(seq->mName)).second)
+                    continue;
+                osg::ref_ptr<SceneUtil::KeyframeHolder> holder = new SceneUtil::KeyframeHolder;
+                loadControllerSequence(*seq, seq->mName, nif.getFilename().value(), *holder);
+                sequences.push_back(std::move(holder));
+            }
+            return sequences;
         }
 
         void loadKf(Nif::FileView nif, SceneUtil::KeyframeHolder& target) const
@@ -552,6 +575,13 @@ namespace NifOsg
 
             if (!textkeys.empty())
                 SceneUtil::addUserData(*created, std::move(textkeys));
+
+            if (!mEmbeddedSequences.empty())
+            {
+                SceneUtil::EmbeddedSequences sequences = loadEmbeddedSequences(nif);
+                if (!sequences.empty())
+                    SceneUtil::addUserData(*created, std::move(sequences));
+            }
 
             created->setUserValue(Misc::OsgUserValues::sFileHash, nif.getHash());
 
@@ -1061,13 +1091,33 @@ namespace NifOsg
         {
             for (Nif::NiTimeControllerPtr ctrl = nifNode->mController; !ctrl.empty(); ctrl = ctrl->mNext)
             {
+                if (ctrl->mRecordType == Nif::RC_NiControllerManager)
+                {
+                    // The sequences are played by name (see loadEmbeddedSequences), whatever the manager is set to do
+                    const Nif::NiControllerManager* manager
+                        = static_cast<const Nif::NiControllerManager*>(ctrl.getPtr());
+                    for (const auto& sequence : manager->mSequences)
+                        if (!sequence.empty())
+                            mEmbeddedSequences.push_back(sequence.getPtr());
+                    continue;
+                }
+                if (ctrl->mRecordType == Nif::RC_NiKeyframeController)
+                {
+                    const Nif::NiKeyframeController* key = static_cast<const Nif::NiKeyframeController*>(ctrl.getPtr());
+                    if (key->mData.empty() && key->mInterpolator.empty())
+                    {
+                        // A manager plays the sequences of the file on a node like this one: it is moved, so it must
+                        // stay a node of its own
+                        if (key->mManagerControlled)
+                            isAnimated = true;
+                        continue;
+                    }
+                }
                 if (!ctrl->isActive())
                     continue;
                 if (ctrl->mRecordType == Nif::RC_NiKeyframeController)
                 {
                     const Nif::NiKeyframeController* key = static_cast<const Nif::NiKeyframeController*>(ctrl.getPtr());
-                    if (key->mData.empty() && key->mInterpolator.empty())
-                        continue;
                     if (!key->mInterpolator.empty()
                         && key->mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
                     {

@@ -3,6 +3,7 @@
 
 #include <map>
 #include <optional>
+#include <vector>
 
 #include <osg/Object>
 
@@ -59,6 +60,10 @@ namespace SceneUtil
         KeyframeControllerMap mKeyframeControllers;
     };
 
+    /// The animations that a model holds itself, as the NiControllerManager of its nif lists them: one holder to a
+    /// sequence, whose only group is named after the sequence (a door that has Open and Close). It is kept in the user
+    /// data of the root of the model.
+    using EmbeddedSequences = std::vector<osg::ref_ptr<const KeyframeHolder>>;
 }
 
 #endif

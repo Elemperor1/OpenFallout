@@ -72,7 +72,7 @@ namespace OFRender
         ptr.getRefData().setBaseNode(std::move(insert));
     }
 
-    void Objects::insertModel(const OFWorld::Ptr& ptr, const std::string& mesh, bool allowLight)
+    void Objects::insertModel(const OFWorld::Ptr& ptr, const std::string& mesh, bool allowLight, bool embedded)
     {
         insertBegin(ptr);
         ptr.getRefData().getBaseNode()->setNodeMask(Mask_Object);
@@ -87,7 +87,7 @@ namespace OFRender
         }
 
         osg::ref_ptr<ObjectAnimation> anim(
-            new ObjectAnimation(ptr, animationMesh, mResourceSystem, animated, allowLight));
+            new ObjectAnimation(ptr, animationMesh, mResourceSystem, animated, allowLight, embedded));
 
         mObjects.emplace(ptr.mRef, std::move(anim));
     }

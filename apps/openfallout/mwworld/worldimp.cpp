@@ -794,6 +794,11 @@ namespace OFWorld
         }
     }
 
+    void World::setObjectCollision(const Ptr& ptr, bool enabled)
+    {
+        mWorldScene->setObjectCollision(ptr, enabled);
+    }
+
     void World::advanceTime(double hours, bool incremental)
     {
         if (!incremental)

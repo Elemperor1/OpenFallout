@@ -67,4 +67,25 @@ namespace
         ASSERT_EQ(characters[0].mLinkedRefs.size(), 1u);
         EXPECT_EQ(characters[0].mLinkedRefs[0].reference.toUint32(), 0x812u);
     }
+
+    TEST(ESM4PlacedDoorTest, an_empty_onam_places_the_door_open)
+    {
+        const auto references = loadRecords<ESM4::Reference>(
+            "REFR", record("REFR", 0x803, valueSubRecord<std::uint32_t>("NAME", 0x00000900) + subRecord("ONAM", "")));
+
+        ASSERT_EQ(references.size(), 1u);
+        EXPECT_TRUE(references[0].mOpenByDefault);
+    }
+
+    TEST(ESM4PlacedDoorTest, a_door_with_no_onam_is_placed_as_it_is_and_another_onam_is_skipped)
+    {
+        const auto references = loadRecords<ESM4::Reference>("REFR",
+            record("REFR", 0x804, valueSubRecord<std::uint32_t>("NAME", 0x00000900))
+                + record(
+                    "REFR", 0x805, subRecord("ONAM", bytePattern(4, 1)) + valueSubRecord<std::uint32_t>("XSCL", 0)));
+
+        ASSERT_EQ(references.size(), 2u);
+        EXPECT_FALSE(references[0].mOpenByDefault);
+        EXPECT_FALSE(references[1].mOpenByDefault);
+    }
 }
