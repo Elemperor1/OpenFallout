@@ -1734,7 +1734,8 @@
 -- @field #number actionPoints The action points the player has.
 -- @field #number maxActionPoints
 -- @field #number cost The action points one attack with the weapon costs.
--- @field #number range How far the weapon reaches in V.A.T.S.
+-- @field #number range How far a target can be in V.A.T.S.: the reach of a blow, twice the range of a thrown weapon, the range
+-- of a gun only if its record fixes it. `nil` when there is no limit (the chance of a hit falls with the distance instead).
 -- @field #string weapon The name of the weapon the player holds, empty for the hands.
 
 ---

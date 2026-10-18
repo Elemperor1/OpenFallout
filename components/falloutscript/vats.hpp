@@ -120,6 +120,11 @@ namespace FalloutScript
             bool arms = true;
         };
 
+        /// The farthest a target can be for the weapon to have any chance: the reach of a blow, twice the range of a
+        /// thrown weapon, the range of a shot only if the record fixes it (else there is no limit, only the chance
+        /// falls).
+        double reach(const Rules& rules, const Weapon& weapon);
+
         /// The chance in percent that an attack at a part hits, 0 to the most the files allow. A blow of the hands or
         /// a melee weapon is sure within its reach; a thrown weapon has the chance of its range and the skill; a
         /// shot has the share of the spread that falls on the target, times the part's own chance.

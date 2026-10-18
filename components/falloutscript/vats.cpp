@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace FalloutScript::Vats
 {
@@ -132,22 +133,33 @@ namespace FalloutScript::Vats
         return std::max(factor, 0.0) * rules.mMaxWobbleAngle;
     }
 
+    double reach(const Rules& rules, const Weapon& weapon)
+    {
+        if (isMelee(weapon.mAnimationType))
+            return rules.mMeleeMaxDistance;
+        // A thrown weapon flies up to twice its range; a shot is stopped by the range of the weapon only if the record
+        // says that range is fixed
+        if (!isGun(weapon.mAnimationType))
+            return weapon.mRange * rules.mThrownRangeMult;
+        return weapon.mRangeFixed ? weapon.mRange : std::numeric_limits<double>::infinity();
+    }
+
     double hitChance(const Rules& rules, const Weapon& weapon, const Shot& shot)
     {
         const double distance = std::max(shot.distance, 0.0);
+        if (distance > reach(rules, weapon))
+            return 0.0;
         const double skill = std::clamp(shot.skill, 0.0, 100.0);
         double chance = 0;
         if (isMelee(weapon.mAnimationType))
         {
             // Within reach a blow is sure, and the part does not count
-            chance = distance <= rules.mMeleeMaxDistance ? 100.0 : 0.0;
+            chance = 100.0;
         }
         else if (!isGun(weapon.mAnimationType))
         {
             // A thrown weapon: sure near, less and less the further it has to fly, up to twice its range
             const double range = weapon.mRange;
-            if (distance > range * rules.mThrownRangeMult)
-                return 0.0;
             const double gap = range * rules.mGrenadeRangeMult - rules.mGrenadeRangeMin;
             const double rangeOdds = gap > 0 ? 1.0 - std::max(distance - rules.mGrenadeRangeMin, 0.0) / gap : 0.0;
             const double armFactor = shot.arms ? 1.0 : 1.0 - rules.mCrippledArm1H;
@@ -157,8 +169,6 @@ namespace FalloutScript::Vats
         }
         else
         {
-            if (weapon.mRangeFixed && distance > weapon.mRange)
-                return 0.0;
             // The shots fall in a circle of the spread at the distance of the target; the target is as big as its
             // size says, and as much of its area as is hit by the circle counts
             const double spread = std::max(weapon.mSpread + shot.extraSpread, 0.0);

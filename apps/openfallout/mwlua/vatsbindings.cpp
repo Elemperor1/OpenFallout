@@ -1,5 +1,7 @@
 #include "vatsbindings.hpp"
 
+#include <cmath>
+
 #include <components/lua/luastate.hpp>
 #include <components/lua/util.hpp>
 
@@ -28,8 +30,8 @@ namespace OFLua
         api["available"] = []() { return OFBase::Environment::get().getFalloutScripts() != nullptr; };
 
         // What the weapon and the action points of the player allow: whether V.A.T.S. can be used, whether it is open,
-        // the action points the player has and has at most, what one attack costs, how far the weapon reaches, and the
-        // name of the weapon ("" for the hands)
+        // the action points the player has and has at most, what one attack costs, how far the weapon reaches (nil when
+        // it has no limit), and the name of the weapon ("" for the hands)
         api["state"] = [lua]() {
             const OFScript::FalloutScripts::VatsState state = scripts().vatsState();
             sol::table row(lua, sol::create);
@@ -38,7 +40,8 @@ namespace OFLua
             row["actionPoints"] = state.mActionPoints;
             row["maxActionPoints"] = state.mMaxActionPoints;
             row["cost"] = state.mCost;
-            row["range"] = state.mRange;
+            if (std::isfinite(state.mRange))
+                row["range"] = state.mRange;
             row["weapon"] = state.mWeaponName;
             return row;
         };

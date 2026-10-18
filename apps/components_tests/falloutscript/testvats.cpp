@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <map>
 #include <string>
 
@@ -125,6 +126,26 @@ namespace
         weapon.mRangeFixed = true;
         EXPECT_GT(Vats::hitChance(rules, weapon, shotAt(5000)), 0.0);
         EXPECT_DOUBLE_EQ(Vats::hitChance(rules, weapon, shotAt(5001)), 0.0);
+    }
+
+    TEST(FalloutScriptVatsTest, theReachOfAWeaponIsTheDistanceWhereItsChanceEnds)
+    {
+        const Vats::Rules rules;
+        EXPECT_DOUBLE_EQ(Vats::reach(rules, fists()), rules.mMeleeMaxDistance);
+        EXPECT_DOUBLE_EQ(Vats::reach(rules, grenade()), grenade().mRange * rules.mThrownRangeMult);
+        // A shot of a weapon that does not fix its range can be aimed at a target beyond it
+        Vats::Weapon weapon = rifle();
+        EXPECT_TRUE(std::isinf(Vats::reach(rules, weapon)));
+        EXPECT_GT(Vats::hitChance(rules, weapon, shotAt(weapon.mRange + 1)), 0.0);
+        weapon.mRangeFixed = true;
+        EXPECT_DOUBLE_EQ(Vats::reach(rules, weapon), weapon.mRange);
+        // At the reach there is a chance, beyond it none, for every kind of weapon
+        for (const Vats::Weapon& kind : { fists(), grenade(), weapon })
+        {
+            const double reach = Vats::reach(rules, kind);
+            EXPECT_GT(Vats::hitChance(rules, kind, shotAt(reach - 1)), 0.0);
+            EXPECT_DOUBLE_EQ(Vats::hitChance(rules, kind, shotAt(reach + 1)), 0.0);
+        }
     }
 
     TEST(FalloutScriptVatsTest, aWiderSpreadAndASmallerTargetMakeAHitLessLikely)

@@ -399,7 +399,7 @@ namespace OFScript
             double mActionPoints = 0;
             double mMaxActionPoints = 0;
             double mCost = 0; // the action points one attack costs
-            double mRange = 0;
+            double mRange = 0; // the farthest a target can be (infinite for a shot of a weapon without fixed range)
             std::string mWeaponName;
         };
         VatsState vatsState();

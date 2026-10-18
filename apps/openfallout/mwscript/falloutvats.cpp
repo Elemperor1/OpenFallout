@@ -144,8 +144,7 @@ namespace OFScript
         state.mMaxActionPoints = mActorValues.permanent(mPlayer, AV::actionPoints);
         state.mCost = FalloutScript::Vats::attackCost(vatsRules(), vatsWeapon(mPlayer));
         const WeaponStats stats = weaponStats(mPlayer);
-        state.mRange = FalloutScript::Vats::isMelee(vatsWeapon(mPlayer).mAnimationType) ? vatsRules().mMeleeMaxDistance
-                                                                                        : stats.mRange;
+        state.mRange = FalloutScript::Vats::reach(vatsRules(), vatsWeapon(mPlayer));
         if (stats.mWeapon != 0)
             state.mWeaponName = itemName(stats.mWeapon);
         state.mAvailable = !mActors.isDead(mPlayer);

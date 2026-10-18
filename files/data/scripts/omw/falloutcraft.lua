@@ -58,6 +58,15 @@ local function closeMode()
     end
 end
 
+-- The player leaves the screen with its button: what was open is closed here, because the mode is no longer ours
+-- when the event that tells of it comes
+local function leave()
+    destroyElement()
+    pipboy.closeRecipes()
+    shownSerial = nil
+    closeMode()
+end
+
 local function skillName(number)
     for _, skill in ipairs(pipboy.skills()) do
         if skill.number == number then
@@ -181,7 +190,7 @@ function render()
             end
             render()
         end, { enabled = pickedRecipe ~= nil and pickedRecipe.status == 'ready', color = colors.titleColor }), 140),
-        widgets.clickable('Close', function() closeMode() end, { color = colors.titleColor })))
+        widgets.clickable('Close', leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
 end
 
