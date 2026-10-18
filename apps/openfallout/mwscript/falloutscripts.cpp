@@ -1302,8 +1302,9 @@ namespace OFScript
             return templateRecordOf(store, record, Record::Template_UseStats, seed);
         }
 
-        /// The weapon "Fists" of the files of both games, which the executables take for a blow that has no weapon
-        constexpr FalloutScript::FormId fistsForm = 0x1F4;
+        /// The local number, in the first master, of the weapon "Fists" of both games, which the executables take for a
+        /// blow that has no weapon
+        constexpr FalloutScript::FormId fistsNumber = 0x1F4;
 
         /// The attributes of DATA, which are the actor values from strength to luck
         void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
@@ -1713,7 +1714,7 @@ namespace OFScript
                         return damage;
                     }
                 }
-            record = mStore.get<ESM4::Weapon>().search(refId(fistsForm));
+            record = mStore.get<ESM4::Weapon>().search(refId(masterForm(fistsNumber)));
         }
         if (record != nullptr)
         {
@@ -1796,8 +1797,9 @@ namespace OFScript
         namespace Entry = FalloutScript::EntryPoint;
         const bool damageAfterArmor = mGame == FalloutScript::Game::NewVegas;
         // The perks see the weapon "Fists" in the place of none, as the executables take it for a blow without a weapon
+        const FalloutScript::FormId fists = masterForm(fistsNumber);
         const FalloutScript::FormId perkWeapon
-            = weapon != 0 || mStore.get<ESM4::Weapon>().search(refId(fistsForm)) == nullptr ? weapon : fistsForm;
+            = weapon != 0 || mStore.get<ESM4::Weapon>().search(refId(fists)) == nullptr ? weapon : fists;
         const FalloutScript::PerkEngine::Context towardsVictim{ victim, perkWeapon };
         const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, perkWeapon };
         double thresholdTaken = 0;

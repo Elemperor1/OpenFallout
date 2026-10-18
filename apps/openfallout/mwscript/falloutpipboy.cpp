@@ -42,8 +42,9 @@ namespace OFScript
 
         /// The local number, in the first master, of the bottle caps, the money of both games
         constexpr FalloutScript::FormId capsNumber = 0x0000000F;
-        /// The weapon of bare hands (the executables take it for a blow that has no weapon)
-        constexpr FalloutScript::FormId fistsForm = 0x1F4;
+        /// The local number, in the first master, of the weapon of bare hands (the executables take it for a blow that
+        /// has no weapon)
+        constexpr FalloutScript::FormId fistsNumber = 0x1F4;
 
         /// The distance in front of the player that a dropped item lands at
         constexpr double dropDistance = 64;
@@ -250,7 +251,7 @@ namespace OFScript
             // The threshold of what is worn and of the perks, against the weapon in hand (the fists for none)
             FalloutScript::FormId weapon = mEquipment.weapon(mPlayer);
             if (weapon == 0)
-                weapon = fistsForm;
+                weapon = masterForm(fistsNumber);
             const FalloutScript::PerkEngine::Context context{ 0, weapon };
             stats.mThreshold = mEquipment.damageThreshold(mPlayer)
                 + mPerks.apply(FalloutScript::EntryPoint::thresholdDefender, mPlayer, 0.0, context);
