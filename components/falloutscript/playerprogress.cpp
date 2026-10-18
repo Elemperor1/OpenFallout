@@ -24,6 +24,7 @@ namespace FalloutScript
         mAwardedLevel = 1;
         mSkillPoints = 0;
         mPerkPoints = 0;
+        mPerkLevels.clear();
         mMiscStats.clear();
         mPerks.clear();
         mPerkOrder.clear();
@@ -124,7 +125,10 @@ namespace FalloutScript
         up.mPerk = Levelling::givesPerk(mRules, mAwardedLevel);
         mSkillPoints += up.mSkillPoints;
         if (up.mPerk)
+        {
             ++mPerkPoints;
+            mPerkLevels.push_back(up.mLevel);
+        }
         return up;
     }
 
@@ -155,7 +159,16 @@ namespace FalloutScript
         if (mPerkPoints <= 0)
             return false;
         --mPerkPoints;
+        // The points of the levels are spent in the order they were given
+        if (!mPerkLevels.empty())
+            mPerkLevels.erase(mPerkLevels.begin());
         return true;
+    }
+
+    int PlayerProgress::perkLevel() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mPerkLevels.empty() ? levelUnderLock() : mPerkLevels.front();
     }
 
     void PlayerProgress::addSkillPoints(int amount)
@@ -168,6 +181,9 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mPerkPoints = std::max(mPerkPoints + amount, 0);
+        // Points that a script takes away are taken from the latest levels first
+        if (mPerkLevels.size() > static_cast<std::size_t>(mPerkPoints))
+            mPerkLevels.resize(static_cast<std::size_t>(mPerkPoints));
     }
 
     void PlayerProgress::modifyMiscStat(int stat, int amount)

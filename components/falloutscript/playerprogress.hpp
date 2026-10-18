@@ -69,6 +69,10 @@ namespace FalloutScript
         /// Spends points; false when there are not that many
         bool spendSkillPoints(int amount);
         bool spendPerkPoint();
+        /// The level that the next perk is chosen at: the level that gave the oldest perk point not spent yet (an
+        /// award of several levels at once keeps the level of each point), or the level of the player when the points
+        /// come from elsewhere
+        int perkLevel() const;
         /// Adds points that a script or an effect gives (a negative amount takes them, down to none)
         void addSkillPoints(int amount);
         void addPerkPoints(int amount);
@@ -109,6 +113,9 @@ namespace FalloutScript
         int mAwardedLevel = 1;
         int mSkillPoints = 0;
         int mPerkPoints = 0;
+        /// The levels that gave the perk points that are not spent yet, oldest first (the points that a script gives
+        /// have none)
+        std::vector<int> mPerkLevels;
         std::map<int, int> mMiscStats;
         std::map<std::pair<FormId, FormId>, int> mPerks;
         /// When each perk was gained or last gained a rank (a count), which is the order of its entries in a list

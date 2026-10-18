@@ -213,6 +213,51 @@ namespace
         EXPECT_EQ(progress.perkPoints(), 1);
     }
 
+    TEST(FalloutScriptPlayerProgressLevellingTest, choosesEachPerkAtTheLevelThatGaveItsPoint)
+    {
+        PlayerProgress progress;
+        progress.setRules(rulesOf(Game::NewVegas, { { "iMaxCharacterLevel", 30 } }));
+        EXPECT_EQ(progress.perkLevel(), 1);
+
+        // one award of three levels: a perk at level 2 and one at level 4, the level of the player being 5
+        progress.rewardExperience(1700);
+        ASSERT_EQ(progress.level(), 5);
+        while (progress.awardNextLevel(5))
+        {
+        }
+        EXPECT_EQ(progress.perkPoints(), 2);
+        EXPECT_EQ(progress.perkLevel(), 2);
+        EXPECT_TRUE(progress.spendPerkPoint());
+        EXPECT_EQ(progress.perkLevel(), 4);
+        EXPECT_TRUE(progress.spendPerkPoint());
+        // with no point left of a level, the level of the player
+        EXPECT_EQ(progress.perkLevel(), 5);
+        EXPECT_FALSE(progress.spendPerkPoint());
+    }
+
+    TEST(FalloutScriptPlayerProgressLevellingTest, aPerkPointFromAScriptIsChosenAtTheLevelOfThePlayer)
+    {
+        PlayerProgress progress;
+        progress.setRules(rulesOf(Game::NewVegas, { { "iMaxCharacterLevel", 30 } }));
+        progress.rewardExperience(1700);
+        progress.addPerkPoints(1);
+        EXPECT_EQ(progress.perkLevel(), 5);
+        // a script that takes points takes the latest levels first
+        while (progress.awardNextLevel(5))
+        {
+        }
+        EXPECT_EQ(progress.perkPoints(), 3);
+        EXPECT_EQ(progress.perkLevel(), 2);
+        progress.addPerkPoints(-2);
+        EXPECT_EQ(progress.perkPoints(), 1);
+        EXPECT_EQ(progress.perkLevel(), 2);
+        progress.addPerkPoints(-1);
+        EXPECT_EQ(progress.perkLevel(), 5);
+        progress.addPerkPoints(1);
+        progress.clear();
+        EXPECT_EQ(progress.perkLevel(), 1);
+    }
+
     TEST(FalloutScriptPlayerProgressLevellingTest, spendsPointsOnlyThatItHas)
     {
         PlayerProgress progress;

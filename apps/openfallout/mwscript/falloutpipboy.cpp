@@ -229,7 +229,7 @@ namespace OFScript
     std::vector<FalloutScripts::PipboyPerk> FalloutScripts::pipboyOfferedPerks()
     {
         std::vector<PipboyPerk> result;
-        for (const FalloutScript::PerkEngine::Offer& offer : mPerks.levelUpList(mPlayer, mProgress.level()))
+        for (const FalloutScript::PerkEngine::Offer& offer : mPerks.levelUpList(mPlayer, mProgress.perkLevel()))
         {
             FalloutScript::PerkInfo info;
             if (mPerks.info(offer.mPerk, info) && !info.mName.empty())
@@ -272,7 +272,7 @@ namespace OFScript
     {
         if (mProgress.perkPoints() <= 0)
             return false;
-        const std::vector<FalloutScript::FormId> offered = mPerks.offered(mPlayer, mProgress.level());
+        const std::vector<FalloutScript::FormId> offered = mPerks.offered(mPlayer, mProgress.perkLevel());
         if (std::find(offered.begin(), offered.end(), perk) == offered.end() || !mProgress.spendPerkPoint())
             return false;
         mProgress.addPerk(mPlayer, perk);
