@@ -158,6 +158,11 @@ namespace OFScript
         FalloutScript::ActorValues& actorValues() { return mActorValues; }
         /// The reference of the player
         FalloutScript::FormId playerReference() const { return mPlayer; }
+
+        /// The number of a record of the first master from its local number (the master is the first plugin, whose
+        /// place among the content files the player reference carries in its high byte)
+        FalloutScript::FormId masterForm(FalloutScript::FormId local) const { return (mPlayer & 0xFF000000u) | local; }
+
         /// Who fights whom and how the characters stand to each other
         FalloutScript::CombatState& combat() { return mCombat; }
         /// What the player has earned and the perks of the characters

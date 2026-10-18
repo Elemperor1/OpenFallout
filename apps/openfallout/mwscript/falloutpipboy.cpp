@@ -37,8 +37,8 @@ namespace OFScript
             return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
         }
 
-        /// The bottle caps, the money of both games (the first miscellaneous item of the first master)
-        constexpr FalloutScript::FormId capsForm = 0x0000000F;
+        /// The local number, in the first master, of the bottle caps, the money of both games
+        constexpr FalloutScript::FormId capsNumber = 0x0000000F;
 
         /// The most objects one drop makes (each is an object of its own in the world)
         constexpr int dropLimit = 10;
@@ -72,7 +72,7 @@ namespace OFScript
             return rows;
         for (const auto& [id, count] : items)
         {
-            if (count <= 0 || id == capsForm)
+            if (count <= 0 || id == masterForm(capsNumber))
                 continue;
             const ESM::RefId record = refId(id);
             PipboyItem row;
@@ -169,7 +169,7 @@ namespace OFScript
         stats.mMaxActionPoints = mActorValues.permanent(mPlayer, AV::actionPoints);
         mEquipment.inventoryWeight(mPlayer, stats.mWeight);
         stats.mMaxWeight = mActorValues.permanent(mPlayer, AV::carryWeight);
-        stats.mCaps = mActors.itemCount(mPlayer, capsForm);
+        stats.mCaps = mActors.itemCount(mPlayer, masterForm(capsNumber));
         stats.mSkillPoints = mProgress.skillPoints();
         stats.mPerkPoints = mProgress.perkPoints();
         stats.mArmorRating = mEquipment.armorRating(mPlayer);

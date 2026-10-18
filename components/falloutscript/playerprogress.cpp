@@ -306,13 +306,17 @@ namespace FalloutScript
         });
         interpreter.setHandler("GetXPForNextLevel",
             [&progress](CallContext&) { return static_cast<double>(progress.experienceForNextLevel()); });
-        // SetLevel's other arguments (the level the game scales to, ...) are not used
+        // SetLevel and ResetXP are called on a character; the level and the experience kept here are the player's, so
+        // a call on anyone else (a script that scales its actor) leaves them alone. SetLevel's other arguments (the
+        // level the game scales to, ...) are not used.
         interpreter.setHandler("SetLevel", [&progress](CallContext& call) {
-            progress.setLevel(intArgument(call, 0));
+            if (call.mReference == call.mHost.player())
+                progress.setLevel(intArgument(call, 0));
             return 0.0;
         });
-        interpreter.setHandler("ResetXP", [&progress](CallContext&) {
-            progress.resetExperience();
+        interpreter.setHandler("ResetXP", [&progress](CallContext& call) {
+            if (call.mReference == call.mHost.player())
+                progress.resetExperience();
             return 0.0;
         });
         interpreter.setHandler("ModPCMiscStat", [&progress](CallContext& call) {
