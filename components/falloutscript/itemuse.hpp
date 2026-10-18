@@ -98,7 +98,8 @@ namespace FalloutScript
         /// The character uses the item (an aid item or a book)
         Result use(FormId actor, FormId item);
 
-        /// Lets the effects that have a duration go on by that many seconds
+        /// Lets the effects that have a duration go on by that many seconds, and gives the player the health that its
+        /// perks recover in that time
         void update(double seconds);
 
         /// Perks change what an item does (the chance of addiction, how long a chem lasts, the skill points of a
@@ -138,6 +139,9 @@ namespace FalloutScript
     private:
         void applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale);
         void instant(FormId actor, int actorValue, double amount, bool detrimental);
+        /// Kills a character with no health left, or makes it fall if it is one that falls (to be called with the
+        /// transitions held)
+        void dieIfSpent(FormId actor);
 
         UseRecords& mRecords;
         ActorState& mState;

@@ -214,6 +214,105 @@ namespace
         EXPECT_FALSE(f.mState.isDead(victim));
     }
 
+    TEST(FalloutScriptItemUseTest, aDropOfTheHealthThatTakesAllOfItKills)
+    {
+        Fixture f;
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 500, 60, true, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_TRUE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, anEssentialCharacterFallsInsteadOfDyingOfADropOfTheHealth)
+    {
+        Fixture f;
+        int falls = 0;
+        f.mState.setFallHandler([&falls](FormId) {
+            ++falls;
+            return true;
+        });
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 500, 60, true, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_EQ(falls, 1);
+        EXPECT_FALSE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, aDropOfTheHealthThatLeavesSomeKillsNoOneAndEndsWithTheEffect)
+    {
+        Fixture f;
+        const double full = f.mValues.current(victim, ActorValue::health);
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 5, 10, true, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_FALSE(f.mState.isDead(victim));
+        EXPECT_EQ(f.mValues.current(victim, ActorValue::health), full - 5);
+        f.mUse.update(11);
+        EXPECT_EQ(f.mValues.current(victim, ActorValue::health), full);
+    }
+
+    /// A perk with an entry for the health a character recovers, which adds two points a second
+    class RecoveringPerk final : public FalloutScript::PerkRecords
+    {
+    public:
+        static constexpr FormId id = 0x0100A0A0;
+
+        bool perk(FormId perk, FalloutScript::PerkInfo& info) override
+        {
+            if (perk != id)
+                return false;
+            info.mId = id;
+            info.mRanks = 1;
+            info.mPlayable = true;
+            FalloutScript::PerkEntry entry;
+            entry.mType = FalloutScript::PerkEntry::EntryPoint;
+            entry.mEntryPoint = FalloutScript::EntryPoint::recoveredHealth;
+            entry.mFunction = 2;
+            entry.mValue = 2;
+            info.mEntries = { entry };
+            return true;
+        }
+        std::vector<FormId> perks() override { return { id }; }
+        bool abilityEffects(FormId, std::vector<FalloutScript::AbilityEffect>&) override { return false; }
+    };
+
+    TEST(FalloutScriptItemUseTest, aPerkThatRecoversHealthGivesThePlayerItsPointsEachSecond)
+    {
+        Fixture f;
+        RecoveringPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mValues.damage(thePlayer, ActorValue::health, 50);
+        f.mValues.damage(victim, ActorValue::health, 50);
+        const double hurt = f.mValues.current(thePlayer, ActorValue::health);
+
+        f.mUse.update(2);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), hurt);
+
+        f.mProgress.addPerk(thePlayer, RecoveringPerk::id);
+        f.mUse.update(2);
+        EXPECT_NEAR(f.mValues.current(thePlayer, ActorValue::health), hurt + 4, 1e-9);
+        // the others do not have the perk
+        EXPECT_EQ(f.mValues.current(victim, ActorValue::health), hurt);
+        // it stops at the most
+        f.mUse.update(1000);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), f.mValues.permanent(thePlayer, ActorValue::health));
+    }
+
+    TEST(FalloutScriptItemUseTest, aPerkThatRecoversHealthDoesNotReviveTheDead)
+    {
+        Fixture f;
+        RecoveringPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mProgress.addPerk(thePlayer, RecoveringPerk::id);
+        f.mValues.damage(thePlayer, ActorValue::health, 100000);
+        f.mState.setDead(thePlayer, true);
+        const double dead = f.mValues.current(thePlayer, ActorValue::health);
+        f.mUse.update(5);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), dead);
+    }
+
     TEST(FalloutScriptItemUseTest, healingStopsAtFullHealth)
     {
         Fixture f;

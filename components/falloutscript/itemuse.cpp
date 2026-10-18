@@ -89,14 +89,19 @@ namespace FalloutScript
             // No blow comes between the damage to the health and the death or fall that follows
             const auto transitions = mState.holdTransitions();
             mValues.damage(actor, actorValue, amount);
-            // A character with no health left is dead, unless it is one that falls (an essential one)
-            if (mValues.current(actor, actorValue) <= 0 && !mState.falls(actor))
-                mState.setDead(actor, true);
+            dieIfSpent(actor);
         }
         else if (detrimental)
             mValues.damage(actor, actorValue, amount);
         else
             mValues.restore(actor, actorValue, amount);
+    }
+
+    void ItemUse::dieIfSpent(FormId actor)
+    {
+        // A character with no health left is dead, unless it is one that falls (an essential one)
+        if (mValues.current(actor, ActorValue::health) <= 0 && !mState.falls(actor))
+            mState.setDead(actor, true);
     }
 
     void ItemUse::applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale)
@@ -127,7 +132,15 @@ namespace FalloutScript
             // A boost that holds while the effect lasts (a drop, for a detrimental one)
             active.mTemporary = true;
             active.mMagnitude = effect.mDetrimental ? -effect.mMagnitude : effect.mMagnitude;
-            mValues.modify(actor, effect.mActorValue, active.mMagnitude);
+            if (effect.mActorValue == ActorValue::health && active.mMagnitude < 0)
+            {
+                // A drop of the health can take all of it: no blow comes between the drop and the death or fall
+                const auto transitions = mState.holdTransitions();
+                mValues.modify(actor, effect.mActorValue, active.mMagnitude);
+                dieIfSpent(actor);
+            }
+            else
+                mValues.modify(actor, effect.mActorValue, active.mMagnitude);
         }
         else
         {
@@ -283,8 +296,12 @@ namespace FalloutScript
             bool mDetrimental;
         };
         std::vector<Step> steps;
+        PerkEngine* perks = nullptr;
+        FormId player = 0;
         {
             const std::lock_guard lock(mMutex);
+            perks = mPerks;
+            player = mPlayer;
             for (Active& active : mActive)
             {
                 const double elapsed = std::min(seconds, active.mRemaining);
@@ -302,6 +319,15 @@ namespace FalloutScript
         // A death that comes of it is handled with the lock free: the host reacts to it
         for (const Step& step : steps)
             instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental);
+
+        // The perks that recover health: the executables work the entry point out from none, in points each second
+        // (the recovery that the characters have of themselves is not modelled)
+        if (perks != nullptr && player != 0 && !mState.isDead(player))
+        {
+            const double rate = perks->apply(EntryPoint::recoveredHealth, player, 0.0);
+            if (rate > 0)
+                mValues.restore(player, ActorValue::health, rate * seconds);
+        }
     }
 
     std::vector<ItemUse::Active> ItemUse::active(FormId actor) const
