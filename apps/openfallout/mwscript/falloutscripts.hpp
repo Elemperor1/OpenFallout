@@ -394,7 +394,8 @@ namespace OFScript
         /// V.A.T.S.: what the player's weapon and action points allow
         struct VatsState
         {
-            bool mAvailable = false; // the player has a weapon it can attack with in V.A.T.S. and is not dead
+            bool mAvailable
+                = false; // the player has a weapon it can attack with in V.A.T.S. and is not dead or unconscious
             bool mOpen = false;
             double mActionPoints = 0;
             double mMaxActionPoints = 0;

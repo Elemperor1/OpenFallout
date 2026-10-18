@@ -3,6 +3,9 @@
 #include "actors.hpp"
 #include "actorvalues.hpp"
 
+#include <utility>
+#include <vector>
+
 namespace FalloutScript
 {
     Crafting::Crafting(RecipeRecords& records, ActorState& state, ActorValues& values)
@@ -61,8 +64,12 @@ namespace FalloutScript
             return state;
         Recipe found;
         mRecords.recipe(recipe, found);
+        // The ingredients are taken in one step, so that of two crafts at once for the last of them only one is made
+        std::vector<std::pair<FormId, int>> wanted;
         for (const RecipeItem& ingredient : found.mIngredients)
-            mState.removeItem(crafter, ingredient.mItem, ingredient.mCount);
+            wanted.emplace_back(ingredient.mItem, ingredient.mCount);
+        if (!mState.takeItems(crafter, wanted))
+            return Status::NeedsItems;
         for (const RecipeItem& output : found.mOutputs)
             mState.addItem(crafter, output.mItem, output.mCount);
         return Status::Ready;

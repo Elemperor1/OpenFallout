@@ -147,7 +147,7 @@ namespace OFScript
         state.mRange = FalloutScript::Vats::reach(vatsRules(), vatsWeapon(mPlayer));
         if (stats.mWeapon != 0)
             state.mWeaponName = itemName(stats.mWeapon);
-        state.mAvailable = !mActors.isDead(mPlayer);
+        state.mAvailable = !mActors.isDead(mPlayer) && !mCombat.unconscious(mPlayer);
         return state;
     }
 
@@ -250,7 +250,8 @@ namespace OFScript
     FalloutScripts::VatsAttackResult FalloutScripts::vatsAttack(const OFWorld::Ptr& target, int part)
     {
         VatsAttackResult result;
-        if (mPlayer == 0 || mActors.isDead(mPlayer))
+        // The dead and the unconscious strike no blows (strike() refuses them), so nothing is spent on their attacks
+        if (mPlayer == 0 || mActors.isDead(mPlayer) || mCombat.unconscious(mPlayer))
         {
             result.mRefused = "dead";
             return result;

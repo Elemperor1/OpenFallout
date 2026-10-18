@@ -1729,7 +1729,7 @@
 
 ---
 -- @type VatsState
--- @field #boolean usable Whether V.A.T.S. can be used (the player is alive).
+-- @field #boolean usable Whether V.A.T.S. can be used (the player is alive and awake).
 -- @field #boolean open Whether the screen of V.A.T.S. is open (see setOpen).
 -- @field #number actionPoints The action points the player has.
 -- @field #number maxActionPoints

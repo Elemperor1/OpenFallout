@@ -5,8 +5,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <map>
 #include <set>
+#include <thread>
 #include <vector>
 
 namespace
@@ -146,6 +148,33 @@ namespace
         // The ingredients are gone, so it can not be made again
         EXPECT_EQ(f.mCrafting.craft(thePlayer, recipeBox), Crafting::Status::NeedsItems);
         EXPECT_EQ(f.mState.itemCount(thePlayer, pipePistol), 1);
+    }
+
+    TEST(FalloutScriptCraftingTest, twoCraftsAtOnceForTheLastIngredientsMakeOnlyOne)
+    {
+        for (int round = 0; round < 200; ++round)
+        {
+            Fixture f;
+            f.mState.removeItem(thePlayer, scrapMetal, 4);
+            f.mState.addItem(thePlayer, scrapMetal, 3);
+            std::atomic<int> ready = 0;
+            std::atomic<int> made = 0;
+            std::vector<std::thread> crafters;
+            for (int i = 0; i < 2; ++i)
+                crafters.emplace_back([&] {
+                    ++ready;
+                    while (ready < 2)
+                        std::this_thread::yield();
+                    if (f.mCrafting.craft(thePlayer, recipeBox) == Crafting::Status::Ready)
+                        ++made;
+                });
+            for (std::thread& crafter : crafters)
+                crafter.join();
+
+            ASSERT_EQ(made, 1) << "round " << round;
+            ASSERT_EQ(f.mState.itemCount(thePlayer, pipePistol), 1) << "round " << round;
+            ASSERT_EQ(f.mState.itemCount(thePlayer, scrapMetal), 0) << "round " << round;
+        }
     }
 
     TEST(FalloutScriptCraftingTest, nothingIsTakenWhenARecipeCanNotBeMade)
