@@ -155,6 +155,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testchargen.cpp
     falloutscript/testcombatcommands.cpp
     falloutscript/testcombatstate.cpp
+    falloutscript/testcrafting.cpp
     falloutscript/testdamage.cpp
     falloutscript/testderivedstats.cpp
     falloutscript/testequipment.cpp
@@ -162,12 +163,14 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testformlists.cpp
     falloutscript/testitemuse.cpp
     falloutscript/testlevelling.cpp
+    falloutscript/testlimbs.cpp
     falloutscript/testpipboy.cpp
     falloutscript/testperks.cpp
     falloutscript/testfurniture.cpp
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp
     falloutscript/testreferencestate.cpp
+    falloutscript/testvats.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
     falloutscript/testdialoguerules.cpp

@@ -100,9 +100,8 @@ namespace FalloutScript
         entry.mFactionEdits.clear();
     }
 
-    int ActorState::itemCount(FormId id, FormId item)
+    int ActorState::heldLocked(FormId id, FormId item)
     {
-        const std::lock_guard lock(mMutex);
         Holder& entry = holder(id);
         knowItems(id, entry);
         if (!entry.mItemsKnown)
@@ -112,6 +111,12 @@ namespace FalloutScript
         }
         const auto found = entry.mItems.find(item);
         return found == entry.mItems.end() ? 0 : found->second;
+    }
+
+    int ActorState::itemCount(FormId id, FormId item)
+    {
+        const std::lock_guard lock(mMutex);
+        return heldLocked(id, item);
     }
 
     void ActorState::addItem(FormId id, FormId item, int count)
@@ -136,6 +141,27 @@ namespace FalloutScript
     int ActorState::removeItem(FormId id, FormId item, int count)
     {
         const std::lock_guard lock(mMutex);
+        return removeLocked(id, item, count);
+    }
+
+    bool ActorState::takeItems(FormId id, const std::vector<std::pair<FormId, int>>& wanted)
+    {
+        const std::lock_guard lock(mMutex);
+        // The same item may be named more than once
+        std::map<FormId, std::int64_t> total;
+        for (const auto& [item, count] : wanted)
+            if (item != 0 && count > 0)
+                total[item] += count;
+        for (const auto& [item, count] : total)
+            if (heldLocked(id, item) < count)
+                return false;
+        for (const auto& [item, count] : total)
+            removeLocked(id, item, static_cast<int>(std::min<std::int64_t>(count, mostItems)));
+        return true;
+    }
+
+    int ActorState::removeLocked(FormId id, FormId item, int count)
+    {
         if (item == 0 || count <= 0)
             return 0;
         Holder& entry = holder(id);

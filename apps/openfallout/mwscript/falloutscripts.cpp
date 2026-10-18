@@ -176,6 +176,8 @@ namespace OFScript
         , mFormLists(*this)
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
+        , mCrafting(*this, mActors, mActorValues)
+        , mLimbs(*this, mActorValues)
         , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
@@ -216,6 +218,13 @@ namespace OFScript
         });
         // The games have a mode of play that has no counterpart here
         mInterpreter.setHandler("IsHardcore", [](FalloutScript::CallContext&) { return 0.0; });
+        // The menu of a workbench, a reloading bench or a campfire is for the player; the screen shows it. The call
+        // comes from the script of the bench (the reference is the bench) or from a quest (none), so none is refused.
+        mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
+            return openRecipes(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
+        });
+        // V.A.T.S. is open while the screen of Lua says so
+        mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
         FalloutScript::addActorTraitCommands(mInterpreter, *this);
         FalloutScript::addDialogueCommands(mInterpreter, mDialogue);
@@ -400,12 +409,18 @@ namespace OFScript
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
         mActorValues.clear();
+        mLimbs.clear();
+        mVatsOpen = false;
         mReferenceState.clear();
         mFormLists.clear();
         mProgress.clear();
         {
             const std::lock_guard lock(mLootMutex);
             mLoot.reset();
+        }
+        {
+            const std::lock_guard lock(mRecipeMutex);
+            mRecipeMenu.reset();
         }
         mPerks.clear();
         mItemUse.clear();
@@ -492,6 +507,25 @@ namespace OFScript
         raiseItemEvents();
         // The actors that came in or went out since the last frame, before the scripts of the frame look at the world
         updateTriggers();
+        // The action points of the player come back while V.A.T.S. is not open
+        if (mPlayer != 0 && !mVatsOpen)
+        {
+            namespace AV = FalloutScript::ActorValue;
+            // New Vegas lets the perks change the share that comes back, as long as a weapon is held
+            std::function<double(double)> perks;
+            if (const FalloutScript::FormId held = mEquipment.weapon(mPlayer); held != 0)
+            {
+                FalloutScript::PerkEngine::Context holding;
+                holding.mWeapon = held;
+                perks = [this, holding](double share) {
+                    return mPerks.apply(FalloutScript::EntryPoint::actionPointRegen, mPlayer, share, holding);
+                };
+            }
+            const double gain = FalloutScript::Vats::restored(
+                vatsRules(), mActorValues.permanent(mPlayer, AV::actionPoints), frametime, perks);
+            if (gain > 0)
+                mActorValues.restore(mPlayer, AV::actionPoints, gain);
+        }
         raiseCombatEvents(frametime);
         updateProgress(frametime);
         mQuests.update(frametime);
@@ -1746,6 +1780,13 @@ namespace OFScript
             // armor works on (the executable adds it to the damage before the armor), so it is part of that too
             hit.mDamage = std::max(mPerks.apply(Entry::weaponDamage, attacker, hit.mDamage, towardsVictim), 0.0);
         }
+        // The damage to the health: a blow at a part of the body does more or less than one at the body (a head shot
+        // more), after the armor, and only a shot or a throw does (hands and melee weapons, and a blow with no weapon,
+        // count the part as 1); a part that does not say anything (0) leaves the damage as it is
+        double dealt = hit.mDamage;
+        if (limb >= 0 && !blow.mMelee)
+            if (const double multiplier = mLimbs.damageMultiplier(victim, limb); multiplier > 0)
+                dealt *= multiplier;
 
         // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
         // a blow that comes late for a death changes nothing
@@ -1754,23 +1795,41 @@ namespace OFScript
         if (mActors.isDead(victim) || cannotStrike(attacker))
             return result;
         result.mHit = true;
-        result.mDamage = hit.mDamage;
+        result.mDamage = dealt;
         result.mCritical = hit.mCritical;
 
         FalloutScript::CombatState::Hit struck;
         struck.mAttacker = attacker;
         struck.mWeapon = weapon;
-        struck.mDamage = hit.mDamage;
+        struck.mDamage = dealt;
         struck.mCritical = hit.mCritical;
         struck.mLimb = limb;
         mCombat.noteHit(victim, struck);
 
-        mActorValues.damage(victim, AV::health, hit.mDamage);
+        mActorValues.damage(victim, AV::health, dealt);
+        if (limb >= 0)
+        {
+            // The condition of the part goes down by the damage after the armor and before the multiplier of the part,
+            // as a share of the part's health; half as much for the player, as much as the weapon says it hurts limbs,
+            // and a perk of the one that is hurt may change that (its limbs take half with Adamantium Skeleton)
+            double limbDamage = mLimbs.limbDamage(victim, limb, hit.mDamage);
+            if (victim == mPlayer)
+            {
+                // Half of it when the settings say nothing (fCombatPlayerLimbDamageMult of both executables)
+                constexpr double playerLimbDamageMult = 0.5;
+                limbDamage *= gameSetting("fCombatPlayerLimbDamageMult", playerLimbDamageMult);
+            }
+            if (const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr)
+                if (record->mHasGameData && record->mGame.mLimbDamageMultiplier > 0)
+                    limbDamage *= record->mGame.mLimbDamageMultiplier;
+            limbDamage = mPerks.apply(Entry::limbDamage, victim, limbDamage, towardsAttacker);
+            result.mCrippled = mLimbs.hurt(victim, limb, limbDamage).mCrippled;
+        }
         // Who did the damage decides whether a kill by someone else pays the player
         if (attacker == mPlayer && attacker != 0)
         {
             const std::lock_guard lock(mPlayerDamageMutex);
-            mPlayerDamage[victim] += hit.mDamage;
+            mPlayerDamage[victim] += dealt;
         }
         if (mActorValues.current(victim, AV::health) > 0)
         {
@@ -1869,12 +1928,13 @@ namespace OFScript
     }
 
     FalloutScripts::FireResult FalloutScripts::fire(
-        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance)
+        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance, bool ignoreCooldown)
     {
         FireResult result;
         if (attacker == 0)
             return result;
         const WeaponStats stats = weaponStats(attacker);
+        if (!ignoreCooldown)
         {
             const std::lock_guard lock(mFireMutex);
             if (mFireCooldowns.count(attacker) != 0)

@@ -49,6 +49,10 @@ namespace FalloutScript
         void addItem(FormId holder, FormId item, int count);
         /// Takes away up to `count` of the item (all it has when it has fewer) and tells how many it took
         int removeItem(FormId holder, FormId item, int count);
+        /// Takes away all of the items (the form and how many) or none: false, and nothing taken, when the holder has
+        /// fewer of any. It is one step, so of two calls at once for the same items only as many succeed as the
+        /// holder has the items for.
+        bool takeItems(FormId holder, const std::vector<std::pair<FormId, int>>& wanted);
         /// Everything the holder has (the form of the item and how many, in the order of the forms). False when the
         /// host can not tell yet what the record holds, for a reference in a cell that is not loaded.
         bool items(FormId holder, std::vector<std::pair<FormId, int>>& result);
@@ -148,6 +152,10 @@ namespace FalloutScript
         void knowItems(FormId id, Holder& entry);
         /// The caller holds the lock
         void noteChange(FormId holder, FormId item, int count);
+        /// The caller holds the lock
+        int heldLocked(FormId id, FormId item);
+        /// The caller holds the lock
+        int removeLocked(FormId id, FormId item, int count);
         void knowFactions(FormId id, Holder& entry);
 
         ActorRecords& mRecords;

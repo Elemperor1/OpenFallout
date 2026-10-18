@@ -1542,13 +1542,30 @@ return {
             end
         end,
     },
+    eventHandlers = {
+        -- The player script asks for the bench when it is done with the level up: a script gives it the scrap and shows
+        -- the menu of the bench
+        OFTestArenaCraftNow = function()
+            stage(@CRAFT@)
+            world.players[1]:sendEvent('OFTestArenaCraft', {})
+        end,
+        -- The player script is done with the bench: V.A.T.S. is tried on the target, and its screen opened with it
+        OFTestArenaVatsNow = function()
+            world.players[1]:sendEvent('OFTestArenaVats', { target = find(@TARGET@) })
+        end,
+        OFTestArenaVatsOpen = function()
+            world.players[1]:sendEvent('OpenVats', { targets = { find(@TARGET@) } })
+        end,
+    },
 }
 """
 for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES))), ("@QUEST@", plugin.ARENA_QUEST_NAME),
                       ("@RAIDER@", str(plugin.ARENA_RAIDER_REF_ID)), ("@DUMMY@", str(plugin.ARENA_DUMMY_REF_ID)),
                       ("@BYSTANDER@", str(plugin.ARENA_BYSTANDER_REF_ID)),
+                      ("@TARGET@", str(plugin.ARENA_TARGET_REF_ID)),
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
+                      ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -1571,6 +1588,10 @@ local lootFrames = nil
 local levelFrames = nil
 local levelSeen = 0
 local levelEscape = nil
+-- Frames since the bench was asked for
+local craftFrames = nil
+-- V.A.T.S.: the target, the frames since it was asked for, and the action points after the attacks
+local vatsTarget, vatsFrames, vatsPoints, vatsStart = nil, nil, 0, nil
 
 return {
     eventHandlers = {
@@ -1596,6 +1617,13 @@ return {
         end,
         OFTestArenaLevel = function()
             levelFrames = 0
+        end,
+        OFTestArenaCraft = function()
+            craftFrames = 0
+        end,
+        OFTestArenaVats = function(data)
+            vatsTarget = data.target
+            vatsFrames = 0
         end,
         OFTestArenaFire = function(data)
             target = data.target
@@ -1677,6 +1705,106 @@ return {
                 elseif levelEscape == 120 then
                     print('OFTEST', 'arena', 'levelgone', 'mode=' .. tostring(I.UI.getMode()))
                     levelEscape = nil
+                    core.sendGlobalEvent('OFTestArenaCraftNow', {})
+                end
+            end
+            if craftFrames then
+                craftFrames = craftFrames + 1
+                if craftFrames == 10 then
+                    craftFrames = nil
+                    local pipboy = core.pipboy
+                    local menu = pipboy.recipes()
+                    if not menu then
+                        print('OFTEST', 'arena', 'recipes', 'none')
+                    else
+                        local statuses, ready, hard = {}, nil, nil
+                        for _, recipe in ipairs(menu.recipes) do
+                            statuses[#statuses + 1] = recipe.status
+                            if recipe.status == 'ready' then ready = recipe elseif recipe.status == 'skill' then hard = recipe end
+                        end
+                        local ingredient = ready and ready.ingredients[1]
+                        print('OFTEST', 'arena', 'recipes', string.format('name=%s mode=%s count=%d statuses=%s scrap=%s',
+                            menu.name, tostring(I.UI.getMode()), #menu.recipes, table.concat(statuses, ','),
+                            ingredient and string.format('%d/%d', ingredient.have, ingredient.count) or 'none'))
+                        local function count(id)
+                            for _, item in ipairs(pipboy.items()) do
+                                if item.id == id then return item.count end
+                            end
+                            return 0
+                        end
+                        local rounds = ready and ready.outputs[1].id or ''
+                        local before = count(rounds)
+                        local made = ready and pipboy.craft(ready.id) or 'none'
+                        local denied = hard and pipboy.craft(hard.id) or 'none'
+                        local again = ready and pipboy.craft(ready.id) or 'none'
+                        print('OFTEST', 'arena', 'craft', string.format('made=%s denied=%s again=%s gained=%d', made, denied,
+                            again, count(rounds) - before))
+                        pipboy.closeRecipes()
+                    end
+                    core.sendGlobalEvent('OFTestArenaVatsNow', {})
+                end
+            end
+            if vatsFrames then
+                vatsFrames = vatsFrames + 1
+                local vats = core.vats
+                if vatsFrames == 1 then
+                    local state, parts = vats.state(), vats.parts(vatsTarget)
+                    local names, chances = {}, {}
+                    for _, part in ipairs(parts) do
+                        names[#names + 1] = part.target
+                        chances[#chances + 1] = string.format('%.0f', part.chance)
+                    end
+                    print('OFTEST', 'arena', 'vats', string.format(
+                        'usable=%s can=%s points=%.0f/%.0f cost=%.0f parts=%s chances=%s', tostring(state.usable),
+                        tostring(vats.canTarget(vatsTarget)), state.actionPoints, state.maxActionPoints, state.cost,
+                        table.concat(names, ','), table.concat(chances, ',')))
+                elseif vatsFrames == 5 then
+                    -- The screen opens on the target it is given, once the bench is out of the way
+                    if I.UI.getMode() ~= nil then
+                        vatsFrames = 4
+                    else
+                        core.sendGlobalEvent('OFTestArenaVatsOpen', {})
+                    end
+                elseif vatsFrames == 15 then
+                    print('OFTEST', 'arena', 'vatsscreen', string.format('mode=%s open=%s', tostring(I.UI.getMode()),
+                        tostring(vats.state().open)))
+                    I.UI.removeMode('Interface')
+                elseif vatsFrames == 17 then
+                    print('OFTEST', 'arena', 'vatsclosed', string.format('mode=%s open=%s', tostring(I.UI.getMode()),
+                        tostring(vats.state().open)))
+                    -- Attacks at the head until one hits (the points allow three)
+                    local head = nil
+                    for _, part in ipairs(vats.parts(vatsTarget)) do
+                        if part.target == 'Head' then head = part end
+                    end
+                    local before = vats.state().actionPoints
+                    local made, hit = 0, nil
+                    while head and not hit and made < 4 do
+                        local result = vats.attack(vatsTarget, head.index)
+                        if result.refused then
+                            print('OFTEST', 'arena', 'vatsrefused', result.refused)
+                            break
+                        end
+                        made = made + 1
+                        if result.hit then hit = result end
+                    end
+                    local after = vats.state()
+                    vatsPoints = after.actionPoints
+                    local after_parts = {}
+                    for _, part in ipairs(vats.parts(vatsTarget)) do
+                        after_parts[part.target] = part.condition
+                    end
+                    print('OFTEST', 'arena', 'vatsattack', string.format(
+                        'made=%d hit=%s spent=%.0f crippled=%s killed=%s head=%.0f torso=%.0f', made,
+                        tostring(hit ~= nil), before - after.actionPoints, tostring(hit and hit.crippled),
+                        tostring(hit and hit.killed), after_parts['Head'] or -1, after_parts['Torso'] or -1))
+                    local again = vats.attack(vatsTarget, head and head.index or 0)
+                    print('OFTEST', 'arena', 'vatsdead', tostring(again.refused))
+                    vatsStart = core.getSimulationTime()
+                elseif vatsStart and core.getSimulationTime() - vatsStart >= 1.5 then
+                    -- The action points come back while V.A.T.S. is closed
+                    print('OFTEST', 'arena', 'vatsregen', tostring(vats.state().actionPoints > vatsPoints))
+                    vatsFrames, vatsStart = nil, nil
                 end
             end
         end,
@@ -2410,8 +2538,10 @@ def check_arena(text):
                         f"of the pistol): {final}")
     if final["raider_ammo"] >= plugin.ARENA_RAIDER_AMMO:
         problems.append(f"the raider should have taken its pistol and shot rounds with it: {final}")
-    if final["health"] >= armed["health"]:
-        problems.append(f"the player should have lost health to the raider: {armed['health']} before, {final['health']} after")
+    # The levels the player gained (5.8 seconds in) added health, so the baseline is the first look after them
+    if final["health"] >= reports["raider 6"]["health"]:
+        problems.append("the player should have lost health to the raider: "
+                        f"{reports['raider 6']['health']} before, {final['health']} after")
     # The bystander never starts a fight, has no package and no weapon: shot once, it has to go for the player
     shot_at = re.findall(r"OFTEST\tarena\tbystander shot\t(\d+)\thit=(\w+) damage=[\d.]+ killed=(\w+)$", text, re.M)
     if len(shot_at) != 1 or shot_at[0][1] != "true" or shot_at[0][2] != "false":
@@ -2497,6 +2627,66 @@ def check_arena_screens(text):
             problems.append(f"the points of the level up should all have been given: {level_back.group(0)}")
     if "OFTEST\tarena\tlevelgone\tmode=nil" not in text:
         problems.append("the screen of the level up should be gone once every point was given")
+    recipes = re.search(r"OFTEST\tarena\trecipes\t(.*)$", text, re.M)
+    want = (f"name={plugin.ARENA_CATEGORY_NAME} mode=Interface count=2 statuses=ready,skill "
+            f"scrap={plugin.ARENA_SCRAP_GIVEN}/{plugin.ARENA_RECIPE_SCRAP}")
+    if not recipes or recipes.group(1) != want:
+        problems.append("the script of the bench should have shown the menu of recipes in a window that stops the game, "
+                        f"with the recipe the player can make and the one it lacks the skill for: want '{want}', "
+                        f"found '{recipes.group(1) if recipes else 'no line'}'")
+    craft = re.search(r"OFTEST\tarena\tcraft\t(.*)$", text, re.M)
+    want = f"made=made denied=skill again=items gained={plugin.ARENA_RECIPE_ROUNDS}"
+    if not craft or craft.group(1) != want:
+        problems.append("making the first recipe should take its scrap and give its rounds, the recipe of too much skill "
+                        f"should be denied, and a second making should lack scrap: want '{want}', found "
+                        f"'{craft.group(1) if craft else 'no line'}'")
+    problems += check_arena_vats(text)
+    return problems
+
+
+def check_arena_vats(text):
+    """The problems with V.A.T.S.: the player can target the character in front of it, whose body (the part data of its
+    race) has four parts that V.A.T.S. can aim at, each with its chance (the most is 95 percent, a part's own chance counts);
+    the screen opens on it and stops the game, and closing it tells the engine; the attacks at the head cost 25 action
+    points each, cripple the head (and kill the target, which has 10 health), a dead target is refused, and the action
+    points come back while V.A.T.S. is closed."""
+    problems = []
+    info = re.search(r"OFTEST\tarena\tvats\tusable=(\w+) can=(\w+) points=([\d.]+)/([\d.]+) cost=([\d.]+) parts=(.*?) "
+                     r"chances=(.*)$", text, re.M)
+    if not info:
+        return ["no 'arena vats' line in the log (core.vats did not tell what the player can target)"]
+    usable, can, points, most, cost, parts, chances = info.groups()
+    if usable != "true" or can != "true":
+        problems.append(f"V.A.T.S. should be usable and the target in front of the player in reach: {info.group(0)}")
+    if parts != "Torso,Head,Left Arm,Right Leg":
+        problems.append(f"V.A.T.S. should offer the four parts the race gives a target name (not the spine): {info.group(0)}")
+    if chances != "95,95,60,80":
+        problems.append("the chances should be the part's own (100, 100, 30, 40) twice over for a rifle shot at this "
+                        f"distance (the most that the area of the target counts), at most 95: {info.group(0)}")
+    if float(cost) != 25 or float(points) < 75 or float(points) > float(most):
+        problems.append(f"an attack with a rifle should cost 25 of the player's action points: {info.group(0)}")
+    for tag, want in (("vatsscreen", "mode=Interface open=true"), ("vatsclosed", "mode=nil open=false")):
+        line = re.search(r"OFTEST\tarena\t" + tag + r"\t(.*)$", text, re.M)
+        if not line or line.group(1) != want:
+            problems.append(f"V.A.T.S. '{tag}' should be '{want}': {line.group(1) if line else 'no line'}")
+    attack = re.search(r"OFTEST\tarena\tvatsattack\tmade=(\d+) hit=(\w+) spent=([\d.]+) crippled=(\w+) killed=(\w+) "
+                       r"head=(-?\d+) torso=(-?\d+)$", text, re.M)
+    if not attack:
+        problems.append("no 'arena vatsattack' line in the log")
+    else:
+        made, hit, spent, crippled, killed, head, torso = attack.groups()
+        if hit != "true" or float(spent) != 25 * int(made):
+            problems.append(f"an attack should hit (95 percent) and cost 25 points: {attack.group(0)}")
+        if crippled != "true" or int(head) > 0 or int(torso) != 100:
+            problems.append(f"the hit at the head should cripple the head and leave the torso alone: {attack.group(0)}")
+        if killed != "true":
+            problems.append(f"the target (10 health) should have died of a head shot of 20: {attack.group(0)}")
+    dead = re.search(r"OFTEST\tarena\tvatsdead\t(\w+)$", text, re.M)
+    if not dead or dead.group(1) != "dead":
+        problems.append(f"an attack at the dead target should be refused as 'dead': {dead.group(1) if dead else 'no line'}")
+    regen = re.search(r"OFTEST\tarena\tvatsregen\t(\w+)$", text, re.M)
+    if not regen or regen.group(1) != "true":
+        problems.append("the action points should come back while V.A.T.S. is closed")
     return problems
 
 

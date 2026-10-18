@@ -36,6 +36,7 @@ namespace FalloutScript
         constexpr int addictionChance = 23;
         constexpr int chemDuration = 25;
         constexpr int drinkingRadiation = 26;
+        constexpr int calculateGunSpread = 34;
         constexpr int enemyCriticalChance = 36;
         constexpr int actionPointRegen = 39;
         constexpr int actionPointCost = 40;
@@ -43,6 +44,8 @@ namespace FalloutScript
         constexpr int attackSpeed = 43;
         constexpr int thresholdDefender = 56;
         constexpr int thresholdAttacker = 58;
+        /// New Vegas: whether the perks make the player see through invisibility in V.A.T.S.
+        constexpr int improvedDetection = 69;
     }
 
     /// The conditions of a group of an entry. The run on says who they are about: see PerkEngine::contextFor.

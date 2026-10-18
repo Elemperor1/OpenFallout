@@ -33,6 +33,7 @@
 #include "regionbindings.hpp"
 #include "soundbindings.hpp"
 #include "stats.hpp"
+#include "vatsbindings.hpp"
 #include "weatherbindings.hpp"
 
 namespace OFLua
@@ -131,6 +132,8 @@ namespace OFLua
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
             api["pipboy"] = context.cachePackage(
                 "openfallout_core_pipboy", [context]() { return initCorePipboyBindings(context); });
+            api["vats"]
+                = context.cachePackage("openfallout_core_vats", [context]() { return initCoreVatsBindings(context); });
 
             const OFWorld::Store<ESM::GameSetting>* gmstStore
                 = &OFBase::Environment::get().getESMStore()->get<ESM::GameSetting>();

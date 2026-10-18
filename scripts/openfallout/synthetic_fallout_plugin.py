@@ -426,6 +426,20 @@ ARENA_SETUP_STAGE = 10
 ARENA_LEVEL_STAGE = 11  # rewards the experience of the levels 2 and 3
 ARENA_LEVEL_XP = 600
 ARENA_DUMMY_ITEM_COUNT = 5  # rounds the dummy carries, for the loot window
+# The bench of the arena (New Vegas crafting): a category with a sub-category, a recipe the player can make (it takes
+# scrap and gives rounds) and one that needs more skill than the player has; the stage gives the scrap and shows the menu
+ARENA_CRAFT_STAGE = 13
+ARENA_CATEGORY_ID = 0x94E
+ARENA_SUB_CATEGORY_ID = 0x94F
+ARENA_RECIPE_ID = 0x950
+ARENA_RECIPE_HARD_ID = 0x951
+ARENA_SCRAP_ID = 0x952
+ARENA_CATEGORY_NAME = "Test Bench"
+ARENA_SUB_CATEGORY_NAME = "Ammo"
+ARENA_SCRAP_GIVEN = 3
+ARENA_RECIPE_SCRAP = 2
+ARENA_RECIPE_ROUNDS = 7
+ARENA_RECIPE_SKILL = 32  # barter, the first of the skills
 # The stages that tell what the game knows, one for each time the test looks (a stage is set once)
 ARENA_PROBE_STAGES = tuple(range(20, 60))
 ARENA_DUMMY_PLACE = (400.0, 0.0, 0.0)
@@ -448,7 +462,20 @@ ARENA_BYSTANDER_REF_ID = 0x94C
 ARENA_GRENADE_ID = 0x94D
 ARENA_GRENADE_COUNT = 2
 ARENA_GRENADE_STAGE = 12
-LAST_ID = 0x94D # the largest form ID of the plugin, which the next object ID of its header follows
+# The target of V.A.T.S.: a character like the dummy, who stands in front of the player and is not shot at by the others
+ARENA_TARGET_ID = 0x953
+ARENA_TARGET_REF_ID = 0x954
+BODY_PARTS_ID = 0x1D  # the number of the DefaultBodyPartData of the games, which every character that is not the player has
+ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
+# The body part data every character has (the BPTD of the games with the number 0x1D, in the first master): the name of the
+# part, what V.A.T.S. calls it (empty: it can not be aimed at), the damage multiplier, the share of the health that the part
+# stands for, the actor value of its condition (the head is the condition of perception, the torso of endurance, the left arm
+# of the left attack, the right leg of the right mobility), its own chance to be hit, and its type (0 torso, 1 head, 3 left
+# arm, 10 right leg, 13 brain), which is the hit location a script is told
+BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100, 0), ("Head", "Head", 2.0, 50, 25, 100, 1),
+              ("LeftArm", "Left Arm", 0.5, 25, 27, 30, 3), ("RightLeg", "Right Leg", 0.5, 25, 30, 40, 10),
+              ("Spine", "", 1.0, 100, -1, 100, 13))
+LAST_ID = 0x954 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1593,6 +1620,25 @@ def race(form_id=RACE_ID, name=RACE_NAME):
                                      *part(2, "righthand"), sub(b"FNAM")])
 
 
+def body_parts():
+    """The BPTD record of every character that is not the player (the number 0x1D): the parts of BODY_PARTS, each with its
+    name (BPTN), node (BPNN), the name V.A.T.S. shows (BPNT), the 84 bytes of BPND (damage multiplier, flags, part type, share
+    of health, actor value of the condition as a signed byte, chance to be hit) and NAM4, which ends the part."""
+    subs = [zstr(b"EDID", "OFTestBodyParts")]
+    for name, target, mult, health, value, to_hit, part_type in BODY_PARTS:
+        data = bytearray(84)
+        struct.pack_into("<f", data, 0, mult)
+        data[5] = part_type
+        data[6] = health
+        struct.pack_into("<b", data, 7, value)
+        data[8] = to_hit
+        subs += [zstr(b"BPTN", name), zstr(b"BPNN", "Bip01 " + name)]
+        if target:
+            subs.append(zstr(b"BPNT", target))
+        subs += [sub(b"BPND", bytes(data)), zstr(b"NAM4", "Bip01 " + name)]
+    return record(b"BPTD", BODY_PARTS_ID, subs)
+
+
 def hair():
     """A HAIR record with a model."""
     return record(b"HAIR", HAIR_ID, [zstr(b"EDID", "OFTestHair"), zstr(b"FULL", "OpenFallout Test Hair"),
@@ -2060,6 +2106,9 @@ def plugin():
                                                  watch_script("exterior"), *arena_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
             + top_group(b"AMMO", [arena_ammo()])
+            + top_group(b"MISC", [arena_scrap()])
+            + top_group(b"RCCT", arena_categories())
+            + top_group(b"RCPE", arena_recipes())
             + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
                                   arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
                                                ARENA_PISTOL_RANGE, 2.0),
@@ -2073,6 +2122,7 @@ def plugin():
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
             + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
+            + top_group(b"BPTD", [body_parts()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
             + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
@@ -2098,6 +2148,32 @@ def arena_ammo():
     """An AMMO record of Fallout 3: the speed, the flags, the value and the rounds of a clip (13 bytes)."""
     return record(b"AMMO", ARENA_AMMO_ID, [zstr(b"EDID", "OFTestArenaAmmo"), zstr(b"FULL", "Test Rounds"),
                                            sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
+
+
+def arena_scrap():
+    """A MISC item of Fallout 3: the value and the weight (8 bytes)."""
+    return record(b"MISC", ARENA_SCRAP_ID, [zstr(b"EDID", "OFTestArenaScrap"), zstr(b"FULL", "Test Scrap"),
+                                            sub(b"DATA", struct.pack("<if", 3, 1.0))])
+
+
+def arena_categories():
+    """The category of the bench and its sub-category (RCCT of New Vegas: names and a byte of flags)."""
+    return [record(b"RCCT", ARENA_CATEGORY_ID, [zstr(b"EDID", "OFTestArenaBench"), zstr(b"FULL", ARENA_CATEGORY_NAME),
+                                                sub(b"DATA", bytes([0]))]),
+            record(b"RCCT", ARENA_SUB_CATEGORY_ID, [zstr(b"EDID", "OFTestArenaBenchAmmo"),
+                                                    zstr(b"FULL", ARENA_SUB_CATEGORY_NAME), sub(b"DATA", bytes([1]))])]
+
+
+def arena_recipes():
+    """The recipes of the bench (RCPE of New Vegas): DATA (skill, level, category, sub-category), then the ingredients
+    (RCIL, RCQY) and the results (RCOD, RCQY). The first needs a skill of 1, which the player has, the second 100."""
+    def recipe(form_id, name, level):
+        return record(b"RCPE", form_id, [
+            zstr(b"EDID", "OFTestArena" + name), zstr(b"FULL", "Make " + name),
+            sub(b"DATA", struct.pack("<IIII", ARENA_RECIPE_SKILL, level, ARENA_CATEGORY_ID, ARENA_SUB_CATEGORY_ID)),
+            sub(b"RCIL", struct.pack("<I", ARENA_SCRAP_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_SCRAP)),
+            sub(b"RCOD", struct.pack("<I", ARENA_AMMO_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_ROUNDS))])
+    return [recipe(ARENA_RECIPE_ID, "Rounds", 1), recipe(ARENA_RECIPE_HARD_ID, "Better Rounds", 100)]
 
 
 def arena_weapon(form_id, name, damage, max_range, attacks_per_second, grenade=False):
@@ -2149,7 +2225,8 @@ def arena_quest():
     glob = {name: index[ARENA_GLOBALS[name][0]] for name in names}
     setup = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(rifle), sf.int_argument(1)),
              sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(ARENA_PLAYER_AMMO)),
-             sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle))]
+             sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle)),
+             sf.call_on(player, sf.SET_ACTOR_VALUE, sf.u16(AV_GUNS), sf.int_argument(100))]
     probe = [
         sf.set_to(sf.global_target(glob["armed"]), sf.call_token(sf.GET_EQUIPPED, sf.form_argument(rifle), reference=player)),
         sf.set_to(sf.global_target(glob["weapon_out"]), sf.call_token(sf.IS_WEAPON_OUT, reference=player)),
@@ -2160,14 +2237,21 @@ def arena_quest():
         sf.set_to(sf.global_target(glob["raider_combat"]), sf.call_token(sf.IS_IN_COMBAT, reference=raider)),
         sf.set_to(sf.global_target(glob["raider_ammo"]),
                   sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=raider))]
-    # The stages that follow give the player experience (for two levels) and grenades, which it throws at the end
+    # The stages that follow give the player experience (for two levels), scrap for the bench, and grenades, which it
+    # throws at the end
     grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
     grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
                 sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
+    # The scrap is given and the menu of the bench is shown on a reference (the dummy stands for the bench), as the
+    # script of a workbench does: the reference of the call is the bench, not the player
+    craft_forms = [PLAYER_REFERENCE, ARENA_SCRAP_ID, ARENA_CATEGORY_ID, ARENA_DUMMY_REF_ID]
+    craft = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_SCRAP_GIVEN)),
+             sf.call_on(4, sf.SHOW_RECIPE_MENU, sf.form_argument(3))]
     entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
                (ARENA_LEVEL_STAGE, "The player gains experience.", 0, [],
                 [sf.call(sf.REWARD_XP, sf.int_argument(ARENA_LEVEL_XP))], forms),
-               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms)]
+               (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms),
+               (ARENA_CRAFT_STAGE, "The bench is used.", 0, [], craft, craft_forms)]
     entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
     return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
 
@@ -2184,7 +2268,9 @@ def arena_people():
     # Never starts a fight (aggression 0), has no package and no weapon, and does not run from one (confidence 4): the
     # test shoots it once, and it has to go for the player with its hands
     bystander = person(ARENA_BYSTANDER_ID, "OFTestArenaBystander", dressed=False, ai=(0, 4))
-    return [dummy, raider, bystander]
+    target = person(ARENA_TARGET_ID, "OFTestArenaTarget", dressed=False, health=ARENA_DUMMY_HEALTH,
+                    attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
+    return [dummy, raider, bystander, target]
 
 
 def arena_cell():
@@ -2198,7 +2284,8 @@ def arena_cell():
         refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
         achr(ARENA_DUMMY_REF_ID, ARENA_DUMMY_PLACE, base=ARENA_DUMMY_ID),
         achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
-        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID)])
+        achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID),
+        achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID)])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
     return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])

@@ -162,6 +162,27 @@ namespace
         EXPECT_EQ(state.removeItem(player, caps, 1), 0);
     }
 
+    TEST(FalloutScriptActorStateTest, taking_items_takes_all_of_them_or_none)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, caps, 5);
+        state.addItem(player, stimpak, 1);
+
+        // One of the two is short: nothing is taken
+        EXPECT_FALSE(state.takeItems(player, { { caps, 3 }, { stimpak, 2 } }));
+        EXPECT_EQ(state.itemCount(player, caps), 5);
+        EXPECT_EQ(state.itemCount(player, stimpak), 1);
+        // The same item named twice counts both times
+        EXPECT_FALSE(state.takeItems(player, { { caps, 3 }, { caps, 3 } }));
+        EXPECT_EQ(state.itemCount(player, caps), 5);
+        EXPECT_TRUE(state.takeItems(player, { { caps, 3 }, { caps, 2 }, { stimpak, 1 } }));
+        EXPECT_EQ(state.itemCount(player, caps), 0);
+        EXPECT_EQ(state.itemCount(player, stimpak), 0);
+        // Nothing to take is taken
+        EXPECT_TRUE(state.takeItems(player, {}));
+    }
+
     TEST(FalloutScriptActorStateTest, a_count_that_is_not_positive_changes_nothing)
     {
         FakeRecords records;

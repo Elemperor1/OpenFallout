@@ -162,7 +162,9 @@ set(BUILTIN_DATA_FILES
     scripts/omw/crimes.lua
     scripts/omw/falloutchargen.lua
     scripts/omw/falloutcombat.lua
+    scripts/omw/falloutcraft.lua
     scripts/omw/falloutdeath.lua
+    scripts/omw/falloutvats.lua
     scripts/omw/falloutloot.lua
     scripts/omw/falloutpipboy.lua
     scripts/omw/falloutwidgets.lua
