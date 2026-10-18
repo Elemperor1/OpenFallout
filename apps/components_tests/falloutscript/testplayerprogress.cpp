@@ -32,6 +32,8 @@ namespace
     // The codes of the commands in the table of the games
     constexpr std::uint16_t OpRewardXP = 0x1177;
     constexpr std::uint16_t OpRewardKarma = 0x1204;
+    constexpr std::uint16_t OpSetLevel = 0x1133;
+    constexpr std::uint16_t OpResetXP = 0x126D;
     constexpr std::uint16_t OpAddPerk = 0x1176;
     constexpr std::uint16_t OpRemovePerk = 0x11A8;
     constexpr std::uint16_t OpHasPerk = 0x11C1;
@@ -208,6 +210,42 @@ namespace
 
         EXPECT_EQ(setup.mProgress.experience(), 150);
         EXPECT_EQ(setup.mProgress.karma(), -45);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPlayerProgressCommandsTest, a_script_sets_the_level_of_the_player_and_takes_its_experience)
+    {
+        Runner levelled;
+        ScriptBuilder levelling;
+        levelling.code(
+            scriptName() + begin(BlockType::OnActivate) + command(OpSetLevel, arguments(1).add(intArg(5))) + end());
+        levelled.run(player, levelling);
+        EXPECT_EQ(levelled.mProgress.level(), 5);
+        EXPECT_EQ(levelled.mProgress.experience(), 1700);
+
+        Runner reset;
+        ScriptBuilder resetting;
+        resetting.code(scriptName() + begin(BlockType::OnActivate) + command(OpRewardXP, arguments(1).add(intArg(300)))
+            + command(OpResetXP, arguments(0)) + end());
+        reset.run(player, resetting);
+        EXPECT_EQ(reset.mProgress.level(), 1);
+        EXPECT_EQ(reset.mProgress.experience(), 0);
+        EXPECT_THAT(reset.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPlayerProgressCommandsTest, the_level_of_someone_else_leaves_the_player_alone)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t target = builder.form(companion);
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpRewardXP, arguments(1).add(intArg(300)))
+            + command(OpSetLevel, arguments(1).add(intArg(9)), target) + command(OpResetXP, arguments(0), target)
+            + end());
+
+        setup.run(player, builder);
+
+        EXPECT_EQ(setup.mProgress.experience(), 300);
+        EXPECT_EQ(setup.mProgress.level(), 2);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 

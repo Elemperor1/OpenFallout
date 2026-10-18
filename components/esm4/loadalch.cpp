@@ -30,6 +30,7 @@
 #include <stdexcept>
 
 #include "reader.hpp"
+#include "recordreader.hpp"
 //#include "writer.hpp"
 
 void ESM4::Potion::load(ESM4::Reader& reader)
@@ -97,6 +98,22 @@ void ESM4::Potion::load(ESM4::Reader& reader)
                 reader.get(mEffects.back().mData);
                 mEffects.back().mHasData = true;
                 break;
+            case ESM::fourCC("CTDA"):
+            {
+                // The condition of Skyrim has one more parameter than the games of this project: it is left unread, as
+                // it always was
+                if (subHdr.dataSize > sizeof(TargetCondition))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                // The conditions of an effect follow it (EFID, EFIT, CTDA*); there are none before the first effect
+                TargetCondition condition;
+                RecordReader(reader, "ALCH").condition(condition);
+                if (!mEffects.empty())
+                    mEffects.back().mConditions.push_back(condition);
+                break;
+            }
             case ESM::fourCC("YNAM"):
                 reader.getFormId(mPickUpSound);
                 break;
@@ -107,7 +124,6 @@ void ESM4::Potion::load(ESM4::Reader& reader)
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
-            case ESM::fourCC("CTDA"):
             case ESM::fourCC("KSIZ"):
             case ESM::fourCC("KWDA"):
             case ESM::fourCC("OBND"):

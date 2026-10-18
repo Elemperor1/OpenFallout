@@ -51,6 +51,7 @@
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadavif.hpp>
 #include <components/esm4/loadbook.hpp>
+#include <components/esm4/loadbptd.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadclmt.hpp>
 #include <components/esm4/loadclot.hpp>
@@ -70,6 +71,7 @@
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadinfo.hpp>
 #include <components/esm4/loadingr.hpp>
+#include <components/esm4/loadkeym.hpp>
 #include <components/esm4/loadland.hpp>
 #include <components/esm4/loadlgtm.hpp>
 #include <components/esm4/loadligh.hpp>
@@ -78,8 +80,10 @@
 #include <components/esm4/loadlvli.hpp>
 #include <components/esm4/loadlvln.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadmgef.hpp>
 #include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadmstt.hpp>
+#include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadotft.hpp>
 #include <components/esm4/loadpack.hpp>
@@ -87,11 +91,14 @@
 #include <components/esm4/loadproj.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrace.hpp>
+#include <components/esm4/loadrcct.hpp>
+#include <components/esm4/loadrcpe.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadscol.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsndr.hpp>
 #include <components/esm4/loadsoun.hpp>
+#include <components/esm4/loadspel.hpp>
 #include <components/esm4/loadstat.hpp>
 #include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadterm.hpp>

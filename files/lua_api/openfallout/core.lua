@@ -1461,6 +1461,208 @@
 -- @field #boolean downed Whether the victim fell unconscious.
 
 ---
+-- @{#Pipboy}: what the player's character is and carries, for the screens of the Pip-Boy, the level up and the loot of
+-- containers in Fallout 3 or New Vegas. The holders of items are told by their form ids, as `core.getFormId` writes
+-- one; the player when it is left out. The words are those of the game settings of the files. Not available in load
+-- scripts.
+-- @field [parent=#core] #Pipboy pipboy
+
+---
+-- @type Pipboy
+
+---
+-- Whether the content is that of Fallout 3 or New Vegas.
+-- @function [parent=#Pipboy] available
+-- @return #boolean
+
+---
+-- The form id of the player.
+-- @function [parent=#Pipboy] player
+-- @return #string
+
+---
+-- The text of a game setting of the files, such as `sInventoryWeapons`.
+-- @function [parent=#Pipboy] text
+-- @param #string name
+-- @return #string "" when the files have no such setting.
+
+---
+-- The value of a game setting that is a number, such as `fPlayerDeathReloadTime`.
+-- @function [parent=#Pipboy] setting
+-- @param #string name
+-- @return #number Nil when the files have no such setting.
+
+---
+-- How the character is now.
+-- @function [parent=#Pipboy] stats
+-- @return #PipboyStats
+
+---
+-- @type PipboyStats
+-- @field #number level
+-- @field #number experience
+-- @field #number levelStart The experience this level started at.
+-- @field #number nextLevel The experience the next level needs.
+-- @field #number karma
+-- @field #string karmaTitle The title that goes with the karma and the level.
+-- @field #number health
+-- @field #number maxHealth
+-- @field #number actionPoints
+-- @field #number maxActionPoints
+-- @field #number weight What the character carries.
+-- @field #number maxWeight What it can carry.
+-- @field #number caps
+-- @field #number skillPoints The points that can still be spent on skills.
+-- @field #number perkPoints The perks that can still be chosen.
+-- @field #number armorRating
+-- @field #number threshold What the armor worn takes off every blow.
+
+---
+-- The seven attributes of SPECIAL, in order.
+-- @function [parent=#Pipboy] attributes
+-- @return #list<#PipboyValue>
+
+---
+-- The skills of the character.
+-- @function [parent=#Pipboy] skills
+-- @return #list<#PipboyValue>
+
+---
+-- @type PipboyValue
+-- @field #number number The number of the actor value.
+-- @field #string name
+-- @field #string description
+-- @field #number value What the character has now.
+-- @field #number base What it has before anything adds to it.
+-- @field #boolean tagged Skills only.
+-- @field #string level The word for how good the skill is (skills only).
+
+---
+-- The perks of the player with their ranks.
+-- @function [parent=#Pipboy] perks
+-- @return #list<#PipboyPerk>
+
+---
+-- The perks of the level-up list, the ones the player can choose from with a perk point first. The rest are
+-- listed too, for the player to see what is coming (`available` is false for them).
+-- @function [parent=#Pipboy] offeredPerks
+-- @return #list<#PipboyPerk>
+
+---
+-- @type PipboyPerk
+-- @field #string id
+-- @field #string name
+-- @field #string description
+-- @field #number rank The rank the player has (0 for none).
+-- @field #number ranks The highest rank.
+-- @field #boolean available False for a perk of the level-up list that cannot be chosen yet.
+
+---
+-- The quests the player follows with the objectives it was told about.
+-- @function [parent=#Pipboy] quests
+-- @return #list<#PipboyQuest>
+
+---
+-- @type PipboyQuest
+-- @field #string id
+-- @field #string name
+-- @field #boolean completed
+-- @field #list<#PipboyObjective> objectives
+
+---
+-- @type PipboyObjective
+-- @field #string text
+-- @field #boolean completed
+
+---
+-- What the holder carries.
+-- @function [parent=#Pipboy] items
+-- @param #string holder The player when it is left out.
+-- @return #list<#PipboyItem>
+
+---
+-- @type PipboyItem
+-- @field #string id
+-- @field #string name
+-- @field #number count
+-- @field #number weight What one weighs.
+-- @field #number value What one is worth.
+-- @field #string category The tab it is listed under: "weapons", "apparel", "aid", "misc" or "ammo".
+-- @field #boolean equipped Whether it is worn or held.
+-- @field #number damage Weapons.
+-- @field #number rating Armor.
+-- @field #number threshold Armor.
+
+---
+-- The player does with the item what it is for: wears, holds or takes off a weapon, armor or ammunition, uses up an aid
+-- item, reads a book.
+-- @function [parent=#Pipboy] use
+-- @param #string item
+-- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
+
+---
+-- The player drops items in front of it.
+-- @function [parent=#Pipboy] drop
+-- @param #string item
+-- @param #number count One by default.
+-- @return #number How many were dropped.
+
+---
+-- Items go from one holder to another.
+-- @function [parent=#Pipboy] transfer
+-- @param #string from
+-- @param #string to
+-- @param #string item
+-- @param #number count
+-- @return #number How many moved.
+
+---
+-- The player opens or closes a container, which the scripts of the container hear of.
+-- @function [parent=#Pipboy] containerOpened
+-- @param #string container
+-- @param #boolean opened
+
+---
+-- The levels the player reached since this was last called.
+-- @function [parent=#Pipboy] takeLevelUps
+-- @return #list<#PipboyLevelUp>
+
+---
+-- @type PipboyLevelUp
+-- @field #number level
+-- @field #number skillPoints The points the level gave.
+-- @field #boolean perk Whether it gave a perk to choose.
+
+---
+-- Spends skill points on a skill (a skill is at most 100).
+-- @function [parent=#Pipboy] spendSkillPoints
+-- @param #number skill The number of the skill.
+-- @param #number points
+-- @return #number How many were spent.
+
+---
+-- Takes skill points back from a skill, as the screen of the level up does for the points it gave itself.
+-- @function [parent=#Pipboy] refundSkillPoints
+-- @param #number skill The number of the skill.
+-- @param #number points
+-- @return #number How many were taken back.
+
+---
+-- Spends the perk point on one of the perks that are offered.
+-- @function [parent=#Pipboy] choosePerk
+-- @param #string perk
+-- @return #boolean False when the perk is not offered or there is no perk point.
+
+---
+-- Whether the player is dead.
+-- @function [parent=#Pipboy] playerDead
+-- @return #boolean
+
+---
+-- The game asks whether to load the most recent save, as it does when the player has died.
+-- @function [parent=#Pipboy] askReload
+
+---
 -- Depending on which store this read-only dialogue record is from, it may either be a journal, topic, greeting, persuasion or voice.
 -- @type DialogueRecord
 -- @field #string id Record identifier

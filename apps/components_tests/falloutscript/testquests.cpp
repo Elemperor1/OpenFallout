@@ -424,6 +424,32 @@ namespace
         EXPECT_FALSE(setup.mQuests.running(questC));
     }
 
+    TEST(FalloutScriptQuestsTest, the_pipboy_lists_a_quest_that_runs_and_one_that_is_over_even_when_it_is_stopped)
+    {
+        Runner setup;
+        setup.mRecords.addQuest(questA);
+        ESM4::Quest& failing = setup.mRecords.addQuest(questB);
+        TestRecords::addEntry(failing, 30, "", ESM4::QuestLogEntry::Flag_FailQuest);
+        setup.start();
+
+        EXPECT_FALSE(setup.mQuests.state(questA)->listed());
+        setup.mQuests.start(questA);
+        EXPECT_TRUE(setup.mQuests.state(questA)->listed());
+        // A quest that is stopped before it is over is not listed
+        setup.mQuests.stop(questA);
+        EXPECT_FALSE(setup.mQuests.state(questA)->listed());
+        // One that was completed stays in the list when a script stops it
+        setup.mQuests.start(questA);
+        setup.mQuests.complete(questA);
+        setup.mQuests.stop(questA);
+        EXPECT_TRUE(setup.mQuests.state(questA)->listed());
+        // So does one that failed
+        setup.mQuests.setStage(questB, 30);
+        setup.mQuests.stop(questB);
+        EXPECT_FALSE(setup.mQuests.running(questB));
+        EXPECT_TRUE(setup.mQuests.state(questB)->listed());
+    }
+
     TEST(FalloutScriptQuestsTest, objectives_are_shown_and_completed_apart_from_each_other)
     {
         Runner setup;

@@ -237,6 +237,22 @@ namespace
         EXPECT_EQ(values.current(guard, variable01 + 1), 0);
     }
 
+    TEST(FalloutScriptActorValuesTest, adding_to_the_base_leaves_the_modifier_and_the_damage_and_stops_at_the_minimum)
+    {
+        ActorValues values;
+
+        values.setBase(guard, variable01, 80);
+        values.modify(guard, variable01, -20);
+        values.addBase(guard, variable01, -10, 0);
+        EXPECT_EQ(values.base(guard, variable01), 70);
+        EXPECT_EQ(values.current(guard, variable01), 50);
+        values.addBase(guard, variable01, -500, 0);
+        EXPECT_EQ(values.base(guard, variable01), 0);
+        // from what the actor has until a script sets it
+        values.addBase(thePlayer, ActorValue::strength, 2, 0);
+        EXPECT_EQ(values.base(thePlayer, ActorValue::strength), ActorValues::startingValue(ActorValue::strength) + 2);
+    }
+
     TEST(FalloutScriptActorValuesTest, restoring_takes_damage_back_but_does_not_add_to_the_value)
     {
         ActorValues values;

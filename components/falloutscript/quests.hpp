@@ -60,6 +60,10 @@ namespace FalloutScript
         std::optional<float> mDelay;
         /// The script of the quest and its variables, for a quest that has one
         std::shared_ptr<Instance> mInstance;
+
+        /// Whether the Pip-Boy lists the quest: while it runs, and when it is over (a script stops a quest that is
+        /// completed or failed, which stays in the list as done)
+        bool listed() const { return mRecord != nullptr && (mRunning || mCompleted || mFailed); }
     };
 
     /// The quests of the loaded plugins and how far the player is in each: which stage was reached, what the objectives
@@ -86,6 +90,8 @@ namespace FalloutScript
 
         bool known(FormId quest) const { return mQuests.count(quest) != 0; }
         const QuestState* state(FormId quest) const;
+        /// Calls the function for every quest with what the player has done in it, in the order of the form ids
+        void forEachState(const std::function<void(FormId, const QuestState&)>& function) const;
         /// The quest with the editor id (the case does not matter), or 0 when there is none (or the editor id is empty)
         FormId findByEditorId(std::string_view editorId) const;
 

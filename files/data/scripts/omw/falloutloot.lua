@@ -1,0 +1,195 @@
+-- Taking things from a container, or from a character that is dead, in Fallout 3 and New Vegas. What is open and what
+-- moves from one holder to the other is the engine's (core.pipboy); this script lists the things and gives the choices
+-- of the player back. Things can be taken, not put back yet.
+local core = require('openfallout.core')
+local input = require('openfallout.input')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
+local I = require('openfallout.interfaces')
+local widgetModule = require('scripts.omw.falloutwidgets')
+
+local pipboy = core.pipboy
+
+if not pipboy.available() then
+    return {}
+end
+
+local v2 = util.vector2
+local colors = widgetModule
+local textSize = widgetModule.textSize
+
+local element = nil
+local modeOpen = false
+local shownSerial = nil
+-- The first line of the list that is shown, and how many lines fit the screen
+local offset = 1
+local listLines = 12
+local listLength = 0
+
+local render
+local widgets
+
+local function update()
+    if element then element:update() end
+end
+
+local function destroyElement()
+    if element then
+        element:destroy()
+        element = nil
+    end
+end
+
+local function openMode()
+    if not modeOpen then
+        modeOpen = true
+        I.UI.addMode('Interface', { windows = {} })
+    end
+end
+
+local function closeMode()
+    if modeOpen then
+        modeOpen = false
+        I.UI.removeMode('Interface')
+    end
+end
+
+-- The player leaves the screen with its button: what was open is closed here, because the mode is no longer ours
+-- when the event that tells of it comes
+local function leave()
+    destroyElement()
+    pipboy.closeLoot()
+    shownSerial = nil
+    closeMode()
+end
+
+local function number(value)
+    return string.format('%d', math.floor(value + 0.5))
+end
+
+local function sortedItems(holder)
+    local items = pipboy.items(holder)
+    table.sort(items, function(a, b)
+        local x, y = a.name:lower(), b.name:lower()
+        if x ~= y then return x < y end
+        return a.id < b.id
+    end)
+    return items
+end
+
+function render()
+    destroyElement()
+    local loot = pipboy.loot()
+    if not loot then
+        return
+    end
+    widgets = widgetModule.new(update)
+    local width = math.max(480, math.floor(ui.screenSize().x * 0.4))
+    local rows = { { props = { size = v2(width, 0) } } }
+    local function add(layout)
+        rows[#rows + 1] = { props = { size = widgetModule.gap } }
+        rows[#rows + 1] = layout
+    end
+    local player = pipboy.player()
+    local items = sortedItems(loot.holder)
+    listLength = #items
+    add(widgets.label(loot.name ~= '' and loot.name or 'Container', colors.titleColor, textSize + 4))
+    if #items == 0 then
+        add(widgets.label('Empty', colors.hintColor))
+    end
+    if offset > math.max(1, #items - listLines + 1) then
+        offset = math.max(1, #items - listLines + 1)
+    end
+    for index = offset, math.min(#items, offset + listLines - 1) do
+        local item = items[index]
+        add(widgets.row(
+            widgets.cell(widgets.clickable(item.name .. (item.count > 1 and (' (' .. item.count .. ')') or ''),
+                function()
+                    pipboy.transfer(loot.holder, player, item.id, item.count)
+                    render()
+                end), 340),
+            widgets.cell(widgets.label(number(item.weight * item.count), colors.hintColor), 60),
+            widgets.label(number(item.value * item.count), colors.hintColor)))
+    end
+    if #items > listLines then
+        add(widgets.label(string.format('%d-%d of %d (wheel, Page Up/Down)', offset,
+            math.min(#items, offset + listLines - 1), #items), colors.hintColor, textSize - 4))
+    end
+    add(widgets.row(
+        widgets.cell(widgets.clickable('Take all', function()
+            for _, item in ipairs(items) do
+                pipboy.transfer(loot.holder, player, item.id, item.count)
+            end
+            render()
+        end, { enabled = #items > 0, color = colors.titleColor }), 140),
+        widgets.clickable('Close', leave, { color = colors.titleColor })))
+    element = ui.create(widgets.panel(rows))
+end
+
+local function scroll(by)
+    if not element then
+        return
+    end
+    local moved = math.max(1, math.min(math.max(1, listLength - listLines + 1), offset + by))
+    if moved ~= offset then
+        offset = moved
+        render()
+    end
+end
+
+local function sync()
+    local loot = pipboy.loot()
+    if not loot then
+        if element or modeOpen then
+            destroyElement()
+            closeMode()
+            shownSerial = nil
+        end
+        return
+    end
+    if loot.serial ~= shownSerial then
+        shownSerial = loot.serial
+        offset = 1
+        openMode()
+        render()
+    end
+end
+
+return {
+    engineHandlers = {
+        onFrame = sync,
+        onKeyPress = function(key)
+            if not element then
+                return
+            end
+            if key.code == input.KEY.DownArrow then
+                scroll(1)
+            elseif key.code == input.KEY.UpArrow then
+                scroll(-1)
+            elseif key.code == input.KEY.PageDown then
+                scroll(listLines)
+            elseif key.code == input.KEY.PageUp then
+                scroll(-listLines)
+            end
+        end,
+        onMouseWheel = function(vertical)
+            if vertical > 0 then
+                scroll(-1)
+            elseif vertical < 0 then
+                scroll(1)
+            end
+        end,
+    },
+    eventHandlers = {
+        -- However the screen is left (the button, Escape, a script), what was open is closed, and the scripts of the
+        -- container hear of it
+        UiModeChanged = function(data)
+            if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then
+                modeOpen = false
+                destroyElement()
+                pipboy.closeLoot()
+                shownSerial = nil
+            end
+        end,
+    },
+}

@@ -50,6 +50,12 @@ namespace FalloutScript
         return find(quest);
     }
 
+    void QuestManager::forEachState(const std::function<void(FormId, const QuestState&)>& function) const
+    {
+        for (const auto& [id, state] : mQuests)
+            function(id, state);
+    }
+
     Instance* QuestManager::instance(FormId quest)
     {
         QuestState* state = find(quest);

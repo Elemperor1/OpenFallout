@@ -423,6 +423,9 @@ ARENA_GLOBALS = {name: (0x93F + index, "OFTestArena" + name.title().replace("_",
 ARENA_CELL_NAME = "OFTestArena"
 ARENA_QUEST_NAME = "OFTestArenaQuest"
 ARENA_SETUP_STAGE = 10
+ARENA_LEVEL_STAGE = 11  # rewards the experience of the levels 2 and 3
+ARENA_LEVEL_XP = 600
+ARENA_DUMMY_ITEM_COUNT = 5  # rounds the dummy carries, for the loot window
 # The stages that tell what the game knows, one for each time the test looks (a stage is set once)
 ARENA_PROBE_STAGES = tuple(range(20, 60))
 ARENA_DUMMY_PLACE = (400.0, 0.0, 0.0)
@@ -444,7 +447,7 @@ ARENA_BYSTANDER_REF_ID = 0x94C
 # The grenades the player throws at the end: a weapon that is its own ammunition
 ARENA_GRENADE_ID = 0x94D
 ARENA_GRENADE_COUNT = 2
-ARENA_GRENADE_STAGE = 11
+ARENA_GRENADE_STAGE = 12
 LAST_ID = 0x94D # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
@@ -2157,11 +2160,13 @@ def arena_quest():
         sf.set_to(sf.global_target(glob["raider_combat"]), sf.call_token(sf.IS_IN_COMBAT, reference=raider)),
         sf.set_to(sf.global_target(glob["raider_ammo"]),
                   sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=raider))]
-    # The last stage gives the player grenades and puts them in its hands, which the test throws at the end
+    # The stages that follow give the player experience (for two levels) and grenades, which it throws at the end
     grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
     grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
                 sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
     entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
+               (ARENA_LEVEL_STAGE, "The player gains experience.", 0, [],
+                [sf.call(sf.REWARD_XP, sf.int_argument(ARENA_LEVEL_XP))], forms),
                (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms)]
     entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
     return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
@@ -2172,7 +2177,8 @@ def arena_people():
     until it is shot (aggression 0, so it only fights back), has one endurance and 5 health, which is 10 health at level 1.
     The raider is very aggressive and foolhardy, carries the pistol and its rounds, and has a skill of 29 with it."""
     dummy = person(ARENA_DUMMY_ID, "OFTestArenaDummy", dressed=False, script=ARENA_DUMMY_SCRIPT_ID,
-                   health=ARENA_DUMMY_HEALTH, attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
+                   health=ARENA_DUMMY_HEALTH, attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2),
+                   items=[(ARENA_AMMO_ID, ARENA_DUMMY_ITEM_COUNT)])
     raider = person(ARENA_RAIDER_ID, "OFTestArenaRaider", dressed=False, script=ARENA_RAIDER_SCRIPT_ID,
                     items=[(ARENA_PISTOL_ID, 1), (ARENA_AMMO_ID, ARENA_RAIDER_AMMO)], ai=(2, 4))
     # Never starts a fight (aggression 0), has no package and no weapon, and does not run from one (confidence 4): the
