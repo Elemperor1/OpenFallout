@@ -57,7 +57,9 @@ namespace
 
     TEST(FalloutScriptPipboyTest, namesTheWordForTheValueOfASkill)
     {
-        const Lookup none = lookupOf({});
+        // The lookup keeps the map it is given, which has to outlast it
+        const std::map<std::string, double> empty;
+        const Lookup none = lookupOf(empty);
         EXPECT_EQ(skillLevelSetting(none, 0), "sSkillLevelNovice");
         EXPECT_EQ(skillLevelSetting(none, 24), "sSkillLevelNovice");
         EXPECT_EQ(skillLevelSetting(none, 25), "sSkillLevelApprentice");
