@@ -163,6 +163,7 @@ namespace OFMechanics
         float mReview = 0.f; // seconds until the packages are looked at again
         float mWait = 0.f; // seconds to stand still before it does anything else
         bool mWalking = false; // it goes to mDestination
+        bool mFleeing = false; // mDestination is a place to run to from the target of its fight, not the target
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
         bool mAtGoal = false; // a goal that stays is reached
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
@@ -370,6 +371,7 @@ namespace OFMechanics
         void stopWalking(FalloutActors::Mind& mind)
         {
             mind.mWalking = false;
+            mind.mFleeing = false;
             mind.mWaypoints.clear();
             mind.mStuck = 0.f;
             mind.mYielded = false;
@@ -1224,10 +1226,12 @@ namespace OFMechanics
             {
                 case FalloutScript::FightAI::Move::Approach:
                 {
-                    if (!mind.mWalking || distanceAcross(target, mind.mDestination) > fightRepathDistance)
+                    if (!mind.mWalking || mind.mFleeing
+                        || distanceAcross(target, mind.mDestination) > fightRepathDistance)
                     {
                         mind.mWaypoints.clear();
                         mind.mDestination = target;
+                        mind.mFleeing = false;
                     }
                     switch (walkTo(frame, mind, mind.mDestination, duration, arrival, true))
                     {
@@ -1242,8 +1246,12 @@ namespace OFMechanics
                 }
                 case FalloutScript::FightAI::Move::Retreat:
                 {
-                    if (!mind.mWalking)
+                    // A character that was going for the target and loses its nerve turns away at once, not when the
+                    // walk to the target is over
+                    if (!mind.mWalking || !mind.mFleeing)
                     {
+                        mind.mWaypoints.clear();
+                        mind.mFleeing = true;
                         osg::Vec3f direction = mind.position() - target;
                         direction.z() = 0.f;
                         if (direction.length2() < 1.f)

@@ -10,6 +10,7 @@ local async = require('openfallout.async')
 local camera = require('openfallout.camera')
 local nearby = require('openfallout.nearby')
 local util = require('openfallout.util')
+local debug = require('openfallout.debug')
 local I = require('openfallout.interfaces')
 local Actor = require('openfallout.types').Actor
 local Player = require('openfallout.types').Player
@@ -24,8 +25,15 @@ end
 -- The aim and the attack are this script's, not Morrowind's
 I.Controls.overrideCombatControls(true)
 
+-- The gates of input/playercontrols.lua, whose combat controls this script replaces: the world is not paused, no menu
+-- is open, the player is not paralyzed
 local function controlsAllowed()
-    return Player.getControlSwitch(self, Player.CONTROL_SWITCH.Controls)
+    if core.isWorldPaused() then return false end
+    if not Player.getControlSwitch(self, Player.CONTROL_SWITCH.Controls) then return false end
+    if I.UI.getMode() then return false end
+    if debug.isGodMode() then return true end
+    local paralysis = Actor.activeEffects(self):getEffect(core.magic.EFFECT_TYPE.Paralyze)
+    return paralysis.magnitude <= 0
 end
 
 local function setDrawn(drawn)
@@ -45,7 +53,7 @@ end))
 -- The button was pressed since the last frame
 local pressed = false
 input.registerActionHandler('Use', async:callback(function(value)
-    if value then pressed = true end
+    if value and controlsAllowed() then pressed = true end
 end))
 
 local center = util.vector2(0.5, 0.5)
