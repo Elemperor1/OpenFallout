@@ -498,6 +498,40 @@ namespace
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
     }
 
+    TEST(FalloutScriptPerksTest, tellsTheHostWhenAnAbilityThatGaveHealthIsGone)
+    {
+        Fixture f;
+        PerkInfo healthy = perk(strongBack, "Lifegiver", 8);
+        PerkEntry ability;
+        ability.mType = PerkEntry::Ability;
+        ability.mAbility = abilityOfStrongBack;
+        healthy.mEntries = { ability };
+        f.mRecords.mPerks[strongBack] = healthy;
+        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::health, 30, {} } };
+        PerkInfo carrying = perk(comprehension, "Carrier", 8);
+        PerkEntry other = ability;
+        other.mAbility = abilityOfStrongBack + 1;
+        carrying.mEntries = { other };
+        f.mRecords.mPerks[comprehension] = carrying;
+        f.mRecords.mAbilities[abilityOfStrongBack + 1] = { { ActorValue::carryWeight, 30, {} } };
+        std::vector<FormId> told;
+        f.mEngine.setHealthLowered([&told](FormId owner) { told.push_back(owner); });
+
+        f.mProgress.addPerk(thePlayer, strongBack);
+        f.mProgress.addPerk(thePlayer, comprehension);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_TRUE(told.empty());
+        // an ability of another value is no reason to look at the health
+        f.mProgress.removePerk(thePlayer, comprehension);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_TRUE(told.empty());
+        f.mProgress.removePerk(thePlayer, strongBack);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_THAT(told, ElementsAre(thePlayer));
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(told.size(), 1u);
+    }
+
     TEST(FalloutScriptPerksTest, anAbilityEffectWithConditionsHasNoEffectWithoutAWayToTellThem)
     {
         Fixture f;

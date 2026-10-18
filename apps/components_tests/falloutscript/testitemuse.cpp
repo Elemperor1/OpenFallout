@@ -349,6 +349,63 @@ namespace
         EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 50);
     }
 
+    TEST(FalloutScriptItemUseTest, aChangeOfALevelKeepsTheModifiersOfTheLevel)
+    {
+        Fixture f;
+        f.mValues.setBase(thePlayer, radiationLevel, 80);
+        f.mValues.modify(thePlayer, radiationLevel, -20);
+        f.mRecords.mConsumables[radAway].mEffects = { effect(radiationLevel, 10) };
+        f.mUse.use(thePlayer, radAway);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 50);
+    }
+
+    TEST(FalloutScriptItemUseTest, itemsUsedAtTheSameTimeAllChangeTheLevel)
+    {
+        for (int round = 0; round < 200; ++round)
+        {
+            Fixture f;
+            f.mValues.setBase(thePlayer, radiationLevel, 80);
+            f.mState.addItem(thePlayer, radAway, 1);
+            std::atomic<int> ready = 0;
+            std::vector<std::thread> users;
+            for (int i = 0; i < 2; ++i)
+                users.emplace_back([&] {
+                    ++ready;
+                    while (ready < 2)
+                        std::this_thread::yield();
+                    f.mUse.use(thePlayer, radAway);
+                });
+            for (std::thread& user : users)
+                user.join();
+
+            ASSERT_EQ(f.mState.itemCount(thePlayer, radAway), 0) << "round " << round;
+            ASSERT_EQ(f.mValues.current(thePlayer, radiationLevel), 0) << "round " << round;
+        }
+    }
+
+    TEST(FalloutScriptItemUseTest, checkingTheHealthKillsOrDropsWhoHasNoneLeft)
+    {
+        Fixture f;
+        f.mValues.damage(victim, ActorValue::health, 100000);
+        f.mUse.checkHealth(victim);
+        EXPECT_TRUE(f.mState.isDead(victim));
+
+        int falls = 0;
+        f.mState.setFallHandler([&falls](FormId) {
+            ++falls;
+            return true;
+        });
+        constexpr FormId other = 0x01000501;
+        f.mValues.damage(other, ActorValue::health, 100000);
+        f.mUse.checkHealth(other);
+        EXPECT_EQ(falls, 1);
+        EXPECT_FALSE(f.mState.isDead(other));
+
+        // someone with health left is left alone
+        f.mUse.checkHealth(thePlayer);
+        EXPECT_FALSE(f.mState.isDead(thePlayer));
+    }
+
     TEST(FalloutScriptItemUseTest, healingStopsAtFullHealth)
     {
         Fixture f;

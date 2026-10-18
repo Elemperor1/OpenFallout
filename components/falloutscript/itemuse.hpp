@@ -133,6 +133,10 @@ namespace FalloutScript
         };
         std::vector<Active> active(FormId actor) const;
 
+        /// Kills a character that has no health left, or makes it fall if it is one that falls: for the health that
+        /// something else took away (the ability of a perk that is gone)
+        void checkHealth(FormId actor);
+
         /// Forgets everything, as for a new game
         void clear();
 

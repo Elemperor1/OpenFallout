@@ -26,6 +26,12 @@ namespace FalloutScript
         mQuestSetter = std::move(setter);
     }
 
+    void PerkEngine::setHealthLowered(std::function<void(FormId)> callback)
+    {
+        const std::lock_guard lock(mMutex);
+        mHealthLowered = std::move(callback);
+    }
+
     bool PerkEngine::info(FormId perk, PerkInfo& result)
     {
         {
@@ -221,6 +227,9 @@ namespace FalloutScript
         std::unique_lock refreshing(mRefreshMutex);
         const std::vector<std::pair<FormId, int>> perks = mProgress.perksOf(owner);
 
+        // Whether some of the health was taken away, for the host to look at when the refresh is done
+        bool healthLowered = false;
+
         // What was applied for a perk that is gone, or for a rank that is no longer the rank, is taken back
         std::vector<std::pair<FormId, FormId>> stale;
         {
@@ -245,8 +254,13 @@ namespace FalloutScript
                 mApplied.erase(key);
             }
             for (std::size_t i = 0; i < applied.mEffects.size(); ++i)
-                if (applied.mOn[i])
-                    mValues.modify(owner, applied.mEffects[i].mActorValue, -applied.mEffects[i].mMagnitude);
+            {
+                if (!applied.mOn[i])
+                    continue;
+                mValues.modify(owner, applied.mEffects[i].mActorValue, -applied.mEffects[i].mMagnitude);
+                healthLowered = healthLowered
+                    || (applied.mEffects[i].mActorValue == ActorValue::health && applied.mEffects[i].mMagnitude > 0);
+            }
         }
 
         // The quest stages that a perk sets are set when the refresh is done, with nothing held: setting a stage may
@@ -321,6 +335,8 @@ namespace FalloutScript
                 if (holds == applied.mOn[i])
                     continue;
                 mValues.modify(owner, effect.mActorValue, holds ? effect.mMagnitude : -effect.mMagnitude);
+                healthLowered
+                    = healthLowered || (!holds && effect.mActorValue == ActorValue::health && effect.mMagnitude > 0);
                 applied.mOn[i] = holds;
                 changed = true;
             }
@@ -332,11 +348,15 @@ namespace FalloutScript
         }
 
         std::function<void(FormId, int)> setter;
+        std::function<void(FormId)> lowered;
         {
             const std::lock_guard lock(mMutex);
             setter = mQuestSetter;
+            lowered = mHealthLowered;
         }
         refreshing.unlock();
+        if (healthLowered && lowered)
+            lowered(owner);
         if (setter)
             for (const auto& [quest, stage] : pendingStages)
                 setter(quest, stage);

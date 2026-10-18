@@ -294,6 +294,8 @@ namespace OFScript
                   const FalloutScript::ConditionContext& context) { return mConditions.holds(conditions, context); };
         mPerks.setConditions(conditionsHold);
         mPerks.setQuestSetter([this](FalloutScript::FormId quest, int stage) { mQuests.setStage(quest, stage); });
+        // A character that lived on the health of a perk that is gone is dead (or has fallen) once it is gone
+        mPerks.setHealthLowered([this](FalloutScript::FormId owner) { mItemUse.checkHealth(owner); });
         mItemUse.setConditions(conditionsHold);
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);

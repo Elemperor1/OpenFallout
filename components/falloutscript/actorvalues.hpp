@@ -109,6 +109,9 @@ namespace FalloutScript
         double current(FormId actor, int value) const;
 
         void setBase(FormId actor, int value, double amount);
+        /// Adds to the base (a negative amount takes away), to no less than the minimum; the reading and the writing
+        /// are one step, so that changes made at the same time all count
+        void addBase(FormId actor, int value, double amount, double minimum);
         void modify(FormId actor, int value, double amount);
         /// Changes the permanent modifier so that the current value is the amount, whatever the base and the damage are
         void setCurrent(FormId actor, int value, double amount);

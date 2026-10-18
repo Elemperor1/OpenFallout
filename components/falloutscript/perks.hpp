@@ -130,6 +130,9 @@ namespace FalloutScript
         void setConditions(ConditionCheck check);
         /// Sets a quest to a stage (for the entries of the type quest stage)
         void setQuestSetter(std::function<void(FormId quest, int stage)> setter);
+        /// Called, with nothing held, when a refresh took away some of the health of a character (an ability that gave
+        /// health is gone), so that the one who lived on it can be found dead or fallen
+        void setHealthLowered(std::function<void(FormId owner)> callback);
 
         /// The other reference of an exchange that a number is worked out for: the character that is hit when the
         /// owner strikes, the attacker when the owner is the one that is hit; the weapon of the exchange (the item
@@ -189,6 +192,7 @@ namespace FalloutScript
         ActorValues& mValues;
         ConditionCheck mConditions;
         std::function<void(FormId, int)> mQuestSetter;
+        std::function<void(FormId)> mHealthLowered;
 
         std::mutex mMutex;
         /// Held while a refresh checks what is applied and applies what is missing, so that two refreshes of a

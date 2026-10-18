@@ -139,6 +139,15 @@ namespace FalloutScript
         mEntries[{ actor, value }].mBase = bounded(amount);
     }
 
+    void ActorValues::addBase(FormId actor, int value, double amount, double minimum)
+    {
+        if (actor == 0 || !isValid(value))
+            return;
+        const std::lock_guard lock(mMutex);
+        Entry& entry = mEntries[{ actor, value }];
+        entry.mBase = bounded(std::max(baseOf(actor, entry, value) + bounded(amount), minimum));
+    }
+
     void ActorValues::modify(FormId actor, int value, double amount)
     {
         if (actor == 0 || !isValid(value))

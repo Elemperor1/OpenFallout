@@ -80,9 +80,9 @@ namespace FalloutScript
             return;
         if (isLevelValue(actorValue))
         {
-            // A level goes up when it is hurt and down when it is restored, and stays between none and the most
-            const double now = mValues.current(actor, actorValue);
-            mValues.setBase(actor, actorValue, std::max(now + (detrimental ? amount : -amount), 0.0));
+            // A level goes up when it is hurt and down when it is restored, and does not go below none. Its modifiers
+            // and damage stay as they are, and a change made at the same time counts too.
+            mValues.addBase(actor, actorValue, detrimental ? amount : -amount, 0.0);
         }
         else if (detrimental && actorValue == ActorValue::health)
         {
@@ -100,8 +100,16 @@ namespace FalloutScript
     void ItemUse::dieIfSpent(FormId actor)
     {
         // A character with no health left is dead, unless it is one that falls (an essential one)
-        if (mValues.current(actor, ActorValue::health) <= 0 && !mState.falls(actor))
+        if (mValues.current(actor, ActorValue::health) <= 0 && !mState.isDead(actor) && !mState.falls(actor))
             mState.setDead(actor, true);
+    }
+
+    void ItemUse::checkHealth(FormId actor)
+    {
+        if (actor == 0)
+            return;
+        const auto transitions = mState.holdTransitions();
+        dieIfSpent(actor);
     }
 
     void ItemUse::applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale)
