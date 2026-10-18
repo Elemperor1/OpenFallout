@@ -218,12 +218,10 @@ namespace OFScript
         });
         // The games have a mode of play that has no counterpart here
         mInterpreter.setHandler("IsHardcore", [](FalloutScript::CallContext&) { return 0.0; });
-        // The menu of a workbench, a reloading bench or a campfire is for the player; the screen shows it
+        // The menu of a workbench, a reloading bench or a campfire is for the player; the screen shows it. The call
+        // comes from the script of the bench (the reference is the bench) or from a quest (none), so none is refused.
         mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
-            return (call.mReference == 0 || call.mReference == mPlayer)
-                    && openRecipes(FalloutScript::formArgument(call, 0))
-                ? 1.0
-                : 0.0;
+            return openRecipes(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
         });
         // V.A.T.S. is open while the screen of Lua says so
         mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });

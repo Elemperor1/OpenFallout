@@ -2242,10 +2242,11 @@ def arena_quest():
     grenade_forms = [PLAYER_REFERENCE, ARENA_GRENADE_ID]
     grenades = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_GRENADE_COUNT)),
                 sf.call_on(1, sf.EQUIP_ITEM, sf.form_argument(2))]
-    # The scrap is given and the menu of the bench is shown, as the script of a workbench does
-    craft_forms = [PLAYER_REFERENCE, ARENA_SCRAP_ID, ARENA_CATEGORY_ID]
+    # The scrap is given and the menu of the bench is shown on a reference (the dummy stands for the bench), as the
+    # script of a workbench does: the reference of the call is the bench, not the player
+    craft_forms = [PLAYER_REFERENCE, ARENA_SCRAP_ID, ARENA_CATEGORY_ID, ARENA_DUMMY_REF_ID]
     craft = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_SCRAP_GIVEN)),
-             sf.call(sf.SHOW_RECIPE_MENU, sf.form_argument(3))]
+             sf.call_on(4, sf.SHOW_RECIPE_MENU, sf.form_argument(3))]
     entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
                (ARENA_LEVEL_STAGE, "The player gains experience.", 0, [],
                 [sf.call(sf.REWARD_XP, sf.int_argument(ARENA_LEVEL_XP))], forms),
