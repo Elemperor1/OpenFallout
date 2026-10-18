@@ -279,7 +279,8 @@ namespace OFScript
             return result;
         }
         const FalloutScript::FormId victim = scriptReferenceOf(target);
-        if (victim == 0 || mActors.isDead(victim))
+        // A target that fell unconscious from an earlier attack of the queue is not struck again
+        if (victim == 0 || mActors.isDead(victim) || mCombat.unconscious(victim))
         {
             result.mRefused = "dead";
             return result;

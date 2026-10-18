@@ -150,6 +150,22 @@ namespace
         EXPECT_EQ(f.mState.itemCount(thePlayer, pipePistol), 1);
     }
 
+    TEST(FalloutScriptCraftingTest, anItemNamedTwiceByARecipeIsNeededForBothAtOnce)
+    {
+        Fixture f;
+        constexpr FormId recipeTwice = 0x01000104;
+        f.mRecipes.add(workbench, recipeTwice, -1, 0, { { scrapMetal, 3 }, { scrapMetal, 3 } }, { { pistolAmmo, 1 } });
+        // Four are enough for each mention alone but not for both
+        EXPECT_EQ(f.mCrafting.status(thePlayer, recipeTwice), Crafting::Status::NeedsItems);
+        EXPECT_EQ(f.mCrafting.craft(thePlayer, recipeTwice), Crafting::Status::NeedsItems);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, scrapMetal), 4);
+        f.mState.addItem(thePlayer, scrapMetal, 2);
+        EXPECT_EQ(f.mCrafting.status(thePlayer, recipeTwice), Crafting::Status::Ready);
+        EXPECT_EQ(f.mCrafting.craft(thePlayer, recipeTwice), Crafting::Status::Ready);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, scrapMetal), 0);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, pistolAmmo), 1);
+    }
+
     TEST(FalloutScriptCraftingTest, twoCraftsAtOnceForTheLastIngredientsMakeOnlyOne)
     {
         for (int round = 0; round < 200; ++round)

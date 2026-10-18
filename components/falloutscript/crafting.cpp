@@ -3,6 +3,9 @@
 #include "actors.hpp"
 #include "actorvalues.hpp"
 
+#include <algorithm>
+#include <cstdint>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -24,11 +27,15 @@ namespace FalloutScript
             entry.mSkill = mValues.current(crafter, recipe.mSkill);
         if (recipe.mSkill >= 0 && entry.mSkill < recipe.mLevel)
             entry.mStatus = Status::NeedsSkill;
+        // An item the recipe names more than once is needed as many times as it is named in all
+        std::map<FormId, std::int64_t> needed;
+        for (const RecipeItem& ingredient : recipe.mIngredients)
+            needed[ingredient.mItem] += std::max(ingredient.mCount, 0);
         for (const RecipeItem& ingredient : recipe.mIngredients)
         {
             const int have = mState.itemCount(crafter, ingredient.mItem);
             entry.mHave.push_back(have);
-            if (have < ingredient.mCount && entry.mStatus == Status::Ready)
+            if (have < needed[ingredient.mItem] && entry.mStatus == Status::Ready)
                 entry.mStatus = Status::NeedsItems;
         }
         return entry;
