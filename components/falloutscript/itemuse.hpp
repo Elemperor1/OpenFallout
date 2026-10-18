@@ -147,7 +147,9 @@ namespace FalloutScript
 
     private:
         void applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale);
-        void instant(FormId actor, int actorValue, double amount, bool detrimental);
+        /// Changes a value by an amount: at once, or, when seconds is more than 0, the share of an effect that lasts
+        /// that those seconds make (the amount is then the magnitude of each second times the seconds)
+        void instant(FormId actor, int actorValue, double amount, bool detrimental, double seconds = 0);
         /// Kills a character with no health left, or makes it fall if it is one that falls (to be called with the
         /// transitions held)
         void dieIfSpent(FormId actor);

@@ -770,6 +770,14 @@ return {
                     openLevelUp()
                     openWindow()
                 end
+            elseif visible and view == 'pipboy' and levelUpPending then
+                -- The window is open when the next level comes (the screen of the one before was just done): its
+                -- screen takes the place of the lists at once, and nothing is left pending
+                levelUpPending = false
+                keyring = false
+                dropPrompt = nil
+                openLevelUp()
+                render()
             end
         end,
         onKeyPress = function(key)

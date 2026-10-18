@@ -79,7 +79,7 @@ namespace FalloutScript
         mAddictions.clear();
     }
 
-    void ItemUse::instant(FormId actor, int actorValue, double amount, bool detrimental)
+    void ItemUse::instant(FormId actor, int actorValue, double amount, bool detrimental, double seconds)
     {
         if (!ActorValues::isValid(actorValue) || amount <= 0)
             return;
@@ -101,7 +101,8 @@ namespace FalloutScript
         else
         {
             // The health that an effect gives back is the value of an entry point (12, Modify Recovered Health), for
-            // what happens at once and for each second of an effect that lasts
+            // what happens at once and for each second of an effect that lasts: the perk works on the points of a
+            // second, so that a perk that adds the same number of points each second is not added to at every frame
             if (actorValue == ActorValue::health)
             {
                 PerkEngine* perks = nullptr;
@@ -110,7 +111,10 @@ namespace FalloutScript
                     perks = mPerks;
                 }
                 if (perks != nullptr)
-                    amount = std::max(perks->apply(EntryPoint::recoveredHealth, actor, amount), 0.0);
+                {
+                    const double span = seconds > 0 ? seconds : 1.0;
+                    amount = std::max(perks->apply(EntryPoint::recoveredHealth, actor, amount / span), 0.0) * span;
+                }
             }
             mValues.restore(actor, actorValue, amount);
         }
@@ -322,6 +326,7 @@ namespace FalloutScript
             int mActorValue;
             double mAmount;
             bool mDetrimental;
+            double mSeconds;
         };
         std::vector<Step> steps;
         // A change that held while an effect lasted, which is taken back now
@@ -343,7 +348,7 @@ namespace FalloutScript
                 const double elapsed = std::min(seconds, active.mRemaining);
                 if (!active.mTemporary)
                     steps.push_back({ active.mActor, active.mActorValue, std::abs(active.mMagnitude) * elapsed,
-                        active.mMagnitude < 0 });
+                        active.mMagnitude < 0, elapsed });
                 active.mRemaining -= seconds;
                 if (active.mRemaining <= 0 && active.mTemporary)
                     expired.push_back({ active.mActor, active.mActorValue, active.mMagnitude });
@@ -366,7 +371,7 @@ namespace FalloutScript
                 mValues.modify(expiry.mActor, expiry.mActorValue, -expiry.mMagnitude);
         }
         for (const Step& step : steps)
-            instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental);
+            instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental, step.mSeconds);
 
         // The perks that recover health: the executables work the entry point out from none, in points each second
         // (the recovery that the characters have of themselves is not modelled)

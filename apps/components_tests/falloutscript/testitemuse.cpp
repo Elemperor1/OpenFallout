@@ -345,6 +345,28 @@ namespace
         EXPECT_NEAR(f.mValues.current(thePlayer, ActorValue::health), again + 30, 1e-9);
     }
 
+    TEST(FalloutScriptItemUseTest, aPerkThatAddsToTheHealthAnEffectGivesBackDoesNotDependOnTheFrameRate)
+    {
+        // The same second of an effect that lasts, as one step and as sixty
+        const auto recovered = [](int steps) {
+            Fixture f;
+            RecoveringPerk records;
+            FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+            f.mUse.setPerks(&perks);
+            f.mProgress.addPerk(thePlayer, RecoveringPerk::id);
+            f.mValues.damage(thePlayer, ActorValue::health, 80);
+            f.mUse.use(thePlayer, superStimpak);
+            const double before = f.mValues.current(thePlayer, ActorValue::health);
+            for (int i = 0; i < steps; ++i)
+                f.mUse.update(1.0 / steps);
+            return f.mValues.current(thePlayer, ActorValue::health) - before;
+        };
+        const double once = recovered(1);
+        // 20 points a second of the effect, 2 of the perk, and 2 of the perk for the tick of the player
+        EXPECT_NEAR(once, 24, 1e-9);
+        EXPECT_NEAR(recovered(60), once, 1e-9);
+    }
+
     TEST(FalloutScriptItemUseTest, aPerkThatRecoversHealthDoesNotReviveTheDead)
     {
         Fixture f;
