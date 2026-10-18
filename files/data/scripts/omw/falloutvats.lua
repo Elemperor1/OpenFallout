@@ -220,15 +220,27 @@ end
 -- The next attack of the queue that is being carried out
 local function step()
     local attack = table.remove(running, 1)
-    -- The queue ends with its last attack, whatever comes of it: a target that is gone between two attacks (or an
-    -- error) must not leave the queue running, because the screen does not open while it is
-    if #running == 0 then
+    -- The queue is over with its last attack, whatever comes of it: a target that is gone between two attacks (or an
+    -- error) must not leave the queue set, because the screen does not open while it is. V.A.T.S. itself stays open
+    -- for the engine through that last attack (its perks and effects see it), and ends after it.
+    local last = #running == 0
+    if last then
+        running = nil
+    end
+    local attacked, result = false, nil
+    if attack and attack.target:isValid() then
+        attacked, result = pcall(vats.attack, attack.target, attack.part)
+    end
+    -- It also ends when the player can not go on
+    if last or (attacked and (result.refused == 'points' or result.refused == 'ammo')) then
         endQueue()
     end
-    if not attack or not attack.target:isValid() then
+    if not attacked then
+        if result then
+            error(result, 0)
+        end
         return
     end
-    local result = vats.attack(attack.target, attack.part)
     if result.refused then
         if result.refused == 'points' then
             ui.showMessage('Not enough action points')
@@ -240,10 +252,6 @@ local function step()
             result.killed and ', dead' or ''))
     else
         ui.showMessage(attack.name .. ' missed')
-    end
-    -- A queue also ends when the player can not go on
-    if result.refused == 'points' or result.refused == 'ammo' then
-        endQueue()
     end
 end
 
