@@ -745,7 +745,12 @@ return {
                 local reached = pipboy.takeLevelUps()
                 if #reached > 0 then
                     levelUpLevel = reached[#reached].level
-                    levelUpPending = true
+                    -- The host hands out no level while a screen is open, so a level that is taken while the screen is
+                    -- showing (the button of the stats page was pressed first) is the one that it shows: nothing is
+                    -- left to open when it is done
+                    if view ~= 'levelup' then
+                        levelUpPending = true
+                    end
                 end
             end
             reopenWait = math.max(0, reopenWait - core.getRealFrameDuration())
