@@ -36,6 +36,7 @@ PLAYER: scripts/omw/falloutdialogue.lua
 PLAYER: scripts/omw/falloutchargen.lua
 PLAYER: scripts/omw/falloutcombat.lua
 PLAYER: scripts/omw/falloutpipboy.lua
+PLAYER: scripts/omw/falloutstatus.lua
 PLAYER: scripts/omw/falloutloot.lua
 PLAYER: scripts/omw/falloutcraft.lua
 PLAYER: scripts/omw/falloutdeath.lua
