@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <map>
 #include <vector>
 
@@ -33,6 +34,8 @@ namespace
     constexpr FormId guns = 0x01000008;
     constexpr FormId novel = 0x01000009;
     constexpr FormId superStimpak = 0x0100000A;
+    constexpr FormId poison = 0x0100000B;
+    constexpr FormId victim = 0x01000500;
     constexpr FormId withdrawal = 0x01000100;
 
     constexpr int radiationLevel = 54;
@@ -64,6 +67,9 @@ namespace
     public:
         std::map<FormId, Consumable> mConsumables;
         std::map<FormId, FalloutScript::BookInfo> mBooks;
+        /// Runs when the use of an item looks its record up, which is after the character was found to have the item:
+        /// where a use on another thread can get in
+        std::function<void()> mWhileUsing;
 
         bool consumable(FormId item, Consumable& result) override
         {
@@ -71,6 +77,8 @@ namespace
             if (found == mConsumables.end())
                 return false;
             result = found->second;
+            if (mWhileUsing)
+                mWhileUsing();
             return true;
         }
         bool book(FormId item, FalloutScript::BookInfo& result) override
@@ -79,6 +87,8 @@ namespace
             if (found == mBooks.end())
                 return false;
             result = found->second;
+            if (mWhileUsing)
+                mWhileUsing();
             return true;
         }
     };
@@ -105,6 +115,7 @@ namespace
             mRecords.mConsumables[nukaCola].mEffects
                 = { effect(ActorValue::health, 10), effect(radiationLevel, 3, 0, true) };
             mRecords.mConsumables[superStimpak].mEffects = { effect(ActorValue::health, 20, 3) };
+            mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 500, 0, true) };
             mRecords.mBooks[guns].mSkill = smallGuns;
             mRecords.mBooks[novel].mSkill = -1;
             mState.addItem(thePlayer, stimpak, 2);
@@ -136,6 +147,69 @@ namespace
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), hurt + 30);
         EXPECT_EQ(f.mState.itemCount(thePlayer, stimpak), 1);
         EXPECT_EQ(f.mProgress.miscStat(6), 1);
+    }
+
+    TEST(FalloutScriptItemUseTest, theLastCopyIsUsedOnceWhenTwoCallsRaceForIt)
+    {
+        Fixture f;
+        // Another call takes the only copy after this one found it
+        f.mRecords.mWhileUsing = [&f] { f.mState.removeItem(thePlayer, radAway, 1); };
+        f.mValues.setBase(thePlayer, radiationLevel, 80);
+
+        EXPECT_EQ(f.mUse.use(thePlayer, radAway).mOutcome, ItemUse::Outcome::Nothing);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), 80);
+        EXPECT_EQ(f.mProgress.miscStat(8), 0);
+
+        // The same for a skill book, which teaches nothing when it is gone
+        f.mState.removeItem(thePlayer, guns, 1);
+        f.mRecords.mWhileUsing = [&f] { f.mState.removeItem(thePlayer, guns, 1); };
+        const double skill = f.mValues.base(thePlayer, smallGuns);
+        EXPECT_EQ(f.mUse.use(thePlayer, guns).mOutcome, ItemUse::Outcome::Nothing);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), skill);
+    }
+
+    TEST(FalloutScriptItemUseTest, aPoisonThatTakesAllTheHealthKills)
+    {
+        Fixture f;
+        f.mState.addItem(victim, poison, 1);
+        EXPECT_EQ(f.mUse.use(victim, poison).mOutcome, ItemUse::Outcome::Consumed);
+        EXPECT_LE(f.mValues.current(victim, ActorValue::health), 0);
+        EXPECT_TRUE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, aPoisonThatWorksOverTimeKillsWhenTheHealthIsGone)
+    {
+        Fixture f;
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 60, 5, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        f.mUse.update(1);
+        EXPECT_FALSE(f.mState.isDead(victim));
+        f.mUse.update(2);
+        EXPECT_TRUE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, anEssentialCharacterFallsInsteadOfDyingOfPoison)
+    {
+        Fixture f;
+        int falls = 0;
+        f.mState.setFallHandler([&falls](FormId) {
+            ++falls;
+            return true;
+        });
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_EQ(falls, 1);
+        EXPECT_FALSE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, aPoisonThatLeavesHealthKillsNoOne)
+    {
+        Fixture f;
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 5, 0, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        EXPECT_FALSE(f.mState.isDead(victim));
     }
 
     TEST(FalloutScriptItemUseTest, healingStopsAtFullHealth)

@@ -37,6 +37,8 @@ local listLines = 12
 local levelUpPending = false
 -- Seconds since the engine was asked for level ups
 local sinceChecked = 0
+-- Seconds before the screen of a level up that was left is asked for again (the window takes a frame to open)
+local reopenWait = 0
 -- What the mouse wheel and the keys move in the list
 local listLength = 0
 
@@ -529,7 +531,7 @@ end
 
 local function hide()
     visible = false
-    view = 'pipboy'
+    -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
 
@@ -580,10 +582,26 @@ return {
                     levelUpPending = true
                 end
             end
-            if levelUpPending and not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
-                levelUpPending = false
-                openLevelUp()
-                openWindow()
+            reopenWait = math.max(0, reopenWait - core.getRealFrameDuration())
+            if not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
+                if view == 'levelup' then
+                    -- The screen was left (Escape, another window) before the points were given: it comes back as it
+                    -- was, unless nothing is left to give (the game was loaded, say)
+                    local stats = pipboy.stats()
+                    if stats.skillPoints > 0 or (stats.perkPoints > 0 and #pipboy.offeredPerks() > 0) then
+                        levelUpPending = false
+                        if reopenWait <= 0 then
+                            reopenWait = 0.5
+                            openWindow()
+                        end
+                    else
+                        view = 'pipboy'
+                    end
+                elseif levelUpPending then
+                    levelUpPending = false
+                    openLevelUp()
+                    openWindow()
+                end
             end
         end,
         onKeyPress = function(key)

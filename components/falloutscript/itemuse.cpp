@@ -84,6 +84,15 @@ namespace FalloutScript
             const double now = mValues.current(actor, actorValue);
             mValues.setBase(actor, actorValue, std::max(now + (detrimental ? amount : -amount), 0.0));
         }
+        else if (detrimental && actorValue == ActorValue::health)
+        {
+            // No blow comes between the damage to the health and the death or fall that follows
+            const auto transitions = mState.holdTransitions();
+            mValues.damage(actor, actorValue, amount);
+            // A character with no health left is dead, unless it is one that falls (an essential one)
+            if (mValues.current(actor, actorValue) <= 0 && !mState.falls(actor))
+                mState.setDead(actor, true);
+        }
         else if (detrimental)
             mValues.damage(actor, actorValue, amount);
         else
@@ -160,7 +169,9 @@ namespace FalloutScript
         Consumable consumable;
         if (mRecords.consumable(item, consumable))
         {
-            mState.removeItem(actor, item, 1);
+            // Of two calls for the last copy, the one that takes it is the one that uses it
+            if (mState.removeItem(actor, item, 1) < 1)
+                return result;
             result.mOutcome = Outcome::Consumed;
             bool stimpak = false;
             bool restoresRadiation = false;
@@ -239,12 +250,14 @@ namespace FalloutScript
                 result.mOutcome = Outcome::NothingToLearn;
                 return result;
             }
+            // The same as for an aid item: the call that takes the book is the one that reads it
+            if (mState.removeItem(actor, item, 1) < 1)
+                return result;
             double points = bookPoints;
             if (perks != nullptr)
                 points = perks->apply(EntryPoint::bookSkillPoints, actor, points);
             const double gained = std::min(points, skillCap - skill);
             mValues.setBase(actor, book.mSkill, skill + gained);
-            mState.removeItem(actor, item, 1);
             result.mOutcome = Outcome::Read;
             result.mGained = gained;
             if (counts)
@@ -257,19 +270,33 @@ namespace FalloutScript
     {
         if (seconds <= 0)
             return;
-        const std::lock_guard lock(mMutex);
-        for (Active& active : mActive)
+        struct Step
         {
-            const double elapsed = std::min(seconds, active.mRemaining);
-            if (!active.mTemporary)
-                instant(
-                    active.mActor, active.mActorValue, std::abs(active.mMagnitude) * elapsed, active.mMagnitude < 0);
-            active.mRemaining -= seconds;
-            if (active.mRemaining <= 0 && active.mTemporary)
-                mValues.modify(active.mActor, active.mActorValue, -active.mMagnitude);
+            FormId mActor;
+            int mActorValue;
+            double mAmount;
+            bool mDetrimental;
+        };
+        std::vector<Step> steps;
+        {
+            const std::lock_guard lock(mMutex);
+            for (Active& active : mActive)
+            {
+                const double elapsed = std::min(seconds, active.mRemaining);
+                if (!active.mTemporary)
+                    steps.push_back({ active.mActor, active.mActorValue, std::abs(active.mMagnitude) * elapsed,
+                        active.mMagnitude < 0 });
+                active.mRemaining -= seconds;
+                if (active.mRemaining <= 0 && active.mTemporary)
+                    mValues.modify(active.mActor, active.mActorValue, -active.mMagnitude);
+            }
+            mActive.erase(
+                std::remove_if(mActive.begin(), mActive.end(), [](const Active& a) { return a.mRemaining <= 0; }),
+                mActive.end());
         }
-        mActive.erase(std::remove_if(mActive.begin(), mActive.end(), [](const Active& a) { return a.mRemaining <= 0; }),
-            mActive.end());
+        // A death that comes of it is handled with the lock free: the host reacts to it
+        for (const Step& step : steps)
+            instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental);
     }
 
     std::vector<ItemUse::Active> ItemUse::active(FormId actor) const

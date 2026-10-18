@@ -181,7 +181,7 @@ namespace OFScript
     {
         std::vector<PipboyQuest> result;
         mQuests.forEachState([&result](FalloutScript::FormId id, const FalloutScript::QuestState& state) {
-            if (state.mRecord == nullptr || !state.mRunning)
+            if (!state.listed())
                 return;
             PipboyQuest quest;
             quest.mId = id;

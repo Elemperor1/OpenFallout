@@ -1570,6 +1570,7 @@ local lootFrames = nil
 -- Frames since the level up was asked for, and since its screen was seen
 local levelFrames = nil
 local levelSeen = 0
+local levelEscape = nil
 
 return {
     eventHandlers = {
@@ -1648,8 +1649,34 @@ return {
                         .. 'skillPointsBack=%d',
                         mode, stats.level, stats.skillPoints, stats.perkPoints, spent, after.skillPoints, refunded,
                         back.skillPoints))
+                    -- Escape: the screen of a level up is not left with points still to give, it comes back
                     I.UI.removeMode('Interface')
                     levelFrames = nil
+                    levelEscape = 0
+                end
+            end
+            if levelEscape then
+                levelEscape = levelEscape + 1
+                if levelEscape == 60 then
+                    local back = I.UI.getMode()
+                    -- Everything is given, as the buttons of the screen do (the points, then a perk, if one is offered)
+                    core.pipboy.spendSkillPoints(32, core.pipboy.stats().skillPoints)
+                    for _, skill in ipairs(core.pipboy.skills()) do
+                        local left = core.pipboy.stats().skillPoints
+                        if left > 0 then core.pipboy.spendSkillPoints(skill.number, left) end
+                    end
+                    for _, perk in ipairs(core.pipboy.offeredPerks()) do
+                        if perk.available ~= false and core.pipboy.stats().perkPoints > 0 then
+                            core.pipboy.choosePerk(perk.id)
+                        end
+                    end
+                    local stats = core.pipboy.stats()
+                    print('OFTEST', 'arena', 'levelback', string.format('mode=%s skillPoints=%d perkPoints=%d offered=%d',
+                        tostring(back), stats.skillPoints, stats.perkPoints, #core.pipboy.offeredPerks()))
+                    I.UI.removeMode('Interface')
+                elseif levelEscape == 120 then
+                    print('OFTEST', 'arena', 'levelgone', 'mode=' .. tostring(I.UI.getMode()))
+                    levelEscape = nil
                 end
             end
         end,
@@ -2456,6 +2483,19 @@ def check_arena_screens(text):
             problems.append(f"the level up should have given skill points that can be spent on a skill: {level_up.group(0)}")
         if int(refunded) != 1 or int(back) != int(after) + 1:
             problems.append(f"a point spent on a skill should be taken back by one refund: {level_up.group(0)}")
+    # The screen of a level up cannot be left (Escape) with points still to give: it comes back, and goes once they are given
+    level_back = re.search(r"OFTEST\tarena\tlevelback\tmode=(\w+) skillPoints=(\d+) perkPoints=(\d+) offered=(\d+)$",
+                           text, re.M)
+    if not level_back:
+        problems.append("no 'arena levelback' line in the log")
+    else:
+        mode, points, perks, offered = level_back.groups()
+        if mode != "Interface":
+            problems.append(f"the screen of the level up should have come back after Escape: {level_back.group(0)}")
+        if int(points) != 0 or (int(perks) != 0 and int(offered) != 0):
+            problems.append(f"the points of the level up should all have been given: {level_back.group(0)}")
+    if "OFTEST\tarena\tlevelgone\tmode=nil" not in text:
+        problems.append("the screen of the level up should be gone once every point was given")
     return problems
 
 

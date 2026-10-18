@@ -60,6 +60,10 @@ namespace FalloutScript
         std::optional<float> mDelay;
         /// The script of the quest and its variables, for a quest that has one
         std::shared_ptr<Instance> mInstance;
+
+        /// Whether the Pip-Boy lists the quest: while it runs, and when it is over (a script stops a quest that is
+        /// completed or failed, which stays in the list as done)
+        bool listed() const { return mRecord != nullptr && (mRunning || mCompleted || mFailed); }
     };
 
     /// The quests of the loaded plugins and how far the player is in each: which stage was reached, what the objectives
