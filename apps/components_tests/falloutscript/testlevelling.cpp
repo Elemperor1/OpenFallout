@@ -20,6 +20,7 @@ namespace
     using FalloutScript::Levelling::levelForExperience;
     using FalloutScript::Levelling::maxLevelForFiles;
     using FalloutScript::Levelling::skillPoints;
+    using FalloutScript::Levelling::skillRoom;
 
     LevellingRules rulesOf(Game game, const std::map<std::string, double>& settings = {})
     {
@@ -113,6 +114,18 @@ namespace
         EXPECT_EQ(skillPoints(rules, 10, 2), 20);
         // intelligence above 10 counts as 11 at most
         EXPECT_EQ(skillPoints(rules, 12, 2), 21);
+    }
+
+    TEST(FalloutScriptLevellingTest, theRoomOfASkillIsWhatIsLeftUnderOneHundredOfItsValue)
+    {
+        EXPECT_EQ(skillRoom(0), 100);
+        EXPECT_EQ(skillRoom(95), 5);
+        EXPECT_EQ(skillRoom(95.5), 4);
+        // a bonus that takes the value to 100 or over leaves no room, a penalty makes room
+        EXPECT_EQ(skillRoom(105), 0);
+        EXPECT_EQ(skillRoom(100), 0);
+        EXPECT_EQ(skillRoom(90), 10);
+        EXPECT_EQ(skillRoom(-5), 105);
     }
 
     TEST(FalloutScriptLevellingTest, givesTheSkillPointsOfNewVegasFromItsOwnRule)

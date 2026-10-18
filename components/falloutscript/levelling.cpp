@@ -15,6 +15,9 @@ namespace FalloutScript
         constexpr std::array<std::string_view, 5> bandNames{ "VeryEasy", "Easy", "Average", "Hard", "VeryHard" };
         constexpr std::array<std::string_view, 5> difficultyNames{ "VE", "E", "N", "H", "VH" };
 
+        /// What a skill can be raised to by points
+        constexpr double skillLimit = 100;
+
         void take(const LevellingRules::Lookup& lookup, std::string_view name, double& setting)
         {
             if (const std::optional<double> value = lookup(name))
@@ -130,6 +133,11 @@ namespace FalloutScript
         if (level % 2 == 0 && static_cast<int>(std::floor(clamped)) % 2 == 1)
             ++points;
         return points;
+    }
+
+    int Levelling::skillRoom(double value)
+    {
+        return static_cast<int>(std::floor(std::max(skillLimit - value, 0.0)));
     }
 
     bool Levelling::givesPerk(const LevellingRules& rules, int level)

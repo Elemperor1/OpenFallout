@@ -65,6 +65,10 @@ namespace FalloutScript
         int maxLevelForFiles(const LevellingRules& rules, const std::vector<std::string>& files);
         /// The skill points that reaching the level gives to a player with that intelligence
         int skillPoints(const LevellingRules& rules, double intelligence, int level);
+        /// How many points can still be given to a skill that stands at that value (its base with the bonuses and
+        /// penalties of perks, items and traits): the games stop at 100 on the value, so a bonus takes room away and a
+        /// penalty makes some
+        int skillRoom(double value);
         /// Whether reaching the level gives a perk to choose
         bool givesPerk(const LevellingRules& rules, int level);
         /// What killing a creature or a character of that level is worth for a game at that difficulty (0 very easy

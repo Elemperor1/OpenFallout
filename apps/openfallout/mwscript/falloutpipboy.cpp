@@ -44,9 +44,6 @@ namespace OFScript
         constexpr int dropLimit = 10;
         /// The distance in front of the player that a dropped item lands at
         constexpr double dropDistance = 64;
-
-        /// What a skill can be raised to by points
-        constexpr double skillLimit = 100;
     }
 
     std::string FalloutScripts::gameSettingText(std::string_view name)
@@ -249,8 +246,9 @@ namespace OFScript
     {
         if (skill < AV::firstSkill || skill > AV::lastSkill || points <= 0)
             return 0;
-        const double room = skillLimit - mActorValues.base(mPlayer, skill);
-        points = std::min(points, static_cast<int>(std::floor(std::max(room, 0.0))));
+        // The room is the room under 100 of the value, as on the screen of the level up: a bonus takes room away, a
+        // penalty makes some
+        points = std::min(points, FalloutScript::Levelling::skillRoom(mActorValues.current(mPlayer, skill)));
         if (points <= 0 || !mProgress.spendSkillPoints(points))
             return 0;
         mActorValues.setBase(mPlayer, skill, mActorValues.base(mPlayer, skill) + points);
