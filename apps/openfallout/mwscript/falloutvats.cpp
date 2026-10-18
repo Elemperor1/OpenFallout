@@ -125,7 +125,8 @@ namespace OFScript
             return result;
         const ESM4::Weapon::GameData& game = record->mGame;
         result.mAnimationType = game.mAnimationType;
-        result.mSpread = game.mSpread;
+        // V.A.T.S. reads the smaller spread of the record (DNAM at 16, "Min Spread"), not the one after it
+        result.mSpread = game.mMinSpread;
         result.mRangeFixed = (game.mFlags2 & ESM4::Weapon::GameData::RangeFixed) != 0;
         result.mRange = FalloutScript::Vats::isMelee(game.mAnimationType) ? 0.0 : weaponStats(attacker).mRange;
         if ((game.mFlags2 & ESM4::Weapon::GameData::OverrideActionPoints) != 0)
@@ -256,8 +257,8 @@ namespace OFScript
             part.mName = parts[i].mName;
             part.mTarget = parts[i].mTarget;
             shot.partToHit = parts[i].mToHit;
-            part.mChance = FalloutScript::Vats::adjustedChance(
-                vatsRules(), FalloutScript::Vats::hitChance(vatsRules(), weapon, shot), toHit);
+            part.mChance
+                = FalloutScript::Vats::adjustedChance(FalloutScript::Vats::hitChance(vatsRules(), weapon, shot), toHit);
             part.mCondition = mLimbs.condition(victim, parts[i].mType);
             result.push_back(std::move(part));
         }

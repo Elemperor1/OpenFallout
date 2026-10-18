@@ -33,6 +33,8 @@ namespace FalloutScript
         double mDuration = 0;
         /// Hurts the value (the flag of the magic effect)
         bool mDetrimental = false;
+        /// The magic effect is hostile (its first flag): the perks that make a chem last longer leave it alone
+        bool mHostile = false;
         /// A change that is undone when the effect ends (the flag of the magic effect); otherwise it lasts
         bool mRecover = false;
         std::vector<ESM4::TargetCondition> mConditions;
@@ -114,6 +116,9 @@ namespace FalloutScript
         void setPlayer(FormId player);
         /// The skill a book can raise to and the points a book gives when no perk changes them
         void setBookRules(double skillCap, double points);
+        /// Whether the perks that make the effects of a chem last longer (entry point 25) work only on an item that
+        /// can make one addicted, as in Fallout 3; New Vegas lets them work on every effect that is not hostile
+        void setChemDurationNeedsAddiction(bool needsAddiction);
 
         /// The items the character is addicted to (the form of the item), in the order they were taken
         std::vector<FormId> addictions(FormId actor) const;
@@ -156,6 +161,7 @@ namespace FalloutScript
         std::function<double()> mRandom;
         double mSkillCap = 100;
         double mBookPoints = 1;
+        bool mChemDurationNeedsAddiction = false;
         FormId mPlayer = 0;
 
         mutable std::mutex mMutex;

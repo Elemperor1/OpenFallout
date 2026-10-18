@@ -23,6 +23,14 @@ namespace FalloutScript
         take("fDamageMeleeWeapCondMult", settings.mMeleeConditionMult);
         take("fFriendHitTimer", settings.mFriendHitSeconds);
         take("fFriendMinimumLastHitTime", settings.mFriendHitSpacingSeconds);
+        const auto takeCount = [&lookup](std::string_view name, int& setting) {
+            if (const std::optional<double> value = lookup(name))
+                setting = static_cast<int>(*value);
+        };
+        takeCount("iFriendHitCombatAllowed", settings.mFriendHitCombatAllowed);
+        takeCount("iFriendHitNonCombatAllowed", settings.mFriendHitNonCombatAllowed);
+        takeCount("iAllyHitCombatAllowed", settings.mAllyHitCombatAllowed);
+        takeCount("iAllyHitNonCombatAllowed", settings.mAllyHitNonCombatAllowed);
         return settings;
     }
 

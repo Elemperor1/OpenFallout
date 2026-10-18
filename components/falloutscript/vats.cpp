@@ -209,10 +209,10 @@ namespace FalloutScript::Vats
         return std::max(share * maxActionPoints, 0.0);
     }
 
-    double adjustedChance(const Rules& rules, double chance, const std::function<double(double)>& perks)
+    double adjustedChance(double chance, const std::function<double(double)>& perks)
     {
         if (chance <= 0 || !perks)
             return chance;
-        return std::clamp(perks(chance / 100.0) * 100.0, 0.0, rules.mMaxChance);
+        return std::max(chance, perks(chance / 100.0) * 100.0);
     }
 }

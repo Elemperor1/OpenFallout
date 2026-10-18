@@ -59,21 +59,30 @@ namespace FalloutScript
         if (!actors.factions(actor, mine) || !actors.factions(target, theirs))
             return CombatState::Relation::Neutral;
         bool ally = false;
+        bool friendly = false;
+        bool enemy = false;
         for (const auto& [first, firstRank] : mine)
             for (const auto& [second, secondRank] : theirs)
             {
-                if (first == second)
-                {
+                std::optional<CombatState::Relation> relation = factionRelation(combat, world, first, second);
+                // The executables have no rule for two characters of one faction: they stand to each other as the
+                // faction stands to itself, which most factions say in a row of their own. One that says nothing is
+                // taken as kin here.
+                if (!relation && first == second)
+                    relation = CombatState::Relation::Ally;
+                if (relation == CombatState::Relation::Ally)
                     ally = true;
-                    continue;
-                }
-                const std::optional<CombatState::Relation> relation = factionRelation(combat, world, first, second);
-                if (relation == CombatState::Relation::Enemy)
-                    return CombatState::Relation::Enemy;
-                if (relation == CombatState::Relation::Ally || relation == CombatState::Relation::Friend)
-                    ally = true;
+                else if (relation == CombatState::Relation::Friend)
+                    friendly = true;
+                else if (relation == CombatState::Relation::Enemy)
+                    enemy = true;
             }
-        return ally ? CombatState::Relation::Ally : CombatState::Relation::Neutral;
+        // An ally wins over a friend, and both over an enemy (the order of the executables)
+        if (ally)
+            return CombatState::Relation::Ally;
+        if (friendly)
+            return CombatState::Relation::Friend;
+        return enemy ? CombatState::Relation::Enemy : CombatState::Relation::Neutral;
     }
 
     bool mayStartFight(const CombatState& combat, const ActorState& actors, FormId actor, FormId target)
@@ -241,15 +250,22 @@ namespace FalloutScript
             const FormId killer = formArgument(call, 0);
             return call.mReference != 0 && killer != 0 && actors.killerOf(call.mReference) == killer ? 1.0 : 0.0;
         });
-        // The number of blows that came from someone on its side
-        interpreter.setHandler("GetFriendHit", [&combat, &actors, &world](CallContext& call) {
+        // The number of blows from the player that someone on its side struck and that it let pass (the blows that
+        // count are told by the host when they are struck, with the allowance of the victim)
+        interpreter.setHandler("GetFriendHit", [&combat](CallContext& call) {
             if (call.mReference == 0)
                 return 0.0;
             int friendly = 0;
             for (const auto& [attacker, count] : combat.hitsTaken(call.mReference))
-                if (relationOfActors(combat, actors, world, call.mReference, attacker) == CombatState::Relation::Ally)
-                    friendly += count;
+                friendly += count;
             return static_cast<double>(friendly);
+        });
+        interpreter.setHandler("SetIgnoreFriendlyHits", [&combat](CallContext& call) {
+            combat.setIgnoreFriendlyHits(call.mReference, flagOrSet(call, 0));
+            return 0.0;
+        });
+        interpreter.setHandler("GetIgnoreFriendlyHits", [&combat](CallContext& call) {
+            return call.mReference != 0 && combat.ignoresFriendlyHits(call.mReference) ? 1.0 : 0.0;
         });
     }
 }

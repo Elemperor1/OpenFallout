@@ -34,6 +34,13 @@ namespace FalloutScript
         /// (fFriendHitTimer, fFriendMinimumLastHitTime)
         double mFriendHitSeconds = 10;
         double mFriendHitSpacingSeconds = 0.5;
+        /// How many blows of the player a character lets pass before it turns on the player, by how it stands to the
+        /// victim's faction (a friend or an ally) and whether the character is in a fight (iFriendHitCombatAllowed,
+        /// iFriendHitNonCombatAllowed, iAllyHitCombatAllowed, iAllyHitNonCombatAllowed). 0 or less lets none pass.
+        int mFriendHitCombatAllowed = 4;
+        int mFriendHitNonCombatAllowed = 0;
+        int mAllyHitCombatAllowed = 1000;
+        int mAllyHitNonCombatAllowed = 3;
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 

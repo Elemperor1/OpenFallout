@@ -163,7 +163,9 @@ function render()
     end
     for _, part in ipairs(parts) do
         local crippled = part.condition <= 0
-        local text = string.format('%s  %d%%%s', part.target, math.floor(part.chance + 0.5), crippled and '  crippled' or '')
+        -- A perk can take the chance over 100 (it is capped before the perks): a hit is sure then, and 100 is what shows
+        local shown = math.min(part.chance, 100)
+        local text = string.format('%s  %d%%%s', part.target, math.floor(shown + 0.5), crippled and '  crippled' or '')
         add(widgets.clickable(text, function()
             queue[#queue + 1] = { target = target, part = part.index, name = part.target, chance = part.chance }
             render()
@@ -173,7 +175,7 @@ function render()
     if #queue > 0 then
         add(widgets.label('Queued', colors.hintColor, textSize - 4))
         for index, attack in ipairs(queue) do
-            add(widgets.label(string.format('%d. %s %d%%', index, attack.name, math.floor(attack.chance + 0.5)),
+            add(widgets.label(string.format('%d. %s %d%%', index, attack.name, math.floor(math.min(attack.chance, 100) + 0.5)),
                 colors.normalColor, textSize - 2))
         end
     end

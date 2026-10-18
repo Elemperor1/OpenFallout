@@ -62,8 +62,17 @@ namespace
         std::map<FormId, std::vector<std::pair<FormId, int>>> mItems;
         std::map<FormId, std::vector<std::pair<FormId, int>>> mFactions;
         std::set<FormId> mUnknown;
+        std::set<FormId> mStartDead;
         std::map<FormId, FormId> mBases;
         int mItemQuestions = 0;
+
+        bool initiallyDead(FormId actor, bool& dead) override
+        {
+            if (mUnknown.count(actor) != 0)
+                return false;
+            dead = mStartDead.count(actor) != 0;
+            return true;
+        }
 
         bool baseFormOf(FormId reference, FormId& base) override
         {
@@ -606,6 +615,41 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptActorCommandsTest, killing_an_actor_that_the_host_lets_fall_does_not_kill_it)
+    {
+        Runner setup;
+        std::vector<FormId> fell;
+        setup.mState.setFallHandler([&](FormId actor) {
+            fell.push_back(actor);
+            return true;
+        });
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpKillActor, arguments(0))
+            + setTo(var('s', 1), callToken(OpGetDead, arguments(0))) + end());
+        builder.variable(1, integerVariable, "dead");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_THAT(fell, ElementsAre(guard));
+        EXPECT_FALSE(setup.mState.isDead(guard));
+        EXPECT_THAT(setup.mState.takeDeaths(), IsEmpty());
+    }
+
+    TEST(FalloutScriptActorCommandsTest, killing_an_actor_that_is_dead_already_asks_nothing_of_the_host)
+    {
+        Runner setup;
+        int asked = 0;
+        setup.mState.setFallHandler([&](FormId) {
+            ++asked;
+            return true;
+        });
+        setup.mState.setDead(guard, true);
+        EXPECT_FALSE(setup.mState.kill(guard));
+        EXPECT_EQ(asked, 0);
+        EXPECT_TRUE(setup.mState.isDead(guard));
+    }
+
     TEST(FalloutScriptActorCommandsTest, bringing_an_actor_back_tells_the_host)
     {
         Runner setup;
@@ -624,6 +668,39 @@ namespace
         EXPECT_THAT(brought, ElementsAre(guard, guard));
         EXPECT_FALSE(setup.mState.isDead(guard));
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorStateTest, an_actor_whose_record_gives_it_no_health_starts_dead)
+    {
+        FakeRecords records;
+        records.mStartDead = { guard };
+        ActorState state(records);
+        std::vector<FormId> told;
+        state.setDeathListener([&](FormId actor) { told.push_back(actor); });
+        EXPECT_TRUE(state.isDead(guard));
+        EXPECT_FALSE(state.isDead(player));
+        // It was dead when it came into being: nothing dies, and a killing blow comes too late
+        EXPECT_THAT(state.takeDeaths(), IsEmpty());
+        EXPECT_FALSE(state.setDead(guard, true));
+        EXPECT_THAT(told, IsEmpty());
+        // A script can bring it back, and it stays alive
+        EXPECT_TRUE(state.setDead(guard, false));
+        EXPECT_FALSE(state.isDead(guard));
+    }
+
+    TEST(FalloutScriptActorStateTest, an_actor_that_is_brought_back_before_it_was_asked_about_stays_alive)
+    {
+        FakeRecords records;
+        records.mStartDead = { guard };
+        ActorState state(records);
+        EXPECT_TRUE(state.setDead(guard, false));
+        EXPECT_FALSE(state.isDead(guard));
+        // Nothing about the record is known yet for one in a cell that is not loaded: it is asked again later
+        records.mUnknown = { crate };
+        records.mStartDead = { guard, crate };
+        EXPECT_FALSE(state.isDead(crate));
+        records.mUnknown.clear();
+        EXPECT_TRUE(state.isDead(crate));
     }
 
     TEST(FalloutScriptActorCommandsTest, a_script_counts_the_dead_of_a_base_form)

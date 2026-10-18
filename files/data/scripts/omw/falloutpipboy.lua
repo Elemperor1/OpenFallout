@@ -35,6 +35,8 @@ local selected = 1
 local listLines = 12
 -- A level up that has not been shown
 local levelUpPending = false
+-- The level that the screen of the level up is for (the games show one screen for each level)
+local levelUpLevel = nil
 -- Seconds since the engine was asked for level ups
 local sinceChecked = 0
 -- Seconds before the screen of a level up that was left is asked for again (the window takes a frame to open)
@@ -376,11 +378,14 @@ local function finishLevelUp()
     if levelPerk then
         pipboy.choosePerk(levelPerk)
     end
-    -- A perk point that is left (several levels were reached) gets a screen of its own
+    -- A perk point that is left gets a screen of its own; when there is none the level is done, and the next level that
+    -- the experience reached (there is a screen for each) is handed out
     if pipboy.stats().perkPoints > 0 and #pipboy.offeredPerks() > 0 then
         openLevelUp()
     else
         view = 'pipboy'
+        levelUpLevel = nil
+        pipboy.levelUpDone()
     end
     render()
 end
@@ -446,7 +451,7 @@ local function levelUpPage(add)
     local lastPage = levelPage == 2 or not hasPerkPage
 
     local title = word('sLevelUpTitleText', 'WELCOME TO LEVEL %d')
-    add(widgets.label(upper((title:gsub('%%d', tostring(stats.level)))), colors.titleColor, textSize + 4))
+    add(widgets.label(upper((title:gsub('%%d', tostring(levelUpLevel or stats.level)))), colors.titleColor, textSize + 4))
 
     local left, complete
     if levelPage == 1 then
@@ -579,7 +584,9 @@ return {
             sinceChecked = sinceChecked + core.getRealFrameDuration()
             if sinceChecked >= 0.25 then
                 sinceChecked = 0
-                if #pipboy.takeLevelUps() > 0 then
+                local reached = pipboy.takeLevelUps()
+                if #reached > 0 then
+                    levelUpLevel = reached[#reached].level
                     levelUpPending = true
                 end
             end
@@ -597,6 +604,8 @@ return {
                         end
                     else
                         view = 'pipboy'
+                        levelUpLevel = nil
+                        pipboy.levelUpDone()
                     end
                 elseif levelUpPending then
                     levelUpPending = false

@@ -67,6 +67,12 @@ namespace FalloutScript
         mBookPoints = points;
     }
 
+    void ItemUse::setChemDurationNeedsAddiction(bool needsAddiction)
+    {
+        const std::lock_guard lock(mMutex);
+        mChemDurationNeedsAddiction = needsAddiction;
+    }
+
     void ItemUse::clear()
     {
         const std::lock_guard lock(mMutex);
@@ -94,7 +100,21 @@ namespace FalloutScript
         else if (detrimental)
             mValues.damage(actor, actorValue, amount);
         else
+        {
+            // The health that an effect gives back is the value of an entry point (12, Modify Recovered Health), for
+            // what happens at once and for each second of an effect that lasts
+            if (actorValue == ActorValue::health)
+            {
+                PerkEngine* perks = nullptr;
+                {
+                    const std::lock_guard lock(mMutex);
+                    perks = mPerks;
+                }
+                if (perks != nullptr)
+                    amount = std::max(perks->apply(EntryPoint::recoveredHealth, actor, amount), 0.0);
+            }
             mValues.restore(actor, actorValue, amount);
+        }
     }
 
     void ItemUse::dieIfSpent(FormId actor)
@@ -179,6 +199,7 @@ namespace FalloutScript
         PerkEngine* perks = nullptr;
         double skillCap = 100;
         double bookPoints = 1;
+        bool durationNeedsAddiction = false;
         FormId player = 0;
         {
             const std::lock_guard lock(mMutex);
@@ -186,6 +207,7 @@ namespace FalloutScript
             perks = mPerks;
             skillCap = mSkillCap;
             bookPoints = mBookPoints;
+            durationNeedsAddiction = mChemDurationNeedsAddiction;
             player = mPlayer;
         }
         const bool counts = actor == player;
@@ -200,8 +222,11 @@ namespace FalloutScript
             bool stimpak = false;
             bool restoresRadiation = false;
             bool resistsRadiation = false;
-            // How long the effects last may be changed by a perk (Chemist doubles the time of a chem)
-            const double durationScale = perks != nullptr ? perks->apply(EntryPoint::chemDuration, actor, 1.0) : 1.0;
+            // How long the effects last may be changed by a perk (Chemist doubles the time of a chem), but not those of
+            // a hostile effect, and in Fallout 3 only of an item that can make one addicted
+            double durationScale = 1.0;
+            if (perks != nullptr && (!durationNeedsAddiction || consumable.mWithdrawal != 0))
+                durationScale = perks->apply(EntryPoint::chemDuration, actor, 1.0);
             for (const ConsumableEffect& effect : consumable.mEffects)
             {
                 if (!effect.mConditions.empty())
@@ -216,7 +241,7 @@ namespace FalloutScript
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationValue && !effect.mDetrimental);
                 resistsRadiation = resistsRadiation
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationResistance && !effect.mDetrimental);
-                applyEffect(actor, effect, durationScale);
+                applyEffect(actor, effect, effect.mHostile ? 1.0 : durationScale);
             }
 
             const bool addictive = consumable.mWithdrawal != 0 && consumable.mAddictionChance > 0;

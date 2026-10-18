@@ -1669,9 +1669,16 @@
 -- @function [parent=#Pipboy] closeRecipes
 
 ---
--- The levels the player reached since this was last called.
+-- The level the player reached whose points have not been handed out to a screen yet, since this was last called.
+-- The games show one screen for each level, so there is one level at a time: the next is handed out after
+-- `levelUpDone`.
 -- @function [parent=#Pipboy] takeLevelUps
 -- @return #list<#PipboyLevelUp>
+
+---
+-- The player is done with the screen of the level that was handed out last, so the next level the experience
+-- reached can be handed out.
+-- @function [parent=#Pipboy] levelUpDone
 
 ---
 -- @type PipboyLevelUp

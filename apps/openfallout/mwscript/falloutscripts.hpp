@@ -180,6 +180,9 @@ namespace OFScript
         FalloutScript::ItemUse::Result useItem(FalloutScript::FormId actor, FalloutScript::FormId item);
         /// The levels the player reached whose points have been handed out and that the interface has not shown yet
         std::vector<FalloutScript::PlayerProgress::LevelUp> takeLevelUps();
+        /// The player is done with the screen of the level that was handed out last: the next level (if the experience
+        /// reached one) is handed out after it
+        void finishLevelUp();
         /// The value of a game setting (GMST) by its editor id, none when the files have no such setting
         std::optional<double> gameSetting(std::string_view name);
         /// The text of a game setting, empty when the files have none
@@ -371,6 +374,8 @@ namespace OFScript
         };
         /// Any thread.
         WeaponStats weaponStats(FalloutScript::FormId attacker);
+        /// How far a blow of the bare hands reaches
+        double unarmedReach(FalloutScript::FormId attacker);
 
         /// What an attack of the player or another character came to
         struct FireResult
@@ -755,6 +760,7 @@ namespace OFScript
             FalloutScript::FormId holder, std::vector<std::pair<FalloutScript::FormId, int>>& items) override;
         bool initialFactions(
             FalloutScript::FormId actor, std::vector<std::pair<FalloutScript::FormId, int>>& factions) override;
+        bool initiallyDead(FalloutScript::FormId actor, bool& dead) override;
         bool itemInfo(FalloutScript::FormId item, FalloutScript::ItemInfo& info) override;
         bool startingArmor(FalloutScript::FormId actor, std::vector<FalloutScript::FormId>& armor) override;
         /// The script of an item record (0 for none)
@@ -773,8 +779,12 @@ namespace OFScript
         /// Runs the OnHit, OnHitWith, OnDeath and OnCombatEnd blocks for what happened in the fights since the last
         /// frame, wakes the essential characters that were down long enough, and lets the time of the fights pass
         void raiseCombatEvents(float frametime);
-        /// A character whose health is gone: an essential one is put out of its fights and lies unconscious until it
-        /// gets up (true), any other one dies (false, nothing is done). Any thread.
+        /// Whether the victim lets this blow pass: the player struck someone on the side of its factions, and the blows
+        /// the victim has taken from the player are no more than it allows. The blow is counted for GetFriendHit.
+        bool toleratesBlow(FalloutScript::FormId attacker, FalloutScript::FormId victim);
+        /// A character whose health is gone (or that a script kills): an essential one is put out of its fights and
+        /// lies unconscious until it gets up, or has its health back to a share of the most if it is down already
+        /// (true), any other one dies (false, nothing is done). Any thread.
         bool fallsInsteadOfDying(FalloutScript::FormId victim);
         bool initialValues(FalloutScript::FormId actor, std::vector<std::pair<int, double>>& values) override;
         bool levelOf(FalloutScript::FormId actor, int playerLevel, int& level) override;
@@ -1011,9 +1021,10 @@ namespace OFScript
         /// The rules of levelling up are read from the settings of the files once, and whoever asks for them while
         /// they are being read waits for that
         std::once_flag mLevellingRulesOnce;
-        /// The levels that were reached and not shown yet
+        /// The levels that were reached and not shown yet, and whether the screen of a level is open (under the mutex)
         std::mutex mLevelUpMutex;
         std::deque<FalloutScript::PlayerProgress::LevelUp> mLevelUps;
+        bool mLevelUpOpen = false;
         /// How much damage the player did to each character it fought, which the experience of a kill depends on
         std::mutex mPlayerDamageMutex;
         std::map<FalloutScript::FormId, double> mPlayerDamage;

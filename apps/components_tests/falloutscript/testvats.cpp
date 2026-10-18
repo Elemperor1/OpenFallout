@@ -270,16 +270,17 @@ namespace
         EXPECT_DOUBLE_EQ(Vats::restored(rules, 100, 2.0, [](double share) { return share - 1.0; }), 0.0);
     }
 
-    TEST(FalloutScriptVatsTest, thePerksChangeTheChanceOfAHitWithinWhatTheFilesAllow)
+    TEST(FalloutScriptVatsTest, thePerksRaiseTheChanceOfAHitAndNeverLowerIt)
     {
-        const Vats::Rules rules;
         const auto quarterMore = [](double chance) { return chance * 1.25; };
-        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 60.0, quarterMore), 75.0);
-        // The most the files allow stays the most
-        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 90.0, quarterMore), 95.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(60.0, quarterMore), 75.0);
+        // The executables cap the chance before the perks and not after: 95 with a quarter more is 118.75
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(95.0, quarterMore), 118.75);
+        // A perk that lowers the chance (Fast Shot) is dropped, the larger of the two is kept
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(40.0, [](double chance) { return chance * 0.8; }), 40.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(40.0, [](double chance) { return chance - 1.0; }), 40.0);
         // No chance (the target is out of reach) stays none, whatever the perks add
-        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 0.0, [](double chance) { return chance + 0.5; }), 0.0);
-        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 40.0, [](double chance) { return chance - 1.0; }), 0.0);
-        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 40.0, nullptr), 40.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(0.0, [](double chance) { return chance + 0.5; }), 0.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(40.0, nullptr), 40.0);
     }
 }

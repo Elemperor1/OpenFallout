@@ -206,7 +206,7 @@ namespace
         EXPECT_THAT(state.takeWoken(), ElementsAre(raider));
     }
 
-    TEST(FalloutScriptCombatStateTest, a_hit_actor_counts_as_attacked_for_a_short_time)
+    TEST(FalloutScriptCombatStateTest, a_hit_actor_counts_as_attacked_until_a_fight_or_a_death_ends_it)
     {
         CombatState state;
         CombatState::Hit hit;
@@ -218,9 +218,11 @@ namespace
 
         EXPECT_TRUE(state.attacked(guard));
         EXPECT_FALSE(state.attacked(raider));
-        state.advance(1.f);
+        // The executables keep no time on it
+        state.advance(100.f);
         EXPECT_TRUE(state.attacked(guard));
-        state.advance(1.5f);
+        // It ends with the fights of the character, or when it is out (dead, unconscious)
+        state.withdraw(guard);
         EXPECT_FALSE(state.attacked(guard));
 
         // The blow is the last one it took, whenever that was
@@ -231,6 +233,22 @@ namespace
         EXPECT_TRUE(last.mCritical);
         EXPECT_EQ(last.mLimb, 3);
         EXPECT_FALSE(state.lastHit(raider, last));
+    }
+
+    TEST(FalloutScriptCombatStateTest, a_blow_that_the_victim_lets_pass_is_not_an_attack)
+    {
+        CombatState state;
+        CombatState::Hit hit;
+        hit.mAttacker = raider;
+        hit.mDamage = 4;
+        state.noteHit(guard, hit, true);
+
+        EXPECT_FALSE(state.attacked(guard));
+        // ... though it is the last blow the character took, and the blocks of its hits run for it
+        CombatState::Hit last;
+        ASSERT_TRUE(state.lastHit(guard, last));
+        EXPECT_DOUBLE_EQ(last.mDamage, 4);
+        EXPECT_THAT(state.takeHits(), SizeIs(1));
     }
 
     TEST(FalloutScriptCombatStateTest, a_character_stays_attacked_as_long_as_it_is_in_a_fight)
@@ -292,37 +310,40 @@ namespace
         EXPECT_TRUE(state.attacked(guard));
     }
 
-    TEST(FalloutScriptCombatStateTest, the_blows_of_each_attacker_are_counted)
+    TEST(FalloutScriptCombatStateTest, only_the_blows_that_are_counted_for_friendly_fire_are_counted_for_each_attacker)
     {
         CombatState state;
-        CombatState::Hit first;
-        first.mAttacker = raider;
-        CombatState::Hit second;
-        second.mAttacker = ghoul;
-        state.noteHit(guard, first);
-        state.noteHit(guard, second);
+        state.setFriendHitRules(10, 0.5);
+        // A blow that is not counted by countFriendHit does not show in what the victim has taken
+        CombatState::Hit hit;
+        hit.mAttacker = raider;
+        state.noteHit(guard, hit);
+        EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
+
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 1);
+        EXPECT_EQ(state.countFriendHit(ghoul, raider, 3), 1);
         state.advance(1.f);
-        state.noteHit(guard, first);
-        state.noteHit(guard, {});
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 2);
+        EXPECT_EQ(state.countFriendHit(guard, ghoul, 3), 1);
         EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 2), std::make_pair(ghoul, 1)));
         EXPECT_THAT(state.hitsTaken(raider), IsEmpty());
+        // No one is nobody
+        EXPECT_EQ(state.countFriendHit(guard, 0, 3), 0);
+        EXPECT_EQ(state.countFriendHit(0, raider, 3), 0);
         state.clear();
         EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
     }
 
-    TEST(FalloutScriptCombatStateTest, a_blow_counts_only_after_the_spacing_and_expires_after_its_life)
+    TEST(FalloutScriptCombatStateTest, a_friendly_blow_counts_only_after_the_spacing_and_expires_after_its_life)
     {
         CombatState state;
         state.setFriendHitRules(10, 0.5);
-        CombatState::Hit blow;
-        blow.mAttacker = raider;
-        state.noteHit(guard, blow);
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 1);
         // Too soon after the one that counted (a burst of pellets is one blow)
         state.advance(0.25f);
-        state.noteHit(guard, blow);
-        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 1);
         state.advance(0.5f);
-        state.noteHit(guard, blow);
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 2);
         EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 2)));
 
         // The first expires 10 seconds after it, the second 0.75 seconds later
@@ -331,8 +352,35 @@ namespace
         state.advance(0.75f);
         EXPECT_THAT(state.hitsTaken(guard), IsEmpty());
         // Counting starts afresh
-        state.noteHit(guard, blow);
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 1);
         EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
+    }
+
+    TEST(FalloutScriptCombatStateTest, an_allowance_of_a_thousand_blows_forgets_the_earlier_ones)
+    {
+        CombatState state;
+        state.setFriendHitRules(10, 0.5);
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 1);
+        state.advance(1.f);
+        EXPECT_EQ(state.countFriendHit(guard, raider, 3), 2);
+        state.advance(1.f);
+        // A victim that lets a thousand blows pass is never weighed up against more than the one
+        EXPECT_EQ(state.countFriendHit(guard, raider, 1000), 1);
+        EXPECT_THAT(state.hitsTaken(guard), ElementsAre(std::make_pair(raider, 1)));
+    }
+
+    TEST(FalloutScriptCombatStateTest, a_character_can_ignore_friendly_hits)
+    {
+        CombatState state;
+        EXPECT_FALSE(state.ignoresFriendlyHits(guard));
+        state.setIgnoreFriendlyHits(guard, true);
+        EXPECT_TRUE(state.ignoresFriendlyHits(guard));
+        EXPECT_FALSE(state.ignoresFriendlyHits(raider));
+        state.setIgnoreFriendlyHits(guard, false);
+        EXPECT_FALSE(state.ignoresFriendlyHits(guard));
+        state.setIgnoreFriendlyHits(guard, true);
+        state.clear();
+        EXPECT_FALSE(state.ignoresFriendlyHits(guard));
     }
 
     TEST(FalloutScriptCombatStateTest, the_blows_are_told_once_in_the_order_they_were_struck)

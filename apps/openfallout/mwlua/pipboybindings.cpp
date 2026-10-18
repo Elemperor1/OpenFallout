@@ -314,6 +314,8 @@ namespace OFLua
             }
             return rows;
         };
+        // The screen of the last level that was handed out is done: the next level is handed out
+        api["levelUpDone"] = []() { scripts().finishLevelUp(); };
         // The perks the player can pick with a perk point, and the points it can spend
         api["offeredPerks"] = [lua]() { return perkRows(lua, scripts().pipboyOfferedPerks()); };
         // Spends points on a skill; how many were spent

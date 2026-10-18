@@ -1685,7 +1685,7 @@ return {
             end
             if levelEscape then
                 levelEscape = levelEscape + 1
-                if levelEscape == 60 then
+                if levelEscape == 60 or levelEscape == 180 then
                     local back = I.UI.getMode()
                     -- Everything is given, as the buttons of the screen do (the points, then a perk, if one is offered)
                     core.pipboy.spendSkillPoints(32, core.pipboy.stats().skillPoints)
@@ -1699,10 +1699,20 @@ return {
                         end
                     end
                     local stats = core.pipboy.stats()
-                    print('OFTEST', 'arena', 'levelback', string.format('mode=%s skillPoints=%d perkPoints=%d offered=%d',
-                        tostring(back), stats.skillPoints, stats.perkPoints, #core.pipboy.offeredPerks()))
+                    -- The experience reached two levels, and each has a screen of its own: the first comes back after
+                    -- Escape, and when all of it is given the second opens
+                    print('OFTEST', 'arena', levelEscape == 60 and 'levelback' or 'levelnext',
+                        string.format('mode=%s skillPoints=%d perkPoints=%d offered=%d', tostring(back), stats.skillPoints,
+                            stats.perkPoints, #core.pipboy.offeredPerks()))
                     I.UI.removeMode('Interface')
                 elseif levelEscape == 120 then
+                    -- The first level is done, so the screen of the second one is open
+                    local next = I.UI.getMode()
+                    local stats = core.pipboy.stats()
+                    print('OFTEST', 'arena', 'levelsecond', string.format('mode=%s skillPoints=%d', tostring(next),
+                        stats.skillPoints))
+                    levelEscape = 121
+                elseif levelEscape == 240 then
                     print('OFTEST', 'arena', 'levelgone', 'mode=' .. tostring(I.UI.getMode()))
                     levelEscape = nil
                     core.sendGlobalEvent('OFTestArenaCraftNow', {})
@@ -2625,8 +2635,22 @@ def check_arena_screens(text):
             problems.append(f"the screen of the level up should have come back after Escape: {level_back.group(0)}")
         if int(points) != 0 or (int(perks) != 0 and int(offered) != 0):
             problems.append(f"the points of the level up should all have been given: {level_back.group(0)}")
+    # The experience reached two levels, and each has a screen: the second opens when the first is done, with the points
+    # of its own level
+    level_second = re.search(r"OFTEST\tarena\tlevelsecond\tmode=(\w+) skillPoints=(\d+)$", text, re.M)
+    if not level_second:
+        problems.append("no 'arena levelsecond' line in the log")
+    elif level_second.group(1) != "Interface" or int(level_second.group(2)) < 1:
+        problems.append("the screen of the second level should open with its own skill points once the first is done: "
+                        f"{level_second.group(0)}")
+    level_next = re.search(r"OFTEST\tarena\tlevelnext\tmode=(\w+) skillPoints=(\d+) perkPoints=(\d+) offered=(\d+)$",
+                           text, re.M)
+    if not level_next:
+        problems.append("no 'arena levelnext' line in the log")
+    elif level_next.group(1) != "Interface" or int(level_next.group(2)) != 0:
+        problems.append(f"the points of the second level should all have been given: {level_next.group(0)}")
     if "OFTEST\tarena\tlevelgone\tmode=nil" not in text:
-        problems.append("the screen of the level up should be gone once every point was given")
+        problems.append("the screen of the level up should be gone once every point of every level was given")
     recipes = re.search(r"OFTEST\tarena\trecipes\t(.*)$", text, re.M)
     want = (f"name={plugin.ARENA_CATEGORY_NAME} mode=Interface count=2 statuses=ready,skill "
             f"scrap={plugin.ARENA_SCRAP_GIVEN}/{plugin.ARENA_RECIPE_SCRAP}")

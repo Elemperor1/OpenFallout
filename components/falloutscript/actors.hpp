@@ -28,6 +28,13 @@ namespace FalloutScript
         /// The form the reference was made from (the base of a character or creature). False when the host can not
         /// tell, which counts the reference as nothing.
         virtual bool baseFormOf(FormId, FormId&) { return false; }
+        /// Whether the reference starts dead: the games make a character or creature whose record gives it no health
+        /// at all (a base health of 0 or less) dead when it comes into being. False when the host can not tell yet.
+        virtual bool initiallyDead(FormId, bool& dead)
+        {
+            dead = false;
+            return true;
+        }
     };
 
     /// What scripts do to characters, creatures and containers, as far as nothing else in the game does it yet: the
@@ -68,12 +75,18 @@ namespace FalloutScript
         /// of the items (OnAdd, OnDrop) from them when it is ready for scripts to run, not in the middle of one.
         std::vector<ItemChange> takeChanges();
 
+        /// Whether the actor is dead; one that starts dead by its record (no health) is, from the first time it is
+        /// asked
         bool isDead(FormId actor) const;
         /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
         /// is told in takeDeaths(). True when this call changed the state: of two calls at once that kill the same
         /// actor, only one gets true. `limb` is the part of the body the killing blow struck, -1 when none did (a
         /// script killed the actor) or it is not known.
         bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1);
+        /// Kills the actor as the game's Kill does (KillActor): one that is dead already stays so, one that the host
+        /// lets fall instead of dying (an essential one) falls and does not die, and any other dies. True when this
+        /// call made the actor dead.
+        bool kill(FormId actor, FormId killer = 0);
         /// The part of the body that the killing blow struck, -1 when the actor is alive or none did
         int killingLimb(FormId actor) const;
 
@@ -165,7 +178,13 @@ namespace FalloutScript
         /// One death or revival at a time, from the change of the state to the end of the listener
         std::recursive_mutex mTransitionMutex;
         std::map<FormId, Holder> mHolders;
-        std::set<FormId> mDead;
+        /// Mutable since a reference that starts dead is found out the first time it is asked about (the caller holds
+        /// the lock)
+        mutable std::set<FormId> mDead;
+        /// The references that have been asked about whether they start dead
+        mutable std::set<FormId> mStartKnown;
+        /// Whether the actor is dead, finding out first whether it starts so (the caller holds the lock)
+        bool deadLocked(FormId actor) const;
         std::map<FormId, FormId> mKillers;
         std::map<FormId, int> mKillingLimbs;
         std::vector<Death> mDeaths;
