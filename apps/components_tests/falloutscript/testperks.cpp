@@ -532,6 +532,50 @@ namespace
         EXPECT_EQ(told.size(), 1u);
     }
 
+    TEST(FalloutScriptPerksTest, tellsTheHostWhenAnAbilityTakesHealthAway)
+    {
+        Fixture f;
+        PerkInfo costly = perk(strongBack, "Frail", 8);
+        PerkEntry ability;
+        ability.mType = PerkEntry::Ability;
+        ability.mAbility = abilityOfStrongBack;
+        costly.mEntries = { ability };
+        f.mRecords.mPerks[strongBack] = costly;
+        FalloutScript::AbilityEffect effect;
+        effect.mActorValue = ActorValue::health;
+        effect.mMagnitude = -30;
+        // The effect holds only while the answer is yes
+        effect.mConditions.resize(1);
+        f.mRecords.mAbilities[abilityOfStrongBack] = { effect };
+        // An ability with no conditions that takes health away, of another perk
+        PerkInfo plain = perk(comprehension, "Toll", 8);
+        PerkEntry toll = ability;
+        toll.mAbility = abilityOfStrongBack + 1;
+        plain.mEntries = { toll };
+        f.mRecords.mPerks[comprehension] = plain;
+        f.mRecords.mAbilities[abilityOfStrongBack + 1] = { { ActorValue::health, -10, {} } };
+        std::vector<FormId> told;
+        f.mEngine.setHealthLowered([&told](FormId owner) { told.push_back(owner); });
+        bool answer = false;
+        f.mEngine.setConditions([&answer](const auto&, const ConditionContext&) { return answer; });
+
+        // A perk that comes with a negative health ability
+        f.mProgress.addPerk(thePlayer, comprehension);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_THAT(told, ElementsAre(thePlayer));
+        // A conditional one does nothing while its conditions do not hold, and tells when they begin to
+        f.mProgress.addPerk(thePlayer, strongBack);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(told.size(), 1u);
+        answer = true;
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(told.size(), 2u);
+        // and taking it back is no loss of health
+        answer = false;
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(told.size(), 2u);
+    }
+
     TEST(FalloutScriptPerksTest, anAbilityEffectWithConditionsHasNoEffectWithoutAWayToTellThem)
     {
         Fixture f;

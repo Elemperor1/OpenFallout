@@ -131,7 +131,8 @@ namespace FalloutScript
         /// Sets a quest to a stage (for the entries of the type quest stage)
         void setQuestSetter(std::function<void(FormId quest, int stage)> setter);
         /// Called, with nothing held, when a refresh took away some of the health of a character (an ability that gave
-        /// health is gone), so that the one who lived on it can be found dead or fallen
+        /// health is gone, or one that costs health has come), so that the one who lived on it can be found dead or
+        /// fallen
         void setHealthLowered(std::function<void(FormId owner)> callback);
 
         /// The other reference of an exchange that a number is worked out for: the character that is hit when the

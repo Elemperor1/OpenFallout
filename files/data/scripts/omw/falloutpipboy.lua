@@ -415,7 +415,7 @@ local function skillRows(add, skills, left)
                     levelAdded[s.number] = (levelAdded[s.number] or 0) + 1
                 end
                 render()
-            end, { enabled = left > 0 and s.value < 100 })))
+            end, { enabled = left > 0 and s.base < 100 })))
     end
 end
 
@@ -453,9 +453,10 @@ local function levelUpPage(add)
         left = stats.skillPoints
         local room = false
         for _, skill in ipairs(skills) do
-            room = room or skill.value < 100
+            room = room or skill.base < 100
         end
-        -- Every point has to be spent, unless no skill can take another
+        -- Every point has to be spent, unless no skill can take another (the room is the room of the base: a boost or
+        -- a penalty on the shown value changes none of it)
         complete = left == 0 or not room
         if left > 0 then
             add(widgets.label(counterText(word('sLevelUpSkillCounter', 'ASSIGN 1 SKILL POINT'),

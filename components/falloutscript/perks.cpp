@@ -32,6 +32,16 @@ namespace FalloutScript
         mHealthLowered = std::move(callback);
     }
 
+    namespace
+    {
+        /// Whether adding the change to an actor value takes health away: a health ability that goes away, or one that
+        /// comes with a negative magnitude
+        bool lowersHealth(int actorValue, double change)
+        {
+            return actorValue == ActorValue::health && change < 0;
+        }
+    }
+
     bool PerkEngine::info(FormId perk, PerkInfo& result)
     {
         {
@@ -258,8 +268,8 @@ namespace FalloutScript
                 if (!applied.mOn[i])
                     continue;
                 mValues.modify(owner, applied.mEffects[i].mActorValue, -applied.mEffects[i].mMagnitude);
-                healthLowered = healthLowered
-                    || (applied.mEffects[i].mActorValue == ActorValue::health && applied.mEffects[i].mMagnitude > 0);
+                healthLowered
+                    = healthLowered || lowersHealth(applied.mEffects[i].mActorValue, -applied.mEffects[i].mMagnitude);
             }
         }
 
@@ -334,9 +344,9 @@ namespace FalloutScript
                 }
                 if (holds == applied.mOn[i])
                     continue;
-                mValues.modify(owner, effect.mActorValue, holds ? effect.mMagnitude : -effect.mMagnitude);
-                healthLowered
-                    = healthLowered || (!holds && effect.mActorValue == ActorValue::health && effect.mMagnitude > 0);
+                const double change = holds ? effect.mMagnitude : -effect.mMagnitude;
+                mValues.modify(owner, effect.mActorValue, change);
+                healthLowered = healthLowered || lowersHealth(effect.mActorValue, change);
                 applied.mOn[i] = holds;
                 changed = true;
             }
