@@ -247,6 +247,8 @@ namespace FalloutScript
                     mProgress.modifyMiscStat(statBooksRead, 1);
                 return result;
             }
+            // Two books read at the same time add up: the skill is read, raised and written by one at a time
+            const std::lock_guard reading(mBookMutex);
             const double skill = mValues.base(actor, book.mSkill);
             if (skill >= skillCap)
             {

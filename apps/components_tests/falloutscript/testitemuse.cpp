@@ -7,8 +7,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <functional>
 #include <map>
+#include <thread>
 #include <vector>
 
 namespace
@@ -325,6 +327,30 @@ namespace
         const ItemUse::Result atCap = f.mUse.use(thePlayer, guns);
         EXPECT_EQ(atCap.mOutcome, ItemUse::Outcome::NothingToLearn);
         EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 1);
+    }
+
+    TEST(FalloutScriptItemUseTest, booksReadAtTheSameTimeAllRaiseTheSkill)
+    {
+        for (int round = 0; round < 200; ++round)
+        {
+            Fixture f;
+            f.mValues.setBase(thePlayer, smallGuns, 40);
+            // Both of them wait for the other, so that they come to the reading of the skill together
+            std::atomic<int> ready = 0;
+            std::vector<std::thread> readers;
+            for (int i = 0; i < 2; ++i)
+                readers.emplace_back([&] {
+                    ++ready;
+                    while (ready < 2)
+                        std::this_thread::yield();
+                    f.mUse.use(thePlayer, guns);
+                });
+            for (std::thread& reader : readers)
+                reader.join();
+
+            ASSERT_EQ(f.mState.itemCount(thePlayer, guns), 0) << "round " << round;
+            ASSERT_EQ(f.mValues.base(thePlayer, smallGuns), 42) << "round " << round;
+        }
     }
 
     TEST(FalloutScriptItemUseTest, aBookToReadStaysWithItsOwner)

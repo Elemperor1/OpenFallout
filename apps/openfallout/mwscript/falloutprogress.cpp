@@ -64,13 +64,13 @@ namespace OFScript
 
     void FalloutScripts::ensureLevellingRules()
     {
-        if (mLevellingRulesSet.exchange(true))
-            return;
-        FalloutScript::LevellingRules rules = FalloutScript::LevellingRules::fromGameSettings(
-            mGame, [this](std::string_view name) { return gameSetting(name); });
-        rules.mMaxLevel = FalloutScript::Levelling::maxLevelForFiles(rules, mContentFiles);
-        mProgress.setRules(rules);
-        mItemUse.setBookRules(100, gameSetting("fBookPerkBonus").value_or(1.0));
+        std::call_once(mLevellingRulesOnce, [this] {
+            FalloutScript::LevellingRules rules = FalloutScript::LevellingRules::fromGameSettings(
+                mGame, [this](std::string_view name) { return gameSetting(name); });
+            rules.mMaxLevel = FalloutScript::Levelling::maxLevelForFiles(rules, mContentFiles);
+            mProgress.setRules(rules);
+            mItemUse.setBookRules(100, gameSetting("fBookPerkBonus").value_or(1.0));
+        });
     }
 
     bool FalloutScripts::perk(FalloutScript::FormId id, FalloutScript::PerkInfo& info)

@@ -889,8 +889,9 @@ namespace OFScript
         FalloutScript::Game mGame;
         /// The characters whose perks have been brought up to date (to take back the effects of those they lost)
         std::set<FalloutScript::FormId> mPerkOwners;
-        /// Whether the rules of levelling up have been read from the settings of the files
-        std::atomic<bool> mLevellingRulesSet{ false };
+        /// The rules of levelling up are read from the settings of the files once, and whoever asks for them while
+        /// they are being read waits for that
+        std::once_flag mLevellingRulesOnce;
         /// The levels that were reached and not shown yet
         std::mutex mLevelUpMutex;
         std::deque<FalloutScript::PlayerProgress::LevelUp> mLevelUps;

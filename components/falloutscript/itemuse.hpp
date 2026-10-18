@@ -153,6 +153,8 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::vector<Active> mActive;
         std::vector<std::pair<FormId, FormId>> mAddictions;
+        /// Held while a book reads the skill, takes the copy and raises the skill (taken before any other lock)
+        std::mutex mBookMutex;
     };
 }
 
