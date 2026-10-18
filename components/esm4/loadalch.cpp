@@ -100,6 +100,13 @@ void ESM4::Potion::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("CTDA"):
             {
+                // The condition of Skyrim has one more parameter than the games of this project: it is left unread, as
+                // it always was
+                if (subHdr.dataSize > sizeof(TargetCondition))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
                 // The conditions of an effect follow it (EFID, EFIT, CTDA*); there are none before the first effect
                 TargetCondition condition;
                 RecordReader(reader, "ALCH").condition(condition);
