@@ -3200,7 +3200,7 @@ namespace OFScript
         if (!mOpenStates.restsOpen(reference))
             return;
         // A door that rests open is loaded without its collision, which it gets back when it is closed
-        if (object.getType() == ESM4::Door::sRecordId)
+        if (object.getType() == ESM4::Door::sRecordId && !hasCollision(object))
             mDoorsWithoutCollision.insert(reference);
         if (auto* animation
             = dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(object)))
@@ -3215,7 +3215,12 @@ namespace OFScript
         if (reference == 0)
             return true;
         settleDoor(object, reference);
-        return !mOpenStates.restsOpen(reference);
+        if (!mOpenStates.restsOpen(reference))
+            return true;
+        // A door that cannot show itself open keeps its collision
+        const auto* animation
+            = dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(object));
+        return animation == nullptr || animation->findGroup("Open").empty();
     }
 
     void FalloutScripts::activateDoor(const OFWorld::Ptr& door)

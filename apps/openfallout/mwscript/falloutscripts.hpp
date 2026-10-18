@@ -158,7 +158,8 @@ namespace OFScript
         /// The 3D of an object that holds animations of its own is built (a door, a switch): an object that rests open
         /// starts so
         void objectInserted(const OFWorld::Ptr& object);
-        /// Whether the object has its collision when it is put in the scene: a door that is open has none
+        /// Whether the object has its collision when it is put in the scene: a door that is open has none, unless its
+        /// model has no way to show it open
         bool hasCollision(const OFWorld::Ptr& object);
         /// A door that is no teleport door is activated: it opens, and closes when it is open. The activation of a
         /// door that is a teleport door is no concern of this.
