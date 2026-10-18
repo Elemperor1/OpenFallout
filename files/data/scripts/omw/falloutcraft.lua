@@ -80,8 +80,18 @@ local function countText(item)
     return string.format('%s x%d (%d)', item.name, item.count, item.have)
 end
 
+-- What the recipe needs of each item in all: an item it names more than once is needed for each mention at once
+local function neededOf(ingredients)
+    local total = {}
+    for _, item in ipairs(ingredients) do
+        total[item.id] = (total[item.id] or 0) + item.count
+    end
+    return total
+end
+
+-- `needed` is what the recipe needs of each item for an ingredient, nil for what it makes
 local function itemLine(item, needed)
-    local color = (needed and item.have < item.count) and colors.badColor or colors.normalColor
+    local color = (needed and item.have < (needed[item.id] or item.count)) and colors.badColor or colors.normalColor
     return widgets.label(countText(item), color, textSize - 2)
 end
 
@@ -167,12 +177,13 @@ function render()
                 math.floor(pickedRecipe.skillValue + 0.5)),
                 pickedRecipe.status == 'skill' and colors.badColor or colors.normalColor, textSize - 2))
         end
+        local needed = neededOf(pickedRecipe.ingredients)
         for _, item in ipairs(pickedRecipe.ingredients) do
-            add(itemLine(item, true))
+            add(itemLine(item, needed))
         end
         add(widgets.label('Makes', colors.hintColor, textSize - 4))
         for _, item in ipairs(pickedRecipe.outputs) do
-            add(itemLine(item, false))
+            add(itemLine(item, nil))
         end
     end
     if message ~= '' then
