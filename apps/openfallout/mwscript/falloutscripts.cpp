@@ -1741,9 +1741,15 @@ namespace OFScript
     {
         // A shot with no armor in the way and no critical hit; the perks of the player work on it as they do in a fight
         const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer);
+        const FalloutScript::PerkEngine::Context context{ 0, weapon };
+        if (mGame != FalloutScript::Game::NewVegas)
+        {
+            // The card of Fallout 3 shows the damage of the weapon at its condition (nothing wears here), which the
+            // perks change when the weapon is built, as in a fight, and not the skill of the player
+            return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, blow.mDamage, context), 0.0);
+        }
         const double dealt
             = FalloutScript::Damage::resolve(damageSettings(), blow, 0.0, 0.0, FalloutScript::Defense(), 100.0).mDamage;
-        const FalloutScript::PerkEngine::Context context{ 0, weapon };
         return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, dealt, context), 0.0);
     }
 
