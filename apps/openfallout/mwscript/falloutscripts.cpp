@@ -2073,12 +2073,13 @@ namespace OFScript
             result.mStrike = strike(attacker, victim, stats.mWeapon, limb);
             return result;
         }
-        // An object has no health, but its script hears of the blow
+        // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
+        // which is the flag of an actor in a fight that nothing would ever clear on an object.
         FalloutScript::CombatState::Hit struck;
         struck.mAttacker = attacker;
         struck.mWeapon = stats.mWeapon;
         struck.mLimb = limb;
-        mCombat.noteHit(victim, struck);
+        mCombat.noteHit(victim, struck, true);
         return result;
     }
 

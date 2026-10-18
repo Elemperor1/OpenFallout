@@ -85,7 +85,8 @@ namespace FalloutScript
             int mLimb = -1; // the part of the body, -1 when not known
         };
         /// A blow was struck at the actor: it is the last one it took, and the actor counts as attacked (GetAttacked)
-        /// unless the blow is `tolerated` (a blow of the player that an ally or friend lets pass, see countFriendHit).
+        /// unless the blow is `tolerated` (a blow of the player that an ally or friend lets pass, see countFriendHit,
+        /// or one at an object, which has no fight to be in: the flag is that of the process of an actor).
         /// The executables keep no time on it: an actor stays attacked for as long as it is in a fight, and is not
         /// any more once its fights are over, once it died or is put out.
         void noteHit(FormId victim, const Hit& hit, bool tolerated = false);
