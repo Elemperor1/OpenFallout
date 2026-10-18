@@ -210,6 +210,14 @@ end
 -- The next attack of the queue that is being carried out
 local function step()
     local attack = table.remove(running, 1)
+    -- The queue ends with its last attack, whatever comes of it: a target that is gone between two attacks (or an
+    -- error) must not leave the queue running, because the screen does not open while it is
+    if #running == 0 then
+        running = nil
+    end
+    if not attack or not attack.target:isValid() then
+        return
+    end
     local result = vats.attack(attack.target, attack.part)
     if result.refused then
         if result.refused == 'points' then
@@ -223,8 +231,8 @@ local function step()
     else
         ui.showMessage(attack.name .. ' missed')
     end
-    -- A queue ends when nothing is left of it or the player can not go on
-    if result.refused == 'points' or result.refused == 'ammo' or #running == 0 then
+    -- A queue also ends when the player can not go on
+    if result.refused == 'points' or result.refused == 'ammo' then
         running = nil
     end
 end
