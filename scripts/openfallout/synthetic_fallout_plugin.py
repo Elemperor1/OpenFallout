@@ -467,6 +467,13 @@ ARENA_TARGET_ID = 0x953
 ARENA_TARGET_REF_ID = 0x954
 BODY_PARTS_ID = 0x1D  # the number of the DefaultBodyPartData of the games, which every character that is not the player has
 ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
+# What the Pip-Boy lists besides the rifle and its rounds: a key (it is on the keyring) and ammunition the rifle does not
+# take (it is dimmed and can not be put on)
+ARENA_KEY_ID = 0x955
+ARENA_OTHER_AMMO_ID = 0x956
+ARENA_KEY_NAME = "Test Key"
+ARENA_OTHER_AMMO_NAME = "Test Slugs"
+ARENA_OTHER_AMMO_COUNT = 3
 # The body part data every character has (the BPTD of the games with the number 0x1D, in the first master): the name of the
 # part, what V.A.T.S. calls it (empty: it can not be aimed at), the damage multiplier, the share of the health that the part
 # stands for, the actor value of its condition (the head is the condition of perception, the torso of endurance, the left arm
@@ -475,7 +482,7 @@ ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
 BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100, 0), ("Head", "Head", 2.0, 50, 25, 100, 1),
               ("LeftArm", "Left Arm", 0.5, 25, 27, 30, 3), ("RightLeg", "Right Leg", 0.5, 25, 30, 40, 10),
               ("Spine", "", 1.0, 100, -1, 100, 13))
-LAST_ID = 0x954 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x956 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2105,8 +2112,9 @@ def plugin():
                                                  new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
                                                  watch_script("exterior"), *arena_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
-            + top_group(b"AMMO", [arena_ammo()])
+            + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
             + top_group(b"MISC", [arena_scrap()])
+            + top_group(b"KEYM", [arena_key()])
             + top_group(b"RCCT", arena_categories())
             + top_group(b"RCPE", arena_recipes())
             + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
@@ -2144,10 +2152,16 @@ def plugin():
             + top_group(b"CELL", [block, arena_cell()]) + top_group(b"WRLD", worldspace()))
 
 
-def arena_ammo():
+def arena_ammo(form_id=ARENA_AMMO_ID, name="Test Rounds"):
     """An AMMO record of Fallout 3: the speed, the flags, the value and the rounds of a clip (13 bytes)."""
-    return record(b"AMMO", ARENA_AMMO_ID, [zstr(b"EDID", "OFTestArenaAmmo"), zstr(b"FULL", "Test Rounds"),
-                                           sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
+    return record(b"AMMO", form_id, [zstr(b"EDID", "OFTestArena" + name.replace(" ", "")), zstr(b"FULL", name),
+                                     sub(b"DATA", struct.pack("<fB3xiB", 5000.0, 0, 1, 12))])
+
+
+def arena_key():
+    """A KEYM record of Fallout 3: the value and the weight (8 bytes)."""
+    return record(b"KEYM", ARENA_KEY_ID, [zstr(b"EDID", "OFTestArenaKey"), zstr(b"FULL", ARENA_KEY_NAME),
+                                          sub(b"DATA", struct.pack("<if", 0, 0.0))])
 
 
 def arena_scrap():
@@ -2219,12 +2233,15 @@ def arena_quest():
     sf = fallout_script
     names = ("armed", "weapon_out", "ammo", "health", "dummy_dead", "raider_dead", "raider_combat", "raider_ammo")
     forms = [PLAYER_REFERENCE, ARENA_RIFLE_ID, ARENA_AMMO_ID, ARENA_DUMMY_REF_ID, ARENA_RAIDER_REF_ID,
-             *(ARENA_GLOBALS[name][0] for name in names)]
+             *(ARENA_GLOBALS[name][0] for name in names), ARENA_KEY_ID, ARENA_OTHER_AMMO_ID]
     index = {form: position + 1 for position, form in enumerate(forms)}
     player, rifle, ammo, dummy, raider = (index[form] for form in forms[:5])
     glob = {name: index[ARENA_GLOBALS[name][0]] for name in names}
     setup = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(rifle), sf.int_argument(1)),
              sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(ARENA_PLAYER_AMMO)),
+             sf.call_on(player, sf.ADD_ITEM, sf.form_argument(index[ARENA_KEY_ID]), sf.int_argument(1)),
+             sf.call_on(player, sf.ADD_ITEM, sf.form_argument(index[ARENA_OTHER_AMMO_ID]),
+                        sf.int_argument(ARENA_OTHER_AMMO_COUNT)),
              sf.call_on(player, sf.EQUIP_ITEM, sf.form_argument(rifle)),
              sf.call_on(player, sf.SET_ACTOR_VALUE, sf.u16(AV_GUNS), sf.int_argument(100))]
     probe = [

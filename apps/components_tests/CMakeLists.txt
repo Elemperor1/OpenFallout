@@ -90,6 +90,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testcreaturecensus.cpp
     esm4/testcreaturemodel.cpp
     esm4/testdebris.cpp
+    esm4/testdefaultobject.cpp
     esm4/testdehydrationstage.cpp
     esm4/testdialogue.cpp
     esm4/testeffectshader.cpp

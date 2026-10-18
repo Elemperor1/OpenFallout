@@ -160,8 +160,8 @@ local function statusLines(stats)
     add(pair(word('sInventoryCaps', 'Caps'), number(stats.caps)))
     add(pair(word('sInventoryWg', 'Weight'), pairText(stats.weight, stats.maxWeight),
         stats.weight > stats.maxWeight and colors.badColor or colors.focusColor))
-    add(pair(word('sInventoryDR', 'DR'), number(stats.armorRating)))
-    add(pair('DT', number(stats.threshold)))
+    add(pair(word('sInventoryDR', 'DR'), string.format('%d', math.floor(stats.armorRating))))
+    if stats.newVegas then add(pair('DT', string.format('%.1f', stats.threshold))) end
     add(pair('Karma', number(stats.karma)))
     return lines
 end
@@ -248,52 +248,147 @@ end
 
 -- Inventory
 
+-- The keyring is open: the keys, and nothing else. The quantity of a drop is being asked: the item, the amount and the
+-- most that can go.
+local keyring = false
+local dropPrompt = nil
+
+local function keyringRow()
+    return { keyring = true, id = 'keyring', name = word('sKeyring', 'Keyring'), count = 1, equipped = false }
+end
+
+-- What a page of the list shows: the things of the tab (armor the files keep from the player is not there, nor are
+-- keys), by name without regard to case, and of two with the same name the one that is worn first; the keys are on the
+-- keyring, a row at the end of the miscellaneous things that opens it
 local function sortedItems(category)
-    local items = {}
+    local items, keys = {}, false
     for _, item in ipairs(pipboy.items()) do
-        if item.category == category then items[#items + 1] = item end
+        if item.key then
+            keys = true
+            if keyring then items[#items + 1] = item end
+        elseif not keyring and not item.hidden and item.category == category then
+            items[#items + 1] = item
+        end
     end
     table.sort(items, function(a, b)
         local x, y = a.name:lower(), b.name:lower()
         if x ~= y then return x < y end
+        if a.equipped ~= b.equipped then return a.equipped end
         return a.id < b.id
     end)
+    if keys and not keyring and category == 'misc' then items[#items + 1] = keyringRow() end
     return items
 end
 
-local function itemDetail(item)
-    if item.category == 'weapons' then
-        return string.format('%s %s', word('sInventoryDam', 'DAM'), number(item.damage))
-    elseif item.category == 'apparel' then
-        if item.threshold > 0 then
-            return string.format('DT %s', number(item.threshold))
-        end
-        return string.format('%s %s', word('sInventoryDR', 'DR'), number(item.rating))
-    end
-    return ''
+-- A number of the cards: nothing above 0 is two dashes, below 1 it has a decimal, else it is whole
+local function amount(value)
+    if not (value > 0) then return '--' end
+    if value < 1 then return string.format('%.1f', value) end
+    return string.format('%.0f', value)
 end
 
-local function itemLines(items, categoryTab)
+-- What the card of an item tells, as {name, value} pairs. New Vegas tells the weight and value of the whole stack,
+-- the threshold of armor and the pellets of a shot; Fallout 3 tells those of one.
+local function cardLines(item, stats)
+    local lines = {}
+    local function add(name, value) lines[#lines + 1] = { name, value } end
+    local nv = stats.newVegas
+    local function weight()
+        if nv then
+            local total = item.cardWeight * item.count
+            add(word('sInventoryWg', 'WG'), total > 0 and string.format('%.2f', total) or '--')
+        else
+            add(word('sInventoryWg', 'WG'), amount(item.cardWeight))
+        end
+    end
+    local function value()
+        add(word('sInventoryVal', 'VAL'), amount(nv and item.value * item.count or math.ceil(item.value)))
+    end
+    if item.category == 'weapons' then
+        if item.pellets > 1 and nv then
+            add(word('sInventoryDam', 'DAM'), string.format('%.1fx%d', item.cardDamage, item.pellets))
+        else
+            add(word('sInventoryDam', 'DAM'), string.format('%d', math.ceil(item.cardDamage)))
+        end
+        weight()
+        value()
+        local ammo = '--'
+        if item.hasAmmo then
+            ammo = item.clip > 0 and string.format('%s (%d/%d)', item.ammoName, item.loaded, item.reserve)
+                or item.ammoName
+        end
+        add(word('sInventoryAmmo', 'AMMO'), ammo)
+    elseif item.category == 'apparel' then
+        if item.rating > 0 or item.threshold > 0 then
+            add(word('sInventoryDR', 'DR'), string.format('%d', math.floor(item.rating)))
+            if nv and item.threshold > 0 then add('DT', string.format('%d', math.floor(item.threshold))) end
+        end
+        weight()
+        value()
+    else
+        weight()
+        value()
+    end
+    return lines
+end
+
+-- What Enter does with the item
+local function useLabel(item)
+    if item.keyring then return item.name end
+    if keyring or item.usable == false then return nil end
+    if item.book then return 'Read' end
+    if item.equipped then return 'Unequip' end
+    if item.category == 'aid' then return 'Use' end
+    return word('sInventoryEquip', 'Equip')
+end
+
+local function useItem(item)
+    if item.keyring then
+        keyring = true
+        offset, selected = 1, 1
+    elseif not keyring and item.usable ~= false then
+        pipboy.use(item.id)
+    end
+end
+
+-- A stack of more than the setting is asked how many to drop; fewer drop one
+local function dropItem(item)
+    if keyring or item.keyring then return end
+    local threshold = pipboy.setting('iInventoryAskQuantityAt') or 5
+    if item.count > threshold then
+        dropPrompt = { id = item.id, name = item.name, amount = 1, max = math.min(item.count, pipboy.dropLimit) }
+    else
+        pipboy.drop(item.id, 1)
+    end
+end
+
+local function promptStep(by)
+    if dropPrompt then
+        dropPrompt.amount = math.max(1, math.min(dropPrompt.max, dropPrompt.amount + by))
+    end
+end
+
+local function promptDone(drop)
+    if drop and dropPrompt then pipboy.drop(dropPrompt.id, dropPrompt.amount) end
+    dropPrompt = nil
+end
+
+local function itemLines(items)
     local lines = {}
     for index, item in ipairs(items) do
         local i, it = index, item
         lines[#lines + 1] = function()
             local picked = i == selected
             local name = (it.equipped and '[E] ' or '    ') .. it.name .. (it.count > 1 and (' (' .. it.count .. ')') or '')
-            local color = picked and colors.pickedColor or (it.equipped and colors.focusColor or colors.normalColor)
-            return widgets.row(
-                widgets.cell(widgets.clickable((picked and '> ' or '  ') .. name, function()
-                    selected = i
-                    pipboy.use(it.id)
-                    render()
-                end, { color = color }), 330),
-                widgets.cell(widgets.label(itemDetail(it), colors.hintColor), 90),
-                widgets.cell(widgets.label(string.format('%s', number(it.weight * it.count)), colors.hintColor), 60),
-                widgets.cell(widgets.label(number(it.value * it.count), colors.hintColor), 70),
-                widgets.clickable(word('sInventoryDrop', 'Drop'), function()
-                    pipboy.drop(it.id, 1)
-                    render()
-                end, { size = textSize - 4 }))
+            -- Ammunition the weapon in hand does not take is dimmed
+            local color = picked and colors.pickedColor
+                or (it.usable == false and it.category == 'ammo' and colors.dimColor)
+                or (it.equipped and colors.focusColor or colors.normalColor)
+            return widgets.clickable((picked and '> ' or '  ') .. name, function()
+                selected = i
+                useItem(it)
+                render()
+            end, { color = color })
         end
     end
     if #lines == 0 then
@@ -302,12 +397,28 @@ local function itemLines(items, categoryTab)
     return lines
 end
 
+-- Health, resistance (and the threshold of New Vegas), caps and weight carried
+local function inventoryHeader(add, stats)
+    local limit = pipboy.setting('iCapsLimit') or 1000000
+    local caps = stats.caps > limit and (string.format('%d', limit) .. '+') or number(stats.caps)
+    local cells = {
+        widgets.cell(widgets.label(string.format('%s %s/%s', word('sHitPointsShort', 'HP'), number(stats.health),
+            number(stats.maxHealth)), colors.hintColor), 150),
+        widgets.cell(widgets.label(string.format('%s %d', word('sInventoryDR', 'DR'), math.floor(stats.armorRating)),
+            colors.hintColor), 90),
+    }
+    if stats.newVegas then
+        cells[#cells + 1] = widgets.cell(widgets.label(string.format('DT %.1f', stats.threshold), colors.hintColor), 100)
+    end
+    cells[#cells + 1] = widgets.cell(widgets.label(word('sInventoryCaps', 'Caps') .. ' ' .. caps, colors.pickedColor), 170)
+    cells[#cells + 1] = widgets.label(string.format('%s %s/%s', word('sInventoryWg', 'Wg'), number(stats.weight),
+        number(stats.maxWeight)), stats.weight > stats.maxWeight and colors.badColor or colors.hintColor)
+    add(widgets.row(table.unpack(cells)))
+end
+
 local function invPage(add)
     local stats = pipboy.stats()
-    add(widgets.row(
-        widgets.cell(widgets.label(word('sInventoryCaps', 'Caps') .. ' ' .. number(stats.caps), colors.pickedColor), 160),
-        widgets.label(word('sInventoryWg', 'Wg') .. ' ' .. pairText(stats.weight, stats.maxWeight),
-            stats.weight > stats.maxWeight and colors.badColor or colors.hintColor)))
+    inventoryHeader(add, stats)
     tabRow(add, invTabs, invTab, function(name)
         if name == 'weapons' then return upper(word('sInventoryWeapons', 'WEAPONS')) end
         if name == 'apparel' then return upper(word('sInventoryApparel', 'APPAREL')) end
@@ -315,11 +426,32 @@ local function invPage(add)
         if name == 'misc' then return upper(word('sInventoryMisc', 'MISC')) end
         return upper(word('sInventoryAmmo', 'AMMO'))
     end, function(name)
+        -- Only a tab that is another one acts, and it closes the keyring
+        if name == invTab and not keyring then return end
         invTab = name
+        keyring = false
+        dropPrompt = nil
         offset = 1
         selected = 1
         render()
     end)
+    if dropPrompt then
+        listLength = 0
+        add(widgets.label(word('sHowMany', 'How many?') .. '  ' .. dropPrompt.name, colors.titleColor))
+        add(widgets.row(
+            widgets.clickable('<', function() promptStep(-1) render() end, { color = colors.titleColor }),
+            widgets.cell(widgets.label(string.format('  %d / %d  ', dropPrompt.amount, dropPrompt.max),
+                colors.focusColor), 150),
+            widgets.clickable('>', function() promptStep(1) render() end, { color = colors.titleColor }),
+            widgets.spacer(30, 0),
+            widgets.clickable('OK', function() promptDone(true) render() end, { color = colors.titleColor }),
+            widgets.spacer(20, 0),
+            widgets.clickable(word('sInventoryCancel', 'Cancel'), function() promptDone(false) render() end,
+                { color = colors.titleColor })))
+        add(widgets.label('Up and Down change the number, Enter drops, Backspace goes back', colors.hintColor,
+            textSize - 4))
+        return
+    end
     local items = sortedItems(invTab)
     listLength = #items
     if selected > #items then selected = #items end
@@ -327,14 +459,31 @@ local function invPage(add)
     -- The window follows the pick
     if selected < offset then offset = selected end
     if selected > offset + listLines - 1 then offset = selected - listLines + 1 end
-    add(widgets.row(
-        widgets.cell(widgets.label('    ' .. word('sInventoryName', 'NAME'), colors.hintColor, textSize - 4), 330),
-        widgets.cell(widgets.label(word('sInventoryDam', 'DAM') .. '/' .. word('sInventoryDR', 'DR'),
-            colors.hintColor, textSize - 4), 90),
-        widgets.cell(widgets.label(word('sInventoryWg', 'WG'), colors.hintColor, textSize - 4), 60),
-        widgets.cell(widgets.label(word('sInventoryVal', 'VAL'), colors.hintColor, textSize - 4), 70)))
-    listWindow(add, itemLines(items, invTab))
-    add(widgets.label('Enter uses, wears or holds the item; D drops it', colors.hintColor, textSize - 4))
+    listWindow(add, itemLines(items))
+    local item = items[selected]
+    if item and not item.keyring then
+        add(widgets.label(item.name, colors.titleColor, textSize - 2))
+        for _, pair in ipairs(cardLines(item, stats)) do
+            add(widgets.row(
+                widgets.cell(widgets.label(pair[1], colors.hintColor, textSize - 2), 120),
+                widgets.label(pair[2], colors.focusColor, textSize - 2)))
+        end
+    end
+    local hint = {}
+    local label = item and useLabel(item)
+    if label then hint[#hint + 1] = 'Enter: ' .. label end
+    if item and not item.keyring and not keyring then hint[#hint + 1] = 'D: ' .. word('sInventoryDrop', 'Drop') end
+    if keyring then hint[#hint + 1] = 'Backspace: ' .. word('sInventoryCancel', 'Cancel') end
+    if #hint > 0 then
+        add(widgets.label(table.concat(hint, '   '), colors.hintColor, textSize - 4))
+    end
+    if keyring then
+        add(widgets.clickable(word('sInventoryCancel', 'Cancel'), function()
+            keyring = false
+            offset, selected = 1, 1
+            render()
+        end, { color = colors.titleColor }))
+    end
 end
 
 -- Data
@@ -537,6 +686,8 @@ end
 
 local function hide()
     visible = false
+    keyring = false
+    dropPrompt = nil
     -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
@@ -549,6 +700,11 @@ end
 
 local function scroll(by)
     if not visible or view ~= 'pipboy' then
+        return
+    end
+    if dropPrompt then
+        promptStep(-by)
+        render()
         return
     end
     if tab == 'inv' then
@@ -568,6 +724,8 @@ local function switchTab(by)
         if name == tab then index = i end
     end
     tab = tabs[(index - 1 + by) % #tabs + 1]
+    keyring = false
+    dropPrompt = nil
     offset, selected = 1, 1
     render()
 end
@@ -618,6 +776,26 @@ return {
             if not visible or view ~= 'pipboy' then
                 return
             end
+            if dropPrompt then
+                -- The quantity of a drop is asked: the keys change it
+                if key.code == input.KEY.UpArrow or key.code == input.KEY.RightArrow then
+                    promptStep(1)
+                elseif key.code == input.KEY.DownArrow or key.code == input.KEY.LeftArrow then
+                    promptStep(-1)
+                elseif key.code == input.KEY.PageUp then
+                    promptStep(5)
+                elseif key.code == input.KEY.PageDown then
+                    promptStep(-5)
+                elseif key.code == input.KEY.Enter then
+                    promptDone(true)
+                elseif key.code == input.KEY.Backspace then
+                    promptDone(false)
+                else
+                    return
+                end
+                render()
+                return
+            end
             if key.code == input.KEY.LeftArrow then
                 switchTab(-1)
             elseif key.code == input.KEY.RightArrow then
@@ -633,15 +811,19 @@ return {
             elseif key.code == input.KEY.Enter then
                 local item = pickedItem()
                 if item then
-                    pipboy.use(item.id)
+                    useItem(item)
                     render()
                 end
             elseif key.code == input.KEY.D then
                 local item = pickedItem()
                 if item then
-                    pipboy.drop(item.id, 1)
+                    dropItem(item)
                     render()
                 end
+            elseif key.code == input.KEY.Backspace and keyring then
+                keyring = false
+                offset, selected = 1, 1
+                render()
             end
         end,
         onMouseWheel = function(vertical)

@@ -62,6 +62,7 @@
 namespace ESM4
 {
     struct AIPackage;
+    struct Weapon;
 }
 
 namespace OFRender
@@ -202,6 +203,24 @@ namespace OFScript
             double mDamage = 0;
             double mRating = 0;
             double mThreshold = 0;
+            /// A key is listed on the keyring and under no tab; a book is read, not used up by use
+            bool mKey = false;
+            bool mBook = false;
+            /// Armor that the files mark as not for the player: no list of the player shows it
+            bool mHidden = false;
+            /// Whether the player can use it now: ammunition only while the weapon in hand takes it
+            bool mUsable = true;
+            /// What the card of the item tells: the weight of one (a perk can lighten small things), for a weapon the
+            /// damage of a shot with the perks of the player and how many pellets a shot flies, and the ammunition
+            /// of the record with the rounds that are loaded and those in reserve
+            double mCardWeight = 0;
+            double mCardDamage = 0;
+            int mPellets = 1;
+            bool mHasAmmo = false;
+            std::string mAmmoName;
+            int mClip = 0;
+            int mLoaded = 0;
+            int mReserve = 0;
         };
         /// What a holder carries, the items the host knows by name, in the order the holder got them
         std::vector<PipboyItem> pipboyItems(FalloutScript::FormId holder);
@@ -225,6 +244,8 @@ namespace OFScript
             int mPerkPoints = 0;
             double mArmorRating = 0;
             double mThreshold = 0;
+            /// New Vegas shows a damage threshold and the weight and value of a whole stack; Fallout 3 neither
+            bool mNewVegas = false;
         };
         PipboyStats pipboyStats();
         /// The quests the player is following with what is left to do, for the data tab
@@ -266,6 +287,8 @@ namespace OFScript
         std::string useItemFromList(FalloutScript::FormId item);
         /// The player puts items on the floor in front of it
         int dropItem(FalloutScript::FormId item, int count);
+        /// The most objects one drop makes (each is an object of its own in the world)
+        static constexpr int sDropLimit = 10;
         /// Items go from one holder to another (a container); the count that moved
         int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count);
         /// The player opens or closes a container, for the scripts that hear of it (OnOpen, OnClose)
@@ -775,6 +798,16 @@ namespace OFScript
             FalloutScript::FormId first, FalloutScript::FormId second) override;
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none
         FalloutScript::WeaponDamage describeWeapon(FalloutScript::FormId weapon, FalloutScript::FormId attacker);
+        /// The damage of one shot (one pellet of a shotgun) of the weapon in the hands of the player as the card of
+        /// the item tells it: the damage of the record with the skill, the condition and the perks of the player
+        double weaponCardDamage(FalloutScript::FormId weapon);
+        /// Whether the weapon takes the ammunition (the one of its record, or one of its list of them)
+        bool weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo);
+        /// What one of an item weighs for the player: New Vegas lightens small things (Pack Rat) as the card of the
+        /// item and the total of the Pip-Boy tell it
+        double carriedWeight(double unit, bool packRat);
+        /// Whether the player has nothing a stimpak (or in New Vegas a doctor's bag) would mend
+        bool atFullHealthFor(FalloutScript::FormId item);
         const FalloutScript::DamageSettings& damageSettings();
         /// Runs the OnHit, OnHitWith, OnDeath and OnCombatEnd blocks for what happened in the fights since the last
         /// frame, wakes the essential characters that were down long enough, and lets the time of the fights pass

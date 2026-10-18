@@ -1736,6 +1736,35 @@ namespace OFScript
         return damage;
     }
 
+    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon)
+    {
+        // A shot with no armor in the way and no critical hit; the perks of the player work on it as they do in a fight
+        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer);
+        const double dealt
+            = FalloutScript::Damage::resolve(damageSettings(), blow, 0.0, 0.0, FalloutScript::Defense(), 100.0).mDamage;
+        const FalloutScript::PerkEngine::Context context{ 0, weapon };
+        return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, dealt, context), 0.0);
+    }
+
+    bool FalloutScripts::weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo)
+    {
+        if (ammo == 0 || weapon.mAmmo.isZeroOrUnset())
+            return false;
+        if (weapon.mAmmo.toUint32() == ammo)
+            return true;
+        const ESM4::FormIdList* list = mStore.get<ESM4::FormIdList>().search(weapon.mAmmo);
+        return list != nullptr
+            && std::any_of(list->mObjects.begin(), list->mObjects.end(),
+                [ammo](const ESM::FormId& object) { return object.toUint32() == ammo; });
+    }
+
+    double FalloutScripts::carriedWeight(double unit, bool packRat)
+    {
+        if (packRat && unit > 0 && unit <= gameSetting("fPackRatThreshold", 2.0))
+            return unit * gameSetting("fPackRatModifier", 0.5);
+        return unit;
+    }
+
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
         FalloutScript::FormId weapon, int limb, double roll)
     {

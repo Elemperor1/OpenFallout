@@ -28,8 +28,9 @@
 */
 #include "loaddobj.hpp"
 
+#include <algorithm>
 #include <cstring>
-#include <stdexcept>
+#include <iterator>
 
 #include "reader.hpp"
 //#include "writer.hpp"
@@ -48,50 +49,32 @@ void ESM4::DefaultObj::load(ESM4::Reader& reader)
                 reader.getZString(mEditorId);
                 break; // "DefaultObjectManager"
             case ESM::fourCC("DATA"):
-                reader.getFormId(mData.stimpack);
-                reader.getFormId(mData.superStimpack);
-                reader.getFormId(mData.radX);
-                reader.getFormId(mData.radAway);
-                reader.getFormId(mData.morphine);
-                reader.getFormId(mData.perkParalysis);
-                reader.getFormId(mData.playerFaction);
-                reader.getFormId(mData.mysteriousStrangerNPC);
-                reader.getFormId(mData.mysteriousStrangerFaction);
-                reader.getFormId(mData.defaultMusic);
-                reader.getFormId(mData.battleMusic);
-                reader.getFormId(mData.deathMusic);
-                reader.getFormId(mData.successMusic);
-                reader.getFormId(mData.levelUpMusic);
-                reader.getFormId(mData.playerVoiceMale);
-                reader.getFormId(mData.playerVoiceMaleChild);
-                reader.getFormId(mData.playerVoiceFemale);
-                reader.getFormId(mData.playerVoiceFemaleChild);
-                reader.getFormId(mData.eatPackageDefaultFood);
-                reader.getFormId(mData.everyActorAbility);
-                reader.getFormId(mData.drugWearsOffImageSpace);
-                // below FONV only
-                if (subHdr.dataSize == 136) // FONV 136/4 = 34 formid
-                {
-                    reader.getFormId(mData.doctorsBag);
-                    reader.getFormId(mData.missFortuneNPC);
-                    reader.getFormId(mData.missFortuneFaction);
-                    reader.getFormId(mData.meltdownExplosion);
-                    reader.getFormId(mData.unarmedForwardPA);
-                    reader.getFormId(mData.unarmedBackwardPA);
-                    reader.getFormId(mData.unarmedLeftPA);
-                    reader.getFormId(mData.unarmedRightPA);
-                    reader.getFormId(mData.unarmedCrouchPA);
-                    reader.getFormId(mData.unarmedCounterPA);
-                    reader.getFormId(mData.spotterEffect);
-                    reader.getFormId(mData.itemDetectedEfect);
-                    reader.getFormId(mData.cateyeMobileEffectNYI);
-                }
+            {
+                // The objects in the order the games keep them (the ones from the doctor's bag on are New Vegas only);
+                // a record with fewer or more is read as far as it goes
+                ESM::FormId* slots[] = { &mData.stimpack, &mData.superStimpack, &mData.radX, &mData.radAway,
+                    &mData.morphine, &mData.perkParalysis, &mData.playerFaction, &mData.mysteriousStrangerNPC,
+                    &mData.mysteriousStrangerFaction, &mData.defaultMusic, &mData.battleMusic, &mData.deathMusic,
+                    &mData.successMusic, &mData.levelUpMusic, &mData.playerVoiceMale, &mData.playerVoiceMaleChild,
+                    &mData.playerVoiceFemale, &mData.playerVoiceFemaleChild, &mData.eatPackageDefaultFood,
+                    &mData.everyActorAbility, &mData.drugWearsOffImageSpace, &mData.doctorsBag, &mData.missFortuneNPC,
+                    &mData.missFortuneFaction, &mData.meltdownExplosion, &mData.unarmedForwardPA,
+                    &mData.unarmedBackwardPA, &mData.unarmedLeftPA, &mData.unarmedRightPA, &mData.unarmedCrouchPA,
+                    &mData.unarmedCounterPA, &mData.spotterEffect, &mData.itemDetectedEfect,
+                    &mData.cateyeMobileEffectNYI };
+                const std::size_t count = std::min<std::size_t>(subHdr.dataSize / 4, std::size(slots));
+                for (std::size_t i = 0; i < count; ++i)
+                    reader.getFormId(*slots[i]);
+                if (subHdr.dataSize > count * 4)
+                    reader.skipSubRecordData(static_cast<std::uint32_t>(subHdr.dataSize - count * 4));
                 break;
+            }
             case ESM::fourCC("DNAM"):
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::DOBJ::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                reader.skipSubRecordData();
+                break;
         }
     }
 }
