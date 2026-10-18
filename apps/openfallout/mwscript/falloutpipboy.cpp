@@ -177,6 +177,8 @@ namespace OFScript
                 row.mValue = static_cast<int>(ingredient->mData.value);
                 row.mWeight = ingredient->mData.weight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
+                // The executables let it be used, but its effects are not read yet, so a use would do nothing
+                row.mUsable = false;
             }
             else if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(record))
             {
@@ -378,7 +380,9 @@ namespace OFScript
             if (mGame == FalloutScript::Game::NewVegas && !objects.mData.doctorsBag.isZeroOrUnset()
                 && objects.mData.doctorsBag.toUint32() == item)
             {
-                for (int limb = AV::firstCondition; limb < AV::lastCondition; ++limb)
+                // The conditions the bag restores (the executables name the six of the body; the player has no more,
+                // the seventh is the brain of a robot)
+                for (int limb = AV::firstCondition; limb <= AV::lastCondition; ++limb)
                     if (mActorValues.current(mPlayer, limb) < mActorValues.permanent(mPlayer, limb))
                         return false;
                 return true;

@@ -1902,16 +1902,20 @@ namespace OFScript
 
     bool FalloutScripts::toleratesBlow(FalloutScript::FormId attacker, FalloutScript::FormId victim)
     {
-        // Only the blows of the player are weighed, and not by a character that ignores friendly hits; the blow of
-        // anyone else turns the victim on the attacker. The standing is that of the factions of the victim toward
-        // those of the attacker.
-        if (attacker == 0 || attacker != mPlayer || victim == mPlayer || mCombat.ignoresFriendlyHits(victim))
+        // Only the blows of the player are weighed; the blow of anyone else turns the victim on the attacker. The
+        // standing is that of the factions of the victim toward those of the attacker.
+        if (attacker == 0 || attacker != mPlayer || victim == mPlayer)
             return false;
         const FalloutScript::CombatState::Relation relation
             = FalloutScript::relationOfActors(mCombat, mActors, *this, victim, attacker);
         using Relation = FalloutScript::CombatState::Relation;
         if (relation != Relation::Ally && relation != Relation::Friend)
             return false;
+        // A character that ignores friendly hits (SetIgnoreFriendlyHits) lets the blow of an ally or friend pass and
+        // counts none (the executables skip the count for it; that the blow then also turns it on nobody is the
+        // meaning of the command, not something read from them)
+        if (mCombat.ignoresFriendlyHits(victim))
+            return true;
         const FalloutScript::DamageSettings& settings = damageSettings();
         const bool fighting = mCombat.inCombat(victim);
         const int allowed = relation == Relation::Friend
