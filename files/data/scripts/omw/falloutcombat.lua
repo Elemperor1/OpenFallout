@@ -58,24 +58,30 @@ end))
 
 local center = util.vector2(0.5, 0.5)
 
+-- How far above or below the feet of the player a blow of the hands or of a melee weapon can land: a little more than the
+-- height of a character, so that what stands on a balcony over the player is out of reach (the games measure the reach
+-- along the floor, which has no such limit; this is a stand-in until their measure is known)
+local meleeHeight = 192
+
 -- What the aim hits within the reach of the weapon: the object the camera looks at, if it is within the reach of the
 -- player. The camera is behind the player in the third person, so the ray is as much longer as the camera is away from
 -- the player, and what it hits counts when it is as near to the player as the weapon reaches (along the floor, as the
--- characters measure it).
-local function aim(range)
+-- characters measure it, and for a blow of the hands or a melee weapon not too far above or below the player either).
+local function aim(stats)
     local from = camera.getPosition()
     local origin = self.position
-    local to = from + camera.viewportToWorldVector(center) * (range + (from - origin):length())
+    local to = from + camera.viewportToWorldVector(center) * (stats.range + (from - origin):length())
     local result = nearby.castRay(from, to, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
     if result.hitObject == nil or result.hitPos == nil then return nil end
     local away = result.hitPos - origin
-    if math.sqrt(away.x * away.x + away.y * away.y) > range then return nil end
+    if math.sqrt(away.x * away.x + away.y * away.y) > stats.range then return nil end
+    if stats.melee and math.abs(away.z) > meleeHeight then return nil end
     return result.hitObject
 end
 
 local function attack()
     local stats = combat.weapon()
-    local target = aim(stats.range)
+    local target = aim(stats)
     combat.fire(target)
 end
 
