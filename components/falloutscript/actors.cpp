@@ -264,8 +264,11 @@ namespace FalloutScript
             return true;
         }
         const std::lock_guard lock(mMutex);
-        // One that starts dead is found out first, so that it does not die again when it is asked about later
+        // One that starts dead is found out first, so that it does not die again when it is asked about later; one
+        // whose record can not be read yet is not asked about it later either, since it was brought back after the
+        // record said what it said
         deadLocked(actor);
+        mStartKnown.insert(actor);
         mKillers.erase(actor);
         mKillingLimbs.erase(actor);
         return mDead.erase(actor) != 0;

@@ -703,6 +703,21 @@ namespace
         EXPECT_TRUE(state.isDead(crate));
     }
 
+    TEST(FalloutScriptActorStateTest, an_actor_brought_back_while_its_record_is_unreadable_stays_alive)
+    {
+        FakeRecords records;
+        records.mUnknown = { guard };
+        records.mStartDead = { guard };
+        ActorState state(records);
+        // The cell of the actor is not loaded: nothing is known, and the script brings it back all the same
+        EXPECT_FALSE(state.setDead(guard, false));
+        records.mUnknown.clear();
+        EXPECT_FALSE(state.isDead(guard));
+        // A later death is a death
+        EXPECT_TRUE(state.setDead(guard, true));
+        EXPECT_TRUE(state.isDead(guard));
+    }
+
     TEST(FalloutScriptActorCommandsTest, a_script_counts_the_dead_of_a_base_form)
     {
         Runner setup;
