@@ -140,8 +140,15 @@ namespace FalloutScript
         /// The spread in degrees that VATS adds to the weapon's: the factor (after the perks) times the largest angle
         double spreadDegrees(const Rules& rules, double factor);
 
-        /// The action points that come back in `seconds` outside VATS
-        double restored(const Rules& rules, double maxActionPoints, double seconds);
+        /// The action points that come back in `seconds` outside VATS. New Vegas gives back a share of the most a
+        /// second, and its perks (`perks`, empty for none) change the share that comes back in these seconds before
+        /// it is taken of the most.
+        double restored(const Rules& rules, double maxActionPoints, double seconds,
+            const std::function<double(double)>& perks = {});
+
+        /// The chance of a hit in percent after the perks (`perks` works on the chance as a fraction, 0 to 1): none
+        /// where there was none (the target is out of reach), and never more than the most the files allow.
+        double adjustedChance(const Rules& rules, double chance, const std::function<double(double)>& perks);
     }
 }
 

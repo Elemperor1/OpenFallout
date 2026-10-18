@@ -83,21 +83,30 @@ local function spent()
     return #queue * vats.state().cost
 end
 
--- The screen is gone: nothing is drawn, and the engine hears that V.A.T.S. is closed
-local function finish()
+-- The screen is gone: nothing is drawn, and the engine hears that V.A.T.S. is closed (unless the attacks of a queue
+-- are still to come, which are part of it)
+local function finish(keepOpen)
     modeOpen = false
     if element then
         element:destroy()
         element = nil
     end
-    vats.setOpen(false)
+    if not keepOpen then
+        vats.setOpen(false)
+    end
 end
 
-local function closeMode()
+local function closeMode(keepOpen)
     if modeOpen then
-        finish()
+        finish(keepOpen)
         I.UI.removeMode('Interface')
     end
+end
+
+-- The last attack of a queue is taken (or the player can not go on): V.A.T.S. is over
+local function endQueue()
+    running = nil
+    vats.setOpen(false)
 end
 
 -- Carries out the queue that was made
@@ -108,7 +117,8 @@ local function go()
     running = queue
     queue = {}
     wait = 0
-    closeMode()
+    -- The attacks come after the screen is gone, and the action points do not come back until the last of them
+    closeMode(true)
 end
 
 function render()
@@ -213,7 +223,7 @@ local function step()
     -- The queue ends with its last attack, whatever comes of it: a target that is gone between two attacks (or an
     -- error) must not leave the queue running, because the screen does not open while it is
     if #running == 0 then
-        running = nil
+        endQueue()
     end
     if not attack or not attack.target:isValid() then
         return
@@ -233,7 +243,7 @@ local function step()
     end
     -- A queue also ends when the player can not go on
     if result.refused == 'points' or result.refused == 'ammo' then
-        running = nil
+        endQueue()
     end
 end
 

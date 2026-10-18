@@ -256,4 +256,30 @@ namespace
         EXPECT_DOUBLE_EQ(Vats::restored(rules, 100, 2.0), 12.0);
         EXPECT_DOUBLE_EQ(Vats::restored(rules, 100, -1.0), 0.0);
     }
+
+    TEST(FalloutScriptVatsTest, thePerksOfNewVegasChangeTheShareOfActionPointsThatComesBack)
+    {
+        const auto twice = [](double share) { return share * 2.0; };
+        Vats::Rules rules;
+        // Fallout 3 gives back points a second and has no perk for it
+        EXPECT_DOUBLE_EQ(Vats::restored(rules, 80, 0.5, twice), 2.0);
+        rules.mRestoreShare = 0.06;
+        EXPECT_DOUBLE_EQ(Vats::restored(rules, 100, 2.0, twice), 24.0);
+        EXPECT_DOUBLE_EQ(Vats::restored(rules, 50, 1.0, twice), 6.0);
+        // Perks that take it all away leave nothing, and never a loss
+        EXPECT_DOUBLE_EQ(Vats::restored(rules, 100, 2.0, [](double share) { return share - 1.0; }), 0.0);
+    }
+
+    TEST(FalloutScriptVatsTest, thePerksChangeTheChanceOfAHitWithinWhatTheFilesAllow)
+    {
+        const Vats::Rules rules;
+        const auto quarterMore = [](double chance) { return chance * 1.25; };
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 60.0, quarterMore), 75.0);
+        // The most the files allow stays the most
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 90.0, quarterMore), 95.0);
+        // No chance (the target is out of reach) stays none, whatever the perks add
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 0.0, [](double chance) { return chance + 0.5; }), 0.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 40.0, [](double chance) { return chance - 1.0; }), 0.0);
+        EXPECT_DOUBLE_EQ(Vats::adjustedChance(rules, 40.0, nullptr), 40.0);
+    }
 }

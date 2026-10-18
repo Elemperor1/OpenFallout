@@ -198,9 +198,21 @@ namespace FalloutScript::Vats
         return std::clamp(chance, 0.0, rules.mMaxChance);
     }
 
-    double restored(const Rules& rules, double maxActionPoints, double seconds)
+    double restored(
+        const Rules& rules, double maxActionPoints, double seconds, const std::function<double(double)>& perks)
     {
-        const double perSecond = rules.mRestoreShare > 0 ? rules.mRestoreShare * maxActionPoints : rules.mRestoreRate;
-        return std::max(perSecond * seconds, 0.0);
+        if (rules.mRestoreShare <= 0)
+            return std::max(rules.mRestoreRate * seconds, 0.0);
+        double share = rules.mRestoreShare * std::max(seconds, 0.0);
+        if (perks)
+            share = perks(share);
+        return std::max(share * maxActionPoints, 0.0);
+    }
+
+    double adjustedChance(const Rules& rules, double chance, const std::function<double(double)>& perks)
+    {
+        if (chance <= 0 || !perks)
+            return chance;
+        return std::clamp(perks(chance / 100.0) * 100.0, 0.0, rules.mMaxChance);
     }
 }

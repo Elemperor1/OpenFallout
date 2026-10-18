@@ -143,6 +143,14 @@ namespace OFScript
         state.mActionPoints = mActorValues.current(mPlayer, AV::actionPoints);
         state.mMaxActionPoints = mActorValues.permanent(mPlayer, AV::actionPoints);
         state.mCost = FalloutScript::Vats::attackCost(vatsRules(), vatsWeapon(mPlayer));
+        // New Vegas lets the perks of the player change what an attack costs
+        if (vatsRules().mNewVegas)
+        {
+            FalloutScript::PerkEngine::Context attacking;
+            attacking.mWeapon = mEquipment.weapon(mPlayer);
+            state.mCost = std::max(
+                mPerks.apply(FalloutScript::EntryPoint::actionPointCost, mPlayer, state.mCost, attacking), 0.0);
+        }
         const WeaponStats stats = weaponStats(mPlayer);
         state.mRange = FalloutScript::Vats::reach(vatsRules(), vatsWeapon(mPlayer));
         if (stats.mWeapon != 0)
@@ -229,6 +237,14 @@ namespace OFScript
         factor = mPerks.apply(FalloutScript::EntryPoint::calculateGunSpread, mPlayer, factor, aiming);
         shot.extraSpread = FalloutScript::Vats::spreadDegrees(vatsRules(), factor);
 
+        // The perks of the player change the chance of a hit (entry point 8, with the weapon and the target)
+        FalloutScript::PerkEngine::Context hitting;
+        hitting.mOther = victim;
+        hitting.mWeapon = held;
+        const std::function<double(double)> toHit = [this, hitting](double chance) {
+            return mPerks.apply(FalloutScript::EntryPoint::hitChance, mPlayer, chance, hitting);
+        };
+
         const std::vector<FalloutScript::BodyPart> parts = mLimbs.partsOf(victim);
         for (std::size_t i = 0; i < parts.size(); ++i)
         {
@@ -240,7 +256,8 @@ namespace OFScript
             part.mName = parts[i].mName;
             part.mTarget = parts[i].mTarget;
             shot.partToHit = parts[i].mToHit;
-            part.mChance = FalloutScript::Vats::hitChance(vatsRules(), weapon, shot);
+            part.mChance = FalloutScript::Vats::adjustedChance(
+                vatsRules(), FalloutScript::Vats::hitChance(vatsRules(), weapon, shot), toHit);
             part.mCondition = mLimbs.condition(victim, parts[i].mType);
             result.push_back(std::move(part));
         }

@@ -513,8 +513,18 @@ namespace OFScript
         if (mPlayer != 0 && !mVatsOpen)
         {
             namespace AV = FalloutScript::ActorValue;
+            // New Vegas lets the perks change the share that comes back, as long as a weapon is held
+            std::function<double(double)> perks;
+            if (const FalloutScript::FormId held = mEquipment.weapon(mPlayer); held != 0)
+            {
+                FalloutScript::PerkEngine::Context holding;
+                holding.mWeapon = held;
+                perks = [this, holding](double share) {
+                    return mPerks.apply(FalloutScript::EntryPoint::actionPointRegen, mPlayer, share, holding);
+                };
+            }
             const double gain = FalloutScript::Vats::restored(
-                vatsRules(), mActorValues.permanent(mPlayer, AV::actionPoints), frametime);
+                vatsRules(), mActorValues.permanent(mPlayer, AV::actionPoints), frametime, perks);
             if (gain > 0)
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
