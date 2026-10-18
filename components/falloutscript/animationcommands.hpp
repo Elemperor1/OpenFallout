@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ANIMATIONCOMMANDS_H
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ANIMATIONCOMMANDS_H
 
+#include <mutex>
 #include <string_view>
 #include <unordered_map>
 
@@ -58,8 +59,12 @@ namespace FalloutScript
         /// Whether the state of the object was set (by rest or a request), so that the state it is loaded in, which a
         /// record may give, does not take the place of it
         bool knows(FormId reference) const;
+        /// Forgets all states (a game is loaded or begun)
+        void clear();
 
     private:
+        // A script that Lua starts sets the state on the thread of Lua while the thread of the frame reads it
+        mutable std::mutex mMutex;
         std::unordered_map<FormId, bool> mOpen;
     };
 

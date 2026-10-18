@@ -271,6 +271,16 @@ namespace
         EXPECT_FALSE(states.restsOpen(gate));
     }
 
+    TEST(FalloutScriptOpenStatesTest, clearing_the_states_forgets_them)
+    {
+        FalloutScript::OpenStates states;
+        states.rest(gate, true);
+
+        states.clear();
+        EXPECT_FALSE(states.knows(gate));
+        EXPECT_FALSE(states.restsOpen(gate));
+    }
+
     TEST(FalloutScriptOpenStatesTest, opening_an_object_takes_it_through_opening_to_open)
     {
         FakeAnimations animations;

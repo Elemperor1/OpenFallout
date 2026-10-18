@@ -45,18 +45,27 @@ namespace FalloutScript
 
     void OpenStates::rest(FormId reference, bool open)
     {
+        const std::lock_guard lock(mMutex);
         mOpen[reference] = open;
     }
 
     bool OpenStates::restsOpen(FormId reference) const
     {
+        const std::lock_guard lock(mMutex);
         const auto found = mOpen.find(reference);
         return found != mOpen.end() && found->second;
     }
 
     bool OpenStates::knows(FormId reference) const
     {
+        const std::lock_guard lock(mMutex);
         return mOpen.find(reference) != mOpen.end();
+    }
+
+    void OpenStates::clear()
+    {
+        const std::lock_guard lock(mMutex);
+        mOpen.clear();
     }
 
     void addAnimationCommands(Interpreter& interpreter, OpenStates& states, AnimationWorld& world, Game game)

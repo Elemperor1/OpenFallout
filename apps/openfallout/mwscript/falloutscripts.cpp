@@ -375,7 +375,7 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
-        mOpenStates = FalloutScript::OpenStates();
+        mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
         mActorValues.clear();
@@ -3166,12 +3166,22 @@ namespace OFScript
         OFRender::ObjectAnimation* animation = objectAnimationOf(reference);
         if (animation == nullptr || !animation->playScripted(group, false, restart))
             return false;
-        // A door that opens lets what is at it through: it has no collision until it is closed again
+        // A door shows what it is told to, so its state follows the group, whoever plays it (the state being set, an
+        // activation or a script). A door that opens lets what is at it through: it has no collision until it is
+        // closed again.
         const OFWorld::Ptr ptr = findReference(reference);
-        if (ptr.getType() == ESM4::Door::sRecordId && Misc::StringUtils::ciEqual(group, "Open"))
+        if (ptr.getType() == ESM4::Door::sRecordId)
         {
-            OFBase::Environment::get().getWorld()->setObjectCollision(ptr, false);
-            mDoorsWithoutCollision.insert(reference);
+            const bool opens = Misc::StringUtils::ciEqual(group, "Open");
+            if (opens || Misc::StringUtils::ciEqual(group, "Close"))
+            {
+                mOpenStates.rest(reference, opens);
+                if (opens)
+                {
+                    OFBase::Environment::get().getWorld()->setObjectCollision(ptr, false);
+                    mDoorsWithoutCollision.insert(reference);
+                }
+            }
         }
         return true;
     }
