@@ -189,6 +189,9 @@ namespace FalloutScript
         std::function<void(FormId, int)> mQuestSetter;
 
         std::mutex mMutex;
+        /// Held while a refresh checks what is applied and applies what is missing, so that two refreshes of a
+        /// character (the ticks of the host and the calls of a script) do not both apply the same perk
+        std::mutex mRefreshMutex;
         std::map<FormId, PerkInfo> mKnown;
         std::map<FormId, bool> mUnknown;
         /// What is applied to a character: by the perk, the rank it was applied for and the effects

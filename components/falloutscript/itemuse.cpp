@@ -210,9 +210,12 @@ namespace FalloutScript
                 {
                     const std::lock_guard lock(mMutex);
                     const auto already = std::find(mAddictions.begin(), mAddictions.end(), std::make_pair(actor, item));
+                    // One who is addicted already does not become addicted again
                     if (already == mAddictions.end())
+                    {
                         mAddictions.emplace_back(actor, item);
-                    result.mAddicted = true;
+                        result.mAddicted = true;
+                    }
                 }
             }
 

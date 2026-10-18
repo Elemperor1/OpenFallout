@@ -5,7 +5,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <map>
+#include <thread>
 #include <vector>
 
 namespace
@@ -391,6 +393,68 @@ namespace
         f.mProgress.removePerk(thePlayer, strongBack);
         f.mEngine.refresh(thePlayer);
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before);
+    }
+
+    TEST(FalloutScriptPerksTest, refreshesAtTheSameTimeApplyAnAbilityOnce)
+    {
+        constexpr int threads = 6;
+        for (int round = 0; round < 100; ++round)
+        {
+            Fixture f;
+            PerkInfo info = perk(strongBack, "Strong Back", 8);
+            PerkEntry ability;
+            ability.mType = PerkEntry::Ability;
+            ability.mAbility = abilityOfStrongBack;
+            info.mEntries = { ability };
+            f.mRecords.mPerks[strongBack] = info;
+            f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
+            f.mProgress.addPerk(thePlayer, strongBack);
+            const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
+
+            // Every one of them waits for the others, so that they all come to the check of what is applied together
+            std::atomic<int> ready = 0;
+            std::vector<std::thread> refreshing;
+            for (int i = 0; i < threads; ++i)
+                refreshing.emplace_back([&] {
+                    ++ready;
+                    while (ready < threads)
+                        std::this_thread::yield();
+                    f.mEngine.refresh(thePlayer);
+                });
+            for (std::thread& thread : refreshing)
+                thread.join();
+
+            ASSERT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before + 50) << "round " << round;
+        }
+    }
+
+    TEST(FalloutScriptPerksTest, aQuestStageThatGivesAnotherPerkDoesNotWaitForTheRefreshItCameFrom)
+    {
+        Fixture f;
+        PerkInfo info = perk(quester, "Quester", 1);
+        PerkEntry stage;
+        stage.mType = PerkEntry::QuestStage;
+        stage.mQuest = 0x01002000;
+        stage.mStage = 30;
+        info.mEntries = { stage };
+        f.mRecords.mPerks[quester] = info;
+        PerkInfo strong = perk(strongBack, "Strong Back", 8);
+        PerkEntry ability;
+        ability.mType = PerkEntry::Ability;
+        ability.mAbility = abilityOfStrongBack;
+        strong.mEntries = { ability };
+        f.mRecords.mPerks[strongBack] = strong;
+        f.mRecords.mAbilities[abilityOfStrongBack] = { { ActorValue::carryWeight, 50 } };
+
+        // The stage runs a script that gives another perk and refreshes (the stage is set with nothing held)
+        f.mEngine.setQuestSetter([&](FormId, int) {
+            f.mProgress.addPerk(thePlayer, strongBack);
+            f.mEngine.refresh(thePlayer);
+        });
+        const double before = f.mValues.current(thePlayer, ActorValue::carryWeight);
+        f.mProgress.addPerk(thePlayer, quester);
+        f.mEngine.refresh(thePlayer);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::carryWeight), before + 50);
     }
 
     TEST(FalloutScriptPerksTest, aHigherRankReplacesTheAbilityOfTheRankBefore)

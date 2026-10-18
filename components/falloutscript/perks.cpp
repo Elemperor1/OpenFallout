@@ -216,6 +216,9 @@ namespace FalloutScript
     {
         if (owner == 0)
             return;
+        // The check of what is applied and the applying of what is missing are one step: of two refreshes at the
+        // same time, the second one finds the work of the first one done and applies nothing again
+        std::unique_lock refreshing(mRefreshMutex);
         const std::vector<std::pair<FormId, int>> perks = mProgress.perksOf(owner);
 
         // What was applied for a perk that is gone, or for a rank that is no longer the rank, is taken back
@@ -245,6 +248,9 @@ namespace FalloutScript
                 mValues.modify(owner, effect.mActorValue, -effect.mMagnitude);
         }
 
+        // The quest stages that a perk sets are set when the refresh is done, with nothing held: setting a stage may
+        // run a script, which may give another perk and refresh again
+        std::vector<std::pair<FormId, int>> pendingStages;
         for (const auto& [perk, rank] : perks)
         {
             {
@@ -275,16 +281,22 @@ namespace FalloutScript
             }
             for (const AbilityEffect& effect : applied.mEffects)
                 mValues.modify(owner, effect.mActorValue, effect.mMagnitude);
-            std::function<void(FormId, int)> setter;
             {
                 const std::lock_guard lock(mMutex);
                 mApplied[{ owner, perk }] = std::move(applied);
-                setter = mQuestSetter;
             }
-            if (setter)
-                for (const auto& [quest, stage] : stages)
-                    setter(quest, stage);
+            pendingStages.insert(pendingStages.end(), stages.begin(), stages.end());
         }
+
+        std::function<void(FormId, int)> setter;
+        {
+            const std::lock_guard lock(mMutex);
+            setter = mQuestSetter;
+        }
+        refreshing.unlock();
+        if (setter)
+            for (const auto& [quest, stage] : pendingStages)
+                setter(quest, stage);
     }
 
     std::vector<PerkEngine::Offer> PerkEngine::levelUpList(FormId owner, int level)

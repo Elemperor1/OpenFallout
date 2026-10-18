@@ -288,11 +288,17 @@ namespace
         EXPECT_THAT(f.mUse.addictions(thePlayer), ElementsAre(mentats));
         EXPECT_EQ(f.mProgress.miscStat(10), 1);
         EXPECT_EQ(f.mProgress.miscStat(9), 2);
-        // a second dose does not list it again
-        f.mUse.use(thePlayer, mentats);
+        // a second dose does not list it again, and the one who is addicted already does not become addicted again
+        EXPECT_FALSE(f.mUse.use(thePlayer, mentats).mAddicted);
         EXPECT_THAT(f.mUse.addictions(thePlayer), ElementsAre(mentats));
+        EXPECT_EQ(f.mProgress.miscStat(10), 1);
+        EXPECT_EQ(f.mProgress.miscStat(9), 3);
         f.mUse.cure(thePlayer, mentats);
         EXPECT_TRUE(f.mUse.addictions(thePlayer).empty());
+        // ... and does become addicted when the addiction was cured
+        f.mState.addItem(thePlayer, mentats, 1);
+        EXPECT_TRUE(f.mUse.use(thePlayer, mentats).mAddicted);
+        EXPECT_EQ(f.mProgress.miscStat(10), 2);
     }
 
     TEST(FalloutScriptItemUseTest, aSkillBookRaisesTheSkillAndIsUsedUp)

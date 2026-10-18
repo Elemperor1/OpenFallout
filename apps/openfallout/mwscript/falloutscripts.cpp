@@ -1740,11 +1740,9 @@ namespace OFScript
             = FalloutScript::Damage::resolve(damageSettings(), blow, chance, bonus, defense, roll);
         if (attacker != 0 && damageAfterArmor)
         {
-            // The perks work on what is left after the armor, and the bonus of a critical blow comes after them
-            const double criticalBonus = hit.mCritical ? std::max(blow.mCriticalDamage, 0.0) : 0.0;
-            const double armored = std::max(hit.mDamage - criticalBonus, 0.0);
-            hit.mDamage
-                = std::max(mPerks.apply(Entry::weaponDamage, attacker, armored, towardsVictim), 0.0) + criticalBonus;
+            // The perks work on what is left after the armor; the bonus of a critical blow is part of the blow that the
+            // armor works on (the executable adds it to the damage before the armor), so it is part of that too
+            hit.mDamage = std::max(mPerks.apply(Entry::weaponDamage, attacker, hit.mDamage, towardsVictim), 0.0);
         }
 
         // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
