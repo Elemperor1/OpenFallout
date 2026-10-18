@@ -2118,6 +2118,8 @@ namespace OFScript
         for (const FalloutScript::ActorState::Death& death : deaths)
         {
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
+            // One that fought nobody and had no package has no mind yet, and its body falls by it
+            evaluatePackage(death.mActor);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -3197,6 +3199,9 @@ namespace OFScript
         settleDoor(object, reference);
         if (!mOpenStates.restsOpen(reference))
             return;
+        // A door that rests open is loaded without its collision, which it gets back when it is closed
+        if (object.getType() == ESM4::Door::sRecordId)
+            mDoorsWithoutCollision.insert(reference);
         if (auto* animation
             = dynamic_cast<OFRender::ObjectAnimation*>(OFBase::Environment::get().getWorld()->getAnimation(object)))
             animation->playScripted("Open", true);

@@ -242,13 +242,14 @@ namespace OFMechanics
             return scripts != nullptr ? scripts->scriptPackages(ptr) : std::vector<const ESM4::AIPackage*>();
         }
 
-        /// Whether a character goes for the player when it sees it, or fights already (a blow or a script started a
-        /// fight with one that never starts one), so that it needs a mind though it has no package
-        bool mayFight(const OFWorld::Ptr& ptr)
+        /// Whether a character needs a mind though it has no package: it goes for the player when it sees it, or
+        /// fights already (a blow or a script started a fight with one that never starts one), or it is dead, and the
+        /// mind is what makes its body fall
+        bool needsMind(const OFWorld::Ptr& ptr)
         {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             return scripts != nullptr && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr()
-                && (scripts->isAggressive(ptr) || scripts->fighting(ptr));
+                && (scripts->isAggressive(ptr) || scripts->fighting(ptr) || scripts->isDead(ptr));
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -421,7 +422,7 @@ namespace OFMechanics
             return;
         // A command from a script outlives the cell: the character takes it up again when the cell is loaded
         const auto command = mCommands.find(ptr.getCellRef().getRefNum());
-        if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty() && !mayFight(ptr))
+        if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty() && !needsMind(ptr))
             return;
         Mind& mind = makeMind(ptr);
         if (command != mCommands.end())
@@ -447,7 +448,7 @@ namespace OFMechanics
         if (found == mMinds.end())
         {
             // A character with no packages of its own has no mind until a script gives it one, or it has to fight
-            if (scriptPackagesOf(ptr).empty() && !mayFight(ptr))
+            if (scriptPackagesOf(ptr).empty() && !needsMind(ptr))
                 return;
             makeMind(ptr).mReview = 0.f;
             return;
