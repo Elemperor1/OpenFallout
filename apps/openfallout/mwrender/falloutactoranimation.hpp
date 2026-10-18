@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include <osg/MatrixTransform>
 #include <osg/Vec3f>
 
 #include "animation.hpp"
@@ -32,6 +33,12 @@ namespace OFRender
         bool canRun() const { return mGaits.mHasRun; }
         float getRunVelocity() const { return mGaits.mRunVelocity; }
 
+        /// The actor is dead: it stops in the pose it has and falls, a person on its back and a creature on its side,
+        /// and lies where it fell (the games have it fall with a ragdoll of Havok, which this does not have). With
+        /// `fallen` it lies there at once: it died before it was in sight.
+        void die(bool fallen);
+        bool isDown() const { return mFall != nullptr; }
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
@@ -46,6 +53,7 @@ namespace OFRender
 
     private:
         class AdvanceCallback;
+        class FallCallback;
 
         /// Adds the animation file to the actor and gives the name of its group, empty when it has nothing to play on
         /// this skeleton
@@ -56,6 +64,8 @@ namespace OFRender
         void setGait(FalloutGait gait);
 
         osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
+        /// The transform that the body falls with, when it has died
+        osg::ref_ptr<osg::MatrixTransform> mFall;
 
         std::string mWalkGroup;
         std::string mRunGroup;

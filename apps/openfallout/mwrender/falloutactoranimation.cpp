@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
@@ -44,6 +45,44 @@ namespace OFRender
         double mLastTime = -1.0;
     };
 
+    /// The body falls over a short time, slowly at first and faster as it goes, as a body does
+    class FalloutActorAnimation::FallCallback : public SceneUtil::NodeCallback<FallCallback, osg::MatrixTransform*>
+    {
+    public:
+        FallCallback(const osg::Vec3f& axis, float lift, bool fallen)
+            : mAxis(axis)
+            , mLift(lift)
+            , mFallen(fallen)
+        {
+        }
+
+        void operator()(osg::MatrixTransform* node, osg::NodeVisitor* nv)
+        {
+            if (!mDone)
+            {
+                constexpr double fallSeconds = 0.7;
+                const double now = nv->getFrameStamp()->getSimulationTime();
+                if (mStart < 0.0)
+                    mStart = now;
+                const float progress = mFallen ? 1.f : static_cast<float>(std::min(1.0, (now - mStart) / fallSeconds));
+                const float eased = progress * progress;
+                // It turns about the point on the ground where it stood, and is lifted by the thickness of its body so
+                // that it does not lie in the ground
+                node->setMatrix(
+                    osg::Matrix::rotate(eased * osg::PI_2, mAxis) * osg::Matrix::translate(0.f, 0.f, eased * mLift));
+                mDone = progress >= 1.f;
+            }
+            traverse(node, nv);
+        }
+
+    private:
+        osg::Vec3f mAxis;
+        float mLift;
+        bool mFallen;
+        bool mDone = false;
+        double mStart = -1.0;
+    };
+
     FalloutActorAnimation::FalloutActorAnimation(
         const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
         : Animation(ptr, std::move(parentNode), resourceSystem)
@@ -54,6 +93,30 @@ namespace OFRender
     {
         if (mAdvanceCallback != nullptr)
             mInsert->removeUpdateCallback(mAdvanceCallback);
+    }
+
+    void FalloutActorAnimation::die(bool fallen)
+    {
+        if (mFall != nullptr || mObjectRoot == nullptr || mObjectRoot->getNumParents() == 0)
+            return;
+        // What it did stops where it is
+        if (mAdvanceCallback != nullptr)
+        {
+            mInsert->removeUpdateCallback(mAdvanceCallback);
+            mAdvanceCallback = nullptr;
+        }
+
+        // A person falls on its back, and a creature (a four-legged one, a robot) on its side. The body is as thick
+        // as a fifth of its size across, which keeps it out of the ground.
+        const bool person = mPtr.getType() == ESM4::Npc::sRecordId;
+        const float lift = std::clamp(mObjectRoot->getBound().radius() * 0.2f, 8.f, 40.f);
+        osg::ref_ptr<osg::MatrixTransform> fall = new osg::MatrixTransform;
+        fall->setName("Fall");
+        osg::Group* parent = mObjectRoot->getParent(0);
+        parent->replaceChild(mObjectRoot, fall);
+        fall->addChild(mObjectRoot);
+        fall->addUpdateCallback(new FallCallback(person ? osg::Vec3f(1, 0, 0) : osg::Vec3f(0, 1, 0), lift, fallen));
+        mFall = fall;
     }
 
     void FalloutActorAnimation::advance(float duration)

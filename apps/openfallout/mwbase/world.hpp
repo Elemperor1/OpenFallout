@@ -211,6 +211,10 @@ namespace OFBase
 
         virtual void disable(const OFWorld::Ptr& ptr) = 0;
 
+        /// Takes the collision of an object that is in the scene away, or gives it back (a door that is open). Does
+        /// nothing for an object that is not in the scene.
+        virtual void setObjectCollision(const OFWorld::Ptr& ptr, bool enabled) = 0;
+
         virtual void advanceTime(double hours, bool incremental = false) = 0;
         ///< Advance in-game time.
 

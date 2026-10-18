@@ -1159,6 +1159,38 @@ namespace OFWorld
         ptr.getRefData().setBaseNode(nullptr);
     }
 
+    void Scene::setObjectCollision(const Ptr& ptr, bool enabled)
+    {
+        if (ptr.isEmpty() || ptr.getRefData().getBaseNode() == nullptr)
+            return;
+        const auto object = mPhysics->getObject(ptr);
+        if (enabled == (object != nullptr))
+            return;
+        if (!enabled)
+        {
+            if (object->getShapeInstance()->mVisualCollisionType == Resource::VisualCollisionType::None)
+                mNavigator.removeObject(DetourNavigator::ObjectId(object), nullptr);
+            mPhysics->remove(ptr);
+            return;
+        }
+
+        try
+        {
+            const VFS::Path::Normalized model = getModel(ptr);
+            if (model.empty())
+                return;
+            const bool isInterior = mCurrentCell && !mCurrentCell->isExterior();
+            ptr.getClass().insertObject(ptr, model, makeDirectNodeRotation(ptr), *mPhysics);
+            addObject(ptr, mWorld, *mPhysics, mLowestPoint, isInterior, mNavigator);
+            mWorld.scaleObject(ptr, ptr.getCellRef().getScale());
+        }
+        catch (std::exception& e)
+        {
+            Log(Debug::Error) << "failed to give '" << ptr.getCellRef().getRefId()
+                              << "' its collision back: " << e.what();
+        }
+    }
+
     bool Scene::isCellActive(const CellStore& cell)
     {
         return mActiveCells.contains(&cell);

@@ -17,6 +17,7 @@
 #include <components/esm/luascripts.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
+#include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfurn.hpp>
 
 #include <components/settings/values.hpp>
@@ -636,6 +637,12 @@ namespace OFLua
         {
             if (object.getType() == ESM4::Furniture::sRecordId)
                 scripts->activateFurniture(actor, object);
+            // A door of Fallout that is no teleport door opens, and closes when it is open
+            else if (object.getType() == ESM4::Door::sRecordId)
+            {
+                if (!object.getCellRef().getTeleport())
+                    scripts->activateDoor(object);
+            }
             // An item of Fallout that an actor activates goes into its inventory
             else
                 scripts->pickUp(object, actor);

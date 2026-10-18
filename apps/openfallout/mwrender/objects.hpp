@@ -52,7 +52,9 @@ namespace OFRender
         ~Objects();
 
         /// @param allowLight If false, no lights will be created, and particles systems will be removed.
-        void insertModel(const OFWorld::Ptr& ptr, const std::string& model, bool allowLight = true);
+        /// @param embedded Whether the animations the model holds itself (a door that opens) are loaded and played.
+        void insertModel(
+            const OFWorld::Ptr& ptr, const std::string& model, bool allowLight = true, bool embedded = false);
 
         void insertNPC(const OFWorld::Ptr& ptr);
         /// A creature of Fallout 3 or New Vegas, with its body models and animations

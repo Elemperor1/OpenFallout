@@ -21,6 +21,7 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/animationcommands.hpp>
 #include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/combatcommands.hpp>
@@ -55,6 +56,11 @@
 namespace ESM4
 {
     struct AIPackage;
+}
+
+namespace OFRender
+{
+    class ObjectAnimation;
 }
 
 namespace OFWorld
@@ -92,7 +98,8 @@ namespace OFScript
                                  private FalloutScript::PlacementWorld,
                                  private FalloutScript::MessageWorld,
                                  private FalloutScript::ControlsWorld,
-                                 private FalloutScript::CombatWorld
+                                 private FalloutScript::CombatWorld,
+                                 private FalloutScript::AnimationWorld
     {
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
@@ -147,6 +154,15 @@ namespace OFScript
         FalloutScript::FormId playerReference() const { return mPlayer; }
         /// Who fights whom and how the characters stand to each other
         FalloutScript::CombatState& combat() { return mCombat; }
+
+        /// The 3D of an object that holds animations of its own is built (a door, a switch): an object that rests open
+        /// starts so
+        void objectInserted(const OFWorld::Ptr& object);
+        /// Whether the object has its collision when it is put in the scene: a door that is open has none
+        bool hasCollision(const OFWorld::Ptr& object);
+        /// A door that is no teleport door is activated: it opens, and closes when it is open. The activation of a
+        /// door that is a teleport door is no concern of this.
+        void activateDoor(const OFWorld::Ptr& door);
 
         /// What a blow did
         struct StrikeResult
@@ -434,6 +450,16 @@ namespace OFScript
         /// the screens of making a character) runs while that menu is open; one that names nothing, or a menu that
         /// the game does not have by that number, runs while any menu is
         bool menuBlockRuns(const FalloutScript::Block& block);
+
+        bool hasGroup(FalloutScript::FormId reference, std::string_view group) override;
+        bool playGroup(FalloutScript::FormId reference, std::string_view group, bool restart) override;
+        bool isGroupPlaying(FalloutScript::FormId reference, std::string_view group) override;
+        /// The animation of the object a reference stands for, when it is in the scene and is no character
+        OFRender::ObjectAnimation* objectAnimationOf(FalloutScript::FormId reference);
+        /// Gives the collision back to the doors that are closed again
+        void updateDoors();
+        /// A door that its record places open rests open, unless something set the state of the door before
+        void settleDoor(const OFWorld::Ptr& door, FalloutScript::FormId reference);
 
         bool traitsOf(FalloutScript::FormId reference, FalloutScript::ActorTraits& traits) override;
         /// What the record of the reference says it is, which is all that anyone but the player has to go by
@@ -823,6 +849,10 @@ namespace OFScript
         double gameSetting(std::string_view name, double fallback);
         std::optional<std::map<std::string, double>> mGameSettingValues;
         FalloutScript::CombatState mCombat;
+        /// Whether the doors and switches are open, and the animations they play for it
+        FalloutScript::OpenStates mOpenStates;
+        /// The doors that are open or on the way to be closed: their collision is away until they are closed
+        std::set<FalloutScript::FormId> mDoorsWithoutCollision;
         /// The blows are rolled for from any thread
         std::mutex mCombatRandomMutex;
         std::mt19937 mCombatRandom;

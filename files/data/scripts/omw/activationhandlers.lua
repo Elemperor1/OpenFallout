@@ -1,14 +1,10 @@
-local async = require('openfallout.async')
 local core = require('openfallout.core')
 local types = require('openfallout.types')
 local world = require('openfallout.world')
 local auxUtil = require('openfallout_aux.util')
 
-local EnableObject = async:registerTimerCallback('EnableObject', function(obj) obj.enabled = true end)
-
 local function ESM4DoorActivation(door, actor)
     -- TODO: Implement lockpicking minigame
-    -- TODO: Play door opening animation
     local Door4 = types.ESM4Door
     core.sound.playSound3d(Door4.record(door).openSound, actor)
     if Door4.isTeleport(door) then
@@ -16,10 +12,9 @@ local function ESM4DoorActivation(door, actor)
         if types.Actor.objectIsInstance(actor) then
             actor:teleport(Door4.destCell(door), Door4.destPosition(door), Door4.destRotation(door))
         end
-    else
-        door.enabled = false
-        async:newSimulationTimer(5, EnableObject, door)
     end
+    -- A door that is no teleport door opens and closes in the engine: the animation of its model plays (see
+    -- LuaManager::defaultActivation), and it has no collision while it is open
     return false -- disable activation handling in C++ mwmechanics code
 end
 

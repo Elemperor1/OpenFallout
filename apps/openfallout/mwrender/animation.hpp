@@ -301,6 +301,16 @@ namespace OFRender
         void addAnimSource(std::string_view model, const std::string& baseModel);
         std::shared_ptr<AnimSource> addSingleAnimSource(VFS::Path::NormalizedView kfname, const std::string& baseModel);
 
+        /** Adds the animations that the model holds itself (the sequences of the manager in its nif file), each as a
+         * group of its own: a door has Open and Close, a switch Forward.
+         * @param model The file of the model, only used to find the rules for blending and for error messages.
+         */
+        void addEmbeddedAnimSources(VFS::Path::NormalizedView model);
+
+        /// Makes an animation source of the keyframes: a controller for each node of the model that they drive
+        std::shared_ptr<AnimSource> addKeyframeSource(osg::ref_ptr<const SceneUtil::KeyframeHolder> keyframes,
+            VFS::Path::NormalizedView kfname, const std::string& baseModel);
+
         /** Adds an additional light to the given node using the specified ESM record. */
         void addExtraLight(osg::ref_ptr<osg::Group> parent, const SceneUtil::LightCommon& light);
 
@@ -508,11 +518,35 @@ namespace OFRender
     class ObjectAnimation : public Animation
     {
     public:
+        /// @param embedded Whether the animations that the model holds itself (in its nif file: Open and Close of a
+        /// door, Forward of a switch) are loaded. The Idle one plays at once and goes on.
         ObjectAnimation(const OFWorld::Ptr& ptr, const std::string& model, Resource::ResourceSystem* resourceSystem,
-            bool animated, bool allowLight);
+            bool animated, bool allowLight, bool embedded = false);
+        ~ObjectAnimation() override;
 
         bool canBeHarvested() const override;
         void harvest(const OFWorld::Ptr& ptr) override;
+
+        /// The group of the model that stands for the name of a script (Forward): the group of the name or else a
+        /// variant of it (Forward_A). Empty when the model has none.
+        std::string findGroup(std::string_view name) const;
+
+        /// Plays the group the name stands for, once, in the place of the one a script played before. The group
+        /// starts from its start, or from its end when `atEnd` (an object that is loaded in the state the group
+        /// leads to), and the object keeps the pose the group ends in. A group that plays already goes on, unless
+        /// `restart`. False when the model has no such group.
+        bool playScripted(std::string_view name, bool atEnd = false, bool restart = true);
+
+        /// Whether a group plays that a script started: the one the name stands for, or any when the name is empty
+        bool isScriptedPlaying(std::string_view name) const;
+
+    private:
+        class AdvanceCallback;
+
+        void advance(float duration) { runAnimation(duration); }
+
+        osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
+        std::string mScriptedGroup;
     };
 
     class UpdateVfxCallback : public SceneUtil::NodeCallback<UpdateVfxCallback>

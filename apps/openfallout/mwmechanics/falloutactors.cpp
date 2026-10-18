@@ -160,6 +160,8 @@ namespace OFMechanics
         bool mAgent = false; // the navigator has been told of an actor of its size, so that it makes a mesh for it
         float mSight = 0.f; // seconds until it looks for the player to go for
         bool mFighting = false; // it was in a fight the last time it was looked at
+        bool mSeenAlive = false; // it was alive when it was looked at
+        bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
         float mWait = 0.f; // seconds to stand still before it does anything else
         bool mWalking = false; // it goes to mDestination
@@ -378,6 +380,14 @@ namespace OFMechanics
             mind.mYield = FalloutYield();
             mind.mPathWaiting = 0.f;
             mind.mPathWaitingReported = false;
+        }
+
+        /// The body of an actor that died falls, and what walks is no longer stopped by it
+        void fall(Frame& frame, FalloutActors::Mind& mind)
+        {
+            if (auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                animation->die(!mind.mSeenAlive);
+            frame.mWorld.setObjectCollision(mind.mPtr, false);
         }
 
         void releaseAgent(FalloutActors::Mind& mind)
@@ -1320,13 +1330,20 @@ namespace OFMechanics
             if (distanceAcross(mind.position(), frame.mPlayer) > range)
                 continue;
 
-            // A script killed it, and nothing else in the game does yet: it does nothing more
+            // It is dead (a blow or a script killed it): it does nothing more, and its body falls, at once for one
+            // that was dead when it came into view
             if (frame.mScripts != nullptr && frame.mScripts->isDead(mind.mPtr))
             {
                 stopWalking(mind);
                 mind.mFighting = false;
+                if (!mind.mFell)
+                {
+                    mind.mFell = true;
+                    fall(frame, mind);
+                }
                 continue;
             }
+            mind.mSeenAlive = true;
 
             // A fight comes before the packages
             if (frame.mScripts != nullptr && fight(frame, mind, duration))
