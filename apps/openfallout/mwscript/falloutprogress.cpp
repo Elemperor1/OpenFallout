@@ -141,7 +141,10 @@ namespace OFScript
                 value = entry.mData.mActorValue;
             if (!FalloutScript::ActorValues::isValid(value))
                 continue;
-            effects.push_back({ value, static_cast<double>(entry.mData.mMagnitude) });
+            // The magnitude has no sign: a detrimental effect takes away what a beneficial one gives (as in an item)
+            const double magnitude = static_cast<double>(entry.mData.mMagnitude);
+            effects.push_back(
+                { value, (effect->mData.mEffectFlags & effectDetrimental) != 0 ? -magnitude : magnitude });
         }
         return true;
     }

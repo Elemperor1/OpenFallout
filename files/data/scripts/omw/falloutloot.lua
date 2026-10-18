@@ -54,6 +54,15 @@ local function closeMode()
     end
 end
 
+-- The player leaves the screen with its button: what was open is closed here, because the mode is no longer ours
+-- when the event that tells of it comes
+local function leave()
+    destroyElement()
+    pipboy.closeLoot()
+    shownSerial = nil
+    closeMode()
+end
+
 local function number(value)
     return string.format('%d', math.floor(value + 0.5))
 end
@@ -113,7 +122,7 @@ function render()
             end
             render()
         end, { enabled = #items > 0, color = colors.titleColor }), 140),
-        widgets.clickable('Close', function() closeMode() end, { color = colors.titleColor })))
+        widgets.clickable('Close', leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
 end
 
