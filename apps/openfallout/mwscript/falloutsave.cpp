@@ -913,7 +913,10 @@ namespace OFScript
     FalloutScripts::SavedPlayer FalloutScripts::savedPlayer()
     {
         SavedPlayer result;
-        if (mStore.get<ESM4::Npc>().getSize() == 0)
+        // The player is a character of Fallout when its record is: content of Morrowind that is played with a plugin of
+        // Fallout still has the player of Morrowind
+        ESM::FormId base;
+        if (!baseOf(mPlayer, base) || mStore.get<ESM4::Npc>().search(base) == nullptr)
             return result;
         result.mKnown = true;
         ensureLevellingRules();

@@ -92,6 +92,15 @@ class SaveDiffTest(unittest.TestCase):
         with self.assertRaises(savediff.SaveFileError):
             savediff.sections(path)
 
+    def test_a_section_that_is_written_twice_cannot_be_compared(self):
+        path = self.write("twice", save(section("a", 1, b"1"), section("b", 1, b"2"), section("a", 1, b"3")))
+        with self.assertRaises(savediff.SaveFileError) as raised:
+            savediff.sections(path)
+        self.assertIn("written twice", str(raised.exception))
+        once = self.write("once", save(section("a", 1, b"3"), section("b", 1, b"2")))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(2, savediff.main([path, once]))
+
     def test_the_exit_status_follows_the_problems(self):
         first = self.write("a", save(section("a", 1, b"1")))
         second = self.write("b", save(section("a", 1, b"2")))

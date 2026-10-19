@@ -69,6 +69,10 @@ def sections(path):
                     payload = content
             if section is None or version is None or payload is None:
                 raise SaveFileError("a FOSV record has no name, no version or no data")
+            if any(section == earlier for earlier, _, _ in found):
+                # The engine reads every record, so the earlier one of two would still have an effect that a comparison
+                # of the last ones hides
+                raise SaveFileError(f"the section {section} is written twice")
             found.append((section, version, payload))
         return found, counts
     except (OSError, struct.error, SaveFileError) as error:
