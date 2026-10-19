@@ -2242,14 +2242,16 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
 
 
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
-               keys=None, new_game=False, load=None):
+               keys=None, new_game=False, load=None, before=()):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
     pressed after the log has a line that matches. `new_game` adds `--new-game`; a `start` of None leaves `--start` out;
-    `load` is a saved game to start from (`--load-savegame`)."""
+    `load` is a saved game to start from (`--load-savegame`); `before` are plugins that come before OFTest.esm in the
+    load order."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
-    command = [str(program), "--resources", str(resources), "--data", str(data), "--content", "OFTest.esm",
+    command = [str(program), "--resources", str(resources), "--data", str(data),
+               *(argument for name in before for argument in ("--content", name)), "--content", "OFTest.esm",
                "--content", scripts, "--skip-menu", *(["--new-game"] if new_game else []),
                *([] if start is None else ["--start", start]), *([] if load is None else ["--load-savegame", str(load)]),
                "--no-grab"]
@@ -2839,15 +2841,18 @@ def check_savesprobe(first, second):
     return problems
 
 
-def check_saves(first, second):
+def check_saves(first, second, third=None):
     """The problems with the saves. `first` is the log of the engine that saved, changed the state and loaded the save
-    again, `second` the log of the engine that was started on the save. The state that the script reads (the stages of
+    again, `second` the log of the engine that was started on the save, `third` (when there is one) the log of an engine
+    that was started on it with another plugin before OFTest.esm, so that every form ID of the save has another top byte now
+    and the save has to be read through the map of plugins. The state that the script reads (the stages of
     the quests, whether a stage is done, the objective of quest B, the global) before the save is what it reads after the
     load, in both; what was changed after the save (quest C moved to a stage, the global) is gone; and three seconds
     later it is the same still: the quests that ran before the save did not run again (the global did not get the seven
     that stage 10 of quest A adds)."""
     problems = []
-    for name, text in (("saving", first), ("fresh", second)):
+    loads = [("fresh", second)] + ([("shifted", third)] if third is not None else [])
+    for name, text in (("saving", first), *loads):
         for line in text.splitlines():
             if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|Error (on )?load|Failed to load|"
                          r"Can't load|damaged|newer than this engine", line, re.I):
@@ -2861,13 +2866,18 @@ def check_saves(first, second):
                 found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
         return found
 
-    first_states, second_states = states(first), states(second)
+    first_states = states(first)
+    started = [("the engine started on the save", second)]
+    if third is not None:
+        started.append(("the engine started on the save with another plugin before it", third))
+    started_states = [(name, states(text)) for name, text in started]
     for tag in ("before", "changed", "loaded", "later"):
         if tag not in first_states:
             problems.append(f"no 'saves {tag}' line in the log of the engine that saved")
-    for tag in ("loaded", "later"):
-        if tag not in second_states:
-            problems.append(f"no 'saves {tag}' line in the log of the engine that was started on the save")
+    for name, found in started_states:
+        for tag in ("loaded", "later"):
+            if tag not in found:
+                problems.append(f"no 'saves {tag}' line in the log of {name}")
     if "OFTEST\tsaves\tsaved\t" not in first:
         problems.append("the menu script did not save the game")
     if "OFTEST\tsaves\tloading\t" not in first:
@@ -2886,7 +2896,7 @@ def check_saves(first, second):
     if (changed["c_stage"], changed["c_done"]) != (str(plugin.QUEST_C_STAGE), "true") \
             or float(changed["counter"]) != SAVES_CHANGED_COUNTER:
         problems.append(f"the changes after the save did not take: {changed}")
-    for name, found in (("the engine that saved", first_states), ("the engine started on the save", second_states)):
+    for name, found in (("the engine that saved", first_states), *started_states):
         for tag in ("loaded", "later"):
             state = found[tag]
             if {key: state[key] for key in wanted} != wanted or float(state["counter"]) != SAVES_COUNTER:
@@ -2914,11 +2924,12 @@ def check_saves(first, second):
                 found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
         return found
 
-    first_cubes, second_cubes = cubes(first), cubes(second)
+    first_cubes = cubes(first)
+    started_cubes = [(name, cubes(text)) for name, text in started]
     for tag, expected in (("before", saved_cubes), ("changed", changed_cubes)):
         if first_cubes.get(tag) != expected:
             problems.append(f"the cubes ({tag}) should be {expected}: {first_cubes.get(tag)}")
-    for name, found in (("the engine that saved", first_cubes), ("the engine started on the save", second_cubes)):
+    for name, found in (("the engine that saved", first_cubes), *started_cubes):
         for tag in ("loaded", "later"):
             if found.get(tag) != saved_cubes:
                 problems.append(f"{name}: after the load ({tag}) the cubes should be the ones of the save "
@@ -2933,7 +2944,8 @@ def check_saves(first, second):
                 found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
         return found
 
-    first_characters, second_characters = characters(first), characters(second)
+    first_characters = characters(first)
+    started_characters = [(name, characters(text)) for name, text in started]
     saved_characters = first_characters.get("before")
     changed_characters = first_characters.get("changed")
     if saved_characters is None or changed_characters is None:
@@ -2950,16 +2962,16 @@ def check_saves(first, second):
         # The script of an object of the cell rewards KARMA_REWARD when the cell is loaded, which a load does again: the karma
         # of the save plus that (not the karma of the game before the load, which is more)
         wanted_after_load = dict(saved_characters, karma=str(int(saved_characters["karma"]) + plugin.KARMA_REWARD))
-        for name, found in (("the engine that saved", first_characters),
-                            ("the engine started on the save", second_characters)):
+        for name, found in (("the engine that saved", first_characters), *started_characters):
             for tag in ("loaded", "later"):
                 if found.get(tag) != wanted_after_load:
                     problems.append(f"{name}: after the load ({tag}) the characters should be the ones of the save "
                                     f"{wanted_after_load}: {found.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
-    if "Quitting peacefully" not in second:
-        problems.append("the log of the engine started on the save does not end with 'Quitting peacefully'")
+    for name, text in started:
+        if "Quitting peacefully" not in text:
+            problems.append(f"the log of {name} does not end with 'Quitting peacefully'")
     return problems
 
 
@@ -4121,7 +4133,7 @@ def main():
     if args.only in (None, "saves"):
         home = work / "saves" / "home"
         home.mkdir(parents=True)
-        for name in ("runtime", "runtime2"):
+        for name in ("runtime", "runtime2", "runtime3"):
             (work / "saves" / name).mkdir(mode=0o700)
         log = home / ".config" / "openfallout" / "openfallout.log"
         print("== saves: --start", plugin.CELL_NAME)
@@ -4132,7 +4144,7 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
-        second = ""
+        second = third = ""
         saved = sorted(home.rglob("*.omwsave"))
         if len(saved) != 1:
             found.append(f"expected one saved game, found {[str(path) for path in saved]}")
@@ -4144,8 +4156,16 @@ def main():
             second = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
             if status != 0:
                 found.append(f"the engine started on the save exited with status {status}")
-        found += check_saves(first, second)
-        for line in (line for text in (first, second) for line in text.splitlines() if "OFTEST" in line):
+            # Once more with a plugin before OFTest.esm: every form ID of the save has another top byte in this load order
+            print(f"== saves: --load-savegame {saved[0].name}, {plugin.EMPTY_ADDON} first")
+            log.rename(log.with_name("loading.log"))
+            status, _ = run_engine(program, build / "resources", data, home, work / "saves" / "runtime3", args.seconds,
+                                   None, [], "savestest.omwscripts", load=saved[0], before=[plugin.EMPTY_ADDON])
+            third = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+            if status != 0:
+                found.append(f"the engine started on the save with another plugin first exited with status {status}")
+        found += check_saves(first, second, third)
+        for line in (line for text in (first, second, third) for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (saves):", problem)

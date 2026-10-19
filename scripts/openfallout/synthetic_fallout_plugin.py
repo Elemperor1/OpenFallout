@@ -265,6 +265,7 @@ PERSON_SPEED = 120
 PERSON_KARMA = 25.0
 PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
 BEAST_LEVEL = 7  # the level of the beast, which the creature that has the list as its template takes the stats from
+EMPTY_ADDON = "OFTestEmpty.omwaddon"
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -2461,6 +2462,16 @@ def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):
     return "\n".join(lines)
 
 
+def empty_addon():
+    """A content file of Morrowind's kind with nothing in it, for a test to put before OFTest.esm in the load order: the form
+    IDs of the plugin that follows have another top byte then, and (as the file is no ESM4 plugin) the player is still the
+    PlayerRef of OFTest.esm."""
+    description = b"empty test add-on".ljust(256, b"\0")
+    header = struct.pack("<fI32s256sI", 1.3, 0, b"OpenFallout", description, 0)
+    body = b"HEDR" + struct.pack("<I", len(header)) + header
+    return b"TES3" + struct.pack("<III", len(body), 0, 0) + body
+
+
 def write(out, animation=True, spline=True):
     """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
     animation file. The animation moves the foot with the control points of a B-spline, as most bones of the files of
@@ -2514,6 +2525,7 @@ def write(out, animation=True, spline=True):
             target.write_bytes(idle_animation.idle_animation(
                 name=name, node=FOOT_BONE, offset=move, stop=LOCOMOTION_SECONDS, spline=spline, root_speed=velocity))
     (out / "OFTest.esm").write_bytes(plugin())
+    (out / EMPTY_ADDON).write_bytes(empty_addon())
     return out / "OFTest.esm"
 
 
