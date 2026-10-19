@@ -499,7 +499,14 @@ AUTOPLAY_SWITCH_PLACES = ((-200.0, 0.0, 0.0), (0.0, 0.0, 0.0), (200.0, 0.0, 0.0)
 AUTOPLAY_ROOM_AT = (0.0, 300.0, 0.0)  # where the player is put in the room
 AUTOPLAY_GLOBALS = {"target_hits": (0x962, "OFTestAutoplayTargetHits"), "switches": (0x963, "OFTestAutoplaySwitches")}
 AUTOPLAY_ROOM_CELL_NAME = "OFTestAutoplayRoom"
-LAST_ID = 0x963 # the largest form ID of the plugin, which the next object ID of its header follows
+# Five cubes in the first cell for the saves: the test moves one, disables one, scales one, and deletes two (one before the
+# game is saved, one after it), and makes a cube that is no reference of the plugin
+SAVED_REF_IDS = {"moved": 0x964, "hidden": 0x965, "grown": 0x966, "gone": 0x967, "doomed": 0x968}
+SAVED_PLACE = (-1200.0, -1700.0)  # the first cube; the others stand 300 apart along x
+SAVED_MOVED_TO = (-1200.0, -1000.0, 128.0)  # 128: half a cube above the floor
+SAVED_MADE_AT = (-300.0, -1000.0, 128.0)
+SAVED_SCALE = 2.0
+LAST_ID = 0x968 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1395,6 +1402,13 @@ def object_refs(kind, origin):
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
 
 
+def saved_refs():
+    """The cubes of the saves, around SAVED_PLACE."""
+    x, y = SAVED_PLACE
+    return [refr(form_id, CUBE_ID, (x + 300.0 * index, y, CUBE / 2))
+            for index, form_id in enumerate(SAVED_REF_IDS.values())]
+
+
 def trigger_script():
     """The script of the trigger (an SCPT record of type 0): OnTriggerEnter for the player counts the times the player
     comes in (and makes a person at the middle of the box, who comes in too, a pass later), OnTriggerEnter for anyone
@@ -2090,6 +2104,7 @@ def plugin():
         acre(HEIR_REF_IDS["interior"], HEIR_ID, (*HEIR_PLACE, 0.0)),
         *package_refs(0, (0.0, 0.0)),
         *object_refs("interior", (0.0, 0.0)),
+        *saved_refs(),
         trigger_reference(),
         furniture_reference(),
         *sitter_references(),

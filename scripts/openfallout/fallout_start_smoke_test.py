@@ -1209,12 +1209,34 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
 SAVES_FROM = 2.0
 SAVES_COUNTER = 123
 SAVES_CHANGED_COUNTER = 999
+SAVES_SETTLE = 0.5
 SAVES_WORLD_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
 local types = require('openfallout.types')
+local util = require('openfallout.util')
 
 local phase, elapsed, since, read = 0, 0, 0, false
+
+-- The cubes of the plugin for the saves, the record the cube that is made has, and where they are put
+local REFS = { moved = @MOVED@, hidden = @HIDDEN@, grown = @GROWN@, gone = @GONE@, doomed = @DOOMED@ }
+local ORDER = { 'moved', 'hidden', 'grown', 'gone', 'doomed' }
+local CUBE = core.getFormId('OFTest.esm', @CUBE@)
+local MOVED_TO = util.vector3(@MOVED_TO@)
+local MADE_AT = util.vector3(@MADE_AT@)
+
+local function find(id)
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+    if ok and object:isValid() and object.count > 0 then return object end
+end
+
+local function cubesAt(cell, place)
+    local found = {}
+    for _, other in ipairs(cell:getAll()) do
+        if other.recordId == CUBE and (other.position - place):length() < 5 then found[#found + 1] = other end
+    end
+    return found
+end
 
 local function describe(tag)
     local a = world.quests.find('@A@')
@@ -1225,6 +1247,23 @@ local function describe(tag)
         a.stage, tostring(a:stageDone(@A_STAGE@)), b.stage, tostring(b.completed),
         tostring(b:objectiveDisplayed(@OBJECTIVE@)), tostring(b:objectiveCompleted(@OBJECTIVE@)), c.stage,
         tostring(c:stageDone(@C_STAGE@)), tostring(world.globals.@COUNTER@)))
+    local fields = {}
+    for _, name in ipairs(ORDER) do
+        local object = find(REFS[name])
+        if object == nil then
+            fields[#fields + 1] = name .. '=gone'
+        else
+            local at = object.position
+            fields[#fields + 1] = string.format('%s=%.0f,%.0f,%.0f,%s,%.1f', name, at.x, at.y, at.z,
+                tostring(object.enabled), object.scale)
+        end
+    end
+    local made = 0
+    for _, other in ipairs(cubesAt(world.players[1].cell, MADE_AT)) do
+        if other.enabled then made = made + 1 end
+    end
+    fields[#fields + 1] = 'made=' .. made
+    print('OFTEST', 'saves refs', tag, table.concat(fields, ' '))
 end
 
 return {
@@ -1237,9 +1276,30 @@ return {
                 elapsed = elapsed + dt
                 if elapsed >= @FROM@ then
                     world.globals.@COUNTER@ = @VALUE@
+                    -- What happens to the cubes before the game is saved: one is moved, one is disabled, one is made
+                    -- bigger, one is deleted, and a cube that is no reference of the plugin is made
+                    local cell = world.players[1].cell
+                    find(REFS.moved):teleport(cell, MOVED_TO)
+                    find(REFS.hidden).enabled = false
+                    find(REFS.grown):setScale(@SCALE@)
+                    find(REFS.gone):remove()
+                    world.createObject(CUBE, 1):teleport(cell, MADE_AT)
+                    phase, since = 5, 0
+                end
+            elseif phase == 5 then
+                -- The frame after the calls is when the world does them
+                since = since + dt
+                if since >= @SETTLE@ then
                     describe('before')
                     phase = 1
                     types.Player.sendMenuEvent(world.players[1], 'OFTestSave', {})
+                end
+            elseif phase == 6 then
+                since = since + dt
+                if since >= @SETTLE@ then
+                    describe('changed')
+                    phase = 2
+                    types.Player.sendMenuEvent(world.players[1], 'OFTestLoad', {})
                 end
             elseif phase == 3 then
                 since = since + dt
@@ -1258,9 +1318,14 @@ return {
         OFTestSaved = function()
             world.quests.find('@C@'):setStage(@C_STAGE@)
             world.globals.@COUNTER@ = @CHANGED@
-            describe('changed')
-            phase = 2
-            types.Player.sendMenuEvent(world.players[1], 'OFTestLoad', {})
+            -- And after it: the cubes are put back, and one more is deleted, with the cube that was made
+            local cell = world.players[1].cell
+            find(REFS.moved):teleport(cell, util.vector3(@PLACE@))
+            find(REFS.hidden).enabled = true
+            find(REFS.grown):setScale(1)
+            find(REFS.doomed):remove()
+            for _, other in ipairs(cubesAt(cell, MADE_AT)) do other:remove() end
+            phase, since = 6, 0
         end,
     },
 }
@@ -1269,7 +1334,17 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@B@", plugin.QUEST_B_NAME).replace("@C@", plugin.QUEST_C_NAME)
                       .replace("@A_STAGE@", str(plugin.QUEST_A_STAGE)).replace("@C_STAGE@", str(plugin.QUEST_C_STAGE))
                       .replace("@OBJECTIVE@", str(plugin.QUEST_OBJECTIVE)).replace("@COUNTER@", plugin.COUNTER_NAME)
-                      .replace("@VALUE@", str(SAVES_COUNTER)).replace("@CHANGED@", str(SAVES_CHANGED_COUNTER)))
+                      .replace("@VALUE@", str(SAVES_COUNTER)).replace("@CHANGED@", str(SAVES_CHANGED_COUNTER))
+                      .replace("@SETTLE@", str(SAVES_SETTLE)).replace("@CUBE@", str(plugin.CUBE_ID))
+                      .replace("@SCALE@", str(plugin.SAVED_SCALE))
+                      .replace("@MOVED_TO@", ", ".join(map(str, plugin.SAVED_MOVED_TO)))
+                      .replace("@MADE_AT@", ", ".join(map(str, plugin.SAVED_MADE_AT)))
+                      .replace("@PLACE@", ", ".join(map(str, (*plugin.SAVED_PLACE, 128.0))))
+                      .replace("@MOVED@", str(plugin.SAVED_REF_IDS["moved"]))
+                      .replace("@HIDDEN@", str(plugin.SAVED_REF_IDS["hidden"]))
+                      .replace("@GROWN@", str(plugin.SAVED_REF_IDS["grown"]))
+                      .replace("@GONE@", str(plugin.SAVED_REF_IDS["gone"]))
+                      .replace("@DOOMED@", str(plugin.SAVED_REF_IDS["doomed"])))
 SAVES_MENU_SCRIPT = """\
 local menu = require('openfallout.menu')
 local core = require('openfallout.core')
@@ -2711,6 +2786,37 @@ def check_saves(first, second):
             if {key: state[key] for key in wanted} != wanted or float(state["counter"]) != SAVES_COUNTER:
                 problems.append(f"{name}: after the load ({tag}) the state should be the one of the save "
                                 f"({wanted}, counter {SAVES_COUNTER}): {state}")
+    # The cubes: what happened to them before the save is what they are after the load, and not what happened after
+    ids = plugin.SAVED_REF_IDS
+    origin = {name: (plugin.SAVED_PLACE[0] + 300.0 * index, plugin.SAVED_PLACE[1], 128.0)
+              for index, name in enumerate(ids)}
+
+    def cube(place, enabled="true", scale=1.0):
+        return f"{place[0]:.0f},{place[1]:.0f},{place[2]:.0f},{enabled},{scale:.1f}"
+
+    saved_cubes = {"moved": cube(plugin.SAVED_MOVED_TO), "hidden": cube(origin["hidden"], "false"),
+                   "grown": cube(origin["grown"], scale=plugin.SAVED_SCALE), "gone": "gone",
+                   "doomed": cube(origin["doomed"]), "made": "1"}
+    changed_cubes = {"moved": cube(origin["moved"]), "hidden": cube(origin["hidden"]),
+                     "grown": cube(origin["grown"]), "gone": "gone", "doomed": "gone", "made": "0"}
+
+    def cubes(text):
+        found = {}
+        for line in text.splitlines():
+            match = re.search(r"OFTEST\tsaves refs\t(before|changed|loaded|later)\t(.+)$", line)
+            if match:
+                found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
+        return found
+
+    first_cubes, second_cubes = cubes(first), cubes(second)
+    for tag, expected in (("before", saved_cubes), ("changed", changed_cubes)):
+        if first_cubes.get(tag) != expected:
+            problems.append(f"the cubes ({tag}) should be {expected}: {first_cubes.get(tag)}")
+    for name, found in (("the engine that saved", first_cubes), ("the engine started on the save", second_cubes)):
+        for tag in ("loaded", "later"):
+            if found.get(tag) != saved_cubes:
+                problems.append(f"{name}: after the load ({tag}) the cubes should be the ones of the save "
+                                f"{saved_cubes}: {found.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
     if "Quitting peacefully" not in second:
