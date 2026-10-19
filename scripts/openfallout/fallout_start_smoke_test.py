@@ -1216,7 +1216,10 @@ local core = require('openfallout.core')
 local types = require('openfallout.types')
 local util = require('openfallout.util')
 
-local phase, elapsed, since, read = 0, 0, 0, false
+-- What runs when: a list of functions and the second they are due. A game that is loaded starts over with the script, so
+-- what comes after a load is scheduled by onLoad and the rest by the first update of a game that was not loaded.
+local pending, clock, loaded, started = {}, 0, false, false
+local function after(seconds, fn) pending[#pending + 1] = { clock + seconds, fn } end
 
 -- The cubes of the plugin for the saves, the record the cube that is made has, and where they are put
 local REFS = { moved = @MOVED@, hidden = @HIDDEN@, grown = @GROWN@, gone = @GONE@, doomed = @DOOMED@ }
@@ -1264,68 +1267,80 @@ local function describe(tag)
     end
     fields[#fields + 1] = 'made=' .. made
     print('OFTEST', 'saves refs', tag, table.concat(fields, ' '))
+    local g = world.globals
+    print('OFTEST', 'saves characters', tag, string.format('items=%d dead=%d luck=%d karma=%d',
+        g.@G_ITEMS@, g.@G_DEAD@, g.@G_LUCK@, g.@G_KARMA@))
+end
+
+-- Sets the stage that writes what the game knows into the globals, and reads them a moment after
+local function report(tag, stage)
+    world.quests.find('@DQUEST@'):setStage(stage)
+    after(@SETTLE@, function() describe(tag) end)
+end
+
+local function askMenu(event)
+    types.Player.sendMenuEvent(world.players[1], event, {})
 end
 
 return {
     engineHandlers = {
-        onSave = function() return { phase = phase } end,
+        onSave = function() return { saved = true } end,
         -- A game that is loaded, in this engine or in another, goes straight to reading the state
-        onLoad = function() phase, since = 3, 0 end,
+        onLoad = function()
+            loaded = true
+            after(0.2, function() report('loaded', @S_LOADED@) end)
+            after(3, function() report('later', @S_LATER@) end)
+            after(3 + 2 * @SETTLE@, function() core.quit() end)
+        end,
         onUpdate = function(dt)
-            if phase == 0 then
-                elapsed = elapsed + dt
-                if elapsed >= @FROM@ then
-                    world.globals.@COUNTER@ = @VALUE@
-                    -- What happens to the cubes before the game is saved: one is moved, one is disabled, one is made
-                    -- bigger, one is deleted, and a cube that is no reference of the plugin is made
-                    local cell = world.players[1].cell
-                    find(REFS.moved):teleport(cell, MOVED_TO)
-                    find(REFS.hidden).enabled = false
-                    find(REFS.grown):setScale(@SCALE@)
-                    find(REFS.gone):remove()
-                    world.createObject(CUBE, 1):teleport(cell, MADE_AT)
-                    phase, since = 5, 0
-                end
-            elseif phase == 5 then
-                -- The frame after the calls is when the world does them
-                since = since + dt
-                if since >= @SETTLE@ then
-                    describe('before')
-                    phase = 1
-                    types.Player.sendMenuEvent(world.players[1], 'OFTestSave', {})
-                end
-            elseif phase == 6 then
-                since = since + dt
-                if since >= @SETTLE@ then
-                    describe('changed')
-                    phase = 2
-                    types.Player.sendMenuEvent(world.players[1], 'OFTestLoad', {})
-                end
-            elseif phase == 3 then
-                since = since + dt
-                if since >= 0.2 and not read then
-                    read = true
-                    describe('loaded')
-                elseif since >= 3 then
-                    describe('later')
-                    phase = 4
-                    core.quit()
+            clock = clock + dt
+            if not started then
+                started = true
+                if not loaded then
+                    after(@FROM@, function()
+                        world.globals.@COUNTER@ = @VALUE@
+                        -- What happens before the game is saved: one cube is moved, one is disabled, one is made bigger,
+                        -- one is deleted, a cube that is no reference of the plugin is made, and the quest of the
+                        -- characters gives the player rounds, luck and karma and kills the person
+                        local cell = world.players[1].cell
+                        find(REFS.moved):teleport(cell, MOVED_TO)
+                        find(REFS.hidden).enabled = false
+                        find(REFS.grown):setScale(@SCALE@)
+                        find(REFS.gone):remove()
+                        world.createObject(CUBE, 1):teleport(cell, MADE_AT)
+                        world.quests.find('@DQUEST@'):setStage(@S_GIVE@)
+                        -- The frame after the calls is when the world does them
+                        after(@SETTLE@, function()
+                            report('before', @S_BEFORE@)
+                            after(2 * @SETTLE@, function() askMenu('OFTestSave') end)
+                        end)
+                    end)
                 end
             end
+            local due = {}
+            for i = #pending, 1, -1 do
+                if pending[i][1] <= clock then due[#due + 1] = table.remove(pending, i) end
+            end
+            for i = #due, 1, -1 do due[i][2]() end
         end,
     },
     eventHandlers = {
         OFTestSaved = function()
             world.quests.find('@C@'):setStage(@C_STAGE@)
             world.globals.@COUNTER@ = @CHANGED@
-            -- And after it: the cubes are put back, and one more is deleted, with the cube that was made
+            -- And after it: the cubes are put back, and one more is deleted, with the cube that was made; the quest takes
+            -- back what it gave
             local cell = world.players[1].cell
             find(REFS.moved):teleport(cell, util.vector3(@PLACE@))
             find(REFS.hidden).enabled = true
             find(REFS.grown):setScale(1)
             find(REFS.doomed):remove()
             for _, other in ipairs(cubesAt(cell, MADE_AT)) do other:remove() end
-            phase, since = 6, 0
+            world.quests.find('@DQUEST@'):setStage(@S_CHANGE@)
+            after(@SETTLE@, function()
+                report('changed', @S_CHANGED@)
+                after(2 * @SETTLE@, function() askMenu('OFTestLoad') end)
+            end)
         end,
     },
 }
@@ -1344,7 +1359,18 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@HIDDEN@", str(plugin.SAVED_REF_IDS["hidden"]))
                       .replace("@GROWN@", str(plugin.SAVED_REF_IDS["grown"]))
                       .replace("@GONE@", str(plugin.SAVED_REF_IDS["gone"]))
-                      .replace("@DOOMED@", str(plugin.SAVED_REF_IDS["doomed"])))
+                      .replace("@DOOMED@", str(plugin.SAVED_REF_IDS["doomed"]))
+                      .replace("@DQUEST@", plugin.SAVED_QUEST_NAME)
+                      .replace("@S_GIVE@", str(plugin.SAVED_STAGES["give"]))
+                      .replace("@S_CHANGE@", str(plugin.SAVED_STAGES["change"]))
+                      .replace("@S_BEFORE@", str(plugin.SAVED_STAGES["before"]))
+                      .replace("@S_CHANGED@", str(plugin.SAVED_STAGES["changed"]))
+                      .replace("@S_LOADED@", str(plugin.SAVED_STAGES["loaded"]))
+                      .replace("@S_LATER@", str(plugin.SAVED_STAGES["later"]))
+                      .replace("@G_ITEMS@", plugin.SAVED_GLOBALS["items"][1])
+                      .replace("@G_DEAD@", plugin.SAVED_GLOBALS["dead"][1])
+                      .replace("@G_LUCK@", plugin.SAVED_GLOBALS["luck"][1])
+                      .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1]))
 SAVES_MENU_SCRIPT = """\
 local menu = require('openfallout.menu')
 local core = require('openfallout.core')
@@ -2817,6 +2843,39 @@ def check_saves(first, second):
             if found.get(tag) != saved_cubes:
                 problems.append(f"{name}: after the load ({tag}) the cubes should be the ones of the save "
                                 f"{saved_cubes}: {found.get(tag)}")
+    # The player and the person: what the quest gave before the save (rounds, luck, karma, a death) is there after the load,
+    # and not what it did after it
+    def characters(text):
+        found = {}
+        for line in text.splitlines():
+            match = re.search(r"OFTEST\tsaves characters\t(before|changed|loaded|later)\t(.+)$", line)
+            if match:
+                found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
+        return found
+
+    first_characters, second_characters = characters(first), characters(second)
+    saved_characters = first_characters.get("before")
+    changed_characters = first_characters.get("changed")
+    if saved_characters is None or changed_characters is None:
+        problems.append(f"no 'saves characters' lines before and after the save: {first_characters}")
+    else:
+        # The rounds and the death are told as they are; luck and karma start where the player's record puts them, so
+        # they are told by what the quest added
+        if (saved_characters["items"], saved_characters["dead"]) != (str(plugin.SAVED_ITEMS), "1") \
+                or (changed_characters["items"], changed_characters["dead"]) != ("0", "0"):
+            problems.append(f"the quest did not give and take back the rounds and the death: {first_characters}")
+        for key, taken in (("luck", plugin.SAVED_LUCK_AFTER), ("karma", plugin.SAVED_KARMA_AFTER)):
+            if int(changed_characters[key]) - int(saved_characters[key]) != taken:
+                problems.append(f"{key} should be {taken} higher after the save: {first_characters}")
+        # The script of an object of the cell rewards KARMA_REWARD when the cell is loaded, which a load does again: the karma
+        # of the save plus that (not the karma of the game before the load, which is more)
+        wanted_after_load = dict(saved_characters, karma=str(int(saved_characters["karma"]) + plugin.KARMA_REWARD))
+        for name, found in (("the engine that saved", first_characters),
+                            ("the engine started on the save", second_characters)):
+            for tag in ("loaded", "later"):
+                if found.get(tag) != wanted_after_load:
+                    problems.append(f"{name}: after the load ({tag}) the characters should be the ones of the save "
+                                    f"{wanted_after_load}: {found.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
     if "Quitting peacefully" not in second:

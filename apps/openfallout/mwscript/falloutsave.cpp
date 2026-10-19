@@ -1,11 +1,13 @@
 #include "falloutscripts.hpp"
 
 #include <algorithm>
+#include <functional>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm4/loadglob.hpp>
+#include <components/falloutscript/savecharacters.hpp>
 #include <components/falloutscript/savescripts.hpp>
 #include <components/falloutscript/savestate.hpp>
 
@@ -141,6 +143,78 @@ namespace FalloutScript
                 if (actor && !packages.empty())
                     host.mScriptPackages[*actor] = std::move(packages);
             }
+        }
+
+        /// What the host keeps beside the rules of the characters: where the scripts of items found them, whose perks
+        /// are brought up to date, how much damage the player did to each character it fought, and the levels the
+        /// player reached that were not shown yet
+        static void writeCharacters(OFScript::FalloutScripts& host, SaveWriter& out)
+        {
+            out.count(host.mItemHolders.size());
+            for (const auto& [item, holder] : host.mItemHolders)
+            {
+                out.form(item);
+                out.form(holder);
+            }
+            out.count(host.mPerkOwners.size());
+            for (const FormId owner : host.mPerkOwners)
+                out.form(owner);
+            {
+                const std::lock_guard lock(host.mPlayerDamageMutex);
+                out.count(host.mPlayerDamage.size());
+                for (const auto& [victim, damage] : host.mPlayerDamage)
+                {
+                    out.form(victim);
+                    out.f64(damage);
+                }
+            }
+            const std::lock_guard lock(host.mLevelUpMutex);
+            out.count(host.mLevelUps.size());
+            for (const FalloutScript::PlayerProgress::LevelUp& level : host.mLevelUps)
+            {
+                out.i32(level.mLevel);
+                out.i32(level.mSkillPoints);
+                out.boolean(level.mPerk);
+            }
+        }
+
+        static void readCharacters(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
+        {
+            const std::size_t holders = in.count(8);
+            for (std::size_t i = 0; i < holders; ++i)
+            {
+                const std::optional<FormId> item = in.form();
+                const std::optional<FormId> holder = in.form();
+                if (item && holder)
+                    host.mItemHolders[*item] = *holder;
+            }
+            const std::size_t owners = in.count(4);
+            for (std::size_t i = 0; i < owners; ++i)
+                if (const std::optional<FormId> owner = in.form())
+                    host.mPerkOwners.insert(*owner);
+            const std::size_t damaged = in.count(12);
+            {
+                const std::lock_guard lock(host.mPlayerDamageMutex);
+                for (std::size_t i = 0; i < damaged; ++i)
+                {
+                    const std::optional<FormId> victim = in.form();
+                    const double damage = in.f64();
+                    if (victim)
+                        host.mPlayerDamage[*victim] = damage;
+                }
+            }
+            const std::size_t levels = in.count(9);
+            const std::lock_guard lock(host.mLevelUpMutex);
+            for (std::size_t i = 0; i < levels; ++i)
+            {
+                FalloutScript::PlayerProgress::LevelUp level;
+                level.mLevel = in.i32();
+                level.mSkillPoints = in.i32();
+                level.mPerk = in.boolean();
+                host.mLevelUps.push_back(level);
+            }
+            // The screen of a level that was not shown is shown as soon as the game asks
+            host.mLevelUpOpen = !host.mLevelUps.empty();
         }
 
         using Place = OFScript::FalloutScripts::Place;
@@ -515,6 +589,61 @@ namespace OFScript
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                     Access::readPackages(*this, in, version);
                 } });
+        // The order is the order of reading: the values of the actors before the perks that added to them
+        const auto section = [&sections](const char* name, std::uint32_t version,
+                                 std::function<void(FalloutScript::SaveWriter&)> write,
+                                 std::function<void(FalloutScript::SaveReader&, std::uint32_t)> read) {
+            sections.push_back({ name, version, std::move(write), std::move(read) });
+        };
+        section("actors", FalloutScript::actorsSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActors(mActors, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readActors(mActors, in, version);
+            });
+        section("equipment", FalloutScript::equipmentSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeEquipment(mEquipment, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readEquipment(mEquipment, in, version);
+            });
+        section("actorvalues", FalloutScript::actorValuesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActorValues(mActorValues, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readActorValues(mActorValues, in, version);
+            });
+        section("progress", FalloutScript::progressSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeProgress(mProgress, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readProgress(mProgress, in, version);
+            });
+        section("perks", FalloutScript::perksSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writePerks(mPerks, mActorValues, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readPerks(mPerks, mActorValues, in, version);
+            });
+        section("itemuse", FalloutScript::itemUseSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeItemUse(mItemUse, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readItemUse(mItemUse, in, version);
+            });
+        section("combat", FalloutScript::combatSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeCombat(mCombat, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readCombat(mCombat, in, version);
+            });
+        section("referencestate", FalloutScript::referencesStateSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReferenceState(mReferenceState, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readReferenceState(mReferenceState, in, version);
+            });
+        section("formlists", FalloutScript::formListsSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeFormLists(mFormLists, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readFormLists(mFormLists, in, version);
+            });
+        section("characters", 1, [this](FalloutScript::SaveWriter& out) { Access::writeCharacters(*this, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                Access::readCharacters(*this, in, version);
+            });
         sections.push_back(
             { "references", 1, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {

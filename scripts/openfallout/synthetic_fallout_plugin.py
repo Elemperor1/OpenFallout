@@ -223,7 +223,7 @@ PROGRESS_GLOBALS = {"perk_before": (0x89F, "OFTestPerkBefore"), "perk_after": (0
                     "perk_teammates": (0x8A1, "OFTestPerkTeammates"), "perk_removed": (0x8A2, "OFTestPerkRemoved"),
                     "note_before": (0x8A3, "OFTestNoteBefore"), "note_after": (0x8A4, "OFTestNoteAfter"),
                     "is_id": (0x8A5, "OFTestIsId"), "is_not_id": (0x8A6, "OFTestIsNotId")}
-XP_REWARD = 150
+XP_REWARD = 60  # the script runs when the cell is loaded, as it is again after a load: three of them are no level
 KARMA_REWARD = -20
 # More of what scripts ask about: the locker cube is linked to the doomed one (XLKR), is in the same cell as it, and is in
 # the worldspace only when the cell is the exterior one. The beast has a script, which adds one to a global when it
@@ -506,7 +506,20 @@ SAVED_PLACE = (-1200.0, -1700.0)  # the first cube; the others stand 300 apart a
 SAVED_MOVED_TO = (-1200.0, -1000.0, 128.0)  # 128: half a cube above the floor
 SAVED_MADE_AT = (-300.0, -1000.0, 128.0)
 SAVED_SCALE = 2.0
-LAST_ID = 0x968 # the largest form ID of the plugin, which the next object ID of its header follows
+# The state of characters for the saves: a quest whose stage 10 gives the player SAVED_ITEMS rounds, adds SAVED_LUCK to its
+# luck, rewards SAVED_KARMA and kills the person of the first cell; stage 30 (set after the game is saved) takes the rounds
+# back, adds more luck and karma and brings the person back; the stages 20 to 23 each write what the game knows into globals
+SAVED_QUEST_ID = 0x969
+SAVED_QUEST_NAME = "OFTestSavedQuest"
+SAVED_GLOBALS = {name: (0x96A + index, "OFTestSaved" + name.title())
+                 for index, name in enumerate(("items", "dead", "luck", "karma"))}
+SAVED_STAGES = {"give": 10, "change": 30, "before": 20, "changed": 21, "loaded": 22, "later": 23}
+SAVED_ITEMS = 12
+SAVED_LUCK = 3
+SAVED_KARMA = 40
+SAVED_LUCK_AFTER = 10
+SAVED_KARMA_AFTER = 100
+LAST_ID = 0x96D # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2132,6 +2145,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"f")
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in SAVED_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in AUTOPLAY_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
@@ -2145,7 +2159,7 @@ def plugin():
                                                  object_script("exterior"), button_script(), chargen_script(),
                                                  new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
                                                  watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
-            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
+            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest(), saved_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
             + top_group(b"MISC", [arena_scrap()])
             + top_group(b"KEYM", [arena_key()])
@@ -2257,6 +2271,37 @@ def arena_scripts():
     raider.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_START_COMBAT, count(started)))
     return [record(b"SCPT", ARENA_DUMMY_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaDummyScript"), *sf.sub_records(dummy)]),
             record(b"SCPT", ARENA_RAIDER_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaRaiderScript"), *sf.sub_records(raider)])]
+
+
+def saved_quest():
+    """The quest of the saves: stages 10 and 30 change the state of the player and of the person of the first cell, and
+    each of the stages 20 to 23 writes what the game knows into the globals."""
+    sf = fallout_script
+    forms = [PLAYER_REFERENCE, NPC_REF_ID, ARENA_AMMO_ID, *(SAVED_GLOBALS[name][0] for name in SAVED_GLOBALS)]
+    player, person, ammo = 1, 2, 3
+    glob = {name: 4 + index for index, name in enumerate(SAVED_GLOBALS)}
+    give = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(SAVED_ITEMS)),
+            sf.call_on(player, sf.MOD_ACTOR_VALUE, sf.u16(AV_LUCK), sf.int_argument(SAVED_LUCK)),
+            sf.call(sf.REWARD_KARMA, sf.int_argument(SAVED_KARMA)),
+            sf.call_on(person, sf.KILL_ACTOR)]
+    change = [sf.call_on(player, sf.REMOVE_ITEM, sf.form_argument(ammo), sf.int_argument(SAVED_ITEMS)),
+              sf.call_on(player, sf.MOD_ACTOR_VALUE, sf.u16(AV_LUCK), sf.int_argument(SAVED_LUCK_AFTER)),
+              sf.call(sf.REWARD_KARMA, sf.int_argument(SAVED_KARMA_AFTER)),
+              sf.call_on(person, 0x108C)]  # ResurrectActor
+    probe = [
+        sf.set_to(sf.global_target(glob["items"]),
+                  sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=player)),
+        sf.set_to(sf.global_target(glob["dead"]), sf.call_token(sf.GET_DEAD, reference=person)),
+        sf.set_to(sf.global_target(glob["luck"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_LUCK), reference=player)),
+        sf.set_to(sf.global_target(glob["karma"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_KARMA), reference=player))]
+    entries = [(SAVED_STAGES["give"], "The state is given.", 0, [], give, forms),
+               (SAVED_STAGES["change"], "The state is changed.", 0, [], change, forms)]
+    entries += [(SAVED_STAGES[name], "The game is read.", 0, [], probe, forms)
+                for name in ("before", "changed", "loaded", "later")]
+    entries.sort(key=lambda entry: entry[0])
+    return quest(SAVED_QUEST_ID, SAVED_QUEST_NAME, "OpenFallout Test Saved Quest", 0, entries)
 
 
 def arena_quest():
