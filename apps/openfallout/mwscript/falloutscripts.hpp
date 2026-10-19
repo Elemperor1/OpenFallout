@@ -1005,8 +1005,9 @@ namespace OFScript
         /// A reference of a cell that was just loaded: what a loaded game said about it waits for the next frame.
         /// \return true for one that the game had deleted
         bool savedReferenceLoaded(FalloutScript::FormId reference);
-        /// The volume of a trigger was just put in: the actors a loaded game said were inside are so
-        void restoreSavedOccupants(FalloutScript::FormId trigger);
+        /// The volume of a trigger was just put in: the actors a loaded game said were inside are so, and the events
+        /// it had not raised yet wait again
+        void restoreSavedTrigger(FalloutScript::FormId trigger);
         static void queueMove(
             std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move);
         /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell

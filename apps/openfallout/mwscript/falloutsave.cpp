@@ -596,13 +596,13 @@ namespace OFScript
         return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
     }
 
-    void FalloutScripts::restoreSavedOccupants(FalloutScript::FormId trigger)
+    void FalloutScripts::restoreSavedTrigger(FalloutScript::FormId trigger)
     {
-        const auto found = mPendingSave->mOccupants.find(trigger);
-        if (found == mPendingSave->mOccupants.end())
+        const auto found = mPendingSave->mTriggers.find(trigger);
+        if (found == mPendingSave->mTriggers.end())
             return;
-        FalloutScript::restoreOccupants(mTriggers, trigger, found->second);
-        mPendingSave->mOccupants.erase(found);
+        FalloutScript::restoreTrigger(mTriggers, trigger, found->second);
+        mPendingSave->mTriggers.erase(found);
     }
 
     bool FalloutScripts::savedReferenceLoaded(FalloutScript::FormId reference)
@@ -728,10 +728,10 @@ namespace OFScript
         section(
             "triggers", FalloutScript::triggersSectionVersion,
             [this](FalloutScript::SaveWriter& out) {
-                FalloutScript::writeTriggers(mTriggers, mPendingSave->mOccupants, out);
+                FalloutScript::writeTriggers(mTriggers, mPendingSave->mTriggers, out);
             },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
-                mPendingSave->mOccupants = FalloutScript::readTriggers(in, version);
+                mPendingSave->mTriggers = FalloutScript::readTriggers(in, version);
             });
         section(
             "openstates", FalloutScript::openStatesSectionVersion,

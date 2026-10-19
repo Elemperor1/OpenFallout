@@ -82,46 +82,71 @@ namespace FalloutScript
     struct SaveAccess<TriggerVolumes>
     {
         static void write(
-            const TriggerVolumes& triggers, const std::map<FormId, std::set<FormId>>& waiting, SaveWriter& out)
+            const TriggerVolumes& triggers, const std::map<FormId, SavedTrigger>& waiting, SaveWriter& out)
         {
             // What a trigger holds now, and what a loaded game said of the triggers whose volumes are not in yet
-            std::map<FormId, std::set<FormId>> all = waiting;
+            std::map<FormId, SavedTrigger> all = waiting;
             for (const auto& [trigger, state] : triggers.mTriggers)
-                if (!state.mOccupants.empty())
-                    all[trigger] = state.mOccupants;
+            {
+                if (state.mOccupants.empty() && state.mQueue.empty())
+                    continue;
+                SavedTrigger saved;
+                saved.mOccupants = state.mOccupants;
+                for (const TriggerVolumes::Event& event : state.mQueue)
+                    saved.mQueue.emplace_back(event.mBlockType, event.mActor);
+                all[trigger] = std::move(saved);
+            }
             out.count(all.size());
-            for (const auto& [trigger, occupants] : all)
+            for (const auto& [trigger, saved] : all)
             {
                 out.form(trigger);
-                out.count(occupants.size());
-                for (const FormId actor : occupants)
+                out.count(saved.mOccupants.size());
+                for (const FormId actor : saved.mOccupants)
                     out.form(actor);
+                out.count(saved.mQueue.size());
+                for (const auto& [blockType, actor] : saved.mQueue)
+                {
+                    out.u16(blockType);
+                    out.form(actor);
+                }
             }
         }
 
-        static std::map<FormId, std::set<FormId>> read(SaveReader& in)
+        static std::map<FormId, SavedTrigger> read(SaveReader& in)
         {
-            std::map<FormId, std::set<FormId>> result;
-            const std::size_t count = in.count(8);
+            std::map<FormId, SavedTrigger> result;
+            const std::size_t count = in.count(12);
             for (std::size_t i = 0; i < count; ++i)
             {
                 const std::optional<FormId> trigger = in.form();
-                std::set<FormId> occupants;
+                SavedTrigger saved;
                 const std::size_t size = in.count(4);
                 for (std::size_t j = 0; j < size; ++j)
                     if (const std::optional<FormId> actor = in.form())
-                        occupants.insert(*actor);
-                if (trigger && !occupants.empty())
-                    result[*trigger] = std::move(occupants);
+                        saved.mOccupants.insert(*actor);
+                const std::size_t queued = in.count(6);
+                for (std::size_t j = 0; j < queued; ++j)
+                {
+                    const std::uint16_t blockType = in.u16();
+                    const std::optional<FormId> actor = in.form();
+                    if (actor && (blockType == BlockType::OnTriggerEnter || blockType == BlockType::OnTriggerLeave))
+                        saved.mQueue.emplace_back(blockType, *actor);
+                }
+                if (trigger && (!saved.mOccupants.empty() || !saved.mQueue.empty()))
+                    result[*trigger] = std::move(saved);
             }
             return result;
         }
 
-        static void restore(TriggerVolumes& triggers, FormId trigger, const std::set<FormId>& occupants)
+        static void restore(TriggerVolumes& triggers, FormId trigger, const SavedTrigger& saved)
         {
             const auto found = triggers.mTriggers.find(trigger);
-            if (found != triggers.mTriggers.end())
-                found->second.mOccupants = occupants;
+            if (found == triggers.mTriggers.end())
+                return;
+            found->second.mOccupants = saved.mOccupants;
+            found->second.mQueue.clear();
+            for (const auto& [blockType, actor] : saved.mQueue)
+                found->second.mQueue.push_back(TriggerVolumes::Event{ blockType, actor });
         }
     };
 
@@ -169,19 +194,19 @@ namespace FalloutScript
         SaveAccess<DialogueManager>::read(dialogue, in, version);
     }
 
-    void writeTriggers(TriggerVolumes& triggers, const std::map<FormId, std::set<FormId>>& waiting, SaveWriter& out)
+    void writeTriggers(TriggerVolumes& triggers, const std::map<FormId, SavedTrigger>& waiting, SaveWriter& out)
     {
         SaveAccess<TriggerVolumes>::write(triggers, waiting, out);
     }
 
-    std::map<FormId, std::set<FormId>> readTriggers(SaveReader& in, std::uint32_t)
+    std::map<FormId, SavedTrigger> readTriggers(SaveReader& in, std::uint32_t)
     {
         return SaveAccess<TriggerVolumes>::read(in);
     }
 
-    void restoreOccupants(TriggerVolumes& triggers, FormId trigger, const std::set<FormId>& occupants)
+    void restoreTrigger(TriggerVolumes& triggers, FormId trigger, const SavedTrigger& saved)
     {
-        SaveAccess<TriggerVolumes>::restore(triggers, trigger, occupants);
+        SaveAccess<TriggerVolumes>::restore(triggers, trigger, saved);
     }
 
     void writeOpenStates(OpenStates& states, SaveWriter& out)

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <components/esm/refid.hpp>
+#include <components/falloutscript/saveworld.hpp>
 #include <components/falloutscript/script.hpp>
 
 #include <osg/Vec3f>
@@ -42,8 +43,9 @@ namespace OFScript
         };
         std::vector<Object> mObjects;
 
-        /// Who stood in the volume of each trigger, until the cell of the trigger is loaded and its volume is put in
-        std::map<FalloutScript::FormId, std::set<FalloutScript::FormId>> mOccupants;
+        /// Who stood in the volume of each trigger and what it had still to raise, until the cell of the trigger is
+        /// loaded and its volume is put in
+        std::map<FalloutScript::FormId, FalloutScript::SavedTrigger> mTriggers;
 
         /// The references of loaded cells that the next frame deletes or scales
         std::vector<FalloutScript::FormId> mToDelete;

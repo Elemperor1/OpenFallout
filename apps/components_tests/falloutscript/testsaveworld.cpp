@@ -255,41 +255,90 @@ namespace
         triggers.set(volumeless, box(2000, 0, 50, 100));
         const auto active = [](FormId) { return true; };
         const TriggerVolumes::Raise raise = [](FormId, std::uint16_t, FormId) {};
-        // Two actors enter the first volume, one the second, and the third volume has nobody
+        // Two actors enter the first volume, one the second, and the third volume has nobody. The first volume raises
+        // one Enter on a pass, so the guard waits for the next one
         triggers.update({ standingAt(player, 0, 0, 0), standingAt(guard, 10, 0, 0), standingAt(raider, 1000, 0, 0) },
             active, raise);
         ASSERT_THAT(triggers.occupants(trigger), ElementsAre(player, guard));
         ASSERT_THAT(triggers.occupants(otherTrigger), ElementsAre(raider));
 
         // A loaded game that has not put the volume of a trigger in yet writes what it was told of it
-        const std::map<FormId, std::set<FormId>> waiting{ { 0x00ff0400, { player } } };
+        const std::map<FormId, FalloutScript::SavedTrigger> waiting{ { 0x00ff0400, { { player }, {} } } };
         SaveWriter out;
         FalloutScript::writeTriggers(triggers, waiting, out);
         SaveReader in(out.bytes());
-        const std::map<FormId, std::set<FormId>> read = FalloutScript::readTriggers(in, 1);
+        const std::map<FormId, FalloutScript::SavedTrigger> read = FalloutScript::readTriggers(in, 1);
         EXPECT_TRUE(in.atEnd());
-        EXPECT_THAT(read,
-            UnorderedElementsAre(Pair(trigger, ElementsAre(player, guard)), Pair(otherTrigger, ElementsAre(raider)),
-                Pair(0x00ff0400u, ElementsAre(player))));
+        ASSERT_THAT(read, ElementsAre(Key(trigger), Key(otherTrigger), Key(0x00ff0400u)));
+        EXPECT_THAT(read.at(trigger).mOccupants, ElementsAre(player, guard));
+        EXPECT_THAT(read.at(otherTrigger).mOccupants, ElementsAre(raider));
+        EXPECT_THAT(read.at(0x00ff0400u).mOccupants, ElementsAre(player));
+        EXPECT_THAT(read.at(0x00ff0400u).mQueue, IsEmpty());
 
         // The volumes come from the cells: after a load the player and the guard are still inside, so nobody enters
+        // again, and the Enter of the guard that had not been raised is raised after the OnTrigger blocks of the pass
         TriggerVolumes loaded;
         loaded.set(trigger, box(0, 0, 50, 100));
-        FalloutScript::restoreOccupants(loaded, trigger, read.at(trigger));
+        FalloutScript::restoreTrigger(loaded, trigger, read.at(trigger));
         EXPECT_THAT(loaded.occupants(trigger), ElementsAre(player, guard));
         std::vector<Raised> events;
         loaded.update({ standingAt(player, 0, 0, 0), standingAt(guard, 10, 0, 0) }, active,
             [&](FormId which, std::uint16_t block, FormId actor) { events.push_back({ which, block, actor }); });
         EXPECT_THAT(events,
             ElementsAre(Raised{ trigger, FalloutScript::BlockType::OnTrigger, player },
-                Raised{ trigger, FalloutScript::BlockType::OnTrigger, guard }));
+                Raised{ trigger, FalloutScript::BlockType::OnTrigger, guard },
+                Raised{ trigger, FalloutScript::BlockType::OnTriggerEnter, guard }));
+    }
+
+    TEST(FalloutScriptSaveWorldTest, theEventsATriggerHasNotRaisedYetComeBack)
+    {
+        const auto active = [](FormId) { return true; };
+        std::vector<Raised> events;
+        const TriggerVolumes::Raise record
+            = [&](FormId which, std::uint16_t block, FormId actor) { events.push_back({ which, block, actor }); };
+        TriggerVolumes triggers;
+        triggers.set(trigger, box(0, 0, 50, 100));
+        // Three actors enter on one pass: the player's Enter is raised and the other two wait
+        triggers.update(
+            { standingAt(player, 0, 0, 0), standingAt(guard, 10, 0, 0), standingAt(raider, 20, 0, 0) }, active, record);
+        ASSERT_THAT(events, ElementsAre(Raised{ trigger, FalloutScript::BlockType::OnTriggerEnter, player }));
+        // Then all of them leave at once: the guard's Enter is raised, and the raider's Enter and the three Leaves wait
+        events.clear();
+        triggers.update({}, active, record);
+        ASSERT_THAT(events, ElementsAre(Raised{ trigger, FalloutScript::BlockType::OnTriggerEnter, guard }));
+        ASSERT_THAT(triggers.occupants(trigger), IsEmpty());
+
+        SaveWriter out;
+        FalloutScript::writeTriggers(triggers, {}, out);
+        SaveReader in(out.bytes());
+        const std::map<FormId, FalloutScript::SavedTrigger> read = FalloutScript::readTriggers(in, 1);
+        EXPECT_TRUE(in.atEnd());
+        ASSERT_THAT(read, ElementsAre(Key(trigger)));
+        EXPECT_THAT(read.at(trigger).mOccupants, IsEmpty());
+        EXPECT_THAT(read.at(trigger).mQueue.size(), 4u);
+
+        // The loaded game raises them one on each pass, in the order the saved one would have
+        TriggerVolumes loaded;
+        loaded.set(trigger, box(0, 0, 50, 100));
+        FalloutScript::restoreTrigger(loaded, trigger, read.at(trigger));
+        std::vector<Raised> after;
+        const TriggerVolumes::Raise again
+            = [&](FormId which, std::uint16_t block, FormId actor) { after.push_back({ which, block, actor }); };
+        events.clear();
+        for (int pass = 0; pass < 5; ++pass)
+        {
+            triggers.update({}, active, record);
+            loaded.update({}, active, again);
+        }
+        EXPECT_THAT(after, ElementsAreArray(events));
+        EXPECT_EQ(after.size(), 4u);
     }
 
     TEST(FalloutScriptSaveWorldTest, anActorThatLeftWhileSavedIsNotKeptInsideAfterTheLoad)
     {
         TriggerVolumes loaded;
         loaded.set(trigger, box(0, 0, 50, 100));
-        FalloutScript::restoreOccupants(loaded, trigger, { player, guard });
+        FalloutScript::restoreTrigger(loaded, trigger, { { player, guard }, {} });
         // The player is still there and the guard is not: the guard leaves and the player does not enter
         std::vector<Raised> events;
         loaded.update(
@@ -304,7 +353,7 @@ namespace
     TEST(FalloutScriptSaveWorldTest, theOccupantsOfATriggerWhoseVolumeIsNotLoadedAreNotInvented)
     {
         TriggerVolumes loaded;
-        FalloutScript::restoreOccupants(loaded, trigger, { player });
+        FalloutScript::restoreTrigger(loaded, trigger, { { player }, {} });
         EXPECT_FALSE(loaded.has(trigger));
         EXPECT_THAT(loaded.occupants(trigger), IsEmpty());
     }

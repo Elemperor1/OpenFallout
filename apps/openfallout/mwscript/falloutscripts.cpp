@@ -670,7 +670,7 @@ namespace OFScript
             const bool known = mTriggers.has(reference);
             mTriggers.set(reference, volume);
             if (!known)
-                restoreSavedOccupants(reference);
+                restoreSavedTrigger(reference);
         }
         for (const FalloutScript::FormId reference : gone)
         {
