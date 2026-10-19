@@ -46,6 +46,10 @@ namespace FalloutScript
                 out.f64(value);
             }
             out.i64(host.mCalendarShift);
+            // The numbers of the objects that were made are not given again: a number that a save names (the variables
+            // of a script) is never one of another object
+            const std::lock_guard made(host.mMadeMutex);
+            out.u32(host.mMadeCount);
         }
 
         static void readGlobals(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
@@ -59,8 +63,13 @@ namespace FalloutScript
                     && host.mStore.get<ESM4::GlobalVariable>().search(OFScript::FalloutScripts::refIdOf(*global)))
                     host.mGlobals[*global] = value;
             }
-            const std::lock_guard lock(host.mCalendarMutex);
-            host.mCalendarShift = in.i64();
+            {
+                const std::lock_guard lock(host.mCalendarMutex);
+                host.mCalendarShift = in.i64();
+            }
+            const FormId madeCount = in.u32();
+            const std::lock_guard made(host.mMadeMutex);
+            host.mMadeCount = std::max(host.mMadeCount, madeCount);
         }
 
         static void writeControls(OFScript::FalloutScripts& host, SaveWriter& out)

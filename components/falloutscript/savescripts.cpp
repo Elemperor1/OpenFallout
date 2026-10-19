@@ -49,7 +49,8 @@ namespace FalloutScript
         SavedVariables readVariables(SaveReader& in)
         {
             SavedVariables result;
-            const std::size_t count = in.count(2);
+            // A kind and the four bytes of a form at least
+            const std::size_t count = in.count(5);
             result.mKinds.reserve(count);
             result.mValues.reserve(count);
             for (std::size_t i = 0; i < count; ++i)
