@@ -145,6 +145,9 @@ namespace ESM
         // format 21 - Random state in saved games.
         REC_RAND = esm3Recname("RAND"), // Random state.
 
+        // OpenFallout - the state of Fallout in saved games, a section of it in each record
+        REC_FOSV = esm3Recname("FOSV"),
+
         REC_ATTR = esm3Recname("ATTR"), // Attribute
         REC_WTYP = esm3Recname("WTYP"), // Weapon type
 

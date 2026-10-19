@@ -11,6 +11,7 @@
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm3/loadcell.hpp>
 #include <components/esm3/loadclas.hpp>
+#include <components/falloutscript/savestate.hpp>
 
 #include <components/l10n/manager.hpp>
 
@@ -299,6 +300,7 @@ void OFState::StateManager::saveGame(std::string_view description, const Slot* s
             + OFBase::Environment::get().getJournal()->countSavedGameRecords()
             + OFBase::Environment::get().getLuaManager()->countSavedGameRecords()
             + OFBase::Environment::get().getWorld()->countSavedGameRecords()
+            + OFBase::Environment::get().getFalloutScripts()->countSavedGameRecords()
             + OFBase::Environment::get().getScriptManager()->getGlobalScripts().countSavedGameRecords()
             + OFBase::Environment::get().getDialogueManager()->countSavedGameRecords()
             + OFBase::Environment::get().getMechanicsManager()->countSavedGameRecords()
@@ -325,6 +327,7 @@ void OFState::StateManager::saveGame(std::string_view description, const Slot* s
         // local scripts that depend on LuaManager.
         OFBase::Environment::get().getLuaManager()->write(writer, listener);
         OFBase::Environment::get().getWorld()->write(writer, listener);
+        OFBase::Environment::get().getFalloutScripts()->write(writer, listener);
         OFBase::Environment::get().getScriptManager()->getGlobalScripts().write(writer, listener);
         OFBase::Environment::get().getMechanicsManager()->write(writer, listener);
         OFBase::Environment::get().getInputManager()->write(writer, listener);
@@ -462,7 +465,8 @@ void OFState::StateManager::loadGame(const Character* character, const std::file
     try
     {
         cleanup();
-        // The state of the scripts of Fallout is not in the saves yet: the game starts from the quests as they begin
+        // What the save holds of Fallout is read over this; a save without it (made by a game of Morrowind) leaves the
+        // quests as they begin
         OFBase::Environment::get().getFalloutScripts()->reset();
 
         Log(Debug::Info) << "Reading save file " << filepath.filename();
@@ -573,6 +577,11 @@ void OFState::StateManager::loadGame(const Character* character, const std::file
                     OFBase::Environment::get().getScriptManager()->getGlobalScripts().readRecord(reader, n.toInt());
                     break;
 
+                case ESM::REC_FOSV:
+
+                    OFBase::Environment::get().getFalloutScripts()->readRecord(reader, n.toInt());
+                    break;
+
                 case ESM::REC_GMAP:
                 case ESM::REC_KEYS:
                 case ESM::REC_ASPL:
@@ -673,6 +682,11 @@ void OFState::StateManager::loadGame(const Character* character, const std::file
         }
     }
     catch (const SaveVersionTooNewError& e)
+    {
+        std::string error = "#{OFEngine:LoadingRequiresNewVersionError}";
+        printSavegameFormatError(e.what(), error);
+    }
+    catch (const FalloutScript::SaveTooNewError& e)
     {
         std::string error = "#{OFEngine:LoadingRequiresNewVersionError}";
         printSavegameFormatError(e.what(), error);

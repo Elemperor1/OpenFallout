@@ -14,6 +14,7 @@
 #include <components/esm4/loadscpt.hpp>
 
 #include "interpreter.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -71,6 +72,9 @@ namespace FalloutScript
     /// stage at once, nested inside the script that set it.
     class QuestManager
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// Tells whether the conditions of a log entry are met. Without one, every condition is met.
         using ConditionCheck = std::function<bool(const std::vector<ESM4::TargetCondition>&)>;

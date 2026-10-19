@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -86,6 +87,9 @@ namespace FalloutScript
     /// the games ask for most (nothing crippled, nothing hurt). It can be used from any thread.
     class ActorValues
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         explicit ActorValues(ActorValueRecords* records = nullptr)
             : mRecords(records)

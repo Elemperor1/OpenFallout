@@ -7,6 +7,7 @@
 #include <set>
 
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -29,6 +30,9 @@ namespace FalloutScript
     /// activation of doors for yet.
     class ReferenceState
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         explicit ReferenceState(ReferenceRecords& records);
 

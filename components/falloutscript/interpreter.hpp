@@ -13,6 +13,7 @@
 
 #include "commandtable.hpp"
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -24,6 +25,9 @@ namespace FalloutScript
     /// for the script of a quest). Several instances share the Script they were made from.
     class Instance
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// A script of a quest is run on no object: a command in it that names none has no object to act on.
         Instance(std::shared_ptr<const Script> script, FormId owner, bool forQuest = false);

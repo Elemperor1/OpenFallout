@@ -50,6 +50,7 @@
 #include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
+#include <components/falloutscript/saveaccess.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 #include <components/falloutscript/vats.hpp>
@@ -59,10 +60,26 @@
 
 #include "../mwworld/ptr.hpp"
 
+namespace ESM
+{
+    class ESMReader;
+    class ESMWriter;
+}
+
 namespace ESM4
 {
     struct AIPackage;
     struct Weapon;
+}
+
+namespace FalloutScript
+{
+    struct SaveSection;
+}
+
+namespace Loading
+{
+    class Listener;
 }
 
 namespace OFRender
@@ -112,6 +129,9 @@ namespace OFScript
                                  private FalloutScript::RecipeRecords,
                                  private FalloutScript::LimbRecords
     {
+        template <class T>
+        friend struct FalloutScript::SaveAccess;
+
     public:
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
             FalloutScript::FormId player = FalloutScript::playerReference);
@@ -126,6 +146,17 @@ namespace OFScript
 
         /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
         void setContentFiles(std::vector<std::string> files);
+
+        /// A saved game holds what the games keep (the stages of the quests, the variables of scripts, what characters
+        /// carry, who is dead ...) as sections, one record each (REC_FOSV), after those of the world. A save that has
+        /// none (made before the state of Fallout was saved) leaves the game as reset() made it.
+        std::size_t countSavedGameRecords();
+        void write(ESM::ESMWriter& writer, Loading::Listener& progress);
+        /// Reads the section of the record that the reader is at. A save that was made by a newer version, or that is
+        /// damaged, throws.
+        void readRecord(ESM::ESMReader& reader, std::uint32_t type);
+        /// What a saved game is made of: the sections, in the order they are written
+        std::vector<FalloutScript::SaveSection> saveSections();
 
         /// The quest of character creation, which the games start when the player picks New in the main menu: the
         /// executables name it in their ini file (CG00 in Fallout 3, VCG00 in New Vegas), and here it is found by its
@@ -864,6 +895,8 @@ namespace OFScript
         /// The id the world knows the reference by: the same number for those of the content files, and the one that
         /// the world gave an object that PlaceAtMe made
         ESM::FormId worldIdOf(FalloutScript::FormId reference) const;
+        /// The record id of a form number, empty for 0
+        static ESM::RefId refIdOf(FalloutScript::FormId id);
         /// The script an object runs: that of its record, or of the template that its record takes its script from
         FalloutScript::FormId scriptOf(const OFWorld::Ptr& ptr, FalloutScript::FormId reference);
 

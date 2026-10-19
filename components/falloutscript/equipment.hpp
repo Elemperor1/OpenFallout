@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -76,6 +77,9 @@ namespace FalloutScript
     /// any thread.
     class Equipment
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         Equipment(ItemRecords& records, ActorState& state);
 

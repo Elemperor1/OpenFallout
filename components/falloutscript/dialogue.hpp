@@ -16,6 +16,7 @@
 #include "conditions.hpp"
 #include "interpreter.hpp"
 #include "quests.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -95,6 +96,9 @@ namespace FalloutScript
     /// a response that is not run immediately are followed too when they name the topic of the scene or the goodbye).
     class DialogueManager
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// The editor id of the topic that starts every conversation
         static constexpr const char* greetingTopic = "Greeting";

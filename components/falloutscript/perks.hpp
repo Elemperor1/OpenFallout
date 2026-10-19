@@ -13,6 +13,7 @@
 
 #include "conditions.hpp"
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -127,6 +128,9 @@ namespace FalloutScript
     /// the character first has the rank (refresh). It can be used from any thread.
     class PerkEngine
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         PerkEngine(PerkRecords& records, PlayerProgress& progress, ActorValues& values);
 

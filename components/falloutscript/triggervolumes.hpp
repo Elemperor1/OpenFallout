@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "script.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -59,6 +60,9 @@ namespace FalloutScript
     /// delay before an actor that left can set a trigger off again.
     class TriggerVolumes
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// Runs a block of the script of the trigger: its reference, the type of the block and the actor
         using Raise = std::function<void(FormId trigger, std::uint16_t blockType, FormId actor)>;

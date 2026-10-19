@@ -12,6 +12,7 @@
 #include <components/esm4/loadscpt.hpp>
 
 #include "interpreter.hpp"
+#include "saveaccess.hpp"
 
 namespace FalloutScript
 {
@@ -23,6 +24,9 @@ namespace FalloutScript
     /// becomes loaded. The other events are triggered from outside (OnActivate, OnAdd ...).
     class ObjectScripts
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// Finds the record of a script by its form id, null for one that is not known
         using ScriptFinder = std::function<const ESM4::Script*(FormId)>;
@@ -81,6 +85,8 @@ namespace FalloutScript
         struct Object
         {
             std::shared_ptr<Instance> mInstance;
+            /// The script the instance was made from
+            FormId mScript = 0;
             bool mLoaded = false;
             bool mHasGameMode = false;
             bool mHasMenuMode = false;
@@ -108,9 +114,20 @@ namespace FalloutScript
         std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
         void run(const std::set<FormId>& references, std::uint16_t blockType, const BlockFilter& filter = {});
 
+        /// The variables that a saved game held for the script of a reference whose script has not been given to it yet
+        /// (its cell is not loaded): the script takes them when it is given
+        struct SavedInstance
+        {
+            FormId mScript = 0;
+            /// The kind and the value of each variable, from the first
+            std::vector<VariableKind> mKinds;
+            std::vector<double> mVariables;
+        };
+
         Interpreter& mInterpreter;
         ScriptFinder mFinder;
         std::map<FormId, Object> mObjects;
+        std::map<FormId, SavedInstance> mSaved;
         /// The references that run GameMode: the loaded ones whose script has such a block
         std::set<FormId> mUpdating;
         /// The references that run MenuMode while a menu is open: the loaded ones whose script has such a block

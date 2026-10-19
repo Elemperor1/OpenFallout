@@ -57,6 +57,23 @@ namespace FalloutScript
         object.mHasGameMode = hasBlockOfType(*prepared, BlockType::GameMode);
         object.mHasMenuMode = hasBlockOfType(*prepared, BlockType::MenuMode);
         object.mInstance = std::make_shared<Instance>(std::move(prepared), reference);
+        object.mScript = script;
+        if (const auto saved = mSaved.find(reference); saved != mSaved.end())
+        {
+            // A script that was changed since the save (other variables) starts over, as the games do
+            const std::vector<Variable>& variables = object.mInstance->script().variables();
+            const SavedInstance& state = saved->second;
+            if (state.mScript == script && state.mVariables.size() + 1 == variables.size())
+            {
+                bool same = true;
+                for (std::size_t i = 0; i < state.mKinds.size(); ++i)
+                    same = same && variables[i + 1].mKind == state.mKinds[i];
+                if (same)
+                    for (std::size_t i = 0; i < state.mVariables.size(); ++i)
+                        object.mInstance->setVariable(static_cast<std::uint32_t>(i + 1), state.mVariables[i]);
+            }
+            mSaved.erase(saved);
+        }
         return object.mInstance.get();
     }
 
@@ -163,6 +180,7 @@ namespace FalloutScript
     void ObjectScripts::clear()
     {
         mObjects.clear();
+        mSaved.clear();
         mUpdating.clear();
         mMenuUpdating.clear();
         mLoaded.clear();
