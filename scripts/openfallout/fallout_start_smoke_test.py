@@ -1397,6 +1397,48 @@ return {
 }
 """
 
+# The probe of the saves in the tool that plays the intros (scripts/openfallout/autoplay/autoplayprobe.lua and
+# autoplaysaves.lua): it saves the game when quest A has stood at its stage, loads it back when quest C has stood at its stage
+# (once), and a game that was loaded says whether the quests are those of the save and saves again. The script of the test
+# only moves the two quests, a second after the start and four seconds later; a second engine is started on the first save.
+SAVES_PROBE_GATES = f"""\
+return {{
+    settle = 1000,
+    tries = 0,
+    gates = {{}},
+    saves = {{
+        after = 1,
+        resaveAfter = 1,
+        save = {{ {{ quest = '{plugin.QUEST_A_NAME}', stage = {plugin.QUEST_A_STAGE} }} }},
+        load = {{ {{ quest = '{plugin.QUEST_C_NAME}', stage = {plugin.QUEST_C_STAGE} }} }},
+    }},
+}}
+"""
+SAVES_PROBE_SCRIPT = f"""\
+local core = require('openfallout.core')
+local world = require('openfallout.world')
+
+local clock, step = 0, 0
+return {{
+    engineHandlers = {{
+        onSave = function() return {{ saved = true }} end,
+        onUpdate = function(dt)
+            clock = clock + dt
+            if step == 0 and clock >= 1 then
+                step = 1
+                world.quests.find('{plugin.QUEST_A_NAME}'):setStage({plugin.QUEST_A_STAGE})
+            elseif step == 1 and clock >= 5 then
+                step = 2
+                world.quests.find('{plugin.QUEST_C_NAME}'):setStage({plugin.QUEST_C_STAGE})
+            elseif step == 2 and clock >= 14 then
+                step = 3
+                core.quit()
+            end
+        end,
+    }},
+}}
+"""
+
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
 # script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
@@ -2759,6 +2801,44 @@ def check_triggers(text):
     return problems
 
 
+def check_savesprobe(first, second):
+    """The problems with the probe of the saves. `first` is the log of the engine that saved the game when quest A had
+    stood at its stage, loaded it back when quest C had (once), and saved again after the load; `second` the log of the engine
+    started on the first save. Both must find the quests as the save had them, say so ("check ok"), save again, and not load."""
+    problems = []
+    for name, text in (("probe", first), ("fresh", second)):
+        for line in text.splitlines():
+            if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|Error (on )?load|Failed to load|"
+                         r"Can't load|damaged|newer than this engine", line, re.I):
+                problems.append(f"({name}) {line}")
+
+    def lines(text, *words):
+        pattern = r"AUTOPLAY\t" + r"\t".join(re.escape(word) for word in words) + r"(?:\t(.*))?$"
+        return [match.group(1) or "" for match in (re.search(pattern, line) for line in text.splitlines()) if match]
+
+    saved = lines(first, "digest", "saved")
+    if len(saved) != 1:
+        problems.append(f"the probe should save the game once, with the quests as they are: {saved}")
+        return problems
+    if not lines(first, "save", "autoplay-save", "ok"):
+        problems.append("the menu script did not save the game")
+    if len(lines(first, "load", "autoplay-save")) != 1:
+        problems.append(f"the game should be loaded back once: {lines(first, 'load', 'autoplay-save')}")
+    for name, text in (("probe", first), ("fresh", second)):
+        if not lines(text, "loaded", "phase=saved"):
+            problems.append(f"({name}) the world script did not find the phase of the save in the game that was loaded")
+        if lines(text, "digest", "loaded") != saved:
+            problems.append(f"({name}) the quests after the load should be those of the save: {lines(text, 'digest', 'loaded')} "
+                            f"instead of {saved}")
+        if len(lines(text, "digest", "check ok")) != 1 or lines(text, "digest", "check MISMATCH"):
+            problems.append(f"({name}) the check of the quests after the load should be ok exactly once")
+        if not lines(text, "save", "autoplay-again", "ok"):
+            problems.append(f"({name}) the game that was loaded should be saved again")
+    if lines(second, "load"):
+        problems.append(f"the engine started on the save should not load a game: {lines(second, 'load')}")
+    return problems
+
+
 def check_saves(first, second):
     """The problems with the saves. `first` is the log of the engine that saved, changed the state and loaded the save
     again, `second` the log of the engine that was started on the save. The state that the script reads (the stages of
@@ -3842,7 +3922,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -4069,6 +4149,54 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (saves):", problem)
+        problems += found
+    if args.only in (None, "savesprobe"):
+        # The probe has a table of its own (a data folder of its own, since the table is a script of it)
+        home = work / "savesprobe" / "home"
+        home.mkdir(parents=True)
+        for name in ("runtime", "runtime2"):
+            (work / "savesprobe" / name).mkdir(mode=0o700)
+        probe_data = work / "savesprobe" / "data"
+        plugin.write(probe_data, animation=not args.no_animation, spline=not args.key_animation)
+        (probe_data / "scripts").mkdir()
+        for name in ("autoplay.lua", "autoplayworld.lua", "autoplayprobe.lua", "autoplaysaves.lua"):
+            shutil.copy(AUTOPLAY / "scripts" / name, probe_data / "scripts" / name)
+        (probe_data / "scripts" / "autoplaygates.lua").write_text(SAVES_PROBE_GATES, encoding="ascii")
+        (probe_data / "scripts" / "savesprobetest.lua").write_text(SAVES_PROBE_SCRIPT, encoding="ascii")
+        shutil.copy(AUTOPLAY / "autoplaysaves.omwscripts", probe_data / "autoplaysaves.omwscripts")
+        (probe_data / "savesprobetest.omwscripts").write_text(
+            "PLAYER: scripts/autoplay.lua\nGLOBAL: scripts/autoplayworld.lua\nGLOBAL: scripts/autoplayprobe.lua\n"
+            "MENU: scripts/autoplaysaves.lua\nGLOBAL: scripts/savesprobetest.lua\n", encoding="ascii")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        print("== savesprobe: --start", plugin.CELL_NAME)
+        status, _ = run_engine(program, build / "resources", probe_data, home, work / "savesprobe" / "runtime",
+                               args.seconds, plugin.CELL_NAME, [], "savesprobetest.omwscripts")
+        first = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        second = ""
+        # The save of the probe is the file that its log names; the second engine is started on it
+        named = re.search(r"AUTOPLAY\tsave\tautoplay-save\tok\tdir=(\S+)\tfiles=(\S+)", first)
+        saved = [path for path in home.rglob("*.omwsave") if named and path.name == named.group(2).split(",")[0]]
+        if len(saved) != 1:
+            found.append(f"expected the saved game {named.group(2) if named else None}, found {[str(p) for p in saved]}")
+        else:
+            print(f"== savesprobe: --load-savegame {saved[0].name}")
+            log.rename(log.with_name("probing.log"))
+            status, _ = run_engine(program, build / "resources", probe_data, home, work / "savesprobe" / "runtime2",
+                                   args.seconds, None, [], "savesprobetest.omwscripts", load=saved[0])
+            second = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+            if status != 0:
+                found.append(f"the engine started on the save exited with status {status}")
+        found += check_savesprobe(first, second)
+        for line in (line for text in (first, second) for line in text.splitlines() if "AUTOPLAY" in line):
+            print(line.split("]", 1)[-1].strip())
+        for path in sorted(home.rglob("*.omwsave")):
+            print(f"saved game {path.relative_to(home)}")
+        for problem in found:
+            print("PROBLEM (savesprobe):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"
