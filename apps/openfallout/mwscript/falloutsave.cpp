@@ -438,6 +438,15 @@ namespace FalloutScript
             std::map<FormId, bool> disabled = host.mDisabled;
             for (const auto& [reference, state] : host.mPendingToggle)
                 disabled[reference] = state;
+            {
+                // What other threads asked for and the thread of the frame has not queued yet is what scripts see, so
+                // it is what the game keeps
+                const std::lock_guard lock(host.mDeferredMutex);
+                for (const auto& [reference, move] : host.mDeferredPlaces)
+                    relocations[reference].add(move);
+                for (const auto& [reference, state] : host.mDeferredDisabled)
+                    disabled[reference] = state;
+            }
 
             out.count(relocations.size());
             for (const auto& [reference, move] : relocations)
@@ -596,12 +605,8 @@ namespace FalloutScript
                 requests.push_back(request);
             }
 
-            // What was said of references that are not in a loaded cell, then the references that were seen to change
-            // (the last say is the one of the save, whichever comes first)
-            for (const auto& [reference, move] : relocations)
-                host.mRelocations[reference] = move;
-            for (const auto& [reference, state] : disabled)
-                host.mDisabled[reference] = state;
+            // The references that were seen to change, then what scripts asked of references and the world had not done
+            // yet, which comes after (whether the reference is in a loaded cell or not)
             for (const Entry& entry : changed)
             {
                 // A reference that was deleted is not put anywhere
@@ -619,6 +624,14 @@ namespace FalloutScript
                 // What is left of a stack that was partly taken
                 references[entry.mReference].mCount = entry.mCount;
             }
+            for (const auto& [reference, move] : relocations)
+            {
+                const auto [slot, added] = host.mRelocations.try_emplace(reference, move);
+                if (!added)
+                    slot->second.add(move);
+            }
+            for (const auto& [reference, state] : disabled)
+                host.mDisabled[reference] = state;
             for (const auto& [reference, state] : references)
                 host.mPendingSave->mReferences[reference] = state;
             for (const Entry& entry : made)
