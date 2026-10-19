@@ -9,7 +9,14 @@
 #include <components/falloutscript/savescripts.hpp>
 #include <components/falloutscript/savestate.hpp>
 
+#include "../mwbase/environment.hpp"
+#include "../mwbase/world.hpp"
+#include "../mwworld/cellstore.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/manualref.hpp"
+#include "../mwworld/worldmodel.hpp"
+
+#include "falloutsavepending.hpp"
 
 namespace FalloutScript
 {
@@ -135,6 +142,318 @@ namespace FalloutScript
                     host.mScriptPackages[*actor] = std::move(packages);
             }
         }
+
+        using Place = OFScript::FalloutScripts::Place;
+        using Move = OFScript::FalloutScripts::Move;
+
+        /// A cell by its form when it has one (a save follows the plugin to another place in the load order), else by
+        /// the text of its id
+        static void writeCell(SaveWriter& out, const ESM::RefId& cell)
+        {
+            const ESM::FormId* form = cell.getIf<ESM::FormId>();
+            if (form != nullptr && form->hasContentFile() && form->mContentFile <= 0xfe)
+            {
+                out.u8(1);
+                out.form(form->toUint32());
+            }
+            else if (!cell.empty())
+            {
+                out.u8(2);
+                out.string(cell.serializeText());
+            }
+            else
+                out.u8(0);
+        }
+
+        /// False when the cell is of a plugin that is not loaded now
+        static bool readCell(SaveReader& in, ESM::RefId& cell)
+        {
+            const std::uint8_t kind = in.u8();
+            if (kind == 1)
+            {
+                const std::optional<FormId> form = in.form();
+                if (!form)
+                    return false;
+                cell = OFScript::FalloutScripts::refIdOf(*form);
+                return true;
+            }
+            if (kind == 2)
+            {
+                cell = ESM::RefId::deserializeText(in.string());
+                return true;
+            }
+            if (kind != 0)
+                throw SaveError("A place of the save has a kind of cell that this engine does not know");
+            cell = ESM::RefId();
+            return true;
+        }
+
+        static void writePlace(SaveWriter& out, const Place& place)
+        {
+            writeCell(out, place.mCell);
+            for (int axis = 0; axis < 3; ++axis)
+                out.f32(place.mPosition[axis]);
+            for (int axis = 0; axis < 3; ++axis)
+                out.f32(place.mAngle[axis]);
+        }
+
+        /// False when the cell of the place is of a plugin that is not loaded now
+        static bool readPlace(SaveReader& in, Place& place)
+        {
+            const bool known = readCell(in, place.mCell);
+            for (int axis = 0; axis < 3; ++axis)
+                place.mPosition[axis] = in.f32();
+            for (int axis = 0; axis < 3; ++axis)
+                place.mAngle[axis] = in.f32();
+            return known;
+        }
+
+        /// A reference of a content file that something happened to, and a reference or object that was made while the
+        /// game ran
+        struct Entry
+        {
+            FormId mReference = 0; // for an object: the number scripts know it by, 0 for none
+            FormId mBase = 0; // objects only
+            bool mEnabled = true;
+            int mCount = 1;
+            float mScale = 1;
+            Place mWhere;
+        };
+
+        static void writeEntry(SaveWriter& out, const Entry& entry, bool object)
+        {
+            out.form(entry.mReference);
+            if (object)
+                out.form(entry.mBase);
+            out.boolean(entry.mEnabled);
+            out.i32(entry.mCount);
+            out.f32(entry.mScale);
+            writePlace(out, entry.mWhere);
+        }
+
+        /// False when a plugin the entry names is not loaded now (the entry is dropped)
+        static bool readEntry(SaveReader& in, Entry& entry, bool object)
+        {
+            const std::optional<FormId> reference = in.form();
+            std::optional<FormId> base = FormId(0);
+            if (object)
+                base = in.form();
+            entry.mReference = reference.value_or(0);
+            entry.mBase = base.value_or(0);
+            entry.mEnabled = in.boolean();
+            entry.mCount = in.i32();
+            entry.mScale = in.f32();
+            const bool placed = readPlace(in, entry.mWhere);
+            return reference && base && placed;
+        }
+
+        static constexpr std::size_t entryBytes = 4 + 1 + 4 + 4 + 1 + 24;
+        static constexpr std::size_t moveBytes = 4 + 4 + 1 + 24;
+
+        static void writeReferences(OFScript::FalloutScripts& host, SaveWriter& out)
+        {
+            std::vector<Entry> changed;
+            std::vector<Entry> made;
+            OFBase::World* world = OFBase::Environment::get().getWorld();
+            OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+            const OFWorld::Ptr player = world != nullptr ? world->getPlayerPtr() : OFWorld::Ptr();
+            if (model != nullptr)
+                model->forEachLoadedCellStore([&](OFWorld::CellStore& store) {
+                    const ESM::RefId cellId = store.getCell()->getId();
+                    store.forEach(
+                        [&](const OFWorld::Ptr& ptr) {
+                            if (ptr == player || !ESM::isESM4Rec(static_cast<ESM::RecNameInts>(ptr.getType())))
+                                return true;
+                            const OFWorld::CellRef& ref = ptr.getCellRef();
+                            const ESM::Position& position = ptr.getRefData().getPosition();
+                            Entry entry;
+                            entry.mEnabled = ptr.getRefData().isEnabled();
+                            entry.mCount = ref.getCount(false);
+                            entry.mScale = ref.getScale();
+                            entry.mWhere = { cellId, position.asVec3(), position.asRotationVec3() };
+                            if (ref.hasContentFile())
+                            {
+                                // What the records say is what a cell that nothing happened to gets again
+                                if (!ptr.getRefData().hasChanged() && !ref.hasChanged())
+                                    return true;
+                                entry.mReference = host.referenceOf(ptr);
+                                if (entry.mReference != 0)
+                                    changed.push_back(entry);
+                                return true;
+                            }
+                            // An object that was made: one that was deleted is gone
+                            if (entry.mCount == 0)
+                                return true;
+                            entry.mReference = host.referenceOf(ptr);
+                            const ESM::RefId base = ref.getRefId();
+                            if (const ESM::FormId* form = base.getIf<ESM::FormId>();
+                                form != nullptr && form->hasContentFile() && form->mContentFile <= 0xfe)
+                                entry.mBase = form->toUint32();
+                            if (entry.mBase != 0)
+                                made.push_back(entry);
+                            return true;
+                        },
+                        true);
+                });
+            const auto byReference = [](const Entry& a, const Entry& b) { return a.mReference < b.mReference; };
+            std::stable_sort(changed.begin(), changed.end(), byReference);
+            std::stable_sort(made.begin(), made.end(), byReference);
+
+            // What scripts asked for in cells that were not loaded, and what a loaded game has not handed to a cell yet
+            std::map<FormId, Move> relocations = host.mRelocations;
+            for (const auto& [reference, move] : host.mPendingMoves)
+                relocations[reference].add(move);
+            std::map<FormId, bool> disabled = host.mDisabled;
+            for (const auto& [reference, state] : host.mPendingToggle)
+                disabled[reference] = state;
+
+            out.count(relocations.size());
+            for (const auto& [reference, move] : relocations)
+            {
+                out.form(reference);
+                out.u32(move.mParts);
+                writePlace(out, move.mWhere);
+            }
+            out.count(disabled.size());
+            for (const auto& [reference, state] : disabled)
+            {
+                out.form(reference);
+                out.boolean(state);
+            }
+
+            out.count(changed.size());
+            for (const Entry& entry : changed)
+                writeEntry(out, entry, false);
+
+            // A reference that is not in a loaded cell yet keeps what a loaded game said of it
+            const OFScript::PendingSave& pending = *host.mPendingSave;
+            out.count(pending.mReferences.size());
+            for (const auto& [reference, state] : pending.mReferences)
+            {
+                out.form(reference);
+                out.boolean(state.mDeleted);
+                out.boolean(state.mScale.has_value());
+                out.f32(state.mScale.value_or(1));
+            }
+
+            // The objects that were made, those that are not made yet again included
+            for (const OFScript::PendingSave::Object& object : pending.mObjects)
+            {
+                Entry entry;
+                entry.mReference = object.mId;
+                entry.mBase = object.mBase;
+                entry.mEnabled = object.mEnabled;
+                entry.mCount = object.mCount;
+                entry.mScale = object.mScale;
+                entry.mWhere = { object.mCell, object.mPosition, object.mAngle };
+                made.push_back(entry);
+            }
+            {
+                const std::lock_guard lock(host.mMadeMutex);
+                for (const auto& [id, request] : host.mPendingMade)
+                {
+                    Entry entry;
+                    entry.mReference = id;
+                    entry.mBase = request.mBase;
+                    entry.mWhere = request.mWhere;
+                    made.push_back(entry);
+                }
+            }
+            out.count(made.size());
+            for (const Entry& entry : made)
+                writeEntry(out, entry, true);
+        }
+
+        static void readReferences(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
+        {
+            std::map<FormId, Move> relocations;
+            std::map<FormId, bool> disabled;
+            std::vector<Entry> changed;
+            std::map<FormId, OFScript::PendingSave::Reference> references;
+            std::vector<Entry> made;
+
+            const std::size_t moves = in.count(moveBytes);
+            for (std::size_t i = 0; i < moves; ++i)
+            {
+                const std::optional<FormId> reference = in.form();
+                Move move;
+                move.mParts = in.u32() & Move::All;
+                if (readPlace(in, move.mWhere) && reference)
+                    relocations[*reference] = move;
+            }
+            const std::size_t toggles = in.count(5);
+            for (std::size_t i = 0; i < toggles; ++i)
+            {
+                const std::optional<FormId> reference = in.form();
+                const bool state = in.boolean();
+                if (reference)
+                    disabled[*reference] = state;
+            }
+            const std::size_t changes = in.count(entryBytes);
+            for (std::size_t i = 0; i < changes; ++i)
+            {
+                Entry entry;
+                if (readEntry(in, entry, false))
+                    changed.push_back(entry);
+            }
+            const std::size_t pendingReferences = in.count(10);
+            for (std::size_t i = 0; i < pendingReferences; ++i)
+            {
+                const std::optional<FormId> reference = in.form();
+                OFScript::PendingSave::Reference state;
+                state.mDeleted = in.boolean();
+                const bool hasScale = in.boolean();
+                const float scale = in.f32();
+                if (hasScale)
+                    state.mScale = scale;
+                if (reference)
+                    references[*reference] = state;
+            }
+            const std::size_t objects = in.count(entryBytes + 4);
+            for (std::size_t i = 0; i < objects; ++i)
+            {
+                Entry entry;
+                if (readEntry(in, entry, true))
+                    made.push_back(entry);
+            }
+
+            // What was said of references that are not in a loaded cell, then the references that were seen to change
+            // (the last say is the one of the save, whichever comes first)
+            for (const auto& [reference, move] : relocations)
+                host.mRelocations[reference] = move;
+            for (const auto& [reference, state] : disabled)
+                host.mDisabled[reference] = state;
+            for (const Entry& entry : changed)
+            {
+                // A reference that was deleted is not put anywhere
+                if (entry.mCount == 0)
+                {
+                    references[entry.mReference].mDeleted = true;
+                    continue;
+                }
+                host.mDisabled[entry.mReference] = !entry.mEnabled;
+                Move move;
+                move.mWhere = entry.mWhere;
+                move.mParts = Move::All;
+                host.mRelocations[entry.mReference] = move;
+                references[entry.mReference].mScale = entry.mScale;
+            }
+            for (const auto& [reference, state] : references)
+                host.mPendingSave->mReferences[reference] = state;
+            for (const Entry& entry : made)
+            {
+                OFScript::PendingSave::Object object;
+                object.mId = entry.mReference;
+                object.mBase = entry.mBase;
+                object.mCell = entry.mWhere.mCell;
+                object.mPosition = entry.mWhere.mPosition;
+                object.mAngle = entry.mWhere.mAngle;
+                object.mEnabled = entry.mEnabled;
+                object.mCount = entry.mCount;
+                object.mScale = entry.mScale;
+                host.mPendingSave->mObjects.push_back(object);
+            }
+        }
     };
 }
 
@@ -144,6 +463,23 @@ namespace OFScript
     {
         const ESM::FormId form = ESM::FormId::fromUint32(id);
         return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
+    }
+
+    bool FalloutScripts::savedReferenceLoaded(FalloutScript::FormId reference)
+    {
+        const auto saved = mPendingSave->mReferences.find(reference);
+        if (saved == mPendingSave->mReferences.end())
+            return false;
+        const PendingSave::Reference state = saved->second;
+        mPendingSave->mReferences.erase(saved);
+        if (state.mDeleted)
+        {
+            mPendingSave->mToDelete.push_back(reference);
+            return true;
+        }
+        if (state.mScale)
+            mPendingSave->mToScale.emplace_back(reference, *state.mScale);
+        return false;
     }
 
     std::vector<FalloutScript::SaveSection> FalloutScripts::saveSections()
@@ -178,6 +514,11 @@ namespace OFScript
             { "packages", 1, [this](FalloutScript::SaveWriter& out) { Access::writePackages(*this, out); },
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                     Access::readPackages(*this, in, version);
+                } });
+        sections.push_back(
+            { "references", 1, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
+                [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                    Access::readReferences(*this, in, version);
                 } });
         return sections;
     }

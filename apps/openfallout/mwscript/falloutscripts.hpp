@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <random>
@@ -95,6 +96,9 @@ namespace OFWorld
 
 namespace OFScript
 {
+    /// What a loaded game says that waits for a cell or for the next frame (falloutsavepending.hpp)
+    struct PendingSave;
+
     /// Which commands the compiled scripts of the loaded content use: Fallout 3 when only its master is loaded, New
     /// Vegas otherwise (its table has all the commands of the other and the same names, and Tale of Two Wastelands runs
     /// on the engine of New Vegas).
@@ -983,6 +987,15 @@ namespace OFScript
         };
         /// Makes an object that PlaceAtMe asked for, at the start of the next frame
         void makeObject(FalloutScript::FormId id, const MadeObject& request);
+        /// Takes in an object that was placed while the game runs: scripts name it by `id`, which the world knows by
+        /// the number it gave the object. It runs its script unless its cell is not loaded, where the cell starts it.
+        void adoptObject(FalloutScript::FormId id, const OFWorld::Ptr& placed, bool run);
+        /// Does what a loaded game said about references and made objects, at the start of a frame: the objects are
+        /// made again, the references that were deleted or scaled are so again once their cell is loaded
+        void applySaved();
+        /// A reference of a cell that was just loaded: what a loaded game said about it waits for the next frame.
+        /// \return true for one that the game had deleted
+        bool savedReferenceLoaded(FalloutScript::FormId reference);
         static void queueMove(
             std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move);
         /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell
@@ -1160,6 +1173,8 @@ namespace OFScript
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
+        /// The state of a loaded game that is put back when the cells and the frame it needs come
+        std::unique_ptr<PendingSave> mPendingSave;
         /// The furniture that an actor uses, and where the actor was put on it: it stops using it when it is more than
         /// a few steps from there. Scripts ask from other threads too.
         struct FurnitureUse

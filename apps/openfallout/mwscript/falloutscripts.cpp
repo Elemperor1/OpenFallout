@@ -81,6 +81,8 @@
 #include "../mwworld/scene.hpp"
 #include "../mwworld/worldmodel.hpp"
 
+#include "falloutsavepending.hpp"
+
 namespace OFScript
 {
     namespace
@@ -187,6 +189,7 @@ namespace OFScript
         , mRandom(std::random_device()())
         , mCombatRandom(std::random_device()())
     {
+        mPendingSave = std::make_unique<PendingSave>();
         // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
         // character whose health is gone and who is essential falls instead
         mActors.setDeathListener([this](FalloutScript::FormId actor) { mCombat.withdraw(actor); });
@@ -394,6 +397,7 @@ namespace OFScript
         mTriggers.clear();
         mTriggerActors.clear();
         mScriptPackages.clear();
+        *mPendingSave = PendingSave();
         {
             const std::lock_guard lock(mFurnitureMutex);
             mFurniture.clear();
@@ -570,6 +574,9 @@ namespace OFScript
             if (reference == 0)
                 return true;
             mReferences[reference] = ptr;
+            // One that the loaded game had deleted is deleted at the start of the next frame: it does not run
+            if (savedReferenceLoaded(reference))
+                return true;
             // An object that scripts moved while its cell was not loaded is put where they wanted it
             if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
             {
@@ -756,6 +763,8 @@ namespace OFScript
         }
         for (const auto& [id, request] : made)
             makeObject(id, request);
+        // The objects that a loaded game had made, and what it did to the references of the cells that are loaded now
+        applySaved();
         // Where scripts put objects. A cell that this loads asks for more, which is for the next frame.
         std::map<FalloutScript::FormId, Move> moves;
         moves.swap(mPendingMoves);
@@ -4038,29 +4047,100 @@ namespace OFScript
                 = !ref.getPtr().getClass().isActor() && !isCharacterOrCreature(ref.getPtr());
             const OFWorld::Ptr placed = OFBase::Environment::get().getWorld()->safePlaceObject(
                 ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
-            const ESM::FormId number = placed.getCellRef().getRefNum();
-            mMade[id] = number;
-            mMadeIds[number] = id;
-            mReferences[id] = placed;
-            // What the world made of the base (a levelled list gives a character), which any thread can ask for
-            if (const ESM::FormId actual = baseOfObject(placed); actual.hasContentFile())
-            {
-                const std::lock_guard lock(mMadeMutex);
-                mMadeBases[id] = actual.toUint32();
-            }
-            // An actor that is made sets triggers off like those of the cells (when its cell is loaded again, the cell
-            // tells of it)
-            if (isCharacterOrCreature(placed))
-                mTriggerActors.insert(id);
-            // It runs its script like any object that is loaded
-            const FalloutScript::FormId script = scriptOf(placed, id);
-            if (script != 0 && mObjects.add(id, script) != nullptr)
-                mPendingLoad.push_back(id);
+            adoptObject(id, placed, true);
         }
         catch (const std::exception& error)
         {
             log("PlaceAtMe: an object of " + FalloutScript::hex(request.mBase) + " can not be made: " + error.what());
         }
+    }
+
+    void FalloutScripts::applySaved()
+    {
+        PendingSave& pending = *mPendingSave;
+        if (pending.mObjects.empty() && pending.mToDelete.empty() && pending.mToScale.empty())
+            return;
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+
+        std::vector<PendingSave::Object> objects;
+        objects.swap(pending.mObjects);
+        for (const PendingSave::Object& object : objects)
+        {
+            try
+            {
+                const Place where{ object.mCell, object.mPosition, object.mAngle };
+                OFWorld::CellStore* cell = cellAt(where);
+                if (cell == nullptr)
+                {
+                    log("Load: the cell " + object.mCell.toDebugString() + " of the object made from "
+                        + FalloutScript::hex(object.mBase) + " is not known, so it is not made again");
+                    continue;
+                }
+                // The objects of a cell that is not loaded wait in it
+                if (cell->getState() != OFWorld::CellStore::State_Loaded)
+                    cell->load();
+                OFWorld::ManualRef ref(mStore, refId(object.mBase), object.mCount);
+                ref.getPtr().mRef->mData.mPhysicsPostponed
+                    = !ref.getPtr().getClass().isActor() && !isCharacterOrCreature(ref.getPtr());
+                ESM::Position position;
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    position.pos[axis] = object.mPosition[axis];
+                    position.rot[axis] = object.mAngle[axis];
+                }
+                const OFWorld::Ptr placed = world->placeObject(ref.getPtr(), cell, position);
+                if (!object.mEnabled)
+                    world->disable(placed);
+                if (object.mScale != 1)
+                    world->scaleObject(placed, object.mScale);
+                if (object.mId != 0)
+                    adoptObject(object.mId, placed, world->getActiveCells().contains(placed.getCell()));
+            }
+            catch (const std::exception& error)
+            {
+                log("Load: an object made from " + FalloutScript::hex(object.mBase)
+                    + " can not be made again: " + error.what());
+            }
+        }
+
+        std::vector<FalloutScript::FormId> toDelete;
+        toDelete.swap(pending.mToDelete);
+        for (const FalloutScript::FormId reference : toDelete)
+        {
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (!ptr.isEmpty() && ptr != world->getPlayerPtr())
+                world->deleteObject(ptr);
+        }
+        std::vector<std::pair<FalloutScript::FormId, float>> toScale;
+        toScale.swap(pending.mToScale);
+        for (const auto& [reference, scale] : toScale)
+        {
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (!ptr.isEmpty())
+                world->scaleObject(ptr, scale);
+        }
+    }
+
+    void FalloutScripts::adoptObject(FalloutScript::FormId id, const OFWorld::Ptr& placed, bool run)
+    {
+        const ESM::FormId number = placed.getCellRef().getRefNum();
+        mMade[id] = number;
+        mMadeIds[number] = id;
+        mReferences[id] = placed;
+        // What the world made of the base (a levelled list gives a character), which any thread can ask for
+        if (const ESM::FormId actual = baseOfObject(placed); actual.hasContentFile())
+        {
+            const std::lock_guard lock(mMadeMutex);
+            mMadeBases[id] = actual.toUint32();
+        }
+        // An actor that is made sets triggers off like those of the cells (when its cell is loaded again, the cell
+        // tells of it)
+        if (isCharacterOrCreature(placed))
+            mTriggerActors.insert(id);
+        // It runs its script like any object that is loaded
+        const FalloutScript::FormId script = run ? scriptOf(placed, id) : 0;
+        if (script != 0 && mObjects.add(id, script) != nullptr)
+            mPendingLoad.push_back(id);
     }
 
     void FalloutScripts::activate(FalloutScript::FormId target, FalloutScript::FormId activator, bool runOnActivate)
