@@ -507,6 +507,9 @@ SAVED_REF_IDS = {"moved": 0x964, "hidden": 0x965, "grown": 0x966, "gone": 0x967,
 SAVED_STACK = 10
 SAVED_TAKEN = 4
 SAVED_TAKEN_AFTER = 2
+# The events that the local script of the person (a Lua script of the smoke test) counts: SAVED_BUMPS before the save, more after it
+SAVED_BUMPS = 3
+SAVED_BUMPS_AFTER = 2
 SAVED_PLACE = (-1200.0, -1700.0)  # the first cube; the others stand 300 apart along x
 SAVED_MOVED_TO = (-1200.0, -1000.0, 128.0)  # 128: half a cube above the floor
 SAVED_MADE_AT = (-300.0, -1000.0, 128.0)

@@ -1233,6 +1233,15 @@ local function find(id)
     if ok and object:isValid() and object.count > 0 then return object end
 end
 
+-- The person of the first cell gets a local script (saveslocal.lua, attached by this script as it is a custom one) that
+-- counts the events it is sent and keeps the count in its saved data
+local PERSON = @PERSON@
+local function bump(times)
+    local person = find(PERSON)
+    if person == nil then return end
+    for _ = 1, times do person:sendEvent('OFTestBump', {}) end
+end
+
 local function cubesAt(cell, place)
     local found = {}
     for _, other in ipairs(cell:getAll()) do
@@ -1261,12 +1270,23 @@ local function describe(tag)
                 tostring(object.enabled), object.scale, object.count)
         end
     end
-    local made = 0
+    local made, madeId = 0, 'none'
     for _, other in ipairs(cubesAt(world.players[1].cell, MADE_AT)) do
-        if other.enabled then made = made + 1 end
+        if other.enabled then
+            made = made + 1
+            madeId = other.id
+        end
     end
     fields[#fields + 1] = 'made=' .. made
     print('OFTEST', 'saves refs', tag, table.concat(fields, ' '))
+    -- The number that the world made up for the cube is the one Lua knew it by
+    print('OFTEST', 'saves made', tag, madeId)
+    local person = find(PERSON)
+    if person ~= nil then
+        person:sendEvent('OFTestAsk', { tag = tag })
+    else
+        print('OFTEST', 'saves local', tag, 'count=none')
+    end
     local g = world.globals
     print('OFTEST', 'saves characters', tag, string.format('items=%d dead=%d luck=%d karma=%d',
         g.@G_ITEMS@, g.@G_DEAD@, g.@G_LUCK@, g.@G_KARMA@))
@@ -1308,10 +1328,12 @@ return {
                         find(REFS.grown):setScale(@SCALE@)
                         find(REFS.gone):remove()
                         find(REFS.stacked):remove(@TAKEN@)
+                        find(PERSON):addScript('scripts/saveslocal.lua')
                         world.createObject(CUBE, 1):teleport(cell, MADE_AT)
                         world.quests.find('@DQUEST@'):setStage(@S_GIVE@)
                         -- The frame after the calls is when the world does them
                         after(@SETTLE@, function()
+                            bump(@BUMPS@)
                             report('before', @S_BEFORE@)
                             after(2 * @SETTLE@, function() askMenu('OFTestSave') end)
                         end)
@@ -1326,6 +1348,9 @@ return {
         end,
     },
     eventHandlers = {
+        OFTestCount = function(event)
+            print('OFTEST', 'saves local', event.tag, string.format('count=%d', event.count))
+        end,
         OFTestSaved = function()
             world.quests.find('@C@'):setStage(@C_STAGE@)
             world.globals.@COUNTER@ = @CHANGED@
@@ -1337,6 +1362,7 @@ return {
             find(REFS.grown):setScale(1)
             find(REFS.doomed):remove()
             find(REFS.stacked):remove(@TAKEN_AFTER@)
+            bump(@BUMPS_AFTER@)
             for _, other in ipairs(cubesAt(cell, MADE_AT)) do other:remove() end
             world.quests.find('@DQUEST@'):setStage(@S_CHANGE@)
             after(@SETTLE@, function()
@@ -1364,6 +1390,8 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@DOOMED@", str(plugin.SAVED_REF_IDS["doomed"]))
                       .replace("@STACKED@", str(plugin.SAVED_REF_IDS["stacked"]))
                       .replace("@TAKEN@", str(plugin.SAVED_TAKEN)).replace("@TAKEN_AFTER@", str(plugin.SAVED_TAKEN_AFTER))
+                      .replace("@PERSON@", str(plugin.NPC_REF_ID)).replace("@BUMPS@", str(plugin.SAVED_BUMPS))
+                      .replace("@BUMPS_AFTER@", str(plugin.SAVED_BUMPS_AFTER))
                       .replace("@DQUEST@", plugin.SAVED_QUEST_NAME)
                       .replace("@S_GIVE@", str(plugin.SAVED_STAGES["give"]))
                       .replace("@S_CHANGE@", str(plugin.SAVED_STAGES["change"]))
@@ -1375,6 +1403,22 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@G_DEAD@", plugin.SAVED_GLOBALS["dead"][1])
                       .replace("@G_LUCK@", plugin.SAVED_GLOBALS["luck"][1])
                       .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1]))
+SAVES_LOCAL_SCRIPT = """\
+local core = require('openfallout.core')
+
+local count = 0
+
+return {
+    engineHandlers = {
+        onSave = function() return { count = count } end,
+        onLoad = function(data) count = data.count end,
+    },
+    eventHandlers = {
+        OFTestBump = function() count = count + 1 end,
+        OFTestAsk = function(event) core.sendGlobalEvent('OFTestCount', { tag = event.tag, count = count }) end,
+    },
+}
+"""
 SAVES_MENU_SCRIPT = """\
 local menu = require('openfallout.menu')
 local core = require('openfallout.core')
@@ -2973,6 +3017,34 @@ def check_saves(first, second, third=None):
                 if found.get(tag) != wanted_after_load:
                     problems.append(f"{name}: after the load ({tag}) the characters should be the ones of the save "
                                     f"{wanted_after_load}: {found.get(tag)}")
+    # The local script of the person keeps what it counted (the events it was sent before the save, and not those after), and
+    # the cube that was made is known to Lua by the same number after the load
+    def tagged(text, kind, pattern):
+        found = {}
+        for line in text.splitlines():
+            match = re.search(rf"OFTEST\tsaves {kind}\t(before|changed|loaded|later)\t{pattern}$", line)
+            if match:
+                found[match.group(1)] = match.group(2)
+        return found
+    first_counts = tagged(first, "local", r"count=(-?\d+)")
+    first_made = tagged(first, "made", r"(\S+)")
+    if first_counts.get("before") != str(plugin.SAVED_BUMPS) \
+            or first_counts.get("changed") != str(plugin.SAVED_BUMPS + plugin.SAVED_BUMPS_AFTER):
+        problems.append(f"the person should have counted {plugin.SAVED_BUMPS} events before the save and "
+                        f"{plugin.SAVED_BUMPS + plugin.SAVED_BUMPS_AFTER} after it: {first_counts}")
+    made_id = first_made.get("before")
+    if made_id in (None, "none"):
+        problems.append(f"no cube was made before the save: {first_made}")
+    for name, text in (("the engine that saved", first), *started):
+        counts = tagged(text, "local", r"count=(-?\d+)")
+        made = tagged(text, "made", r"(\S+)")
+        for tag in ("loaded", "later"):
+            if counts.get(tag) != str(plugin.SAVED_BUMPS):
+                problems.append(f"{name}: after the load ({tag}) the local script of the person should have counted "
+                                f"{plugin.SAVED_BUMPS} events (the ones of the save): {counts.get(tag)}")
+            if made.get(tag) != made_id:
+                problems.append(f"{name}: after the load ({tag}) the cube that was made should be {made_id} to Lua: "
+                                f"{made.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
     for name, text in started:
@@ -3976,7 +4048,9 @@ def main():
         "PLAYER: scripts/arenaplayer.lua\nGLOBAL: scripts/arenatest.lua\n", encoding="ascii")
     (data / "scripts" / "savesworld.lua").write_text(SAVES_WORLD_SCRIPT, encoding="ascii")
     (data / "scripts" / "savesmenu.lua").write_text(SAVES_MENU_SCRIPT, encoding="ascii")
-    (data / "savestest.omwscripts").write_text("GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\n", encoding="ascii")
+    (data / "scripts" / "saveslocal.lua").write_text(SAVES_LOCAL_SCRIPT, encoding="ascii")
+    (data / "savestest.omwscripts").write_text(
+        "GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\nCUSTOM: scripts/saveslocal.lua\n", encoding="ascii")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")

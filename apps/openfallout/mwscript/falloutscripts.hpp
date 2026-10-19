@@ -1004,9 +1004,10 @@ namespace OFScript
         /// Does what a loaded game said about references and made objects, at the start of a frame: the objects are
         /// made again, the references that were deleted or scaled are so again once their cell is loaded
         void applySaved();
-        /// A reference of a cell that was just loaded: what a loaded game said about it waits for the next frame.
+        /// A reference of a cell that was just loaded: its Lua scripts are those of the loaded game at once, what else the
+        /// game said about it waits for the next frame.
         /// \return true for one that the game had deleted
-        bool savedReferenceLoaded(FalloutScript::FormId reference);
+        bool savedReferenceLoaded(FalloutScript::FormId reference, const OFWorld::Ptr& ptr);
         /// What scripts asked of a reference while it was out of the loaded cells (or what a loaded game says they
         /// had asked) is done to it at the start of the next frame
         void takeSavedChanges(FalloutScript::FormId reference);

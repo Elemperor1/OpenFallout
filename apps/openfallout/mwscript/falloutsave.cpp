@@ -13,6 +13,7 @@
 #include <components/falloutscript/saveworld.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/luamanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -345,21 +346,83 @@ namespace FalloutScript
         {
             FormId mReference = 0; // for an object: the number scripts know it by, 0 for none
             FormId mBase = 0; // objects only
+            ESM::RefNum mNumber; // objects only: the number that Lua knows it by
             bool mEnabled = true;
             int mCount = 1;
             float mScale = 1;
             Place mWhere;
+            std::optional<ESM::LuaScripts> mLua;
         };
+
+        /// The state of the Lua scripts of an object: the scripts (by the number they have in the configuration, which
+        /// the save of Lua maps), the data of each, which is binary, and its timers
+        static void writeLua(SaveWriter& out, const std::optional<ESM::LuaScripts>& lua)
+        {
+            out.boolean(lua.has_value());
+            if (!lua)
+                return;
+            out.count(lua->mScripts.size());
+            for (const ESM::LuaScript& script : lua->mScripts)
+            {
+                out.i32(script.mScriptId);
+                out.string(script.mData);
+                out.count(script.mTimers.size());
+                for (const ESM::LuaTimer& timer : script.mTimers)
+                {
+                    out.u8(static_cast<std::uint8_t>(timer.mType));
+                    out.f64(timer.mTime);
+                    out.string(timer.mCallbackName);
+                    out.string(timer.mCallbackArgument);
+                }
+            }
+        }
+
+        static constexpr std::size_t luaScriptBytes = 4 + 4 + 4;
+        static constexpr std::size_t luaTimerBytes = 1 + 8 + 4 + 4;
+
+        static std::optional<ESM::LuaScripts> readLua(SaveReader& in)
+        {
+            if (!in.boolean())
+                return std::nullopt;
+            ESM::LuaScripts lua;
+            const std::size_t scripts = in.count(luaScriptBytes);
+            for (std::size_t i = 0; i < scripts; ++i)
+            {
+                ESM::LuaScript script;
+                script.mScriptId = in.i32();
+                script.mData = in.string();
+                const std::size_t timers = in.count(luaTimerBytes);
+                for (std::size_t j = 0; j < timers; ++j)
+                {
+                    ESM::LuaTimer timer;
+                    const std::uint8_t type = in.u8();
+                    timer.mTime = in.f64();
+                    timer.mCallbackName = in.string();
+                    timer.mCallbackArgument = in.string();
+                    if (type > static_cast<std::uint8_t>(ESM::LuaTimer::Type::REAL_TIME))
+                        continue;
+                    timer.mType = static_cast<ESM::LuaTimer::Type>(type);
+                    script.mTimers.push_back(std::move(timer));
+                }
+                lua.mScripts.push_back(std::move(script));
+            }
+            return lua;
+        }
 
         static void writeEntry(SaveWriter& out, const Entry& entry, bool object)
         {
             out.form(entry.mReference);
             if (object)
+            {
                 out.form(entry.mBase);
+                out.u32(entry.mNumber.mIndex);
+                out.i32(entry.mNumber.mContentFile);
+            }
             out.boolean(entry.mEnabled);
             out.i32(entry.mCount);
             out.f32(entry.mScale);
             writePlace(out, entry.mWhere);
+            writeLua(out, entry.mLua);
         }
 
         /// False when a plugin the entry names is not loaded now (the entry is dropped)
@@ -368,17 +431,23 @@ namespace FalloutScript
             const std::optional<FormId> reference = in.form();
             std::optional<FormId> base = FormId(0);
             if (object)
+            {
                 base = in.form();
+                entry.mNumber.mIndex = in.u32();
+                entry.mNumber.mContentFile = in.i32();
+            }
             entry.mReference = reference.value_or(0);
             entry.mBase = base.value_or(0);
             entry.mEnabled = in.boolean();
             entry.mCount = in.i32();
             entry.mScale = in.f32();
             const bool placed = readPlace(in, entry.mWhere);
+            entry.mLua = readLua(in);
             return reference && base && placed;
         }
 
-        static constexpr std::size_t entryBytes = 4 + 1 + 4 + 4 + 1 + 24;
+        static constexpr std::size_t entryBytes = 4 + 1 + 4 + 4 + 1 + 24 + 1;
+        static constexpr std::size_t objectBytes = entryBytes + 4 + 8;
         static constexpr std::size_t moveBytes = 4 + 4 + 1 + 24;
         static constexpr std::size_t requestBytes = 4 + 4 + 4 + 1 + 4 + 1 + 24;
 
@@ -389,6 +458,7 @@ namespace FalloutScript
             OFBase::World* world = OFBase::Environment::get().getWorld();
             OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
             const OFWorld::Ptr player = world != nullptr ? world->getPlayerPtr() : OFWorld::Ptr();
+            OFBase::LuaManager* lua = OFBase::Environment::get().getLuaManager();
             if (model != nullptr)
                 model->forEachLoadedCellStore([&](OFWorld::CellStore& store) {
                     const ESM::RefId cellId = store.getCell()->getId();
@@ -403,6 +473,13 @@ namespace FalloutScript
                             entry.mCount = ref.getCount(false);
                             entry.mScale = ref.getScale();
                             entry.mWhere = { cellId, position.asVec3(), position.asRotationVec3() };
+                            // What its Lua scripts keep (the generic save of a cell leaves the references of Fallout
+                            // out)
+                            if (lua != nullptr && ptr.getRefData().getLuaScripts() != nullptr)
+                            {
+                                entry.mLua.emplace();
+                                lua->saveLocalScripts(ptr, *entry.mLua);
+                            }
                             if (ref.hasContentFile())
                             {
                                 // What the records say is what a cell that nothing happened to gets again
@@ -417,6 +494,7 @@ namespace FalloutScript
                             if (entry.mCount == 0)
                                 return true;
                             entry.mReference = host.referenceOf(ptr);
+                            entry.mNumber = ref.getRefNum();
                             const ESM::RefId base = ref.getRefId();
                             if (const ESM::FormId* form = base.getIf<ESM::FormId>();
                                 form != nullptr && form->hasContentFile() && form->mContentFile <= 0xfe)
@@ -477,6 +555,7 @@ namespace FalloutScript
                 out.f32(state.mScale.value_or(1));
                 out.boolean(state.mCount.has_value());
                 out.i32(state.mCount.value_or(1));
+                writeLua(out, state.mLua);
             }
 
             // The objects that were made, those that are not made yet again included
@@ -489,6 +568,8 @@ namespace FalloutScript
                 entry.mCount = object.mCount;
                 entry.mScale = object.mScale;
                 entry.mWhere = { object.mCell, object.mPosition, object.mAngle };
+                entry.mNumber = object.mNumber;
+                entry.mLua = object.mLua;
                 made.push_back(entry);
             }
             out.count(made.size());
@@ -558,7 +639,7 @@ namespace FalloutScript
                 if (readEntry(in, entry, false))
                     changed.push_back(entry);
             }
-            const std::size_t pendingReferences = in.count(15);
+            const std::size_t pendingReferences = in.count(16);
             for (std::size_t i = 0; i < pendingReferences; ++i)
             {
                 const std::optional<FormId> reference = in.form();
@@ -568,6 +649,7 @@ namespace FalloutScript
                 const float scale = in.f32();
                 const bool hasCount = in.boolean();
                 const int count = in.i32();
+                state.mLua = readLua(in);
                 if (hasScale)
                     state.mScale = scale;
                 if (hasCount)
@@ -575,7 +657,7 @@ namespace FalloutScript
                 if (reference)
                     references[*reference] = state;
             }
-            const std::size_t objects = in.count(entryBytes + 4);
+            const std::size_t objects = in.count(objectBytes);
             for (std::size_t i = 0; i < objects; ++i)
             {
                 Entry entry;
@@ -623,6 +705,8 @@ namespace FalloutScript
                 references[entry.mReference].mScale = entry.mScale;
                 // What is left of a stack that was partly taken
                 references[entry.mReference].mCount = entry.mCount;
+                if (entry.mLua)
+                    references[entry.mReference].mLua = entry.mLua;
             }
             for (const auto& [reference, move] : relocations)
             {
@@ -645,6 +729,8 @@ namespace FalloutScript
                 object.mEnabled = entry.mEnabled;
                 object.mCount = entry.mCount;
                 object.mScale = entry.mScale;
+                object.mNumber = entry.mNumber;
+                object.mLua = entry.mLua;
                 host.mPendingSave->mObjects.push_back(object);
             }
             host.mPendingSave->mRequests = std::move(requests);
@@ -669,7 +755,7 @@ namespace OFScript
         mPendingSave->mTriggers.erase(found);
     }
 
-    bool FalloutScripts::savedReferenceLoaded(FalloutScript::FormId reference)
+    bool FalloutScripts::savedReferenceLoaded(FalloutScript::FormId reference, const OFWorld::Ptr& ptr)
     {
         const auto saved = mPendingSave->mReferences.find(reference);
         if (saved == mPendingSave->mReferences.end())
@@ -685,6 +771,9 @@ namespace OFScript
             mPendingSave->mToScale.emplace_back(reference, *state.mScale);
         if (state.mCount)
             mPendingSave->mToCount.emplace_back(reference, *state.mCount);
+        // The scripts of the configuration have been started on it with the cell: those of the save take their place
+        if (state.mLua)
+            OFBase::Environment::get().getLuaManager()->restoreLocalScripts(ptr, *state.mLua);
         return false;
     }
 

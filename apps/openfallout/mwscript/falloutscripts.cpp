@@ -597,7 +597,7 @@ namespace OFScript
                 return true;
             mReferences[reference] = ptr;
             // One that the loaded game had deleted is deleted at the start of the next frame: it does not run
-            if (savedReferenceLoaded(reference))
+            if (savedReferenceLoaded(reference, ptr))
                 return true;
             takeSavedChanges(reference);
             if (isCharacterOrCreature(ptr))
@@ -4063,6 +4063,51 @@ namespace OFScript
         }
     }
 
+    namespace
+    {
+        /// Whether a number that the world made up comes after another (the counter goes up in the index, and down in
+        /// the content file when the index runs out)
+        bool generatedLater(const ESM::RefNum& a, const ESM::RefNum& b)
+        {
+            return a.mContentFile < b.mContentFile || (a.mContentFile == b.mContentFile && a.mIndex > b.mIndex);
+        }
+
+        /// Makes the next number that the world makes up for an object the given one, and puts the counter back (never
+        /// behind the number) when it goes out of scope
+        class NumberGuard
+        {
+        public:
+            NumberGuard(OFWorld::WorldModel& model, const ESM::RefNum& number)
+                : mModel(model)
+                , mCounter(model.getLastGeneratedRefNum())
+            {
+                if (!isGenerated(number))
+                    return;
+                mActive = true;
+                ESM::RefNum before = number;
+                --before.mIndex;
+                mModel.setLastGeneratedRefNum(before);
+                if (generatedLater(number, mCounter))
+                    mCounter = number;
+            }
+            ~NumberGuard()
+            {
+                if (mActive)
+                    mModel.setLastGeneratedRefNum(mCounter);
+            }
+            NumberGuard(const NumberGuard&) = delete;
+            NumberGuard& operator=(const NumberGuard&) = delete;
+
+            /// Generated numbers have a content file below zero
+            static bool isGenerated(const ESM::RefNum& number) { return number.mContentFile < 0 && number.mIndex != 0; }
+
+        private:
+            OFWorld::WorldModel& mModel;
+            ESM::RefNum mCounter;
+            bool mActive = false;
+        };
+    }
+
     void FalloutScripts::applySaved()
     {
         PendingSave& pending = *mPendingSave;
@@ -4110,7 +4155,18 @@ namespace OFScript
                     position.pos[axis] = object.mPosition[axis];
                     position.rot[axis] = object.mAngle[axis];
                 }
-                const OFWorld::Ptr placed = world->placeObject(ref.getPtr(), cell, position);
+                const OFWorld::Ptr placed = [&] {
+                    // Lua knows the object by the number the world made up for it, which it keeps in its saved data:
+                    // the world gives the object the next number it has when the object is put in the cell, so the next
+                    // number is the one of the save for as long as it takes
+                    const NumberGuard numbers(*OFBase::Environment::get().getWorldModel(), object.mNumber);
+                    return world->placeObject(ref.getPtr(), cell, position);
+                }();
+                if (NumberGuard::isGenerated(object.mNumber) && placed.getCellRef().getRefNum() != object.mNumber)
+                    log("Load: the object made from " + FalloutScript::hex(object.mBase)
+                        + " has not the number Lua knew it by");
+                if (object.mLua)
+                    OFBase::Environment::get().getLuaManager()->restoreLocalScripts(placed, *object.mLua);
                 if (!object.mEnabled)
                     world->disable(placed);
                 if (object.mScale != 1)

@@ -7,7 +7,9 @@
 #include <utility>
 #include <vector>
 
+#include <components/esm/luascripts.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm3/refnum.hpp>
 #include <components/falloutscript/saveworld.hpp>
 #include <components/falloutscript/script.hpp>
 
@@ -26,6 +28,8 @@ namespace OFScript
             bool mDeleted = false;
             std::optional<float> mScale;
             std::optional<int> mCount;
+            /// The state of the Lua scripts attached to it
+            std::optional<ESM::LuaScripts> mLua;
         };
         std::map<FalloutScript::FormId, Reference> mReferences;
 
@@ -41,6 +45,9 @@ namespace OFScript
             bool mEnabled = true;
             int mCount = 1;
             float mScale = 1;
+            /// The number that Lua knows it by (a number the world made up when the object was made)
+            ESM::RefNum mNumber;
+            std::optional<ESM::LuaScripts> mLua;
         };
         std::vector<Object> mObjects;
 
