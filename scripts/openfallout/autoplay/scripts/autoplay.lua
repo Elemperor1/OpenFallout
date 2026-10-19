@@ -1,6 +1,7 @@
 -- Plays the New Game of Fallout 3 and New Vegas for a person who is not there: answers the message boxes, finishes the
 -- screens of character creation, picks the topics of a conversation (the one it has picked least often with the
--- character, the first of them) and ends it when it has picked them all twice, and logs each of these in lines that
+-- character, the first of them) and ends it when it has picked them all twice, shoots at what the world script tells it to
+-- (the weapon is the player's), and logs each of these in lines that
 -- start with AUTOPLAY (counts and numbers, no text of the game). It is a developer tool, not part of the game: it is loaded with
 --     openfallout --data scripts/openfallout/autoplay --content autoplay.omwscripts ...
 -- The scripts of the data folder are of the player (this file) and of the world (autoplayworld.lua, which follows the quests).
@@ -19,6 +20,9 @@ local NAME = 'Autoplay'
 local MAX_PICKS = 2
 -- How long (real seconds) a conversation that has nothing to pick from, and says nothing, is left before it is ended
 local CLOSE_AFTER = 3
+-- How long (real seconds) the player shoots at one target before giving up (the weapon is ready again only after its time
+-- between two shots has passed in the game, which a screen that stops the game does not let pass)
+local FIRE_LIMIT = 90
 
 local boxSerial, boxWaited, boxAnswered = nil, 0, nil
 local pageSerial, pageWaited = nil, 0
@@ -26,6 +30,9 @@ local topicWaited, emptyWaited = 0, 0
 -- How often each topic was picked, by the character and the topic
 local picks = {}
 local lastStatus = 0
+-- What the player is shooting at: the object, its form id (as core.getFormId writes it), how many shots it may take, whether
+-- it goes on until the target is dead, the shots fired so far and the real seconds spent
+local firing = nil
 
 local function log(...) print('AUTOPLAY', ...) end
 
@@ -120,7 +127,49 @@ local function pickTopic(dt)
     core.conversation.choose(state.options[best].topic)
 end
 
+-- The player takes the weapon in hand and shoots at the target, once each time the weapon is ready, until the shots are
+-- fired or (when the gate says so) the target is dead. A shot at an object tells its script about the blow; one at a character
+-- or creature takes health from it.
+local function shoot(dt)
+    if not firing then return end
+    firing.waited = firing.waited + dt
+    local why
+    if firing.untilDead and core.combat.isDead(firing.form) then
+        why = 'dead'
+    elseif firing.fired >= firing.shots then
+        why = 'shots'
+    elseif firing.waited >= FIRE_LIMIT then
+        why = 'time'
+    else
+        local ok, row = pcall(core.combat.fire, firing.target)
+        if not ok then
+            log('fire error', tostring(row))
+            why = 'error'
+        elseif row.outOfAmmo then
+            why = 'ammo'
+        elseif row.fired then
+            firing.fired = firing.fired + 1
+            log('fire', string.format('shot=%d hit=%s damage=%.1f killed=%s', firing.fired, tostring(row.hit),
+                row.damage, tostring(row.killed)))
+        end
+    end
+    if why then
+        log('fire done', why, string.format('shots=%d real=%.1f', firing.fired, firing.waited))
+        firing = nil
+    end
+end
+
 return {
+    eventHandlers = {
+        AutoplayFire = function(data)
+            local weapon = core.combat.weapon()
+            log('fire start', string.format('shots=%d untilDead=%s rounds=%d range=%.0f', data.shots,
+                tostring(data.untilDead), weapon.rounds, weapon.range))
+            core.combat.setDrawn(true)
+            firing = { target = data.target, form = data.form, shots = data.shots, untilDead = data.untilDead,
+                fired = 0, waited = 0 }
+        end,
+    },
     engineHandlers = {
         -- every frame, also while a screen or a box stops the game (the time of the game does not pass then)
         onFrame = function()
@@ -128,6 +177,7 @@ return {
             answerBox(dt)
             finishPage(dt)
             pickTopic(dt)
+            shoot(dt)
             lastStatus = lastStatus + dt
             if lastStatus >= 5 then
                 lastStatus = 0

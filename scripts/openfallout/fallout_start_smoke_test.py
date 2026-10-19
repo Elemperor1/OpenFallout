@@ -1052,6 +1052,67 @@ return {{
 }}
 """
 
+# The gates of autoplay that shoot, take the player to another cell by its form ID and activate several things at once, on the
+# arena: once the quest of the arena has given the player the rifle (stage 10) autoplay shoots three times at the activator whose
+# script counts the blows, shoots at the dummy until it is dead, goes to the room (which has three switches), activates the three
+# switches and goes back to the arena. Each gate waits for the one before it (`gap`, real seconds: of the gates that are ready the
+# first of the table goes first, so the gaps are the same).
+AUTOPLAY_GATE = "quest = '{quest}', stage = {stage}, file = 'OFTest.esm'".format(
+    quest=plugin.ARENA_QUEST_NAME, stage=plugin.ARENA_SETUP_STAGE)
+AUTOPLAY_GATES = f"""\
+return {{
+    settle = 1,
+    tries = 1,
+    gates = {{
+        {{ {AUTOPLAY_GATE}, ref = {plugin.AUTOPLAY_TARGET_REF_ID}, how = 'fire', shots = 3 }},
+        {{ {AUTOPLAY_GATE}, ref = {plugin.ARENA_DUMMY_REF_ID}, how = 'fire', shots = 20, untilDead = true, gap = 4 }},
+        {{ {AUTOPLAY_GATE}, cell = {plugin.AUTOPLAY_ROOM_CELL_ID}, at = {{ {", ".join(map(str, plugin.AUTOPLAY_ROOM_AT))} }}, how = 'teleport', gap = 4 }},
+        {{ {AUTOPLAY_GATE}, refs = {{ {", ".join(map(str, plugin.AUTOPLAY_SWITCH_REF_IDS))} }}, how = 'activate', gap = 4 }},
+        {{ {AUTOPLAY_GATE}, cell = {plugin.ARENA_CELL_ID}, at = {{ 0.0, 0.0, 0.0 }}, how = 'teleport', gap = 4 }},
+    }},
+}}
+"""
+
+# The world script of that test: puts the quest of the arena at the stage that gives the player the rifle, and says every
+# few seconds what the scripts of the activators and of the dummy counted and where the player is
+AUTOPLAY_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+
+local elapsed, nextReport, started = 0, 0, false
+local function report()
+    local g, player = world.globals, world.players[1]
+    print('OFTEST', 'autoplay', 'state', string.format('t=%.0f targetHits=%.0f dummyHits=%.0f deaths=%.0f switches=%.0f cell=%s',
+        elapsed, g.@TARGET_HITS@, g.@HITS@, g.@DEATHS@, g.@SWITCHES@, tostring(player.cell.name)))
+end
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if not started and elapsed >= 1 then
+                started = true
+                local quest = world.quests.find('@QUEST@')
+                print('OFTEST', 'autoplay', 'stage', tostring(quest ~= nil and quest:setStage(@SETUP@)))
+            end
+            if elapsed >= nextReport then
+                nextReport = nextReport + 2
+                report()
+            end
+            if elapsed >= @END@ then
+                report()
+                core.quit()
+            end
+        end,
+    },
+}
+"""
+AUTOPLAY_END = 30
+AUTOPLAY_SCRIPT = (AUTOPLAY_SCRIPT.replace("@QUEST@", plugin.ARENA_QUEST_NAME).replace("@SETUP@", str(plugin.ARENA_SETUP_STAGE))
+                   .replace("@END@", str(AUTOPLAY_END)).replace("@TARGET_HITS@", plugin.AUTOPLAY_GLOBALS["target_hits"][1])
+                   .replace("@SWITCHES@", plugin.AUTOPLAY_GLOBALS["switches"][1])
+                   .replace("@HITS@", plugin.ARENA_GLOBALS["hits"][1]).replace("@DEATHS@", plugin.ARENA_GLOBALS["deaths"][1]))
+
 # Walks the player into the trigger of the plugin and out of it again, and logs what the script of the trigger counted.
 # The box is turned a quarter about z, so that its long side runs along y: a point 100 to the side along y is inside it,
 # and one 100 along x is not (the box is 40 across).
@@ -2600,6 +2661,54 @@ def check_arena(text):
     return problems
 
 
+def check_autoplay(text):
+    """The problems with the gates of autoplay on the arena: each of the five gates runs (shoot at the activator, shoot at the
+    dummy until it is dead, go to the other cell by its form ID, activate the three switches, go back), the player fires the
+    three shots at the activator and the script of the activator hears each (OnHitWith), the dummy dies of the shots it is
+    given (OnDeath once), the script of the switches hears three activations, and the player is in the arena again at the end."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|AUTOPLAY\tfire error", line, re.I):
+            problems.append(line)
+    if re.search(r"OFTEST\tautoplay\tstage\ttrue$", text, re.M) is None:
+        problems.append("the quest of the arena was not put at the stage that gives the rifle")
+    gates = re.findall(r"AUTOPLAY\tgate\t(\w+)\t\w+\tstage=(\d+) (\S+) try=(\d+)\t(.*)$", text, re.M)
+    expected = [("fire", f"ref={plugin.AUTOPLAY_TARGET_REF_ID:06X}"), ("fire", f"ref={plugin.ARENA_DUMMY_REF_ID:06X}"),
+                ("teleport", f"cell={plugin.AUTOPLAY_ROOM_CELL_ID:06X}"),
+                ("activate", f"ref={plugin.AUTOPLAY_SWITCH_REF_IDS[0]:06X}"),
+                ("teleport", f"cell={plugin.ARENA_CELL_ID:06X}")]
+    if [(how, target) for how, _, target, _, _ in gates] != expected:
+        problems.append(f"autoplay should run its five gates, in order: {gates}")
+    for how, _, target, _, result in gates:
+        if result != "ok":
+            problems.append(f"the gate {how} {target} did not work: {result}")
+    done = re.findall(r"AUTOPLAY\tfire done\t(\w+)\tshots=(\d+) real=([\d.]+)$", text, re.M)
+    if [reason for reason, _, _ in done] != ["shots", "dead"] or done and int(done[0][1]) != 3:
+        problems.append(f"the player should fire its three shots at the activator, then fire at the dummy until it is dead: {done}")
+    states = []
+    for line in text.splitlines():
+        match = re.search(r"OFTEST\tautoplay\tstate\tt=(\d+) targetHits=(-?[\d.]+) dummyHits=(-?[\d.]+) deaths=(-?[\d.]+) "
+                          r"switches=(-?[\d.]+) cell=(.*)$", line)
+        if match:
+            states.append((int(match.group(1)), *(float(value) for value in match.groups()[1:5]), match.group(6)))
+    if not states:
+        problems.append("no 'autoplay state' line in the log")
+        return problems
+    last = states[-1]
+    if last[1] != 3:
+        problems.append(f"the script of the activator should have heard three blows (OnHitWith): {last}")
+    if last[2] < 1 or last[3] != 1:
+        problems.append(f"the dummy should have been hit and have died once (OnHit, OnDeath): {last}")
+    if last[4] != 3:
+        problems.append(f"the script of the switches should have heard three activations: {last}")
+    cells = {state[5] for state in states}
+    if len(cells) != 2:
+        problems.append(f"the player should have been in two cells (the arena, the room, and the arena again): {sorted(cells)}")
+    elif states[0][5] != last[5]:
+        problems.append(f"the player should be back in the arena at the end: {states[0][5]} {last[5]}")
+    return problems
+
+
 def check_arena_screens(text):
     """The problems with the screens of the arena: the Pip-Boy tells what the character is and carries (the experience of
     the kill, the rifle held, the seven attributes and thirteen skills) and opens its window; the dead dummy is looted (the
@@ -3411,7 +3520,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -3573,6 +3682,36 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (arena):", problem)
+        problems += found
+    if args.only in (None, "autoplay"):
+        # The gates of autoplay have a table of their own (a data folder of their own, since the table is a script of it)
+        home = work / "autoplay" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "autoplay" / "runtime"
+        runtime.mkdir(mode=0o700)
+        gate_data = work / "autoplay" / "data"
+        plugin.write(gate_data, animation=not args.no_animation, spline=not args.key_animation)
+        (gate_data / "scripts").mkdir()
+        for name in ("autoplay.lua", "autoplayworld.lua"):
+            shutil.copy(AUTOPLAY / "scripts" / name, gate_data / "scripts" / name)
+        (gate_data / "scripts" / "autoplaygates.lua").write_text(AUTOPLAY_GATES, encoding="ascii")
+        (gate_data / "scripts" / "autoplaytest.lua").write_text(AUTOPLAY_SCRIPT, encoding="ascii")
+        (gate_data / "autoplaytest.omwscripts").write_text(
+            "PLAYER: scripts/autoplay.lua\nGLOBAL: scripts/autoplayworld.lua\nGLOBAL: scripts/autoplaytest.lua\n", encoding="ascii")
+        print("== autoplay: --start", plugin.ARENA_CELL_NAME)
+        status, _ = run_engine(program, build / "resources", gate_data, home, runtime, args.seconds, plugin.ARENA_CELL_NAME, [],
+                               "autoplaytest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_autoplay(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line or "AUTOPLAY" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (autoplay):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

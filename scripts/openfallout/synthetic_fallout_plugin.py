@@ -482,7 +482,24 @@ ARENA_OTHER_AMMO_COUNT = 3
 BODY_PARTS = (("Torso", "Torso", 1.0, 100, 26, 100, 0), ("Head", "Head", 2.0, 50, 25, 100, 1),
               ("LeftArm", "Left Arm", 0.5, 25, 27, 30, 3), ("RightLeg", "Right Leg", 0.5, 25, 30, 40, 10),
               ("Spine", "", 1.0, 100, -1, 100, 13))
-LAST_ID = 0x956 # the largest form ID of the plugin, which the next object ID of its header follows
+# What autoplay (scripts/openfallout/autoplay) is made to do on the arena: shoot at an activator whose script hears the blows
+# (OnHitWith), shoot at the dummy until it is dead, go to another cell by its form ID (a room with three switches), and
+# activate the three switches, which count the activations in a global
+AUTOPLAY_TARGET_ID = 0x957
+AUTOPLAY_TARGET_REF_ID = 0x958
+AUTOPLAY_TARGET_SCRIPT_ID = 0x959
+AUTOPLAY_TARGET_PLACE = (500.0, -300.0, 0.0)
+AUTOPLAY_ROOM_FLOOR_REF_ID = 0x95A
+AUTOPLAY_ROOM_CELL_ID = 0x95B  # another block and sub-block of the interior cells than the arena has
+AUTOPLAY_ROOM_MARKER_REF_ID = 0x95C
+AUTOPLAY_SWITCH_ID = 0x95D
+AUTOPLAY_SWITCH_REF_IDS = (0x95E, 0x95F, 0x960)
+AUTOPLAY_SWITCH_SCRIPT_ID = 0x961
+AUTOPLAY_SWITCH_PLACES = ((-200.0, 0.0, 0.0), (0.0, 0.0, 0.0), (200.0, 0.0, 0.0))
+AUTOPLAY_ROOM_AT = (0.0, 300.0, 0.0)  # where the player is put in the room
+AUTOPLAY_GLOBALS = {"target_hits": (0x962, "OFTestAutoplayTargetHits"), "switches": (0x963, "OFTestAutoplaySwitches")}
+AUTOPLAY_ROOM_CELL_NAME = "OFTestAutoplayRoom"
+LAST_ID = 0x963 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2100,17 +2117,19 @@ def plugin():
                                   *(global_variable(form_id, name, b"f")
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in AUTOPLAY_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
             + top_group(b"FLST", form_lists())
             + top_group(b"TACT", [intercom_base()])
-            + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base()])
+            + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base(),
+                                  *autoplay_objects()])
             + top_group(b"FURN", [furniture_base()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
                                                  new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
-                                                 watch_script("exterior"), *arena_scripts()])
+                                                 watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
             + top_group(b"MISC", [arena_scrap()])
@@ -2149,7 +2168,7 @@ def plugin():
             + top_group(b"DIAL", dialogue())
             + top_group(b"CREA", [*creatures()[:2], heir()])
             + top_group(b"LVLC", [creatures()[2]])
-            + top_group(b"CELL", [block, arena_cell()]) + top_group(b"WRLD", worldspace()))
+            + top_group(b"CELL", [block, arena_cell(), autoplay_room_cell()]) + top_group(b"WRLD", worldspace()))
 
 
 def arena_ammo(form_id=ARENA_AMMO_ID, name="Test Rounds"):
@@ -2302,10 +2321,51 @@ def arena_cell():
         achr(ARENA_DUMMY_REF_ID, ARENA_DUMMY_PLACE, base=ARENA_DUMMY_ID),
         achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
         achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID),
-        achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID)])
+        achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID),
+        refr(AUTOPLAY_TARGET_REF_ID, AUTOPLAY_TARGET_ID, AUTOPLAY_TARGET_PLACE)])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
     return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])
+
+
+def autoplay_objects():
+    """The activator that autoplay shoots at and the switch it activates (ACTI records with a script and no model)."""
+    return [record(b"ACTI", AUTOPLAY_TARGET_ID, [zstr(b"EDID", "OFTestAutoplayTarget"),
+                                                 sub(b"SCRI", struct.pack("<I", AUTOPLAY_TARGET_SCRIPT_ID))]),
+            record(b"ACTI", AUTOPLAY_SWITCH_ID, [zstr(b"EDID", "OFTestAutoplaySwitch"),
+                                                 sub(b"SCRI", struct.pack("<I", AUTOPLAY_SWITCH_SCRIPT_ID))])]
+
+
+def autoplay_scripts():
+    """The script of the target (it counts the blows of any weapon, as the target of the tutorial of Fallout 3 does) and
+    the script of the switches (it counts the activations)."""
+    sf = fallout_script
+
+    def counting(script_id, name, block_type, global_name):
+        script = sf.Script(0)
+        counter = script.form(AUTOPLAY_GLOBALS[global_name][0])
+        script.add(sf.statement(sf.SCRIPT_NAME), sf.block(block_type, sf.set_to(
+            sf.global_target(counter), sf.global_target(counter) + sf.number("1") + sf.operator("+"))))
+        return record(b"SCPT", script_id, [zstr(b"EDID", name), *sf.sub_records(script)])
+
+    return [counting(AUTOPLAY_TARGET_SCRIPT_ID, "OFTestAutoplayTargetScript", sf.ON_HIT_WITH, "target_hits"),
+            counting(AUTOPLAY_SWITCH_SCRIPT_ID, "OFTestAutoplaySwitchScript", sf.ON_ACTIVATE, "switches")]
+
+
+def autoplay_room_cell():
+    """The other interior cell, which autoplay is taken to by its form ID: a floor, an entry marker and the three switches."""
+    xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
+    cell = record(b"CELL", AUTOPLAY_ROOM_CELL_ID, [zstr(b"EDID", AUTOPLAY_ROOM_CELL_NAME),
+                                                   zstr(b"FULL", "OpenFallout Test Autoplay Room"),
+                                                   sub(b"DATA", b"\x01"), sub(b"XCLL", xcll)])
+    refs = group(struct.pack("<I", AUTOPLAY_ROOM_CELL_ID), 9, [
+        refr(AUTOPLAY_ROOM_FLOOR_REF_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
+        refr(AUTOPLAY_ROOM_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
+        *(refr(form_id, AUTOPLAY_SWITCH_ID, place)
+          for form_id, place in zip(AUTOPLAY_SWITCH_REF_IDS, AUTOPLAY_SWITCH_PLACES))])
+    children = group(struct.pack("<I", AUTOPLAY_ROOM_CELL_ID), 6, [refs])
+    sub_block = group(struct.pack("<i", AUTOPLAY_ROOM_CELL_ID // 10 % 10), 3, [cell, children])
+    return group(struct.pack("<i", AUTOPLAY_ROOM_CELL_ID % 10), 2, [sub_block])
 
 
 def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):

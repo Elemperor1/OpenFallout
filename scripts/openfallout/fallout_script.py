@@ -25,6 +25,7 @@ ON_PACKAGE_START = 15 # the blocks of the events of the AI packages of a charact
 ON_PACKAGE_DONE = 16
 ON_PACKAGE_CHANGE = 20
 ON_HIT = 8 # the blocks of the events of combat
+ON_HIT_WITH = 9
 ON_DEATH = 10
 ON_START_COMBAT = 25
 ON_LOAD = 21
