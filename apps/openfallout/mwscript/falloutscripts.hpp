@@ -1007,6 +1007,9 @@ namespace OFScript
         /// A reference of a cell that was just loaded: what a loaded game said about it waits for the next frame.
         /// \return true for one that the game had deleted
         bool savedReferenceLoaded(FalloutScript::FormId reference);
+        /// What scripts asked of a reference while it was out of the loaded cells (or what a loaded game says they
+        /// had asked) is done to it at the start of the next frame
+        void takeSavedChanges(FalloutScript::FormId reference);
         /// The volume of a trigger was just put in: the actors a loaded game said were inside are so, and the events
         /// it had not raised yet wait again
         void restoreSavedTrigger(FalloutScript::FormId trigger);

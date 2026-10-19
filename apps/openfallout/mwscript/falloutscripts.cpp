@@ -564,6 +564,28 @@ namespace OFScript
         return made != mMade.end() ? made->second : ESM::FormId::fromUint32(reference);
     }
 
+    void FalloutScripts::takeSavedChanges(FalloutScript::FormId reference)
+    {
+        // An object that scripts moved while its cell was not loaded is put where they wanted it
+        if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
+        {
+            // The place is the whole place the object was given, of which scripts named the parts in the mask
+            Move move = moved->second;
+            // Whatever a script asked for since then comes after it
+            if (const auto asked = mPendingMoves.find(reference); asked != mPendingMoves.end())
+                move.add(asked->second);
+            mPendingMoves[reference] = move;
+            mRelocations.erase(moved);
+        }
+        // An object that scripts enabled or disabled while its cell was not loaded is so now, whatever its record
+        // says; from here on the state is that of the object
+        if (const auto state = mDisabled.find(reference); state != mDisabled.end())
+        {
+            mPendingToggle.emplace_back(reference, state->second);
+            mDisabled.erase(state);
+        }
+    }
+
     void FalloutScripts::cellLoaded(OFWorld::CellStore& cell)
     {
         // This runs while the scene is being changed, which scripts must not change in turn (enabling or disabling an
@@ -577,24 +599,7 @@ namespace OFScript
             // One that the loaded game had deleted is deleted at the start of the next frame: it does not run
             if (savedReferenceLoaded(reference))
                 return true;
-            // An object that scripts moved while its cell was not loaded is put where they wanted it
-            if (const auto moved = mRelocations.find(reference); moved != mRelocations.end())
-            {
-                // The place is the whole place the object was given, of which scripts named the parts in the mask
-                Move move = moved->second;
-                // Whatever a script asked for since then comes after it
-                if (const auto asked = mPendingMoves.find(reference); asked != mPendingMoves.end())
-                    move.add(asked->second);
-                mPendingMoves[reference] = move;
-                mRelocations.erase(moved);
-            }
-            // An object that scripts enabled or disabled while its cell was not loaded is so now, whatever its record
-            // says; from here on the state is that of the object
-            if (const auto state = mDisabled.find(reference); state != mDisabled.end())
-            {
-                mPendingToggle.emplace_back(reference, state->second);
-                mDisabled.erase(state);
-            }
+            takeSavedChanges(reference);
             if (isCharacterOrCreature(ptr))
                 mTriggerActors.insert(reference);
             const FalloutScript::FormId script = scriptOf(ptr, reference);
@@ -4061,9 +4066,23 @@ namespace OFScript
     void FalloutScripts::applySaved()
     {
         PendingSave& pending = *mPendingSave;
-        if (pending.mObjects.empty() && pending.mToDelete.empty() && pending.mToScale.empty())
+        if (pending.mObjects.empty() && pending.mRequests.empty() && pending.mToDelete.empty()
+            && pending.mToScale.empty())
             return;
         OFBase::World* world = OFBase::Environment::get().getWorld();
+
+        // What PlaceAtMe had asked for is asked again, and made at the start of the next frame as it would have been
+        if (!pending.mRequests.empty())
+        {
+            const std::lock_guard lock(mMadeMutex);
+            for (const PendingSave::Request& request : pending.mRequests)
+            {
+                mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle } };
+                mMadeBases[request.mId] = request.mBase;
+            }
+            pending.mRequests.clear();
+        }
 
         std::vector<PendingSave::Object> objects;
         objects.swap(pending.mObjects);
@@ -4097,7 +4116,14 @@ namespace OFScript
                 if (object.mScale != 1)
                     world->scaleObject(placed, object.mScale);
                 if (object.mId != 0)
-                    adoptObject(object.mId, placed, world->getActiveCells().contains(placed.getCell()));
+                {
+                    const bool loaded = world->getActiveCells().contains(placed.getCell());
+                    adoptObject(object.mId, placed, loaded);
+                    // What scripts had asked of it when the game was saved and the world had not done yet; in a cell
+                    // that is not loaded the cell hands it over when it is
+                    if (loaded)
+                        takeSavedChanges(object.mId);
+                }
             }
             catch (const std::exception& error)
             {

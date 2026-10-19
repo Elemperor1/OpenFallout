@@ -43,6 +43,20 @@ namespace OFScript
         };
         std::vector<Object> mObjects;
 
+        /// What PlaceAtMe had asked for and the world had not made yet: asked again, to be made at the next frame
+        struct Request
+        {
+            FalloutScript::FormId mId = 0;
+            FalloutScript::FormId mBase = 0;
+            FalloutScript::FormId mNear = 0;
+            int mDirection = 0;
+            float mDistance = 0;
+            ESM::RefId mCell;
+            osg::Vec3f mPosition;
+            osg::Vec3f mAngle;
+        };
+        std::vector<Request> mRequests;
+
         /// Who stood in the volume of each trigger and what it had still to raise, until the cell of the trigger is
         /// loaded and its volume is put in
         std::map<FalloutScript::FormId, FalloutScript::SavedTrigger> mTriggers;

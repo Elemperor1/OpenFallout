@@ -380,6 +380,7 @@ namespace FalloutScript
 
         static constexpr std::size_t entryBytes = 4 + 1 + 4 + 4 + 1 + 24;
         static constexpr std::size_t moveBytes = 4 + 4 + 1 + 24;
+        static constexpr std::size_t requestBytes = 4 + 4 + 4 + 1 + 4 + 1 + 24;
 
         static void writeReferences(OFScript::FalloutScripts& host, SaveWriter& out)
         {
@@ -479,20 +480,39 @@ namespace FalloutScript
                 entry.mWhere = { object.mCell, object.mPosition, object.mAngle };
                 made.push_back(entry);
             }
+            out.count(made.size());
+            for (const Entry& entry : made)
+                writeEntry(out, entry, true);
+
+            // What PlaceAtMe asked for and the world has not made yet is written as it was asked, as where the object
+            // goes depends on the reference it is made next to
+            std::vector<OFScript::PendingSave::Request> requests = pending.mRequests;
             {
                 const std::lock_guard lock(host.mMadeMutex);
                 for (const auto& [id, request] : host.mPendingMade)
                 {
-                    Entry entry;
-                    entry.mReference = id;
-                    entry.mBase = request.mBase;
-                    entry.mWhere = request.mWhere;
-                    made.push_back(entry);
+                    OFScript::PendingSave::Request saved;
+                    saved.mId = id;
+                    saved.mBase = request.mBase;
+                    saved.mNear = request.mNear;
+                    saved.mDirection = request.mDirection;
+                    saved.mDistance = request.mDistance;
+                    saved.mCell = request.mWhere.mCell;
+                    saved.mPosition = request.mWhere.mPosition;
+                    saved.mAngle = request.mWhere.mAngle;
+                    requests.push_back(saved);
                 }
             }
-            out.count(made.size());
-            for (const Entry& entry : made)
-                writeEntry(out, entry, true);
+            out.count(requests.size());
+            for (const OFScript::PendingSave::Request& request : requests)
+            {
+                out.form(request.mId);
+                out.form(request.mBase);
+                out.form(request.mNear);
+                out.u8(static_cast<std::uint8_t>(request.mDirection));
+                out.f32(request.mDistance);
+                writePlace(out, { request.mCell, request.mPosition, request.mAngle });
+            }
         }
 
         static void readReferences(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
@@ -547,6 +567,28 @@ namespace FalloutScript
                 if (readEntry(in, entry, true))
                     made.push_back(entry);
             }
+            std::vector<OFScript::PendingSave::Request> requests;
+            const std::size_t asked = in.count(requestBytes);
+            for (std::size_t i = 0; i < asked; ++i)
+            {
+                const std::optional<FormId> id = in.form();
+                const std::optional<FormId> base = in.form();
+                const std::optional<FormId> near = in.form();
+                OFScript::PendingSave::Request request;
+                request.mDirection = in.u8();
+                request.mDistance = in.f32();
+                Place where;
+                const bool placed = readPlace(in, where);
+                if (!id || !base || !near || !placed || request.mDirection > 3)
+                    continue;
+                request.mId = *id;
+                request.mBase = *base;
+                request.mNear = *near;
+                request.mCell = where.mCell;
+                request.mPosition = where.mPosition;
+                request.mAngle = where.mAngle;
+                requests.push_back(request);
+            }
 
             // What was said of references that are not in a loaded cell, then the references that were seen to change
             // (the last say is the one of the save, whichever comes first)
@@ -584,6 +626,7 @@ namespace FalloutScript
                 object.mScale = entry.mScale;
                 host.mPendingSave->mObjects.push_back(object);
             }
+            host.mPendingSave->mRequests = std::move(requests);
         }
     };
 }
