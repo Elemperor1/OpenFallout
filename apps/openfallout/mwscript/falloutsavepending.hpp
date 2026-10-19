@@ -3,6 +3,8 @@
 
 #include <map>
 #include <optional>
+#include <set>
+#include <utility>
 #include <vector>
 
 #include <components/esm/refid.hpp>
@@ -39,6 +41,9 @@ namespace OFScript
             float mScale = 1;
         };
         std::vector<Object> mObjects;
+
+        /// Who stood in the volume of each trigger, until the cell of the trigger is loaded and its volume is put in
+        std::map<FalloutScript::FormId, std::set<FalloutScript::FormId>> mOccupants;
 
         /// The references of loaded cells that the next frame deletes or scales
         std::vector<FalloutScript::FormId> mToDelete;

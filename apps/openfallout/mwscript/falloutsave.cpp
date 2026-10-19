@@ -10,6 +10,7 @@
 #include <components/falloutscript/savecharacters.hpp>
 #include <components/falloutscript/savescripts.hpp>
 #include <components/falloutscript/savestate.hpp>
+#include <components/falloutscript/saveworld.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
@@ -215,6 +216,62 @@ namespace FalloutScript
             }
             // The screen of a level that was not shown is shown as soon as the game asks
             host.mLevelUpOpen = !host.mLevelUps.empty();
+        }
+
+        /// The furniture that characters use and the doors that scripts took the collision of
+        static void writeFurniture(OFScript::FalloutScripts& host, SaveWriter& out)
+        {
+            {
+                const std::lock_guard lock(host.mFurnitureMutex);
+                out.count(host.mFurniture.size());
+                for (const auto& [actor, use] : host.mFurniture)
+                {
+                    out.form(actor);
+                    out.form(use.mFurniture);
+                    for (int axis = 0; axis < 3; ++axis)
+                        out.f32(use.mPlace[axis]);
+                    out.i32(use.mEntry);
+                    out.i32(use.mKind);
+                    for (int axis = 0; axis < 3; ++axis)
+                        out.f32(use.mFurniturePlace[axis]);
+                }
+            }
+            out.count(host.mDoorsWithoutCollision.size());
+            for (const FormId door : host.mDoorsWithoutCollision)
+                out.form(door);
+        }
+
+        static void readFurniture(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
+        {
+            std::map<FormId, OFScript::FalloutScripts::FurnitureUse> uses;
+            const std::size_t count = in.count(4 + 4 + 12 + 8 + 12);
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                const std::optional<FormId> actor = in.form();
+                const std::optional<FormId> furniture = in.form();
+                OFScript::FalloutScripts::FurnitureUse use;
+                for (int axis = 0; axis < 3; ++axis)
+                    use.mPlace[axis] = in.f32();
+                use.mEntry = in.i32();
+                use.mKind = in.i32();
+                for (int axis = 0; axis < 3; ++axis)
+                    use.mFurniturePlace[axis] = in.f32();
+                if (actor && furniture)
+                {
+                    use.mFurniture = *furniture;
+                    uses[*actor] = use;
+                }
+            }
+            std::set<FormId> doors;
+            const std::size_t doorCount = in.count(4);
+            for (std::size_t i = 0; i < doorCount; ++i)
+                if (const std::optional<FormId> door = in.form())
+                    doors.insert(*door);
+            {
+                const std::lock_guard lock(host.mFurnitureMutex);
+                host.mFurniture = std::move(uses);
+            }
+            host.mDoorsWithoutCollision = std::move(doors);
         }
 
         using Place = OFScript::FalloutScripts::Place;
@@ -539,6 +596,15 @@ namespace OFScript
         return form.isZeroOrUnset() ? ESM::RefId() : ESM::RefId::formIdRefId(form);
     }
 
+    void FalloutScripts::restoreSavedOccupants(FalloutScript::FormId trigger)
+    {
+        const auto found = mPendingSave->mOccupants.find(trigger);
+        if (found == mPendingSave->mOccupants.end())
+            return;
+        FalloutScript::restoreOccupants(mTriggers, trigger, found->second);
+        mPendingSave->mOccupants.erase(found);
+    }
+
     bool FalloutScripts::savedReferenceLoaded(FalloutScript::FormId reference)
     {
         const auto saved = mPendingSave->mReferences.find(reference);
@@ -595,55 +661,92 @@ namespace OFScript
                                  std::function<void(FalloutScript::SaveReader&, std::uint32_t)> read) {
             sections.push_back({ name, version, std::move(write), std::move(read) });
         };
-        section("actors", FalloutScript::actorsSectionVersion,
+        section(
+            "actors", FalloutScript::actorsSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActors(mActors, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readActors(mActors, in, version);
             });
-        section("equipment", FalloutScript::equipmentSectionVersion,
+        section(
+            "equipment", FalloutScript::equipmentSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeEquipment(mEquipment, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readEquipment(mEquipment, in, version);
             });
-        section("actorvalues", FalloutScript::actorValuesSectionVersion,
+        section(
+            "actorvalues", FalloutScript::actorValuesSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActorValues(mActorValues, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readActorValues(mActorValues, in, version);
             });
-        section("progress", FalloutScript::progressSectionVersion,
+        section(
+            "progress", FalloutScript::progressSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeProgress(mProgress, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readProgress(mProgress, in, version);
             });
-        section("perks", FalloutScript::perksSectionVersion,
+        section(
+            "perks", FalloutScript::perksSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writePerks(mPerks, mActorValues, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readPerks(mPerks, mActorValues, in, version);
             });
-        section("itemuse", FalloutScript::itemUseSectionVersion,
+        section(
+            "itemuse", FalloutScript::itemUseSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeItemUse(mItemUse, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readItemUse(mItemUse, in, version);
             });
-        section("combat", FalloutScript::combatSectionVersion,
+        section(
+            "combat", FalloutScript::combatSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeCombat(mCombat, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readCombat(mCombat, in, version);
             });
-        section("referencestate", FalloutScript::referencesStateSectionVersion,
+        section(
+            "referencestate", FalloutScript::referencesStateSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReferenceState(mReferenceState, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readReferenceState(mReferenceState, in, version);
             });
-        section("formlists", FalloutScript::formListsSectionVersion,
+        section(
+            "formlists", FalloutScript::formListsSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeFormLists(mFormLists, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readFormLists(mFormLists, in, version);
             });
-        section("characters", 1, [this](FalloutScript::SaveWriter& out) { Access::writeCharacters(*this, out); },
+        section(
+            "dialogue", FalloutScript::dialogueSectionVersion,
+            [this](FalloutScript::SaveWriter& out) {
+                const std::lock_guard lock(mDialogueMutex);
+                FalloutScript::writeDialogue(mDialogue, out);
+            },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
-                Access::readCharacters(*this, in, version);
+                const std::lock_guard lock(mDialogueMutex);
+                FalloutScript::readDialogue(mDialogue, in, version);
             });
+        section(
+            "triggers", FalloutScript::triggersSectionVersion,
+            [this](FalloutScript::SaveWriter& out) {
+                FalloutScript::writeTriggers(mTriggers, mPendingSave->mOccupants, out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                mPendingSave->mOccupants = FalloutScript::readTriggers(in, version);
+            });
+        section(
+            "openstates", FalloutScript::openStatesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeOpenStates(mOpenStates, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readOpenStates(mOpenStates, in, version);
+            });
+        section(
+            "furniture", 1, [this](FalloutScript::SaveWriter& out) { Access::writeFurniture(*this, out); },
+            [this](
+                FalloutScript::SaveReader& in, std::uint32_t version) { Access::readFurniture(*this, in, version); });
+        section(
+            "characters", 1, [this](FalloutScript::SaveWriter& out) { Access::writeCharacters(*this, out); },
+            [this](
+                FalloutScript::SaveReader& in, std::uint32_t version) { Access::readCharacters(*this, in, version); });
         sections.push_back(
             { "references", 1, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {

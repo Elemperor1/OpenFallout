@@ -667,7 +667,10 @@ namespace OFScript
             volume.mAxisX = { x.x(), x.y(), x.z() };
             volume.mAxisY = { y.x(), y.y(), y.z() };
             volume.mAxisZ = { z.x(), z.y(), z.z() };
+            const bool known = mTriggers.has(reference);
             mTriggers.set(reference, volume);
+            if (!known)
+                restoreSavedOccupants(reference);
         }
         for (const FalloutScript::FormId reference : gone)
         {
