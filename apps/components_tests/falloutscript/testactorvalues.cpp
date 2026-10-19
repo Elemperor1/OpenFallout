@@ -237,6 +237,32 @@ namespace
         EXPECT_EQ(values.current(guard, variable01 + 1), 0);
     }
 
+    TEST(FalloutScriptActorValuesTest, a_skill_is_read_from_0_to_100_whatever_is_stored)
+    {
+        ActorValues values;
+        constexpr int repair = 39;
+
+        values.setBase(guard, repair, 100);
+        values.modify(guard, repair, 20);
+        EXPECT_EQ(values.base(guard, repair), 100);
+        EXPECT_EQ(values.permanent(guard, repair), 100);
+        EXPECT_EQ(values.current(guard, repair), 100);
+
+        // A penalty of 35 against the stored 120 shows 85, and the points added under it (the level-up menu allows 15)
+        // are kept in the base, which shows 100 again
+        values.modify(guard, repair, -35);
+        EXPECT_EQ(values.current(guard, repair), 85);
+        values.addBase(guard, repair, 15, 0);
+        EXPECT_EQ(values.base(guard, repair), 115);
+        EXPECT_EQ(values.current(guard, repair), 100);
+
+        values.damage(guard, repair, 200);
+        EXPECT_EQ(values.current(guard, repair), 0);
+        // Another actor value keeps going past 100
+        values.setBase(guard, variable01, 250);
+        EXPECT_EQ(values.current(guard, variable01), 250);
+    }
+
     TEST(FalloutScriptActorValuesTest, adding_to_the_base_leaves_the_modifier_and_the_damage_and_stops_at_the_minimum)
     {
         ActorValues values;

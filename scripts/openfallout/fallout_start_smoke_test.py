@@ -1609,6 +1609,22 @@ return {
                 'level=%d experience=%d title=%s health=%.0f/%.0f items=%d equipped=%d attributes=%d skills=%d perks=%d',
                 stats.level, stats.experience, stats.karmaTitle, stats.health, stats.maxHealth, #items, equipped,
                 #pipboy.attributes(), #pipboy.skills(), #pipboy.perks()))
+            -- The lists and cards: the rounds the rifle takes can be used and the others can not, the key is on the keyring,
+            -- and the card of the rifle tells its damage and its ammunition with the rounds in the clip and in reserve
+            local function named(name)
+                for _, item in ipairs(items) do
+                    if item.name == name then return item end
+                end
+                return { usable = false, key = false, cardDamage = 0, hasAmmo = false, ammoName = '', clip = 0, loaded = 0,
+                    reserve = 0, id = '' }
+            end
+            local rounds, slugs, key, rifle = named('Test Rounds'), named('Test Slugs'), named('Test Key'),
+                named('OFTestArenaRifle')
+            print('OFTEST', 'arena', 'pipboyitems', string.format(
+                'rounds=%s slugs=%s slugsUse=[%s] key=%s keyUsable=%s rifle=%.1f,%s,%s,%d,%d,%d newVegas=%s threshold=%.1f',
+                tostring(rounds.usable), tostring(slugs.usable), pipboy.use(slugs.id), tostring(key.key),
+                tostring(key.usable), rifle.cardDamage, tostring(rifle.hasAmmo), rifle.ammoName, rifle.clip,
+                rifle.loaded, rifle.reserve, tostring(stats.newVegas), stats.threshold))
             I.UI.setMode('Interface', { windows = { 'Inventory' } })
             pipboyFrames = 0
         end,
@@ -1685,7 +1701,7 @@ return {
             end
             if levelEscape then
                 levelEscape = levelEscape + 1
-                if levelEscape == 60 then
+                if levelEscape == 60 or levelEscape == 180 then
                     local back = I.UI.getMode()
                     -- Everything is given, as the buttons of the screen do (the points, then a perk, if one is offered)
                     core.pipboy.spendSkillPoints(32, core.pipboy.stats().skillPoints)
@@ -1699,10 +1715,20 @@ return {
                         end
                     end
                     local stats = core.pipboy.stats()
-                    print('OFTEST', 'arena', 'levelback', string.format('mode=%s skillPoints=%d perkPoints=%d offered=%d',
-                        tostring(back), stats.skillPoints, stats.perkPoints, #core.pipboy.offeredPerks()))
+                    -- The experience reached two levels, and each has a screen of its own: the first comes back after
+                    -- Escape, and when all of it is given the second opens
+                    print('OFTEST', 'arena', levelEscape == 60 and 'levelback' or 'levelnext',
+                        string.format('mode=%s skillPoints=%d perkPoints=%d offered=%d', tostring(back), stats.skillPoints,
+                            stats.perkPoints, #core.pipboy.offeredPerks()))
                     I.UI.removeMode('Interface')
                 elseif levelEscape == 120 then
+                    -- The first level is done, so the screen of the second one is open
+                    local next = I.UI.getMode()
+                    local stats = core.pipboy.stats()
+                    print('OFTEST', 'arena', 'levelsecond', string.format('mode=%s skillPoints=%d', tostring(next),
+                        stats.skillPoints))
+                    levelEscape = 121
+                elseif levelEscape == 240 then
                     print('OFTEST', 'arena', 'levelgone', 'mode=' .. tostring(I.UI.getMode()))
                     levelEscape = nil
                     core.sendGlobalEvent('OFTestArenaCraftNow', {})
@@ -2594,6 +2620,24 @@ def check_arena_screens(text):
             problems.append(f"the Pip-Boy should list the rifle (held) and its rounds: {pipboy.group(0)}")
         if int(attributes) != 7 or int(skills) != 13:
             problems.append(f"the Pip-Boy should list 7 attributes and 13 skills: {pipboy.group(0)}")
+    cards = re.search(r"OFTEST\tarena\tpipboyitems\trounds=(\w+) slugs=(\w+) slugsUse=\[(.*?)\] key=(\w+) keyUsable=(\w+) "
+                      r"rifle=([\d.]+),(\w+),(.*?),(\d+),(\d+),(\d+) newVegas=(\w+) threshold=([\d.]+)$", text, re.M)
+    if not cards:
+        problems.append("no 'arena pipboyitems' line in the log (the lists and cards of the Pip-Boy were not read)")
+    else:
+        rounds, slugs, slugs_use, key, key_usable, damage, has_ammo, ammo_name, clip, loaded, reserve, nv, threshold = \
+            cards.groups()
+        if (rounds, slugs, slugs_use) != ("true", "false", ""):
+            problems.append("the rounds of the rifle in hand should be usable and the others not: " + cards.group(0))
+        if (key, key_usable) != ("true", "false"):
+            problems.append("the key should be a key that is not used from the list: " + cards.group(0))
+        if float(damage) != plugin.ARENA_RIFLE_DAMAGE or has_ammo != "true" or ammo_name != "Test Rounds":
+            problems.append("the card of the rifle should tell its damage and its ammunition: " + cards.group(0))
+        if int(clip) != 12 or not 0 < int(loaded) <= 12 or int(reserve) < 0:
+            problems.append("the card of the rifle should tell the rounds in the clip and in reserve: " + cards.group(0))
+        # The arena has no master of Fallout 3, so the game is New Vegas, which tells a threshold (nothing is worn here)
+        if nv != "true" or float(threshold) != 0:
+            problems.append("New Vegas should tell a damage threshold of 0 for a character in no armor: " + cards.group(0))
     if not re.search(r"OFTEST\tarena\tmode\tInterface$", text, re.M):
         problems.append("the Pip-Boy should have opened the window that stops the game (mode Interface)")
     loot = re.search(r"OFTEST\tarena\tloot\t(.*)$", text, re.M)
@@ -2625,8 +2669,22 @@ def check_arena_screens(text):
             problems.append(f"the screen of the level up should have come back after Escape: {level_back.group(0)}")
         if int(points) != 0 or (int(perks) != 0 and int(offered) != 0):
             problems.append(f"the points of the level up should all have been given: {level_back.group(0)}")
+    # The experience reached two levels, and each has a screen: the second opens when the first is done, with the points
+    # of its own level
+    level_second = re.search(r"OFTEST\tarena\tlevelsecond\tmode=(\w+) skillPoints=(\d+)$", text, re.M)
+    if not level_second:
+        problems.append("no 'arena levelsecond' line in the log")
+    elif level_second.group(1) != "Interface" or int(level_second.group(2)) < 1:
+        problems.append("the screen of the second level should open with its own skill points once the first is done: "
+                        f"{level_second.group(0)}")
+    level_next = re.search(r"OFTEST\tarena\tlevelnext\tmode=(\w+) skillPoints=(\d+) perkPoints=(\d+) offered=(\d+)$",
+                           text, re.M)
+    if not level_next:
+        problems.append("no 'arena levelnext' line in the log")
+    elif level_next.group(1) != "Interface" or int(level_next.group(2)) != 0:
+        problems.append(f"the points of the second level should all have been given: {level_next.group(0)}")
     if "OFTEST\tarena\tlevelgone\tmode=nil" not in text:
-        problems.append("the screen of the level up should be gone once every point was given")
+        problems.append("the screen of the level up should be gone once every point of every level was given")
     recipes = re.search(r"OFTEST\tarena\trecipes\t(.*)$", text, re.M)
     want = (f"name={plugin.ARENA_CATEGORY_NAME} mode=Interface count=2 statuses=ready,skill "
             f"scrap={plugin.ARENA_SCRAP_GIVEN}/{plugin.ARENA_RECIPE_SCRAP}")

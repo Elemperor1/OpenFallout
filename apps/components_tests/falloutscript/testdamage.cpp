@@ -85,9 +85,9 @@ namespace
         Defense defense;
         defense.mThreshold = 10;
         defense.mResistance = 50;
-        // (40 + 10 - 10) * 0.5 = 20, and without the bonus (40 - 10) * 0.5 = 15
-        EXPECT_DOUBLE_EQ(hit(weapon, defense, alwaysCritical, 10).mDamage, 20);
-        EXPECT_DOUBLE_EQ(hit(weapon, defense, noCritical, 10).mDamage, 15);
+        // (40 + 10) * 0.5 - 10 = 15, and without the bonus 40 * 0.5 - 10 = 10
+        EXPECT_DOUBLE_EQ(hit(weapon, defense, alwaysCritical, 10).mDamage, 15);
+        EXPECT_DOUBLE_EQ(hit(weapon, defense, noCritical, 10).mDamage, 10);
     }
 
     TEST(FalloutScriptDamageTest, the_chance_of_a_critical_blow_is_that_of_the_attacker_times_the_weapons)
@@ -126,19 +126,44 @@ namespace
         defense.mResistance = 50;
         EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 20);
         defense.mResistance = 100;
-        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 6); // 85 percent is the most
+        DamageSettings fallout3; // no floor: only the most that armor can take shows
+        fallout3.mMinimumDamage = false;
+        EXPECT_DOUBLE_EQ(hit(weapon, defense, noCritical, 10, 0, fallout3).mDamage, 6); // 85 percent is the most
         defense.mResistance = -30;
-        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 40); // armor does not make a blow worse
+        EXPECT_DOUBLE_EQ(
+            hit(weapon, defense, noCritical, 10, 0, fallout3).mDamage, 40); // armor does not make a blow worse
     }
 
-    TEST(FalloutScriptDamageTest, the_threshold_comes_before_the_resistance)
+    TEST(FalloutScriptDamageTest, the_resistance_comes_before_the_threshold)
     {
         WeaponDamage weapon;
         weapon.mDamage = 100;
         Defense defense;
         defense.mThreshold = 20;
         defense.mResistance = 50;
-        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 40);
+        // 100 * 0.5 = 50, then 20 points less
+        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 30);
+    }
+
+    TEST(FalloutScriptDamageTest, new_vegas_keeps_a_share_of_the_blow_whatever_the_armor_takes_and_fallout_3_does_not)
+    {
+        WeaponDamage weapon;
+        weapon.mDamage = 40;
+        Defense defense;
+        defense.mResistance = 100; // 85 percent is the most, which leaves 6
+        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 8); // a fifth of the blow
+        DamageSettings fallout3;
+        fallout3.mMinimumDamage = false;
+        EXPECT_DOUBLE_EQ(hit(weapon, defense, noCritical, 10, 0, fallout3).mDamage, 6);
+    }
+
+    TEST(FalloutScriptDamageTest, a_threshold_below_nothing_takes_nothing)
+    {
+        WeaponDamage weapon;
+        weapon.mDamage = 20;
+        Defense defense;
+        defense.mThreshold = -5; // the perks of an attacker can take off more than the armor has
+        EXPECT_DOUBLE_EQ(hit(weapon, defense).mDamage, 20);
     }
 
     TEST(FalloutScriptDamageTest, a_weapon_without_damage_does_none)

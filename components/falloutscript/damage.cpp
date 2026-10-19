@@ -23,6 +23,14 @@ namespace FalloutScript
         take("fDamageMeleeWeapCondMult", settings.mMeleeConditionMult);
         take("fFriendHitTimer", settings.mFriendHitSeconds);
         take("fFriendMinimumLastHitTime", settings.mFriendHitSpacingSeconds);
+        const auto takeCount = [&lookup](std::string_view name, int& setting) {
+            if (const std::optional<double> value = lookup(name))
+                setting = static_cast<int>(*value);
+        };
+        takeCount("iFriendHitCombatAllowed", settings.mFriendHitCombatAllowed);
+        takeCount("iFriendHitNonCombatAllowed", settings.mFriendHitNonCombatAllowed);
+        takeCount("iAllyHitCombatAllowed", settings.mAllyHitCombatAllowed);
+        takeCount("iAllyHitNonCombatAllowed", settings.mAllyHitNonCombatAllowed);
         return settings;
     }
 
@@ -52,14 +60,15 @@ namespace FalloutScript
         if (result.mCritical)
             blow += std::max(weapon.mCriticalDamage, 0.0);
 
-        // The threshold takes away points, but never more than what leaves a share of the blow
-        const double floor = blow * std::clamp(settings.mMinimumThroughThreshold, 0.0, 1.0);
-        double through = blow;
-        if (defense.mThreshold > 0)
-            through = std::max(blow - defense.mThreshold, floor);
-        // Then the resistance takes a share
+        // The executables work the armor in this order: the resistance takes its share (no more than the most armor
+        // can), the threshold takes points, and the blow does not fall below a share of what it was when it met the
+        // armor (New Vegas; Fallout 3 has no such floor)
+        const double entering = blow;
         const double resisted = std::clamp(defense.mResistance, 0.0, settings.mMaxResistance) / 100.0;
-        blow = through * (1.0 - resisted);
+        blow *= 1.0 - resisted;
+        blow -= std::max(defense.mThreshold, 0.0);
+        if (settings.mMinimumDamage)
+            blow = std::max(blow, entering * std::clamp(settings.mMinimumThroughThreshold, 0.0, 1.0));
         result.mDamage = std::max(blow, 0.0);
         return result;
     }

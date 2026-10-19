@@ -1516,8 +1516,10 @@
 -- @field #number caps
 -- @field #number skillPoints The points that can still be spent on skills.
 -- @field #number perkPoints The perks that can still be chosen.
--- @field #number armorRating
--- @field #number threshold What the armor worn takes off every blow.
+-- @field #number armorRating The resistance of what is worn, a whole number, at most what armor can take away.
+-- @field #number threshold New Vegas: what the armor worn and the perks take off every blow (0 in Fallout 3).
+-- @field #boolean newVegas Whether the content is that of New Vegas, which tells the threshold and the weight and
+-- value of a whole stack.
 
 ---
 -- The seven attributes of SPECIAL, in order.
@@ -1594,6 +1596,18 @@
 -- @field #number damage Weapons.
 -- @field #number rating Armor.
 -- @field #number threshold Armor.
+-- @field #boolean key A key: it is on the keyring and in none of the lists.
+-- @field #boolean book A book (listed with the aid).
+-- @field #boolean hidden Armor that the files keep from the player: no list of the Pip-Boy shows it.
+-- @field #boolean usable Whether the player can use it now; ammunition only while the weapon in hand takes it.
+-- @field #number cardWeight What one weighs for the player (New Vegas lightens small things with the Pack Rat perk).
+-- @field #number cardDamage Weapons held by the player: the damage of one shot (one pellet) with its skill and perks.
+-- @field #number pellets How many pellets a shot flies.
+-- @field #boolean hasAmmo Weapons: whether the ammunition of the weapon is known.
+-- @field #string ammoName Weapons: the name of that ammunition.
+-- @field #number clip Weapons: how many rounds the clip takes.
+-- @field #number loaded Weapons: the rounds of the ammunition that are in the clip.
+-- @field #number reserve Weapons: the rounds of the ammunition that are not.
 
 ---
 -- The player does with the item what it is for: wears, holds or takes off a weapon, armor or ammunition, uses up an aid
@@ -1601,6 +1615,10 @@
 -- @function [parent=#Pipboy] use
 -- @param #string item
 -- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
+
+---
+-- The most items that one drop puts on the floor.
+-- @field [parent=#Pipboy] #number dropLimit
 
 ---
 -- The player drops items in front of it.
@@ -1669,9 +1687,16 @@
 -- @function [parent=#Pipboy] closeRecipes
 
 ---
--- The levels the player reached since this was last called.
+-- The level the player reached whose points have not been handed out to a screen yet, since this was last called.
+-- The games show one screen for each level, so there is one level at a time: the next is handed out after
+-- `levelUpDone`.
 -- @function [parent=#Pipboy] takeLevelUps
 -- @return #list<#PipboyLevelUp>
+
+---
+-- The player is done with the screen of the level that was handed out last, so the next level the experience
+-- reached can be handed out.
+-- @function [parent=#Pipboy] levelUpDone
 
 ---
 -- @type PipboyLevelUp

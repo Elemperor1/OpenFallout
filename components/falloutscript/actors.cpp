@@ -43,6 +43,7 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mHolders.clear();
         mDead.clear();
+        mStartKnown.clear();
         mKillers.clear();
         mKillingLimbs.clear();
         mDeaths.clear();
@@ -216,6 +217,22 @@ namespace FalloutScript
     bool ActorState::isDead(FormId actor) const
     {
         const std::lock_guard lock(mMutex);
+        return deadLocked(actor);
+    }
+
+    bool ActorState::deadLocked(FormId actor) const
+    {
+        if (actor != 0 && mStartKnown.count(actor) == 0)
+        {
+            // A reference whose record gives it no health starts dead, and what scripts did to it is done to that
+            bool dead = false;
+            if (mRecords.initiallyDead(actor, dead))
+            {
+                mStartKnown.insert(actor);
+                if (dead)
+                    mDead.insert(actor);
+            }
+        }
         return mDead.count(actor) != 0;
     }
 
@@ -228,7 +245,8 @@ namespace FalloutScript
         {
             {
                 const std::lock_guard lock(mMutex);
-                if (!mDead.insert(actor).second)
+                // One that starts dead is dead already
+                if (deadLocked(actor) || !mDead.insert(actor).second)
                     return false;
                 constexpr std::size_t mostDeaths = 1024;
                 if (mDeaths.size() < mostDeaths)
@@ -246,9 +264,25 @@ namespace FalloutScript
             return true;
         }
         const std::lock_guard lock(mMutex);
+        // One that starts dead is found out first, so that it does not die again when it is asked about later; one
+        // whose record can not be read yet is not asked about it later either, since it was brought back after the
+        // record said what it said
+        deadLocked(actor);
+        mStartKnown.insert(actor);
         mKillers.erase(actor);
         mKillingLimbs.erase(actor);
         return mDead.erase(actor) != 0;
+    }
+
+    bool ActorState::kill(FormId actor, FormId killer)
+    {
+        if (actor == 0)
+            return false;
+        // No blow, death or revival comes between the checks and the end
+        const std::lock_guard transition(mTransitionMutex);
+        if (isDead(actor) || falls(actor))
+            return false;
+        return setDead(actor, true, killer);
     }
 
     void ActorState::setDeathListener(std::function<void(FormId)> listener)
@@ -426,8 +460,8 @@ namespace FalloutScript
             return base != 0 ? static_cast<double>(state.deadCount(base)) : 0.0;
         });
         interpreter.setHandler("KillActor", [&state](CallContext& call) {
-            // The first argument, when there is one, is the killer
-            state.setDead(call.mReference, true, formArgument(call, 0));
+            // The first argument, when there is one, is the killer. An essential actor does not die of it.
+            state.kill(call.mReference, formArgument(call, 0));
             return 0.0;
         });
         interpreter.setHandler("AddToFaction", [&state](CallContext& call) {

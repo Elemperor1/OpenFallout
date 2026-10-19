@@ -24,9 +24,9 @@ namespace FalloutScript
         virtual std::optional<CombatState::Relation> recordedRelation(FormId first, FormId second) = 0;
     };
 
-    /// How the actor stands to the target by the factions they are in: an enemy when a faction of the one is the enemy
-    /// of a faction of the other, in what scripts said or else what the records say, an ally when none is an enemy and
-    /// one is an ally
+    /// How the actor stands to the target by the factions they are in, in what scripts said or else what the records
+    /// say about each faction of the one toward each faction of the other: an ally when any pair says so, else a
+    /// friend when any does, else an enemy when any does
     CombatState::Relation relationOfActors(
         CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor, FormId target);
 
@@ -45,7 +45,8 @@ namespace FalloutScript
     /// IsInCombat, GetCombatTarget, IsCombatTarget, GetDetected, SetAlert, GetIsAlerted, GetAttacked, GetShouldAttack,
     /// SetUnconscious, GetUnconscious, SetRestrained, GetRestrained, SetEssential, SetActorRefEssential, IsEssential,
     /// IsActorRefEssential, SetEnemy, SetAlly, GetFactionCombatReaction, GetHitLocation, GetKillingBlowLimb,
-    /// GetLastHitCritical, IsKiller and GetFriendHit. Those that the command table does not have are left out.
+    /// GetLastHitCritical, IsKiller, GetFriendHit, SetIgnoreFriendlyHits and GetIgnoreFriendlyHits. Those that the
+    /// command table does not have are left out.
     void addCombatCommands(Interpreter& interpreter, CombatState& combat, ActorState& actors, CombatWorld& world);
 }
 

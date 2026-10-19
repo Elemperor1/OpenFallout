@@ -84,18 +84,27 @@ namespace FalloutScript
             bool mCritical = false;
             int mLimb = -1; // the part of the body, -1 when not known
         };
-        /// A blow was struck at the actor: it counts as attacked (GetAttacked) for as long as it is in a fight, and
-        /// the blow is the last one it took and one more that its attacker struck (hitsTaken). An actor that is in no
-        /// fight stays attacked for a short time that passes with advance().
-        void noteHit(FormId victim, const Hit& hit);
+        /// A blow was struck at the actor: it is the last one it took, and the actor counts as attacked (GetAttacked)
+        /// unless the blow is `tolerated` (a blow of the player that an ally or friend lets pass, see countFriendHit,
+        /// or one at an object, which has no fight to be in: the flag is that of the process of an actor).
+        /// The executables keep no time on it: an actor stays attacked for as long as it is in a fight, and is not
+        /// any more once its fights are over, once it died or is put out.
+        void noteHit(FormId victim, const Hit& hit, bool tolerated = false);
         bool attacked(FormId actor) const;
-        /// How many blows each attacker struck at the actor that have not expired: a blow counts only when the
-        /// attacker's last counted blow at the actor is longer ago than the spacing, and expires after the life of a
-        /// hit (setFriendHitRules). The time is that of advance().
+        /// A blow of the attacker at the victim that its faction does not mind: it counts for GetFriendHit when the
+        /// attacker's last counted blow at the victim is longer ago than the spacing, and expires after the life of a
+        /// blow (setFriendHitRules); with an allowance of 1000 or more the earlier ones are forgotten first. The time
+        /// is that of advance(). The answer is how many blows count now, the number that is weighed against the
+        /// allowance of the victim.
+        int countFriendHit(FormId victim, FormId attacker, int allowance);
+        /// How many blows each attacker struck at the actor that count and have not expired
         std::vector<std::pair<FormId, int>> hitsTaken(FormId victim) const;
         /// fFriendHitTimer (the seconds a counted blow lasts, 10 in the games) and fFriendMinimumLastHitTime (the
         /// seconds between two counted blows of one attacker, 0.5)
         void setFriendHitRules(double lifeSeconds, double spacingSeconds);
+        /// An actor that ignores friendly hits (SetIgnoreFriendlyHits) turns on no blow of an ally or friend
+        void setIgnoreFriendlyHits(FormId actor, bool ignore);
+        bool ignoresFriendlyHits(FormId actor) const;
         /// The last blow the actor took, false when it took none
         bool lastHit(FormId actor, Hit& hit) const;
         void advance(float seconds);
@@ -136,7 +145,8 @@ namespace FalloutScript
         std::set<FormId> mRestrained;
         std::map<FormId, bool> mEssential;
         std::map<std::pair<FormId, FormId>, Relation> mRelations;
-        std::map<FormId, float> mAttacked; // the seconds left of being attacked while in no fight
+        std::set<FormId> mAttacked;
+        std::set<FormId> mIgnoreFriendlyHits;
         /// The times (on the clock of advance()) of the counted blows, by victim and attacker
         std::map<FormId, std::map<FormId, std::vector<double>>> mHitTimes;
         double mClock = 0;

@@ -146,9 +146,11 @@ namespace FalloutScript
         double restored(const Rules& rules, double maxActionPoints, double seconds,
             const std::function<double(double)>& perks = {});
 
-        /// The chance of a hit in percent after the perks (`perks` works on the chance as a fraction, 0 to 1): none
-        /// where there was none (the target is out of reach), and never more than the most the files allow.
-        double adjustedChance(const Rules& rules, double chance, const std::function<double(double)>& perks);
+        /// The chance of a hit in percent after the perks (`perks` works on the chance as a fraction, 0 to 1). The
+        /// executables cap the chance before the perks (hitChance does), keep the larger of the chance and what the
+        /// perks make of it (a perk that lowers it, like Fast Shot, changes nothing here) and cap nothing after: a
+        /// capped 0.95 with a quarter more is 1.1875. None where there was none (the target is out of reach).
+        double adjustedChance(double chance, const std::function<double(double)>& perks);
     }
 }
 

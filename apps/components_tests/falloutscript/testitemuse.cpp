@@ -299,6 +299,74 @@ namespace
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), f.mValues.permanent(thePlayer, ActorValue::health));
     }
 
+    /// A perk that multiplies the health that is recovered by one and a half
+    class BetterHealingPerk final : public FalloutScript::PerkRecords
+    {
+    public:
+        static constexpr FormId id = 0x0100A0C0;
+
+        bool perk(FormId perk, FalloutScript::PerkInfo& info) override
+        {
+            if (perk != id)
+                return false;
+            info.mId = id;
+            info.mRanks = 1;
+            info.mPlayable = true;
+            FalloutScript::PerkEntry entry;
+            entry.mType = FalloutScript::PerkEntry::EntryPoint;
+            entry.mEntryPoint = FalloutScript::EntryPoint::recoveredHealth;
+            entry.mFunction = 3;
+            entry.mValue = 1.5;
+            info.mEntries = { entry };
+            return true;
+        }
+        std::vector<FormId> perks() override { return { id }; }
+        bool abilityEffects(FormId, std::vector<FalloutScript::AbilityEffect>&) override { return false; }
+    };
+
+    TEST(FalloutScriptItemUseTest, aPerkThatRecoversHealthAlsoWorksOnTheHealthAnEffectGivesBack)
+    {
+        Fixture f;
+        BetterHealingPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mProgress.addPerk(thePlayer, BetterHealingPerk::id);
+        f.mValues.damage(thePlayer, ActorValue::health, 80);
+        const double hurt = f.mValues.current(thePlayer, ActorValue::health);
+        // A stimpak gives back 30, and 45 with the perk
+        f.mUse.use(thePlayer, stimpak);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::health), hurt + 45);
+        // ... and so does each second of an effect that lasts (20 points a second)
+        f.mValues.heal(thePlayer, ActorValue::health);
+        f.mValues.damage(thePlayer, ActorValue::health, 80);
+        const double again = f.mValues.current(thePlayer, ActorValue::health);
+        f.mUse.use(thePlayer, superStimpak);
+        f.mUse.update(1);
+        EXPECT_NEAR(f.mValues.current(thePlayer, ActorValue::health), again + 30, 1e-9);
+    }
+
+    TEST(FalloutScriptItemUseTest, aPerkThatAddsToTheHealthAnEffectGivesBackDoesNotDependOnTheFrameRate)
+    {
+        // The same second of an effect that lasts, as one step and as sixty
+        const auto recovered = [](int steps) {
+            Fixture f;
+            RecoveringPerk records;
+            FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+            f.mUse.setPerks(&perks);
+            f.mProgress.addPerk(thePlayer, RecoveringPerk::id);
+            f.mValues.damage(thePlayer, ActorValue::health, 80);
+            f.mUse.use(thePlayer, superStimpak);
+            const double before = f.mValues.current(thePlayer, ActorValue::health);
+            for (int i = 0; i < steps; ++i)
+                f.mUse.update(1.0 / steps);
+            return f.mValues.current(thePlayer, ActorValue::health) - before;
+        };
+        const double once = recovered(1);
+        // 20 points a second of the effect, 2 of the perk, and 2 of the perk for the tick of the player
+        EXPECT_NEAR(once, 24, 1e-9);
+        EXPECT_NEAR(recovered(60), once, 1e-9);
+    }
+
     TEST(FalloutScriptItemUseTest, aPerkThatRecoversHealthDoesNotReviveTheDead)
     {
         Fixture f;
@@ -495,6 +563,75 @@ namespace
         EXPECT_EQ(f.mProgress.miscStat(10), 2);
     }
 
+    /// A perk that doubles the time a chem lasts (Chemist)
+    class ChemistPerk final : public FalloutScript::PerkRecords
+    {
+    public:
+        static constexpr FormId id = 0x0100A0B0;
+
+        bool perk(FormId perk, FalloutScript::PerkInfo& info) override
+        {
+            if (perk != id)
+                return false;
+            info.mId = id;
+            info.mRanks = 1;
+            info.mPlayable = true;
+            FalloutScript::PerkEntry entry;
+            entry.mType = FalloutScript::PerkEntry::EntryPoint;
+            entry.mEntryPoint = FalloutScript::EntryPoint::chemDuration;
+            entry.mFunction = 3;
+            entry.mValue = 2;
+            info.mEntries = { entry };
+            return true;
+        }
+        std::vector<FormId> perks() override { return { id }; }
+        bool abilityEffects(FormId, std::vector<FalloutScript::AbilityEffect>&) override { return false; }
+    };
+
+    TEST(FalloutScriptItemUseTest, aPerkThatLengthensChemsLeavesTheHostileEffectsOfTheItemAlone)
+    {
+        Fixture f;
+        ChemistPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mProgress.addPerk(thePlayer, ChemistPerk::id);
+        // A boost for 240 seconds and a drop of the perception for 100 that the item's effect marks hostile
+        ConsumableEffect hostile = effect(ActorValue::perception, 3, 100, true, true);
+        hostile.mHostile = true;
+        f.mRecords.mConsumables[mentats].mEffects = { effect(ActorValue::intelligence, 5, 240, false, true), hostile };
+        f.mUse.use(thePlayer, mentats);
+        const std::vector<ItemUse::Active> running = f.mUse.active(thePlayer);
+        ASSERT_EQ(running.size(), 2u);
+        EXPECT_EQ(running[0].mRemaining, 480);
+        EXPECT_EQ(running[1].mRemaining, 100);
+    }
+
+    TEST(FalloutScriptItemUseTest, inFalloutThreeAPerkThatLengthensChemsWorksOnlyOnAnItemThatCanMakeOneAddicted)
+    {
+        Fixture f;
+        ChemistPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mProgress.addPerk(thePlayer, ChemistPerk::id);
+        f.mUse.setChemDurationNeedsAddiction(true);
+        // Mentats can make one addicted, Rad-X cannot
+        f.mUse.use(thePlayer, mentats);
+        f.mUse.use(thePlayer, radX);
+        double mentatsTime = 0;
+        double radXTime = 0;
+        for (const ItemUse::Active& running : f.mUse.active(thePlayer))
+            (running.mActorValue == radiationResistance ? radXTime : mentatsTime) = running.mRemaining;
+        EXPECT_EQ(mentatsTime, 480);
+        EXPECT_EQ(radXTime, 240);
+        // New Vegas has no such rule
+        f.mUse.setChemDurationNeedsAddiction(false);
+        f.mState.addItem(thePlayer, radX, 1);
+        f.mUse.update(1000);
+        f.mUse.use(thePlayer, radX);
+        ASSERT_EQ(f.mUse.active(thePlayer).size(), 1u);
+        EXPECT_EQ(f.mUse.active(thePlayer).front().mRemaining, 480);
+    }
+
     TEST(FalloutScriptItemUseTest, aSkillBookRaisesTheSkillAndIsUsedUp)
     {
         Fixture f;
@@ -508,17 +645,21 @@ namespace
         EXPECT_EQ(f.mProgress.miscStat(15), 1);
     }
 
-    TEST(FalloutScriptItemUseTest, aSkillBookGivesWhatTheRulesSayAndStopsAtTheCap)
+    TEST(FalloutScriptItemUseTest, aSkillBookGivesWhatTheRulesSayAndIsNotTurnedAwayAtAHundred)
     {
         Fixture f;
-        f.mUse.setBookRules(100, 3);
+        f.mUse.setBookRules(3);
         f.mValues.setBase(thePlayer, smallGuns, 98);
-        const ItemUse::Result nearCap = f.mUse.use(thePlayer, guns);
-        EXPECT_EQ(nearCap.mGained, 2);
-        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 100);
-        const ItemUse::Result atCap = f.mUse.use(thePlayer, guns);
-        EXPECT_EQ(atCap.mOutcome, ItemUse::Outcome::NothingToLearn);
-        EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 1);
+        const ItemUse::Result first = f.mUse.use(thePlayer, guns);
+        EXPECT_EQ(first.mGained, 3);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 101);
+        // The skill is read as 100 at most, so the book that is read now still adds to what is stored
+        EXPECT_EQ(f.mValues.current(thePlayer, smallGuns), 100);
+        const ItemUse::Result second = f.mUse.use(thePlayer, guns);
+        EXPECT_EQ(second.mOutcome, ItemUse::Outcome::Read);
+        EXPECT_EQ(second.mGained, 3);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 104);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 0);
     }
 
     TEST(FalloutScriptItemUseTest, booksReadAtTheSameTimeAllRaiseTheSkill)

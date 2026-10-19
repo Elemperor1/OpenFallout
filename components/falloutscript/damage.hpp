@@ -9,14 +9,16 @@ namespace FalloutScript
 {
     /// The settings of the games (GMST records) that say how much of a blow a character takes. A setting that the
     /// files do not have keeps the value given here, which is what both games have for it (read from their GMST
-    /// records), and the rule of New Vegas for armor (a flat threshold, then a share). Fallout 3 has the share only
-    /// and says so by having no threshold on its armor. fMinDamMultiplier is in New Vegas only.
+    /// records), and the rule of New Vegas for armor (a share, then a flat threshold, then a floor that keeps a share
+    /// of the blow). Fallout 3 has the share only, with no threshold on its armor and no floor.
     struct DamageSettings
     {
         /// The most of a blow that armor can take away in percent (fMaxArmorRating)
         double mMaxResistance = 85;
-        /// The share of a blow that always gets through the threshold of armor (fMinDamMultiplier, a fifth)
+        /// The share of a blow that always gets through the armor (fMinDamMultiplier, a fifth), of the blow as the
+        /// armor finds it, and whether the game has that floor (New Vegas does; Fallout 3 does not)
         double mMinimumThroughThreshold = 0.2;
+        bool mMinimumDamage = true;
         /// A character who hits with a weapon of its hands or of melee adds its strength bonus (the derived melee
         /// damage)
         bool mMeleeStrengthBonus = true;
@@ -34,6 +36,13 @@ namespace FalloutScript
         /// (fFriendHitTimer, fFriendMinimumLastHitTime)
         double mFriendHitSeconds = 10;
         double mFriendHitSpacingSeconds = 0.5;
+        /// How many blows of the player a character lets pass before it turns on the player, by how it stands to the
+        /// victim's faction (a friend or an ally) and whether the character is in a fight (iFriendHitCombatAllowed,
+        /// iFriendHitNonCombatAllowed, iAllyHitCombatAllowed, iAllyHitNonCombatAllowed). 0 or less lets none pass.
+        int mFriendHitCombatAllowed = 4;
+        int mFriendHitNonCombatAllowed = 0;
+        int mAllyHitCombatAllowed = 1000;
+        int mAllyHitNonCombatAllowed = 3;
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 

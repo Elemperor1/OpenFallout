@@ -6,9 +6,9 @@ namespace FalloutScript
 {
     namespace
     {
-        /// How long a character that is in no fight counts as attacked after a blow
-        constexpr float attackedSeconds = 2.f;
         constexpr std::size_t mostChanges = 1024;
+        /// An allowance of this many blows or more is no limit: the blows are not counted up (iAllyHitCombatAllowed)
+        constexpr int friendHitUnlimited = 1000;
     }
 
     void CombatState::clear()
@@ -23,6 +23,7 @@ namespace FalloutScript
         mEssential.clear();
         mRelations.clear();
         mAttacked.clear();
+        mIgnoreFriendlyHits.clear();
         mHitTimes.clear();
         mClock = 0;
         mLastHits.clear();
@@ -236,20 +237,28 @@ namespace FalloutScript
         return found->second;
     }
 
-    void CombatState::noteHit(FormId victim, const Hit& hit)
+    void CombatState::noteHit(FormId victim, const Hit& hit, bool tolerated)
     {
         const std::lock_guard lock(mMutex);
-        mAttacked[victim] = attackedSeconds;
-        if (hit.mAttacker != 0)
-        {
-            std::vector<double>& times = mHitTimes[victim][hit.mAttacker];
-            std::erase_if(times, [this](double time) { return mClock - time >= mHitLife; });
-            if (times.empty() || mClock - times.back() >= mHitSpacing)
-                times.push_back(mClock);
-        }
+        if (!tolerated)
+            mAttacked.insert(victim);
         mLastHits[victim] = hit;
         if (mHitEvents.size() < mostChanges)
             mHitEvents.push_back({ victim, hit });
+    }
+
+    int CombatState::countFriendHit(FormId victim, FormId attacker, int allowance)
+    {
+        if (victim == 0 || attacker == 0)
+            return 0;
+        const std::lock_guard lock(mMutex);
+        std::vector<double>& times = mHitTimes[victim][attacker];
+        std::erase_if(times, [this](double time) { return mClock - time >= mHitLife; });
+        if (allowance >= friendHitUnlimited)
+            times.clear();
+        if (times.empty() || mClock - times.back() >= mHitSpacing)
+            times.push_back(mClock);
+        return static_cast<int>(times.size());
     }
 
     bool CombatState::attacked(FormId actor) const
@@ -280,6 +289,23 @@ namespace FalloutScript
         mHitSpacing = std::max(spacingSeconds, 0.0);
     }
 
+    void CombatState::setIgnoreFriendlyHits(FormId actor, bool ignore)
+    {
+        if (actor == 0)
+            return;
+        const std::lock_guard lock(mMutex);
+        if (ignore)
+            mIgnoreFriendlyHits.insert(actor);
+        else
+            mIgnoreFriendlyHits.erase(actor);
+    }
+
+    bool CombatState::ignoresFriendlyHits(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        return mIgnoreFriendlyHits.count(actor) != 0;
+    }
+
     bool CombatState::lastHit(FormId actor, Hit& hit) const
     {
         const std::lock_guard lock(mMutex);
@@ -303,17 +329,6 @@ namespace FalloutScript
                 attacker = attacker->second.empty() ? victim->second.erase(attacker) : std::next(attacker);
             }
             victim = victim->second.empty() ? mHitTimes.erase(victim) : std::next(victim);
-        }
-        for (auto it = mAttacked.begin(); it != mAttacked.end();)
-        {
-            // In a fight, it stays attacked until the fight is over
-            if (inFight(it->first))
-            {
-                ++it;
-                continue;
-            }
-            it->second -= seconds;
-            it = it->second <= 0 ? mAttacked.erase(it) : std::next(it);
         }
         for (auto it = mWakeTimers.begin(); it != mWakeTimers.end();)
         {

@@ -60,11 +60,16 @@ namespace FalloutScript
         mRandom = std::move(random);
     }
 
-    void ItemUse::setBookRules(double skillCap, double points)
+    void ItemUse::setBookRules(double points)
     {
         const std::lock_guard lock(mMutex);
-        mSkillCap = skillCap;
         mBookPoints = points;
+    }
+
+    void ItemUse::setChemDurationNeedsAddiction(bool needsAddiction)
+    {
+        const std::lock_guard lock(mMutex);
+        mChemDurationNeedsAddiction = needsAddiction;
     }
 
     void ItemUse::clear()
@@ -74,7 +79,7 @@ namespace FalloutScript
         mAddictions.clear();
     }
 
-    void ItemUse::instant(FormId actor, int actorValue, double amount, bool detrimental)
+    void ItemUse::instant(FormId actor, int actorValue, double amount, bool detrimental, double seconds)
     {
         if (!ActorValues::isValid(actorValue) || amount <= 0)
             return;
@@ -94,7 +99,25 @@ namespace FalloutScript
         else if (detrimental)
             mValues.damage(actor, actorValue, amount);
         else
+        {
+            // The health that an effect gives back is the value of an entry point (12, Modify Recovered Health), for
+            // what happens at once and for each second of an effect that lasts: the perk works on the points of a
+            // second, so that a perk that adds the same number of points each second is not added to at every frame
+            if (actorValue == ActorValue::health)
+            {
+                PerkEngine* perks = nullptr;
+                {
+                    const std::lock_guard lock(mMutex);
+                    perks = mPerks;
+                }
+                if (perks != nullptr)
+                {
+                    const double span = seconds > 0 ? seconds : 1.0;
+                    amount = std::max(perks->apply(EntryPoint::recoveredHealth, actor, amount / span), 0.0) * span;
+                }
+            }
             mValues.restore(actor, actorValue, amount);
+        }
     }
 
     void ItemUse::dieIfSpent(FormId actor)
@@ -177,15 +200,15 @@ namespace FalloutScript
 
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
         PerkEngine* perks = nullptr;
-        double skillCap = 100;
         double bookPoints = 1;
+        bool durationNeedsAddiction = false;
         FormId player = 0;
         {
             const std::lock_guard lock(mMutex);
             check = mConditions;
             perks = mPerks;
-            skillCap = mSkillCap;
             bookPoints = mBookPoints;
+            durationNeedsAddiction = mChemDurationNeedsAddiction;
             player = mPlayer;
         }
         const bool counts = actor == player;
@@ -200,8 +223,11 @@ namespace FalloutScript
             bool stimpak = false;
             bool restoresRadiation = false;
             bool resistsRadiation = false;
-            // How long the effects last may be changed by a perk (Chemist doubles the time of a chem)
-            const double durationScale = perks != nullptr ? perks->apply(EntryPoint::chemDuration, actor, 1.0) : 1.0;
+            // How long the effects last may be changed by a perk (Chemist doubles the time of a chem), but not those of
+            // a hostile effect, and in Fallout 3 only of an item that can make one addicted
+            double durationScale = 1.0;
+            if (perks != nullptr && (!durationNeedsAddiction || consumable.mWithdrawal != 0))
+                durationScale = perks->apply(EntryPoint::chemDuration, actor, 1.0);
             for (const ConsumableEffect& effect : consumable.mEffects)
             {
                 if (!effect.mConditions.empty())
@@ -216,7 +242,7 @@ namespace FalloutScript
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationValue && !effect.mDetrimental);
                 resistsRadiation = resistsRadiation
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationResistance && !effect.mDetrimental);
-                applyEffect(actor, effect, durationScale);
+                applyEffect(actor, effect, effect.mHostile ? 1.0 : durationScale);
             }
 
             const bool addictive = consumable.mWithdrawal != 0 && consumable.mAddictionChance > 0;
@@ -274,18 +300,13 @@ namespace FalloutScript
             // Two books read at the same time add up: the skill is read, raised and written by one at a time
             const std::lock_guard reading(mBookMutex);
             const double skill = mValues.base(actor, book.mSkill);
-            if (skill >= skillCap)
-            {
-                result.mOutcome = Outcome::NothingToLearn;
-                return result;
-            }
             // The same as for an aid item: the call that takes the book is the one that reads it
             if (mState.removeItem(actor, item, 1) < 1)
                 return result;
             double points = bookPoints;
             if (perks != nullptr)
                 points = perks->apply(EntryPoint::bookSkillPoints, actor, points);
-            const double gained = std::min(points, skillCap - skill);
+            const double gained = std::max(points, 0.0);
             mValues.setBase(actor, book.mSkill, skill + gained);
             result.mOutcome = Outcome::Read;
             result.mGained = gained;
@@ -305,6 +326,7 @@ namespace FalloutScript
             int mActorValue;
             double mAmount;
             bool mDetrimental;
+            double mSeconds;
         };
         std::vector<Step> steps;
         // A change that held while an effect lasted, which is taken back now
@@ -326,7 +348,7 @@ namespace FalloutScript
                 const double elapsed = std::min(seconds, active.mRemaining);
                 if (!active.mTemporary)
                     steps.push_back({ active.mActor, active.mActorValue, std::abs(active.mMagnitude) * elapsed,
-                        active.mMagnitude < 0 });
+                        active.mMagnitude < 0, elapsed });
                 active.mRemaining -= seconds;
                 if (active.mRemaining <= 0 && active.mTemporary)
                     expired.push_back({ active.mActor, active.mActorValue, active.mMagnitude });
@@ -349,7 +371,7 @@ namespace FalloutScript
                 mValues.modify(expiry.mActor, expiry.mActorValue, -expiry.mMagnitude);
         }
         for (const Step& step : steps)
-            instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental);
+            instant(step.mActor, step.mActorValue, step.mAmount, step.mDetrimental, step.mSeconds);
 
         // The perks that recover health: the executables work the entry point out from none, in points each second
         // (the recovery that the characters have of themselves is not modelled)

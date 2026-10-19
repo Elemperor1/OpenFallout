@@ -42,6 +42,8 @@ namespace FalloutScript
         constexpr int actionPointCost = 40;
         constexpr int runSpeed = 42;
         constexpr int attackSpeed = 43;
+        /// New Vegas: more than 0 makes the small things that the player carries weigh less
+        constexpr int packRat = 55;
         constexpr int thresholdDefender = 56;
         constexpr int thresholdAttacker = 58;
         /// New Vegas: whether the perks make the player see through invisibility in V.A.T.S.

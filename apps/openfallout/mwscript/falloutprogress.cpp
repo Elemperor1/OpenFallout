@@ -47,6 +47,7 @@ namespace OFScript
         }
 
         /// The flags of a magic effect (the bits are those of the editor, which no executable has been read for)
+        constexpr std::uint32_t effectHostile = 0x1;
         constexpr std::uint32_t effectRecovers = 0x2;
         constexpr std::uint32_t effectDetrimental = 0x4;
 
@@ -69,7 +70,8 @@ namespace OFScript
                 mGame, [this](std::string_view name) { return gameSetting(name); });
             rules.mMaxLevel = FalloutScript::Levelling::maxLevelForFiles(rules, mContentFiles);
             mProgress.setRules(rules);
-            mItemUse.setBookRules(100, gameSetting("fBookPerkBonus").value_or(1.0));
+            mItemUse.setBookRules(gameSetting("fBookPerkBonus").value_or(1.0));
+            mItemUse.setChemDurationNeedsAddiction(mGame == FalloutScript::Game::Fallout3);
         });
     }
 
@@ -174,6 +176,7 @@ namespace OFScript
                 made.mArchetype = static_cast<int>(effect->mData.mArchetype);
                 made.mActorValue = effect->mData.mActorValue;
                 made.mDetrimental = (effect->mData.mEffectFlags & effectDetrimental) != 0;
+                made.mHostile = (effect->mData.mEffectFlags & effectHostile) != 0;
                 made.mRecover = (effect->mData.mEffectFlags & effectRecovers) != 0;
             }
             else if (entry.mBaseEffect.mIndex == engineRestoreHealth)
@@ -211,6 +214,12 @@ namespace OFScript
         return result;
     }
 
+    void FalloutScripts::finishLevelUp()
+    {
+        const std::lock_guard lock(mLevelUpMutex);
+        mLevelUpOpen = false;
+    }
+
     void FalloutScripts::rewardExperience(int amount)
     {
         ensureLevellingRules();
@@ -225,22 +234,32 @@ namespace OFScript
     {
         ensureLevellingRules();
         // The points of the levels that were reached are handed out one level at a time, for the intelligence the
-        // player has when it gets there
-        while (const auto up = mProgress.awardNextLevel(mActorValues.permanent(mPlayer, AV::intelligence)))
+        // player has when it gets there, and the next level waits until the screen of the one before is done: the
+        // games show one screen for each level, with its own skill points and perk, never one for several
+        bool screenOpen = false;
         {
-            FalloutScript::PlayerProgress::LevelUp reached = *up;
-            const double points
-                = mPerks.apply(FalloutScript::EntryPoint::gainedSkillPoints, mPlayer, reached.mSkillPoints);
-            const int extra = static_cast<int>(std::lround(points)) - reached.mSkillPoints;
-            if (extra != 0)
-            {
-                mProgress.addSkillPoints(extra);
-                reached.mSkillPoints += extra;
-            }
-            log("Level " + std::to_string(reached.mLevel) + ": " + std::to_string(reached.mSkillPoints)
-                + " skill points" + (reached.mPerk ? " and a perk to choose" : ""));
             const std::lock_guard lock(mLevelUpMutex);
-            mLevelUps.push_back(reached);
+            screenOpen = mLevelUpOpen;
+        }
+        if (!screenOpen)
+        {
+            if (const auto up = mProgress.awardNextLevel(mActorValues.permanent(mPlayer, AV::intelligence)))
+            {
+                FalloutScript::PlayerProgress::LevelUp reached = *up;
+                const double points
+                    = mPerks.apply(FalloutScript::EntryPoint::gainedSkillPoints, mPlayer, reached.mSkillPoints);
+                const int extra = static_cast<int>(std::lround(points)) - reached.mSkillPoints;
+                if (extra != 0)
+                {
+                    mProgress.addSkillPoints(extra);
+                    reached.mSkillPoints += extra;
+                }
+                log("Level " + std::to_string(reached.mLevel) + ": " + std::to_string(reached.mSkillPoints)
+                    + " skill points" + (reached.mPerk ? " and a perk to choose" : ""));
+                const std::lock_guard lock(mLevelUpMutex);
+                mLevelUps.push_back(reached);
+                mLevelUpOpen = true;
+            }
         }
         // The perks of the characters that have them, and of those that had them (their effects are taken back)
         mPerkOwners.insert(mPlayer);
@@ -252,7 +271,7 @@ namespace OFScript
             mItemUse.update(frametime);
     }
 
-    void FalloutScripts::awardKillExperience(FalloutScript::FormId victim, bool byPlayer)
+    void FalloutScripts::awardKillExperience(FalloutScript::FormId victim)
     {
         if (victim == 0 || victim == mPlayer)
             return;
@@ -268,12 +287,14 @@ namespace OFScript
         }
         ensureLevellingRules();
         const FalloutScript::LevellingRules rules = mProgress.rules();
-        // A kill by someone else pays when the player did enough of it (a share of the health of the victim)
-        if (!byPlayer)
+        // Whoever strikes the last blow, a kill pays the player only when the player did more than a share of the
+        // health of the victim in all (iXPDeathRewardHealthThreshold, 40 percent in both games): the share is told in
+        // whole percent, a victim with no health counts as 100, and a player who did no damage at all gets nothing
+        // (a character that a script kills pays nothing)
         {
             const double health = mActorValues.permanent(victim, AV::health);
-            const double share = health > 0 ? damage / health * 100 : 100;
-            if (std::lround(share) <= rules.mDeathHealthThreshold)
+            const int share = health > 0 ? static_cast<int>(std::min(damage / health * 100, 1e6)) : 100;
+            if (damage <= 0 || share <= rules.mDeathHealthThreshold)
                 return;
         }
         ESM::FormId base;

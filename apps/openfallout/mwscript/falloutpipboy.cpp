@@ -9,6 +9,8 @@
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcont.hpp>
+#include <components/esm4/loaddobj.hpp>
+#include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadgmst.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
@@ -17,6 +19,7 @@
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/falloutscript/levelling.hpp>
+#include <components/falloutscript/perks.hpp>
 #include <components/misc/strings/lower.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -39,9 +42,10 @@ namespace OFScript
 
         /// The local number, in the first master, of the bottle caps, the money of both games
         constexpr FalloutScript::FormId capsNumber = 0x0000000F;
+        /// The local number, in the first master, of the weapon of bare hands (the executables take it for a blow that
+        /// has no weapon)
+        constexpr FalloutScript::FormId fistsNumber = 0x1F4;
 
-        /// The most objects one drop makes (each is an object of its own in the world)
-        constexpr int dropLimit = 10;
         /// The distance in front of the player that a dropped item lands at
         constexpr double dropDistance = 64;
     }
@@ -67,10 +71,16 @@ namespace OFScript
         std::vector<std::pair<FalloutScript::FormId, int>> items;
         if (!mActors.items(holder, items))
             return rows;
+        const bool player = holder == mPlayer;
+        // What the card of an item tells depends on what the player holds and on its perks
+        const FalloutScript::FormId heldId = player ? mEquipment.weapon(mPlayer) : 0;
+        const ESM4::Weapon* held = heldId != 0 ? mStore.get<ESM4::Weapon>().search(refId(heldId)) : nullptr;
+        const bool packRat = player && mGame == FalloutScript::Game::NewVegas
+            && mPerks.apply(FalloutScript::EntryPoint::packRat, mPlayer, 0.0) > 0;
         for (const auto& [id, count] : items)
         {
             // The caps of the player are on the status line; those of a container or a corpse are there to take
-            if (count <= 0 || (holder == mPlayer && id == masterForm(capsNumber)))
+            if (count <= 0 || (player && id == masterForm(capsNumber)))
                 continue;
             const ESM::RefId record = refId(id);
             PipboyItem row;
@@ -83,15 +93,52 @@ namespace OFScript
                 row.mWeight = weapon->mData.weight;
                 row.mDamage = weapon->mData.damage;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Weapons;
+                if (player)
+                {
+                    row.mCardDamage = weaponCardDamage(id);
+                    row.mClip = weapon->mData.clipSize;
+                    if (weapon->mHasGameData)
+                        row.mPellets = std::max<int>(weapon->mGame.mProjectileCount, 1);
+                    // The ammunition: the one chosen when the weapon takes it, else the one of the record, else the
+                    // first of its list that the player has (or just the first)
+                    FalloutScript::FormId ammo = mEquipment.ammo(mPlayer);
+                    if (!weaponTakesAmmo(*weapon, ammo))
+                    {
+                        ammo = 0;
+                        if (mStore.get<ESM4::Ammunition>().search(weapon->mAmmo) != nullptr)
+                            ammo = weapon->mAmmo.toUint32();
+                        else if (const ESM4::FormIdList* list = mStore.get<ESM4::FormIdList>().search(weapon->mAmmo))
+                            for (const ESM::FormId& object : list->mObjects)
+                            {
+                                const FalloutScript::FormId candidate = object.toUint32();
+                                if (ammo == 0 || mActors.itemCount(mPlayer, candidate) > 0)
+                                    ammo = candidate;
+                                if (mActors.itemCount(mPlayer, candidate) > 0)
+                                    break;
+                            }
+                    }
+                    if (const ESM4::Ammunition* shot
+                        = ammo != 0 ? mStore.get<ESM4::Ammunition>().search(refId(ammo)) : nullptr)
+                    {
+                        row.mHasAmmo = true;
+                        row.mAmmoName = shot->mFullName;
+                        // The rounds in the weapon are those of its clip, the rest are in reserve
+                        const int have = mActors.itemCount(mPlayer, ammo);
+                        row.mLoaded = std::min(row.mClip, have);
+                        row.mReserve = have - row.mLoaded;
+                    }
+                }
             }
             else if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(record))
             {
                 row.mName = armor->mFullName;
                 row.mValue = static_cast<int>(armor->mData.value);
                 row.mWeight = armor->mData.weight;
-                row.mRating = armor->mHasRating ? armor->mRating : 0.0;
+                // A piece rates as the executables read it: the whole number of the rating
+                row.mRating = armor->mHasRating ? std::trunc(armor->mRating) : 0.0;
                 row.mThreshold = armor->mDamageThreshold;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Apparel;
+                row.mHidden = (armor->mGeneralFlags & ESM4::Armor::FO3_NonPlayable) != 0;
             }
             else if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(record))
             {
@@ -99,6 +146,8 @@ namespace OFScript
                 row.mValue = static_cast<int>(ammo->mData.mValue);
                 row.mWeight = ammo->mData.mWeight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Ammo;
+                // Ammunition is for the weapon in hand, and for nothing else
+                row.mUsable = !player || (held != nullptr && weaponTakesAmmo(*held, id));
             }
             else if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(record))
             {
@@ -112,35 +161,47 @@ namespace OFScript
                 row.mName = misc->mFullName;
                 row.mValue = static_cast<int>(misc->mData.value);
                 row.mWeight = misc->mData.weight;
+                row.mUsable = false;
             }
             else if (const ESM4::Book* book = mStore.get<ESM4::Book>().search(record))
             {
+                // A book is listed with the things to use
                 row.mName = book->mFullName;
                 row.mValue = static_cast<int>(book->mData.value);
                 row.mWeight = book->mData.weight;
+                row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
+                row.mBook = true;
             }
             else if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(record))
             {
                 row.mName = ingredient->mFullName;
                 row.mValue = static_cast<int>(ingredient->mData.value);
                 row.mWeight = ingredient->mData.weight;
+                row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
+                // The executables let it be used, but its effects are not read yet, so a use would do nothing
+                row.mUsable = false;
             }
             else if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(record))
             {
                 row.mName = mod->mFullName;
                 row.mValue = static_cast<int>(mod->mData.mValue);
                 row.mWeight = mod->mData.mWeight;
+                row.mUsable = false;
             }
             else if (const ESM4::Key* key = mStore.get<ESM4::Key>().search(record))
             {
+                // A key is on the keyring and not in the lists of the tabs
                 row.mName = key->mFullName;
                 row.mValue = static_cast<int>(key->mData.value);
                 row.mWeight = key->mData.weight;
+                row.mKey = true;
+                row.mUsable = false;
             }
             else
                 continue;
             if (row.mName.empty())
                 row.mName = editorId(id);
+            row.mCardWeight = carriedWeight(row.mWeight, packRat);
             row.mEquipped = mEquipment.isEquipped(holder, id);
             rows.push_back(std::move(row));
         }
@@ -165,13 +226,36 @@ namespace OFScript
         stats.mMaxHealth = mActorValues.permanent(mPlayer, AV::health);
         stats.mActionPoints = mActorValues.current(mPlayer, AV::actionPoints);
         stats.mMaxActionPoints = mActorValues.permanent(mPlayer, AV::actionPoints);
-        mEquipment.inventoryWeight(mPlayer, stats.mWeight);
+        stats.mNewVegas = mGame == FalloutScript::Game::NewVegas;
+        // What is carried weighs what its cards say (a perk can lighten the small things)
+        std::vector<std::pair<FalloutScript::FormId, int>> held;
+        if (mActors.items(mPlayer, held))
+        {
+            const bool packRat = stats.mNewVegas && mPerks.apply(FalloutScript::EntryPoint::packRat, mPlayer, 0.0) > 0;
+            for (const auto& [item, count] : held)
+            {
+                FalloutScript::ItemInfo info;
+                if (itemInfo(item, info))
+                    stats.mWeight += carriedWeight(info.mWeight, packRat) * count;
+            }
+        }
         stats.mMaxWeight = mActorValues.permanent(mPlayer, AV::carryWeight);
         stats.mCaps = mActors.itemCount(mPlayer, masterForm(capsNumber));
         stats.mSkillPoints = mProgress.skillPoints();
         stats.mPerkPoints = mProgress.perkPoints();
-        stats.mArmorRating = mEquipment.armorRating(mPlayer);
-        stats.mThreshold = mEquipment.damageThreshold(mPlayer);
+        // The resistance is a whole number and goes no higher than the most that armor takes away
+        stats.mArmorRating
+            = std::min(std::trunc(mEquipment.armorRating(mPlayer)), std::trunc(damageSettings().mMaxResistance));
+        if (stats.mNewVegas)
+        {
+            // The threshold of what is worn and of the perks, against the weapon in hand (the fists for none)
+            FalloutScript::FormId weapon = mEquipment.weapon(mPlayer);
+            if (weapon == 0)
+                weapon = masterForm(fistsNumber);
+            const FalloutScript::PerkEngine::Context context{ 0, weapon };
+            stats.mThreshold = mEquipment.damageThreshold(mPlayer)
+                + mPerks.apply(FalloutScript::EntryPoint::thresholdDefender, mPlayer, 0.0, context);
+        }
         return stats;
     }
 
@@ -283,6 +367,31 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::atFullHealthFor(FalloutScript::FormId item)
+    {
+        // The stimpak mends the health, the doctor's bag of New Vegas the health and the limbs: neither is used up on
+        // a player who has nothing to mend (the objects are those the default object record names)
+        for (const ESM4::DefaultObj& objects : mStore.get<ESM4::DefaultObj>())
+        {
+            const auto health = [this] {
+                return mActorValues.current(mPlayer, AV::health) >= mActorValues.permanent(mPlayer, AV::health);
+            };
+            if (!objects.mData.stimpack.isZeroOrUnset() && objects.mData.stimpack.toUint32() == item)
+                return health();
+            if (mGame == FalloutScript::Game::NewVegas && !objects.mData.doctorsBag.isZeroOrUnset()
+                && objects.mData.doctorsBag.toUint32() == item)
+            {
+                // The conditions the bag restores (the executables name the six of the body; the player has no more,
+                // the seventh is the brain of a robot)
+                for (int limb = AV::firstCondition; limb <= AV::lastCondition; ++limb)
+                    if (mActorValues.current(mPlayer, limb) < mActorValues.permanent(mPlayer, limb))
+                        return false;
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::string FalloutScripts::useItemFromList(FalloutScript::FormId item)
     {
         if (mActors.itemCount(mPlayer, item) <= 0)
@@ -298,8 +407,22 @@ namespace OFScript
                 mEquipment.unequip(mPlayer, item);
                 return "unequipped";
             }
+            // Ammunition is put on only while the weapon in hand takes it
+            if (info.mKind == FalloutScript::ItemKind::Ammo)
+            {
+                const FalloutScript::FormId heldId = mEquipment.weapon(mPlayer);
+                const ESM4::Weapon* held = heldId != 0 ? mStore.get<ESM4::Weapon>().search(refId(heldId)) : nullptr;
+                if (held == nullptr || !weaponTakesAmmo(*held, item))
+                    return std::string();
+            }
             return mEquipment.equip(mPlayer, item) == FalloutScript::Equipment::Outcome::Equipped ? "equipped"
                                                                                                   : std::string();
+        }
+        if (known && info.mKind == FalloutScript::ItemKind::Aid && atFullHealthFor(item))
+        {
+            const std::string text = gameSettingText("sFullHealth");
+            tellPlayer(text.empty() ? "You are already at full health." : text);
+            return std::string();
         }
         const FalloutScript::ItemUse::Result result = useItem(mPlayer, item);
         switch (result.mOutcome)
@@ -316,7 +439,7 @@ namespace OFScript
 
     int FalloutScripts::dropItem(FalloutScript::FormId item, int count)
     {
-        count = std::min({ count, dropLimit, mActors.itemCount(mPlayer, item) });
+        count = std::min({ count, sDropLimit, mActors.itemCount(mPlayer, item) });
         if (count <= 0)
             return 0;
         if (mEquipment.isEquipped(mPlayer, item) && mActors.itemCount(mPlayer, item) <= count)

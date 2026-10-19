@@ -428,6 +428,7 @@ namespace OFScript
         {
             const std::lock_guard lock(mLevelUpMutex);
             mLevelUps.clear();
+            mLevelUpOpen = false;
         }
         {
             const std::lock_guard lock(mPlayerDamageMutex);
@@ -1301,6 +1302,10 @@ namespace OFScript
             return templateRecordOf(store, record, Record::Template_UseStats, seed);
         }
 
+        /// The local number, in the first master, of the weapon "Fists" of both games, which the executables take for a
+        /// blow that has no weapon
+        constexpr FalloutScript::FormId fistsNumber = 0x1F4;
+
         /// The attributes of DATA, which are the actor values from strength to luck
         void addAttributes(std::vector<std::pair<int, double>>& values, const ESM4::FalloutStats& stats)
         {
@@ -1458,7 +1463,8 @@ namespace OFScript
         {
             info.mKind = FalloutScript::ItemKind::Armor;
             info.mSlots = armor->mArmorFlags;
-            info.mRating = armor->mHasRating ? armor->mRating : 0.0;
+            // The rating of a piece is a whole number: the executables cut the fraction off (a rating of 45.5 is 45)
+            info.mRating = armor->mHasRating ? std::trunc(armor->mRating) : 0.0;
             info.mThreshold = armor->mDamageThreshold;
             info.mWeight = armor->mData.weight;
             return true;
@@ -1689,7 +1695,8 @@ namespace OFScript
         int skill = AV::lastSkill;
         if (record == nullptr)
         {
-            // Bare hands: the records have no weapon for a fist here, so it does a point and the strength bonus
+            // Bare hands are the weapon "Fists" of the files (form 0x1F4), which the executables take for a blow that
+            // has no weapon. A file without it: a point and the strength bonus.
             damage.mDamage = 1;
             damage.mMelee = true;
             // A creature fights with the attack of its record, and its combat skill is its skill
@@ -1707,8 +1714,9 @@ namespace OFScript
                         return damage;
                     }
                 }
+            record = mStore.get<ESM4::Weapon>().search(refId(masterForm(fistsNumber)));
         }
-        else
+        if (record != nullptr)
         {
             damage.mDamage = record->mData.damage;
             if (record->mHasCritical)
@@ -1727,6 +1735,41 @@ namespace OFScript
         if (attacker != 0 && skill >= AV::firstSkill && skill <= AV::lastSkill)
             damage.mSkill = mActorValues.current(attacker, skill);
         return damage;
+    }
+
+    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon)
+    {
+        // A shot with no armor in the way and no critical hit; the perks of the player work on it as they do in a fight
+        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer);
+        const FalloutScript::PerkEngine::Context context{ 0, weapon };
+        if (mGame != FalloutScript::Game::NewVegas)
+        {
+            // The card of Fallout 3 shows the damage of the weapon at its condition (nothing wears here), which the
+            // perks change when the weapon is built, as in a fight, and not the skill of the player
+            return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, blow.mDamage, context), 0.0);
+        }
+        const double dealt
+            = FalloutScript::Damage::resolve(damageSettings(), blow, 0.0, 0.0, FalloutScript::Defense(), 100.0).mDamage;
+        return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, dealt, context), 0.0);
+    }
+
+    bool FalloutScripts::weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo)
+    {
+        if (ammo == 0 || weapon.mAmmo.isZeroOrUnset())
+            return false;
+        if (weapon.mAmmo.toUint32() == ammo)
+            return true;
+        const ESM4::FormIdList* list = mStore.get<ESM4::FormIdList>().search(weapon.mAmmo);
+        return list != nullptr
+            && std::any_of(list->mObjects.begin(), list->mObjects.end(),
+                [ammo](const ESM::FormId& object) { return object.toUint32() == ammo; });
+    }
+
+    double FalloutScripts::carriedWeight(double unit, bool packRat)
+    {
+        if (packRat && unit > 0 && unit <= gameSetting("fPackRatThreshold", 2.0))
+            return unit * gameSetting("fPackRatModifier", 0.5);
+        return unit;
     }
 
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
@@ -1759,8 +1802,12 @@ namespace OFScript
         // is changed when the blow is built in Fallout 3, after the armor in New Vegas.
         namespace Entry = FalloutScript::EntryPoint;
         const bool damageAfterArmor = mGame == FalloutScript::Game::NewVegas;
-        const FalloutScript::PerkEngine::Context towardsVictim{ victim, weapon };
-        const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, weapon };
+        // The perks see the weapon "Fists" in the place of none, as the executables take it for a blow without a weapon
+        const FalloutScript::FormId fists = masterForm(fistsNumber);
+        const FalloutScript::FormId perkWeapon
+            = weapon != 0 || mStore.get<ESM4::Weapon>().search(refId(fists)) == nullptr ? weapon : fists;
+        const FalloutScript::PerkEngine::Context towardsVictim{ victim, perkWeapon };
+        const FalloutScript::PerkEngine::Context towardsAttacker{ attacker, perkWeapon };
         double thresholdTaken = 0;
         if (attacker != 0)
         {
@@ -1780,6 +1827,10 @@ namespace OFScript
             // armor works on (the executable adds it to the damage before the armor), so it is part of that too
             hit.mDamage = std::max(mPerks.apply(Entry::weaponDamage, attacker, hit.mDamage, towardsVictim), 0.0);
         }
+        // A player who is in V.A.T.S. takes only a share of a blow (fVATSPlayerDamageMult: 0.75 in New Vegas, 0.1 in
+        // Fallout 3), after the armor and before the part of the body
+        if (victim == mPlayer && mVatsOpen)
+            hit.mDamage *= std::max(gameSetting("fVATSPlayerDamageMult", 1.0), 0.0);
         // The damage to the health: a blow at a part of the body does more or less than one at the body (a head shot
         // more), after the armor, and only a shot or a throw does (hands and melee weapons, and a blow with no weapon,
         // count the part as 1); a part that does not say anything (0) leaves the damage as it is
@@ -1804,7 +1855,10 @@ namespace OFScript
         struck.mDamage = dealt;
         struck.mCritical = hit.mCritical;
         struck.mLimb = limb;
-        mCombat.noteHit(victim, struck);
+        // A blow of the player that an ally or friend of the victim lets pass does not turn the victim on the player,
+        // and does not count as an attack on it
+        const bool tolerated = toleratesBlow(attacker, victim);
+        mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
         if (limb >= 0)
@@ -1834,7 +1888,7 @@ namespace OFScript
         if (mActorValues.current(victim, AV::health) > 0)
         {
             // A character that is hit fights back, and the attacker is in the fight too
-            if (attacker != 0)
+            if (attacker != 0 && !tolerated)
             {
                 if (!mCombat.inCombat(victim))
                     FalloutScript::startFight(mCombat, mActors, victim, attacker);
@@ -1854,14 +1908,52 @@ namespace OFScript
         return result;
     }
 
+    bool FalloutScripts::toleratesBlow(FalloutScript::FormId attacker, FalloutScript::FormId victim)
+    {
+        // Only the blows of the player are weighed; the blow of anyone else turns the victim on the attacker. The
+        // standing is that of the factions of the victim toward those of the attacker.
+        if (attacker == 0 || attacker != mPlayer || victim == mPlayer)
+            return false;
+        const FalloutScript::CombatState::Relation relation
+            = FalloutScript::relationOfActors(mCombat, mActors, *this, victim, attacker);
+        using Relation = FalloutScript::CombatState::Relation;
+        if (relation != Relation::Ally && relation != Relation::Friend)
+            return false;
+        // A character that ignores friendly hits (SetIgnoreFriendlyHits) lets the blow of an ally or friend pass and
+        // counts none (the executables skip the count for it; that the blow then also turns it on nobody is the
+        // meaning of the command, not something read from them)
+        if (mCombat.ignoresFriendlyHits(victim))
+            return true;
+        const FalloutScript::DamageSettings& settings = damageSettings();
+        const bool fighting = mCombat.inCombat(victim);
+        const int allowed = relation == Relation::Friend
+            ? (fighting ? settings.mFriendHitCombatAllowed : settings.mFriendHitNonCombatAllowed)
+            : (fighting ? settings.mAllyHitCombatAllowed : settings.mAllyHitNonCombatAllowed);
+        // No blow is let pass when the allowance is none, and then none is counted either
+        if (allowed <= 0)
+            return false;
+        return mCombat.countFriendHit(victim, attacker, allowed) <= allowed;
+    }
+
     bool FalloutScripts::fallsInsteadOfDying(FalloutScript::FormId victim)
     {
         if (!FalloutScript::isEssential(mCombat, mActors, *this, victim))
             return false;
         // The character is out before the fights end, so none starts in between, and no death or revival comes
-        // between the two steps. How long an essential character lies unconscious before it gets up is
-        // fEssentialDeathTime (read from the executables of both games: 10 seconds).
+        // between the two steps
         const auto transitions = mActors.holdTransitions();
+        if (mCombat.unconscious(victim) || mCombat.restrained(victim))
+        {
+            // One that is down or restrained already is not put down again: its health comes back to a share of the
+            // most (fEssentialHealthPercentReGain, 0.3 in the executables of both games), whatever it was
+            namespace AV = FalloutScript::ActorValue;
+            const double regained = std::clamp(gameSetting("fEssentialHealthPercentReGain", 0.3), 0.0, 1.0);
+            mActorValues.heal(victim, AV::health);
+            mActorValues.damage(victim, AV::health, mActorValues.permanent(victim, AV::health) * (1.0 - regained));
+            return true;
+        }
+        // How long an essential character lies unconscious before it gets up is fEssentialDeathTime (read from the
+        // executables of both games: 10 seconds).
         mCombat.setUnconscious(victim, true, static_cast<float>(gameSetting("fEssentialDeathTime", 10.0)));
         mCombat.withdraw(victim);
         return true;
@@ -1878,17 +1970,34 @@ namespace OFScript
         }
     }
 
+    double FalloutScripts::unarmedReach(FalloutScript::FormId attacker)
+    {
+        // A creature reaches as far as the reach of its record says (RNAM, in game units as it is, twice that for a
+        // giant), a person half of fCombatDistance (fHandReachMult), read from the executables of both games
+        ESM::FormId base;
+        if (attacker != 0 && baseOf(attacker, base) && !base.isZeroOrUnset())
+            if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+            {
+                constexpr std::uint8_t giantType = 7;
+                const double giant
+                    = creature->mCreatureType == giantType ? gameSetting("fCombatGiantCreatureReachMult", 2.0) : 1.0;
+                return static_cast<double>(creature->mAttackReach) * giant;
+            }
+        return gameSetting("fHandReachMult", 0.5) * gameSetting("fCombatDistance", 128.0);
+    }
+
     FalloutScripts::WeaponStats FalloutScripts::weaponStats(FalloutScript::FormId attacker)
     {
-        // A blow of the hands or a melee weapon reaches this far (the games take it from the reach of the weapon)
-        constexpr double meleeReach = 130;
+        // A blow of a melee weapon reaches its reach times fCombatDistance (128 in both executables); the hands reach
+        // as far as the character does (unarmedReach)
+        const double combatDistance = gameSetting("fCombatDistance", 128.0);
         WeaponStats stats;
         stats.mWeapon = attacker != 0 ? mEquipment.weapon(attacker) : 0;
         const ESM4::Weapon* record
             = stats.mWeapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon)) : nullptr;
         if (record == nullptr || !record->mHasGameData)
         {
-            stats.mRange = meleeReach;
+            stats.mRange = unarmedReach(attacker);
             return stats;
         }
         const ESM4::Weapon::GameData& game = record->mGame;
@@ -1901,7 +2010,7 @@ namespace OFScript
         stats.mInterval = perSecond > 0 ? 1.0 / perSecond : 0.5;
         if (stats.mMelee)
         {
-            stats.mRange = meleeReach * std::max<double>(game.mReach, 1.0);
+            stats.mRange = combatDistance * std::max<double>(game.mReach, 0.0);
             return stats;
         }
         // The shots are not flown: a weapon reaches as far as its projectile does
@@ -1970,12 +2079,13 @@ namespace OFScript
             result.mStrike = strike(attacker, victim, stats.mWeapon, limb);
             return result;
         }
-        // An object has no health, but its script hears of the blow
+        // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
+        // which is the flag of an actor in a fight that nothing would ever clear on an object.
         FalloutScript::CombatState::Hit struck;
         struck.mAttacker = attacker;
         struck.mWeapon = stats.mWeapon;
         struck.mLimb = limb;
-        mCombat.noteHit(victim, struck);
+        mCombat.noteHit(victim, struck, true);
         return result;
     }
 
@@ -2208,11 +2318,15 @@ namespace OFScript
             const auto transitions = mActors.holdTransitions();
             mCombat.advance(frametime);
 
-            // Essential characters that were down long enough got up (nobody woke them before) with a share of their
-            // health (fEssentialHealthPercentReGain, 0.3 in the executables)
+            // Essential characters that were down long enough got up (nobody woke them before). One whose health was
+            // gone has a share of it back (fEssentialHealthPercentReGain, 0.3 in the executables, which read it where
+            // an essential character is put down again; what the games do for one that gets up is not known), one that
+            // was put down with its health left keeps it.
             for (const FalloutScript::FormId actor : mCombat.takeWoken())
             {
                 namespace AV = FalloutScript::ActorValue;
+                if (mActorValues.current(actor, AV::health) > 0)
+                    continue;
                 const double regained = std::clamp(gameSetting("fEssentialHealthPercentReGain", 0.3), 0.0, 1.0);
                 mActorValues.heal(actor, AV::health);
                 mActorValues.damage(actor, AV::health, mActorValues.permanent(actor, AV::health) * (1.0 - regained));
@@ -2249,7 +2363,7 @@ namespace OFScript
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
-            awardKillExperience(death.mActor, death.mKiller == mPlayer);
+            awardKillExperience(death.mActor);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -2289,6 +2403,23 @@ namespace OFScript
             if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
                 take(owner->mFactions);
         }
+        return true;
+    }
+
+    bool FalloutScripts::initiallyDead(FalloutScript::FormId actor, bool& dead)
+    {
+        dead = false;
+        ESM::FormId base;
+        if (!baseOf(actor, base))
+            return false;
+        if (actor == mPlayer || base.isZeroOrUnset())
+            return true;
+        // The executables look at the base health of the record of the character or creature itself (a template does
+        // not change it): a record that gives none, 0 or less, makes a character that is dead when it comes into being
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+            dead = npc->mFalloutStats.mKnown && npc->mFalloutStats.mHealth <= 0;
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+            dead = creature->mFalloutStats.mKnown && creature->mFalloutStats.mHealth <= 0;
         return true;
     }
 
@@ -2376,6 +2507,8 @@ namespace OFScript
                     return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
                 });
             mCombat.setFriendHitRules(mDamageSettings->mFriendHitSeconds, mDamageSettings->mFriendHitSpacingSeconds);
+            // The armor of Fallout 3 has no floor that keeps a share of the blow
+            mDamageSettings->mMinimumDamage = mGame == FalloutScript::Game::NewVegas;
         }
         return *mDamageSettings;
     }

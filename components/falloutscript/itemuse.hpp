@@ -33,6 +33,8 @@ namespace FalloutScript
         double mDuration = 0;
         /// Hurts the value (the flag of the magic effect)
         bool mDetrimental = false;
+        /// The magic effect is hostile (its first flag): the perks that make a chem last longer leave it alone
+        bool mHostile = false;
         /// A change that is undone when the effect ends (the flag of the magic effect); otherwise it lasts
         bool mRecover = false;
         std::vector<ESM4::TargetCondition> mConditions;
@@ -81,8 +83,6 @@ namespace FalloutScript
             Consumed,
             /// A book was read: a skill book is used up, another book stays
             Read,
-            /// A skill book that teaches nothing, the skill being at its highest
-            NothingToLearn,
         };
 
         struct Result
@@ -112,8 +112,13 @@ namespace FalloutScript
         void setRandom(std::function<double()> random);
         /// The player, whose counters of the Pip-Boy count what is used
         void setPlayer(FormId player);
-        /// The skill a book can raise to and the points a book gives when no perk changes them
-        void setBookRules(double skillCap, double points);
+        /// The points a book gives when no perk changes them. A skill book is never refused: the executables turn it
+        /// away only at 200 of a skill that is read as 100 at most, so one read at 100 adds points that show only
+        /// when a penalty takes the shown value down
+        void setBookRules(double points);
+        /// Whether the perks that make the effects of a chem last longer (entry point 25) work only on an item that
+        /// can make one addicted, as in Fallout 3; New Vegas lets them work on every effect that is not hostile
+        void setChemDurationNeedsAddiction(bool needsAddiction);
 
         /// The items the character is addicted to (the form of the item), in the order they were taken
         std::vector<FormId> addictions(FormId actor) const;
@@ -142,7 +147,9 @@ namespace FalloutScript
 
     private:
         void applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale);
-        void instant(FormId actor, int actorValue, double amount, bool detrimental);
+        /// Changes a value by an amount: at once, or, when seconds is more than 0, the share of an effect that lasts
+        /// that those seconds make (the amount is then the magnitude of each second times the seconds)
+        void instant(FormId actor, int actorValue, double amount, bool detrimental, double seconds = 0);
         /// Kills a character with no health left, or makes it fall if it is one that falls (to be called with the
         /// transitions held)
         void dieIfSpent(FormId actor);
@@ -154,8 +161,8 @@ namespace FalloutScript
         PerkEngine* mPerks = nullptr;
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> mConditions;
         std::function<double()> mRandom;
-        double mSkillCap = 100;
         double mBookPoints = 1;
+        bool mChemDurationNeedsAddiction = false;
         FormId mPlayer = 0;
 
         mutable std::mutex mMutex;

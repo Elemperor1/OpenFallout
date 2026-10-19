@@ -54,6 +54,8 @@ namespace
     constexpr std::uint16_t OpSetRestrained = 0x10F3;
     constexpr std::uint16_t OpGetRestrained = 0x10F4;
     constexpr std::uint16_t OpStopCombatAlarmOnActor = 0x1101;
+    constexpr std::uint16_t OpSetIgnoreFriendlyHits = 0x1151;
+    constexpr std::uint16_t OpGetIgnoreFriendlyHits = 0x1152;
     constexpr std::uint16_t OpGetFriendHit = 0x1120;
     constexpr std::uint16_t OpIsInCombat = 0x1121;
     constexpr std::uint16_t OpIsEssential = 0x1162;
@@ -562,7 +564,11 @@ namespace
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(3), 2);
 
-        setup.mCombat.advance(5.f);
+        // The executables keep no time on it: it is over with the fights of the character
+        setup.mCombat.advance(100.f);
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+        EXPECT_EQ(setup.variable(4), 1);
+        setup.mCombat.withdraw(guard);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(4), 0);
         EXPECT_EQ(setup.variable(1), 2);
@@ -586,29 +592,29 @@ namespace
         EXPECT_EQ(setup.variable(2), 0);
     }
 
-    TEST(FalloutScriptCombatCommandsTest, the_blows_from_friends_are_counted)
+    TEST(FalloutScriptCombatCommandsTest, the_blows_that_were_let_pass_are_counted_and_expire)
     {
         Runner setup;
-        setup.mWorld.mFactions[ghoul] = { { vault, 2 } };
-        CombatState::Hit byFriend;
-        byFriend.mAttacker = ghoul;
-        setup.mCombat.noteHit(guard, byFriend);
+        setup.mCombat.setFriendHitRules(10, 0.5);
+        CombatState::Hit hit;
+        hit.mAttacker = ghoul;
+        // A blow is counted when the host weighs it against what the victim allows, not by being struck
+        setup.mCombat.noteHit(guard, hit);
         ScriptBuilder builder;
         builder.code(scriptName() + begin(BlockType::OnActivate)
             + setTo(var('s', 1), callToken(OpGetFriendHit, arguments(0))) + end());
         builder.variable(1, integerVariable, "friend");
 
         setup.run(builder);
-        EXPECT_EQ(setup.variable(1), 1);
+        EXPECT_EQ(setup.variable(1), 0);
 
-        // The blows of someone else do not count, and the blows of friends add up
-        CombatState::Hit byRaider;
-        byRaider.mAttacker = raider;
-        setup.mCombat.noteHit(guard, byRaider);
+        setup.mCombat.countFriendHit(guard, ghoul, 3);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(1), 1);
+
+        // The blows add up
         setup.mCombat.advance(1.f);
-        setup.mCombat.noteHit(guard, byFriend);
+        setup.mCombat.countFriendHit(guard, ghoul, 3);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(1), 2);
 
@@ -616,5 +622,63 @@ namespace
         setup.mCombat.advance(11.f);
         setup.mObjects.trigger(guard, BlockType::OnActivate);
         EXPECT_EQ(setup.variable(1), 0);
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, a_script_can_make_a_character_ignore_friendly_hits)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('s', 1), callToken(OpGetIgnoreFriendlyHits, arguments(0)))
+            + command(OpSetIgnoreFriendlyHits, arguments(0))
+            + setTo(var('s', 2), callToken(OpGetIgnoreFriendlyHits, arguments(0)))
+            + command(OpSetIgnoreFriendlyHits, arguments(1).add(intArg(0)))
+            + setTo(var('s', 3), callToken(OpGetIgnoreFriendlyHits, arguments(0))) + end());
+        builder.variable(1, integerVariable, "before")
+            .variable(2, integerVariable, "set")
+            .variable(3, integerVariable, "cleared");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 0);
+        EXPECT_EQ(setup.variable(2), 1);
+        EXPECT_EQ(setup.variable(3), 0);
+        EXPECT_FALSE(setup.mCombat.ignoresFriendlyHits(guard));
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, an_ally_wins_over_a_friend_and_both_over_an_enemy_by_the_factions)
+    {
+        using Relation = CombatState::Relation;
+        const auto standing = [](Relation toMutants, Relation toGang) {
+            // The guard is in the vault, the ghoul in the mutants and in the gang, the raider in the gang
+            Runner setup;
+            setup.mWorld.mFactions[ghoul] = { { mutants, 0 }, { gang, 0 } };
+            setup.mWorld.mRecorded[{ vault, mutants }] = toMutants;
+            setup.mWorld.mRecorded[{ vault, gang }] = toGang;
+            return FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, ghoul);
+        };
+        EXPECT_EQ(standing(Relation::Neutral, Relation::Enemy), Relation::Enemy);
+        EXPECT_EQ(standing(Relation::Friend, Relation::Enemy), Relation::Friend);
+        EXPECT_EQ(standing(Relation::Ally, Relation::Enemy), Relation::Ally);
+        EXPECT_EQ(standing(Relation::Friend, Relation::Ally), Relation::Ally);
+        EXPECT_EQ(standing(Relation::Neutral, Relation::Neutral), Relation::Neutral);
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, a_faction_is_kin_to_itself_unless_its_own_row_says_otherwise)
+    {
+        using Relation = CombatState::Relation;
+        {
+            Runner setup;
+            setup.mWorld.mFactions[raider] = { { vault, 0 } };
+            EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, raider),
+                Relation::Ally);
+        }
+        {
+            Runner setup;
+            setup.mWorld.mFactions[raider] = { { vault, 0 } };
+            setup.mWorld.mRecorded[{ vault, vault }] = Relation::Neutral;
+            EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, raider),
+                Relation::Neutral);
+        }
     }
 }

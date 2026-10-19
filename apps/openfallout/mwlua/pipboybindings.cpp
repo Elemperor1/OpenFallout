@@ -126,6 +126,7 @@ namespace OFLua
             row["perkPoints"] = stats.mPerkPoints;
             row["armorRating"] = stats.mArmorRating;
             row["threshold"] = stats.mThreshold;
+            row["newVegas"] = stats.mNewVegas;
             return row;
         };
         // The seven attributes of SPECIAL: number, name, description, value now and base
@@ -199,7 +200,10 @@ namespace OFLua
         };
         // What a holder carries (the player when none is named): id, name, count, weight, value, the tab it is listed
         // under ("weapons", "apparel", "aid", "misc" or "ammo"), whether it is worn or held, and for weapons the
-        // damage and for armor its rating and threshold
+        // damage and for armor its rating and threshold. Also what the lists and cards of the Pip-Boy need: a key
+        // (listed on the keyring), a book, armor the files mark as not for the player (hidden), whether the item
+        // can be used now, the weight of one for the player, the damage of a shot and its pellets, and the
+        // ammunition line (name, clip, rounds loaded and in reserve)
         api["items"] = [lua](sol::optional<std::string_view> holder) {
             sol::table rows(lua, sol::create);
             int index = 1;
@@ -216,6 +220,18 @@ namespace OFLua
                 row["damage"] = item.mDamage;
                 row["rating"] = item.mRating;
                 row["threshold"] = item.mThreshold;
+                row["key"] = item.mKey;
+                row["book"] = item.mBook;
+                row["hidden"] = item.mHidden;
+                row["usable"] = item.mUsable;
+                row["cardWeight"] = item.mCardWeight;
+                row["cardDamage"] = item.mCardDamage;
+                row["pellets"] = item.mPellets;
+                row["hasAmmo"] = item.mHasAmmo;
+                row["ammoName"] = item.mAmmoName;
+                row["clip"] = item.mClip;
+                row["loaded"] = item.mLoaded;
+                row["reserve"] = item.mReserve;
                 rows[index++] = row;
             }
             return rows;
@@ -223,6 +239,8 @@ namespace OFLua
         // The player puts on or takes off, eats or reads the item; what happened ("equipped", "unequipped", "used",
         // "read"), or "" when nothing did
         api["use"] = [](std::string_view item) { return scripts().useItemFromList(parseId(item)); };
+        // The most items one drop puts on the floor
+        api["dropLimit"] = OFScript::FalloutScripts::sDropLimit;
         // The player drops items in front of it; how many
         api["drop"] = [](std::string_view item, sol::optional<int> count) {
             return scripts().dropItem(parseId(item), count.value_or(1));
@@ -314,6 +332,8 @@ namespace OFLua
             }
             return rows;
         };
+        // The screen of the last level that was handed out is done: the next level is handed out
+        api["levelUpDone"] = []() { scripts().finishLevelUp(); };
         // The perks the player can pick with a perk point, and the points it can spend
         api["offeredPerks"] = [lua]() { return perkRows(lua, scripts().pipboyOfferedPerks()); };
         // Spends points on a skill; how many were spent
