@@ -157,6 +157,7 @@ namespace OFLua
         // Loading from a save
         void readRecord(ESM::ESMReader& reader, uint32_t type) override;
         void loadLocalScripts(const OFWorld::Ptr& ptr, const ESM::LuaScripts& data) override;
+        void restoreLocalScripts(const OFWorld::Ptr& ptr, const ESM::LuaScripts& data) override;
         void setContentFileMapping(const std::map<int, int>& mapping) override { mContentFileMapping = mapping; }
 
         // At the end of the next `synchronizedUpdate` drops script cache and reloads all scripts.

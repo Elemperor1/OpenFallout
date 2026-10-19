@@ -1,0 +1,79 @@
+#ifndef OPENFALLOUT_SCRIPT_FALLOUTSAVEPENDING_H
+#define OPENFALLOUT_SCRIPT_FALLOUTSAVEPENDING_H
+
+#include <map>
+#include <optional>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <components/esm/luascripts.hpp>
+#include <components/esm/refid.hpp>
+#include <components/esm3/refnum.hpp>
+#include <components/falloutscript/saveworld.hpp>
+#include <components/falloutscript/script.hpp>
+
+#include <osg/Vec3f>
+
+namespace OFScript
+{
+    /// What a loaded game says that waits for a cell to be loaded or for the next frame, as the world is not ready for
+    /// it while the records of the save are read. It is empty for a game that was not loaded.
+    struct PendingSave
+    {
+        /// What the world does to a reference of a content file once its cell is loaded (where it is and whether it is
+        /// enabled are the host's maps of the objects that scripts moved and disabled in cells that were not loaded)
+        struct Reference
+        {
+            bool mDeleted = false;
+            std::optional<float> mScale;
+            std::optional<int> mCount;
+            /// The state of the Lua scripts attached to it
+            std::optional<ESM::LuaScripts> mLua;
+        };
+        std::map<FalloutScript::FormId, Reference> mReferences;
+
+        /// An object that was made while the game ran (by a script or by the player), which is made again
+        struct Object
+        {
+            /// The number scripts know it by, 0 for an object that no script was told of
+            FalloutScript::FormId mId = 0;
+            FalloutScript::FormId mBase = 0;
+            ESM::RefId mCell;
+            osg::Vec3f mPosition;
+            osg::Vec3f mAngle;
+            bool mEnabled = true;
+            int mCount = 1;
+            float mScale = 1;
+            /// The number that Lua knows it by (a number the world made up when the object was made)
+            ESM::RefNum mNumber;
+            std::optional<ESM::LuaScripts> mLua;
+        };
+        std::vector<Object> mObjects;
+
+        /// What PlaceAtMe had asked for and the world had not made yet: asked again, to be made at the next frame
+        struct Request
+        {
+            FalloutScript::FormId mId = 0;
+            FalloutScript::FormId mBase = 0;
+            FalloutScript::FormId mNear = 0;
+            int mDirection = 0;
+            float mDistance = 0;
+            ESM::RefId mCell;
+            osg::Vec3f mPosition;
+            osg::Vec3f mAngle;
+        };
+        std::vector<Request> mRequests;
+
+        /// Who stood in the volume of each trigger and what it had still to raise, until the cell of the trigger is
+        /// loaded and its volume is put in
+        std::map<FalloutScript::FormId, FalloutScript::SavedTrigger> mTriggers;
+
+        /// The references of loaded cells that the next frame deletes, scales or gives a stack count
+        std::vector<FalloutScript::FormId> mToDelete;
+        std::vector<std::pair<FalloutScript::FormId, float>> mToScale;
+        std::vector<std::pair<FalloutScript::FormId, int>> mToCount;
+    };
+}
+
+#endif

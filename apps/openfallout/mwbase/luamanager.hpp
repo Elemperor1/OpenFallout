@@ -181,6 +181,9 @@ namespace OFBase
         // Loading from a save
         virtual void readRecord(ESM::ESMReader& reader, uint32_t type) = 0;
         virtual void loadLocalScripts(const OFWorld::Ptr& ptr, const ESM::LuaScripts& data) = 0;
+        /// The scripts of a saved game on an object that may be in the scene already (the scripts that the
+        /// configuration started on it are replaced by the saved ones)
+        virtual void restoreLocalScripts(const OFWorld::Ptr& ptr, const ESM::LuaScripts& data) = 0;
 
         // Should be called before loading. The map is used to fix refnums if the order of content files was changed.
         virtual void setContentFileMapping(const std::map<int, int>&) = 0;

@@ -265,6 +265,17 @@ void OFState::StateManager::saveGame(std::string_view description, const Slot* s
         profile.mCurrentDay = world.getTimeManager()->getTimeStamp().getDay();
         profile.mCurrentHealth = stats.getHealth().getCurrent();
         profile.mMaximumHealth = stats.getHealth().getModified();
+        // The level and the health of the games are kept by the host of the scripts, not by the stats of the player
+        if (OFScript::FalloutScripts* fallout = OFBase::Environment::get().getFalloutScripts())
+        {
+            const OFScript::FalloutScripts::SavedPlayer saved = fallout->savedPlayer();
+            if (saved.mKnown)
+            {
+                profile.mPlayerLevel = saved.mLevel;
+                profile.mCurrentHealth = static_cast<float>(saved.mHealth);
+                profile.mMaximumHealth = static_cast<float>(saved.mMaxHealth);
+            }
+        }
 
         Log(Debug::Info) << "Making a screenshot for saved game '" << description << "'";
         writeScreenshot(profile.mScreenshot);

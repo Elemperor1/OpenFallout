@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <random>
@@ -95,6 +96,9 @@ namespace OFWorld
 
 namespace OFScript
 {
+    /// What a loaded game says that waits for a cell or for the next frame (falloutsavepending.hpp)
+    struct PendingSave;
+
     /// Which commands the compiled scripts of the loaded content use: Fallout 3 when only its master is loaded, New
     /// Vegas otherwise (its table has all the commands of the other and the same names, and Tale of Two Wastelands runs
     /// on the engine of New Vegas).
@@ -157,6 +161,18 @@ namespace OFScript
         void readRecord(ESM::ESMReader& reader, std::uint32_t type);
         /// What a saved game is made of: the sections, in the order they are written
         std::vector<FalloutScript::SaveSection> saveSections();
+        /// What the list of saved games says of the player: the level and the health the games work out (the stats of
+        /// Morrowind that the header would take them from are not the ones that count). `mKnown` is false when the
+        /// player is not a character of the games (Morrowind's player, with or without plugins of Fallout), where the
+        /// stats of Morrowind are the right ones.
+        struct SavedPlayer
+        {
+            bool mKnown = false;
+            int mLevel = 1;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+        };
+        SavedPlayer savedPlayer();
 
         /// The quest of character creation, which the games start when the player picks New in the main menu: the
         /// executables name it in their ini file (CG00 in Fallout 3, VCG00 in New Vegas), and here it is found by its
@@ -983,6 +999,21 @@ namespace OFScript
         };
         /// Makes an object that PlaceAtMe asked for, at the start of the next frame
         void makeObject(FalloutScript::FormId id, const MadeObject& request);
+        /// Takes in an object that was placed while the game runs: scripts name it by `id`, which the world knows by
+        /// the number it gave the object. It runs its script unless its cell is not loaded, where the cell starts it.
+        void adoptObject(FalloutScript::FormId id, const OFWorld::Ptr& placed, bool run);
+        /// Does what a loaded game said about references and made objects, at the start of a frame: the objects are
+        /// made again, the references that were deleted or scaled are so again once their cell is loaded
+        void applySaved();
+        /// A reference of a cell that was just loaded: its Lua scripts are those of the loaded game at once, what else
+        /// the game said about it waits for the next frame. True for one that the game had deleted.
+        bool savedReferenceLoaded(FalloutScript::FormId reference, const OFWorld::Ptr& ptr);
+        /// What scripts asked of a reference while it was out of the loaded cells (or what a loaded game says they
+        /// had asked) is done to it at the start of the next frame
+        void takeSavedChanges(FalloutScript::FormId reference);
+        /// The volume of a trigger was just put in: the actors a loaded game said were inside are so, and the events
+        /// it had not raised yet wait again
+        void restoreSavedTrigger(FalloutScript::FormId trigger);
         static void queueMove(
             std::map<FalloutScript::FormId, Move>& moves, FalloutScript::FormId reference, const Move& move);
         /// Where the reference is by the world: where it is in a loaded cell, else where a script put it while its cell
@@ -1160,6 +1191,8 @@ namespace OFScript
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
+        /// The state of a loaded game that is put back when the cells and the frame it needs come
+        std::unique_ptr<PendingSave> mPendingSave;
         /// The furniture that an actor uses, and where the actor was put on it: it stops using it when it is more than
         /// a few steps from there. Scripts ask from other threads too.
         struct FurnitureUse

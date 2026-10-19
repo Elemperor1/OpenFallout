@@ -171,6 +171,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp
     falloutscript/testreferencestate.cpp
+    falloutscript/testsavecharacters.cpp
+    falloutscript/testsaveworld.cpp
     falloutscript/testsavestate.cpp
     falloutscript/testvats.cpp
     falloutscript/testcommandtable.cpp

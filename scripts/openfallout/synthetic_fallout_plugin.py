@@ -223,7 +223,7 @@ PROGRESS_GLOBALS = {"perk_before": (0x89F, "OFTestPerkBefore"), "perk_after": (0
                     "perk_teammates": (0x8A1, "OFTestPerkTeammates"), "perk_removed": (0x8A2, "OFTestPerkRemoved"),
                     "note_before": (0x8A3, "OFTestNoteBefore"), "note_after": (0x8A4, "OFTestNoteAfter"),
                     "is_id": (0x8A5, "OFTestIsId"), "is_not_id": (0x8A6, "OFTestIsNotId")}
-XP_REWARD = 150
+XP_REWARD = 60  # the script runs when the cell is loaded, as it is again after a load: three of them are no level
 KARMA_REWARD = -20
 # More of what scripts ask about: the locker cube is linked to the doomed one (XLKR), is in the same cell as it, and is in
 # the worldspace only when the cell is the exterior one. The beast has a script, which adds one to a global when it
@@ -265,6 +265,7 @@ PERSON_SPEED = 120
 PERSON_KARMA = 25.0
 PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
 BEAST_LEVEL = 7  # the level of the beast, which the creature that has the list as its template takes the stats from
+EMPTY_ADDON = "OFTestEmpty.omwaddon"
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -499,7 +500,34 @@ AUTOPLAY_SWITCH_PLACES = ((-200.0, 0.0, 0.0), (0.0, 0.0, 0.0), (200.0, 0.0, 0.0)
 AUTOPLAY_ROOM_AT = (0.0, 300.0, 0.0)  # where the player is put in the room
 AUTOPLAY_GLOBALS = {"target_hits": (0x962, "OFTestAutoplayTargetHits"), "switches": (0x963, "OFTestAutoplaySwitches")}
 AUTOPLAY_ROOM_CELL_NAME = "OFTestAutoplayRoom"
-LAST_ID = 0x963 # the largest form ID of the plugin, which the next object ID of its header follows
+# Six cubes in the first cell for the saves: the test moves one, disables one, scales one, and deletes two (one before the
+# game is saved, one after it), takes part of the stack of one (it is SAVED_STACK of them, SAVED_TAKEN go before the game is
+# saved and SAVED_TAKEN_AFTER after it), and makes a cube that is no reference of the plugin
+SAVED_REF_IDS = {"moved": 0x964, "hidden": 0x965, "grown": 0x966, "gone": 0x967, "doomed": 0x968, "stacked": 0x96E}
+SAVED_STACK = 10
+SAVED_TAKEN = 4
+SAVED_TAKEN_AFTER = 2
+# The events that the local script of the person (a Lua script of the smoke test) counts: SAVED_BUMPS before the save, more after it
+SAVED_BUMPS = 3
+SAVED_BUMPS_AFTER = 2
+SAVED_PLACE = (-1200.0, -1700.0)  # the first cube; the others stand 300 apart along x
+SAVED_MOVED_TO = (-1200.0, -1000.0, 128.0)  # 128: half a cube above the floor
+SAVED_MADE_AT = (-300.0, -1000.0, 128.0)
+SAVED_SCALE = 2.0
+# The state of characters for the saves: a quest whose stage 10 gives the player SAVED_ITEMS rounds, adds SAVED_LUCK to its
+# luck, rewards SAVED_KARMA and kills the person of the first cell; stage 30 (set after the game is saved) takes the rounds
+# back, adds more luck and karma and brings the person back; the stages 20 to 23 each write what the game knows into globals
+SAVED_QUEST_ID = 0x969
+SAVED_QUEST_NAME = "OFTestSavedQuest"
+SAVED_GLOBALS = {name: (0x96A + index, "OFTestSaved" + name.title())
+                 for index, name in enumerate(("items", "dead", "luck", "karma"))}
+SAVED_STAGES = {"give": 10, "change": 30, "before": 20, "changed": 21, "loaded": 22, "later": 23}
+SAVED_ITEMS = 12
+SAVED_LUCK = 3
+SAVED_KARMA = 40
+SAVED_LUCK_AFTER = 10
+SAVED_KARMA_AFTER = 100
+LAST_ID = 0x96E # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -834,8 +862,10 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None, enable_parent=None):
+         primitive=None, enable_parent=None, count=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if count is not None:
+        subs.append(sub(b"XCNT", struct.pack("<i", count)))
     if enable_parent is not None:
         # XESP, 8 bytes: the reference that this one is enabled with, and the flags (1: the other way round)
         subs.append(sub(b"XESP", struct.pack("<II", *enable_parent)))
@@ -1393,6 +1423,14 @@ def object_refs(kind, origin):
             refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2),
                  linked=DOOMED_REF_IDS[kind]),
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
+
+
+def saved_refs():
+    """The cubes of the saves, around SAVED_PLACE."""
+    x, y = SAVED_PLACE
+    return [refr(form_id, CUBE_ID, (x + 300.0 * index, y, CUBE / 2),
+                 count=SAVED_STACK if form_id == SAVED_REF_IDS["stacked"] else None)
+            for index, form_id in enumerate(SAVED_REF_IDS.values())]
 
 
 def trigger_script():
@@ -2090,6 +2128,7 @@ def plugin():
         acre(HEIR_REF_IDS["interior"], HEIR_ID, (*HEIR_PLACE, 0.0)),
         *package_refs(0, (0.0, 0.0)),
         *object_refs("interior", (0.0, 0.0)),
+        *saved_refs(),
         trigger_reference(),
         furniture_reference(),
         *sitter_references(),
@@ -2117,6 +2156,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"f")
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in SAVED_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in AUTOPLAY_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
                                     for key, (form_id, name) in MOVE_GLOBALS.items())])
@@ -2130,7 +2170,7 @@ def plugin():
                                                  object_script("exterior"), button_script(), chargen_script(),
                                                  new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
                                                  watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
-            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest()])
+            + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest(), saved_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
             + top_group(b"MISC", [arena_scrap()])
             + top_group(b"KEYM", [arena_key()])
@@ -2242,6 +2282,37 @@ def arena_scripts():
     raider.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_START_COMBAT, count(started)))
     return [record(b"SCPT", ARENA_DUMMY_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaDummyScript"), *sf.sub_records(dummy)]),
             record(b"SCPT", ARENA_RAIDER_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaRaiderScript"), *sf.sub_records(raider)])]
+
+
+def saved_quest():
+    """The quest of the saves: stages 10 and 30 change the state of the player and of the person of the first cell, and
+    each of the stages 20 to 23 writes what the game knows into the globals."""
+    sf = fallout_script
+    forms = [PLAYER_REFERENCE, NPC_REF_ID, ARENA_AMMO_ID, *(SAVED_GLOBALS[name][0] for name in SAVED_GLOBALS)]
+    player, person, ammo = 1, 2, 3
+    glob = {name: 4 + index for index, name in enumerate(SAVED_GLOBALS)}
+    give = [sf.call_on(player, sf.ADD_ITEM, sf.form_argument(ammo), sf.int_argument(SAVED_ITEMS)),
+            sf.call_on(player, sf.MOD_ACTOR_VALUE, sf.u16(AV_LUCK), sf.int_argument(SAVED_LUCK)),
+            sf.call(sf.REWARD_KARMA, sf.int_argument(SAVED_KARMA)),
+            sf.call_on(person, sf.KILL_ACTOR)]
+    change = [sf.call_on(player, sf.REMOVE_ITEM, sf.form_argument(ammo), sf.int_argument(SAVED_ITEMS)),
+              sf.call_on(player, sf.MOD_ACTOR_VALUE, sf.u16(AV_LUCK), sf.int_argument(SAVED_LUCK_AFTER)),
+              sf.call(sf.REWARD_KARMA, sf.int_argument(SAVED_KARMA_AFTER)),
+              sf.call_on(person, 0x108C)]  # ResurrectActor
+    probe = [
+        sf.set_to(sf.global_target(glob["items"]),
+                  sf.call_token(sf.GET_ITEM_COUNT, sf.form_argument(ammo), reference=player)),
+        sf.set_to(sf.global_target(glob["dead"]), sf.call_token(sf.GET_DEAD, reference=person)),
+        sf.set_to(sf.global_target(glob["luck"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_LUCK), reference=player)),
+        sf.set_to(sf.global_target(glob["karma"]),
+                  sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_KARMA), reference=player))]
+    entries = [(SAVED_STAGES["give"], "The state is given.", 0, [], give, forms),
+               (SAVED_STAGES["change"], "The state is changed.", 0, [], change, forms)]
+    entries += [(SAVED_STAGES[name], "The game is read.", 0, [], probe, forms)
+                for name in ("before", "changed", "loaded", "later")]
+    entries.sort(key=lambda entry: entry[0])
+    return quest(SAVED_QUEST_ID, SAVED_QUEST_NAME, "OpenFallout Test Saved Quest", 0, entries)
 
 
 def arena_quest():
@@ -2401,6 +2472,16 @@ def box_mesh(half_extents=(CUBE / 2,) * 3, center=(0.0, 0.0, 0.0)):
     return "\n".join(lines)
 
 
+def empty_addon():
+    """A content file of Morrowind's kind with nothing in it, for a test to put before OFTest.esm in the load order: the form
+    IDs of the plugin that follows have another top byte then, and (as the file is no ESM4 plugin) the player is still the
+    PlayerRef of OFTest.esm."""
+    description = b"empty test add-on".ljust(256, b"\0")
+    header = struct.pack("<fI32s256sI", 1.3, 0, b"OpenFallout", description, 0)
+    body = b"HEDR" + struct.pack("<I", len(header)) + header
+    return b"TES3" + struct.pack("<III", len(body), 0, 0) + body
+
+
 def write(out, animation=True, spline=True):
     """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
     animation file. The animation moves the foot with the control points of a B-spline, as most bones of the files of
@@ -2454,6 +2535,7 @@ def write(out, animation=True, spline=True):
             target.write_bytes(idle_animation.idle_animation(
                 name=name, node=FOOT_BONE, offset=move, stop=LOCOMOTION_SECONDS, spline=spline, root_speed=velocity))
     (out / "OFTest.esm").write_bytes(plugin())
+    (out / EMPTY_ADDON).write_bytes(empty_addon())
     return out / "OFTest.esm"
 
 

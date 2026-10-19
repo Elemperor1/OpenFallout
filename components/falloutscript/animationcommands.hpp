@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "interpreter.hpp"
+#include "saveaccess.hpp"
 #include "vanillacommands.hpp"
 
 namespace FalloutScript
@@ -41,6 +42,9 @@ namespace FalloutScript
     /// the way. An object whose model has not both of those never is: it only rests.
     class OpenStates
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// The state of the object, one of OpenState
         int stateOf(FormId reference, AnimationWorld& world) const;

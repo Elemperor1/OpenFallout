@@ -960,6 +960,30 @@ namespace OFLua
         scripts->load(data);
     }
 
+    void LuaManager::restoreLocalScripts(const OFWorld::Ptr& ptr, const ESM::LuaScripts& data)
+    {
+        LocalScripts* scripts = ptr.getRefData().getLuaScripts();
+        if (scripts != nullptr)
+        {
+            // In the scene already, with the scripts of the configuration: those of the save take their place (the
+            // queued events of the object then reach them, as they would reach the scripts of an object that was
+            // loaded)
+            scripts->setSavedDataDeserializer(mLocalLoader.get());
+            scripts->load(data);
+            return;
+        }
+        loadLocalScripts(ptr, data);
+        // An object in the scene has been through objectAddedToScene without scripts (the scripts that are attached
+        // while the game runs, which the configuration does not start, are only in the save)
+        scripts = ptr.getRefData().getLuaScripts();
+        if (scripts != nullptr && ptr.isInCell()
+            && OFBase::Environment::get().getWorldScene()->isCellActive(*ptr.getCell()))
+        {
+            scripts->setActive(true, false);
+            insertActive(mActiveLocalScripts, scripts->getWeakPointer());
+        }
+    }
+
     void LuaManager::reloadAllScriptsImpl()
     {
         Log(Debug::Info) << "Reload Lua";
