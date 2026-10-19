@@ -500,9 +500,13 @@ AUTOPLAY_SWITCH_PLACES = ((-200.0, 0.0, 0.0), (0.0, 0.0, 0.0), (200.0, 0.0, 0.0)
 AUTOPLAY_ROOM_AT = (0.0, 300.0, 0.0)  # where the player is put in the room
 AUTOPLAY_GLOBALS = {"target_hits": (0x962, "OFTestAutoplayTargetHits"), "switches": (0x963, "OFTestAutoplaySwitches")}
 AUTOPLAY_ROOM_CELL_NAME = "OFTestAutoplayRoom"
-# Five cubes in the first cell for the saves: the test moves one, disables one, scales one, and deletes two (one before the
-# game is saved, one after it), and makes a cube that is no reference of the plugin
-SAVED_REF_IDS = {"moved": 0x964, "hidden": 0x965, "grown": 0x966, "gone": 0x967, "doomed": 0x968}
+# Six cubes in the first cell for the saves: the test moves one, disables one, scales one, and deletes two (one before the
+# game is saved, one after it), takes part of the stack of one (it is SAVED_STACK of them, SAVED_TAKEN go before the game is
+# saved and SAVED_TAKEN_AFTER after it), and makes a cube that is no reference of the plugin
+SAVED_REF_IDS = {"moved": 0x964, "hidden": 0x965, "grown": 0x966, "gone": 0x967, "doomed": 0x968, "stacked": 0x96E}
+SAVED_STACK = 10
+SAVED_TAKEN = 4
+SAVED_TAKEN_AFTER = 2
 SAVED_PLACE = (-1200.0, -1700.0)  # the first cube; the others stand 300 apart along x
 SAVED_MOVED_TO = (-1200.0, -1000.0, 128.0)  # 128: half a cube above the floor
 SAVED_MADE_AT = (-300.0, -1000.0, 128.0)
@@ -520,7 +524,7 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x96D # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x96E # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -855,8 +859,10 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None, enable_parent=None):
+         primitive=None, enable_parent=None, count=None):
     subs = [sub(b"NAME", struct.pack("<I", base))]
+    if count is not None:
+        subs.append(sub(b"XCNT", struct.pack("<i", count)))
     if enable_parent is not None:
         # XESP, 8 bytes: the reference that this one is enabled with, and the flags (1: the other way round)
         subs.append(sub(b"XESP", struct.pack("<II", *enable_parent)))
@@ -1419,7 +1425,8 @@ def object_refs(kind, origin):
 def saved_refs():
     """The cubes of the saves, around SAVED_PLACE."""
     x, y = SAVED_PLACE
-    return [refr(form_id, CUBE_ID, (x + 300.0 * index, y, CUBE / 2))
+    return [refr(form_id, CUBE_ID, (x + 300.0 * index, y, CUBE / 2),
+                 count=SAVED_STACK if form_id == SAVED_REF_IDS["stacked"] else None)
             for index, form_id in enumerate(SAVED_REF_IDS.values())]
 
 

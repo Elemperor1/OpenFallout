@@ -4067,7 +4067,7 @@ namespace OFScript
     {
         PendingSave& pending = *mPendingSave;
         if (pending.mObjects.empty() && pending.mRequests.empty() && pending.mToDelete.empty()
-            && pending.mToScale.empty())
+            && pending.mToScale.empty() && pending.mToCount.empty())
             return;
         OFBase::World* world = OFBase::Environment::get().getWorld();
 
@@ -4147,6 +4147,14 @@ namespace OFScript
             const OFWorld::Ptr ptr = findReference(reference);
             if (!ptr.isEmpty())
                 world->scaleObject(ptr, scale);
+        }
+        std::vector<std::pair<FalloutScript::FormId, int>> toCount;
+        toCount.swap(pending.mToCount);
+        for (const auto& [reference, count] : toCount)
+        {
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (!ptr.isEmpty())
+                ptr.getCellRef().setCount(count);
         }
     }
 

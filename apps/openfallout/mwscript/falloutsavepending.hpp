@@ -25,6 +25,7 @@ namespace OFScript
         {
             bool mDeleted = false;
             std::optional<float> mScale;
+            std::optional<int> mCount;
         };
         std::map<FalloutScript::FormId, Reference> mReferences;
 
@@ -61,9 +62,10 @@ namespace OFScript
         /// loaded and its volume is put in
         std::map<FalloutScript::FormId, FalloutScript::SavedTrigger> mTriggers;
 
-        /// The references of loaded cells that the next frame deletes or scales
+        /// The references of loaded cells that the next frame deletes, scales or gives a stack count
         std::vector<FalloutScript::FormId> mToDelete;
         std::vector<std::pair<FalloutScript::FormId, float>> mToScale;
+        std::vector<std::pair<FalloutScript::FormId, int>> mToCount;
     };
 }
 

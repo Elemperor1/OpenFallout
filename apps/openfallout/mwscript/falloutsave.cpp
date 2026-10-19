@@ -466,6 +466,8 @@ namespace FalloutScript
                 out.boolean(state.mDeleted);
                 out.boolean(state.mScale.has_value());
                 out.f32(state.mScale.value_or(1));
+                out.boolean(state.mCount.has_value());
+                out.i32(state.mCount.value_or(1));
             }
 
             // The objects that were made, those that are not made yet again included
@@ -547,7 +549,7 @@ namespace FalloutScript
                 if (readEntry(in, entry, false))
                     changed.push_back(entry);
             }
-            const std::size_t pendingReferences = in.count(10);
+            const std::size_t pendingReferences = in.count(15);
             for (std::size_t i = 0; i < pendingReferences; ++i)
             {
                 const std::optional<FormId> reference = in.form();
@@ -555,8 +557,12 @@ namespace FalloutScript
                 state.mDeleted = in.boolean();
                 const bool hasScale = in.boolean();
                 const float scale = in.f32();
+                const bool hasCount = in.boolean();
+                const int count = in.i32();
                 if (hasScale)
                     state.mScale = scale;
+                if (hasCount)
+                    state.mCount = count;
                 if (reference)
                     references[*reference] = state;
             }
@@ -610,6 +616,8 @@ namespace FalloutScript
                 move.mParts = Move::All;
                 host.mRelocations[entry.mReference] = move;
                 references[entry.mReference].mScale = entry.mScale;
+                // What is left of a stack that was partly taken
+                references[entry.mReference].mCount = entry.mCount;
             }
             for (const auto& [reference, state] : references)
                 host.mPendingSave->mReferences[reference] = state;
@@ -662,6 +670,8 @@ namespace OFScript
         }
         if (state.mScale)
             mPendingSave->mToScale.emplace_back(reference, *state.mScale);
+        if (state.mCount)
+            mPendingSave->mToCount.emplace_back(reference, *state.mCount);
         return false;
     }
 

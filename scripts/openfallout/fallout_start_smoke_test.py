@@ -1222,8 +1222,8 @@ local pending, clock, loaded, started = {}, 0, false, false
 local function after(seconds, fn) pending[#pending + 1] = { clock + seconds, fn } end
 
 -- The cubes of the plugin for the saves, the record the cube that is made has, and where they are put
-local REFS = { moved = @MOVED@, hidden = @HIDDEN@, grown = @GROWN@, gone = @GONE@, doomed = @DOOMED@ }
-local ORDER = { 'moved', 'hidden', 'grown', 'gone', 'doomed' }
+local REFS = { moved = @MOVED@, hidden = @HIDDEN@, grown = @GROWN@, gone = @GONE@, doomed = @DOOMED@, stacked = @STACKED@ }
+local ORDER = { 'moved', 'hidden', 'grown', 'gone', 'doomed', 'stacked' }
 local CUBE = core.getFormId('OFTest.esm', @CUBE@)
 local MOVED_TO = util.vector3(@MOVED_TO@)
 local MADE_AT = util.vector3(@MADE_AT@)
@@ -1257,8 +1257,8 @@ local function describe(tag)
             fields[#fields + 1] = name .. '=gone'
         else
             local at = object.position
-            fields[#fields + 1] = string.format('%s=%.0f,%.0f,%.0f,%s,%.1f', name, at.x, at.y, at.z,
-                tostring(object.enabled), object.scale)
+            fields[#fields + 1] = string.format('%s=%.0f,%.0f,%.0f,%s,%.1f,%d', name, at.x, at.y, at.z,
+                tostring(object.enabled), object.scale, object.count)
         end
     end
     local made = 0
@@ -1307,6 +1307,7 @@ return {
                         find(REFS.hidden).enabled = false
                         find(REFS.grown):setScale(@SCALE@)
                         find(REFS.gone):remove()
+                        find(REFS.stacked):remove(@TAKEN@)
                         world.createObject(CUBE, 1):teleport(cell, MADE_AT)
                         world.quests.find('@DQUEST@'):setStage(@S_GIVE@)
                         -- The frame after the calls is when the world does them
@@ -1335,6 +1336,7 @@ return {
             find(REFS.hidden).enabled = true
             find(REFS.grown):setScale(1)
             find(REFS.doomed):remove()
+            find(REFS.stacked):remove(@TAKEN_AFTER@)
             for _, other in ipairs(cubesAt(cell, MADE_AT)) do other:remove() end
             world.quests.find('@DQUEST@'):setStage(@S_CHANGE@)
             after(@SETTLE@, function()
@@ -1360,6 +1362,8 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@GROWN@", str(plugin.SAVED_REF_IDS["grown"]))
                       .replace("@GONE@", str(plugin.SAVED_REF_IDS["gone"]))
                       .replace("@DOOMED@", str(plugin.SAVED_REF_IDS["doomed"]))
+                      .replace("@STACKED@", str(plugin.SAVED_REF_IDS["stacked"]))
+                      .replace("@TAKEN@", str(plugin.SAVED_TAKEN)).replace("@TAKEN_AFTER@", str(plugin.SAVED_TAKEN_AFTER))
                       .replace("@DQUEST@", plugin.SAVED_QUEST_NAME)
                       .replace("@S_GIVE@", str(plugin.SAVED_STAGES["give"]))
                       .replace("@S_CHANGE@", str(plugin.SAVED_STAGES["change"]))
@@ -2907,14 +2911,16 @@ def check_saves(first, second, third=None):
     origin = {name: (plugin.SAVED_PLACE[0] + 300.0 * index, plugin.SAVED_PLACE[1], 128.0)
               for index, name in enumerate(ids)}
 
-    def cube(place, enabled="true", scale=1.0):
-        return f"{place[0]:.0f},{place[1]:.0f},{place[2]:.0f},{enabled},{scale:.1f}"
+    def cube(place, enabled="true", scale=1.0, count=1):
+        return f"{place[0]:.0f},{place[1]:.0f},{place[2]:.0f},{enabled},{scale:.1f},{count}"
 
+    left = plugin.SAVED_STACK - plugin.SAVED_TAKEN
     saved_cubes = {"moved": cube(plugin.SAVED_MOVED_TO), "hidden": cube(origin["hidden"], "false"),
                    "grown": cube(origin["grown"], scale=plugin.SAVED_SCALE), "gone": "gone",
-                   "doomed": cube(origin["doomed"]), "made": "1"}
+                   "doomed": cube(origin["doomed"]), "stacked": cube(origin["stacked"], count=left), "made": "1"}
     changed_cubes = {"moved": cube(origin["moved"]), "hidden": cube(origin["hidden"]),
-                     "grown": cube(origin["grown"]), "gone": "gone", "doomed": "gone", "made": "0"}
+                     "grown": cube(origin["grown"]), "gone": "gone", "doomed": "gone",
+                     "stacked": cube(origin["stacked"], count=left - plugin.SAVED_TAKEN_AFTER), "made": "0"}
 
     def cubes(text):
         found = {}
