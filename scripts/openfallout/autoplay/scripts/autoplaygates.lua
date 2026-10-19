@@ -24,10 +24,11 @@ return {
     saves = {
         after = 5,
         resaveAfter = 3,
-        -- Fallout 3: after the shooting range and the classroom test (CG03 stage 25), back from the escape's first stage;
+        -- Fallout 3: after the shooting range and the classroom test (CG03 stage 25), back from the escape's stage 21 (the quest
+        -- stands there for some 20 s until its gate fires; stage 3 never stands for 5 s on the real data, Mac round 1);
         -- New Vegas: after the Vigor Tester (VCG01 stage 65), back when Doc is to talk (stage 80)
         save = { { quest = 'CG03', stage = 25 }, { quest = 'VCG01', stage = 65 } },
-        load = { { quest = 'CG04', stage = 3 }, { quest = 'VCG01', stage = 80 } },
+        load = { { quest = 'CG04', stage = 21 }, { quest = 'VCG01', stage = 80 } },
     },
     boxes = {
         -- CG04VaultExitMessage, at the door out of Vault 101: five buttons, and the last one leaves (the others stay)
