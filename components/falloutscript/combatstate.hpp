@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -19,6 +20,9 @@ namespace FalloutScript
     /// the game. It can be used from any thread.
     class CombatState
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// Forgets everything, as for a new game
         void clear();

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "levelling.hpp"
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -21,6 +22,9 @@ namespace FalloutScript
     /// from the experience; the points of a new level are handed out by awardNextLevel.
     class PlayerProgress
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         /// Karma stays between minus this and this
         static constexpr int karmaLimit = 1000;

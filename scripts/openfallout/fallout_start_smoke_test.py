@@ -1201,6 +1201,101 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
                   .replace("@SITTER_GLOBAL@", plugin.SITTER_GLOBAL[1]).replace("@SITTER_CHAIR@", str(plugin.SITTER_CHAIR_REF_ID))
                   .replace("@SITTER@", str(plugin.SITTER_REF_ID)))
 
+# Saves: a script of the world waits for the quests of the plugin to run, sets a global, asks the script of the menu for a
+# save, changes the state (the global, and quest C, which has not been started) and asks the menu for the game to be loaded
+# again: what the script then reads must be the state of the save, and the quests that the game ran before the save must
+# not run again (the global is not given the seven that stage 10 of quest A adds once more). A second engine started with
+# `--load-savegame` on the save must read the same.
+SAVES_FROM = 2.0
+SAVES_COUNTER = 123
+SAVES_CHANGED_COUNTER = 999
+SAVES_WORLD_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+local types = require('openfallout.types')
+
+local phase, elapsed, since, read = 0, 0, 0, false
+
+local function describe(tag)
+    local a = world.quests.find('@A@')
+    local b = world.quests.find('@B@')
+    local c = world.quests.find('@C@')
+    print('OFTEST', 'saves', tag, string.format(
+        'a_stage=%d a_done=%s b_stage=%d b_completed=%s b_shown=%s b_finished=%s c_stage=%d c_done=%s counter=%s',
+        a.stage, tostring(a:stageDone(@A_STAGE@)), b.stage, tostring(b.completed),
+        tostring(b:objectiveDisplayed(@OBJECTIVE@)), tostring(b:objectiveCompleted(@OBJECTIVE@)), c.stage,
+        tostring(c:stageDone(@C_STAGE@)), tostring(world.globals.@COUNTER@)))
+end
+
+return {
+    engineHandlers = {
+        onSave = function() return { phase = phase } end,
+        -- A game that is loaded, in this engine or in another, goes straight to reading the state
+        onLoad = function() phase, since = 3, 0 end,
+        onUpdate = function(dt)
+            if phase == 0 then
+                elapsed = elapsed + dt
+                if elapsed >= @FROM@ then
+                    world.globals.@COUNTER@ = @VALUE@
+                    describe('before')
+                    phase = 1
+                    types.Player.sendMenuEvent(world.players[1], 'OFTestSave', {})
+                end
+            elseif phase == 3 then
+                since = since + dt
+                if since >= 0.2 and not read then
+                    read = true
+                    describe('loaded')
+                elseif since >= 3 then
+                    describe('later')
+                    phase = 4
+                    core.quit()
+                end
+            end
+        end,
+    },
+    eventHandlers = {
+        OFTestSaved = function()
+            world.quests.find('@C@'):setStage(@C_STAGE@)
+            world.globals.@COUNTER@ = @CHANGED@
+            describe('changed')
+            phase = 2
+            types.Player.sendMenuEvent(world.players[1], 'OFTestLoad', {})
+        end,
+    },
+}
+"""
+SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).replace("@A@", plugin.QUEST_A_NAME)
+                      .replace("@B@", plugin.QUEST_B_NAME).replace("@C@", plugin.QUEST_C_NAME)
+                      .replace("@A_STAGE@", str(plugin.QUEST_A_STAGE)).replace("@C_STAGE@", str(plugin.QUEST_C_STAGE))
+                      .replace("@OBJECTIVE@", str(plugin.QUEST_OBJECTIVE)).replace("@COUNTER@", plugin.COUNTER_NAME)
+                      .replace("@VALUE@", str(SAVES_COUNTER)).replace("@CHANGED@", str(SAVES_CHANGED_COUNTER)))
+SAVES_MENU_SCRIPT = """\
+local menu = require('openfallout.menu')
+local core = require('openfallout.core')
+
+return {
+    eventHandlers = {
+        OFTestSave = function()
+            menu.saveGame('oftest')
+            print('OFTEST', 'saves', 'saved', tostring(menu.getCurrentSaveDir()))
+            core.sendGlobalEvent('OFTestSaved', {})
+        end,
+        OFTestLoad = function()
+            local dir = menu.getCurrentSaveDir()
+            for slot, info in pairs(menu.getSaves(dir)) do
+                if info.description == 'oftest' then
+                    print('OFTEST', 'saves', 'loading', dir, slot)
+                    menu.loadGame(dir, slot)
+                    return
+                end
+            end
+            print('OFTEST', 'saves', 'no slot', tostring(dir))
+        end,
+    },
+}
+"""
+
 # Reads the scripted object of the plugin, whose script (a compiled script of an object) runs in the engine: it
 # disables a cube on load, counts frames, measures its distance to the player and counts activations by the player. The
 # script looks the objects up by the form ID of the reference of the kind of cell that is loaded. After the time the
@@ -2004,15 +2099,17 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
 
 
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
-               keys=None, new_game=False):
+               keys=None, new_game=False, load=None):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
-    pressed after the log has a line that matches. `new_game` adds `--new-game`; a `start` of None leaves `--start` out."""
+    pressed after the log has a line that matches. `new_game` adds `--new-game`; a `start` of None leaves `--start` out;
+    `load` is a saved game to start from (`--load-savegame`)."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data), "--content", "OFTest.esm",
                "--content", scripts, "--skip-menu", *(["--new-game"] if new_game else []),
-               *([] if start is None else ["--start", start]), "--no-grab"]
+               *([] if start is None else ["--start", start]), *([] if load is None else ["--load-savegame", str(load)]),
+               "--no-grab"]
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, so give it one.
     master, slave = pty.openpty()
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
@@ -2558,6 +2655,66 @@ def check_triggers(text):
                             f"it is on, not walk on to the package that comes after: {later[0]}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_saves(first, second):
+    """The problems with the saves. `first` is the log of the engine that saved, changed the state and loaded the save
+    again, `second` the log of the engine that was started on the save. The state that the script reads (the stages of
+    the quests, whether a stage is done, the objective of quest B, the global) before the save is what it reads after the
+    load, in both; what was changed after the save (quest C moved to a stage, the global) is gone; and three seconds
+    later it is the same still: the quests that ran before the save did not run again (the global did not get the seven
+    that stage 10 of quest A adds)."""
+    problems = []
+    for name, text in (("saving", first), ("fresh", second)):
+        for line in text.splitlines():
+            if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|Error (on )?load|Failed to load|"
+                         r"Can't load|damaged|newer than this engine", line, re.I):
+                problems.append(f"({name}) {line}")
+
+    def states(text):
+        found = {}
+        for line in text.splitlines():
+            match = re.search(r"OFTEST\tsaves\t(before|changed|loaded|later)\t(.+)$", line)
+            if match:
+                found[match.group(1)] = dict(item.split("=", 1) for item in match.group(2).split(" "))
+        return found
+
+    first_states, second_states = states(first), states(second)
+    for tag in ("before", "changed", "loaded", "later"):
+        if tag not in first_states:
+            problems.append(f"no 'saves {tag}' line in the log of the engine that saved")
+    for tag in ("loaded", "later"):
+        if tag not in second_states:
+            problems.append(f"no 'saves {tag}' line in the log of the engine that was started on the save")
+    if "OFTEST\tsaves\tsaved\t" not in first:
+        problems.append("the menu script did not save the game")
+    if "OFTEST\tsaves\tloading\t" not in first:
+        problems.append("the menu script did not find the save to load")
+    if problems:
+        return problems
+    before = first_states["before"]
+    wanted = {"a_stage": str(plugin.QUEST_A_STAGE), "a_done": "true", "b_stage": str(plugin.QUEST_B_STAGE),
+              "b_completed": "true", "b_shown": "true", "b_finished": "true", "c_stage": "0", "c_done": "false"}
+    for key, value in wanted.items():
+        if before[key] != value:
+            problems.append(f"before the save {key} should be {value} (the quests ran): {before}")
+    if float(before["counter"]) != SAVES_COUNTER:
+        problems.append(f"the script set the global to {SAVES_COUNTER}: {before}")
+    changed = first_states["changed"]
+    if (changed["c_stage"], changed["c_done"]) != (str(plugin.QUEST_C_STAGE), "true") \
+            or float(changed["counter"]) != SAVES_CHANGED_COUNTER:
+        problems.append(f"the changes after the save did not take: {changed}")
+    for name, found in (("the engine that saved", first_states), ("the engine started on the save", second_states)):
+        for tag in ("loaded", "later"):
+            state = found[tag]
+            if {key: state[key] for key in wanted} != wanted or float(state["counter"]) != SAVES_COUNTER:
+                problems.append(f"{name}: after the load ({tag}) the state should be the one of the save "
+                                f"({wanted}, counter {SAVES_COUNTER}): {state}")
+    if "Quitting peacefully" not in first:
+        problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
+    if "Quitting peacefully" not in second:
+        problems.append("the log of the engine started on the save does not end with 'Quitting peacefully'")
     return problems
 
 
@@ -3520,7 +3677,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -3554,6 +3711,9 @@ def main():
     (data / "scripts" / "arenaplayer.lua").write_text(ARENA_PLAYER_SCRIPT, encoding="ascii")
     (data / "arenatest.omwscripts").write_text(
         "PLAYER: scripts/arenaplayer.lua\nGLOBAL: scripts/arenatest.lua\n", encoding="ascii")
+    (data / "scripts" / "savesworld.lua").write_text(SAVES_WORLD_SCRIPT, encoding="ascii")
+    (data / "scripts" / "savesmenu.lua").write_text(SAVES_MENU_SCRIPT, encoding="ascii")
+    (data / "savestest.omwscripts").write_text("GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\n", encoding="ascii")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
@@ -3712,6 +3872,38 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (autoplay):", problem)
+        problems += found
+    if args.only in (None, "saves"):
+        home = work / "saves" / "home"
+        home.mkdir(parents=True)
+        for name in ("runtime", "runtime2"):
+            (work / "saves" / name).mkdir(mode=0o700)
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        print("== saves: --start", plugin.CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, work / "saves" / "runtime", args.seconds,
+                               plugin.CELL_NAME, [], "savestest.omwscripts")
+        first = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        second = ""
+        saved = sorted(home.rglob("*.omwsave"))
+        if len(saved) != 1:
+            found.append(f"expected one saved game, found {[str(path) for path in saved]}")
+        else:
+            print(f"== saves: --load-savegame {saved[0].name}")
+            log.rename(log.with_name("saving.log"))
+            status, _ = run_engine(program, build / "resources", data, home, work / "saves" / "runtime2", args.seconds,
+                                   None, [], "savestest.omwscripts", load=saved[0])
+            second = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+            if status != 0:
+                found.append(f"the engine started on the save exited with status {status}")
+        found += check_saves(first, second)
+        for line in (line for text in (first, second) for line in text.splitlines() if "OFTEST" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (saves):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

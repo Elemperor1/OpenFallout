@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -45,6 +46,9 @@ namespace FalloutScript
     /// knows what an item is.
     class ActorState
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         explicit ActorState(ActorRecords& records);
 

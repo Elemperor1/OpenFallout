@@ -9,6 +9,7 @@
 #include <components/esm4/script.hpp>
 
 #include "conditions.hpp"
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -72,6 +73,9 @@ namespace FalloutScript
     /// keep on in update. It can be used from any thread.
     class ItemUse
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         ItemUse(UseRecords& records, ActorState& state, ActorValues& values, PlayerProgress& progress);
 

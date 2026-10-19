@@ -5,6 +5,7 @@
 #include <mutex>
 #include <vector>
 
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -28,6 +29,9 @@ namespace FalloutScript
     /// that and what was added. It can be used from any thread.
     class FormLists
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         explicit FormLists(FormListRecords& records);
 

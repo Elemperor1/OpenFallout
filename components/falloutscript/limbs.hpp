@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "saveaccess.hpp"
 #include "script.hpp"
 
 namespace FalloutScript
@@ -46,6 +47,9 @@ namespace FalloutScript
     /// down until it is crippled. It can be used from any thread.
     class Limbs
     {
+        template <class T>
+        friend struct SaveAccess;
+
     public:
         Limbs(LimbRecords& records, ActorValues& values);
 
