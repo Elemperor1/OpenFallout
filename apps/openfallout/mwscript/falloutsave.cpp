@@ -757,8 +757,11 @@ namespace OFScript
 
     FalloutScripts::SavedPlayer FalloutScripts::savedPlayer()
     {
-        ensureLevellingRules();
         SavedPlayer result;
+        if (mStore.get<ESM4::Npc>().getSize() == 0)
+            return result;
+        result.mKnown = true;
+        ensureLevellingRules();
         result.mLevel = mProgress.level();
         result.mHealth = mActorValues.current(mPlayer, FalloutScript::ActorValue::health);
         result.mMaxHealth = mActorValues.permanent(mPlayer, FalloutScript::ActorValue::health);

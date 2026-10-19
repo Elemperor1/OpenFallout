@@ -86,6 +86,12 @@ class SaveDiffTest(unittest.TestCase):
         with self.assertRaises(savediff.SaveFileError):
             savediff.sections(path)
 
+    def test_a_section_without_a_version_cannot_be_read(self):
+        unversioned = record("FOSV", sub("NAME", b"a\0"), sub("DATA", b"1"))
+        path = self.write("unversioned", save(unversioned))
+        with self.assertRaises(savediff.SaveFileError):
+            savediff.sections(path)
+
     def test_the_exit_status_follows_the_problems(self):
         first = self.write("a", save(section("a", 1, b"1")))
         second = self.write("b", save(section("a", 1, b"2")))

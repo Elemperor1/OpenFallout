@@ -366,10 +366,10 @@ namespace
         EXPECT_EQ(last.mDamage, 12.5);
         EXPECT_TRUE(last.mCritical);
         EXPECT_EQ(last.mLimb, 2);
-        EXPECT_EQ(loaded.takeHits().size(), 1u);
         SaveWriter again;
-        FalloutScript::writeCombat(combat, again);
+        FalloutScript::writeCombat(loaded, again);
         EXPECT_EQ(again.bytes(), out.bytes());
+        EXPECT_EQ(loaded.takeHits().size(), 1u);
     }
 
     class Uses final : public FalloutScript::UseRecords

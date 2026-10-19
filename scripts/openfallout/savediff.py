@@ -67,8 +67,8 @@ def sections(path):
                     (version,) = struct.unpack("<I", content)
                 elif sub == "DATA":
                     payload = content
-            if section is None or payload is None:
-                raise SaveFileError("a FOSV record has no name or no data")
+            if section is None or version is None or payload is None:
+                raise SaveFileError("a FOSV record has no name, no version or no data")
             found.append((section, version, payload))
         return found, counts
     except (OSError, struct.error, SaveFileError) as error:

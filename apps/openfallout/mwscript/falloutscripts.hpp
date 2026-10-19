@@ -162,9 +162,11 @@ namespace OFScript
         /// What a saved game is made of: the sections, in the order they are written
         std::vector<FalloutScript::SaveSection> saveSections();
         /// What the list of saved games says of the player: the level and the health the games work out (the stats of
-        /// Morrowind that the header would take them from are not the ones that count)
+        /// Morrowind that the header would take them from are not the ones that count). `mKnown` is false for content
+        /// files that hold no characters of the games, where the stats of Morrowind are the right ones.
         struct SavedPlayer
         {
+            bool mKnown = false;
             int mLevel = 1;
             double mHealth = 0;
             double mMaxHealth = 0;

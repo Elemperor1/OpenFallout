@@ -269,9 +269,12 @@ void OFState::StateManager::saveGame(std::string_view description, const Slot* s
         if (OFScript::FalloutScripts* fallout = OFBase::Environment::get().getFalloutScripts())
         {
             const OFScript::FalloutScripts::SavedPlayer saved = fallout->savedPlayer();
-            profile.mPlayerLevel = saved.mLevel;
-            profile.mCurrentHealth = static_cast<float>(saved.mHealth);
-            profile.mMaximumHealth = static_cast<float>(saved.mMaxHealth);
+            if (saved.mKnown)
+            {
+                profile.mPlayerLevel = saved.mLevel;
+                profile.mCurrentHealth = static_cast<float>(saved.mHealth);
+                profile.mMaximumHealth = static_cast<float>(saved.mMaxHealth);
+            }
         }
 
         Log(Debug::Info) << "Making a screenshot for saved game '" << description << "'";
