@@ -755,6 +755,16 @@ namespace OFScript
         return sections;
     }
 
+    FalloutScripts::SavedPlayer FalloutScripts::savedPlayer()
+    {
+        ensureLevellingRules();
+        SavedPlayer result;
+        result.mLevel = mProgress.level();
+        result.mHealth = mActorValues.current(mPlayer, FalloutScript::ActorValue::health);
+        result.mMaxHealth = mActorValues.permanent(mPlayer, FalloutScript::ActorValue::health);
+        return result;
+    }
+
     std::size_t FalloutScripts::countSavedGameRecords()
     {
         return saveSections().size();

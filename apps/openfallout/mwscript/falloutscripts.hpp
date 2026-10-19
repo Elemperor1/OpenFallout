@@ -161,6 +161,15 @@ namespace OFScript
         void readRecord(ESM::ESMReader& reader, std::uint32_t type);
         /// What a saved game is made of: the sections, in the order they are written
         std::vector<FalloutScript::SaveSection> saveSections();
+        /// What the list of saved games says of the player: the level and the health the games work out (the stats of
+        /// Morrowind that the header would take them from are not the ones that count)
+        struct SavedPlayer
+        {
+            int mLevel = 1;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+        };
+        SavedPlayer savedPlayer();
 
         /// The quest of character creation, which the games start when the player picks New in the main menu: the
         /// executables name it in their ini file (CG00 in Fallout 3, VCG00 in New Vegas), and here it is found by its
