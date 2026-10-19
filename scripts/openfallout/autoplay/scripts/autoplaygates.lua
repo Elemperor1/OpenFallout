@@ -38,7 +38,8 @@ return {
         -- 50 to 70 are the shooting range and the radroach: the result of 44 puts the BB gun and 50 rounds in the hands of the
         -- player; the script of each of the three targets counts every blow it hears of (any weapon) and sets 55 at the third,
         -- which enables the radroach; its script sets 70 when it dies (a BB gun does 4 and the radroach has 5 health). The
-        -- player shoots at the first target and then at the radroach; the stand-ins after them are given a minute.
+        -- player shoots at the first target and then at the radroach (Mac round 7: both stages came by themselves, 3 shots and 3
+        -- shots, so there is no stand-in after them).
         { quest = 'CG02', stage = 10, file = 'Fallout3.esm', ref = 0x09F64F, how = 'walk' },
         { quest = 'CG02', stage = 12, file = 'Fallout3.esm', ref = 0x09F64F, how = 'walk' },
         { quest = 'CG02', stage = 15, file = 'Fallout3.esm', ref = 0x0309A8, how = 'activate' },
@@ -52,11 +53,9 @@ return {
         { quest = 'CG02', stage = 44, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 44, how = 'setstage', to = 50, settle = 60 }, -- the Dad's walk to the range, if he does not
         { quest = 'CG02', stage = 50, file = 'Fallout3.esm', ref = 0x0304EB, how = 'fire', shots = 3, tries = 1 },
-        { quest = 'CG02', stage = 50, how = 'setstage', to = 55, settle = 60 }, -- three hits with the BB gun, if they do not
         { quest = 'CG02', stage = 55, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 60, file = 'Fallout3.esm', ref = 0x0306CD, how = 'fire', shots = 20, untilDead = true,
             tries = 1 },
-        { quest = 'CG02', stage = 60, how = 'setstage', to = 70, settle = 60 }, -- the radroach dies, if it does not
         { quest = 'CG02', stage = 70, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 80, file = 'Fallout3.esm', ref = 0x060C81, how = 'walk' },
         -- The classroom (CG03): the Dad, the trigger by the door, Amata, Mr. Brotch (who offers the test, which needs the player
@@ -75,8 +74,8 @@ return {
         { quest = 'CG03', stage = 70, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate', settle = 90 }, -- Mr. Brotch again
         { quest = 'CG03', stage = 80, file = 'Fallout3.esm', ref = 0x02B797, how = 'walk' },
         -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight: the stand-in), Butch, the trigger in
-        -- the atrium, the Overseer, Amata, the trigger by the reactor, the three switches (a stand-in: the open state of a
-        -- switch), the control pod, Amata, and the door out, whose box needs its last button (boxes above)
+        -- the atrium, the Overseer, Amata, the trigger by the reactor, the three switches, the control pod, Amata, and the door
+        -- out, whose box needs its last button (boxes above)
         { quest = 'CG04', stage = 3, file = 'Fallout3.esm', ref = 0x0230E4, how = 'activate' },
         { quest = 'CG04', stage = 10, file = 'Fallout3.esm', ref = 0x02A325, how = 'walk' },
         { quest = 'CG04', stage = 12, how = 'setstage', to = 15 },
@@ -92,17 +91,14 @@ return {
         { quest = 'CG04', stage = 50, file = 'Fallout3.esm', ref = 0x057E98, how = 'walk' },
         -- The switches in the reactor room (cell 0x02A186, which no door of the data leads to: the player is taken there): the
         -- script of each switch sets 110 and counts one more, and at the third sets 120 (GetOpenState is 3 for an object that
-        -- is no door). The three are activated at once, and the player is taken back to the atrium (by the overseer's terminal,
-        -- not into the trigger of the office, whose script sets 60 again) before the guards that 110 sends there get to the
-        -- player; the door in the atrium that leads to the entrance, where the control pod is, is used by the player first:
-        -- the pod is in another cell
+        -- is no door), so the three are activated at once and both stages come in the same frame (Mac round 7: no stand-in
+        -- was needed). The player is taken back to the atrium (by the overseer's terminal, not into the trigger of the office,
+        -- whose script sets 60 again) before the guards that 110 sends there get to the player; the door in the atrium that
+        -- leads to the entrance, where the control pod is, is used by the player first: the pod is in another cell
         { quest = 'CG04', stage = 60, file = 'Fallout3.esm', cell = 0x02A186, at = { -1351.0, -3092.4, 7954.9 }, how = 'teleport',
             tries = 1 },
         { quest = 'CG04', stage = 60, file = 'Fallout3.esm', refs = { 0x02987C, 0x0660C0, 0x0660C1 }, how = 'activate',
             gap = 5 },
-        { quest = 'CG04', stage = 60, how = 'setstage', to = 110, settle = 90 }, -- the first switch, if it does not
-        { quest = 'CG04', stage = 110, file = 'Fallout3.esm', ref = 0x05398D, how = 'activate', tries = 1 },
-        { quest = 'CG04', stage = 110, how = 'setstage', to = 120, settle = 60 }, -- the third switch, if it does not
         { quest = 'CG04', stage = 120, file = 'Fallout3.esm', cell = 0x024511, at = { -4640.0, -508.0, 8488.0 },
             how = 'teleport', tries = 1, settle = 2, gap = 2 },
         { quest = 'CG04', stage = 120, file = 'Fallout3.esm', ref = 0x05398D, how = 'activate', tries = 1, gap = 5 },

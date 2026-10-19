@@ -22,7 +22,7 @@ is tried twice (its own `tries` if it has one). A gate can have a `settle` (how 
 real seconds since the gate before it): of the gates that are ready, the first of the table goes first.
 
 A gate can also put the quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, and for what a gate
-before it should have brought about. Such a stand-in has a `settle` of a minute, and each one that the log shows was used is
+before it should have brought about. Such a stand-in has a `settle` of its own (a minute for most, so a run that waits is not stalled), and each one that the log shows was used is
 something the engine does not do yet. The table also names the button of a message box that is not the first (the box at the door
 out of Vault 101 leaves with its last button). The table holds the references that the static surveys found; a stage that waits for
 something else (the characters finishing their packages, the timers of the intros) is left as it is, and the quest line shows where
