@@ -48,11 +48,12 @@ local function askMenu(event, data)
     types.Player.sendMenuEvent(world.players[1], event, data)
 end
 
--- Whether one of the quests of the list has stood at its stage long enough
+-- Whether one of the quests of the list has stood at its stage long enough (`after` of the entry, else of the table)
 local function stoodAt(wants, real)
     for _, want in ipairs(wants or {}) do
         local quest = world.quests.find(want.quest)
-        if quest and quest.stage == want.stage and real - (since[want.quest] or real) >= (saves.after or 5) then
+        local wait = want.after or saves.after or 5
+        if quest and quest.stage == want.stage and real - (since[want.quest] or real) >= wait then
             return true
         end
     end

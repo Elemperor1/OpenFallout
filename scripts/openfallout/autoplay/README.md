@@ -41,12 +41,13 @@ several things at once, on the arena of the plugin.
 
 `autoplaysaves.omwscripts` loads the same files and two more: `autoplayprobe.lua` (a world script) and `autoplaysaves.lua` (a
 menu script, the only kind that may save or load). The `saves` table of `autoplaygates.lua` says when. The game is saved
-(description `autoplay-save`) when one of the quests of `save` has stood at its stage for `after` real seconds: the stage and
-whether it runs, for each quest the tool follows, are logged (`AUTOPLAY digest saved`) and written into the save. When one of
-the quests of `load` has stood at its stage, the game is loaded back in the same engine, once. A game that was loaded from the
-save, here or in a new engine (`--load-savegame` with the file the log names), logs the quests as it has them (`digest
-loaded`), says `digest check ok` when they are those of the save (`MISMATCH` when not), and saves again (description
-`autoplay-again`) `resaveAfter` seconds later. The intro goes on from the loaded game to its last stage.
+(description `autoplay-save`) when one of the quests of `save` has stood at its stage for `after` real seconds (the table's,
+or the entry's own: the Vigor Tester stage of New Vegas stands 2.7 s only): the stage and whether it runs, for each quest the
+tool follows, are logged (`AUTOPLAY digest saved`) and written into the save. When one of the quests of `load` has stood at
+its stage, the game is loaded back in the same engine, once. A game that was loaded from the save, here or in a new engine
+(`--load-savegame` with the file the log names), logs the quests as it has them (`digest loaded`), says `digest check ok`
+when they are those of the save (`MISMATCH` when not), and saves again (description `autoplay-again`) `resaveAfter` seconds
+later. The intro goes on from the loaded game to its last stage.
 
 ```
 openfallout --skip-menu --new-game --content Fallout3.esm \

@@ -15,7 +15,8 @@
 -- The references are the ones the Mac found in the base plugins (static survey, rounds 7 and 8); `ref` is the form id without
 -- the number of the plugin in the load order (the plugin itself is `file`). The stages are those the quest waits at.
 -- `saves` (optional) is the probe of the saves (M7): `save` and `load` are lists of quests and stages, and when one of the
--- quests has stood still at its stage for `after` real seconds the game is saved (`save`) or loaded back from that save, once
+-- quests has stood still at its stage for `after` real seconds (the entry's own, else that of the table) the game is saved
+-- (`save`) or loaded back from that save, once
 -- (`load`). A game that is loaded from the save (here, or in a new engine with --load-savegame) logs the quests it has, saves
 -- again `resaveAfter` seconds later, and carries on to the end of the intro. autoplayworld.lua has the details.
 return {
@@ -24,10 +25,12 @@ return {
     saves = {
         after = 5,
         resaveAfter = 3,
-        -- Fallout 3: after the shooting range and the classroom test (CG03 stage 25), back from the escape's first stage;
-        -- New Vegas: after the Vigor Tester (VCG01 stage 65), back when Doc is to talk (stage 80)
-        save = { { quest = 'CG03', stage = 25 }, { quest = 'VCG01', stage = 65 } },
-        load = { { quest = 'CG04', stage = 3 }, { quest = 'VCG01', stage = 80 } },
+        -- Fallout 3: after the shooting range and the classroom test (CG03 stage 25), back from the escape's stage 21 (the quest
+        -- stands there for some 20 s until its gate fires; stage 3 never stands for 5 s on the real data, Mac round 1);
+        -- New Vegas: after the Vigor Tester (VCG01 stage 65, which stands for 2.7 s only: its entry waits 2 s), back when Doc
+        -- is to talk (stage 80, which stands for 79 s)
+        save = { { quest = 'CG03', stage = 25 }, { quest = 'VCG01', stage = 65, after = 2 } },
+        load = { { quest = 'CG04', stage = 21 }, { quest = 'VCG01', stage = 80 } },
     },
     boxes = {
         -- CG04VaultExitMessage, at the door out of Vault 101: five buttons, and the last one leaves (the others stay)
