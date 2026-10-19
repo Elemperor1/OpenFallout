@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "levelling.hpp"
-#include "script.hpp"
 #include "saveaccess.hpp"
+#include "script.hpp"
 
 namespace FalloutScript
 {

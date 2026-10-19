@@ -1207,8 +1207,8 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
 # not run again (the global is not given the seven that stage 10 of quest A adds once more). A second engine started with
 # `--load-savegame` on the save must read the same.
 SAVES_FROM = 2.0
-SAVES_COUNTER = 123.5
-SAVES_CHANGED_COUNTER = 999.0
+SAVES_COUNTER = 123
+SAVES_CHANGED_COUNTER = 999
 SAVES_WORLD_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')

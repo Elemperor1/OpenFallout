@@ -210,7 +210,8 @@ namespace
         return out.take();
     }
 
-    void readQuests(FalloutScript::QuestManager& manager, const std::string& bytes, SaveReader::FormMapping mapping = {})
+    void readQuests(
+        FalloutScript::QuestManager& manager, const std::string& bytes, SaveReader::FormMapping mapping = {})
     {
         SaveReader in(bytes, std::move(mapping));
         FalloutScript::readQuests(manager, in, FalloutScript::questsSectionVersion);
@@ -351,7 +352,8 @@ namespace
         return out.take();
     }
 
-    void readObjects(FalloutScript::ObjectScripts& scripts, const std::string& bytes, SaveReader::FormMapping mapping = {})
+    void readObjects(
+        FalloutScript::ObjectScripts& scripts, const std::string& bytes, SaveReader::FormMapping mapping = {})
     {
         SaveReader in(bytes, std::move(mapping));
         FalloutScript::readObjectScripts(scripts, in, FalloutScript::objectScriptsSectionVersion);

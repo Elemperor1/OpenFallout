@@ -10,8 +10,8 @@
 #include <utility>
 #include <vector>
 
-#include "script.hpp"
 #include "saveaccess.hpp"
+#include "script.hpp"
 
 namespace FalloutScript
 {

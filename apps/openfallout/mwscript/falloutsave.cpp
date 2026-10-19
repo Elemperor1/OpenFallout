@@ -55,7 +55,8 @@ namespace FalloutScript
             {
                 const std::optional<FormId> global = in.form();
                 const double value = in.f64();
-                if (global && host.mStore.get<ESM4::GlobalVariable>().search(OFScript::FalloutScripts::refIdOf(*global)))
+                if (global
+                    && host.mStore.get<ESM4::GlobalVariable>().search(OFScript::FalloutScripts::refIdOf(*global)))
                     host.mGlobals[*global] = value;
             }
             const std::lock_guard lock(host.mCalendarMutex);
@@ -144,7 +145,8 @@ namespace OFScript
         sections.push_back({ "format", 1, [this](FalloutScript::SaveWriter& out) { Access::writeFormat(*this, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) { Access::readFormat(*this, in, version); } });
         sections.push_back({ "globals", 1, [this](FalloutScript::SaveWriter& out) { Access::writeGlobals(*this, out); },
-            [this](FalloutScript::SaveReader& in, std::uint32_t version) { Access::readGlobals(*this, in, version); } });
+            [this](
+                FalloutScript::SaveReader& in, std::uint32_t version) { Access::readGlobals(*this, in, version); } });
         sections.push_back({ "quests", FalloutScript::questsSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeQuests(mQuests, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
@@ -155,12 +157,19 @@ namespace OFScript
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readObjectScripts(mObjects, in, version);
             } });
-        sections.push_back({ "controls", 1, [this](FalloutScript::SaveWriter& out) { Access::writeControls(*this, out); },
-            [this](FalloutScript::SaveReader& in, std::uint32_t version) { Access::readControls(*this, in, version); } });
+        sections.push_back(
+            { "controls", 1, [this](FalloutScript::SaveWriter& out) { Access::writeControls(*this, out); },
+                [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                    Access::readControls(*this, in, version);
+                } });
         sections.push_back({ "talking", 1, [this](FalloutScript::SaveWriter& out) { Access::writeTalking(*this, out); },
-            [this](FalloutScript::SaveReader& in, std::uint32_t version) { Access::readTalking(*this, in, version); } });
-        sections.push_back({ "packages", 1, [this](FalloutScript::SaveWriter& out) { Access::writePackages(*this, out); },
-            [this](FalloutScript::SaveReader& in, std::uint32_t version) { Access::readPackages(*this, in, version); } });
+            [this](
+                FalloutScript::SaveReader& in, std::uint32_t version) { Access::readTalking(*this, in, version); } });
+        sections.push_back(
+            { "packages", 1, [this](FalloutScript::SaveWriter& out) { Access::writePackages(*this, out); },
+                [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                    Access::readPackages(*this, in, version);
+                } });
         return sections;
     }
 
@@ -178,7 +187,10 @@ namespace OFScript
             writer.startRecord(ESM::REC_FOSV);
             writer.writeHNString("NAME", section.mName);
             writer.writeHNT("VERS", section.mVersion);
-            writer.writeHNString("DATA", out.bytes());
+            // The bytes are not a text: no encoding, and they may hold zeros
+            writer.startSubRecord("DATA");
+            writer.write(out.bytes().data(), out.bytes().size());
+            writer.endRecord("DATA");
             writer.endRecord(ESM::REC_FOSV);
         }
     }
@@ -194,7 +206,9 @@ namespace OFScript
         std::uint32_t version = 0;
         reader.getHNT(version, "VERS");
         reader.getSubNameIs("DATA");
-        const std::string_view data = reader.getHStringView();
+        reader.getSubHeader();
+        std::string data(reader.getSubSize(), '\0');
+        reader.getExact(data.data(), data.size());
 
         const std::vector<FalloutScript::SaveSection> sections = saveSections();
         const auto section = std::find_if(sections.begin(), sections.end(),
@@ -209,12 +223,13 @@ namespace OFScript
             throw FalloutScript::SaveTooNewError("The section " + name + " of the state of Fallout", version);
 
         // The plugin of a form of the save may be at another place in the load order now, or not loaded
-        FalloutScript::SaveReader in(data, [&reader](FalloutScript::FormId saved) -> std::optional<FalloutScript::FormId> {
-            ESM::FormId form = ESM::FormId::fromUint32(saved);
-            if (!reader.applyContentFileMapping(form))
-                return std::nullopt;
-            return form.toUint32();
-        });
+        FalloutScript::SaveReader in(
+            data, [&reader](FalloutScript::FormId saved) -> std::optional<FalloutScript::FormId> {
+                ESM::FormId form = ESM::FormId::fromUint32(saved);
+                if (!reader.applyContentFileMapping(form))
+                    return std::nullopt;
+                return form.toUint32();
+            });
         try
         {
             section->mRead(in, version);
@@ -225,7 +240,8 @@ namespace OFScript
         }
         catch (const FalloutScript::SaveError& error)
         {
-            throw FalloutScript::SaveError("The section " + name + " of the state of Fallout is damaged: " + error.what());
+            throw FalloutScript::SaveError(
+                "The section " + name + " of the state of Fallout is damaged: " + error.what());
         }
     }
 }

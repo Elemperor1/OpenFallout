@@ -6,8 +6,8 @@
 #include <optional>
 #include <set>
 
-#include "script.hpp"
 #include "saveaccess.hpp"
+#include "script.hpp"
 
 namespace FalloutScript
 {

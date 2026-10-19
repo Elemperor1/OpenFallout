@@ -31,7 +31,8 @@ namespace FalloutScript
     {
     public:
         SaveTooNewError(std::string_view what, std::uint32_t version)
-            : SaveError(std::string(what) + " has version " + std::to_string(version) + ", which is newer than this engine reads")
+            : SaveError(std::string(what) + " has version " + std::to_string(version)
+                  + ", which is newer than this engine reads")
             , mVersion(version)
         {
         }
@@ -70,8 +71,8 @@ namespace FalloutScript
         std::string mBytes;
     };
 
-    /// Reads what a SaveWriter wrote. Every read is checked against the bytes that are left: a save that is cut short or
-    /// that names more entries than it has room for throws SaveError.
+    /// Reads what a SaveWriter wrote. Every read is checked against the bytes that are left: a save that is cut short
+    /// or that names more entries than it has room for throws SaveError.
     class SaveReader
     {
     public:
@@ -114,8 +115,8 @@ namespace FalloutScript
         FormMapping mMapping;
     };
 
-    /// A part of the state of the game that a save holds: its name, the version of its layout, and how it is written and
-    /// read
+    /// A part of the state of the game that a save holds: its name, the version of its layout, and how it is written
+    /// and read
     struct SaveSection
     {
         std::string mName;

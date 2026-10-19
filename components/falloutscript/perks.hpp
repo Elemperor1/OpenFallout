@@ -12,8 +12,8 @@
 #include <components/esm4/script.hpp>
 
 #include "conditions.hpp"
-#include "script.hpp"
 #include "saveaccess.hpp"
+#include "script.hpp"
 
 namespace FalloutScript
 {
