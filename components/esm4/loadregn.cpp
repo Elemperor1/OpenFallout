@@ -103,6 +103,10 @@ void ESM4::Region::load(ESM4::Reader& reader)
                     std::cout << padding  << "RPLD: 0x" << std::hex << *it << std::endl;
 #endif
                 }
+                // A payload that is not a whole number of floats ends in bytes that are no corner: skipped, so that the
+                // next subrecord header is read from where it is
+                if (const std::uint32_t rest = subHdr.dataSize % sizeof(std::uint32_t); rest != 0)
+                    reader.skipSubRecordData(rest);
                 if (!pointsExpected)
                     mAreas.emplace_back();
                 pointsExpected = false;
