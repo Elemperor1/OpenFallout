@@ -2609,7 +2609,7 @@ namespace OFScript
         if (reference == 0 || topic == 0 || !conditionBaseOf(reference, base))
         {
             const std::lock_guard lock(mDialogueMutex);
-            if (mSayLogged.insert({ reference, topic }).second)
+            if (mSayLogged.try_emplace({ reference, topic }, true).second)
                 Log(Debug::Info) << "Say: " << std::hex << reference << " is to say topic " << topic << std::dec
                                  << ", which cannot be done (the speaker or the topic is not there)";
             return false;
@@ -2626,9 +2626,13 @@ namespace OFScript
             const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic,
                 toCharacter ? listener : 0, followUps, !followUps, toCharacter ? numberOf(listenerBase) : 0);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
-            // says something to the player that nobody hears, or nothing, is otherwise silent
-            if (mSayLogged.insert({ reference, topic }).second)
+            // says something to the player that nobody hears, or nothing, is otherwise silent. So is the first time
+            // after that when the answer is not the same, a topic that had a line and has none (or the other way round)
+            const bool nothing = view.mLines.empty();
+            const auto [logged, first] = mSayLogged.try_emplace({ reference, topic }, nothing);
+            if (first || logged->second != nothing)
             {
+                logged->second = nothing;
                 const ESM4::Dialogue* record = mDialogue.topic(topic);
                 Log(Debug::Info) << "Say: " << std::hex << reference << std::dec << " is to say topic "
                                  << (record != nullptr ? record->mEditorId : std::string("(not there)")) << " ("

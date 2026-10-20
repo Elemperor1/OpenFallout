@@ -1108,8 +1108,10 @@ namespace OFScript
         std::atomic<int> mConversationVoice{ 0 };
         /// The characters that say lines outside of a conversation (the thread of the frame only)
         std::vector<Saying> mSayings;
-        /// The speakers and topics that sayTopic has logged (the first time is logged), under mDialogueMutex
-        std::set<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mSayLogged;
+        /// The speakers and topics that sayTopic has logged, with whether the last call found nothing to say. The first
+        /// call is logged, and each later one that finds a line where the last found none (or the other way round),
+        /// under mDialogueMutex
+        std::map<std::pair<FalloutScript::FormId, FalloutScript::FormId>, bool> mSayLogged;
         FalloutScript::FormId mPlayer;
         FalloutScript::Game mGame;
         /// The characters whose perks have been brought up to date (to take back the effects of those they lost)
