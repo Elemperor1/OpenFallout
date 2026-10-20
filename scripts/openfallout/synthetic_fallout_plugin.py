@@ -329,6 +329,13 @@ BUTTON_PICKED = 2
 SAID_TOPIC_ID = 0x8F3
 SAID_INFO_ID = 0x8F4
 SAID_TEXT = "Said aloud."
+# The end script of the question also makes the talker say a topic whose only response cannot be said (it is for another
+# voice). The game tells the script of a speaker that has nothing to say that it is done, at once, so the Begin SayToDone
+# block of that topic runs once (the global "empty"), and a script that calls SayTo over and over while nothing fits is
+# not left waiting for a line that never comes.
+EMPTY_TOPIC_ID = 0x977
+EMPTY_INFO_ID = 0x978
+EMPTY_TEXT = "Nobody says this."
 # The blocks of the script name what they are for. SayToDone names the topic that was said, so a block that names another
 # topic must not run (the fifth global); MenuMode names the number of a menu: the conversation (1009) and the message box
 # (1001) are open at some time in the test and count (the sixth and seventh), the love tester (1074) is not and must not
@@ -337,7 +344,8 @@ DIALOGUE_GLOBALS = {"begin": (0x8D1, "OFTestDialogueBegin"), "end": (0x8D2, "OFT
                     "button": (0x8D3, "OFTestDialogueButton"), "said": (0x8F2, "OFTestDialogueSaid"),
                     "wrong": (0x8F5, "OFTestDialogueWrong"), "talk": (0x8F6, "OFTestDialogueTalk"),
                     "box": (0x8F7, "OFTestDialogueBox"), "elsewhere": (0x8F8, "OFTestDialogueElsewhere"),
-                    "said_end": (0x913, "OFTestDialogueSaidEnd"), "ordered": (0x914, "OFTestDialogueOrdered")}
+                    "said_end": (0x913, "OFTestDialogueSaidEnd"), "ordered": (0x914, "OFTestDialogueOrdered"),
+                    "empty": (0x979, "OFTestDialogueEmpty")}
 MENU_NUMBERS = {"talk": 1009, "box": 1001, "elsewhere": 1074}
 TALKER_NAME = "OFTestTalker"
 TALKER_TITLE = "OpenFallout Test Talker"
@@ -548,7 +556,7 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x976 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x979 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1039,6 +1047,7 @@ def button_script():
             count("ordered"),
             sf.statement(sf.END_IF)]), names=sf.form_argument(script.form(SAID_TOPIC_ID))),
         sf.block(sf.SAY_TO_DONE, count("wrong"), names=sf.form_argument(script.form(ADDED_TOPIC_ID))),
+        sf.block(sf.SAY_TO_DONE, count("empty"), names=sf.form_argument(script.form(EMPTY_TOPIC_ID))),
         *(sf.block(sf.MENU_MODE_BLOCK, count(name), names=sf.int_argument(number))
           for name, number in MENU_NUMBERS.items()))
     return record(b"SCPT", BUTTON_SCRIPT_ID, [zstr(b"EDID", "OFTestButtonScript"), *sf.sub_records(script)])
@@ -1805,9 +1814,13 @@ def response(form_id, text, conditions=(), flags=0, adds=(), prompt=None, begin=
         subs += [sub(b"NEXT")]
         statements = [fallout_script.set_to(fallout_script.global_target(1), fallout_script.number("1"))]
         references = [end]
-        if say is not None:
-            statements.append(fallout_script.call_on(2, fallout_script.SAY, fallout_script.form_argument(3)))
-            references += [TALKER_REF_ID, say]
+        topics = [] if say is None else ([say] if isinstance(say, int) else list(say))
+        if topics:
+            references.append(TALKER_REF_ID)
+            for number, topic_id in enumerate(topics):
+                statements.append(fallout_script.call_on(2, fallout_script.SAY,
+                                                         fallout_script.form_argument(3 + number)))
+                references.append(topic_id)
         subs += stage_script(statements, references)
     elif show is not None:
         subs += [sub(b"NEXT")]
@@ -1840,9 +1853,11 @@ def dialogue():
         topic(ASK_TOPIC_ID, "OFTestAsk", ASK_TOPIC_NAME, 0, 0x02, 90.0),
         topic_group(ASK_TOPIC_ID, [
             response(ASK_INFO_ID, ASK_TEXT, adds=[ADDED_TOPIC_ID], prompt=ASK_PROMPT, begin=begin, end=end,
-                     say=SAID_TOPIC_ID)]),
+                     say=[SAID_TOPIC_ID, EMPTY_TOPIC_ID])]),
         topic(SAID_TOPIC_ID, "OFTestSaid", "", 0, 0),
         topic_group(SAID_TOPIC_ID, [response(SAID_INFO_ID, SAID_TEXT, end=DIALOGUE_GLOBALS["said_end"][0])]),
+        topic(EMPTY_TOPIC_ID, "OFTestEmpty", "", 0, 0),
+        topic_group(EMPTY_TOPIC_ID, [response(EMPTY_INFO_ID, EMPTY_TEXT, [is_other_voice])]),
         topic(SPEAK_TOPIC_ID, "OFTestSpeakTopic", "", 0, 0),
         topic_group(SPEAK_TOPIC_ID, [response(SPEAK_INFO_ID, SPEAK_TEXT)]),
         topic(INTERCOM_TOPIC_ID, "OFTestIntercomTopic", "", 0, 0),

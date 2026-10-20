@@ -46,10 +46,23 @@ the last directory counts):
 4. The masters of all of these, wherever the data directories have them.
 
 The ini files are `Fallout_default.ini`, `Fallout.ini` and `FalloutPrefs.ini` in the folder above each data directory
-(where the games ship `Fallout_default.ini`), then the ones given with `--game-ini`, later ones over earlier ones.
+(where the games ship `Fallout_default.ini`), then the ones given with `--game-ini`, later ones over earlier ones. A key
+that stands twice in a section of one file counts with its first value, which is what the Windows call the executables
+read their ini files with gives (the executable of New Vegas imports `GetPrivateProfileStringA`). The retail
+`Fallout_default.ini` of New Vegas needs it: it has `sTestFile1=FalloutNV.esm` near the top and `sTestFile1=` again
+further down, and its `sTestFile2` is `FalloutNV_lang.esp`. With the last value counting, the base master would not
+have been named at all (Mac round 8D part B).
 Without any plugin named, the order is the games' own: `--plugin-order time` (below) unless `--plugin-order list` says
 otherwise. With the Tale of Two Wastelands output folder as the only data directory, the rules give exactly the 14
 plugins of the merged game (the four small packs have no `.NAM` file there, so they stay out).
+
+`FalloutNV_lang.esp` is a placeholder of 56 bytes: the header of a plugin (no master, no record, no group, next object
+id `0x800`) and nothing else, which the retail ini makes active through `sTestFile2`. The executable does the same:
+the files `sTestFile1` to `sTestFile10` name are looked up in the list of plugins the scan of the `Data` folder built and
+get the same active flag a `.NAM` file gives them, in the same list and so in the same order (the scan sorts masters
+before the others, then by file time; nothing in the executables builds a name with `_lang`; Mac round 8D part B). It
+loads last of the 19 plugins in an unnamed run of the Tale of Two Wastelands output with the New Vegas `Data`, changes
+no record, and takes one of the 255 places.
 
 ## `--plugins-file`
 
@@ -145,6 +158,40 @@ that means everything the reference has is the later plugin's: the flags, the po
   only wants to add a reference to a cell has to carry the cell record too, as the editor writes it.
 
 `smoke --only mods` and `--only activation` check each of these with a synthetic mod, `OFTestMod.esp`.
+
+## The birth scene of Tale of Two Wastelands (CG00)
+
+The first Mac run of a New Game on the 14 plugins (round 8C part E) never left the quest `CG00` of the Vault 101 birth
+scene: the stages went 5, 6, 8, 9, 10, 18, 20, 22, 38, 40, 42, 65, 70, 80 and stood there. Fallout 3 alone goes on to
+85, 90, 100 and `CG01` in about 12 s. The scripts and records (round 8D part A) say what Tale of Two Wastelands changed
+and why that meets a gap the engine could not cross:
+
+- Stage 60 of `CG00` calls `TTW_ShowGeneProjector` (code `0x3800`, no arguments, 2 calls in the 14 plugins, the other
+  in `Vault101ExitScript`) where Fallout 3 calls `ShowRaceMenu`. The name is the one the source text of the scripts
+  has. The engine now knows it as a command and opens the same menu for the race and the face; the gene projector of the
+  extender's own interface is not made.
+- A new stage 70 (the traits) comes between the Dad's last line of the talk and stage 80: the two Dad responses that set
+  80 in Fallout 3 (`0x0601F37F`, `0x0601F380`) now need a stage below 70 and set 70, and the timer of `CG00SCRIPT` sets
+  80 and opens the traits menu about a second later. Between 70 and 80 none of the 18 responses of `CG00DadSpeech` can
+  be said (the two that fit by stage are Say Once and used).
+- The script of the Dad calls `SayTo` every frame while his `talking` is 0 and sets `talking` to 1 after it; a block
+  `Begin SayToDone CG00DadSpeech` sets it back to 0. In the executable `SayTo` (`0x5C9100`) raises that block on the
+  speaker's script at once, inside the call, when no response of the topic can be said (`0x8DC596`, in `SayTopic`; the
+  block runs on the next pass over the script's blocks); when a line is said it is raised at the end of the line, after
+  the end script of the response (`0x936076`), and a second `SayTo` while a line is running cuts it. So the Dad's script
+  keeps cycling through the gap and says the next line as soon as stage 80 is set. The engine ignored the empty call, so
+  `talking` stayed 1 for good.
+
+The engine now tells the script of a speaker that has nothing to say, in the next frame, that it is done (the frame after,
+so that the block that made the call has ended first, as the executable's flag does), and the log says when a topic that
+had a line has none, or the other way round. `smoke --only dialogue` checks it with a topic whose only response is for
+another voice.
+
+Other facts of the executable that the engine does not follow yet: Say Once is kept for the response itself, for every
+speaker (the engine keeps it for each character); a speaker that is not in the high process level, or a player in some
+state, takes an instant path that runs the begin and end scripts and raises the block back to back, and raises nothing when
+no response fits; the begin script of a response runs when the response is picked, before the voice starts, and the end
+script when the line is over (the engine does both).
 
 ## Not done
 

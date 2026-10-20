@@ -822,6 +822,8 @@ namespace OFScript
         };
         void startSaying(FalloutScript::FormId reference, std::vector<SaidLine> lines);
         void updateVoices(float frametime);
+        /// Tells the scripts of the characters that were told to say what nobody could say that they are done
+        void raiseNothingSaid();
 
         void forEachTopic(const std::function<void(const ESM4::Dialogue&)>& function) const override;
         void forEachInfo(const std::function<void(const ESM4::DialogInfo&)>& function) const override;
@@ -1108,8 +1110,13 @@ namespace OFScript
         std::atomic<int> mConversationVoice{ 0 };
         /// The characters that say lines outside of a conversation (the thread of the frame only)
         std::vector<Saying> mSayings;
-        /// The speakers and topics that sayTopic has logged (the first time is logged), under mDialogueMutex
-        std::set<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mSayLogged;
+        /// The speakers and topics that sayTopic has logged, with whether the last call found nothing to say. The first
+        /// call is logged, and each later one that finds a line where the last found none (or the other way round),
+        /// under mDialogueMutex
+        std::map<std::pair<FalloutScript::FormId, FalloutScript::FormId>, bool> mSayLogged;
+        /// The speakers and topics that a script told to say something nobody could say, whose scripts are told at the
+        /// start of the next frame that they are done (Begin SayToDone Topic), under mDialogueMutex
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mNothingSaid;
         FalloutScript::FormId mPlayer;
         FalloutScript::Game mGame;
         /// The characters whose perks have been brought up to date (to take back the effects of those they lost)

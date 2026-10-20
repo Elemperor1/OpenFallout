@@ -61,7 +61,10 @@ namespace Files
             const std::string_view key = trim(line.substr(0, equals));
             if (key.empty())
                 continue;
-            result.mValues[makeKey(section, key)] = std::string(trim(line.substr(equals + 1)));
+            // A key that appears twice in a section counts once, with its first value: that is what the Windows call the
+            // games read their ini files with (GetPrivateProfileString) gives, and the ini of New Vegas depends on it
+            // (it lists sTestFile1 as FalloutNV.esm near the top and empty again further down)
+            result.mValues.try_emplace(makeKey(section, key), std::string(trim(line.substr(equals + 1))));
         }
         return result;
     }

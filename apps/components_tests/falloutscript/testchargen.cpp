@@ -1,6 +1,7 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/chargen.hpp>
+#include <components/falloutscript/extendercommands.hpp>
 #include <components/falloutscript/objects.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
@@ -401,6 +402,7 @@ namespace
     constexpr FormId crate = 0x01000100;
     constexpr FormId scriptOfCrates = 0x01002000;
     constexpr std::uint16_t OpShowRaceMenu = 0x10DA;
+    constexpr std::uint16_t OpTtwShowGeneProjector = 0x3800;
     constexpr std::uint16_t OpShowNameMenu = 0x10DC;
     constexpr std::uint16_t OpGetPlayerName = 0x11E1;
     constexpr std::uint16_t OpSetInChargen = 0x10E7;
@@ -437,6 +439,7 @@ namespace
             , mInterpreter(mHost, mCommands)
             , mChargen(game)
         {
+            FalloutScript::addExtenderCommands(mCommands, game);
             FalloutScript::addChargenCommands(mInterpreter, mChargen, [this] { ++mOpened; });
         }
 
@@ -465,6 +468,37 @@ namespace
         setup.mChargen.finishPage();
         EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Special));
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptChargenCommandsTest, the_gene_projector_of_tale_of_two_wastelands_opens_the_menu_of_the_race)
+    {
+        // The bytes of the call in the quest CG00 (stage 60) of the plugin: the code, a length of 0, and then the next
+        // statement; where Fallout 3 has ShowRaceMenu
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpTtwShowGeneProjector, arguments(0))
+            + command(OpGetPlayerName, arguments(0)) + end());
+        setup.run(builder);
+
+        EXPECT_EQ(setup.mOpened, 2);
+        EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Race));
+        EXPECT_EQ(setup.mChargen.menu(), 1036);
+        setup.mChargen.finishPage();
+        EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Name));
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "");
+    }
+
+    TEST(FalloutScriptChargenCommandsTest, the_gene_projector_is_not_a_command_of_fallout_3)
+    {
+        Runner setup(Game::Fallout3);
+        ScriptBuilder builder;
+        builder.code(
+            scriptName() + begin(BlockType::OnActivate) + command(OpTtwShowGeneProjector, arguments(0)) + end());
+        setup.run(builder);
+
+        EXPECT_FALSE(setup.mChargen.menuOpen());
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "0x3800 (script extender) 1");
     }
 
     TEST(FalloutScriptChargenCommandsTest, the_name_is_asked_for_after_the_race_as_the_scripts_of_the_games_do)

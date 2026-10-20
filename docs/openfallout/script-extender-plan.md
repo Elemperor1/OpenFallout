@@ -99,6 +99,10 @@ perk, and the checks that TTW makes of the other mods and plugins.
   by its length, and has the value 0 in an expression. So the script goes on, and `If` or `Set` on the value of an
   extender function sees 0. The version test of TTW therefore reads `100 * 0 + 10 * 0 + 0 < 635`, which is true: what
   TTW's handler does then is for the real-data round to show.
+- One code is known by name and works: `0x3800`, `TTW_ShowGeneProjector` (2 calls, no arguments, in the quest `CG00` and
+  in `Vault101ExitScript`; the name is the one the scripts' source text has, Mac round 8D part A). The engine opens the
+  menu for the race and the face for it, as for `ShowRaceMenu` where Fallout 3 calls that, and `smoke` and a unit test
+  check it. `extendercommands.cpp` is where such a name is added; the other 131 codes are still steps over and counts.
 - The 52 function blocks never run, because nothing calls them: the interpreter runs the blocks of the events it
   knows, and a function is not one.
 - A condition (`CTDA`) that names a function the table lacks is reported once and has the value 0, compared as usual.
@@ -170,7 +174,7 @@ commands, `0x1545` is the call of a user function). They match the shape of ever
 expression, on an object or not, the arguments). The project of that source has no licence file, so nothing of its code
 or its tables is copied here or in the engine; a table of names that ships has to be dumped from the DLL, or written
 by hand from the layouts above, and checked against the DLL when there is one. The names of the plugin-range codes are
-not known.
+not known, except `0x3800`, which the scripts' own source text names.
 
 ## Not done
 

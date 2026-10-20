@@ -35,9 +35,22 @@ namespace
         EXPECT_EQ(ini.get("Archive", "SArchiveList"), "A.bsa");
     }
 
-    TEST(FilesGameIniTest, takesTheLastOfAKeyThatAppearsTwice)
+    TEST(FilesGameIniTest, takesTheFirstOfAKeyThatAppearsTwiceInASection)
     {
-        EXPECT_EQ(GameIni::parse("[A]\nk=1\nk=2\n").get("A", "k"), "2");
+        EXPECT_EQ(GameIni::parse("[A]\nk=1\nk=2\n").get("A", "k"), "1");
+        // Not the same key in another section, and not the same key in the section when it is named again
+        const GameIni ini = GameIni::parse("[A]\nk=1\n[B]\nk=2\n[A]\nk=3\n");
+        EXPECT_EQ(ini.get("A", "k"), "1");
+        EXPECT_EQ(ini.get("B", "k"), "2");
+    }
+
+    TEST(FilesGameIniTest, anEmptyValueFurtherDownDoesNotTakeThePlaceOfTheFirst)
+    {
+        // The shape of Fallout_default.ini of New Vegas, which names the base master and then an empty one again
+        const GameIni ini = GameIni::parse(
+            "[General]\nsTestFile2=FalloutNV_lang.esp\nsTestFile1=FalloutNV.esm\nbX=1\nsTestFile1=\n");
+        EXPECT_EQ(ini.get("General", "sTestFile1"), "FalloutNV.esm");
+        EXPECT_EQ(ini.get("General", "STestFile2"), "FalloutNV_lang.esp");
     }
 
     TEST(FilesGameIniTest, keepsAnEqualsSignInAValueAndAnEmptyValue)

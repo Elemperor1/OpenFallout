@@ -43,6 +43,7 @@
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/falloutscript/extendercommands.hpp>
 #include <components/falloutscript/fightai.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/falloutscript/playercontrols.hpp>
@@ -89,6 +90,14 @@ namespace OFScript
     {
         constexpr std::string_view newVegasMaster = "falloutnv.esm";
         constexpr std::string_view fallout3Master = "fallout3.esm";
+
+        /// The commands the game's executable lists, and the few of a script extender that the engine knows by name
+        FalloutScript::CommandTable commandsOf(FalloutScript::Game game)
+        {
+            FalloutScript::CommandTable table = FalloutScript::vanillaCommands(game);
+            FalloutScript::addExtenderCommands(table, game);
+            return table;
+        }
 
         /// A character or creature of Fallout (their classes are not those of Morrowind's actors, so isActor does not
         /// tell them)
@@ -166,7 +175,7 @@ namespace OFScript
     FalloutScripts::FalloutScripts(
         const OFWorld::ESMStore& store, FalloutScript::Game game, FalloutScript::FormId player)
         : mStore(store)
-        , mCommands(FalloutScript::vanillaCommands(game))
+        , mCommands(commandsOf(game))
         , mInterpreter(*this, mCommands)
         , mConditions(mInterpreter)
         , mQuests(mInterpreter, *this)
@@ -474,6 +483,7 @@ namespace OFScript
         }
         mSayings.clear();
         mSayLogged.clear();
+        mNothingSaid.clear();
     }
 
     void FalloutScripts::update(float frametime, bool paused)
@@ -481,6 +491,7 @@ namespace OFScript
         runPending();
         updateMessageBoxes();
         updateVoices(frametime);
+        raiseNothingSaid();
         if (paused)
         {
             // The game is stopped with no window open (a script of Lua paused the world): nothing runs
@@ -2609,12 +2620,13 @@ namespace OFScript
         if (reference == 0 || topic == 0 || !conditionBaseOf(reference, base))
         {
             const std::lock_guard lock(mDialogueMutex);
-            if (mSayLogged.insert({ reference, topic }).second)
+            if (mSayLogged.try_emplace({ reference, topic }, true).second)
                 Log(Debug::Info) << "Say: " << std::hex << reference << " is to say topic " << topic << std::dec
                                  << ", which cannot be done (the speaker or the topic is not there)";
             return false;
         }
         std::vector<SaidLine> lines;
+        bool saidNothing = false;
         {
             const std::lock_guard lock(mDialogueMutex);
             // The player is the listener when none is named (and is the one conditions on the target are about then)
@@ -2626,9 +2638,14 @@ namespace OFScript
             const FalloutScript::DialogueView view = mDialogue.say({ reference, numberOf(base) }, topic,
                 toCharacter ? listener : 0, followUps, !followUps, toCharacter ? numberOf(listenerBase) : 0);
             // The first time that a character is told to say a topic is logged, with what came of it: a script that
-            // says something to the player that nobody hears, or nothing, is otherwise silent
-            if (mSayLogged.insert({ reference, topic }).second)
+            // says something to the player that nobody hears, or nothing, is otherwise silent. So is the first time
+            // after that when the answer is not the same, a topic that had a line and has none (or the other way round)
+            const bool nothing = view.mLines.empty();
+            saidNothing = nothing;
+            const auto [logged, first] = mSayLogged.try_emplace({ reference, topic }, nothing);
+            if (first || logged->second != nothing)
             {
+                logged->second = nothing;
                 const ESM4::Dialogue* record = mDialogue.topic(topic);
                 Log(Debug::Info) << "Say: " << std::hex << reference << std::dec << " is to say topic "
                                  << (record != nullptr ? record->mEditorId : std::string("(not there)")) << " ("
@@ -2656,7 +2673,21 @@ namespace OFScript
             }
         }
         if (lines.empty())
+        {
+            // When no response of the topic can be said the game does not leave the script of the speaker waiting for
+            // the end of a line: it tells it at once, inside the command, that it is done (the script of the birth
+            // scene of Tale of Two Wastelands calls SayTo every frame while its Dad has nothing to say between two
+            // stages, and goes on only because of this). The block runs in the next frame, after the one that called
+            // the command has ended, as the game sets a flag that its next pass over the blocks takes.
+            if (saidNothing)
+            {
+                const std::lock_guard lock(mDialogueMutex);
+                const std::pair<FalloutScript::FormId, FalloutScript::FormId> told{ reference, topic };
+                if (std::find(mNothingSaid.begin(), mNothingSaid.end(), told) == mNothingSaid.end())
+                    mNothingSaid.push_back(told);
+            }
             return false;
+        }
         lines.back().mEnd = true;
         runOnMainThread(
             [this, reference, lines = std::move(lines)]() mutable { startSaying(reference, std::move(lines)); });
@@ -2779,6 +2810,20 @@ namespace OFScript
                 return;
             }
         mSayings.push_back(std::move(saying));
+    }
+
+    void FalloutScripts::raiseNothingSaid()
+    {
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> told;
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            told.swap(mNothingSaid);
+        }
+        for (const auto& [speaker, topic] : told)
+            mObjects.trigger(
+                speaker, FalloutScript::BlockType::SayToDone, 0, [topic = topic](const FalloutScript::Block& block) {
+                    return FalloutScript::blockIsForForm(block, topic);
+                });
     }
 
     void FalloutScripts::updateVoices(float frametime)

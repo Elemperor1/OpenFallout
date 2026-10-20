@@ -884,6 +884,7 @@ return {
                 world.players[1]:sendEvent('OFTestButtonValue', world.globals.@BUTTON@)
                 print('OFTEST', 'dialogue said', tostring(world.globals.@SAID@))
                 print('OFTEST', 'dialogue ordered', tostring(world.globals.@ORDERED@))
+                print('OFTEST', 'dialogue empty', tostring(world.globals.@EMPTY@))
                 print('OFTEST', 'dialogue blocks', tostring(world.globals.@WRONG@), tostring(world.globals.@TALK@),
                     tostring(world.globals.@BOX@), tostring(world.globals.@ELSEWHERE@))
             end
@@ -895,7 +896,7 @@ return {
     "@SAID@", plugin.DIALOGUE_GLOBALS["said"][1]).replace("@WRONG@", plugin.DIALOGUE_GLOBALS["wrong"][1]).replace(
     "@TALK@", plugin.DIALOGUE_GLOBALS["talk"][1]).replace("@BOX@", plugin.DIALOGUE_GLOBALS["box"][1]).replace(
     "@ELSEWHERE@", plugin.DIALOGUE_GLOBALS["elsewhere"][1]).replace(
-    "@ORDERED@", plugin.DIALOGUE_GLOBALS["ordered"][1])
+    "@ORDERED@", plugin.DIALOGUE_GLOBALS["ordered"][1]).replace("@EMPTY@", plugin.DIALOGUE_GLOBALS["empty"][1])
 
 # The making of the character, in an engine of its own because its screens pause the game. A script of the world sets the
 # global that the script of a quest waits for, the script opens the menus (the race, then the name, SPECIAL with the
@@ -2728,6 +2729,15 @@ def check_dialogue(text):
     if not said or said[-1] != "1" or any(value not in ("0", "1") for value in said):
         problems.append("the talker was made to say a topic once, so the Begin SayToDone block of its script should have "
                         f"run once by the time the button was read: {said}")
+
+    # The topic whose only response could not be said was told too, and the game tells the script of the speaker that it is
+    # done (Begin SayToDone for that topic) in the frame after: once, with the line about it in the log
+    empty = lines("empty")
+    if not empty or empty[-1] != "1" or any(value not in ("0", "1") for value in empty):
+        problems.append("the talker was made to say a topic that nobody can say, so the Begin SayToDone block for it should "
+                        f"have run once by the time the button was read: {empty}")
+    if not re.search(r"Say: .* is to say topic OFTestEmpty .*: nothing it can say", text):
+        problems.append("the log should say that the talker was to say OFTestEmpty and had nothing it could say")
 
     # The end script of the response that was said had run by then (it sets a global that the block reads): once
     ordered = lines("ordered")
