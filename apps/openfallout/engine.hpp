@@ -10,6 +10,7 @@
 #include <components/files/collections.hpp>
 #include <components/settings/settings.hpp>
 #include <components/translation/translation.hpp>
+#include <components/vfs/registerarchives.hpp>
 
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -150,6 +151,7 @@ namespace OF
         std::unique_ptr<ToUTF8::Utf8Encoder> mEncoder;
         Files::PathContainer mDataDirs;
         std::vector<std::string> mArchives;
+        VFS::ArchiveOptions mArchiveOptions;
         std::filesystem::path mResDir;
         osg::ref_ptr<osgViewer::Viewer> mViewer;
         osg::ref_ptr<osgViewer::ScreenCaptureHandler> mScreenCaptureHandler;
@@ -210,8 +212,11 @@ namespace OF
         /// Set data dirs
         void setDataDirs(const Files::PathContainer& dataDirs);
 
-        /// Add BSA archive
+        /// Add BSA archive. The archives go in the order of increasing priority.
         void addArchive(const std::string& archive);
+
+        /// How the archives and the loose files of the data directories go together
+        void setArchiveOptions(VFS::ArchiveOptions options);
 
         /// Set resource dir
         void setResourceDir(const std::filesystem::path& parResDir);

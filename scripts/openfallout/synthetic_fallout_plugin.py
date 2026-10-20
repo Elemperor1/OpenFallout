@@ -27,7 +27,7 @@ files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
-writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
+writes `OFTest.esm`, `OFTestMod.esp` (a mod that has it as its master), `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
 `meshes/openfallout/wall.nif`, `meshes/openfallout/chair.nif`, `meshes/openfallout/person_foot.nif`,
 `meshes/characters/_male/skeleton.nif`, `meshes/characters/_male/mtidle.kf`,
 `textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
@@ -266,6 +266,27 @@ PERSON_KARMA = 25.0
 PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
 BEAST_LEVEL = 7  # the level of the beast, which the creature that has the list as its template takes the stats from
 EMPTY_ADDON = "OFTestEmpty.omwaddon"
+# A plugin that has OFTest.esm as its master, as the add-ons of the games have: it changes a global of the master and
+# adds one of its own
+MOD_ADDON = "OFTestMod.esp"
+MOD_BASE_GLOBAL_ID = 0x96F
+MOD_BASE_GLOBAL_NAME = "OFTestModBase"
+MOD_BASE_VALUE = 1
+MOD_OVERRIDDEN_VALUE = 2
+MOD_ADDED_GLOBAL_ID = 0x01000800 # the plugin is the second of the load order: its own form IDs start with 01
+MOD_ADDED_GLOBAL_NAME = "OFTestModAdded"
+MOD_ADDED_VALUE = 3
+MOD_CELL_FULL_NAME = "OpenFallout Test Cell (modded)"
+# Cubes far from the start in the interior cell, one for each thing that a mod does to a placed reference: the mod
+# disables one, enables one that the master disables, moves one up, deletes one (once with the subrecords of the master
+# and once with none), moves one to the exterior cell, and leaves one alone; and it places a new one (its own form ID).
+MOD_REFS = {"disable": 0x970, "enable": 0x971, "move": 0x972, "delete": 0x973, "bare": 0x974, "elsewhere": 0x975,
+            "keep": 0x976}
+MOD_NEW_REF_ID = 0x01000801
+MOD_REF_BASE = (6000.0, 0.0)  # the first of the cubes is here, the others follow in a row 300 apart
+MOD_MOVED_BY = 500.0 # the height the mod moves its cube up to
+MOD_ELSEWHERE_PLACE = (300.0, 300.0, 0.0)  # where the cube is in the exterior cell
+MOD_NEW_PLACE = (6000.0, 2400.0, 0.0)
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -527,7 +548,7 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x96E # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x976 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -613,6 +634,7 @@ INVERSE_REF_IDS = {"interior": 0x930, "exterior": 0x931}
 FOLLOWER_PLACE = (300.0, -800.0)
 INVERSE_PLACE = (300.0, -1100.0)
 CELL_NAME = "OFTestCell"
+CELL_FULL_NAME = "OpenFallout Test Cell"
 NPC_NAME = "OFTestPerson"
 RACE_NAME = "OFTestRace"
 # The skeleton of the character, as the record names it: Fallout characters have theirs in the NPC_ record, not in the
@@ -862,7 +884,7 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None, enable_parent=None, count=None):
+         primitive=None, enable_parent=None, count=None, flags=0):
     subs = [sub(b"NAME", struct.pack("<I", base))]
     if count is not None:
         subs.append(sub(b"XCNT", struct.pack("<i", count)))
@@ -881,7 +903,7 @@ def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_lev
     if scale is not None:
         subs.append(sub(b"XSCL", struct.pack("<f", scale)))
     subs.append(sub(b"DATA", struct.pack("<6f", *position, *rotation)))
-    return record(b"REFR", form_id, subs)
+    return record(b"REFR", form_id, subs, flags)
 
 
 def lighting(ambient, directional, fog, fog_near, fog_far):
@@ -2051,19 +2073,29 @@ def achr(form_id, position, base=NPC_ID):
                                      sub(b"DATA", struct.pack("<6f", *position, 0.0, 0.0, 0.0))])
 
 
-def worldspace():
-    """The WRLD record of OFTestWorld followed by its children: the exterior cell 0,0 in an exterior block and sub-block
-    (both labelled with the grid 0,0), with its references in the temporary children group of the cell."""
+def world_record():
+    """The WRLD record of OFTestWorld."""
     land_level, water_level = -2700.0, -14000.0
-    wrld = record(b"WRLD", WORLD_ID, [zstr(b"EDID", WORLD_NAME), zstr(b"FULL", "OpenFallout Test World"),
+    return record(b"WRLD", WORLD_ID, [zstr(b"EDID", WORLD_NAME), zstr(b"FULL", "OpenFallout Test World"),
                                       sub(b"NAM0", struct.pack("<ff", -4096.0, -4096.0)),
                                       sub(b"NAM9", struct.pack("<ff", 8192.0, 8192.0)),
                                       sub(b"CNAM", struct.pack("<I", CLIMATE_ID)),
                                       sub(b"NAM2", struct.pack("<I", WATER_TYPE_ID)), sub(b"DATA", b"\x00"),
                                       sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
-    # DATA of an exterior cell is its flags (0: not an interior, no water), XCLC the grid and the flags of the land.
-    cell = record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
+
+
+def exterior_cell():
+    """The CELL record of the exterior cell 0,0. DATA of an exterior cell is its flags (0: not an interior, no water), XCLC
+    the grid and the flags of the land."""
+    return record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
                                               sub(b"XCLC", struct.pack("<iiI", 0, 0, 0))])
+
+
+def worldspace():
+    """The WRLD record of OFTestWorld followed by its children: the exterior cell 0,0 in an exterior block and sub-block
+    (both labelled with the grid 0,0), with its references in the temporary children group of the cell."""
+    wrld = world_record()
+    cell = exterior_cell()
     # Two more cells with flat terrain and water flagged: one with a height of its own, one with the largest float.
     water_cell = record(b"CELL", WATER_CELL_ID, [zstr(b"EDID", WORLD_NAME + "WaterCell"), sub(b"DATA", b"\x02"),
                                                  sub(b"XCLC", struct.pack("<iiI", *WATER_CELL, 0)),
@@ -2095,6 +2127,25 @@ def worldspace():
     return [wrld, group(struct.pack("<I", WORLD_ID), 1, [block])]
 
 
+def mod_place(key):
+    """Where the cube that OFTestMod.esp does something to stands in the interior cell: a row far from the start."""
+    return (MOD_REF_BASE[0], MOD_REF_BASE[1] + 300.0 * list(MOD_REFS).index(key), 0.0)
+
+
+def mod_target_references():
+    """The cubes that the mod changes: all enabled, except that the master disables the one that the mod enables."""
+    return [refr(form_id, CUBE_ID, mod_place(key), flags=0x800 if key == "enable" else 0)
+            for key, form_id in MOD_REFS.items()]
+
+
+def interior_cell(full_name=CELL_FULL_NAME):
+    """The CELL record of the interior OFTestCell."""
+    xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
+    return record(b"CELL", CELL_ID, [zstr(b"EDID", CELL_NAME), zstr(b"FULL", full_name), sub(b"DATA", b"\x01"),
+                                     sub(b"XCLL", xcll), sub(b"LTMP", struct.pack("<I", TEMPLATE_ID)),
+                                     sub(b"LNAM", struct.pack("<I", INHERIT_FOG_COLOR_AND_FAR))])
+
+
 def plugin():
     hedr = struct.pack("<fiI", 0.94, 18, LAST_ID + 1)
     header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"),
@@ -2110,11 +2161,7 @@ def plugin():
     template = record(b"LGTM", TEMPLATE_ID, [
         zstr(b"EDID", "OFTestLighting"),
         sub(b"DATA", lighting((1, 2, 3), (4, 5, 6), TEMPLATE_FOG, 1.0, TEMPLATE_FOG_FAR))])
-    xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
-    cell = record(b"CELL", CELL_ID, [zstr(b"EDID", CELL_NAME), zstr(b"FULL", "OpenFallout Test Cell"),
-                                     sub(b"DATA", b"\x01"), sub(b"XCLL", xcll),
-                                     sub(b"LTMP", struct.pack("<I", TEMPLATE_ID)),
-                                     sub(b"LNAM", struct.pack("<I", INHERIT_FOG_COLOR_AND_FAR))])
+    cell = interior_cell()
     refs = group(struct.pack("<I", CELL_ID), 9, [
         refr(FLOOR_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(PILLAR_ID, CUBE_ID, (0.0, PILLAR_DISTANCE, CUBE / 2)),
@@ -2134,6 +2181,7 @@ def plugin():
         *sitter_references(),
         *speaker_references(),
         *intercom_references(),
+        *mod_target_references(),
     ])
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
@@ -2151,6 +2199,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l")
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   global_variable(SITTER_GLOBAL[0], SITTER_GLOBAL[1], b"l"),
+                                  global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l", MOD_BASE_VALUE),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f")
@@ -2482,6 +2531,44 @@ def empty_addon():
     return b"TES3" + struct.pack("<III", len(body), 0, 0) + body
 
 
+def mod_addon():
+    """The plugin of a mod: not flagged as a master, with OFTest.esm as its master. It changes the value of a global of
+    the master (the form ID starts with 00, the first master) and adds a global of its own (it starts with 01, the
+    plugin itself). It overrides the interior cell with another name and, in it, the cubes of mod_target_references:
+    one disabled, one enabled, one moved up, one deleted (once with the subrecords the master has and once with none).
+    One cube is placed in the exterior cell instead (the override puts it in another cell than the master did), and a
+    cube of its own is added."""
+    hedr = struct.pack("<fiI", 0.94, 2, 0x802)
+    header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"), zstr(b"MAST", "OFTest.esm"),
+                                 sub(b"DATA", bytes(8))])
+    place = mod_place
+    moved = (place("move")[0], place("move")[1], MOD_MOVED_BY)
+    refs = group(struct.pack("<I", CELL_ID), 9, [
+        refr(MOD_REFS["disable"], CUBE_ID, place("disable"), flags=0x800),
+        refr(MOD_REFS["enable"], CUBE_ID, place("enable")),
+        refr(MOD_REFS["move"], CUBE_ID, moved),
+        refr(MOD_REFS["delete"], CUBE_ID, place("delete"), flags=0x20),
+        record(b"REFR", MOD_REFS["bare"], [], flags=0x20),
+        refr(MOD_NEW_REF_ID, CUBE_ID, MOD_NEW_PLACE),
+    ])
+    cell = interior_cell(MOD_CELL_FULL_NAME)
+    children = group(struct.pack("<I", CELL_ID), 6, [refs])
+    sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
+    block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
+    exterior_refs = group(struct.pack("<I", EXTERIOR_CELL_ID), 9, [
+        refr(MOD_REFS["elsewhere"], CUBE_ID, MOD_ELSEWHERE_PLACE)])
+    exterior_children = group(struct.pack("<I", EXTERIOR_CELL_ID), 6, [exterior_refs])
+    grid = struct.pack("<hh", 0, 0)
+    exterior_sub_block = group(grid, 5, [exterior_cell(), exterior_children])
+    exterior_block = group(grid, 4, [exterior_sub_block])
+    return (header + top_group(b"GLOB", [global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l",
+                                                         MOD_OVERRIDDEN_VALUE),
+                                         global_variable(MOD_ADDED_GLOBAL_ID, MOD_ADDED_GLOBAL_NAME, b"l",
+                                                         MOD_ADDED_VALUE)])
+            + top_group(b"CELL", [block])
+            + top_group(b"WRLD", [world_record(), group(struct.pack("<I", WORLD_ID), 1, [exterior_block])]))
+
+
 def write(out, animation=True, spline=True):
     """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
     animation file. The animation moves the foot with the control points of a B-spline, as most bones of the files of
@@ -2536,6 +2623,7 @@ def write(out, animation=True, spline=True):
                 name=name, node=FOOT_BONE, offset=move, stop=LOCOMOTION_SECONDS, spline=spline, root_speed=velocity))
     (out / "OFTest.esm").write_bytes(plugin())
     (out / EMPTY_ADDON).write_bytes(empty_addon())
+    (out / MOD_ADDON).write_bytes(mod_addon())
     return out / "OFTest.esm"
 
 

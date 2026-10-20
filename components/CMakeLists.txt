@@ -124,7 +124,7 @@ add_component_dir (bullethelpers
     )
 
 add_component_dir (vfs
-    manager archive bsaarchive filesystemarchive pathutil registerarchives
+    manager archive bsaarchive filesystemarchive pathutil registerarchives archiveorder archiveinvalidation
     )
 
 add_component_dir (resource
@@ -343,6 +343,7 @@ add_component_dir (esm4
     magiceffectid
     packagecensus
     packageschedule
+    pluginorder
     reader
     readerutils
     recordreader
@@ -390,7 +391,7 @@ ENDIF()
 add_component_dir (files
     linuxpath androidpath windowspath macospath fixedpath multidircollection collections configurationmanager
     constrainedfilestream memorystream hash configfileparser openfile constrainedfilestreambuf conversion
-    istreamptr streamwithbuffer utils
+    istreamptr streamwithbuffer utils gameini
     )
 
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")

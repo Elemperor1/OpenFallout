@@ -1,13 +1,21 @@
 #include <components/debug/debugging.hpp>
+#include <components/esm4/pluginorder.hpp>
 #include <components/fallback/fallback.hpp>
 #include <components/fallback/validate.hpp>
+#include <components/files/collections.hpp>
 #include <components/files/configurationmanager.hpp>
+#include <components/files/gameini.hpp>
+#include <components/files/openfile.hpp>
 #include <components/misc/osgpluginchecker.hpp>
 #include <components/misc/rng.hpp>
+#include <components/misc/strings/algorithm.hpp>
 #include <components/platform/platform.hpp>
 #include <components/version/version.hpp>
+#include <components/vfs/archiveinvalidation.hpp>
+#include <components/vfs/archiveorder.hpp>
 
 #include "mwgui/debugwindow.hpp"
+#include "mwscript/falloutscripts.hpp"
 
 #include "engine.hpp"
 #include "options.hpp"
@@ -22,7 +30,10 @@
 extern "C" __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
 #endif
 
+#include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 #if (defined(__APPLE__) || defined(__linux) || defined(__unix) || defined(__posix))
 #include <unistd.h>
@@ -96,34 +107,128 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
                                             // due to implementation bugs.
     engine.setDataDirs(dataDirs);
 
-    // fallback archives
-    StringsVector archives = variables["fallback-archive"].as<StringsVector>();
-    for (StringsVector::const_iterator it = archives.begin(); it != archives.end(); ++it)
+    const Files::Collections collections(dataDirs);
+
+    // The ini files of the games: the ones in the folder of each game, then the ones that were given
+    std::vector<std::filesystem::path> iniPaths = Files::findGameInis(dataDirs);
+    for (const auto& path : variables["game-ini"].as<Files::MaybeQuotedPathContainer>())
+        iniPaths.push_back(path);
+    const Files::GameIni gameIni = Files::GameIni::load(iniPaths);
+
+    const std::string pluginOrder = variables["plugin-order"].as<std::string>();
+    if (!pluginOrder.empty() && pluginOrder != "list" && pluginOrder != "time")
     {
-        engine.addArchive(*it);
+        Log(Debug::Error) << "plugin-order must be list or time, not " << pluginOrder << ". Aborting...";
+        return false;
     }
 
     StringsVector content = variables["content"].as<StringsVector>();
+    {
+        // The content files named on the command line or in the configuration are listed once each. The active
+        // plugins of a Plugins.txt that are listed there too are the same plugin.
+        std::set<std::string> contentDedupe{ "builtin.omwscripts" };
+        for (const auto& contentFile : content)
+        {
+            if (!contentDedupe.insert(contentFile).second)
+            {
+                Log(Debug::Error) << "Content file specified more than once: " << contentFile << ". Aborting...";
+                return false;
+            }
+        }
+    }
+
+    std::vector<std::string> pluginsFileNames;
+    const std::filesystem::path pluginsFile = variables["plugins-file"].as<Files::MaybeQuotedPath>();
+    if (!pluginsFile.empty())
+    {
+        const auto stream = Files::openBinaryInputFileStream(pluginsFile);
+        if (!stream->is_open())
+        {
+            Log(Debug::Error) << "Failed to open the plugins file " << pluginsFile << ". Aborting...";
+            return false;
+        }
+        const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+        pluginsFileNames = ESM4::dropMissingPlugins(ESM4::parsePluginsFile(text), collections);
+    }
+
+    // Plugins named with content= (or none: then the games' own rules make some active) and the order they load in
+    ESM4::ContentOrder contentOrder = ESM4::ContentOrder::List;
+    if (std::any_of(content.begin(), content.end(), ESM4::isPluginName))
+    {
+        for (std::string& name : pluginsFileNames)
+            if (std::none_of(content.begin(), content.end(),
+                    [&name](const std::string& listed) { return Misc::StringUtils::ciEqual(listed, name); }))
+                content.push_back(std::move(name));
+    }
+    else
+    {
+        std::vector<std::string> testFiles;
+        for (int i = 1; i <= 10; ++i)
+            if (const auto name = gameIni.get("General", "sTestFile" + std::to_string(i)); name && !name->empty())
+                testFiles.push_back(*name);
+        const std::vector<std::string> active = ESM4::activePlugins(testFiles, pluginsFileNames, collections);
+        std::string names;
+        for (const std::string& name : active)
+            names += (names.empty() ? "" : ", ") + name;
+        Log(Debug::Info) << "No plugin is named, so the plugins the games make active load: "
+                         << (names.empty() ? "none" : names);
+        content.insert(content.begin(), active.begin(), active.end());
+        // The games have no other order for the files of their Data folder
+        contentOrder = ESM4::ContentOrder::FileTime;
+    }
+    if (pluginOrder == "list")
+        contentOrder = ESM4::ContentOrder::List;
+    else if (pluginOrder == "time")
+        contentOrder = ESM4::ContentOrder::FileTime;
+
     if (content.empty())
     {
         Log(Debug::Error) << "No content file given (esm/esp, nor omwgame/omwaddon). Aborting...";
         return false;
     }
     engine.addContentFile("builtin.omwscripts");
-    std::set<std::string> contentDedupe{ "builtin.omwscripts" };
-    for (const auto& contentFile : content)
-    {
-        if (!contentDedupe.insert(contentFile).second)
-        {
-            Log(Debug::Error) << "Content file specified more than once: " << contentFile << ". Aborting...";
-            return false;
-        }
-    }
+
+    // The games load the masters first and a master before the plugins that list it, whatever order they were named in
+    content = ESM4::orderContentFiles(content, collections, contentOrder, 1); // builtin.omwscripts comes first
 
     for (auto& file : content)
     {
         engine.addContentFile(file);
     }
+
+    // The archives the games open, the order they look in them, and loose files against archives (see
+    // components/vfs/archiveorder.hpp): the games treat New Vegas, and so Tale of Two Wastelands, and Fallout 3 alike
+    // except for the order of the archives
+    const VFS::ArchiveRules archiveRules = OFScript::chooseGame(content) == FalloutScript::Game::Fallout3
+        ? VFS::ArchiveRules::Fallout3
+        : VFS::ArchiveRules::NewVegas;
+    const VFS::ArchiveSettings archiveSettings = VFS::ArchiveSettings::read(gameIni, archiveRules);
+    const std::vector<std::string> archives = VFS::orderArchives(
+        VFS::archivesToOpen(archiveSettings, archiveRules, variables["fallback-archive"].as<StringsVector>(),
+            ESM4::pluginArchives(content, collections), collections),
+        archiveRules);
+    {
+        std::string names;
+        for (const std::string& archive : archives)
+            names += (names.empty() ? "" : ", ") + archive;
+        Log(Debug::Info) << "Archive order (the first one that has a file wins): " << (names.empty() ? "none" : names);
+    }
+    // The engine takes the archives in the order of increasing priority
+    for (auto it = archives.rbegin(); it != archives.rend(); ++it)
+        engine.addArchive(*it);
+
+    VFS::ArchiveOptions archiveOptions;
+    archiveOptions.mArchivesWin = !archiveSettings.mInvalidateOlderFiles;
+    if (archiveSettings.mUseArchives && archiveSettings.mInvalidateOlderFiles
+        && collections.doesExist(archiveSettings.mInvalidationFile))
+    {
+        const auto stream = Files::openBinaryInputFileStream(collections.getPath(archiveSettings.mInvalidationFile));
+        const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+        auto invalidation = std::make_shared<VFS::ArchiveInvalidation>(VFS::ArchiveInvalidation::parse(text));
+        Log(Debug::Info) << "Read " << archiveSettings.mInvalidationFile << ", which invalidates files of archives";
+        archiveOptions.mInvalidation = std::move(invalidation);
+    }
+    engine.setArchiveOptions(std::move(archiveOptions));
 
     StringsVector groundcover = variables["groundcover"].as<StringsVector>();
     for (auto& file : groundcover)

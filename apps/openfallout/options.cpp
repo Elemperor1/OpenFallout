@@ -40,6 +40,28 @@ namespace OpenMW
         addOption("content", bpo::value<StringsVector>()->default_value(StringsVector(), "")->multitoken()->composing(),
             "content file(s): esm/esp, or omwgame/omwaddon/omwscripts");
 
+        addOption("plugins-file", bpo::value<Files::MaybeQuotedPath>()->default_value(Files::MaybeQuotedPath(), ""),
+            "read more content files from a file in the format of the Plugins.txt of the games (one name to a line; "
+            "where lines start with *, only those are active). They are added after the plugins given with "
+            "content. Where no plugin is given, they are active in addition to the ones the games make active "
+            "themselves (the base master, the plugins with a .NAM file). Names that are not in the data directories "
+            "are skipped, as the games skip them");
+
+        addOption("plugin-order", bpo::value<std::string>()->default_value(""),
+            "how the plugins are ordered: list or time. Either way the masters (the files whose header says so) load "
+            "first, and a master before the plugins that list it. list: keep the order given (what mod managers "
+            "write); time: oldest file first, the rule of the games, which have no other. The default is list where "
+            "plugins are named and time where the games' rules choose them");
+
+        addOption("game-ini",
+            bpo::value<Files::MaybeQuotedPathContainer>()
+                ->default_value(Files::MaybeQuotedPathContainer(), "game-ini")
+                ->multitoken()
+                ->composing(),
+            "ini file(s) of the game (Fallout.ini, FalloutPrefs.ini) to read the settings of the games from, later "
+            "files over earlier ones. The Fallout_default.ini, Fallout.ini and FalloutPrefs.ini that sit in the "
+            "folder above a data directory are read first");
+
         addOption("groundcover",
             bpo::value<StringsVector>()->default_value(StringsVector(), "")->multitoken()->composing(),
             "groundcover content file(s): esm/esp, or omwgame/omwaddon");

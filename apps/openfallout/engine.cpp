@@ -469,6 +469,11 @@ void OF::Engine::addArchive(const std::string& archive)
     mArchives.push_back(archive);
 }
 
+void OF::Engine::setArchiveOptions(VFS::ArchiveOptions options)
+{
+    mArchiveOptions = std::move(options);
+}
+
 // Set resource dir
 void OF::Engine::setResourceDir(const std::filesystem::path& parResDir)
 {
@@ -755,7 +760,8 @@ void OF::Engine::prepareEngine()
     if (std::filesystem::is_directory(fallbackDir))
         mVFS->addArchive(std::make_unique<VFS::FileSystemArchive>(fallbackDir));
 
-    VFS::registerArchives(mVFS.get(), mFileCollections, mArchives, true, &mEncoder.get()->getStatelessEncoder());
+    VFS::registerArchives(
+        mVFS.get(), mFileCollections, mArchives, true, &mEncoder.get()->getStatelessEncoder(), mArchiveOptions);
 
     mResourceSystem = std::make_unique<Resource::ResourceSystem>(
         mVFS.get(), Settings::cells().mCacheExpiryDelay, &mEncoder.get()->getStatelessEncoder());
