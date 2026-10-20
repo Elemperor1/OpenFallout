@@ -1,140 +1,140 @@
-code,name,name_class,name_scripts,calls,scripts,on_reference,stmt,expr,decoder,first_file,first_record,first_formid,first_script
-0x1400,GetNVSEVersion,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler
-0x1401,GetNVSERevision,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler
-0x1402,GetNVSEBeta,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler
-0x1403,GetBaseObject,elimination,2,3,2,both,0,3,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x1405,GetHealth,order,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x140A,GetType,certain,3,4,3,both,0,4,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript
-0x1410,GetWeaponType,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x143F,ListGetCount,order,9,10,8,no,0,10,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript
-0x1440,ListGetNthForm,order,11,18,10,no,0,18,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript
-0x1441,ListGetFormIndex,elimination,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript
-0x1442,ListAddForm,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x1449,GetEquippedObject,certain,10,22,10,yes,0,22,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x144A,GetEquippedCurrentHealth,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x144C,SetName,certain,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,06019279,DialogueRivetCityScript
-0x1453,IsKeyPressed,order,1,8,1,no,0,8,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript
-0x146D,GetParentCell,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x146E,GetParentWorldspace,order,2,3,2,yes,0,3,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x1479,IsPowerArmor,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C007EA2,TTWFollowerCrossPerkQuestScript
-0x149A,GetNumericGameSetting,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C009267,TTWCovertOpsFunctionScript
-0x149B,SetNumericGameSetting,certain,12,51,12,no,51,0,lists,TaleOfTwoWastelands,SCPT,0100C59E,NVDLC01VillaTravelTriggerScript
-0x149C,GetNumericIniSetting,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x149D,SetNumericINISetting,elimination,5,12,5,no,12,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x14A0,PrintC,elimination,3,47,3,no,47,0,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT
-0x14A8,GetGameRestarted,order,6,6,6,no,0,6,lists,TaleOfTwoWastelands,SCPT,03012027,NVDLC03HologramEffect02SCRIPT
-0x14AC,GetGameLoaded,order,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,03012027,NVDLC03HologramEffect02SCRIPT
-0x14AD,GetWeaponItemMod,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14AE,IsModLoaded,order,2,9,2,no,0,9,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x14BA,IsFormValid,order,5,10,5,no,0,10,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14BB,isReference,certain,5,13,5,no,0,13,lists,TaleOfTwoWastelands,SCPT,0602FB20,FFER57SlaveSCRIPT
-0x14CF,LogicalAnd,elimination,4,20,4,no,0,20,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14D0,LogicalOr,certain,1,11,1,no,0,11,lists,TaleOfTwoWastelands,SCPT,0C01C682,TTWFNWorldspaceMapper
-0x14F2,GetEquippedWeaponModFlags,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14F4,GetWeaponItemModEffect,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14F5,GetWeaponItemModValue1,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x14F8,IsOwned,elimination,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,00017E1B,TrapGenericTripwireSCRIPT
-0x1502,GetFirstRefForItem,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT
-0x1510,GetBaseForm,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript
-0x151C,SetPackageTargetReference,certain,3,12,3,no,12,0,lists,TaleOfTwoWastelands,INFO,06047579,-
-0x152D,Update3D,certain,2,5,2,both,5,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript
-0x1539,let,order,8,29,8,no,29,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript
-0x153B,While,order,20,25,20,no,25,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript
-0x153C,Loop,order,20,25,20,no,25,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript
-0x153F,break,order,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x1541,print,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C008DF9,TTWBabyBookOnMenuCloseEventHandlerScript
-0x1545,call,certain,55,83,55,no,83,0,lists,TaleOfTwoWastelands,SCPT,0007DD5D,HD00LabScript
-0x154F,ar_construct,order,1,,,,,,misses,,,,
-0x1550,ar_size,order,5,,,,,,misses,,,,
-0x1562,ar_null,order,2,,,,,,misses,,,,
-0x1566,ar_append,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript
-0x15B8,UnequipMe,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT
-0x15B9,IsEquipped,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT
-0x15C3,GetPerkRank,elimination,3,12,3,yes,0,12,lists,TaleOfTwoWastelands,SCPT,0C009257,TTWDaddysFunction
-0x15DF,IsPluginInstalled,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x15E0,GetPluginVersion,order,1,4,1,no,0,4,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler
-0x15E9,SetEventHandler,order,1,4,1,no,4,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x15EF,AddSpellNS,elimination,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0602EDFC,MS01Lucky8BallScript
-0x1608,HasEffectShader,certain,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,07004437,DLC02GeneralChaseScript
-0x224D,GetCreatureType,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C008D03,TTWCryolatorEffectScript
-0x224E,GetLoadedTypeArray,order,1,,,,,,misses,,,,
-0x2266,GetFormFromMod,order,4,18,4,no,0,18,lists,TaleOfTwoWastelands,SCPT,00072021,RCExBridge1SCRIPT
-0x2267,GetPerkEntryCount,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript
-0x2268,GetNthPerkEntryType,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript
-0x226E,SetNthPerkEntryValue1,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x22E0,GetDistance2D,certain,2,4,2,both,0,4,lists,TaleOfTwoWastelands,SCPT,0602B1AD,DukovScript
-0x22E1,GetDistance3D,certain,2,30,2,yes,0,30,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT
-0x22EA,GetCellImageSpace,certain,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0607C2D6,HD01QuestScript
-0x2606,AddItemAlt,certain,7,14,7,yes,14,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript
-0x261E,SetExplosionTraitForm,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C009255,TTWStayFrostyFunction
-0x26C0,SetSoundSourceFile,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,QUST,06014E83,CG01
-0x26C5,GetDestructionDataNumStages,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x26CE,GetTeammates,order,2,,,,,,misses,,,,
-0x26DC,GetProjectileRefSource,elimination,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0C009212,TTWDragonsBreathEventHandlerScript
-0x26ED,DisableNavmeshAlt,order,2,14,2,no,14,0,lists,TaleOfTwoWastelands,SCPT,04003217,NVDLC04Silo1ElevatorScript
-0x26EE,EnableNavmeshAlt,order,4,9,4,no,9,0,lists,TaleOfTwoWastelands,SCPT,00072021,RCExBridge1SCRIPT
-0x26F9,SetObjectEffect,order,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript
-0x270F,GetItemRefCurrentHealth,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT
-0x2717,EquipItemAlt,order,1,12,1,yes,12,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript
-0x2718,UnequipItemAlt,order,1,5,1,yes,5,0,lists,TaleOfTwoWastelands,SCPT,0C0091FE,TTWRemoveItemFixFunction
-0x2741,StopIdle,certain,2,3,2,both,3,0,lists,TaleOfTwoWastelands,SCPT,08005957,DLC01AshurSCRIPT
-0x2754,GetCombatDisabled,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0A006642,DLC04TheBrainNPCSCRIPT
-0x2755,SetCombatDisabled,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0A006642,DLC04TheBrainNPCSCRIPT
-0x2759,MoveToEditorPosition,certain,2,32,2,yes,32,0,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT
-0x277D,IsInWater,elimination,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript
-0x2786,GetAshPileSource,certain,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C007F76,TTWAshPileFixScript
-0x278A,IsSoundPlaying,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x279A,SetOnMenuOpenEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x279B,SetOnMenuCloseEventHandler,order,4,6,4,no,6,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x27A1,GetCurrentAmmo,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript
-0x27AC,SetSpeedMult,certain,3,6,3,no,6,0,lists,TaleOfTwoWastelands,SCPT,0C008D03,TTWCryolatorEffectScript
-0x27BE,GetPerkFlag,order,2,4,2,no,0,4,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x27C9,SetInteractionDisabled,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x27D1,SetOnKeyUpEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x27E2,RemoveMeIRAlt,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT
-0x27EC,IsSpellTargetAlt,certain,43,50,43,both,0,50,lists,TaleOfTwoWastelands,SCPT,001252C0,LegionMongrelSnifferScript
-0x27ED,GetCalculatedWeaponDamage,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x27EE,GetOptionalPatch,order,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT
-0x27EF,SetOptionalPatch,certain,2,11,2,no,11,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x27F5,GetAVMod,certain,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016517D,FerociousLoyaltyScript
-0x280B,GetKiller,certain,25,25,25,no,0,25,lists,TaleOfTwoWastelands,SCPT,0600312D,MS09FamilyCombatScript
-0x2810,ScriptWait,elimination,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,07003EC6,DLC02ElevatorSCRIPT
-0x2822,SetTerminalUIModel,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x2829,CastImmediate,certain,9,33,9,both,33,0,lists,TaleOfTwoWastelands,SCPT,00173234,50MGIncendiaryScript
-0x282C,GetHitAttacker,certain,28,28,28,both,0,28,lists,TaleOfTwoWastelands,SCPT,0001DEA6,VictoryRifleKnockdownScript
-0x282D,GetHitProjectile,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript
-0x282E,GetHitWeapon,elimination,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,00173234,50MGIncendiaryScript
-0x282F,GetGameDaysPassed,elimination,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008D1F,TTWTrainTripQuestScript
-0x2830,GetWaterImmersionPerc,certain,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript
-0x2836,ToggleCraftingMessages,order,3,5,3,no,3,2,lists,TaleOfTwoWastelands,SCPT,0C008536,TTWAmmoPressMenuCloseEventHandlerScript
-0x2837,ToggleHardcoreTracking,certain,32,66,32,no,66,0,lists,TaleOfTwoWastelands,SCPT,0011E65E,VCG01RemoveDocCarebearModeTriggerSCRIPT
-0x2839,GetEquippedItemRef,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x283F,IsAnimPlayingEx,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript
-0x2840,AttachAshPileEx,certain,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0005C6C2,AlienDisintegrationEffectScript
-0x2841,MarkActivatorAshPile,order,1,3,1,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x2844,PushObject,certain,2,6,2,yes,6,0,lists,TaleOfTwoWastelands,SCPT,06058668,Dunwich02MoverTrig01SCRIPT
-0x2861,StopSound,certain,3,5,3,no,5,0,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript
-0x2862,IsMusicPlaying,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x2863,SetMusicState,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x286B,GetPlayerPerks,order,1,,,,,,misses,,,,
-0x2878,SetOnLocationDiscoverEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x287B,SetOnCraftingEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x2880,SetOnHitEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x288B,SetGameHour,certain,30,39,30,no,39,0,lists,TaleOfTwoWastelands,SCPT,0011EBA6,PressDemoQuestScript
-0x2892,GetIsLAA,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x2895,DonnerReedKuruParty,certain,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,07007CF3,DLC02NPCBaseSCRIPT
-0x28A1,ToggleItemUnique,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x28AC,TogglePipboyLight,elimination,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,060254C9,MQ04Script
-0x28AF,GetProjectileRefImpactRef,certain,6,6,6,no,0,6,lists,TaleOfTwoWastelands,SCPT,0C00920E,TTWCoinShotEventHandlerScript
-0x28B0,SetOnProjectileImpactEventHandler,order,1,9,1,no,9,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x28B3,SetOnUseAidItemEventHandler,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x28D7,InitRockItLauncher,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x3165,GetQuestFailed,certain,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,060B2942,MS14ArmorT51bScript
-0x317E,IsDLLLoaded,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x31E4,GetExtraMiscStat,certain,3,8,3,no,0,8,lists,TaleOfTwoWastelands,SCPT,0007691E,AchievementScript
-0x31E5,ModExtraMiscStat,certain,27,27,27,no,27,0,lists,TaleOfTwoWastelands,SCPT,000410BE,BobbleheadSTRScript
-0x31EE,InitExtraMiscStat,order,1,5,1,no,5,0,lists,TaleOfTwoWastelands,SCPT,0C07916A,TTWGenericHandlerScriptMiscStatsScript
-0x3800,TTW_ShowGeneProjector,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,0605CF93,Vault101ExitScript
-0x3806,TTW_GetPlugins,order,1,,,,,,misses,,,,
-0x3808,TTW_EnableRadioFix,certain,6,8,6,no,8,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript
-0x3CE0,ActorHasBaseFlag,certain,21,21,21,yes,0,21,lists,TaleOfTwoWastelands,SCPT,00017E1B,TrapGenericTripwireSCRIPT
+code,name,name_class,name_scripts,calls,scripts,on_reference,stmt,expr,decoder,first_file,first_record,first_formid,first_script,owner,registered_name,short_name,needs_reference,parameters,condition,returns
+0x1400,GetNVSEVersion,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler,xNVSE 6.4.9,GetNVSEVersion,,no,,yes,
+0x1401,GetNVSERevision,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler,xNVSE 6.4.9,GetNVSERevision,,no,,yes,
+0x1402,GetNVSEBeta,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler,xNVSE 6.4.9,GetNVSEBeta,,no,,yes,
+0x1403,GetBaseObject,elimination,2,3,2,both,0,3,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,xNVSE 6.4.9,GetBaseObject,gbo,yes,,no,
+0x1405,GetHealth,order,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetHealth,GetBaseHealth,no,61?,yes,
+0x140A,GetType,certain,3,4,3,both,0,4,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript,xNVSE 6.4.9,GetType,GetObjectType,no,61?,yes,
+0x1410,GetWeaponType,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,xNVSE 6.4.9,GetWeaponType,GetWeapType,no,3?,yes,
+0x143F,ListGetCount,order,9,10,8,no,0,10,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript,xNVSE 6.4.9,ListGetCount,,no,37,no,
+0x1440,ListGetNthForm,order,11,18,10,no,0,18,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript,xNVSE 6.4.9,ListGetNthForm,,no,37 1,no,
+0x1441,ListGetFormIndex,elimination,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript,xNVSE 6.4.9,ListGetFormIndex,,no,37 61?,yes,
+0x1442,ListAddForm,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,ListAddForm,,no,37 61 1? 1?,no,
+0x1449,GetEquippedObject,certain,10,22,10,yes,0,22,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetEquippedObject,GetEqObj,yes,1,no,
+0x144A,GetEquippedCurrentHealth,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetEquippedCurrentHealth,GetEqCurHealth,yes,1,yes,
+0x144C,SetName,certain,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,06019279,DialogueRivetCityScript,xNVSE 6.4.9,SetName,,no,0 61?,no,
+0x1453,IsKeyPressed,order,1,8,1,no,0,8,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript,xNVSE 6.4.9,IsKeyPressed,,no,1 1?,yes,
+0x146D,GetParentCell,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,GetParentCell,gpc,yes,,no,
+0x146E,GetParentWorldspace,order,2,3,2,yes,0,3,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,GetParentWorldspace,gpw,yes,,no,
+0x1479,IsPowerArmor,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C007EA2,TTWFollowerCrossPerkQuestScript,xNVSE 6.4.9,IsPowerArmor,IsPA,no,3?,yes,
+0x149A,GetNumericGameSetting,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C009267,TTWCovertOpsFunctionScript,xNVSE 6.4.9,GetNumericGameSetting,,no,0,no,
+0x149B,SetNumericGameSetting,certain,12,51,12,no,51,0,lists,TaleOfTwoWastelands,SCPT,0100C59E,NVDLC01VillaTravelTriggerScript,xNVSE 6.4.9,SetNumericGameSetting,,no,0 2,no,
+0x149C,GetNumericIniSetting,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,GetNumericIniSetting,,no,0,no,
+0x149D,SetNumericINISetting,elimination,5,12,5,no,12,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,SetNumericIniSetting,,no,0 2,no,
+0x14A0,PrintC,elimination,3,47,3,no,47,0,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT,xNVSE 6.4.9,PrintToConsole,printc,no,0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?,no,
+0x14A8,GetGameRestarted,order,6,6,6,no,0,6,lists,TaleOfTwoWastelands,SCPT,03012027,NVDLC03HologramEffect02SCRIPT,xNVSE 6.4.9,GetGameRestarted,,no,,no,
+0x14AC,GetGameLoaded,order,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,03012027,NVDLC03HologramEffect02SCRIPT,xNVSE 6.4.9,GetGameLoaded,,no,,no,
+0x14AD,GetWeaponItemMod,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetWeaponItemMod,,no,1 3?,no,
+0x14AE,IsModLoaded,order,2,9,2,no,0,9,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,IsModLoaded,,no,0,no,
+0x14BA,IsFormValid,order,5,10,5,no,0,10,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,IsFormValid,,no,61?,no,
+0x14BB,isReference,certain,5,13,5,no,0,13,lists,TaleOfTwoWastelands,SCPT,0602FB20,FFER57SlaveSCRIPT,xNVSE 6.4.9,IsReference,,no,4,no,
+0x14CF,LogicalAnd,elimination,4,20,4,no,0,20,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,LogicalAnd,,no,1 1,no,
+0x14D0,LogicalOr,certain,1,11,1,no,0,11,lists,TaleOfTwoWastelands,SCPT,0C01C682,TTWFNWorldspaceMapper,xNVSE 6.4.9,LogicalOr,,no,1 1,no,
+0x14F2,GetEquippedWeaponModFlags,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetEquippedWeaponModFlags,,yes,,yes,
+0x14F4,GetWeaponItemModEffect,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetWeaponItemModEffect,,no,1 3?,no,
+0x14F5,GetWeaponItemModValue1,order,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,xNVSE 6.4.9,GetWeaponItemModValue1,,no,1 3?,no,
+0x14F8,IsOwned,elimination,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,00017E1B,TrapGenericTripwireSCRIPT,xNVSE 6.4.9,IsOwned,,yes,6?,yes,
+0x1502,GetFirstRefForItem,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT,xNVSE 6.4.9,GetFirstRefForItem,,yes,3,no,
+0x1510,GetBaseForm,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript,xNVSE 6.4.9,GetBaseForm,gbf,yes,,no,
+0x151C,SetPackageTargetReference,certain,3,12,3,no,12,0,lists,TaleOfTwoWastelands,INFO,06047579,-,xNVSE 6.4.9,SetPackageTargetReference,,no,61 4?,no,
+0x152D,Update3D,certain,2,5,2,both,5,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript,xNVSE 6.4.9,Update3D,,yes,,no,
+0x1539,let,order,8,29,8,no,29,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript,xNVSE 6.4.9,Let,,no,32845,no,
+0x153B,While,order,20,25,20,no,25,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript,xNVSE 6.4.9,while,,no,32770,no,
+0x153C,Loop,order,20,25,20,no,25,0,lists,TaleOfTwoWastelands,SCPT,001164A4,VCG04ActivatorScript,xNVSE 6.4.9,loop,,no,1?,no,
+0x153F,break,order,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,break,,no,1?,no,
+0x1541,print,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C008DF9,TTWBabyBookOnMenuCloseEventHandlerScript,xNVSE 6.4.9,Print,,no,32772,no,
+0x1545,call,certain,55,83,55,no,83,0,lists,TaleOfTwoWastelands,SCPT,0007DD5D,HD00LabScript,xNVSE 6.4.9,Call,,no,0,no,
+0x154F,ar_construct,order,1,,,,,,misses,,,,,xNVSE 6.4.9,ar_Construct,,no,0,no,
+0x1550,ar_size,order,5,,,,,,misses,,,,,xNVSE 6.4.9,ar_Size,,no,32832,no,
+0x1562,ar_null,order,2,,,,,,misses,,,,,xNVSE 6.4.9,ar_Null,,no,,no,
+0x1566,ar_append,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript,xNVSE 6.4.9,ar_Append,,no,32832 32845,no,
+0x15B8,UnequipMe,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT,xNVSE 6.4.9,UnequipMe,,yes,,no,
+0x15B9,IsEquipped,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT,xNVSE 6.4.9,IsEquipped,,yes,,no,
+0x15C3,GetPerkRank,elimination,3,12,3,yes,0,12,lists,TaleOfTwoWastelands,SCPT,0C009257,TTWDaddysFunction,xNVSE 6.4.9,GetPerkRank,,no,39 6?,yes,
+0x15DF,IsPluginInstalled,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,IsPluginInstalled,,no,0,no,
+0x15E0,GetPluginVersion,order,1,4,1,no,0,4,lists,TaleOfTwoWastelands,QUST,0C01B68E,TTWGenericHandler,xNVSE 6.4.9,GetPluginVersion,,no,0,no,
+0x15E9,SetEventHandler,order,1,4,1,no,4,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,xNVSE 6.4.9,SetEventHandler,,no,32772 32776 2097152? 2097152? 2097152?,no,
+0x15EF,AddSpellNS,elimination,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0602EDFC,MS01Lucky8BallScript,xNVSE 6.4.9,AddSpellNS,,no,7,no,
+0x1608,HasEffectShader,certain,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,07004437,DLC02GeneralChaseScript,xNVSE 6.4.9,HasEffectShader,,yes,36,no,
+0x224D,GetCreatureType,elimination,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C008D03,TTWCryolatorEffectScript,JIP LN 57.30,GetCreatureType,,no,25?,no,
+0x224E,GetLoadedTypeArray,order,1,,,,,,misses,,,,,JIP LN 57.30,GetLoadedTypeArray,GLTA,no,1 1?,no,array
+0x2266,GetFormFromMod,order,4,18,4,no,0,18,lists,TaleOfTwoWastelands,SCPT,00072021,RCExBridge1SCRIPT,JIP LN 57.30,GetFormFromMod,GFFM,no,0 0,no,form
+0x2267,GetPerkEntryCount,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript,JIP LN 57.30,GetPerkEntryCount,,no,39,no,
+0x2268,GetNthPerkEntryType,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C008DFA,TTWBabyBookOnMenuOpenEventHandlerScript,JIP LN 57.30,GetNthPerkEntryType,,no,39 1,no,
+0x226E,SetNthPerkEntryValue1,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetNthPerkEntryValue1,,no,61 1 2,no,
+0x22E0,GetDistance2D,certain,2,4,2,both,0,4,lists,TaleOfTwoWastelands,SCPT,0602B1AD,DukovScript,JIP LN 57.30,GetDistance2D,,yes,4,yes,
+0x22E1,GetDistance3D,certain,2,30,2,yes,0,30,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT,JIP LN 57.30,GetDistance3D,,yes,4,yes,
+0x22EA,GetCellImageSpace,certain,2,2,2,no,0,2,lists,TaleOfTwoWastelands,SCPT,0607C2D6,HD01QuestScript,JIP LN 57.30,GetCellImageSpace,,no,61,no,form
+0x2606,AddItemAlt,certain,7,14,7,yes,14,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript,JIP LN 57.30,AddItemAlt,,yes,50 1? 2? 1? 1?,no,
+0x261E,SetExplosionTraitForm,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C009255,TTWStayFrostyFunction,JIP LN 57.30,SetExplosionTraitForm,,no,61 1 61?,no,
+0x26C0,SetSoundSourceFile,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,QUST,06014E83,CG01,JIP LN 57.30,SetSoundSourceFile,,no,12 0,no,
+0x26C5,GetDestructionDataNumStages,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,JIP LN 57.30,GetDestructionDataNumStages,,no,61,no,
+0x26CE,GetTeammates,order,2,,,,,,misses,,,,,JIP LN 57.30,GetTeammates,,no,,no,array
+0x26DC,GetProjectileRefSource,elimination,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0C009212,TTWDragonsBreathEventHandlerScript,JIP LN 57.30,GetProjectileRefSource,,yes,,no,form
+0x26ED,DisableNavmeshAlt,order,2,14,2,no,14,0,lists,TaleOfTwoWastelands,SCPT,04003217,NVDLC04Silo1ElevatorScript,JIP LN 57.30,DisableNavMeshAlt,,no,61,no,
+0x26EE,EnableNavmeshAlt,order,4,9,4,no,9,0,lists,TaleOfTwoWastelands,SCPT,00072021,RCExBridge1SCRIPT,JIP LN 57.30,EnableNavMeshAlt,,no,61,no,
+0x26F9,SetObjectEffect,order,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript,JIP LN 57.30,SetObjectEffect,,no,61 61?,no,
+0x270F,GetItemRefCurrentHealth,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT,JIP LN 57.30,GetItemRefCurrentHealth,,yes,1?,no,
+0x2717,EquipItemAlt,order,1,12,1,yes,12,0,lists,TaleOfTwoWastelands,SCPT,0C00874D,TTWTestQuestScript,JIP LN 57.30,EquipItemAlt,,yes,3 1? 1?,no,
+0x2718,UnequipItemAlt,order,1,5,1,yes,5,0,lists,TaleOfTwoWastelands,SCPT,0C0091FE,TTWRemoveItemFixFunction,JIP LN 57.30,UnequipItemAlt,,yes,3 1? 1?,no,
+0x2741,StopIdle,certain,2,3,2,both,3,0,lists,TaleOfTwoWastelands,SCPT,08005957,DLC01AshurSCRIPT,JIP LN 57.30,StopIdle,,yes,,no,
+0x2754,GetCombatDisabled,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0A006642,DLC04TheBrainNPCSCRIPT,JIP LN 57.30,GetCombatDisabled,,yes,,no,
+0x2755,SetCombatDisabled,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0A006642,DLC04TheBrainNPCSCRIPT,JIP LN 57.30,SetCombatDisabled,,yes,1 6?,no,
+0x2759,MoveToEditorPosition,certain,2,32,2,yes,32,0,lists,TaleOfTwoWastelands,SCPT,0C001595,TTWMegatonNPCsStayInMegatonSCRIPT,JIP LN 57.30,MoveToEditorPosition,,yes,1?,no,
+0x277D,IsInWater,elimination,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript,JIP LN 57.30,IsInWater,,yes,,yes,
+0x2786,GetAshPileSource,certain,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C007F76,TTWAshPileFixScript,JIP LN 57.30,GetAshPileSource,,yes,,no,form
+0x278A,IsSoundPlaying,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,IsSoundPlaying,,no,12 4?,no,
+0x279A,SetOnMenuOpenEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnMenuOpenEventHandler,,no,61 1 1?,no,
+0x279B,SetOnMenuCloseEventHandler,order,4,6,4,no,6,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnMenuCloseEventHandler,,no,61 1 1?,no,
+0x27A1,GetCurrentAmmo,order,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0C008DB7,TTWAmmoSwitchEventHandlerScript,JIP LN 57.30,GetCurrentAmmo,,yes,,no,form
+0x27AC,SetSpeedMult,certain,3,6,3,no,6,0,lists,TaleOfTwoWastelands,SCPT,0C008D03,TTWCryolatorEffectScript,JIP LN 57.30,SetSpeedMult,,yes,1?,no,
+0x27BE,GetPerkFlag,order,2,4,2,no,0,4,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,GetPerkFlag,,no,39 1,no,
+0x27C9,SetInteractionDisabled,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetInteractionDisabled,,no,1 21?,no,
+0x27D1,SetOnKeyUpEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnKeyUpEventHandler,,no,61 1 1?,no,
+0x27E2,RemoveMeIRAlt,order,1,1,1,yes,1,0,lists,TaleOfTwoWastelands,SCPT,0C008FA0,TTWSSinkWeaponExchangeFunctionSCRIPT,JIP LN 57.30,RemoveMeIRAlt,,yes,1? 1? 26?,no,
+0x27EC,IsSpellTargetAlt,certain,43,50,43,both,0,50,lists,TaleOfTwoWastelands,SCPT,001252C0,LegionMongrelSnifferScript,JIP LN 57.30,IsSpellTargetAlt,,yes,11,yes,
+0x27ED,GetCalculatedWeaponDamage,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,JIP LN 57.30,GetCalculatedWeaponDamage,,no,3?,no,
+0x27EE,GetOptionalPatch,order,3,3,3,no,0,3,lists,TaleOfTwoWastelands,SCPT,0016C42C,RepairKitEffectSCRIPT,JIP LN 57.30,GetOptionalPatch,,no,0,no,
+0x27EF,SetOptionalPatch,certain,2,11,2,no,11,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOptionalPatch,,no,0 1,no,
+0x27F5,GetAVMod,certain,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0016517D,FerociousLoyaltyScript,JIP LN 57.30,GetActorValueModifier,GetAVMod,yes,5 1?,no,
+0x280B,GetKiller,certain,25,25,25,no,0,25,lists,TaleOfTwoWastelands,SCPT,0600312D,MS09FamilyCombatScript,JIP LN 57.30,GetKiller,,yes,,no,form
+0x2810,ScriptWait,elimination,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,07003EC6,DLC02ElevatorSCRIPT,JIP LN 57.30,ScriptWait,,no,1,no,
+0x2822,SetTerminalUIModel,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetTerminalUIModel,,no,61 0?,no,
+0x2829,CastImmediate,certain,9,33,9,both,33,0,lists,TaleOfTwoWastelands,SCPT,00173234,50MGIncendiaryScript,JIP LN 57.30,CastImmediate,,yes,11 6?,no,
+0x282C,GetHitAttacker,certain,28,28,28,both,0,28,lists,TaleOfTwoWastelands,SCPT,0001DEA6,VictoryRifleKnockdownScript,JIP LN 57.30,GetHitAttacker,,yes,,no,form
+0x282D,GetHitProjectile,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C00186D,TTWIncendiaryOnHitEventHandlerScript,JIP LN 57.30,GetHitProjectile,,yes,,no,form
+0x282E,GetHitWeapon,elimination,4,4,4,no,0,4,lists,TaleOfTwoWastelands,SCPT,00173234,50MGIncendiaryScript,JIP LN 57.30,GetHitWeapon,,yes,,no,form
+0x282F,GetGameDaysPassed,elimination,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C008D1F,TTWTrainTripQuestScript,JIP LN 57.30,GetGameDaysPassed,,no,1? 1? 1?,no,
+0x2830,GetWaterImmersionPerc,certain,2,2,2,yes,0,2,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript,JIP LN 57.30,GetWaterImmersionPerc,,yes,,yes,
+0x2836,ToggleCraftingMessages,order,3,5,3,no,3,2,lists,TaleOfTwoWastelands,SCPT,0C008536,TTWAmmoPressMenuCloseEventHandlerScript,JIP LN 57.30,ToggleCraftingMessages,,no,1?,no,
+0x2837,ToggleHardcoreTracking,certain,32,66,32,no,66,0,lists,TaleOfTwoWastelands,SCPT,0011E65E,VCG01RemoveDocCarebearModeTriggerSCRIPT,JIP LN 57.30,ToggleHardcoreTracking,,no,1,no,
+0x2839,GetEquippedItemRef,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,JIP LN 57.30,GetEquippedItemRef,,yes,1,no,form
+0x283F,IsAnimPlayingEx,order,1,1,1,yes,0,1,lists,TaleOfTwoWastelands,SCPT,0C008E76,TTWMeleeFixEventHandlerScript,JIP LN 57.30,IsAnimPlayingEx,,yes,1 1? 1? 1?,no,
+0x2840,AttachAshPileEx,certain,3,3,3,no,3,0,lists,TaleOfTwoWastelands,SCPT,0005C6C2,AlienDisintegrationEffectScript,JIP LN 57.30,AttachAshPileEx,,yes,61,no,
+0x2841,MarkActivatorAshPile,order,1,3,1,no,3,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,MarkActivatorAshPile,,no,61,no,
+0x2844,PushObject,certain,2,6,2,yes,6,0,lists,TaleOfTwoWastelands,SCPT,06058668,Dunwich02MoverTrig01SCRIPT,JIP LN 57.30,PushObject,,yes,2 2 2 2 4?,no,
+0x2861,StopSound,certain,3,5,3,no,5,0,lists,TaleOfTwoWastelands,SCPT,0010062E,VMS15RebreatherScript,JIP LN 57.30,StopSound,,no,12 4?,no,
+0x2862,IsMusicPlaying,order,1,2,1,no,0,2,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,IsMusicPlaying,,no,61?,no,
+0x2863,SetMusicState,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetMusicState,,no,1,no,
+0x286B,GetPlayerPerks,order,1,,,,,,misses,,,,,JIP LN 57.30,GetPlayerPerks,,no,,no,array
+0x2878,SetOnLocationDiscoverEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnLocationDiscoverEventHandler,,no,61 1,no,
+0x287B,SetOnCraftingEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnCraftingEventHandler,,no,61 1,no,
+0x2880,SetOnHitEventHandler,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnHitEventHandler,,no,61 1 61?,no,
+0x288B,SetGameHour,certain,30,39,30,no,39,0,lists,TaleOfTwoWastelands,SCPT,0011EBA6,PressDemoQuestScript,JIP LN 57.30,SetGameHour,,no,2,no,
+0x2892,GetIsLAA,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,GetIsLAA,,no,,no,
+0x2895,DonnerReedKuruParty,certain,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,07007CF3,DLC02NPCBaseSCRIPT,JIP LN 57.30,DonnerReedKuruParty,TheOtherOtherWhiteMeat,yes,1,no,
+0x28A1,ToggleItemUnique,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,ToggleItemUnique,,no,61 1,no,
+0x28AC,TogglePipboyLight,elimination,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,060254C9,MQ04Script,JIP LN 57.30,TogglePipBoyLight,,no,1?,no,
+0x28AF,GetProjectileRefImpactRef,certain,6,6,6,no,0,6,lists,TaleOfTwoWastelands,SCPT,0C00920E,TTWCoinShotEventHandlerScript,JIP LN 57.30,GetProjectileRefImpactRef,,yes,,no,form
+0x28B0,SetOnProjectileImpactEventHandler,order,1,9,1,no,9,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnProjectileImpactEventHandler,,no,61 1 61,no,
+0x28B3,SetOnUseAidItemEventHandler,order,1,2,1,no,2,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,SetOnUseAidItemEventHandler,,no,61 1 61,no,
+0x28D7,InitRockItLauncher,order,1,1,1,no,1,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JIP LN 57.30,InitRockItLauncher,,no,3,no,
+0x3165,GetQuestFailed,certain,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,060B2942,MS14ArmorT51bScript,JohnnyGuitar 5.28,GetQuestFailed,GetQF,no,14,yes,
+0x317E,IsDLLLoaded,order,1,1,1,no,0,1,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,JohnnyGuitar 5.28,IsDLLLoaded,,no,0 1?,no,
+0x31E4,GetExtraMiscStat,certain,3,8,3,no,0,8,lists,TaleOfTwoWastelands,SCPT,0007691E,AchievementScript,JohnnyGuitar 5.28,GetExtraMiscStat,,no,0,no,
+0x31E5,ModExtraMiscStat,certain,27,27,27,no,27,0,lists,TaleOfTwoWastelands,SCPT,000410BE,BobbleheadSTRScript,JohnnyGuitar 5.28,ModExtraMiscStat,,no,0 1,no,
+0x31EE,InitExtraMiscStat,order,1,5,1,no,5,0,lists,TaleOfTwoWastelands,SCPT,0C07916A,TTWGenericHandlerScriptMiscStatsScript,JohnnyGuitar 5.28,InitExtraMiscStat,,no,0,no,
+0x3800,TTW_ShowGeneProjector,certain,2,2,2,no,2,0,lists,TaleOfTwoWastelands,SCPT,0605CF93,Vault101ExitScript,ttw_nvse 3.3.3b,TTW_ShowGeneProjector,,no,,no,
+0x3806,TTW_GetPlugins,order,1,,,,,,misses,,,,,ttw_nvse 3.3.3b,TTW_GetPlugins,,no,,no,array
+0x3808,TTW_EnableRadioFix,certain,6,8,6,no,8,0,lists,TaleOfTwoWastelands,SCPT,0C001880,TTWGenericHandlerScript,ttw_nvse 3.3.3b,TTW_EnableRadioFix,,no,1,no,
+0x3CE0,ActorHasBaseFlag,certain,21,21,21,yes,0,21,lists,TaleOfTwoWastelands,SCPT,00017E1B,TrapGenericTripwireSCRIPT,ShowOff 1.84,GetActorHasBaseFlag,ActorHasBaseFlag,no,1 25?,yes,
