@@ -122,6 +122,27 @@ go through the order above like the others: among archives of rank 0 (`Fallout -
 the games, and among those of any other rank the one opened later wins, so the archive of a plugin that loads later is
 looked in before that of an earlier plugin.
 
+## What a later plugin does to the records of an earlier one
+
+A record with the form ID of an earlier plugin's record replaces it as a whole; nothing is merged field by field, and
+the last plugin in the load order wins. That is the rule of the games (Mac round 8A), and the stores here work the same
+way: they are keyed by form ID and a later record replaces the earlier one. For placed references (REFR, ACHR, ACRE)
+that means everything the reference has is the later plugin's: the flags, the position, and the cell it stands in.
+
+- A reference that a plugin flags as deleted (flag `0x20`) is gone: the cell does not list it. This holds when the
+  record has its subrecords and when it has none.
+- A reference flagged as initially disabled (`0x800`) is disabled; an override without the flag enables a reference
+  the master disabled.
+- A reference whose override stands in another cell is in that cell only: it leaves the cell the earlier plugin put it
+  in. (The games load the children of a cell when the cell loads, and the exe reads did not settle what happens to an
+  override of a child that is already there; here the last plugin wins in every case.)
+- A plugin's own records have the plugin's own index in their form ID (the top byte, the number of its masters); a
+  reference of a mod to a record of its master has the master's index.
+- A cell, worldspace or any other record a plugin includes whole replaces the earlier one the same way, so a mod that
+  only wants to add a reference to a cell has to carry the cell record too, as the editor writes it.
+
+`smoke --only mods` and `--only activation` check each of these with a synthetic mod, `OFTestMod.esp`.
+
 ## Not done
 
 - The games skip a plugin file of zero bytes; OpenFallout does not check the size of a plugin.
@@ -132,3 +153,7 @@ looked in before that of an earlier plugin.
   another archive here).
 - A file's path in an archive is looked up with forward slashes lower-cased, as in the engine's VFS; the games hash the
   path with backslashes.
+- Partial forms: the games read a record flagged `0x4000` in a plugin that is not a master and lists no masters as an
+  addition to an existing form (it loads into it, and is dropped when there is no such form). OpenFallout loads such a
+  record like any other, as a whole. Whether the plugins of Tale of Two Wastelands use the flag is for the real-data
+  round to count.

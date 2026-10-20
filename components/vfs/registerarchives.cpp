@@ -9,6 +9,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/files/conversion.hpp>
+#include <components/misc/strings/algorithm.hpp>
 
 #include <components/vfs/archiveinvalidation.hpp>
 #include <components/vfs/bsaarchive.hpp>
@@ -19,6 +20,47 @@ namespace VFS
 {
     namespace
     {
+        // Whether the directory (path components divided by slashes, any case) is below the base directory. The games
+        // are case-insensitive, and so is the lookup in the archives, but a file system may not be.
+        bool directoryExistsIgnoringCase(const std::filesystem::path& base, std::string_view directory)
+        {
+            std::filesystem::path current = base;
+            std::size_t start = 0;
+            while (start < directory.size())
+            {
+                std::size_t end = directory.find('/', start);
+                if (end == std::string_view::npos)
+                    end = directory.size();
+                const std::string_view component = directory.substr(start, end - start);
+                start = end + 1;
+                if (component.empty())
+                    continue;
+                std::error_code error;
+                const std::filesystem::path exact = current / Files::pathFromUnicodeString(component);
+                if (std::filesystem::is_directory(exact, error))
+                {
+                    current = exact;
+                    continue;
+                }
+                bool found = false;
+                for (std::filesystem::directory_iterator it(current, error), last; !error && it != last;
+                     it.increment(error))
+                {
+                    std::error_code entryError;
+                    if (it->is_directory(entryError)
+                        && Misc::StringUtils::ciEqual(Files::pathToUnicodeString(it->path().filename()), component))
+                    {
+                        current = it->path();
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    return false;
+            }
+            return true;
+        }
+
         void addArchives(VFS::Manager* vfs, const Files::Collections& collections,
             const std::vector<std::string>& archives, const ToUTF8::StatelessUtf8Encoder* encoder,
             const ArchiveOptions& options)
@@ -34,8 +76,7 @@ namespace VFS
                         return found->second;
                     bool exists = directory.empty();
                     for (const auto& dataDir : dataDirs)
-                        exists = exists
-                            || std::filesystem::is_directory(dataDir / Files::pathFromUnicodeString(directory));
+                        exists = exists || directoryExistsIgnoringCase(dataDir, directory);
                     cache->emplace(std::string(directory), exists);
                     return exists;
                 };

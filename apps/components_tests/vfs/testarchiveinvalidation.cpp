@@ -137,4 +137,19 @@ namespace
         // There is no directory only in the Data folder: the file is the archive's
         EXPECT_EQ(read(*vfs, "only/c.txt"), "archive");
     }
+
+    TEST(VFSRegisterArchivesCaseTest, aDirectoryOfTheDataFolderCountsWhateverItsCase)
+    {
+        // The only loose directory is spelled Meshes; the archive and the invalidation say meshes
+        const std::filesystem::path dir = TestingOpenMW::outputDirPath("registerarchives_case");
+        makeArchive(dir / "Test.bsa");
+        writeFile(dir / "Meshes" / "other.txt", "loose");
+        const Files::Collections collections(Files::PathContainer{ dir });
+        VFS::ArchiveOptions options;
+        options.mInvalidation = std::make_shared<ArchiveInvalidation>(ArchiveInvalidation::parse("b.txt\n"));
+        VFS::Manager vfs;
+        VFS::registerArchives(&vfs, collections, { "Test.bsa" }, true, nullptr, options);
+        EXPECT_EQ(read(vfs, "meshes/b.txt"), "missing");
+        EXPECT_EQ(read(vfs, "only/c.txt"), "archive");
+    }
 }

@@ -668,13 +668,41 @@ return {
             print('OFTEST', 'mods order', table.concat(names, ','))
             print('OFTEST', 'mods base', tostring(world.globals.@BASE@), tostring(world.globals.@ADDED@))
             print('OFTEST', 'mods id', tostring(core.getFormId('@MOD@', 0x800)))
+
+            -- what the mod did to the cubes it changes: where each is (the cell it is listed in, none when the cell
+            -- does not have it or it is deleted), whether it is enabled, and where it stands
+            local interior = world.getCellById(core.getFormId('OFTest.esm', @CELL@))
+            local exterior = world.getCellById(core.getFormId('OFTest.esm', @EXTERIOR@))
+            local cells = { interior = interior:getAll(), exterior = exterior:getAll() }
+            local wanted = { @REFS@ }
+            for _, item in ipairs(wanted) do
+                local found, object = 'none', nil
+                for _, where in ipairs({ 'interior', 'exterior' }) do
+                    for _, other in ipairs(cells[where]) do
+                        if tostring(other.id) == tostring(core.getFormId(item[2], item[3])):gsub('^FormId:', '') then
+                            found, object = where, other
+                        end
+                    end
+                end
+                if object then
+                    local at = object.position
+                    print('OFTEST', 'mods ref', item[1], found, tostring(object.enabled),
+                        string.format('%d,%d,%d', at.x, at.y, at.z))
+                else
+                    print('OFTEST', 'mods ref', item[1], found)
+                end
+            end
             core.quit()
         end,
     },
 }
 """
 MODS_SCRIPT = (MODS_SCRIPT.replace("@BASE@", plugin.MOD_BASE_GLOBAL_NAME).replace("@ADDED@", plugin.MOD_ADDED_GLOBAL_NAME)
-               .replace("@MOD@", plugin.MOD_ADDON))
+               .replace("@MOD@", plugin.MOD_ADDON).replace("@CELL@", str(plugin.CELL_ID))
+               .replace("@EXTERIOR@", str(plugin.EXTERIOR_CELL_ID))
+               .replace("@REFS@", ", ".join("{ '%s', 'OFTest.esm', %d }" % (key, form_id)
+                                           for key, form_id in plugin.MOD_REFS.items())
+                        + ", { 'new', '%s', 0x801 }" % plugin.MOD_ADDON))
 
 
 # Archives and loose files. A global script reads four files through the VFS: one that is loose and in an archive (the
@@ -2974,8 +3002,43 @@ def check_mods(text):
         elif files.index("oftestmod.esp") != files.index("oftest.esm") + 1:
             problems.append(f"the mod must load right after its master: {order.group(1)}")
     problems += check_mod_values(text)
+    problems += check_mod_records(text)
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_mod_records(text):
+    """The problems with the records of the mod. It overrides the interior cell (with another name, which Lua does not show:
+    a cell is named by its editor ID) and, in it, disables one cube, enables one that the master disables, moves one up, deletes two (one of the records has no
+    subrecords), moves one to the exterior cell, leaves one alone and adds one of its own."""
+    problems = []
+    place = plugin.mod_place
+    moved = (int(place("move")[0]), int(place("move")[1]), int(plugin.MOD_MOVED_BY))
+    wanted = {
+        "disable": ("interior", "false", place("disable")),
+        "enable": ("interior", "true", place("enable")),
+        "move": ("interior", "true", moved),
+        "delete": ("none", None, None),
+        "bare": ("none", None, None),
+        "elsewhere": ("exterior", "true", plugin.MOD_ELSEWHERE_PLACE),
+        "keep": ("interior", "true", place("keep")),
+        "new": ("interior", "true", plugin.MOD_NEW_PLACE),
+    }
+    for key, (where, enabled, position) in wanted.items():
+        found = re.search(rf"OFTEST\tmods ref\t{key}\t(\S+)(?:\t(\S+)\t(\S+))?", text)
+        if not found:
+            problems.append(f"the script did not log the cube '{key}'")
+            continue
+        if found.group(1) != where:
+            problems.append(f"cube '{key}': it is listed in {found.group(1)}, it must be in {where}")
+            continue
+        if enabled is not None and found.group(2) != enabled:
+            problems.append(f"cube '{key}': enabled is {found.group(2)}, it must be {enabled}")
+        if position is not None:
+            expected = ",".join(str(int(value)) for value in position)
+            if found.group(3) != expected:
+                problems.append(f"cube '{key}': it stands at {found.group(3)}, it must be at {expected}")
     return problems
 
 
@@ -3017,7 +3080,7 @@ def check_activation(text):
             problems.append(f"the master must load before the mod: {order.group(1)}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
-    return problems + check_mod_values(text)
+    return problems + check_mod_values(text) + check_mod_records(text)
 
 
 def check_archives(text, loose_wins):
