@@ -541,6 +541,9 @@ namespace FalloutScript
         interpreter.setHandler("GetPlayerName", open({ { ChargenPage::Name }, textEditMenu }));
         interpreter.setHandler("ShowNameMenu", open({ { ChargenPage::Name }, textEditMenu }));
         interpreter.setHandler("ShowRaceMenu", open({ { ChargenPage::Race }, raceSexMenu }));
+        // The Gene Projector of Tale of Two Wastelands is the menu of the face and the race, called where Fallout 3
+        // calls ShowRaceMenu (its own interface is the extender's, so this is the menu the engine has)
+        interpreter.setHandler("TTW_ShowGeneProjector", open({ { ChargenPage::Race }, raceSexMenu }));
         // The scripts of the games give the book and the vigor tester 40 points, and SetSPECIALPoints too; the commands
         // without a number have the default, which is that
         const Menu book{ { ChargenPage::Special }, specialBookMenu, true };
