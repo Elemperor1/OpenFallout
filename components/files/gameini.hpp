@@ -12,8 +12,9 @@ namespace Files
 {
     /// The settings of an ini file of Fallout 3 or New Vegas (Fallout_default.ini, Fallout.ini, FalloutNV.ini):
     /// sections in brackets, `key=value` lines, lines that start with a semicolon are comments. Sections and keys are
-    /// compared without regard to case. Where a key appears twice in a section the last one counts, as the games read
-    /// it.
+    /// compared without regard to case. Where a key appears twice in a section the first one counts, as the Windows
+    /// call the games read their ini files with gives it (the retail Fallout_default.ini of New Vegas lists sTestFile1
+    /// twice, the second time empty). A later file merged over this one replaces a value whatever it is.
     class GameIni
     {
     public:
