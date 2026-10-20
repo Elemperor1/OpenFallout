@@ -668,12 +668,47 @@ return {
             print('OFTEST', 'mods order', table.concat(names, ','))
             print('OFTEST', 'mods base', tostring(world.globals.@BASE@), tostring(world.globals.@ADDED@))
             print('OFTEST', 'mods id', tostring(core.getFormId('@MOD@', 0x800)))
+            core.quit()
         end,
     },
 }
 """
 MODS_SCRIPT = (MODS_SCRIPT.replace("@BASE@", plugin.MOD_BASE_GLOBAL_NAME).replace("@ADDED@", plugin.MOD_ADDED_GLOBAL_NAME)
                .replace("@MOD@", plugin.MOD_ADDON))
+
+
+# Archives and loose files. A global script reads four files through the VFS: one that is loose and in an archive (the
+# games' bInvalidateOlderFiles decides which one counts), one that is only in an archive and that ArchiveInvalidation.txt
+# names, one that is only in an archive, and one that is in the archive that is named after the mod (found without being
+# asked for).
+ARCHIVES_SCRIPT = """\
+local vfs = require('openfallout.vfs')
+
+local elapsed, done = 0, false
+
+local function content(name)
+    if not vfs.fileExists(name) then return 'missing' end
+    local file = vfs.open(name)
+    local text = file:read('*a')
+    file:close()
+    return (text:gsub('%s+$', ''))
+end
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < 2 then return end
+            done = true
+            print('OFTEST', 'archives', 'shared', content('oftest/shared.txt'))
+            print('OFTEST', 'archives', 'hidden', content('oftest/hidden.txt'))
+            print('OFTEST', 'archives', 'only', content('oftest/archiveonly.txt'))
+            print('OFTEST', 'archives', 'mod', content('oftest/modarchive.txt'))
+            require('openfallout.core').quit()
+        end,
+    },
+}
+"""
 
 
 # The conversation, in an engine of its own because it pauses the game, which the walk must not be. A script of the world
@@ -2939,6 +2974,8 @@ def check_mods(text):
         elif files.index("oftestmod.esp") != files.index("oftest.esm") + 1:
             problems.append(f"the mod must load right after its master: {order.group(1)}")
     problems += check_mod_values(text)
+    if "Quitting peacefully" not in text:
+        problems.append("the log does not end with 'Quitting peacefully'")
     return problems
 
 
@@ -2949,7 +2986,7 @@ def check_mod_values(text):
     if not base:
         problems.append("the script did not log the globals")
     else:
-        if float(base.group(1)) != plugin.MOD_OVERRIDDEN_VALUE:
+        if base.group(1) == "nil" or float(base.group(1)) != plugin.MOD_OVERRIDDEN_VALUE:
             problems.append(f"the mod changes {plugin.MOD_BASE_GLOBAL_NAME} to {plugin.MOD_OVERRIDDEN_VALUE}, the global is "
                             f"{base.group(1)} (the master has {plugin.MOD_BASE_VALUE})")
         if base.group(2) == "nil" or float(base.group(2)) != plugin.MOD_ADDED_VALUE:
@@ -2978,7 +3015,36 @@ def check_activation(text):
             problems.append(f"both plugins must load once: {order.group(1)}")
         elif files.index("oftest.esm") > files.index("oftestmod.esp"):
             problems.append(f"the master must load before the mod: {order.group(1)}")
+    if "Quitting peacefully" not in text:
+        problems.append("the log does not end with 'Quitting peacefully'")
     return problems + check_mod_values(text)
+
+
+def check_archives(text, loose_wins):
+    """The problems with the archives. The archive OFTestArchive.bsa was named on the command line, OFTestMod - Main.bsa
+    is found because OFTestMod.esp has a master. A file that is loose and in the archive comes from the loose one when
+    the ini file says bInvalidateOlderFiles=1 (the default) and from the archive when it says 0; with 1,
+    ArchiveInvalidation.txt hides oftest/hidden.txt of the archive, with 0 it is not read."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|Archive '.*' not found", line,
+                     re.I):
+            problems.append(line)
+    if not re.search(r"Archive order \(the first one that has a file wins\): .*OFTestMod - Main\.bsa", text):
+        problems.append("the log does not list the archive that is named after the mod")
+    if not re.search(r"Archive order .*OFTestArchive\.bsa", text):
+        problems.append("the log does not list the archive that was named on the command line")
+    wanted = {"shared": "loose" if loose_wins else "archive", "hidden": "missing" if loose_wins else "archive",
+              "only": "archive", "mod": "modarchive"}
+    for name, value in wanted.items():
+        found = re.search(rf"OFTEST\tarchives\t{name}\t(\S+)", text)
+        if not found:
+            problems.append(f"the script did not log {name}")
+        elif found.group(1) != value:
+            problems.append(f"oftest/{name}: the file is {found.group(1)}, it must be {value}")
+    if "Quitting peacefully" not in text:
+        problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
 
 
 def check_saves(first, second, third=None):
@@ -4104,7 +4170,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -4145,6 +4211,8 @@ def main():
         "GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\nCUSTOM: scripts/saveslocal.lua\n", encoding="ascii")
     (data / "scripts" / "modstest.lua").write_text(MODS_SCRIPT, encoding="ascii")
     (data / "modstest.omwscripts").write_text("GLOBAL: scripts/modstest.lua\n", encoding="ascii")
+    (data / "scripts" / "archivestest.lua").write_text(ARCHIVES_SCRIPT, encoding="ascii")
+    (data / "archivestest.omwscripts").write_text("GLOBAL: scripts/archivestest.lua\n", encoding="ascii")
     (data / (Path(plugin.MOD_ADDON).stem + ".NAM")).write_bytes(b"")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
@@ -4436,6 +4504,55 @@ def main():
         for problem in found:
             print("PROBLEM (activation):", problem)
         problems += found
+    if args.only in (None, "archives"):
+        # Two archives made with bsatool: OFTestArchive.bsa has oftest/shared.txt (a loose copy sits beside it),
+        # oftest/hidden.txt and oftest/archiveonly.txt; "OFTestMod - Main.bsa" has oftest/modarchive.txt. The archive
+        # directory is a second data directory.
+        stage = work / "archives_stage"
+        extra = work / "archives_data"
+        (stage / "oftest").mkdir(parents=True)
+        (extra / "oftest").mkdir(parents=True)
+        bsatool = build / "bsatool"
+
+        def make_archive(name, files):
+            archive = extra / name
+            subprocess.run([str(bsatool), "create", str(archive)], check=True, cwd=stage, stdout=subprocess.DEVNULL)
+            for relative, text in files.items():
+                (stage / relative).write_text(text, encoding="ascii")
+                subprocess.run([str(bsatool), "add", str(archive), relative], check=True, cwd=stage,
+                               stdout=subprocess.DEVNULL)
+
+        make_archive("OFTestArchive.bsa", {"oftest/shared.txt": "archive", "oftest/hidden.txt": "archive",
+                                            "oftest/archiveonly.txt": "archive"})
+        make_archive("OFTestMod - Main.bsa", {"oftest/modarchive.txt": "modarchive"})
+        (extra / "oftest" / "shared.txt").write_text("loose", encoding="ascii")
+        (extra / "ArchiveInvalidation.txt").write_text("hidden.txt\r\n", encoding="ascii")
+        for loose_wins in (True, False):
+            name = "archives" if loose_wins else "archivesold"
+            home = work / name / "home"
+            home.mkdir(parents=True)
+            runtime = work / name / "runtime"
+            runtime.mkdir(mode=0o700)
+            ini = work / name / "Fallout.ini"
+            ini.write_text(f"[Archive]\nbInvalidateOlderFiles={1 if loose_wins else 0}\n", encoding="ascii")
+            print(f"== {name}: bInvalidateOlderFiles={1 if loose_wins else 0}, the archives next to a loose copy")
+            status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                                   "archivestest.omwscripts", before=[plugin.MOD_ADDON],
+                                   extra=("--data", str(extra), "--fallback-archive", "OFTestArchive.bsa", "--game-ini",
+                                          str(ini)))
+            log = home / ".config" / "openfallout" / "openfallout.log"
+            text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+            print(f"log: {log}")
+            found = []
+            if status != 0:
+                found.append(f"the engine exited with status {status}")
+            found += check_archives(text, loose_wins)
+            for line in (line for line in text.splitlines() if "OFTEST" in line or "Archive order" in line
+                         or "ArchiveInvalidation" in line):
+                print(line.split("]", 1)[-1].strip())
+            for problem in found:
+                print(f"PROBLEM ({name}):", problem)
+            problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"
         home.mkdir(parents=True)

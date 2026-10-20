@@ -214,6 +214,8 @@ file(GLOB UNITTEST_SRC_FILES
     resource/testobjectcache.cpp
     resource/testresourcesystem.cpp
 
+    vfs/testarchiveinvalidation.cpp
+    vfs/testarchiveorder.cpp
     vfs/testpathutil.cpp
 
     sceneutil/osgacontroller.cpp

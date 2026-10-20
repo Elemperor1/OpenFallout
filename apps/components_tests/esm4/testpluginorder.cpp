@@ -232,6 +232,32 @@ namespace
             ElementsAre("builtin.omwscripts", "Base.esm", "Mod.esp", "scripts.omwscripts"));
     }
 
+    TEST(ESM4PluginOrderTest, countsEveryContentFileAndTheOnesThatLoadBeforeTheListAgainstTheLimit)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("pluginorder_limit");
+        write(dir / "Base.esm", headerWith(ESM4::Rec_ESM, {}));
+        write(dir / "Mod.esp", headerWith(0, { "Base.esm" }));
+        const Files::Collections collections(Files::PathContainer{ dir });
+
+        auto withScripts = [](std::string plugin, std::size_t scripts) {
+            std::vector<std::string> content{ std::move(plugin) };
+            for (std::size_t i = 0; i < scripts; ++i)
+                content.push_back("s" + std::to_string(i) + ".omwscripts");
+            return content;
+        };
+        // 254 files and the one in front of them fill the 255 places; the added master is a file too
+        EXPECT_EQ(ESM4::orderContentFiles(withScripts("Base.esm", ESM4::sMaxPlugins - 2), collections,
+                      ESM4::ContentOrder::List, 1)
+                      .size(),
+            ESM4::sMaxPlugins - 1);
+        EXPECT_ERROR(ESM4::orderContentFiles(
+                         withScripts("Base.esm", ESM4::sMaxPlugins - 1), collections, ESM4::ContentOrder::List, 1),
+            "Cannot load 256 content files");
+        EXPECT_ERROR(ESM4::orderContentFiles(
+                         withScripts("Mod.esp", ESM4::sMaxPlugins - 2), collections, ESM4::ContentOrder::List, 1),
+            "Cannot load 256 content files");
+    }
+
     TEST(ESM4PluginOrderTest, refusesAMasterThatIsNeitherListedNorInTheDirectories)
     {
         const auto dir = TestingOpenMW::outputDirPath("pluginorder_nomaster");
@@ -299,7 +325,7 @@ namespace
     {
         EXPECT_TRUE(ESM4::isPluginName("FalloutNV.esm"));
         EXPECT_TRUE(ESM4::isPluginName("Mod.ESP"));
-        EXPECT_TRUE(ESM4::isPluginName("Small.esl"));
+        EXPECT_FALSE(ESM4::isPluginName("Small.esl"));
         EXPECT_FALSE(ESM4::isPluginName("Mod.esp.bak"));
         EXPECT_FALSE(ESM4::isPluginName("scripts.omwscripts"));
         EXPECT_FALSE(ESM4::isPluginName("esp"));
@@ -348,5 +374,25 @@ namespace
         write(dir / "Fallout3.esm", headerWith(ESM4::Rec_ESM, {}));
         const Files::Collections collections(Files::PathContainer{ dir });
         EXPECT_THAT(ESM4::activePlugins({}, {}, collections), ElementsAre("Fallout3.esm"));
+    }
+
+    TEST(ESM4PluginOrderTest, findsTheArchivesThatStartWithTheNameOfAPluginThatHasAMaster)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("pluginorder_archives");
+        write(dir / "FalloutNV.esm", headerWith(ESM4::Rec_ESM, {}));
+        write(dir / "DeadMoney.esm", headerWith(ESM4::Rec_ESM, { "FalloutNV.esm" }));
+        write(dir / "Mod.esp", headerWith(0, { "FalloutNV.esm" }));
+        for (const char* name : { "Fallout - Meshes.bsa", "DeadMoney - Main.bsa", "DEADMONEY - Sounds.bsa",
+                 "DeadMoneyX.bsa", "Mod - Main.bsa", "Mod.txt", "Other - Main.bsa" })
+            write(dir / name, "x");
+        write(dir / "DeadMoney - Empty.bsa", "");
+        const Files::Collections collections(Files::PathContainer{ dir });
+
+        // The base master has no master, so none of its archives is found; an empty archive is left out
+        EXPECT_THAT(
+            ESM4::pluginArchives(
+                { "builtin.omwscripts", "FalloutNV.esm", "DeadMoney.esm", "Mod.esp", "DeadMoney.esm" }, collections),
+            ElementsAre("DeadMoney - Main.bsa", "DEADMONEY - Sounds.bsa", "DeadMoneyX.bsa", "Mod - Main.bsa"));
+        EXPECT_THAT(ESM4::pluginArchives({ "FalloutNV.esm" }, collections), IsEmpty());
     }
 }

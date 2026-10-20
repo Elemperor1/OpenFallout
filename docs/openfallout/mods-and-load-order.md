@@ -23,8 +23,9 @@ The log says what moved, in lines that start with `Load order:`.
 A master that a plugin lists and that was not named is added when a data directory has it, as the games do (they
 activate the masters of every active plugin). One that no data directory has stops the start with a message that
 names each plugin and each master that is missing; so do two plugins that list each other as masters, a plugin named
-twice, and more than 255 plugins. 255 is the room a form ID has: its top byte names the plugin, and `0xFF` is the byte
-of the objects the game makes while it runs.
+twice, and more content files than fit: 255 is the room a form ID has (its top byte names the file, and `0xFF` is the
+byte of the objects the game makes while it runs), and OpenFallout's built-in script file takes the first place, so 254
+plugins and other content files fit. Only `.esm` and `.esp` files are plugins (the games have no `.esl`).
 
 When a plugin that is not a master was made for another version of a master (the size of the master's file is not the
 size in the plugin's header), the log warns and the start goes on, as in the games.
@@ -61,7 +62,73 @@ data directory is skipped with a warning, as the games skip it.
 The games themselves find their `Plugins.txt` in `%LOCALAPPDATA%\FalloutNV\` (or `Fallout3\`), or in the current
 directory when `bUseMyGamesDirectory` is 0 in `Fallout.ini`. OpenFallout reads only the file it is given.
 
+## Archives
+
+The games open BSA archives in this order, and so does OpenFallout (the names are looked up in the data directories):
+
+1. The archives of `sArchiveList` in the `[Archive]` section of the ini files (the files of "Which plugins load"; the
+   list is split at commas and the names are trimmed, which matters for the retail list of New Vegas that has two
+   spaces in front of its last name). Where no ini names a list, the retail list of the game is used: Textures,
+   Textures2, Meshes, Voices1, Sound and Misc for New Vegas, Textures, Meshes, Voices, Sound, MenuVoices and Misc for
+   Fallout 3, all as `Fallout - <name>.bsa`. (The games fall back to a list of three archives, one of them
+   Oblivion's, when the ini does not name one; no retail install lacks the list.) A listed archive that no data
+   directory has is skipped.
+2. The archives named with `--fallback-archive`. A name that is not in any data directory still stops the start.
+3. `Update.bsa`, for New Vegas, if a data directory has one.
+4. For every plugin that has at least one master: the archives whose name starts with the name of the plugin
+   (`<plugin>*.bsa`), the ones that are not empty, in the order of the names. This is how `Fallout3 - Meshes.bsa` and
+   the others of Tale of Two Wastelands, `TaleOfTwoWastelands - Main.bsa`, `YUPTTW - Main.bsa` and the archives of the
+   DLC (`Anchorage - Main.bsa`, ...) and of a mod (`MyMod - Main.bsa`) come in, with no list that names them.
+
+`bUseArchives=0` in the ini turns 1 and 3 off. A name is opened once, whatever its case.
+
+**The order they are looked in.** The games keep one list of the archives and take the file from the first archive
+that has it. Fallout 3 appends each archive to the end of the list, so the one opened first wins. New Vegas ranks an
+archive by its name (the test is on the letters, and case counts): `Fallo` 0, `DeadM` 1, `Hones` 2, `Lones` 3, `OldWo`
+4, `Updat` 5, any other 6. A rank 0 archive goes to the end; any other goes in front of the first archive in the list
+that is one of the base game's or of Dead Money, or of Honest Hearts when its rank is above 1, of Lonesome Road above 2,
+of Old World Blues above 3, and of Update above 3; where there is none, to the front. So a later DLC's archives win
+over an earlier one's, `Update.bsa` sits between them, and the archives of a mod win over all of them. The rule is
+the same for Tale of Two Wastelands (a game with `FalloutNV.esm` is New Vegas, with or without `Fallout3.esm`). The log
+prints the list, with the one that wins first:
+
+    Archive order (the first one that has a file wins): Anchorage - Main.bsa, ..., Fallout - Textures.bsa, ...
+
+For the Tale of Two Wastelands output folder alone (it has no New Vegas originals, which are in the New Vegas Data
+folder; name both folders as data directories for a full install) the list is the 28 archives that Mac round 8A
+worked out from the rules; a unit test (`newVegasRanksTheArchivesOfTaleOfTwoWastelandsAsTheMacReadItInTheGame`) holds it.
+
+The engine looks in its archives from the last registered to the first, so OpenFallout registers them in reverse.
+
+## Loose files against archives
+
+`bInvalidateOlderFiles` in the `[Archive]` section decides (default 1, as in the games). With 1, a file in a data
+directory wins over an archive's file with the same path, whatever the age of either: in the games, the existence of
+the loose file invalidates the archive's. With 0, the archive's file wins. Another loose file in an earlier data
+directory loses to one in a later directory, as before.
+
+`ArchiveInvalidation.txt` (the file `SInvalidationFile` names; read from a data directory when `bInvalidateOlderFiles`
+is 1) hides archive files that have no loose copy. A line with a backslash is a directory: the files directly in that
+directory of the archives are hidden. Any other line is a file name, hidden in every directory of the archives for
+which the data directories have a directory of the same path. (The games compare name hashes; OpenFallout compares
+the names, which differs only when two names have the same hash.) A hidden file counts as not found in that archive,
+and the search goes on in the others and then in the loose files.
+
+`--game-ini` reads the settings above like any other; the engine's own `--fallback-archive` stays for the archives
+that no ini names.
+
+**Deviations.** `--fallback-archive` used to give the archive named last the highest priority. Now the archives it names
+go through the order above like the others: among archives of rank 0 (`Fallout - ...`) the one opened first wins, as in
+the games, and among those of any other rank the one opened later wins, so the archive of a plugin that loads later is
+looked in before that of an earlier plugin.
+
 ## Not done
 
 - The games skip a plugin file of zero bytes; OpenFallout does not check the size of a plugin.
 - A `DLCList.txt` is not read: neither game's executable reads it.
+- Not emulated, because the executables compare with an uninitialised value or the effect was not found: the file-time
+  compare of archives that have no name table, the type mask that filters archives by what they hold, `.override`
+  marker files, `bCheckRuntimeCollisions`, and the `ArchiveInvalidation Invalidated!.bsa` trick (the file is only
+  another archive here).
+- A file's path in an archive is looked up with forward slashes lower-cased, as in the engine's VFS; the games hash the
+  path with backslashes.

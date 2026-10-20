@@ -24,7 +24,7 @@ namespace ESM4
     // before every plugin that is not, whatever the order of the list; within each of the two groups the order of the
     // list stays.
 
-    /// Whether the name of a file is that of a plugin of the games: it ends in .esm, .esp or .esl
+    /// Whether the name of a file is that of a plugin of the games: it ends in .esm or .esp (the games have no .esl)
     bool isPluginName(std::string_view name);
 
     /// What the order needs to know of a plugin: the name it is listed by, whether its header flags it as a master and
@@ -78,9 +78,10 @@ namespace ESM4
     /// after \a order has been applied; all other content stays where it is. As in the games, a master of a listed
     /// plugin that the list lacks is added when the collections have it (after the last plugin of the list). The log
     /// says what moved or was added. Throws std::runtime_error if a content file is not found or the plugins cannot be
-    /// ordered, which includes a master that neither the list nor the collections have.
+    /// ordered, which includes a master that neither the list nor the collections have, or if the content files (the
+    /// list with the masters that were added, and \a firstIndex files that load before it) would not fit in sMaxPlugins.
     std::vector<std::string> orderContentFiles(const std::vector<std::string>& content,
-        const Files::Collections& collections, ContentOrder order = ContentOrder::List);
+        const Files::Collections& collections, ContentOrder order = ContentOrder::List, std::size_t firstIndex = 0);
 
     /// The names the collections have a plugin for, in the order given. The games ignore a line of a Plugins.txt that
     /// names a file that is not in their Data folder, and so does this; the log names each one.
@@ -95,6 +96,13 @@ namespace ESM4
     /// list that has it spells it, in that order.
     std::vector<std::string> activePlugins(const std::vector<std::string>& testFiles,
         const std::vector<std::string>& pluginsFile, const Files::Collections& collections);
+
+    /// The archives the games open for the plugins of a content list, which must be in load order: for every plugin
+    /// that lists a master (the base master does not), the archives of the collections that have the name of the plugin
+    /// without its extension at the start of their name and end in .bsa ("DeadMoney - Main.bsa" for DeadMoney.esm, and
+    /// also "DeadMoneyX.bsa"), in the order of their names, each once, empty files left out. Other content is skipped.
+    std::vector<std::string> pluginArchives(
+        const std::vector<std::string>& content, const Files::Collections& collections);
 
     /// One line for each master a plugin that is not a master was made for in another version than the one at hand:
     /// the games warn of these and load on. \a sizeOf gives the size of the file of a master, nothing if it has none.

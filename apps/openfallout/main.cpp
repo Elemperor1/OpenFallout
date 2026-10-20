@@ -11,8 +11,11 @@
 #include <components/misc/strings/algorithm.hpp>
 #include <components/platform/platform.hpp>
 #include <components/version/version.hpp>
+#include <components/vfs/archiveinvalidation.hpp>
+#include <components/vfs/archiveorder.hpp>
 
 #include "mwgui/debugwindow.hpp"
+#include "mwscript/falloutscripts.hpp"
 
 #include "engine.hpp"
 #include "options.hpp"
@@ -104,13 +107,6 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
                                             // due to implementation bugs.
     engine.setDataDirs(dataDirs);
 
-    // fallback archives
-    StringsVector archives = variables["fallback-archive"].as<StringsVector>();
-    for (StringsVector::const_iterator it = archives.begin(); it != archives.end(); ++it)
-    {
-        engine.addArchive(*it);
-    }
-
     const Files::Collections collections(dataDirs);
 
     // The ini files of the games: the ones in the folder of each game, then the ones that were given
@@ -193,12 +189,46 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
     engine.addContentFile("builtin.omwscripts");
 
     // The games load the masters first and a master before the plugins that list it, whatever order they were named in
-    content = ESM4::orderContentFiles(content, collections, contentOrder);
+    content = ESM4::orderContentFiles(content, collections, contentOrder, 1); // builtin.omwscripts comes first
 
     for (auto& file : content)
     {
         engine.addContentFile(file);
     }
+
+    // The archives the games open, the order they look in them, and loose files against archives (see
+    // components/vfs/archiveorder.hpp): the games treat New Vegas, and so Tale of Two Wastelands, and Fallout 3 alike
+    // except for the order of the archives
+    const VFS::ArchiveRules archiveRules = OFScript::chooseGame(content) == FalloutScript::Game::Fallout3
+        ? VFS::ArchiveRules::Fallout3
+        : VFS::ArchiveRules::NewVegas;
+    const VFS::ArchiveSettings archiveSettings = VFS::ArchiveSettings::read(gameIni, archiveRules);
+    const std::vector<std::string> archives = VFS::orderArchives(
+        VFS::archivesToOpen(archiveSettings, archiveRules, variables["fallback-archive"].as<StringsVector>(),
+            ESM4::pluginArchives(content, collections), collections),
+        archiveRules);
+    {
+        std::string names;
+        for (const std::string& archive : archives)
+            names += (names.empty() ? "" : ", ") + archive;
+        Log(Debug::Info) << "Archive order (the first one that has a file wins): " << (names.empty() ? "none" : names);
+    }
+    // The engine takes the archives in the order of increasing priority
+    for (auto it = archives.rbegin(); it != archives.rend(); ++it)
+        engine.addArchive(*it);
+
+    VFS::ArchiveOptions archiveOptions;
+    archiveOptions.mArchivesWin = !archiveSettings.mInvalidateOlderFiles;
+    if (archiveSettings.mUseArchives && archiveSettings.mInvalidateOlderFiles
+        && collections.doesExist(archiveSettings.mInvalidationFile))
+    {
+        const auto stream = Files::openBinaryInputFileStream(collections.getPath(archiveSettings.mInvalidationFile));
+        const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+        auto invalidation = std::make_shared<VFS::ArchiveInvalidation>(VFS::ArchiveInvalidation::parse(text));
+        Log(Debug::Info) << "Read " << archiveSettings.mInvalidationFile << ", which invalidates files of archives";
+        archiveOptions.mInvalidation = std::move(invalidation);
+    }
+    engine.setArchiveOptions(std::move(archiveOptions));
 
     StringsVector groundcover = variables["groundcover"].as<StringsVector>();
     for (auto& file : groundcover)

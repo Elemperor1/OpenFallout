@@ -96,8 +96,7 @@ namespace ESM4
     bool isPluginName(std::string_view name)
     {
         const std::string_view extension = Misc::getFileExtension(name);
-        return Misc::StringUtils::ciEqual(extension, "esm") || Misc::StringUtils::ciEqual(extension, "esp")
-            || Misc::StringUtils::ciEqual(extension, "esl");
+        return Misc::StringUtils::ciEqual(extension, "esm") || Misc::StringUtils::ciEqual(extension, "esp");
     }
 
     std::optional<PluginInfo> readPluginInfo(const std::filesystem::path& path, std::string name)
@@ -196,8 +195,8 @@ namespace ESM4
         return result;
     }
 
-    std::vector<std::string> orderContentFiles(
-        const std::vector<std::string>& content, const Files::Collections& collections, ContentOrder order)
+    std::vector<std::string> orderContentFiles(const std::vector<std::string>& content,
+        const Files::Collections& collections, ContentOrder order, std::size_t firstIndex)
     {
         struct Entry
         {
@@ -299,6 +298,17 @@ namespace ESM4
              }))
             Log(Debug::Warning) << warning;
 
+        // The place of a content file in the load order is the number a form ID has for it, and that has the one byte
+        // that sMaxPlugins is about, no matter what kind of file the others are
+        if (firstIndex + content.size() + (entries.size() - slots.size()) > sMaxPlugins)
+        {
+            std::ostringstream message;
+            message << "Cannot load " << firstIndex + content.size() + (entries.size() - slots.size())
+                    << " content files: the top byte of a form ID names the file, and at most " << sMaxPlugins
+                    << " can load together";
+            throw std::runtime_error(message.str());
+        }
+
         // The plugins fill the places the plugins of the list had; the masters that were added follow the last of them
         std::vector<std::string> result;
         std::size_t next = 0;
@@ -365,10 +375,40 @@ namespace ESM4
             add(name);
 
         const Files::MultiDirCollection& markers = collections.getCollection("nam");
-        for (const char* extension : { "esm", "esp", "esl" })
+        for (const char* extension : { "esm", "esp" })
             for (const auto& [name, path] : collections.getCollection(extension))
                 if (markers.doesExist(name.substr(0, name.size() - std::string_view(extension).size()) + "nam"))
                     add(name);
+        return result;
+    }
+
+    std::vector<std::string> pluginArchives(
+        const std::vector<std::string>& content, const Files::Collections& collections)
+    {
+        std::vector<std::string> result;
+        std::unordered_set<std::string> seen;
+        for (const std::string& name : content)
+        {
+            if (!isPluginName(name))
+                continue;
+            const Files::MultiDirCollection& plugins = collections.getCollection(Misc::getFileExtension(name));
+            if (!plugins.doesExist(name))
+                continue;
+            const std::optional<PluginInfo> info = readPluginInfo(plugins.getPath(name), name);
+            if (!info || info->mMasters.empty())
+                continue;
+
+            const std::string base = name.substr(0, name.size() - Misc::getFileExtension(name).size() - 1);
+            for (const auto& [archive, path] : collections.getCollection("bsa"))
+            {
+                std::error_code error;
+                if (archive.size() > base.size()
+                    && Misc::StringUtils::ciEqual(std::string_view(archive).substr(0, base.size()), base)
+                    && std::filesystem::file_size(path, error) > 0 && !error
+                    && seen.insert(Misc::StringUtils::lowerCase(archive)).second)
+                    result.push_back(archive);
+            }
+        }
         return result;
     }
 
