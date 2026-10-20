@@ -112,6 +112,18 @@ namespace
         EXPECT_TRUE(region.covers(ESM::FormId::fromUint32(0x808u), 210, 20));
     }
 
+    TEST(ESM4RegionTest, readsOnFromPointsThatEndInBytesOfNoCorner)
+    {
+        // A payload that is not a whole number of floats: the stray bytes are skipped, and the area that follows is
+        // read from where it begins
+        const ESM4::Region region = loadRegion(valueSubRecord<std::uint32_t>("RPLI", 0)
+            + subRecord("RPLD", points(square) + std::string(2, 'x')) + area(0, triangle));
+
+        ASSERT_EQ(region.mAreas.size(), 2u);
+        EXPECT_EQ(region.mAreas[0].mPoints, square);
+        EXPECT_EQ(region.mAreas[1].mPoints, triangle);
+    }
+
     TEST(ESM4RegionTest, aDeletedRegionCoversNothing)
     {
         const ESM4::Region region = loadRegion(area(0, square), deletedRecord);

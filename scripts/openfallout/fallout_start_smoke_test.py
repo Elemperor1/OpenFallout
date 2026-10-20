@@ -3847,7 +3847,7 @@ def check_objects(text, scenario):
     # cell; in a building the player is in none. The log entries of quest D that the conditions let through say the same.
     if found is not None:
         want = [1.0, 0.0, 0.0, 0.0] if scenario.exterior else [0.0, 0.0, 0.0, 0.0]
-        if len(found) != 4 or any(abs(float(a) - b) > 0.001 for a, b in zip(found, want)):
+        if len(found) != 4 or any(abs(float(a) - b) > 0.001 for a, b in zip(found, want, strict=True)):
             problems.append("IsPlayerInRegion should tell 1 only for the region that the exterior cell lists, covers the "
                             "player and has the worldspace of the cell, not for one that the cell lists and does not "
                             "cover the player, one that covers the player and the cell does not list, or one of another "

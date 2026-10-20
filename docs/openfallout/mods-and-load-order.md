@@ -187,6 +187,20 @@ so that the block that made the call has ended first, as the executable's flag d
 had a line has none, or the other way round. `smoke --only dialogue` checks it with a topic whose only response is for
 another voice.
 
+Mac rounds 8E and 8F ran the New Game on the real data of an unnamed start (the Tale of Two Wastelands output over the
+New Vegas `Data`: 19 plugins). `CG00` now goes on to 70, 80, 85, 90 and 100 (stage 70 to 80 takes 1.8 s), `CG01` begins
+124 s into the run, and the intro goes through `CG01` to `CG04` stage 145 at 1,534 s with the gates of the autoplay tool
+(36 or 37, all taken; the one stand-in is the committed `setstage` of `CG03` 55 to 60). The projector opens the race menu
+and the tool answers it. Eight `Say` calls of 61 found nothing to say (the Dad twice, in `CG00` at stages 70 and 90;
+the intercom of `CG02`; three speakers of `CG03`; the two Holdens of `CG04`): the log has no line for a `SayToDone`
+block, so that it ran is known for the Dad's first call only (the stage went on 1.73 s later); four of the other
+speakers have no block for that topic and two have one. The first run then looped at the door of the vault: the message
+box there is the `FalloutNV.esm` record `0x05CF94`, which `TaleOfTwoWastelands.esm` overrides with six buttons (a new
+fourth one; the last still leaves), and the table of the autoplay tool named only the Fallout 3 record, so the tool pressed
+the first button 665 times. With both records in the table the last button is pressed, `CG04` goes to 150 and 200 and
+`MQ01` stage 10 begins at 1,588 s (game time 1,076 s), and the run ends by itself with status 0. Fallout 3 alone gets
+there at 1,487 s (M6 round 5).
+
 Other facts of the executable that the engine does not follow yet: Say Once is kept for the response itself, for every
 speaker (the engine keeps it for each character); a speaker that is not in the high process level, or a player in some
 state, takes an instant path that runs the begin and end scripts and raises the block back to back, and raises nothing when
@@ -234,6 +248,9 @@ condition and the command answer 0 and `SetCasinoWinningsLevel` does nothing.
   the 16 retail ESMs carries the flag (Mac round 8B part D1), so this matters for other mods only.
 - The casino of New Vegas: the menus of the slot machines, blackjack and roulette, and the winnings the player has in
   each casino (the answers above are the ones of a player who never gambled).
+- No value of a `PlayerInRegion` condition was compared with the game on the real data: the 492 `REGN` records of the
+  Tale of Two Wastelands load order load (Mac round 8F), and the region and casino entries are gone from the list of
+  commands that scripts reached and the engine lacks, nothing more.
 - `PlayerInRegion` works the list out when it is asked, not when the player enters a cell (see above). The parts of the
   executable that were not traced: what the per-frame check at `0x947B10` and the state at `player+0x7AC` do when they
   put the player into a cell again.
