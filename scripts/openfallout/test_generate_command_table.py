@@ -72,12 +72,13 @@ class GenerateCommandTableTest(unittest.TestCase):
         entries = generate.condition_parameters(rows)
         # a command with no parameters has no line; the third parameter is not kept
         # (the functions that only a condition can name are added to what the table has)
-        self.assertEqual(entries, [(2, 50, 1), (53, 4, 22), (57, 14, 23), (58, 14, None), (79, 14, 22)])
+        self.assertEqual(entries, [(2, 50, 1), (53, 4, 22), (57, 14, 23), (58, 14, None), (79, 14, 22),
+                                   (610, 63, None), (612, 69, None)])
         out = io.StringIO()
         generate.write_conditions(entries, out)
         lines = [line for line in out.getvalue().splitlines() if not line.startswith("//")]
         self.assertEqual(lines, ["{ 2, 50, 1 },", "{ 53, 4, 22 },", "{ 57, 14, 23 },", "{ 58, 14, 0xFFFF },",
-                                 "{ 79, 14, 22 },"])
+                                 "{ 79, 14, 22 },", "{ 610, 63, 0xFFFF },", "{ 612, 69, 0xFFFF },"])
 
 
 if __name__ == "__main__":

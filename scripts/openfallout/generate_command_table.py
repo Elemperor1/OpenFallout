@@ -103,8 +103,11 @@ def parameter_types(parameters):
 # The functions a condition can name that the table of commands of the executables has no entry for, because a script
 # writes them another way (the variable of another script is `reference.variable`). Their parameters are those the
 # community documentation of conditions gives: GetScriptVariable (an object, the index of a variable of its script)
-# and GetQuestVariable (a quest, the index of a variable of its script). The number is the code less 0x1000.
-CONDITION_ONLY = {53: (4, 22), 79: (14, 22)}
+# and GetQuestVariable (a quest, the index of a variable of its script). The number is the code less 0x1000. New
+# Vegas also has two functions with no command of that code, GetCasinoWinningStage (0x262, evaluate 0x5A6170, a casino)
+# and PlayerInRegion (0x264, evaluate 0x5A6280, a region); the types are those of GetCasinoWinningsLevel and
+# IsPlayerInRegion, which read the same parameter.
+CONDITION_ONLY = {53: (4, 22), 79: (14, 22), 610: (63, None), 612: (69, None)}
 
 
 def condition_parameters(rows):

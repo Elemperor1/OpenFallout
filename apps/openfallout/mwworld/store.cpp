@@ -1218,6 +1218,7 @@ template class OFWorld::TypedDynamicStore<ESM4::Quest>;
 template class OFWorld::TypedDynamicStore<ESM4::Race>;
 template class OFWorld::TypedDynamicStore<ESM4::Recipe>;
 template class OFWorld::TypedDynamicStore<ESM4::RecipeCategory>;
+template class OFWorld::TypedDynamicStore<ESM4::Region>;
 template class OFWorld::TypedDynamicStore<ESM4::Script>;
 template class OFWorld::TypedDynamicStore<ESM4::Sound>;
 template class OFWorld::TypedDynamicStore<ESM4::SoundReference>;

@@ -71,19 +71,36 @@ namespace ESM4
 #pragma pack(pop)
 
         ESM::FormId mId; // from the header
-        std::uint32_t mFlags; // from the header, see enum type RecordFlag for details
+        std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
         std::string mEditorId;
-        std::uint32_t mColour; // RGBA
+        std::uint32_t mColour = 0; // RGBA
         ESM::FormId mWorldId; // worldspace formid
 
         std::string mShader; //?? ICON
         std::string mMapName;
 
-        std::uint32_t mEdgeFalloff;
-        std::vector<std::uint32_t> mRPLD; // unknown, point data?
+        std::uint32_t mEdgeFalloff = 0;
+        std::vector<std::uint32_t> mRPLD; // the points of the last area, as they are written
 
-        RegionData mData;
+        /// One of the areas of a region: a polygon of points in the worldspace (RPLI, the falloff of its edge, and
+        /// RPLD, the x and y of its corners as floats). A region has as many as it lists pairs of the two.
+        struct Area
+        {
+            std::uint32_t mEdgeFalloff = 0;
+            std::vector<float> mPoints; // x and y of each corner
+
+            /// Whether the point is inside the polygon: a ray from it towards greater x crosses an odd number of its
+            /// edges. A polygon of fewer than 3 corners holds nothing.
+            bool contains(float x, float y) const;
+        };
+        std::vector<Area> mAreas;
+
+        /// Whether a player at x and y of the worldspace is in the region as the games make the list of the regions of
+        /// the player: not a deleted record, a region of that worldspace or of none, and inside one of its areas
+        bool covers(ESM::FormId worldspace, float x, float y) const;
+
+        RegionData mData{};
         std::vector<RegionSound> mSounds;
 
         void load(ESM4::Reader& reader);

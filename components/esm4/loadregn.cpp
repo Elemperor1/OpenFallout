@@ -26,15 +26,48 @@
 */
 #include "loadregn.hpp"
 
-#include <stdexcept>
+#include <cstring>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
+
+bool ESM4::Region::Area::contains(float x, float y) const
+{
+    const std::size_t count = mPoints.size() / 2;
+    if (count < 3)
+        return false;
+    bool inside = false;
+    for (std::size_t i = 0, j = count - 1; i < count; j = i++)
+    {
+        const float xi = mPoints[2 * i];
+        const float yi = mPoints[2 * i + 1];
+        const float xj = mPoints[2 * j];
+        const float yj = mPoints[2 * j + 1];
+        // An edge that spans the height of the point, and crosses it to the right of the point
+        if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+            inside = !inside;
+    }
+    return inside;
+}
+
+bool ESM4::Region::covers(ESM::FormId worldspace, float x, float y) const
+{
+    if ((mFlags & Rec_Deleted) != 0)
+        return false;
+    if (!mWorldId.isZeroOrUnset() && mWorldId != worldspace)
+        return false;
+    for (const Area& area : mAreas)
+        if (area.contains(x, y))
+            return true;
+    return false;
+}
 
 void ESM4::Region::load(ESM4::Reader& reader)
 {
     mId = reader.getFormIdFromHeader();
     mFlags = reader.hdr().record.flags;
+    // The points of an area follow its falloff; the points that come without one are an area of their own
+    bool pointsExpected = false;
 
     while (reader.getSubRecordHeader())
     {
@@ -55,6 +88,8 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("RPLI"):
                 reader.get(mEdgeFalloff);
+                mAreas.emplace_back().mEdgeFalloff = mEdgeFalloff;
+                pointsExpected = true;
                 break;
             case ESM::fourCC("RPLD"):
             {
@@ -68,7 +103,13 @@ void ESM4::Region::load(ESM4::Reader& reader)
                     std::cout << padding  << "RPLD: 0x" << std::hex << *it << std::endl;
 #endif
                 }
-
+                if (!pointsExpected)
+                    mAreas.emplace_back();
+                pointsExpected = false;
+                std::vector<float>& points = mAreas.back().mPoints;
+                points.resize(mRPLD.size());
+                if (!mRPLD.empty())
+                    std::memcpy(points.data(), mRPLD.data(), mRPLD.size() * sizeof(std::uint32_t));
                 break;
             }
             case ESM::fourCC("RDAT"):
@@ -76,8 +117,12 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("RDMP"):
             {
+                // Only the areas matter to the engine: a name that is out of place is skipped, not an error
                 if (mData.type != RDAT_Map)
-                    throw std::runtime_error("REGN unexpected data type");
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
                 reader.getLocalizedString(mMapName);
                 break;
             }
@@ -104,8 +149,10 @@ void ESM4::Region::load(ESM4::Reader& reader)
             case ESM::fourCC("RDSD"): // Possibly the same as RDSA
             {
                 if (mData.type != RDAT_Sound)
-                    throw std::runtime_error(
-                        "ESM4::REGN::load - unexpected data type " + ESM::printName(subHdr.typeId));
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
 
                 std::size_t numSounds = subHdr.dataSize / sizeof(RegionSound);
                 mSounds.resize(numSounds);
@@ -118,6 +165,7 @@ void ESM4::Region::load(ESM4::Reader& reader)
             case ESM::fourCC("RDSA"):
             case ESM::fourCC("RDWT"): // formId
             case ESM::fourCC("RDOT"): // formId
+            case ESM::fourCC("MICO"): // small icon, FO3 and FONV
             case ESM::fourCC("RDID"): // FONV
             case ESM::fourCC("RDSB"): // FONV
             case ESM::fourCC("RDSI"): // FONV
@@ -141,7 +189,10 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::REGN::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                // The engine reads a region for its areas and its worldspace; what it does not know is of no use to it,
+                // and a plugin must not fail to load because of it
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

@@ -95,6 +95,7 @@
 #include <components/esm4/loadrcct.hpp>
 #include <components/esm4/loadrcpe.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadregn.hpp>
 #include <components/esm4/loadscol.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsndr.hpp>

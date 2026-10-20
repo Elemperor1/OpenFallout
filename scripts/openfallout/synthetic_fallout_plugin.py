@@ -297,6 +297,24 @@ ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6,
                        "dlc_there": (0x8BE, "OFTestAvDlcThere"), "dlc_missing": (0x8BF, "OFTestAvDlcMissing"),
                        "person_level": (0x8C0, "OFTestAvPersonLevel"), "day_of_week": (0x8C1, "OFTestAvDayOfWeek"),
                        "current_package": (0x8C2, "OFTestAvCurrentPackage"), "user_level": (0x8C3, "OFTestAvUserLevel")}
+# Four regions (REGN) and the exterior cell that lists three of them (XCLR). The first covers the whole cell, so the player
+# stands in it; the second is a square of the cell that the player is not in; the third covers the whole cell and the cell
+# does not list it; the fourth is listed and covers the cell and names another worldspace. IsPlayerInRegion and the
+# condition PlayerInRegion tell 1 for the first alone, and 0 for every region in an interior cell. The quest D has a log
+# entry for each region, which the condition on it lets through or not, and quest A sets its stage.
+REGION_IDS = {"in": 0x97A, "out": 0x97B, "unlisted": 0x97C, "other_world": 0x97D}
+REGION_LISTED = ("in", "out", "other_world")
+REGION_AREAS = {"in": (0.0, 0.0, 4096.0, 4096.0), "out": (3000.0, 3000.0, 4000.0, 4000.0),
+                "unlisted": (0.0, 0.0, 4096.0, 4096.0), "other_world": (0.0, 0.0, 4096.0, 4096.0)}
+REGION_GLOBALS = {"in": (0x97E, "OFTestRegionIn"), "out": (0x97F, "OFTestRegionOut"),
+                  "unlisted": (0x980, "OFTestRegionUnlisted"), "other_world": (0x981, "OFTestRegionOtherWorld")}
+REGION_TEXTS = {"in": "The player is in the region", "out": "The player is in the square far away",
+                "unlisted": "The player is in the region the cell does not list",
+                "other_world": "The player is in the region of another worldspace"}
+QUEST_D_ID = 0x982
+QUEST_D_NAME = "OFTestQuestD"
+QUEST_D_STAGE = 10
+PLAYER_IN_REGION_FUNCTION = 612 # the number the games give PlayerInRegion in a condition
 # A conversation: a character with a voice type (and a second voice type that nobody has), the topics of the games (the
 # greeting that opens it, the goodbye that closes it, a topic at the top of the list and one that a response adds) and
 # their responses, with the globals that the scripts of the responses set
@@ -556,7 +574,7 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x979 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x982 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1239,6 +1257,8 @@ def object_script(kind):
     game_hour = script.form(GAME_HOUR_ID)
     clock = {name: script.form(form_id) for name, (form_id, _) in CLOCK_GLOBALS.items()}
     values = {name: script.form(form_id) for name, (form_id, _) in ACTOR_VALUE_GLOBALS.items()}
+    regions = {name: script.form(form_id) for name, (form_id, _) in REGION_GLOBALS.items()}
+    region_forms = {name: script.form(form_id) for name, form_id in REGION_IDS.items()}
     person_ref = script.form(NPC_REF_ID if kind == "interior" else EXTERIOR_NPC_REF_ID)
     user_ref = script.form(CREATURE_USER_REF_ID if kind == "interior" else EXTERIOR_CREATURE_USER_REF_ID)
     # The actor values, on the locker cube (the player for karma): a number written bare in two bytes, then the amount
@@ -1269,6 +1289,10 @@ def object_script(kind):
                   sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_THERE))),
         sf.set_to(sf.global_target(values["dlc_missing"]),
                   sf.call_token(sf.IS_DLC_INSTALLED, sf.string_argument(DLC_NAME_MISSING))),
+        # IsPlayerInRegion: the regions that the cell lists and the player stands in, and not the others
+        *(sf.set_to(sf.global_target(regions[name]),
+                    sf.call_token(sf.IS_PLAYER_IN_REGION, sf.form_argument(region_forms[name])))
+          for name in REGION_IDS),
         # The level of the test person is the one of its record; the game begins on a Monday (the 1 of a week that
         # begins on a Sunday)
         sf.set_to(sf.global_target(values["person_level"]), sf.call_token(sf.GET_LEVEL, reference=person_ref)),
@@ -1623,7 +1647,8 @@ def quests():
         sf.call(sf.SET_STAGE, sf.form_argument(1), sf.int_argument(QUEST_B_STAGE)),
         sf.call(sf.SET_OBJECTIVE_DISPLAYED, sf.form_argument(1), sf.int_argument(QUEST_OBJECTIVE),
                 sf.int_argument(1)),
-        sf.set_to(sf.global_target(2), sf.global_target(2) + sf.number(str(COUNTER_ADDS)) + sf.operator("+"))]
+        sf.set_to(sf.global_target(2), sf.global_target(2) + sf.number(str(COUNTER_ADDS)) + sf.operator("+")),
+        sf.call(sf.SET_STAGE, sf.form_argument(3), sf.int_argument(QUEST_D_STAGE))]
     # Stage 20 of B has two log entries, which the conditions tell apart: the first applies when quest A is at its stage
     # 10 (it is, as the script of A set it before this) and completes the quest and the objective. The second applies
     # when quest A is at stage 99, which it never is: its text must stay out of the journal and its result script, which
@@ -1643,12 +1668,18 @@ def quests():
                      sf.call_on(index, sf.SET_POS, sf.axis_argument("Y"), sf.int_argument(int(origin + SETTER_SET[1])))]
     return [
         quest(QUEST_A_ID, QUEST_A_NAME, "OpenFallout Test Quest A", QUEST_FLAG_START_GAME,
-              [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID])], script=QUEST_SCRIPT_ID,
+              [(QUEST_A_STAGE, QUEST_A_TEXT, 0, [], a_result, [QUEST_B_ID, COUNTER_ID, QUEST_D_ID])],
+              script=QUEST_SCRIPT_ID,
               delay=QUEST_RECORD_DELAY),
         quest(QUEST_B_ID, QUEST_B_NAME, "OpenFallout Test Quest B", 0,
               [(QUEST_B_STAGE, QUEST_B_TEXT, STAGE_FLAG_COMPLETE_QUEST, [a_at_ten], b_result, [QUEST_B_ID]),
                (QUEST_B_STAGE, QUEST_NEVER_TEXT, 0, [a_at_ninety_nine], never_result, [COUNTER_ID])],
               objective=(QUEST_OBJECTIVE, QUEST_OBJECTIVE_TEXT)),
+        # The regions: a log entry for each, which the player is told when the condition PlayerInRegion on it holds
+        quest(QUEST_D_ID, QUEST_D_NAME, "OpenFallout Test Quest D", 0,
+              [(QUEST_D_STAGE, REGION_TEXTS[name], 0,
+                [condition(PLAYER_IN_REGION_FUNCTION, REGION_IDS[name], compare=0x00, value=1.0)], [], [])
+               for name in REGION_IDS]),
         # The quest that opens the gate of the packages: it has the one stage, which the test sets from Lua
         quest(QUEST_C_ID, QUEST_C_NAME, "OpenFallout Test Quest C", 0,
               [(QUEST_C_STAGE, QUEST_C_TEXT, 0, [], c_result, [SETTER_REF_IDS["interior"], SETTER_REF_IDS["exterior"]])]),
@@ -2099,11 +2130,27 @@ def world_record():
                                       sub(b"DNAM", struct.pack("<ff", land_level, water_level))])
 
 
+def region(name):
+    """A REGN record of the regions test: one area, a square from the first two numbers of its REGION_AREAS to the last two
+    (RPLI the falloff of its edge, RPLD its corners as floats), in the worldspace of the test (the other one names the cell,
+    which no worldspace is)."""
+    left, bottom, right, top = REGION_AREAS[name]
+    world = EXTERIOR_CELL_ID if name == "other_world" else WORLD_ID
+    return record(b"REGN", REGION_IDS[name], [zstr(b"EDID", "OFTestRegion" + name.title().replace("_", "")),
+                                              sub(b"RCLR", struct.pack("<I", 0xFF00FF00)),
+                                              sub(b"WNAM", struct.pack("<I", world)),
+                                              sub(b"RPLI", struct.pack("<I", 0)),
+                                              sub(b"RPLD", struct.pack("<8f", left, bottom, right, bottom, right, top,
+                                                                       left, top))])
+
+
 def exterior_cell():
     """The CELL record of the exterior cell 0,0. DATA of an exterior cell is its flags (0: not an interior, no water), XCLC
-    the grid and the flags of the land."""
+    the grid and the flags of the land, XCLR the regions it lists."""
     return record(b"CELL", EXTERIOR_CELL_ID, [zstr(b"EDID", WORLD_NAME + "Cell"), sub(b"DATA", b"\x00"),
-                                              sub(b"XCLC", struct.pack("<iiI", 0, 0, 0))])
+                                              sub(b"XCLC", struct.pack("<iiI", 0, 0, 0)),
+                                              sub(b"XCLR", b"".join(struct.pack("<I", REGION_IDS[name])
+                                                                    for name in REGION_LISTED))])
 
 
 def worldspace():
@@ -2219,6 +2266,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f")
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in REGION_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in SAVED_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in AUTOPLAY_GLOBALS.values()),
@@ -2251,7 +2299,8 @@ def plugin():
             + top_group(b"AVIF", [actor_value_info(form_id, *texts[:1], *texts[1:])
                                   for form_id, texts in AVIF_TEXTS.items()])
             + top_group(b"WTHR", [weather(), weather(CONDITIONAL_WEATHER_ID, CONDITIONAL_WEATHER_NAME)])
-            + top_group(b"CLMT", [climate()]) + top_group(b"WATR", [water_type()])
+            + top_group(b"CLMT", [climate()]) + top_group(b"REGN", [region(name) for name in REGION_IDS])
+            + top_group(b"WATR", [water_type()])
             + top_group(b"LTEX", [land_texture()]) + top_group(b"TXST", [texture_set()])
             + top_group(b"BPTD", [body_parts()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])

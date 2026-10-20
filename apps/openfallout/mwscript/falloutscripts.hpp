@@ -1032,6 +1032,11 @@ namespace OFScript
         /// which runs only while the thread of the frame draws the scene (between allowUpdate and finishUpdate): the
         /// maps and objects that this reads are changed by the frame before that, never at the same time.
         bool whereIs(FalloutScript::FormId reference, Place& result);
+        /// Whether the player is in the region, as the condition PlayerInRegion and the command IsPlayerInRegion ask:
+        /// the region is one that the exterior cell of the player lists (its XCLR) and the player stands inside one of
+        /// the areas of the region. Nothing in a cell inside. (The games work this out once, when the player enters a
+        /// cell; this works it out where the player is when asked.)
+        bool playerInRegion(FalloutScript::FormId region);
         /// Moves the object now. An object that is not in a loaded cell is moved when its cell is loaded.
         void applyMove(FalloutScript::FormId reference, const Move& move);
         /// Puts the object at the place at the start of the next frame, and until then the script that asked sees it
