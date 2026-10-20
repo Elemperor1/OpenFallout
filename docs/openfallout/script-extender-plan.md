@@ -8,8 +8,8 @@ part of that work is the census and the run-time count at the end of "What the e
 written yet.
 
 Sources: Mac rounds 8B (parts E and D), 8B2 and 8B3 on the 14 plugins of the TTW output folder (counts, bytes, editor IDs
-and setting names, no game text; the tables are in `/mnt/project-files/openfallout/m8/`, one row per code in
-`ttw-extension-codes.csv`), the executables of both games (neither mentions an extender: Mac rounds 4 and 8A), and the
+and setting names, no game text; one row per code is in `ttw-extension-codes.csv` next to this page, the Mac's longer
+notes are in the project's shared folder and not in the repository), the executables of both games (neither mentions an extender: Mac rounds 4 and 8A), and the
 public source of xNVSE, read for how the commands are numbered and nothing else (see "Where the names come from").
 Everything called a name of a command below is an outside name for a code; the bytes agree with the names (a statement or
 an expression, on an object or not, the shape of the arguments), but no extender file was available to check them.
@@ -107,7 +107,9 @@ perk, and the checks that TTW makes of the other mods and plugins.
   one spell; `0x2807` in 3 of one perk). A condition's function index is the script code minus `0x1000`.
 - M8 adds a count: the engine now counts how often scripts reach a code the table lacks and prints it with the other
   missing commands at the end of a run (`Commands that scripts reached and that are not implemented, with how often`),
-  so a start of TTW says which of the 132 codes a play-through reaches.
+  so a start of TTW says which of the 132 codes a play-through reaches. The count takes the conditions in too: a
+  function that a record's condition names and the table lacks (the three above, and the two of New Vegas in "Not
+  done") is counted whenever the condition is tested, so the list can hold a code that no script calls.
 
 ## The plan
 
