@@ -110,6 +110,18 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
         engine.addArchive(*it);
     }
 
+    const Files::Collections collections(dataDirs);
+
+    ESM4::ContentOrder contentOrder = ESM4::ContentOrder::List;
+    const std::string pluginOrder = variables["plugin-order"].as<std::string>();
+    if (pluginOrder == "time")
+        contentOrder = ESM4::ContentOrder::FileTime;
+    else if (pluginOrder != "list")
+    {
+        Log(Debug::Error) << "plugin-order must be list or time, not " << pluginOrder << ". Aborting...";
+        return false;
+    }
+
     StringsVector content = variables["content"].as<StringsVector>();
     {
         // The content files named on the command line or in the configuration are listed once each. The active
@@ -134,7 +146,7 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
                 return false;
             }
             const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
-            for (std::string& name : ESM4::parsePluginsFile(text))
+            for (std::string& name : ESM4::dropMissingPlugins(ESM4::parsePluginsFile(text), collections))
                 if (std::none_of(content.begin(), content.end(),
                         [&name](const std::string& listed) { return Misc::StringUtils::ciEqual(listed, name); }))
                     content.push_back(std::move(name));
@@ -148,7 +160,7 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
     engine.addContentFile("builtin.omwscripts");
 
     // The games load the masters first and a master before the plugins that list it, whatever order they were named in
-    content = ESM4::orderContentFiles(content, Files::Collections(dataDirs));
+    content = ESM4::orderContentFiles(content, collections, contentOrder);
 
     for (auto& file : content)
     {

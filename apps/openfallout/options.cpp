@@ -42,9 +42,13 @@ namespace OpenMW
 
         addOption("plugins-file", bpo::value<Files::MaybeQuotedPath>()->default_value(Files::MaybeQuotedPath(), ""),
             "read more content files from a file in the format of the Plugins.txt of the games (one name to a line; "
-            "where lines start with *, only those are active). They are added after the content files given, and "
-            "the plugins of both load in the order the games load them: masters first, a master before the plugins "
-            "that list it");
+            "where lines start with *, only those are active). They are added after the content files given. Names "
+            "that are not in the data directories are skipped, as the games skip them");
+
+        addOption("plugin-order", bpo::value<std::string>()->default_value("list"),
+            "how the plugins are ordered. Either way the masters (the files whose header says so) load first, and a "
+            "master before the plugins that list it. list: keep the order given (what mod managers write); time: "
+            "oldest file first, the rule of the games, which have no other");
 
         addOption("groundcover",
             bpo::value<StringsVector>()->default_value(StringsVector(), "")->multitoken()->composing(),

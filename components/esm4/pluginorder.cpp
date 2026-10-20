@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -37,6 +38,13 @@ namespace ESM4
             return std::string(text.substr(first, last - first + 1));
         }
 
+        bool isPluginName(std::string_view name)
+        {
+            const std::string_view extension = Misc::getFileExtension(name);
+            return Misc::StringUtils::ciEqual(extension, "esm") || Misc::StringUtils::ciEqual(extension, "esp")
+                || Misc::StringUtils::ciEqual(extension, "esl");
+        }
+
         struct Orderer
         {
             const std::vector<PluginInfo>& mPlugins;
@@ -46,11 +54,13 @@ namespace ESM4
             std::vector<std::size_t> mOrder;
             std::vector<std::string> mProblems;
             std::vector<std::size_t> mChain;
+            std::string_view mMissingMaster;
 
-            explicit Orderer(const std::vector<PluginInfo>& plugins)
+            Orderer(const std::vector<PluginInfo>& plugins, std::string_view missingMaster)
                 : mPlugins(plugins)
                 , mState(plugins.size(), 0)
                 , mReasons(plugins.size())
+                , mMissingMaster(missingMaster)
             {
             }
 
@@ -78,7 +88,7 @@ namespace ESM4
                     const auto found = mByName.find(Misc::StringUtils::lowerCase(master));
                     if (found == mByName.end())
                         mProblems.push_back(
-                            mPlugins[index].mName + " needs " + master + ", which is not among the plugins to load");
+                            mPlugins[index].mName + " needs " + master + ", " + std::string(mMissingMaster));
                     else
                         place(found->second, index);
                 }
@@ -112,13 +122,16 @@ namespace ESM4
 
         Reader reader(Files::openBinaryInputFileStream(path), path, nullptr, nullptr, true);
         for (const ESM::MasterData& master : reader.getGameFiles())
+        {
             info.mMasters.push_back(master.name);
+            info.mMasterSizes.push_back(master.size);
+        }
         return info;
     }
 
-    PluginOrder orderPlugins(const std::vector<PluginInfo>& plugins)
+    PluginOrder orderPlugins(const std::vector<PluginInfo>& plugins, std::string_view missingMaster)
     {
-        Orderer orderer(plugins);
+        Orderer orderer(plugins, missingMaster);
 
         if (plugins.size() > sMaxPlugins)
         {
@@ -183,33 +196,163 @@ namespace ESM4
     }
 
     std::vector<std::string> orderContentFiles(
-        const std::vector<std::string>& content, const Files::Collections& collections)
+        const std::vector<std::string>& content, const Files::Collections& collections, ContentOrder order)
     {
+        struct Entry
+        {
+            PluginInfo mInfo;
+            std::filesystem::path mPath;
+        };
+
         std::vector<std::size_t> slots;
-        std::vector<PluginInfo> plugins;
+        std::vector<Entry> entries;
+        std::unordered_map<std::string, std::size_t> byName;
+
         for (std::size_t i = 0; i < content.size(); ++i)
         {
-            const std::string_view extension = Misc::getFileExtension(content[i]);
-            if (!Misc::StringUtils::ciEqual(extension, "esm") && !Misc::StringUtils::ciEqual(extension, "esp")
-                && !Misc::StringUtils::ciEqual(extension, "esl"))
+            if (!isPluginName(content[i]))
                 continue;
-            const Files::MultiDirCollection& files = collections.getCollection(extension);
+            const Files::MultiDirCollection& files = collections.getCollection(Misc::getFileExtension(content[i]));
             if (!files.doesExist(content[i]))
                 throw std::runtime_error("Failed loading " + content[i] + ": the content file does not exist");
-            if (std::optional<PluginInfo> info = readPluginInfo(files.getPath(content[i]), content[i]))
+            std::filesystem::path path = files.getPath(content[i]);
+            if (std::optional<PluginInfo> info = readPluginInfo(path, content[i]))
             {
                 slots.push_back(i);
-                plugins.push_back(std::move(*info));
+                byName.emplace(Misc::StringUtils::lowerCase(content[i]), entries.size());
+                entries.push_back({ std::move(*info), std::move(path) });
             }
         }
 
-        const PluginOrder order = orderPlugins(plugins);
-        for (const std::string& move : order.mMoves)
+        // The games activate the masters of an active plugin themselves, wherever in their Data folder they are
+        for (std::size_t k = 0; k < entries.size(); ++k)
+        {
+            const std::vector<std::string> masters = entries[k].mInfo.mMasters;
+            const std::string requester = entries[k].mInfo.mName;
+            for (const std::string& master : masters)
+            {
+                if (!isPluginName(master) || byName.contains(Misc::StringUtils::lowerCase(master)))
+                    continue;
+                const Files::MultiDirCollection& files = collections.getCollection(Misc::getFileExtension(master));
+                if (!files.doesExist(master))
+                    continue;
+                std::filesystem::path path = files.getPath(master);
+                std::string name = Files::pathToUnicodeString(path.filename());
+                if (std::optional<PluginInfo> info = readPluginInfo(path, name))
+                {
+                    Log(Debug::Info) << "Load order: " << name << " is added: it is a master of " << requester;
+                    byName.emplace(Misc::StringUtils::lowerCase(master), entries.size());
+                    entries.push_back({ std::move(*info), std::move(path) });
+                }
+            }
+        }
+
+        if (order == ContentOrder::FileTime)
+        {
+            std::vector<std::filesystem::file_time_type> times;
+            for (const Entry& entry : entries)
+            {
+                std::error_code error;
+                const auto time = std::filesystem::last_write_time(entry.mPath, error);
+                times.push_back(error ? std::filesystem::file_time_type::min() : time);
+            }
+            std::vector<std::size_t> sorted(entries.size());
+            std::iota(sorted.begin(), sorted.end(), std::size_t(0));
+            std::stable_sort(sorted.begin(), sorted.end(), [&](std::size_t a, std::size_t b) {
+                if (entries[a].mInfo.mMaster != entries[b].mInfo.mMaster)
+                    return entries[a].mInfo.mMaster;
+                return times[a] < times[b];
+            });
+            std::vector<Entry> reordered;
+            for (const std::size_t index : sorted)
+                reordered.push_back(std::move(entries[index]));
+            entries = std::move(reordered);
+            Log(Debug::Info) << "Load order: the plugins are sorted by the time their files were written";
+        }
+
+        std::vector<PluginInfo> plugins;
+        for (const Entry& entry : entries)
+            plugins.push_back(entry.mInfo);
+
+        const PluginOrder sorted = orderPlugins(plugins, "which is neither listed nor in the data directories");
+        for (const std::string& move : sorted.mMoves)
             Log(Debug::Info) << "Load order: " << move;
 
-        std::vector<std::string> result = content;
-        for (std::size_t position = 0; position < slots.size(); ++position)
-            result[slots[position]] = content[slots[order.mOrder[position]]];
+        std::vector<PluginInfo> loaded;
+        std::vector<std::string> names;
+        for (const std::size_t index : sorted.mOrder)
+        {
+            loaded.push_back(plugins[index]);
+            names.push_back(plugins[index].mName);
+        }
+
+        std::unordered_map<std::string, std::filesystem::path> paths;
+        for (const Entry& entry : entries)
+            paths.emplace(Misc::StringUtils::lowerCase(entry.mInfo.mName), entry.mPath);
+        for (const std::string& warning : masterSizeWarnings(loaded, [&](const std::string& name) {
+                 const auto found = paths.find(Misc::StringUtils::lowerCase(name));
+                 std::error_code error;
+                 const std::uintmax_t size
+                     = found == paths.end() ? std::uintmax_t(-1) : std::filesystem::file_size(found->second, error);
+                 return error || found == paths.end() ? std::nullopt : std::optional<std::uint64_t>(size);
+             }))
+            Log(Debug::Warning) << warning;
+
+        // The plugins fill the places the plugins of the list had; the masters that were added follow the last of them
+        std::vector<std::string> result;
+        std::size_t next = 0;
+        std::size_t slot = 0;
+        for (std::size_t i = 0; i < content.size(); ++i)
+        {
+            if (slot < slots.size() && slots[slot] == i)
+            {
+                ++slot;
+                result.push_back(names[next++]);
+                if (slot == slots.size())
+                    while (next < names.size())
+                        result.push_back(names[next++]);
+            }
+            else
+                result.push_back(content[i]);
+        }
+        return result;
+    }
+
+    std::vector<std::string> dropMissingPlugins(
+        const std::vector<std::string>& names, const Files::Collections& collections)
+    {
+        std::vector<std::string> result;
+        for (const std::string& name : names)
+        {
+            if (isPluginName(name) && collections.getCollection(Misc::getFileExtension(name)).doesExist(name))
+                result.push_back(name);
+            else
+                Log(Debug::Warning) << "Plugins file: " << name << " is not in the data directories, skipped";
+        }
+        return result;
+    }
+
+    std::vector<std::string> masterSizeWarnings(const std::vector<PluginInfo>& plugins,
+        const std::function<std::optional<std::uint64_t>(const std::string&)>& sizeOf)
+    {
+        std::vector<std::string> result;
+        for (const PluginInfo& plugin : plugins)
+        {
+            // The games check the plugins that are not masters
+            if (plugin.mMaster)
+                continue;
+            for (std::size_t i = 0; i < plugin.mMasters.size() && i < plugin.mMasterSizes.size(); ++i)
+            {
+                const std::uint64_t expected = plugin.mMasterSizes[i];
+                if (expected == 0)
+                    continue;
+                const std::optional<std::uint64_t> actual = sizeOf(plugin.mMasters[i]);
+                if (actual && *actual != expected)
+                    result.push_back(plugin.mName + " was made for another version of " + plugin.mMasters[i]
+                        + ": it is " + std::to_string(*actual) + " bytes, the plugin expects "
+                        + std::to_string(expected));
+            }
+        }
         return result;
     }
 
