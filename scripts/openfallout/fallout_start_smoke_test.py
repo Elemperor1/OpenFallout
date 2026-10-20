@@ -663,7 +663,9 @@ return {
             elapsed = elapsed + dt
             if done or elapsed < 2 then return end
             done = true
-            print('OFTEST', 'mods order', table.concat(core.contentFiles.list, ','))
+            local names = {}
+            for _, name in ipairs(core.contentFiles.list) do table.insert(names, name) end
+            print('OFTEST', 'mods order', table.concat(names, ','))
             print('OFTEST', 'mods base', tostring(world.globals.@BASE@), tostring(world.globals.@ADDED@))
             print('OFTEST', 'mods id', tostring(core.getFormId('@MOD@', 0x800)))
         end,

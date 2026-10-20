@@ -68,8 +68,8 @@ namespace
         const ESM4::PluginOrder order = ESM4::orderPlugins(list);
         EXPECT_THAT(names(list, order), ElementsAre("FalloutNV.esm", "Mod.esp", "Patch.esp"));
         ASSERT_THAT(order.mMoves, Not(IsEmpty()));
-        EXPECT_THAT(
-            order.mMoves, Contains(HasSubstr("Mod.esp moves from place 3 to place 2: it is a master of Patch.esp")));
+        EXPECT_THAT(order.mMoves,
+            Contains(HasSubstr("Mod.esp moves from place 3 to place 2 of 3: it is a master of Patch.esp")));
     }
 
     TEST(ESM4PluginOrderTest, comparesNamesWithoutCase)
@@ -130,7 +130,9 @@ namespace
         EXPECT_THAT(ESM4::parsePluginsFile("# comment\r\nFalloutNV.esm\r\n\r\n  DeadMoney.esm  \nMod.esp"),
             ElementsAre("FalloutNV.esm", "DeadMoney.esm", "Mod.esp"));
         EXPECT_THAT(ESM4::parsePluginsFile(""), IsEmpty());
-        EXPECT_THAT(ESM4::parsePluginsFile("\xEF\xBB\xBFFalloutNV.esm\n"), ElementsAre("FalloutNV.esm"));
+        EXPECT_THAT(ESM4::parsePluginsFile("\xEF\xBB\xBF"
+                                           "FalloutNV.esm\n"),
+            ElementsAre("FalloutNV.esm"));
     }
 
     TEST(ESM4PluginOrderTest, readsOnlyTheMarkedNamesOfAPluginsFileThatMarksSome)
