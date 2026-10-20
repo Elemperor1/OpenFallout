@@ -10,8 +10,10 @@ optionally with `--plugins-file` (below). Whatever order they are named in, they
 
 1. Every plugin whose TES4 header flags it as a master loads before every plugin that does not. The flag in the header
    decides, not the extension: an `.esp` with the flag loads with the masters, an `.esm` without it with the others.
-2. A plugin loads after every master it lists. The games do not check this (a master that loads late then replaces what
-   the plugin changed); OpenFallout moves the master up instead.
+2. A plugin loads after every master it lists. The games do this for plugins flagged as masters (each is pulled behind
+   the masters it lists, even when those were written later); a plugin that is not flagged and lists a master that
+   sorts after it keeps its place there, and the master then replaces what the plugin changed. OpenFallout moves the
+   master up for every plugin.
 3. Within the masters and within the other plugins, the order is the order they were named in. `--plugin-order time`
    uses the rule the games have instead: oldest file first. Files written at the same time keep the order they were
    named in. (The games put the one their file search found later first; that depends on the file system.)
