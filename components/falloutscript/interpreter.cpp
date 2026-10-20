@@ -71,6 +71,9 @@ namespace FalloutScript
             return 0;
         }
 
+        // The first code of a script extender (xNVSE, FOSE); the commands of the games stop below it
+        constexpr std::uint16_t firstExtenderOpcode = 0x1400;
+
         std::string hex(std::uint32_t value)
         {
             std::ostringstream stream;
@@ -157,7 +160,16 @@ namespace FalloutScript
             const CommandInfo* command = mCommands.find(opcode);
             if (!summary.empty())
                 summary += ", ";
-            summary += (command != nullptr ? command->mName : hex(opcode)) + " " + std::to_string(count);
+            if (command != nullptr)
+                summary += command->mName;
+            else
+            {
+                // The codes the table lacks: from 0x1400 on they belong to a script extender (NVSE, FOSE)
+                summary += hex(opcode);
+                if (opcode >= firstExtenderOpcode)
+                    summary += " (script extender)";
+            }
+            summary += " " + std::to_string(count);
         }
         return summary;
     }
@@ -420,6 +432,7 @@ namespace FalloutScript
         const CommandInfo* command = mCommands.find(opcode);
         if (command == nullptr)
         {
+            ++mMissingHits[opcode];
             reportOnce(Report_UnknownCommand | opcode,
                 "A condition names the function " + hex(opcode) + ", which is not in the table");
             return 0;
@@ -461,6 +474,7 @@ namespace FalloutScript
 
         if (prepared.mProblem == CallProblem::UnknownCommand)
         {
+            ++mMissingHits[call.mOpcode];
             reportOnce(Report_UnknownCommand | call.mOpcode,
                 "A script calls the command " + hex(call.mOpcode) + ", which is not in the table");
             return 0;

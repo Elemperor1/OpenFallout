@@ -370,6 +370,22 @@ namespace
         EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "");
     }
 
+    TEST(FalloutScriptInterpreterTest, countsHowOftenACodeThatIsNotInTheTableIsReached)
+    {
+        Runner setup;
+        // 0x1545 is a code of the script extenders, 0x1FFF too; 0x13FF is below them
+        ScriptBuilder builder = block(command(0x1545, arguments(0)) + command(0x1545, arguments(0))
+            + command(0x13FF, arguments(0)) + command(OpNothing, arguments(0)) + command(0x1FFF, arguments(0)));
+        Instance instance = setup.instance(builder);
+        setup.mInterpreter.run(instance, GameMode);
+        setup.mInterpreter.run(instance, GameMode);
+        // each code is told once, the count goes up every time
+        EXPECT_EQ(setup.mHost.mLog.size(), 4u);
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(),
+            "0x1545 (script extender) 4, Nothing 2, 0x13ff 2, 0x1fff (script extender) 2");
+        EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "");
+    }
+
     TEST(FalloutScriptInterpreterTest, namesTheScriptAndTheVariableWhenAScriptIsNotThere)
     {
         Runner setup;
