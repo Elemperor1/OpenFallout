@@ -1,9 +1,13 @@
 #include <components/debug/debugging.hpp>
+#include <components/esm4/pluginorder.hpp>
 #include <components/fallback/fallback.hpp>
 #include <components/fallback/validate.hpp>
+#include <components/files/collections.hpp>
 #include <components/files/configurationmanager.hpp>
+#include <components/files/openfile.hpp>
 #include <components/misc/osgpluginchecker.hpp>
 #include <components/misc/rng.hpp>
+#include <components/misc/strings/algorithm.hpp>
 #include <components/platform/platform.hpp>
 #include <components/version/version.hpp>
 
@@ -22,7 +26,10 @@
 extern "C" __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
 #endif
 
+#include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 #if (defined(__APPLE__) || defined(__linux) || defined(__unix) || defined(__posix))
 #include <unistd.h>
@@ -104,21 +111,44 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
     }
 
     StringsVector content = variables["content"].as<StringsVector>();
+    {
+        // The content files named on the command line or in the configuration are listed once each. The active
+        // plugins of a Plugins.txt that are listed there too are the same plugin.
+        std::set<std::string> contentDedupe{ "builtin.omwscripts" };
+        for (const auto& contentFile : content)
+        {
+            if (!contentDedupe.insert(contentFile).second)
+            {
+                Log(Debug::Error) << "Content file specified more than once: " << contentFile << ". Aborting...";
+                return false;
+            }
+        }
+
+        const std::filesystem::path pluginsFile = variables["plugins-file"].as<Files::MaybeQuotedPath>();
+        if (!pluginsFile.empty())
+        {
+            const auto stream = Files::openBinaryInputFileStream(pluginsFile);
+            if (!stream->is_open())
+            {
+                Log(Debug::Error) << "Failed to open the plugins file " << pluginsFile << ". Aborting...";
+                return false;
+            }
+            const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+            for (std::string& name : ESM4::parsePluginsFile(text))
+                if (std::none_of(content.begin(), content.end(),
+                        [&name](const std::string& listed) { return Misc::StringUtils::ciEqual(listed, name); }))
+                    content.push_back(std::move(name));
+        }
+    }
     if (content.empty())
     {
         Log(Debug::Error) << "No content file given (esm/esp, nor omwgame/omwaddon). Aborting...";
         return false;
     }
     engine.addContentFile("builtin.omwscripts");
-    std::set<std::string> contentDedupe{ "builtin.omwscripts" };
-    for (const auto& contentFile : content)
-    {
-        if (!contentDedupe.insert(contentFile).second)
-        {
-            Log(Debug::Error) << "Content file specified more than once: " << contentFile << ". Aborting...";
-            return false;
-        }
-    }
+
+    // The games load the masters first and a master before the plugins that list it, whatever order they were named in
+    content = ESM4::orderContentFiles(content, Files::Collections(dataDirs));
 
     for (auto& file : content)
     {

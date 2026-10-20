@@ -40,6 +40,12 @@ namespace OpenMW
         addOption("content", bpo::value<StringsVector>()->default_value(StringsVector(), "")->multitoken()->composing(),
             "content file(s): esm/esp, or omwgame/omwaddon/omwscripts");
 
+        addOption("plugins-file", bpo::value<Files::MaybeQuotedPath>()->default_value(Files::MaybeQuotedPath(), ""),
+            "read more content files from a file in the format of the Plugins.txt of the games (one name to a line; "
+            "where lines start with *, only those are active). They are added after the content files given, and "
+            "the plugins of both load in the order the games load them: masters first, a master before the plugins "
+            "that list it");
+
         addOption("groundcover",
             bpo::value<StringsVector>()->default_value(StringsVector(), "")->multitoken()->composing(),
             "groundcover content file(s): esm/esp, or omwgame/omwaddon");

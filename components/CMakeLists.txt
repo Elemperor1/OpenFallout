@@ -343,6 +343,7 @@ add_component_dir (esm4
     magiceffectid
     packagecensus
     packageschedule
+    pluginorder
     reader
     readerutils
     recordreader

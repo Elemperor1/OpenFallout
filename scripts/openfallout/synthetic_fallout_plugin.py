@@ -27,7 +27,7 @@ files of the games.
 
     scripts/openfallout/synthetic_fallout_plugin.py --out some/data/folder
 
-writes `OFTest.esm`, `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
+writes `OFTest.esm`, `OFTestMod.esp` (a mod that has it as its master), `meshes/openfallout/cube.osgt`, the meshes of the person (`meshes/openfallout/person_*.osgt`),
 `meshes/openfallout/wall.nif`, `meshes/openfallout/chair.nif`, `meshes/openfallout/person_foot.nif`,
 `meshes/characters/_male/skeleton.nif`, `meshes/characters/_male/mtidle.kf`,
 `textures/sky/oftestclouds.dds` and `textures/landscape/oftestground.dds` into the folder.
@@ -266,6 +266,16 @@ PERSON_KARMA = 25.0
 PERSON_LEVEL = 12  # the level of its ACBS (no flag is set, so it is the level of the character)
 BEAST_LEVEL = 7  # the level of the beast, which the creature that has the list as its template takes the stats from
 EMPTY_ADDON = "OFTestEmpty.omwaddon"
+# A plugin that has OFTest.esm as its master, as the add-ons of the games have: it changes a global of the master and
+# adds one of its own
+MOD_ADDON = "OFTestMod.esp"
+MOD_BASE_GLOBAL_ID = 0x96F
+MOD_BASE_GLOBAL_NAME = "OFTestModBase"
+MOD_BASE_VALUE = 1
+MOD_OVERRIDDEN_VALUE = 2
+MOD_ADDED_GLOBAL_ID = 0x01000800 # the plugin is the second of the load order: its own form IDs start with 01
+MOD_ADDED_GLOBAL_NAME = "OFTestModAdded"
+MOD_ADDED_VALUE = 3
 DLC_NAME_THERE = "OF Test"  # the plugin the test loads is OFTest.esm
 DLC_NAME_MISSING = "Absent Pack"
 ACTOR_VALUE_GLOBALS = {"variable": (0x8B5, "OFTestAvVariable"), "share": (0x8B6, "OFTestAvShare"),
@@ -527,7 +537,7 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x96E # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x96F # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2151,6 +2161,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l")
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   global_variable(SITTER_GLOBAL[0], SITTER_GLOBAL[1], b"l"),
+                                  global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l", MOD_BASE_VALUE),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f")
@@ -2482,6 +2493,19 @@ def empty_addon():
     return b"TES3" + struct.pack("<III", len(body), 0, 0) + body
 
 
+def mod_addon():
+    """The plugin of a mod: not flagged as a master, with OFTest.esm as its master. It changes the value of a global of
+    the master (the form ID starts with 00, the first master) and adds a global of its own (it starts with 01, the
+    plugin itself)."""
+    hedr = struct.pack("<fiI", 0.94, 2, 0x801)
+    header = record(b"TES4", 0, [sub(b"HEDR", hedr), zstr(b"CNAM", "OpenFallout"), zstr(b"MAST", "OFTest.esm"),
+                                 sub(b"DATA", bytes(8))])
+    return header + top_group(b"GLOB", [global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l",
+                                                        MOD_OVERRIDDEN_VALUE),
+                                        global_variable(MOD_ADDED_GLOBAL_ID, MOD_ADDED_GLOBAL_NAME, b"l",
+                                                        MOD_ADDED_VALUE)])
+
+
 def write(out, animation=True, spline=True):
     """Write the plugin and its files into the folder. `animation` is false for the files of the person to have no
     animation file. The animation moves the foot with the control points of a B-spline, as most bones of the files of
@@ -2536,6 +2560,7 @@ def write(out, animation=True, spline=True):
                 name=name, node=FOOT_BONE, offset=move, stop=LOCOMOTION_SECONDS, spline=spline, root_speed=velocity))
     (out / "OFTest.esm").write_bytes(plugin())
     (out / EMPTY_ADDON).write_bytes(empty_addon())
+    (out / MOD_ADDON).write_bytes(mod_addon())
     return out / "OFTest.esm"
 
 

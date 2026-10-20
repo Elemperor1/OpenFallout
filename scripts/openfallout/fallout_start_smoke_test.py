@@ -648,6 +648,32 @@ QUEST_SCRIPT = (QUEST_SCRIPT.replace("@FROM@", str(plugin.QUEST_DELAY * (plugin.
                 .replace("@OBJECTIVE@", str(plugin.QUEST_OBJECTIVE))
                 .replace("@A_STAGE@", str(plugin.QUEST_A_STAGE)).replace("@COUNTER@", plugin.COUNTER_NAME))
 
+# A mod, named before the plugin it has as its master (--content OFTestMod.esp --content OFTest.esm): the engine puts the
+# master first, as the games do, and the global of the master that the mod changes and the global that the mod adds are
+# read by a script of the world.
+MODS_SCRIPT = """\
+local core = require('openfallout.core')
+local world = require('openfallout.world')
+
+local elapsed, done = 0, false
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < 2 then return end
+            done = true
+            print('OFTEST', 'mods order', table.concat(core.contentFiles.list, ','))
+            print('OFTEST', 'mods base', tostring(world.globals.@BASE@), tostring(world.globals.@ADDED@))
+            print('OFTEST', 'mods id', tostring(core.getFormId('@MOD@', 0x800)))
+        end,
+    },
+}
+"""
+MODS_SCRIPT = (MODS_SCRIPT.replace("@BASE@", plugin.MOD_BASE_GLOBAL_NAME).replace("@ADDED@", plugin.MOD_ADDED_GLOBAL_NAME)
+               .replace("@MOD@", plugin.MOD_ADDON))
+
+
 # The conversation, in an engine of its own because it pauses the game, which the walk must not be. A script of the world
 # activates the talker (the player does, in the game) and a script of the player looks at the conversation with
 # core.conversation: the greeting that the voice type and the sex of the talker pick (the one for another voice must not be
@@ -2889,6 +2915,39 @@ def check_savesprobe(first, second):
     return problems
 
 
+def check_mods(text):
+    """The problems with the load order. The engine was told to load the mod before its master; the log must say that the
+    master moved, the content list must have the master first, the global the mod changes must have the value of the mod
+    and the global it adds must be there."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|required dependency|"
+                     r"cannot be loaded", line, re.I):
+            problems.append(line)
+    if not re.search(r"Load order: OFTest\.esm moves from place 2 to place 1 of 2: it is flagged as a master", text):
+        problems.append("the log does not say that the master moved before the mod")
+    order = re.search(r"OFTEST\tmods order\t(\S+)", text)
+    if not order:
+        problems.append("the script did not log the content list")
+    else:
+        files = [name.lower() for name in order.group(1).split(",")]
+        if "oftest.esm" not in files or "oftestmod.esp" not in files or files.index("oftest.esm") > files.index("oftestmod.esp"):
+            problems.append(f"the master must load before the mod: {order.group(1)}")
+        elif files.index("oftestmod.esp") != files.index("oftest.esm") + 1:
+            problems.append(f"the mod must load right after its master: {order.group(1)}")
+    base = re.search(r"OFTEST\tmods base\t(\S+)\t(\S+)", text)
+    if not base:
+        problems.append("the script did not log the globals")
+    else:
+        if float(base.group(1)) != plugin.MOD_OVERRIDDEN_VALUE:
+            problems.append(f"the mod changes {plugin.MOD_BASE_GLOBAL_NAME} to {plugin.MOD_OVERRIDDEN_VALUE}, the global is "
+                            f"{base.group(1)} (the master has {plugin.MOD_BASE_VALUE})")
+        if base.group(2) == "nil" or float(base.group(2)) != plugin.MOD_ADDED_VALUE:
+            problems.append(f"the mod adds {plugin.MOD_ADDED_GLOBAL_NAME} with the value {plugin.MOD_ADDED_VALUE}, the global "
+                            f"is {base.group(2)}")
+    return problems
+
+
 def check_saves(first, second, third=None):
     """The problems with the saves. `first` is the log of the engine that saved, changed the state and loaded the save
     again, `second` the log of the engine that was started on the save, `third` (when there is one) the log of an engine
@@ -4012,7 +4071,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -4051,6 +4110,8 @@ def main():
     (data / "scripts" / "saveslocal.lua").write_text(SAVES_LOCAL_SCRIPT, encoding="ascii")
     (data / "savestest.omwscripts").write_text(
         "GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\nCUSTOM: scripts/saveslocal.lua\n", encoding="ascii")
+    (data / "scripts" / "modstest.lua").write_text(MODS_SCRIPT, encoding="ascii")
+    (data / "modstest.omwscripts").write_text("GLOBAL: scripts/modstest.lua\n", encoding="ascii")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
@@ -4297,6 +4358,26 @@ def main():
             print(f"saved game {path.relative_to(home)}")
         for problem in found:
             print("PROBLEM (savesprobe):", problem)
+        problems += found
+    if args.only in (None, "mods"):
+        home = work / "mods" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "mods" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== mods: --start", plugin.CELL_NAME, f"with {plugin.MOD_ADDON} named before OFTest.esm")
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                               "modstest.omwscripts", before=[plugin.MOD_ADDON])
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_mods(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line or "Load order" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (mods):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

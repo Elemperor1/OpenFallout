@@ -122,6 +122,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testpackagecensus.cpp
     esm4/testpackageschedule.cpp
     esm4/testperk.cpp
+    esm4/testpluginorder.cpp
     esm4/testpokerchip.cpp
     esm4/testprimitive.cpp
     esm4/testprojectile.cpp
