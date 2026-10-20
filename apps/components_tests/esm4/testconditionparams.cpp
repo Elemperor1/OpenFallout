@@ -23,6 +23,7 @@ namespace
     constexpr std::uint32_t getStageDone = 59;
     constexpr std::uint32_t getIsSex = 70;
     constexpr std::uint32_t getIsVoiceType = 427;
+    constexpr std::uint32_t playerInRegion = 612;
     constexpr std::uint32_t notInTheTable = 500;
 
     TEST(ESM4ConditionParamsTest, knowsTheTypesOfTheParametersOfAFunction)
@@ -39,6 +40,15 @@ namespace
         const ESM4::ConditionParameterTypes variable = ESM4::conditionParameterTypes(79);
         EXPECT_EQ(variable.mFirst, 14u);
         EXPECT_EQ(variable.mSecond, 22u); // the index of a variable
+
+        // the two functions of New Vegas that have no command of their code: the casino of GetCasinoWinningStage and
+        // the region of PlayerInRegion are forms of the file
+        const ESM4::ConditionParameterTypes casino = ESM4::conditionParameterTypes(610);
+        EXPECT_EQ(casino.mFirst, 63u);
+        EXPECT_EQ(casino.mSecond, ESM4::ConditionParameterTypes::none);
+        const ESM4::ConditionParameterTypes region = ESM4::conditionParameterTypes(612);
+        EXPECT_EQ(region.mFirst, 69u);
+        EXPECT_EQ(region.mSecond, ESM4::ConditionParameterTypes::none);
 
         // the voice type of GetIsVoiceType, which is a form of the file
         EXPECT_EQ(ESM4::conditionParameterTypes(getIsVoiceType).mFirst, 46u);
@@ -121,9 +131,12 @@ namespace
             // a function the table does not have: both parameters stay
             + condition(0, 0, notInTheTable, 0x00001234, 0x01000100, 0)
             // a voice type is a form of the master, and the sex a number
-            + condition(0, 0, getIsVoiceType, 0x00001234, 0, 0) + condition(0, 0, getIsSex, 1, 0, 0));
+            + condition(0, 0, getIsVoiceType, 0x00001234, 0, 0)
+            + condition(0, 0, getIsSex, 1, 0, 0)
+            // a region of the master, in a function that only a condition can name
+            + condition(0, 0, playerInRegion, 0x00001234, 0, 0));
 
-        ASSERT_EQ(conditions.size(), 6u);
+        ASSERT_EQ(conditions.size(), 7u);
         EXPECT_EQ(conditions[0].param1, 0x02001234u);
         EXPECT_EQ(conditions[0].param2, 10u);
         EXPECT_EQ(conditions[1].param1, 0x05000100u);
@@ -132,6 +145,7 @@ namespace
         EXPECT_EQ(conditions[3].param2, 0x01000100u);
         EXPECT_EQ(conditions[4].param1, 0x02001234u);
         EXPECT_EQ(conditions[5].param1, 1u);
+        EXPECT_EQ(conditions[6].param1, 0x02001234u);
     }
 
     TEST(ESM4ConditionParamsTest, givesTheGlobalAndTheReferenceOfAConditionTheIndexToo)

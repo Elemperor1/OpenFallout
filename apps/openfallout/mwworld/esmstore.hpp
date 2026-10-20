@@ -130,6 +130,7 @@ namespace ESM4
     struct Recipe;
     struct RecipeCategory;
     struct Reference;
+    struct Region;
     struct Script;
     struct Sound;
     struct SoundReference;
@@ -186,10 +187,10 @@ namespace OFWorld
             Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>, Store<ESM4::Note>,
             Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>, Store<ESM4::Potion>, Store<ESM4::Projectile>,
             Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Recipe>, Store<ESM4::RecipeCategory>,
-            Store<ESM4::Reference>, Store<ESM4::Script>, Store<ESM4::Sound>, Store<ESM4::SoundReference>,
-            Store<ESM4::Spell>, Store<ESM4::Static>, Store<ESM4::StaticCollection>, Store<ESM4::TalkingActivator>,
-            Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::VoiceType>,
-            Store<ESM4::Water>, Store<ESM4::Weapon>, Store<ESM4::Weather>, Store<ESM4::World>>;
+            Store<ESM4::Reference>, Store<ESM4::Region>, Store<ESM4::Script>, Store<ESM4::Sound>,
+            Store<ESM4::SoundReference>, Store<ESM4::Spell>, Store<ESM4::Static>, Store<ESM4::StaticCollection>,
+            Store<ESM4::TalkingActivator>, Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>,
+            Store<ESM4::VoiceType>, Store<ESM4::Water>, Store<ESM4::Weapon>, Store<ESM4::Weather>, Store<ESM4::World>>;
 
     private:
         template <typename T>
@@ -358,10 +359,7 @@ namespace OFWorld
     const ESM::NPC* ESMStore::insert<ESM::NPC>(const ESM::NPC& npc);
 
     template <class T>
-    concept HasRecordId = requires
-    {
-        T::sRecordId;
-    };
+    concept HasRecordId = requires { T::sRecordId; };
 }
 
 #endif

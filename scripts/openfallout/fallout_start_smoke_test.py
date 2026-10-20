@@ -1678,6 +1678,10 @@ return {
                 -- The link of the record, the cell and worldspace of the cube, and the loads of the script of the beast
                 print('OFTEST', 'object world', tostring(g.@LINKED@), tostring(g.@LINKED_NONE@),
                     tostring(g.@SAME_CELL@), tostring(g.@IN_WORLDSPACE@), tostring(g.@TEMPLATE_LOADS@))
+                -- IsPlayerInRegion for the region the cell lists and the player stands in, the one it lists and the player
+                -- is not in, the one it does not list and the one of another worldspace
+                print('OFTEST', 'object regions', tostring(g.@REGION_IN@), tostring(g.@REGION_OUT@),
+                    tostring(g.@REGION_UNLISTED@), tostring(g.@REGION_OTHER_WORLD@))
                 -- The clock: GetCurrentTime, the global GameHour and GetGlobalValue of it
                 print('OFTEST', 'object clock', string.format('%.4f', g.@HOUR_COMMAND@),
                     string.format('%.4f', g.@HOUR_GLOBAL@), string.format('%.4f', g.@GLOBAL_VALUE@))
@@ -1791,6 +1795,10 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@LOCKER@", ", ".join(map(str, plugin.LOCKER_REF_IDS.values())))
                  .replace("@PLACE_DISTANCE@", str(plugin.PLACE_DISTANCE))
                  .replace("@PLACED@", plugin.WORLD_QUERY_GLOBALS["placed"][1])
+                 .replace("@REGION_IN@", plugin.REGION_GLOBALS["in"][1])
+                 .replace("@REGION_OUT@", plugin.REGION_GLOBALS["out"][1])
+                 .replace("@REGION_UNLISTED@", plugin.REGION_GLOBALS["unlisted"][1])
+                 .replace("@REGION_OTHER_WORLD@", plugin.REGION_GLOBALS["other_world"][1])
                  .replace("@HOUR_COMMAND@", plugin.CLOCK_GLOBALS["hour_command"][1])
                  .replace("@HOUR_GLOBAL@", plugin.CLOCK_GLOBALS["hour_global"][1])
                  .replace("@GLOBAL_VALUE@", plugin.CLOCK_GLOBALS["global_value"][1])
@@ -3834,6 +3842,24 @@ def check_objects(text, scenario):
                         "in the exterior cell, and the script of the beast should have run for the beast, for the "
                         "creature placed as a list that stands for it and for the creature that takes its script from "
                         f"it as its template (1, 0, 1, worldspace, 3): {found}")
+    found = one("regions")
+    # The exterior cell lists three regions and the player stands in the first of them, which names the worldspace of the
+    # cell; in a building the player is in none. The log entries of quest D that the conditions let through say the same.
+    if found is not None:
+        want = [1.0, 0.0, 0.0, 0.0] if scenario.exterior else [0.0, 0.0, 0.0, 0.0]
+        if len(found) != 4 or any(abs(float(a) - b) > 0.001 for a, b in zip(found, want)):
+            problems.append("IsPlayerInRegion should tell 1 only for the region that the exterior cell lists, covers the "
+                            "player and has the worldspace of the cell, not for one that the cell lists and does not "
+                            "cover the player, one that covers the player and the cell does not list, or one of another "
+                            "worldspace, and 0 for all in a building "
+                            f"({', '.join(str(int(number)) for number in want)}): {found}")
+    for name, words in plugin.REGION_TEXTS.items():
+        told = [line for line in text.splitlines()
+                if f"Journal: {plugin.QUEST_D_NAME} stage {plugin.QUEST_D_STAGE}: {words}" in line]
+        wanted = 1 if scenario.exterior and name == "in" else 0
+        if len(told) != wanted:
+            problems.append(f"the condition PlayerInRegion should let the log entry '{words}' through {wanted} times, "
+                            f"not {len(told)}")
     found = one("clock")
     if found is not None:
         hours = [float(value) for value in found]

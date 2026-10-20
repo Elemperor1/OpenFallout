@@ -193,6 +193,31 @@ state, takes an instant path that runs the begin and end scripts and raises the 
 no response fits; the begin script of a response runs when the response is picked, before the voice starts, and the end
 script when the line is over (the engine does both).
 
+## Regions: `PlayerInRegion` and `IsPlayerInRegion`
+
+`FalloutNV.esm` has 74 conditions that ask `PlayerInRegion` (the function number `0x264`; the command table has no
+command of the code `0x1264`) and a script command `IsPlayerInRegion` (`0x1260`) that asks the same thing. Both read the
+list of regions of the player, which the executable makes in one place (Mac round 8D part C): whenever the player is put
+into a cell (`SetParentCell`, `0x94CAE0`), not when the player moves inside it. The candidates are the regions that the
+exterior cell lists (its `XCLR`); the player is in one of them when its position is inside one of the areas of the
+region (`REGN` `RPLI`, then `RPLD`: the corners of a polygon as floats) and the region is of the worldspace of the
+player or of none. A building has no list, so every region reads 0 there, and the object the condition runs on is never
+looked at. OpenFallout reads the areas of the `REGN` records (`ESM4::Region`) and answers both from the exterior cell of
+the player: the region is on its `XCLR` list, the worldspace matches, and the player is inside an area (an even-odd test
+of the x and y). The one difference: the games work the list out once, with the position the player is put at, so a
+player who walks out of an area of the cell still reads as inside until the next cell is entered; OpenFallout looks at
+the position of the player when the condition or the command is asked. The parameter of the function is a form, so the
+loader gives it the load order index of its plugin like the other forms of a condition (the table of the parameters of
+conditions has the entries `610` and `612`, which the command table cannot give).
+
+Also in this part of the table, `GetCasinoWinningStage` (the condition `0x262`) and `GetCasinoWinningsLevel` (`0x125C`)
+tell the highest of 1 to 4 for which the winnings of the player in that casino reach that quarter of the casino's limit,
+and 0 for a casino that the player has no record in; the record is made only by the menus of the slot machines,
+blackjack and roulette (`ShowSlotMachineMenu`, `ShowBlackJackMenu`, `ShowRouletteMenu`), and `SetCasinoWinningsLevel`
+changes a record that exists and makes none. OpenFallout has none of those menus, so the player never has a record: the
+condition and the command answer 0 and `SetCasinoWinningsLevel` does nothing.
+`smoke --only exterior` and `--only interior` check the region, from the command and from a condition of a log entry.
+
 ## Not done
 
 - The games skip a plugin file of zero bytes; OpenFallout does not check the size of a plugin.
@@ -207,3 +232,8 @@ script when the line is over (the engine does both).
   addition to an existing form (it loads into it, and is dropped when there is no such form). OpenFallout loads such a
   record like any other, as a whole. No record of the 14 plugins of Tale of Two Wastelands, of its four packs or of
   the 16 retail ESMs carries the flag (Mac round 8B part D1), so this matters for other mods only.
+- The casino of New Vegas: the menus of the slot machines, blackjack and roulette, and the winnings the player has in
+  each casino (the answers above are the ones of a player who never gambled).
+- `PlayerInRegion` works the list out when it is asked, not when the player enters a cell (see above). The parts of the
+  executable that were not traced: what the per-frame check at `0x947B10` and the state at `player+0x7AC` do when they
+  put the player into a cell again.

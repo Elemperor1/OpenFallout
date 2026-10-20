@@ -135,6 +135,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testrecipecategory.cpp
     esm4/testrecordreader.cpp
     esm4/testreferencecensus.cpp
+    esm4/testregion.cpp
     esm4/testreputation.cpp
     esm4/testscript.cpp
     esm4/testscriptargs.cpp

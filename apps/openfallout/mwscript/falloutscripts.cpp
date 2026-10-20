@@ -37,6 +37,7 @@
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadrace.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadregn.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadvtyp.hpp>
@@ -309,6 +310,21 @@ namespace OFScript
                 : 0.0;
         });
         FalloutScript::addConditionFunctions(mConditions);
+        // PlayerInRegion is the condition 0x264 and IsPlayerInRegion the command 0x1260 of the games, which both ask
+        // the list of regions of the player (the object it is run on is not looked at)
+        mConditions.setFunction(
+            0x264, [this](FalloutScript::ConditionCall& call) { return playerInRegion(call.mFirst) ? 1.0 : 0.0; });
+        mInterpreter.setHandler("IsPlayerInRegion", [this](FalloutScript::CallContext& call) {
+            return playerInRegion(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
+        });
+        // The games keep a record of the winnings of the player in a casino, which the menus of the slot machines,
+        // blackjack and roulette add the first time they are opened and no command adds. There are no such menus here,
+        // so the player has no record in any casino, and for a casino without one the stage is 0 (GetCasinoWinningStage
+        // is the condition 0x262, GetCasinoWinningsLevel the command that works it out the same way) and
+        // SetCasinoWinningsLevel changes nothing.
+        mConditions.setFunction(0x262, [](FalloutScript::ConditionCall&) { return 0.0; });
+        mInterpreter.setHandler("GetCasinoWinningsLevel", [](FalloutScript::CallContext&) { return 0.0; });
+        mInterpreter.setHandler("SetCasinoWinningsLevel", [](FalloutScript::CallContext&) { return 1.0; });
         // Perks and the effects of items look at the conditions of their records, about the character who has them
         const auto conditionsHold
             = [this](const std::vector<ESM4::TargetCondition>& conditions,
@@ -3795,6 +3811,27 @@ namespace OFScript
             return 0;
         const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
         return id != nullptr ? numberOf(*id) : 0;
+    }
+
+    bool FalloutScripts::playerInRegion(FalloutScript::FormId region)
+    {
+        const ESM::FormId wanted = ESM::FormId::fromUint32(region);
+        Place place;
+        if (wanted.isZeroOrUnset() || !whereIs(mPlayer, place))
+            return false;
+        const OFWorld::CellStore* cell = cellAt(place);
+        // In a building the list of regions of the player is empty
+        if (cell == nullptr || !cell->isExterior())
+            return false;
+        const ESM::FormId* cellForm = cell->getCell()->getId().getIf<ESM::FormId>();
+        const ESM4::Cell* record = cellForm != nullptr ? mStore.get<ESM4::Cell>().search(*cellForm) : nullptr;
+        if (record == nullptr
+            || std::find(record->mRegions.begin(), record->mRegions.end(), wanted) == record->mRegions.end())
+            return false;
+        const ESM4::Region* area = mStore.get<ESM4::Region>().search(wanted);
+        const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
+        return area != nullptr && worldspace != nullptr
+            && area->covers(*worldspace, place.mPosition.x(), place.mPosition.y());
     }
 
     bool FalloutScripts::inCell(FalloutScript::FormId reference, FalloutScript::FormId cell)
