@@ -118,6 +118,12 @@ perk, and the checks that TTW makes of the other mods and plugins.
   in `Vault101ExitScript`; the name is the one the scripts' source text has, Mac round 8D part A). The engine opens the
   menu for the race and the face for it, as for `ShowRaceMenu` where Fallout 3 calls that, and `smoke` and a unit test
   check it. `extendercommands.cpp` is where such a name is added; the other 138 codes are still steps over and counts.
+- What a start of Tale of Two Wastelands does with that (Mac rounds 8C, 8E and 8F): `TTWGenericHandler` stage 0 reads the
+  version commands and `GetPluginVersion`, gets 0, and opens five one-button message boxes (xNVSE 6.3.5, JIP LN,
+  JohnnyGuitar, lStewieAl's Tweaks, ShowOff: "missing or older"); they pause the world until they are pressed, and the
+  autoplay tool presses them away at once. Behind them the intro runs from `CG00` to `MQ01` stage 10 with 14 codes
+  that the table lacks reached (the 12 of the first start and `0x278a`, `0x2862` after the exit); 56 to 58 commands of the
+  games are missing at run time besides.
 - The 52 function blocks never run, because nothing calls them: the interpreter runs the blocks of the events it
   knows, and a function is not one.
 - A condition (`CTDA`) that names a function the table lacks and the engine does not implement as a condition function
