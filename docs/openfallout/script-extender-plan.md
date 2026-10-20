@@ -277,8 +277,7 @@ names in `ttw-extension-codes.csv` are now the ones the DLLs register (`register
   tables are in the shared folder; nothing reads them.
 - The meaning of the tokens `42`, `18`, `73` and `6e` in the `Let` expressions, and of the `58` token's arguments, was
   not decoded (the layout and the sample bytes are in the Mac notes).
-- Which plugin owns which range from `0x2000`, beyond TTW's own `TTW_` names and the `...Alt` names of JIP LN.
-- The three extender functions that conditions name (above) are not implemented, so those 22 conditions read 0.
+- The three extender functions that conditions name (above; the extender files name them) are not implemented, so those 22 conditions read 0.
 - Not an extender matter, found on the way: `FalloutNV.esm` has 25 conditions with the function index `0x262` and 74
   with `0x264`, and the command table has no row for the codes `0x1262` and `0x1264`. `0x264` (`PlayerInRegion`) is
   implemented, and `0x262` (`GetCasinoWinningStage`) answers 0, the answer of a player who has not gambled (see
