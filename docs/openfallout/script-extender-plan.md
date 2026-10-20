@@ -59,7 +59,10 @@ add-ons and the four packs hold no call of a code that their own game's table la
   `0x3806`, 139 codes and 1097 calls in all. The CSV has the 7 with `decoder` = `misses`, and the language step has to
   read such a token in the expression bytes: `58 00 00 code(2) length(2) body`.) 52 scripts are user functions; 189 of the 327
   scripts are functions or have an extension call in an expression, the other 138 (250 calls) are plain statements.
-- 54 codes (496 calls) are in the NVSE range `0x1400` to `0x1FFF`, 78 codes (584 calls) are from `0x2000`.
+- 54 codes (496 calls) are in the NVSE range `0x1400` to `0x1FFF`, 78 codes (584 calls) are from `0x2000`. These two
+  figures, and every count below (the groups, the high bytes, the steps), are those of the 132 codes the decoder lists. The
+  7 codes it misses are 3 in the first range (`0x154F`, `0x1550`, `0x1562`: 57 codes in all) and 4 in the second
+  (`0x224E`, `0x26CE`, `0x286B`, `0x3806`: 82 in all); their 17 calls are in none of the counts below.
 - 69 scripts whose editor ID starts with `TTW` hold 584 calls; the other 258 scripts (496 calls) are scripts of the
   original games that TTW or the YUP patch changed, among them 18 `INFO` result scripts. The plugin-range codes are
   not only TTW's own: 22 of the 78 codes are called only by changed original scripts (by their names, a
@@ -117,7 +120,8 @@ perk, and the checks that TTW makes of the other mods and plugins.
   check it. `extendercommands.cpp` is where such a name is added; the other 138 codes are still steps over and counts.
 - The 52 function blocks never run, because nothing calls them: the interpreter runs the blocks of the events it
   knows, and a function is not one.
-- A condition (`CTDA`) that names a function the table lacks is reported once and has the value 0, compared as usual.
+- A condition (`CTDA`) that names a function the table lacks and the engine does not implement as a condition function
+  (`0x264` and `0x262` are, see below) is reported once and has the value 0, compared as usual.
   The 14 plugins hold 201,884 conditions; three extender functions are among them, 22 conditions in all and only in the
   two TTW files (index `0x17EC`, the script code `0x27EC`, in 17 conditions of 11 records; `0x177C` in 2 conditions of
   one spell; `0x2807` in 3 of one perk). A condition's function index is the script code minus `0x1000`.
@@ -151,7 +155,7 @@ The order follows what each step makes work, and what it needs from the engine.
    can write (a change of a setting must reach the code that reads it, such as the hacking game and the pick-pocket
    chance); the equipped object and its condition need the equipment and condition state of M5 and M6; `Update3D` and
    `SetPackageTargetReference` need the world.
-4. **The plugin-range codes** (584 calls). The scripts give each a name, not the parameters, the meaning or the owner. Two ways: the DLLs
+4. **The plugin-range codes** (82 codes; 584 calls of the 78 the decoder lists). The scripts give each a name, not the parameters, the meaning or the owner. Two ways: the DLLs
    themselves (dump the registered command table like the games' table is dumped, which gives names and parameters
    without copying any list), or the public documentation of each plugin (names and meanings, written again by hand).
    The first is the better one and needs Jacob (below). Order by use: `0x2837`, `0x27EC`, `0x288B`, `0x2829`,
@@ -190,7 +194,7 @@ in the plugins): in 326 of the 327 scripts that call an extender code, the ident
 commands, keywords, variables, editor IDs or words of ordinary scripts are as many as the codes and stand in the same
 order, so the i-th code is the i-th name. 40 codes are certain (a script with one code and one name), 17 follow by
 elimination and 82 by the order alone (the rule held at 762 of 762 places where a code was already certain); 53 of
-those 82 are called in one script only. `ttw-extension-codes.csv` has the class of each name. The project of that source has no licence file, so nothing of its code
+those 82 are called in one script only. `ttw-extension-codes.csv` has the class of each name. The project of that source has no license file, so nothing of its code
 or its tables is copied here or in the engine; a table of names that ships has to be dumped from the DLL, or written
 by hand from the layouts above, and checked against the DLL when there is one. The names of the plugin-range codes are
 the scripts' own.

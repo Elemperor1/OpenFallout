@@ -35,6 +35,10 @@ return {
     boxes = {
         -- CG04VaultExitMessage, at the door out of Vault 101: five buttons, and the last one leaves (the others stay)
         { file = 'Fallout3.esm', ref = 0x05CF94, button = -1 },
+        -- The Tale of Two Wastelands has no such message in its Fallout3.esm: the record is FalloutNV.esm's (the same number),
+        -- which TaleOfTwoWastelands.esm overrides with six buttons (a new fourth one, the last still leaves; Mac round 8E, where
+        -- the first button was pressed over and over, 665 times, and the intro never ended)
+        { file = 'FalloutNV.esm', ref = 0x05CF94, button = -1 },
     },
     gates = {
         -- Fallout 3, Vault 101 (cell 0x028138): the Dad's trigger (a sphere, sets stage 12 for the player); the way out of the
