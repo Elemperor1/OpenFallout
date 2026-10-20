@@ -17,7 +17,8 @@ that Jacob sent on 2026-10-20 (xNVSE 6.4.9 and the plugin DLLs of the TTW mod li
 (all 139 codes have one); the bytes agree with the names (a statement or an expression, on an object or not, the shape
 of the arguments), and the extender files, read afterwards, agree with all 139 (17 are spelled with other capital
 letters there or are the short form of the registered name). They also give each code its owner, its parameters and
-whether it can stand in a condition, which the scripts could not. What a command does is in neither.
+whether it can stand in a condition, which the scripts could not, and name two more functions that only conditions use
+(no script calls them, so they are not among the 139). What a command does is in neither.
 
 ## What an extender adds to a compiled script
 
@@ -189,7 +190,8 @@ What it settles:
 - **Conditions.** The files' conditions name three extender functions (see "What the engine does today"): `0x27EC` is
   `IsSpellTargetAlt` (JIP LN, on a reference, one magic item), index `0x177C` is `GetRadiationLevelAlt` (JIP LN, `0x277C`,
   on a reference, no parameters) and index `0x2807` is `TTW_GetEquippedWeaponSkill` (`ttw_nvse`, `0x3807`, on a reference, no
-  parameters). 20 of the 139 codes the scripts call can stand in a condition.
+  parameters). Only `0x27EC` is one of the 139 codes that scripts call (and so a row of the CSV); the other two are named by
+  the DLLs alone, because only conditions use them. Of the 139 codes the scripts call, 20 can stand in a condition.
 - **What is in the DLLs and in no script.** No script and no condition of the files calls `TTW_CRC32` (`0x3805`);
   `TTW_GetEquippedWeaponSkill` is used by a perk's condition and by no script. Of the 82 plugin-range commands 30 need a
   reference, and 11 of those stand in the files without a reference in front, so (as for the games' commands) the object
