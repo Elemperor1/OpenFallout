@@ -29,19 +29,39 @@ of the objects the game makes while it runs.
 When a plugin that is not a master was made for another version of a master (the size of the master's file is not the
 size in the plugin's header), the log warns and the start goes on, as in the games.
 
+## Which plugins load
+
+Name the plugins with `--content` (one for each) and those load, with their masters. Name none and OpenFallout does
+what the games do: the files of the Data folder that are *active* load. The games find the active ones in four places,
+and so does OpenFallout (the games' `Data` folder is the data directories together; for a name that is in several,
+the last directory counts):
+
+1. The base master: the values of `sTestFile1` to `sTestFile10` in the `[General]` section of the ini file, or, where
+   the ini names none, `FalloutNV.esm` (`Fallout3.esm` where there is no such file).
+2. The names in a `Plugins.txt` (`--plugins-file`, below).
+3. Every plugin that has a file of the same name with the extension `.NAM` next to it (New Vegas does this; the files
+   are empty). This is how Tale of Two Wastelands activates its plugins.
+4. The masters of all of these, wherever the data directories have them.
+
+The ini files are `Fallout_default.ini`, `Fallout.ini` and `FalloutPrefs.ini` in the folder above each data directory
+(where the games ship `Fallout_default.ini`), then the ones given with `--game-ini`, later ones over earlier ones.
+Without any plugin named, the order is the games' own: `--plugin-order time` (below) unless `--plugin-order list` says
+otherwise. With the Tale of Two Wastelands output folder as the only data directory, the rules give exactly the 14
+plugins of the merged game (the four small packs have no `.NAM` file there, so they stay out).
+
 ## `--plugins-file`
 
 `--plugins-file <path>` reads more plugins from a file in the format of the `Plugins.txt` of the games: one file name
 to a line, case does not matter, lines that start with `#` and blank lines are skipped, a UTF-8 byte order mark is
 skipped. The newer format marks the active plugins with a leading `*` and lists the others too; where any line has the
-mark, only the marked ones count. The names are added after those given with `--content` (a plugin named in both is
-loaded once). A name that is not in any data directory is skipped with a warning, as the games skip it.
+mark, only the marked ones count. Where plugins are named with `--content`, the names are added after them (a plugin
+named in both is loaded once); where none is, they join the plugins the games make active. A name that is not in any
+data directory is skipped with a warning, as the games skip it.
 
 The games themselves find their `Plugins.txt` in `%LOCALAPPDATA%\FalloutNV\` (or `Fallout3\`), or in the current
 directory when `bUseMyGamesDirectory` is 0 in `Fallout.ini`. OpenFallout reads only the file it is given.
 
 ## Not done
 
-- The games also activate plugins from `sTestFile1` to `sTestFile10` in `Fallout.ini` and, New Vegas only, from a
-  `<plugin>.NAM` file next to the plugin. OpenFallout loads what it is told to.
+- The games skip a plugin file of zero bytes; OpenFallout does not check the size of a plugin.
 - A `DLCList.txt` is not read: neither game's executable reads it.

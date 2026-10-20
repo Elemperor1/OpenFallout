@@ -24,6 +24,9 @@ namespace ESM4
     // before every plugin that is not, whatever the order of the list; within each of the two groups the order of the
     // list stays.
 
+    /// Whether the name of a file is that of a plugin of the games: it ends in .esm, .esp or .esl
+    bool isPluginName(std::string_view name);
+
     /// What the order needs to know of a plugin: the name it is listed by, whether its header flags it as a master and
     /// the names of its masters, in the order the header lists them, each with the size in bytes the header says the
     /// master had when the plugin was made (0 where it says none).
@@ -83,6 +86,15 @@ namespace ESM4
     /// names a file that is not in their Data folder, and so does this; the log names each one.
     std::vector<std::string> dropMissingPlugins(
         const std::vector<std::string>& names, const Files::Collections& collections);
+
+    /// The plugins that the games make active when they are asked nothing: the ones the ini file names (the values of
+    /// sTestFile1 to sTestFile10 of its [General] section, \a testFiles here; where it names none, FalloutNV.esm, or
+    /// Fallout3.esm where there is no such file), the ones a Plugins.txt names (\a pluginsFile, names that are not
+    /// there are skipped) and every plugin that has a file of the same name with the extension .NAM next to it. The
+    /// games activate the masters of these as well; orderContentFiles does that. Each plugin is named once, as the
+    /// list that has it spells it, in that order.
+    std::vector<std::string> activePlugins(const std::vector<std::string>& testFiles,
+        const std::vector<std::string>& pluginsFile, const Files::Collections& collections);
 
     /// One line for each master a plugin that is not a master was made for in another version than the one at hand:
     /// the games warn of these and load on. \a sizeOf gives the size of the file of a master, nothing if it has none.

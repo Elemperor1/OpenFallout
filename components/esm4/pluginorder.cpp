@@ -21,6 +21,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ESM4
 {
@@ -36,13 +37,6 @@ namespace ESM4
                 return {};
             const std::size_t last = text.find_last_not_of(spaces);
             return std::string(text.substr(first, last - first + 1));
-        }
-
-        bool isPluginName(std::string_view name)
-        {
-            const std::string_view extension = Misc::getFileExtension(name);
-            return Misc::StringUtils::ciEqual(extension, "esm") || Misc::StringUtils::ciEqual(extension, "esp")
-                || Misc::StringUtils::ciEqual(extension, "esl");
         }
 
         struct Orderer
@@ -97,6 +91,13 @@ namespace ESM4
                 mOrder.push_back(index);
             }
         };
+    }
+
+    bool isPluginName(std::string_view name)
+    {
+        const std::string_view extension = Misc::getFileExtension(name);
+        return Misc::StringUtils::ciEqual(extension, "esm") || Misc::StringUtils::ciEqual(extension, "esp")
+            || Misc::StringUtils::ciEqual(extension, "esl");
     }
 
     std::optional<PluginInfo> readPluginInfo(const std::filesystem::path& path, std::string name)
@@ -329,6 +330,45 @@ namespace ESM4
             else
                 Log(Debug::Warning) << "Plugins file: " << name << " is not in the data directories, skipped";
         }
+        return result;
+    }
+
+    std::vector<std::string> activePlugins(const std::vector<std::string>& testFiles,
+        const std::vector<std::string>& pluginsFile, const Files::Collections& collections)
+    {
+        std::vector<std::string> result;
+        std::unordered_set<std::string> seen;
+        const auto add = [&](const std::string& name) {
+            if (seen.insert(Misc::StringUtils::lowerCase(name)).second)
+                result.push_back(name);
+        };
+        const auto has = [&](std::string_view name) {
+            return isPluginName(name) && collections.getCollection(Misc::getFileExtension(name)).doesExist(name);
+        };
+
+        bool named = false;
+        for (const std::string& name : testFiles)
+            if (has(name))
+            {
+                add(name);
+                named = true;
+            }
+        if (!named)
+            for (const char* name : { "FalloutNV.esm", "Fallout3.esm" })
+                if (has(name))
+                {
+                    add(name);
+                    break;
+                }
+
+        for (const std::string& name : dropMissingPlugins(pluginsFile, collections))
+            add(name);
+
+        const Files::MultiDirCollection& markers = collections.getCollection("nam");
+        for (const char* extension : { "esm", "esp", "esl" })
+            for (const auto& [name, path] : collections.getCollection(extension))
+                if (markers.doesExist(name.substr(0, name.size() - std::string_view(extension).size()) + "nam"))
+                    add(name);
         return result;
     }
 

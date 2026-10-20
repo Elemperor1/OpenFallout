@@ -4,6 +4,7 @@
 #include <components/fallback/validate.hpp>
 #include <components/files/collections.hpp>
 #include <components/files/configurationmanager.hpp>
+#include <components/files/gameini.hpp>
 #include <components/files/openfile.hpp>
 #include <components/misc/osgpluginchecker.hpp>
 #include <components/misc/rng.hpp>
@@ -112,11 +113,14 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
 
     const Files::Collections collections(dataDirs);
 
-    ESM4::ContentOrder contentOrder = ESM4::ContentOrder::List;
+    // The ini files of the games: the ones in the folder of each game, then the ones that were given
+    std::vector<std::filesystem::path> iniPaths = Files::findGameInis(dataDirs);
+    for (const auto& path : variables["game-ini"].as<Files::MaybeQuotedPathContainer>())
+        iniPaths.push_back(path);
+    const Files::GameIni gameIni = Files::GameIni::load(iniPaths);
+
     const std::string pluginOrder = variables["plugin-order"].as<std::string>();
-    if (pluginOrder == "time")
-        contentOrder = ESM4::ContentOrder::FileTime;
-    else if (pluginOrder != "list")
+    if (!pluginOrder.empty() && pluginOrder != "list" && pluginOrder != "time")
     {
         Log(Debug::Error) << "plugin-order must be list or time, not " << pluginOrder << ". Aborting...";
         return false;
@@ -135,23 +139,52 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
                 return false;
             }
         }
-
-        const std::filesystem::path pluginsFile = variables["plugins-file"].as<Files::MaybeQuotedPath>();
-        if (!pluginsFile.empty())
-        {
-            const auto stream = Files::openBinaryInputFileStream(pluginsFile);
-            if (!stream->is_open())
-            {
-                Log(Debug::Error) << "Failed to open the plugins file " << pluginsFile << ". Aborting...";
-                return false;
-            }
-            const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
-            for (std::string& name : ESM4::dropMissingPlugins(ESM4::parsePluginsFile(text), collections))
-                if (std::none_of(content.begin(), content.end(),
-                        [&name](const std::string& listed) { return Misc::StringUtils::ciEqual(listed, name); }))
-                    content.push_back(std::move(name));
-        }
     }
+
+    std::vector<std::string> pluginsFileNames;
+    const std::filesystem::path pluginsFile = variables["plugins-file"].as<Files::MaybeQuotedPath>();
+    if (!pluginsFile.empty())
+    {
+        const auto stream = Files::openBinaryInputFileStream(pluginsFile);
+        if (!stream->is_open())
+        {
+            Log(Debug::Error) << "Failed to open the plugins file " << pluginsFile << ". Aborting...";
+            return false;
+        }
+        const std::string text((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+        pluginsFileNames = ESM4::dropMissingPlugins(ESM4::parsePluginsFile(text), collections);
+    }
+
+    // Plugins named with content= (or none: then the games' own rules make some active) and the order they load in
+    ESM4::ContentOrder contentOrder = ESM4::ContentOrder::List;
+    if (std::any_of(content.begin(), content.end(), ESM4::isPluginName))
+    {
+        for (std::string& name : pluginsFileNames)
+            if (std::none_of(content.begin(), content.end(),
+                    [&name](const std::string& listed) { return Misc::StringUtils::ciEqual(listed, name); }))
+                content.push_back(std::move(name));
+    }
+    else
+    {
+        std::vector<std::string> testFiles;
+        for (int i = 1; i <= 10; ++i)
+            if (const auto name = gameIni.get("General", "sTestFile" + std::to_string(i)); name && !name->empty())
+                testFiles.push_back(*name);
+        const std::vector<std::string> active = ESM4::activePlugins(testFiles, pluginsFileNames, collections);
+        std::string names;
+        for (const std::string& name : active)
+            names += (names.empty() ? "" : ", ") + name;
+        Log(Debug::Info) << "No plugin is named, so the plugins the games make active load: "
+                         << (names.empty() ? "none" : names);
+        content.insert(content.begin(), active.begin(), active.end());
+        // The games have no other order for the files of their Data folder
+        contentOrder = ESM4::ContentOrder::FileTime;
+    }
+    if (pluginOrder == "list")
+        contentOrder = ESM4::ContentOrder::List;
+    else if (pluginOrder == "time")
+        contentOrder = ESM4::ContentOrder::FileTime;
+
     if (content.empty())
     {
         Log(Debug::Error) << "No content file given (esm/esp, nor omwgame/omwaddon). Aborting...";

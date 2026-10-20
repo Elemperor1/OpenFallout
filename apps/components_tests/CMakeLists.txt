@@ -65,6 +65,7 @@ file(GLOB UNITTEST_SRC_FILES
     esmloader/record.cpp
 
     files/conversiontests.cpp
+    files/testgameini.cpp
     files/hash.cpp
 
     toutf8/toutf8.cpp

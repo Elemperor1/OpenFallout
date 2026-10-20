@@ -2318,17 +2318,18 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
 
 
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
-               keys=None, new_game=False, load=None, before=()):
+               keys=None, new_game=False, load=None, before=(), plugins=True, extra=()):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
     pressed after the log has a line that matches. `new_game` adds `--new-game`; a `start` of None leaves `--start` out;
     `load` is a saved game to start from (`--load-savegame`); `before` are plugins that come before OFTest.esm in the
-    load order."""
+    load order; `plugins` False names no plugin at all; `extra` are more arguments."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data),
-               *(argument for name in before for argument in ("--content", name)), "--content", "OFTest.esm",
-               "--content", scripts, "--skip-menu", *(["--new-game"] if new_game else []),
+               *(argument for name in before if plugins for argument in ("--content", name)),
+               *(("--content", "OFTest.esm") if plugins else ()),
+               "--content", scripts, *extra, "--skip-menu", *(["--new-game"] if new_game else []),
                *([] if start is None else ["--start", start]), *([] if load is None else ["--load-savegame", str(load)]),
                "--no-grab"]
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, so give it one.
@@ -2937,6 +2938,13 @@ def check_mods(text):
             problems.append(f"the master must load before the mod: {order.group(1)}")
         elif files.index("oftestmod.esp") != files.index("oftest.esm") + 1:
             problems.append(f"the mod must load right after its master: {order.group(1)}")
+    problems += check_mod_values(text)
+    return problems
+
+
+def check_mod_values(text):
+    """The problems with the two globals of the mod: the one it changes has the value of the mod, the one it adds is there."""
+    problems = []
     base = re.search(r"OFTEST\tmods base\t(\S+)\t(\S+)", text)
     if not base:
         problems.append("the script did not log the globals")
@@ -2948,6 +2956,29 @@ def check_mods(text):
             problems.append(f"the mod adds {plugin.MOD_ADDED_GLOBAL_NAME} with the value {plugin.MOD_ADDED_VALUE}, the global "
                             f"is {base.group(2)}")
     return problems
+
+
+def check_activation(text):
+    """The problems with the plugins that the games' rules make active. No plugin was named: the ini file names
+    OFTest.esm (sTestFile1) and a file OFTestMod.NAM sits next to the mod, so both must load, the master first, and the
+    mod must change and add its globals."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|required dependency|"
+                     r"cannot be loaded|No content file", line, re.I):
+            problems.append(line)
+    if not re.search(r"the plugins the games make active load: OFTest\.esm, OFTestMod\.esp", text):
+        problems.append("the log does not say which plugins the games' rules made active")
+    order = re.search(r"OFTEST\tmods order\t(\S+)", text)
+    if not order:
+        problems.append("the script did not log the content list")
+    else:
+        files = [name.lower() for name in order.group(1).split(",")]
+        if files.count("oftest.esm") != 1 or files.count("oftestmod.esp") != 1:
+            problems.append(f"both plugins must load once: {order.group(1)}")
+        elif files.index("oftest.esm") > files.index("oftestmod.esp"):
+            problems.append(f"the master must load before the mod: {order.group(1)}")
+    return problems + check_mod_values(text)
 
 
 def check_saves(first, second, third=None):
@@ -4073,7 +4104,7 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -4114,6 +4145,7 @@ def main():
         "GLOBAL: scripts/savesworld.lua\nMENU: scripts/savesmenu.lua\nCUSTOM: scripts/saveslocal.lua\n", encoding="ascii")
     (data / "scripts" / "modstest.lua").write_text(MODS_SCRIPT, encoding="ascii")
     (data / "modstest.omwscripts").write_text("GLOBAL: scripts/modstest.lua\n", encoding="ascii")
+    (data / (Path(plugin.MOD_ADDON).stem + ".NAM")).write_bytes(b"")
     (data / "scripts" / "triggertest.lua").write_text(TRIGGER_SCRIPT, encoding="ascii")
     (data / "triggertest.omwscripts").write_text("GLOBAL: scripts/triggertest.lua\n", encoding="ascii")
     (data / "scripts" / "chargentest.lua").write_text(CHARGEN_SCRIPT, encoding="ascii")
@@ -4380,6 +4412,29 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (mods):", problem)
+        problems += found
+    if args.only in (None, "activation"):
+        home = work / "activation" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "activation" / "runtime"
+        runtime.mkdir(mode=0o700)
+        ini = work / "activation" / "Fallout.ini"
+        ini.write_text("[General]\nsTestFile1=OFTest.esm\n", encoding="ascii")
+        print("== activation: no plugin named; sTestFile1 names OFTest.esm and", plugin.MOD_ADDON, "has a .NAM file")
+        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.CELL_NAME, [],
+                               "modstest.omwscripts", plugins=False, extra=("--game-ini", str(ini)))
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_activation(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line or "Load order" in line
+                     or "make active" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (activation):", problem)
         problems += found
     if args.only in (None, "newgame"):
         home = work / "newgame" / "home"

@@ -294,4 +294,59 @@ namespace
         EXPECT_THAT(warnings[0], HasSubstr("120 bytes"));
         EXPECT_THAT(warnings[0], HasSubstr("expects 100"));
     }
+
+    TEST(ESM4PluginOrderTest, recognisesTheNamesOfPlugins)
+    {
+        EXPECT_TRUE(ESM4::isPluginName("FalloutNV.esm"));
+        EXPECT_TRUE(ESM4::isPluginName("Mod.ESP"));
+        EXPECT_TRUE(ESM4::isPluginName("Small.esl"));
+        EXPECT_FALSE(ESM4::isPluginName("Mod.esp.bak"));
+        EXPECT_FALSE(ESM4::isPluginName("scripts.omwscripts"));
+        EXPECT_FALSE(ESM4::isPluginName("esp"));
+    }
+
+    TEST(ESM4PluginOrderTest, activatesTheBaseMasterThePluginsOfAFileAndThePluginsWithAMarker)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("pluginorder_active");
+        write(dir / "FalloutNV.esm", headerWith(ESM4::Rec_ESM, {}));
+        write(dir / "DeadMoney.esm", headerWith(ESM4::Rec_ESM, { "FalloutNV.esm" }));
+        write(dir / "Marked.esm", headerWith(ESM4::Rec_ESM, { "FalloutNV.esm" }));
+        write(dir / "MARKED.NAM", "");
+        write(dir / "Listed.esp", headerWith(0, { "FalloutNV.esm" }));
+        write(dir / "Idle.esp", headerWith(0, { "FalloutNV.esm" }));
+        write(dir / "Lonely.nam", "");
+        const Files::Collections collections(Files::PathContainer{ dir });
+
+        // The base master (no sTestFile names a plugin), the file, the marker; not the others
+        EXPECT_THAT(ESM4::activePlugins({}, { "listed.ESP", "Gone.esp" }, collections),
+            UnorderedElementsAre("FalloutNV.esm", "listed.ESP", "Marked.esm"));
+        // A plugin that sTestFile names takes the place of the base master
+        EXPECT_THAT(ESM4::activePlugins({ "Idle.esp", "Absent.esm" }, {}, collections),
+            UnorderedElementsAre("Idle.esp", "Marked.esm"));
+        // Each once
+        EXPECT_THAT(ESM4::activePlugins({ "Marked.esm" }, { "marked.esm" }, collections), ElementsAre("Marked.esm"));
+    }
+
+    TEST(ESM4PluginOrderTest, activatesTheMastersOfTheActivePluginsToo)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("pluginorder_active_masters");
+        write(dir / "FalloutNV.esm", headerWith(ESM4::Rec_ESM, {}));
+        write(dir / "Fallout3.esm", headerWith(ESM4::Rec_ESM, { "FalloutNV.esm", "DeadMoney.esm" }));
+        write(dir / "DeadMoney.esm", headerWith(ESM4::Rec_ESM, { "FalloutNV.esm" }));
+        write(dir / "Fallout3.NAM", "");
+        const Files::Collections collections(Files::PathContainer{ dir });
+
+        const std::vector<std::string> active = ESM4::activePlugins({}, {}, collections);
+        // Fallout3.esm has a marker; its masters come with it when the order is made
+        EXPECT_THAT(ESM4::orderContentFiles(active, collections, ESM4::ContentOrder::FileTime),
+            ElementsAre("FalloutNV.esm", "DeadMoney.esm", "Fallout3.esm"));
+    }
+
+    TEST(ESM4PluginOrderTest, fallsBackToFallout3WhenThereIsNoNewVegas)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("pluginorder_active_fo3");
+        write(dir / "Fallout3.esm", headerWith(ESM4::Rec_ESM, {}));
+        const Files::Collections collections(Files::PathContainer{ dir });
+        EXPECT_THAT(ESM4::activePlugins({}, {}, collections), ElementsAre("Fallout3.esm"));
+    }
 }
