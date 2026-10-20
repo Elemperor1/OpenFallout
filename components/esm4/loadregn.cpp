@@ -27,7 +27,6 @@
 #include "loadregn.hpp"
 
 #include <cstring>
-#include <stdexcept>
 
 #include "reader.hpp"
 // #include "writer.hpp"
@@ -118,8 +117,12 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("RDMP"):
             {
+                // Only the areas matter to the engine: a name that is out of place is skipped, not an error
                 if (mData.type != RDAT_Map)
-                    throw std::runtime_error("REGN unexpected data type");
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
                 reader.getLocalizedString(mMapName);
                 break;
             }
@@ -146,8 +149,10 @@ void ESM4::Region::load(ESM4::Reader& reader)
             case ESM::fourCC("RDSD"): // Possibly the same as RDSA
             {
                 if (mData.type != RDAT_Sound)
-                    throw std::runtime_error(
-                        "ESM4::REGN::load - unexpected data type " + ESM::printName(subHdr.typeId));
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
 
                 std::size_t numSounds = subHdr.dataSize / sizeof(RegionSound);
                 mSounds.resize(numSounds);
@@ -160,6 +165,7 @@ void ESM4::Region::load(ESM4::Reader& reader)
             case ESM::fourCC("RDSA"):
             case ESM::fourCC("RDWT"): // formId
             case ESM::fourCC("RDOT"): // formId
+            case ESM::fourCC("MICO"): // small icon, FO3 and FONV
             case ESM::fourCC("RDID"): // FONV
             case ESM::fourCC("RDSB"): // FONV
             case ESM::fourCC("RDSI"): // FONV
@@ -183,7 +189,10 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::REGN::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                // The engine reads a region for its areas and its worldspace; what it does not know is of no use to it,
+                // and a plugin must not fail to load because of it
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

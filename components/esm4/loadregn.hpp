@@ -74,13 +74,13 @@ namespace ESM4
         std::uint32_t mFlags = 0; // from the header, see enum type RecordFlag for details
 
         std::string mEditorId;
-        std::uint32_t mColour; // RGBA
+        std::uint32_t mColour = 0; // RGBA
         ESM::FormId mWorldId; // worldspace formid
 
         std::string mShader; //?? ICON
         std::string mMapName;
 
-        std::uint32_t mEdgeFalloff;
+        std::uint32_t mEdgeFalloff = 0;
         std::vector<std::uint32_t> mRPLD; // the points of the last area, as they are written
 
         /// One of the areas of a region: a polygon of points in the worldspace (RPLI, the falloff of its edge, and
@@ -100,7 +100,7 @@ namespace ESM4
         /// the player: not a deleted record, a region of that worldspace or of none, and inside one of its areas
         bool covers(ESM::FormId worldspace, float x, float y) const;
 
-        RegionData mData;
+        RegionData mData{};
         std::vector<RegionSound> mSounds;
 
         void load(ESM4::Reader& reader);

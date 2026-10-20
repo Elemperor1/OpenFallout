@@ -96,6 +96,22 @@ namespace
         EXPECT_TRUE(unnamed.covers(ESM::FormId::fromUint32(0x809u), 50, 50));
     }
 
+    TEST(ESM4RegionTest, readsTheAreasOfARegionThatHasSubrecordsOfNoUseToTheEngine)
+    {
+        // The small icon of the games, a sound list and a map name that stand where no data entry of their type is,
+        // and a subrecord that no game has: none of them stops the load, and the areas are read
+        const ESM4::Region region = loadRegion(zString("EDID", "x") + zString("ICON", "large.dds")
+            + zString("MICO", "small.dds") + valueSubRecord<std::uint32_t>("WNAM", 0x808u) + area(0, square)
+            + subRecord("RDSD", std::string(12, 'x')) + zString("RDMP", "map") + subRecord("ZZZZ", "1")
+            + area(0, triangle));
+
+        EXPECT_EQ(region.mEditorId, "x");
+        ASSERT_EQ(region.mAreas.size(), 2u);
+        EXPECT_EQ(region.mAreas[0].mPoints, square);
+        EXPECT_EQ(region.mAreas[1].mPoints, triangle);
+        EXPECT_TRUE(region.covers(ESM::FormId::fromUint32(0x808u), 210, 20));
+    }
+
     TEST(ESM4RegionTest, aDeletedRegionCoversNothing)
     {
         const ESM4::Region region = loadRegion(area(0, square), deletedRecord);
