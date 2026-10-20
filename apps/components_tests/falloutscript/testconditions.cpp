@@ -199,6 +199,8 @@ namespace
         EXPECT_THAT(test.mHost.mLog, SizeIs(2));
         EXPECT_THAT(test.mHost.mLog[0], HasSubstr("Nothing"));
         EXPECT_THAT(test.mHost.mLog[1], HasSubstr("not in the table"));
+        // both count, the one the table lacks too (function 900 is the code 0x1384)
+        EXPECT_EQ(test.mInterpreter.takeMissingSummary(), "Nothing 2, 0x1384 2");
     }
 
     TEST(FalloutScriptConditionsTest, readsAVariableOfTheScriptOfAQuest)

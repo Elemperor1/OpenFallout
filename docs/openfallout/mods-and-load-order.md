@@ -41,7 +41,8 @@ the last directory counts):
    the ini names none, `FalloutNV.esm` (`Fallout3.esm` where there is no such file).
 2. The names in a `Plugins.txt` (`--plugins-file`, below).
 3. Every plugin that has a file of the same name with the extension `.NAM` next to it (New Vegas does this; the files
-   are empty). This is how Tale of Two Wastelands activates its plugins.
+   in its `Data` folder hold the plugin's display name, but only that the file exists counts). This is how Tale of Two
+   Wastelands activates its plugins.
 4. The masters of all of these, wherever the data directories have them.
 
 The ini files are `Fallout_default.ini`, `Fallout.ini` and `FalloutPrefs.ini` in the folder above each data directory
@@ -135,7 +136,9 @@ that means everything the reference has is the later plugin's: the flags, the po
   the master disabled.
 - A reference whose override stands in another cell is in that cell only: it leaves the cell the earlier plugin put it
   in. (The games load the children of a cell when the cell loads, and the exe reads did not settle what happens to an
-  override of a child that is already there; here the last plugin wins in every case.)
+  override of a child that is already there; here the last plugin wins in every case.) Tale of Two Wastelands has 406
+  of these, all in its own file: 404 references of `PointLookout.esm` that it moves into cells of `Fallout3.esm`, and
+  2 of `Fallout3.esm` (Mac round 8B part D3).
 - A plugin's own records have the plugin's own index in their form ID (the top byte, the number of its masters); a
   reference of a mod to a record of its master has the master's index.
 - A cell, worldspace or any other record a plugin includes whole replaces the earlier one the same way, so a mod that
@@ -155,5 +158,5 @@ that means everything the reference has is the later plugin's: the flags, the po
   path with backslashes.
 - Partial forms: the games read a record flagged `0x4000` in a plugin that is not a master and lists no masters as an
   addition to an existing form (it loads into it, and is dropped when there is no such form). OpenFallout loads such a
-  record like any other, as a whole. Whether the plugins of Tale of Two Wastelands use the flag is for the real-data
-  round to count.
+  record like any other, as a whole. No record of the 14 plugins of Tale of Two Wastelands, of its four packs or of
+  the 16 retail ESMs carries the flag (Mac round 8B part D1), so this matters for other mods only.
