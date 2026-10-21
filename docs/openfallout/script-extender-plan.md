@@ -10,11 +10,15 @@ written yet.
 Sources: Mac rounds 8B (parts E and D), 8B2, 8B3 and 8D (part D) on the 14 plugins of the TTW output folder (counts,
 bytes, editor IDs, setting names and the source text of scripts, no game text; one row per code is in
 `ttw-extension-codes.csv` next to this page, the Mac's longer notes are in the project's shared folder and not in the
-repository), the executables of both games (neither mentions an extender: Mac rounds 4 and 8A), and the public source of
-xNVSE, read for how the commands are numbered and nothing else (see "Where the names come from"). Every name of a
-command below is the one the scripts' own source text gives the code (all 139 codes have one); the bytes agree with the
-names (a statement or an expression, on an object or not, the shape of the arguments), but no extender file was
-available to check them, and the meaning and the parameters of a plugin-range command are known only from its name.
+repository), the executables of both games (neither mentions an extender: Mac rounds 4 and 8A), the public source of
+xNVSE, read for how the commands are numbered and nothing else (see "Where the names come from"), and the extender files
+that Jacob sent on 2026-10-20 (xNVSE 6.4.9 and the plugin DLLs of the TTW mod list), read without running them (see
+"What the extender files gave"). Every name of a command below is the one the scripts' own source text gives the code
+(all 139 codes have one); the bytes agree with the names (a statement or an expression, on an object or not, the shape
+of the arguments), and the extender files, read afterwards, agree with all 139 (17 are spelled with other capital
+letters there or are the short form of the registered name). They also give each code its owner, its parameters and
+whether it can stand in a condition, which the scripts could not, and name two more functions that only conditions use
+(no script calls them, so they are not among the 139). What a command does is in neither.
 
 ## What an extender adds to a compiled script
 
@@ -85,10 +89,9 @@ The 54 core codes, by what they are (53 of the names agree with the order of the
 The 78 plugin-range codes, by the high byte of the code: `0x22` 8 codes / 61 calls, `0x26` 8 / 47, `0x27` 23 / 148,
 `0x28` 31 / 255, `0x31` 5 / 42, `0x38` 2 / 10, `0x3C` 1 / 21. The five most called are `0x2837` `ToggleHardcoreTracking`
 (66 calls), `0x27EC` `IsSpellTargetAlt` (50), `0x288B` `SetGameHour` (39), `0x2829` `CastImmediate` (33) and `0x282C`
-`GetHitAttacker` (28). Which plugin owns which range is only partly known: the scripts' text gives TTW's own for the
-names that start with `TTW_` (`0x3800`, `0x3806` and `0x3808`, `TTW_EnableRadioFix`) and one comment says that
-`EnableNavMeshAlt` (`0x26EE`) is a function of JIP LN, so the other `...Alt` names (`0x26ED`, `0x2606`, `0x2717`,
-`0x2718`, `0x27EC`, `0x27E2`) are probably its too (Mac 8D part D4). The rest is not known (see below).
+`GetHitAttacker` (28). Which plugin owns which range was only partly known from the scripts (the names that start with `TTW_`, and one comment
+that says `EnableNavMeshAlt` is a function of JIP LN); the extender files settle it: of the 82 plugin-range codes 73 are
+JIP LN's, 5 JohnnyGuitar's, 3 TTW's own plugin (`ttw_nvse`) and 1 ShowOff's (see "What the extender files gave").
 
 **What TTW asks of the extender.** The quest script of `TTWGenericHandler` sets three globals from the version commands
 and `TTWGenericHandlerScript` tests `100 * version + 10 * revision + beta < 635`, so TTW wants NVSE 6.3.5 or later; it
@@ -137,6 +140,65 @@ perk, and the checks that TTW makes of the other mods and plugins.
   function that a record's condition names and the table lacks (the three above, and the two of New Vegas in "Not
   done") is counted whenever the condition is tested, so the list can hold a code that no script calls.
 
+## What the extender files gave
+
+Jacob sent the files of the TTW mod list on 2026-10-20: xNVSE 6.4.9 (`nvse_1_4.dll`, the loader, the debug symbols),
+JIP LN NVSE plugin 57.30, JohnnyGuitar NVSE 5.28, ShowOff xNVSE 1.84, lStewieAl's Tweaks 10.05, kNVSE (file 37) and
+`ttw_nvse` of the archive "ROOG NVSE 3.3.3b", with the ini presets. All are 32-bit Windows plugins for the real game; they
+were read in the cloud sandbox with a PE reader and a disassembler, never run, and none is part of the repository.
+
+**How the tables were read.** A plugin's `NVSEPlugin_Load` calls `SetOpcodeBase(base)` and then registers its commands
+one by one (`RegisterCommand`, or `RegisterTypedCommand` with the type of the return value); a command gets the code
+`base + n`, with n counting the registrations after the base, so a placeholder that is registered four times uses four
+codes. The structure that is registered has the layout that `scripts/openfallout/dump_command_table.py` documents for the
+games' tables (name, short name, help text, needs a reference, parameters, the three functions, flags), and sits in the
+DLL's data. The reader follows `Load` and the functions it calls in the order of the code, keeps the values pushed on the
+stack and held in registers, and takes the code of the n-th registration. xNVSE builds its own table the same way in one
+function that adds one structure per call (634 commands; 20 other calls in it also take a code of their own, and their
+meaning was not read). The help texts are not kept. The method is held by its result: the codes it gives for the 139 codes
+of the TTW files carry the names the scripts' text gave them, 139 of 139 (up to the spellings below).
+
+| Owner (file) | Base | Codes | In the TTW files |
+|---|---|---|---|
+| xNVSE 6.4.9 (`nvse_1_4.dll`) | `0x1400` | `0x1400` to `0x168D` (654, 20 of them not read) | 57 codes, 496 calls |
+| lStewieAl's Tweaks 10.05 | `0x2132` | `0x2132` to `0x2139` (8) | none |
+| JIP LN 57.30 (`jip_nvse.dll`) | `0x2200`, `0x2600` | `0x2200` to `0x233A` (315) and `0x2600` to `0x2942` (835); 32 of them are the placeholder `NONE` | 73 codes, 511 calls |
+| JohnnyGuitar 5.28 | `0x3100` | `0x3100` to `0x3275` (374) | 5 codes, 42 calls |
+| `ttw_nvse` 3.3.3b | `0x3800` | `0x3800` to `0x3808` (9 codes, 6 commands: `0x3801` to `0x3804` are one placeholder) | 3 codes, 10 calls |
+| kNVSE (file 37) | `0x3920` | `0x3920` to `0x3928` (9) | none |
+| ShowOff 1.84 | `0x3C93` | `0x3C93` to `0x3D69` (215) | 1 code, 21 calls |
+
+(The calls are those of the codes the decoder lists; the 7 it misses, see above, are counted as codes only.)
+
+`ttw-extension-codes.csv` now has for every one of the 139 codes the owner, the name as registered, the short name,
+whether the command needs a reference, the parameters (the notation of `vanillacommands.inc`: the type number, `?` for an
+optional one), whether it has a condition function and, for the plugin ones that declare it, the type it returns (form
+or array). The tables of all the 2,400 or so codes of the files, with the plugin's own words for the parameters, are in the
+project's shared folder (`openfallout/m8/extender-tables`, not in the repository), with the tools that read them.
+
+What it settles:
+
+- **Names.** All 139 agree with the scripts. 14 differ in capital letters (`let` and `Let`, `DisableNavmeshAlt` and
+  `DisableNavMeshAlt`, `SetNumericINISetting` and `SetNumericIniSetting`) and 3 are the short forms the scripts used
+  (`PrintC` for `PrintToConsole`, `GetAVMod` for `GetActorValueModifier`, `ActorHasBaseFlag` for `GetActorHasBaseFlag`).
+  Scripts are case-blind, so none of this matters to a call.
+- **Parameters.** The 82 plugin-range commands use only parameter types of the games' table (16 of its 62: strings,
+  integers, floats, forms, actor values, an actor, a quest, a magic item and the like) and no type of the expression
+  layout, so their arguments are the plain layout described above, and the reader the engine has for the games' commands
+  decodes them once a row of the table names them. Only 6 xNVSE commands (`Let`, `While`, `Print`, `SetEventHandler`,
+  `ar_Size`, `ar_Append`) use the expression types.
+- **Conditions.** The files' conditions name three extender functions (see "What the engine does today"): `0x27EC` is
+  `IsSpellTargetAlt` (JIP LN, on a reference, one magic item), index `0x177C` is `GetRadiationLevelAlt` (JIP LN, `0x277C`,
+  on a reference, no parameters) and index `0x2807` is `TTW_GetEquippedWeaponSkill` (`ttw_nvse`, `0x3807`, on a reference, no
+  parameters). Only `0x27EC` is one of the 139 codes that scripts call (and so a row of the CSV); the other two are named by
+  the DLLs alone, because only conditions use them. Of the 139 codes the scripts call, 20 can stand in a condition.
+- **What is in the DLLs and in no script.** No script and no condition of the files calls `TTW_CRC32` (`0x3805`);
+  `TTW_GetEquippedWeaponSkill` is used by a perk's condition and by no script. Of the 82 plugin-range commands 30 need a
+  reference, and 11 of those stand in the files without a reference in front, so (as for the games' commands) the object
+  of the script is the target.
+- **What is in neither.** The meaning of a command. The tables give a signature, not a behaviour; `GetHitAttacker` returns a
+  form and takes no arguments, and what it must return is for the step that writes it.
+
 ## The plan
 
 The order follows what each step makes work, and what it needs from the engine.
@@ -161,11 +223,12 @@ The order follows what each step makes work, and what it needs from the engine.
    can write (a change of a setting must reach the code that reads it, such as the hacking game and the pick-pocket
    chance); the equipped object and its condition need the equipment and condition state of M5 and M6; `Update3D` and
    `SetPackageTargetReference` need the world.
-4. **The plugin-range codes** (82 codes; 584 calls of the 78 the decoder lists). The scripts give each a name, not the parameters, the meaning or the owner. Two ways: the DLLs
-   themselves (dump the registered command table like the games' table is dumped, which gives names and parameters
-   without copying any list), or the public documentation of each plugin (names and meanings, written again by hand).
-   The first is the better one and needs Jacob (below). Order by use: `0x2837`, `0x27EC`, `0x288B`, `0x2829`,
-   `0x282C`, then the bobblehead and trap counters.
+4. **The plugin-range codes** (82 codes; 584 calls of the 78 the decoder lists). The names, the owners and the
+   parameters of all 82 are read from the DLLs (see above), so the rows of the command table can be written from
+   `ttw-extension-codes.csv` and the calls decode; what is left is the meaning of each, from the plugin's public
+   documentation, written again by hand. Order by use: `0x2837`, `0x27EC`, `0x288B`, `0x2829`, `0x282C`, then the
+   bobblehead and trap counters. The three condition functions of the files (`0x27EC`, `0x277C`, `0x3807`) need the
+   condition evaluator to know them as well.
 5. **Mods beyond TTW.** The retail setup on the Mac lists JIP LN, JohnnyGuitar, ShowOff, kNVSE, lStewieAl's Tweaks and
    others; each of them is hundreds of commands. They are written one at a time as mods ask for them; the run-time
    count of the engine says which a given load order reaches. Native plugin DLLs, hooks on the game's code and the
@@ -182,11 +245,10 @@ needs them.
 
 ## What it needs from Jacob
 
-Nothing blocks steps 1 to 3. Step 4 needs the extender files of a working TTW install, which only Jacob has: the NVSE
-loader and `nvse_1_4.dll`, and the plugin DLLs TTW asks for (`ttw_nvse`, JIP LN, JohnnyGuitar, ShowOff, lStewieAl's
-Tweaks, kNVSE, and any other plugin of the mod list). None is on the Mac (Mac 8A part E and 8B part E6), and a new
-download is Jacob's to make. With them, the command tables dumped from the DLLs give the names, the parameters and the
-owner of every range; without them the 78 codes have a name from the scripts and nothing else.
+Nothing blocks steps 1 to 4. The extender files that step 4 needed were not on the Mac (Mac 8A part E and 8B part E6) and
+Jacob sent them on 2026-10-20 (see "What the extender files gave"): the command tables dumped from the DLLs gave the
+names, the parameters and the owner of every range. Nothing in this plan is waiting for Jacob now. A mod's DLL that is not
+among those files has to be sent the same way when step 5 reaches it.
 
 ## Where the names come from
 
@@ -205,13 +267,19 @@ or its tables is copied here or in the engine; a table of names that ships has t
 by hand from the layouts above, and checked against the DLL when there is one. The names of the plugin-range codes are
 the scripts' own.
 
+The extender files, read afterwards, confirmed the numbering for all 139 codes (57 of xNVSE, 82 of the plugins), so the
+names in `ttw-extension-codes.csv` are now the ones the DLLs register (`registered_name`), and the scripts' spelling
+(`name`) is kept next to them. The method held for every code that was named by order alone.
+
 ## Not done
 
 - Every step of the plan above. The engine knows one of the 139 codes, `0x3800`; it still treats the other 138 as commands it does not know.
+  What step 4 needs is read (the table rows of the 82 codes are in the CSV); what each of them does is not written.
+- The commands of the plugins that no TTW script calls (JIP LN registers 1,150 codes, JohnnyGuitar 374, ShowOff 215): the
+  tables are in the shared folder; nothing reads them.
 - The meaning of the tokens `42`, `18`, `73` and `6e` in the `Let` expressions, and of the `58` token's arguments, was
   not decoded (the layout and the sample bytes are in the Mac notes).
-- Which plugin owns which range from `0x2000`, beyond TTW's own `TTW_` names and the `...Alt` names of JIP LN.
-- The three extender functions that conditions name (above) are not implemented, so those 22 conditions read 0.
+- The three extender functions that conditions name (above; the extender files name them) are not implemented, so those 22 conditions read 0.
 - Not an extender matter, found on the way: `FalloutNV.esm` has 25 conditions with the function index `0x262` and 74
   with `0x264`, and the command table has no row for the codes `0x1262` and `0x1264`. `0x264` (`PlayerInRegion`) is
   implemented, and `0x262` (`GetCasinoWinningStage`) answers 0, the answer of a player who has not gambled (see
