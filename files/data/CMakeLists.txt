@@ -42,95 +42,6 @@ set(BUILTIN_DATA_FILES
     textures/omw_xbox_button_rt.dds
     textures/omw/water_nm.png
 
-    # The images of the interface of Morrowind that the archives of Fallout do not have (made by
-    # scripts/openfallout/make_gui_textures.py)
-    textures/_land_default.dds
-    textures/compass.dds
-    textures/cursor_drop_ground.dds
-    textures/door_icon.dds
-    textures/menu_bar_gray.dds
-    textures/menu_button_frame_bottom.dds
-    textures/menu_button_frame_bottom_left_corner.dds
-    textures/menu_button_frame_bottom_right_corner.dds
-    textures/menu_button_frame_left.dds
-    textures/menu_button_frame_right.dds
-    textures/menu_button_frame_top.dds
-    textures/menu_button_frame_top_left_corner.dds
-    textures/menu_button_frame_top_right_corner.dds
-    textures/menu_head_block_bottom.dds
-    textures/menu_head_block_bottom_left_corner.dds
-    textures/menu_head_block_bottom_right_corner.dds
-    textures/menu_head_block_left.dds
-    textures/menu_head_block_middle.dds
-    textures/menu_head_block_right.dds
-    textures/menu_head_block_top.dds
-    textures/menu_head_block_top_left_corner.dds
-    textures/menu_head_block_top_right_corner.dds
-    textures/menu_rightbuttondown_bottom.dds
-    textures/menu_rightbuttondown_bottom_left.dds
-    textures/menu_rightbuttondown_bottom_right.dds
-    textures/menu_rightbuttondown_center.dds
-    textures/menu_rightbuttondown_left.dds
-    textures/menu_rightbuttondown_right.dds
-    textures/menu_rightbuttondown_top.dds
-    textures/menu_rightbuttondown_top_left.dds
-    textures/menu_rightbuttondown_top_right.dds
-    textures/menu_rightbuttonup_bottom.dds
-    textures/menu_rightbuttonup_bottom_left.dds
-    textures/menu_rightbuttonup_bottom_right.dds
-    textures/menu_rightbuttonup_center.dds
-    textures/menu_rightbuttonup_left.dds
-    textures/menu_rightbuttonup_right.dds
-    textures/menu_rightbuttonup_top.dds
-    textures/menu_rightbuttonup_top_left.dds
-    textures/menu_rightbuttonup_top_right.dds
-    textures/menu_small_energy_bar_bottom.dds
-    textures/menu_small_energy_bar_top.dds
-    textures/menu_small_energy_bar_vert.dds
-    textures/menu_thick_border_bottom.dds
-    textures/menu_thick_border_bottom_left_corner.dds
-    textures/menu_thick_border_bottom_right_corner.dds
-    textures/menu_thick_border_left.dds
-    textures/menu_thick_border_right.dds
-    textures/menu_thick_border_top.dds
-    textures/menu_thick_border_top_left_corner.dds
-    textures/menu_thick_border_top_right_corner.dds
-    textures/menu_thin_border_bottom.dds
-    textures/menu_thin_border_bottom_left_corner.dds
-    textures/menu_thin_border_bottom_right_corner.dds
-    textures/menu_thin_border_left.dds
-    textures/menu_thin_border_right.dds
-    textures/menu_thin_border_top.dds
-    textures/menu_thin_border_top_left_corner.dds
-    textures/menu_thin_border_top_right_corner.dds
-    textures/scroll.dds
-    textures/target.dds
-    textures/tx_cursor.dds
-    textures/tx_cursormove.dds
-    textures/tx_menubook.dds
-    textures/tx_menubook_bookmark.dds
-    textures/tx_menubook_cancel_idle.dds
-    textures/tx_menubook_cancel_over.dds
-    textures/tx_menubook_cancel_pressed.dds
-    textures/tx_menubook_close_idle.dds
-    textures/tx_menubook_close_over.dds
-    textures/tx_menubook_close_pressed.dds
-    textures/tx_menubook_journal_idle.dds
-    textures/tx_menubook_journal_over.dds
-    textures/tx_menubook_journal_pressed.dds
-    textures/tx_menubook_next_idle.dds
-    textures/tx_menubook_next_over.dds
-    textures/tx_menubook_next_pressed.dds
-    textures/tx_menubook_prev_idle.dds
-    textures/tx_menubook_prev_over.dds
-    textures/tx_menubook_prev_pressed.dds
-    textures/tx_menubook_take_idle.dds
-    textures/tx_menubook_take_over.dds
-    textures/tx_menubook_take_pressed.dds
-    textures/tx_menubook_topics_idle.dds
-    textures/tx_menubook_topics_over.dds
-    textures/tx_menubook_topics_pressed.dds
-
     fonts/DejaVuFontLicense.txt
     fonts/DejaVuLGCSansMono.ttf
     fonts/DejaVuLGCSansMono.omwfont
@@ -367,6 +278,103 @@ set(BUILTIN_DATA_FILES
 
 foreach (f ${BUILTIN_DATA_FILES})
     copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs/${f}")
+endforeach (f)
+
+# The images of the interface of Morrowind that the archives of Fallout do not have, made by
+# scripts/openfallout/make_gui_textures.py. They go into resources/vfs-fallback, which the engine adds to the virtual
+# file system below every archive and data directory, so that a game that has an image of the same name (Morrowind has
+# most of them) shadows the one made here.
+set(FALLBACK_TEXTURES
+    textures/_land_default.dds
+    textures/compass.dds
+    textures/cursor_drop_ground.dds
+    textures/door_icon.dds
+    textures/menu_bar_gray.dds
+    textures/menu_button_frame_bottom.dds
+    textures/menu_button_frame_bottom_left_corner.dds
+    textures/menu_button_frame_bottom_right_corner.dds
+    textures/menu_button_frame_left.dds
+    textures/menu_button_frame_right.dds
+    textures/menu_button_frame_top.dds
+    textures/menu_button_frame_top_left_corner.dds
+    textures/menu_button_frame_top_right_corner.dds
+    textures/menu_head_block_bottom.dds
+    textures/menu_head_block_bottom_left_corner.dds
+    textures/menu_head_block_bottom_right_corner.dds
+    textures/menu_head_block_left.dds
+    textures/menu_head_block_middle.dds
+    textures/menu_head_block_right.dds
+    textures/menu_head_block_top.dds
+    textures/menu_head_block_top_left_corner.dds
+    textures/menu_head_block_top_right_corner.dds
+    textures/menu_rightbuttondown_bottom.dds
+    textures/menu_rightbuttondown_bottom_left.dds
+    textures/menu_rightbuttondown_bottom_right.dds
+    textures/menu_rightbuttondown_center.dds
+    textures/menu_rightbuttondown_left.dds
+    textures/menu_rightbuttondown_right.dds
+    textures/menu_rightbuttondown_top.dds
+    textures/menu_rightbuttondown_top_left.dds
+    textures/menu_rightbuttondown_top_right.dds
+    textures/menu_rightbuttonup_bottom.dds
+    textures/menu_rightbuttonup_bottom_left.dds
+    textures/menu_rightbuttonup_bottom_right.dds
+    textures/menu_rightbuttonup_center.dds
+    textures/menu_rightbuttonup_left.dds
+    textures/menu_rightbuttonup_right.dds
+    textures/menu_rightbuttonup_top.dds
+    textures/menu_rightbuttonup_top_left.dds
+    textures/menu_rightbuttonup_top_right.dds
+    textures/menu_small_energy_bar_bottom.dds
+    textures/menu_small_energy_bar_top.dds
+    textures/menu_small_energy_bar_vert.dds
+    textures/menu_thick_border_bottom.dds
+    textures/menu_thick_border_bottom_left_corner.dds
+    textures/menu_thick_border_bottom_right_corner.dds
+    textures/menu_thick_border_left.dds
+    textures/menu_thick_border_right.dds
+    textures/menu_thick_border_top.dds
+    textures/menu_thick_border_top_left_corner.dds
+    textures/menu_thick_border_top_right_corner.dds
+    textures/menu_thin_border_bottom.dds
+    textures/menu_thin_border_bottom_left_corner.dds
+    textures/menu_thin_border_bottom_right_corner.dds
+    textures/menu_thin_border_left.dds
+    textures/menu_thin_border_right.dds
+    textures/menu_thin_border_top.dds
+    textures/menu_thin_border_top_left_corner.dds
+    textures/menu_thin_border_top_right_corner.dds
+    textures/scroll.dds
+    textures/target.dds
+    textures/tx_cursor.dds
+    textures/tx_cursormove.dds
+    textures/tx_menubook.dds
+    textures/tx_menubook_bookmark.dds
+    textures/tx_menubook_cancel_idle.dds
+    textures/tx_menubook_cancel_over.dds
+    textures/tx_menubook_cancel_pressed.dds
+    textures/tx_menubook_close_idle.dds
+    textures/tx_menubook_close_over.dds
+    textures/tx_menubook_close_pressed.dds
+    textures/tx_menubook_journal_idle.dds
+    textures/tx_menubook_journal_over.dds
+    textures/tx_menubook_journal_pressed.dds
+    textures/tx_menubook_next_idle.dds
+    textures/tx_menubook_next_over.dds
+    textures/tx_menubook_next_pressed.dds
+    textures/tx_menubook_prev_idle.dds
+    textures/tx_menubook_prev_over.dds
+    textures/tx_menubook_prev_pressed.dds
+    textures/tx_menubook_take_idle.dds
+    textures/tx_menubook_take_over.dds
+    textures/tx_menubook_take_pressed.dds
+    textures/tx_menubook_topics_idle.dds
+    textures/tx_menubook_topics_over.dds
+    textures/tx_menubook_topics_pressed.dds
+)
+
+foreach (f ${FALLBACK_TEXTURES})
+    copy_resource_file("${CMAKE_CURRENT_SOURCE_DIR}/${f}" "${OPENFALLOUT_RESOURCES_ROOT}" "resources/vfs-fallback/${f}")
 endforeach (f)
 
 # A skeleton with no body for the actors of a game that supplies none, Fallout 3 and New Vegas among them. It is copied to

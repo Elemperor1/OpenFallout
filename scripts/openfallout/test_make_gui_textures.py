@@ -49,11 +49,20 @@ class GuiTexturesTest(unittest.TestCase):
                         missing.add(match.group(1))
         self.assertEqual(sorted(missing), [])
 
-    def test_build_copies_them(self):
+    def test_build_copies_them_below_the_archives(self):
+        # they go to resources/vfs-fallback, so that the image of a game that has one of the same name shadows them
         with open(os.path.join(DATA, 'CMakeLists.txt')) as stream:
-            listed = set(re.findall(r'^\s+textures/(\S+)$', stream.read(), re.MULTILINE))
+            text = stream.read()
+        match = re.search(r'set\(FALLBACK_TEXTURES\n(.*?)\n\)', text, re.DOTALL)
+        self.assertIsNotNone(match, 'files/data/CMakeLists.txt has no FALLBACK_TEXTURES')
+        listed = set(re.findall(r'^\s+textures/(\S+)$', match.group(1), re.MULTILINE))
         for name in self.images:
-            self.assertIn(name + '.dds', listed, '%s.dds is not in files/data/CMakeLists.txt' % name)
+            self.assertIn(name + '.dds', listed, '%s.dds is not in FALLBACK_TEXTURES' % name)
+        self.assertEqual(sorted(listed), sorted(name + '.dds' for name in self.images))
+        self.assertIn('resources/vfs-fallback/${f}', text)
+        builtin = re.search(r'set\(BUILTIN_DATA_FILES\n(.*?)\n\)', text, re.DOTALL).group(1)
+        for name in self.images:
+            self.assertNotIn('textures/%s.dds' % name, builtin, '%s.dds would be installed over the archives' % name)
 
 
 if __name__ == '__main__':
