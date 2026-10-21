@@ -525,6 +525,13 @@ namespace OFGui
         mHealth->setVisible(visible);
         mMagicka->setVisible(visible);
         mStamina->setVisible(visible);
+        // the frames of the bars hold their tooltips and take the clicks
+        for (const char* name : { "HealthFrame", "MagickaFrame", "FatigueFrame" })
+        {
+            MyGUI::Widget* frame = nullptr;
+            getWidget(frame, name);
+            frame->setVisible(visible);
+        }
         updatePositions();
     }
 

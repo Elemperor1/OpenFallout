@@ -13,7 +13,8 @@ import os
 import struct
 import sys
 
-GEOMETRY_DATA = ('NiTriShapeData', 'NiTriStripsData', 'BSPackedAdditionalGeometryData', 'NiLinesData')
+# the blocks that start with a group id and then the number of vertices (not the packed additional data of Bethesda)
+GEOMETRY_DATA = ('NiTriShapeData', 'NiTriStripsData', 'NiLinesData')
 
 
 class Reader:
@@ -47,15 +48,19 @@ def parse(data):
     info = {'header': data[:end].decode('latin-1')}
     version = reader.take('<I')
     info['version'] = '.'.join(str((version >> shift) & 0xFF) for shift in (24, 16, 8, 0))
-    if version < 0x14000005:
-        raise ValueError('version %s is before 20.0.0.5' % info['version'])
+    if version < 0x14020007:
+        # the sizes of the blocks are in the header from 20.2.0.7 on
+        raise ValueError('version %s is before 20.2.0.7' % info['version'])
     info['little endian'] = bool(reader.take('<B'))
     info['user version'] = reader.take('<I')
     blocks = reader.take('<I')
-    info['bs version'] = reader.take('<I') if info['user version'] >= 3 or version >= 0x14020007 else 0
-    for _ in range(3):
-        # author, process script and export script: a length byte and the characters
-        reader.text(reader.take('<B'))
+    info['bs version'] = 0
+    if version == 0x14020007 and info['user version'] >= 3:
+        # the header of Bethesda: its version, then the author, the process script and the export script (a length byte
+        # and the characters)
+        info['bs version'] = reader.take('<I')
+        for _ in range(3):
+            reader.text(reader.take('<B'))
     types = [reader.text(reader.take('<I')) for _ in range(reader.take('<H'))]
     indices = [reader.take('<H') & 0x7FFF for _ in range(blocks)]
     sizes = [reader.take('<I') for _ in range(blocks)]
@@ -64,6 +69,9 @@ def parse(data):
     info['strings'] = [reader.text(reader.take('<I')) for _ in range(count)]
     for _ in range(reader.take('<I')):
         reader.take('<I')
+    for index in indices:
+        if index >= len(types):
+            raise ValueError('a block has the type %d, the header lists %d types' % (index, len(types)))
     info['blocks'] = [(types[index], size) for index, size in zip(indices, sizes)]
     # the first fields of a geometry block: the group id and the number of vertices
     offset = reader.pos

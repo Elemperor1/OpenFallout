@@ -305,8 +305,8 @@ def build_all():
     bookmark = panel(32, 64, 1)
     images['tx_menubook_bookmark'] = bookmark
     for name, glyph, size in (('prev', 'prev', (48, 32)), ('next', 'next', (48, 32)), ('close', 'close', (48, 32)),
-                              ('take', 'take', (128, 32)), ('journal', 'journal', (128, 32)),
-                              ('topics', 'topics', (128, 32)), ('cancel', 'cancel', (128, 32))):
+                              ('take', 'take', (64, 32)), ('journal', 'journal', (64, 32)),
+                              ('topics', 'topics', (56, 32)), ('cancel', 'cancel', (56, 32))):
         for state in ('idle', 'over', 'pressed'):
             images['tx_menubook_%s_%s' % (name, state)] = glyph_button(size[0], size[1], state, glyph)
 

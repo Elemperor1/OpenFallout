@@ -119,7 +119,7 @@ local reportedMarkup = 0
 local function clean(text)
     text = tostring(text or '')
     local tags, controls = {}, 0
-    text = text:gsub('<(%a+)[^<>\r\n]*>', function(kind)
+    text = text:gsub('<(%a+)=[^<>\r\n]*>', function(kind)
         tags[#tags + 1] = kind
         return ' '
     end)
