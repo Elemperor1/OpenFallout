@@ -25,6 +25,8 @@
 #include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/npcstats.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "draganddrop.hpp"
 #include "inventorywindow.hpp"
 #include "itemwidget.hpp"
@@ -37,10 +39,12 @@ namespace OFGui
     {
         // Fallout 3 and New Vegas have a head-up display of their own (files/data/scripts/omw/falloutstatus.lua), so the
         // bars of health, magicka and fatigue, the boxes of the weapon, the spell and the effects and the minimap of
-        // Morrowind are not shown for them
+        // Morrowind are not shown for them. The scripts of Fallout are there for every content (also Morrowind), so
+        // the content is Fallout when it has the dialogue of Fallout, as the window of the dialogue decides too.
         bool isFalloutContent()
         {
-            return OFBase::Environment::get().getFalloutScripts() != nullptr;
+            const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            return scripts != nullptr && scripts->hasDialogue();
         }
     }
 
@@ -309,17 +313,20 @@ namespace OFGui
     {
         LocalMapBase::onFrame(dt);
 
-        // the HUD is made before the content is known, and the window manager sets the parts only when a window opens
-        // or closes, so the parts of Morrowind are taken away the first time that the content is seen to be Fallout
-        if (!mFalloutHudApplied && isFalloutContent())
+        // the window manager sets the parts only when a window opens or closes, so the parts of Morrowind are taken
+        // away once, in the first frame, when the content is Fallout
+        if (!mContentChecked)
         {
-            mFalloutHudApplied = true;
-            setHmsVisible(false);
-            setWeapVisible(false);
-            setSpellVisible(false);
-            setSneakVisible(false);
-            setEffectVisible(false);
-            setMinimapVisible(false);
+            mContentChecked = true;
+            if (isFalloutContent())
+            {
+                setHmsVisible(false);
+                setWeapVisible(false);
+                setSpellVisible(false);
+                setSneakVisible(false);
+                setEffectVisible(false);
+                setMinimapVisible(false);
+            }
         }
 
         mCellNameTimer -= dt;

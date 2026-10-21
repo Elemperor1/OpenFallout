@@ -104,7 +104,7 @@ namespace OFGui
         bool mSpellVisible = true;
         bool mWorldMouseOver = false;
         bool mIsDrowning = false;
-        bool mFalloutHudApplied = false;
+        bool mContentChecked = false;
 
         void onWorldClicked(MyGUI::Widget* sender);
         void onWorldMouseOver(MyGUI::Widget* sender, int x, int y);
