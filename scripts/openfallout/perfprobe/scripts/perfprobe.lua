@@ -11,6 +11,7 @@
 local core = require('openfallout.core')
 local self = require('openfallout.self')
 local debug = require('openfallout.debug')
+local I = require('openfallout.interfaces')
 
 -- The phases, in order. `secs` is real time. `shot` takes a screenshot when the phase ends, `turn` makes a full turn to the
 -- right with a screenshot at each quarter, `run` makes the player run.
@@ -38,6 +39,7 @@ local frames, window = {}, {}
 local hitches, hitchLog = 0, 0
 local shots = 0
 local lastPos, lastCheck = nil, 0
+local overridden = false
 
 local function log(...) print('PERF', ...) end
 
@@ -140,6 +142,12 @@ local function onUpdate()
             spec.lastQuarter = quarter
             shot('turn' .. quarter)
         end
+    end
+    -- the default controls script writes the movement of the player from the keyboard every frame unless it is told not to
+    local wantOverride = spec.run or spec.turn
+    if wantOverride ~= overridden then
+        overridden = wantOverride
+        I.Controls.overrideMovementControls(overridden and true or false)
     end
     if spec.run then
         controls.movement = 1
