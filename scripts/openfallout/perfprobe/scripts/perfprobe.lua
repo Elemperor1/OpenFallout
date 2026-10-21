@@ -152,6 +152,9 @@ local function onUpdate()
     if spec.run then
         controls.movement = 1
         controls.run = true
+        -- the engine applies the yaw of the controls on every frame they are written, so it is set to zero here, after
+        -- a turn phase or a stall turn left a value in it, and the stall turn below is one frame only
+        controls.yawChange = 0
         if now - lastCheck >= 1 then
             local pos = self.position
             if lastPos and (pos - lastPos):length() < STALL_UNITS then
@@ -166,6 +169,7 @@ local function onUpdate()
     if inPhase >= spec.secs then
         controls.movement = 0
         controls.run = false
+        controls.yawChange = 0
         if spec.shot then shot(spec.name) end
         endPhase(now)
         startPhase(now)
