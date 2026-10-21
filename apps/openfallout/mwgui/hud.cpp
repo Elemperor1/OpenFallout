@@ -33,6 +33,17 @@
 
 namespace OFGui
 {
+    namespace
+    {
+        // Fallout 3 and New Vegas have a head-up display of their own (files/data/scripts/omw/falloutstatus.lua), so the
+        // bars of health, magicka and fatigue, the boxes of the weapon, the spell and the effects and the minimap of
+        // Morrowind are not shown for them
+        bool isFalloutContent()
+        {
+            return OFBase::Environment::get().getFalloutScripts() != nullptr;
+        }
+    }
+
     HUD::HUD(CustomMarkerCollection& customMarkers, DragAndDrop* dragAndDrop, OFRender::LocalMap* localMapRender)
         : WindowBase("openmw_hud.layout")
         , LocalMapBase(customMarkers, localMapRender, Settings::map().mLocalMapHudFogOfWar)
@@ -298,6 +309,19 @@ namespace OFGui
     {
         LocalMapBase::onFrame(dt);
 
+        // the HUD is made before the content is known, and the window manager sets the parts only when a window opens
+        // or closes, so the parts of Morrowind are taken away the first time that the content is seen to be Fallout
+        if (!mFalloutHudApplied && isFalloutContent())
+        {
+            mFalloutHudApplied = true;
+            setHmsVisible(false);
+            setWeapVisible(false);
+            setSpellVisible(false);
+            setSneakVisible(false);
+            setEffectVisible(false);
+            setMinimapVisible(false);
+        }
+
         mCellNameTimer -= dt;
         mWeaponSpellTimer -= dt;
         if (mCellNameTimer < 0)
@@ -490,6 +514,7 @@ namespace OFGui
 
     void HUD::setHmsVisible(bool visible)
     {
+        visible = visible && !isFalloutContent();
         mHealth->setVisible(visible);
         mMagicka->setVisible(visible);
         mStamina->setVisible(visible);
@@ -498,31 +523,31 @@ namespace OFGui
 
     void HUD::setWeapVisible(bool visible)
     {
-        mWeapBox->setVisible(visible);
+        mWeapBox->setVisible(visible && !isFalloutContent());
         updatePositions();
     }
 
     void HUD::setSpellVisible(bool visible)
     {
-        mSpellBox->setVisible(visible);
+        mSpellBox->setVisible(visible && !isFalloutContent());
         updatePositions();
     }
 
     void HUD::setSneakVisible(bool visible)
     {
-        mSneakBox->setVisible(visible);
+        mSneakBox->setVisible(visible && !isFalloutContent());
         updatePositions();
     }
 
     void HUD::setEffectVisible(bool visible)
     {
-        mEffectBox->setVisible(visible);
+        mEffectBox->setVisible(visible && !isFalloutContent());
         updatePositions();
     }
 
     void HUD::setMinimapVisible(bool visible)
     {
-        mMinimapBox->setVisible(visible);
+        mMinimapBox->setVisible(visible && !isFalloutContent());
         updatePositions();
     }
 
