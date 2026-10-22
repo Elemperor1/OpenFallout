@@ -8,6 +8,7 @@
 #include <osg/Node>
 #include <osg/ref_ptr>
 
+#include <components/sceneutil/material.hpp>
 #include <components/vfs/pathutil.hpp>
 
 namespace VFS
@@ -56,11 +57,15 @@ namespace Resource
     SpeedTreeClusters getSpeedTreeClusters(int imageWidth, int imageHeight);
 
     /// `cards` upright quads of the given width and height that stand on z = 0, cross at the origin and are turned
-    /// evenly about the vertical axis. The coordinates of the image run from its top (v = 0) to its bottom, as in a nif.
-    /// Each card shows one cluster of the image, the cards one after the other taking the clusters row by row from
+    /// evenly about the vertical axis. The coordinates of the image run from its top (v = 0) to its bottom, as in a
+    /// nif. Each card shows one cluster of the image, the cards one after the other taking the clusters row by row from
     /// the top left, and starting again at the first when there are more cards than clusters.
     osg::ref_ptr<osg::Geometry> makeCrossedCards(
         float width, float height, unsigned int cards, SpeedTreeClusters clusters = {});
+
+    /// The material of the cards: the light they take as both their ambient and their diffuse colour. It has to be a
+    /// SceneUtil::Material, as the shaders (and the visitor that sets them up) read no other kind of material.
+    osg::ref_ptr<SceneUtil::Material> makeSpeedTreeMaterial();
 
     /// The cards of a tree with the image of its record, which is alpha tested and drawn on both sides. A node
     /// without anything to draw when the image cannot be found.

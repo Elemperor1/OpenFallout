@@ -3,9 +3,11 @@
 
 #include <components/esm/refid.hpp>
 #include <components/resource/resourcemanager.hpp>
+#include <components/sceneutil/loddebug.hpp>
 #include <components/terrain/lodindex.hpp>
 #include <components/terrain/quadtreeworld.hpp>
 
+#include <atomic>
 #include <utility>
 
 namespace Resource
@@ -25,8 +27,18 @@ namespace OFRender
         /// The largest node, in cells, that draws distant objects.
         static constexpr float sLargestObjectsSize = 8.f;
 
+        struct Options
+        {
+            /// Whether the blocks of objects are drawn
+            bool mObjects = true;
+            /// How the normal maps of the tiles are read: the values of `lodNormalMode` in the shader bs/default.frag
+            int mNormalMode = 0;
+            /// What of the debug words changes which files are drawn (the rest changes the files as they are loaded)
+            SceneUtil::LodDebug mDebug;
+        };
+
         FalloutLod(Resource::SceneManager* sceneManager, Terrain::LodIndex index, ESM::RefId worldspace,
-            bool objects, double expiryDelay);
+            const Options& options, double expiryDelay);
 
         osg::ref_ptr<osg::Node> getChunk(float size, const osg::Vec2f& center, unsigned char lod, unsigned int lodFlags,
             bool activeGrid, const osg::Vec3f& viewPoint, bool compile) override;
@@ -50,11 +62,14 @@ namespace OFRender
         Terrain::LodIndex::Coverage getTerrainCoverage(float size, const osg::Vec2f& center) const;
         osg::ref_ptr<osg::Node> createChunk(float size, const osg::Vec2f& center, bool compile);
         void addObjects(osg::Group& group, float size, const osg::Vec2f& center);
+        void reportObjects(float size, int x, int y, osg::Group& objects);
 
         Resource::SceneManager* mSceneManager;
         Terrain::LodIndex mIndex;
-        bool mObjects;
+        Options mOptions;
         float mCellSize;
+        /// The nodes with objects that have been logged
+        std::atomic<int> mReported{ 0 };
     };
 }
 

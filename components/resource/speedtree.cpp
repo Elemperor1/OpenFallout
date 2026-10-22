@@ -7,11 +7,11 @@
 
 #include <osg/AlphaFunc>
 #include <osg/Group>
-#include <osg/Material>
 #include <osg/Texture2D>
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/resourcehelpers.hpp>
+#include <components/sceneutil/material.hpp>
 #include <components/sceneutil/texturetype.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
@@ -91,6 +91,14 @@ namespace Resource
         return geometry;
     }
 
+    osg::ref_ptr<SceneUtil::Material> makeSpeedTreeMaterial()
+    {
+        // The shaders take the colours of a surface from a SceneUtil::Material and nothing else
+        const osg::Vec4f light(sSpeedTreeLight, sSpeedTreeLight, sSpeedTreeLight, 1.f);
+        return new SceneUtil::Material(
+            { .mDiffuse = light, .mAmbient = light, .mSpecular = osg::Vec4f(0.f, 0.f, 0.f, 0.f) });
+    }
+
     osg::ref_ptr<osg::Node> makeSpeedTreeStandIn(const SpeedTreeStandIn& tree, ImageManager& imageManager)
     {
         osg::ref_ptr<osg::Group> node = new osg::Group;
@@ -124,15 +132,7 @@ namespace Resource
         stateset->setTextureAttribute(0, new SceneUtil::TextureType("diffuseMap"), osg::StateAttribute::ON);
         stateset->setAttributeAndModes(new osg::AlphaFunc(osg::AlphaFunc::GREATER, 0.5f), osg::StateAttribute::ON);
         stateset->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
-        osg::ref_ptr<osg::Material> material = new osg::Material;
-        material->setColorMode(osg::Material::OFF);
-        material->setAmbient(
-            osg::Material::FRONT_AND_BACK, osg::Vec4f(sSpeedTreeLight, sSpeedTreeLight, sSpeedTreeLight, 1.f));
-        material->setDiffuse(
-            osg::Material::FRONT_AND_BACK, osg::Vec4f(sSpeedTreeLight, sSpeedTreeLight, sSpeedTreeLight, 1.f));
-        material->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4f(0.f, 0.f, 0.f, 0.f));
-        material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4f(0.f, 0.f, 0.f, 0.f));
-        stateset->setAttributeAndModes(material, osg::StateAttribute::ON);
+        stateset->setAttributeAndModes(makeSpeedTreeMaterial(), osg::StateAttribute::ON);
 
         node->addChild(geometry);
         return node;

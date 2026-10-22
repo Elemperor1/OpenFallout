@@ -36,6 +36,17 @@ namespace OFLua
         // For example "prisonmarker" has class "Door" despite that it is only an invisible marker.
         if (Misc::ResourceHelpers::isHiddenMarker(ptr.getCellRef().getRefId()))
             return nullptr;
+        // The classes of the Fallout records do not tell what they are as the Morrowind ones do
+        switch (ptr.mRef->getType())
+        {
+            case ESM::REC_NPC_4:
+            case ESM::REC_CREA4:
+                return &mActorsInScene;
+            case ESM::REC_CONT4:
+                return &mContainersInScene;
+            default:
+                break;
+        }
         const OFWorld::Class& cls = ptr.getClass();
         if (cls.isActivator())
             return &mActivatorsInScene;

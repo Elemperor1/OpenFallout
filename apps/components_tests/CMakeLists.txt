@@ -227,6 +227,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     sceneutil/osgacontroller.cpp
     sceneutil/smoothnormals.cpp
+    sceneutil/loddebug.cpp
     sceneutil/userdata.cpp
 
     bsa/testbsafile.cpp

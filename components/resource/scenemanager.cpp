@@ -45,6 +45,7 @@
 #include <components/sceneutil/controller.hpp>
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/lightmanager.hpp>
+#include <components/sceneutil/loddebug.hpp>
 #include <components/sceneutil/optimizer.hpp>
 #include <components/sceneutil/riggeometryosgaextension.hpp>
 #include <components/sceneutil/smoothnormals.hpp>
@@ -1036,7 +1037,10 @@ namespace Resource
             // The distant land of the games comes without normals, and the lighting and the normal maps need them. The
             // tiles of land have skirts that hang from their edges to far below the ground
             if (path.value().starts_with("meshes/landscape/lod/"))
+            {
                 SceneUtil::generateMissingNormals(*loaded, sLodSkirtHeight);
+                SceneUtil::applyLodDebug(*loaded, path.value(), mLodDebug, sLodSkirtHeight);
+            }
 
             // set filtering settings
             SetFilterSettingsVisitor setFilterSettingsVisitor(mMinFilter, mMagFilter, mMaxAnisotropy);

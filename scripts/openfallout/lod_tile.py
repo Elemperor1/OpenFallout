@@ -9,6 +9,10 @@ between a tile and a neighbour of another level of detail.
 
 This one is a flat square at one height with a skirt down from its south edge.
 
+The blocks of the distant objects (meshes/landscape/lod/<worldspace>/blocks/<worldspace>.level4.x<X>.y<Y>.nif) are a different
+kind of file: the root node stays at the origin, the vertices are in the units of the world, and the shape is a
+BSSegmentedTriShape. block() writes one with a flat square over the 4 by 4 cells of the block.
+
     scripts/openfallout/lod_tile.py oftestworld.level8.x8.y0.nif
 """
 import struct
@@ -23,6 +27,7 @@ NONE = -1
 IDENTITY = (1, 0, 0, 0, 1, 0, 0, 0, 1)
 CELL_SIZE = 4096.0
 SKIRT_FLOOR = -14098.0
+BLOCK_CELLS = 4
 
 
 def node(name, translation, children):
@@ -59,6 +64,11 @@ def shape_data(points, triangles, size):
     return out + struct.pack("<H", 0)  # no match groups
 
 
+def segmented_shape(name, data_ref, triangles):
+    """A BSSegmentedTriShape: an NiTriShape with a list of segments, here one that holds all the triangles."""
+    return shape(name, data_ref) + struct.pack("<I", 1) + struct.pack("<BII", 0, 0, triangles)
+
+
 def tile(level, x, y, height):
     """A file for the tile of L by L cells from the cell x, y: a square at the height, and below its south edge the skirt."""
     size = level * CELL_SIZE
@@ -71,6 +81,23 @@ def tile(level, x, y, height):
         ("NiTriShapeData", shape_data(points, triangles, size)),
     ]
     return nif(blocks, ["OFTestTile", "OFTestTileShape"], [0])
+
+
+def block(x, y, height):
+    """A file for the block of 4 by 4 cells from the cell x, y: the root node at the origin, and a square at the height
+    whose points are where it is drawn in the world."""
+    size = BLOCK_CELLS * CELL_SIZE
+    left, bottom = x * CELL_SIZE, y * CELL_SIZE
+    points = [(left, bottom, height), (left + size, bottom, height), (left + size, bottom + size, height),
+              (left, bottom + size, height)]
+    triangles = [(0, 1, 2), (0, 2, 3)]
+    data = shape_data(points, triangles, size)
+    blocks = [
+        ("NiNode", node(0, (0, 0, 0), [1])),
+        ("BSSegmentedTriShape", segmented_shape(1, 2, len(triangles))),
+        ("NiTriShapeData", data),
+    ]
+    return nif(blocks, ["OFTestBlock", "OFTestBlockShape"], [0])
 
 
 if __name__ == "__main__":

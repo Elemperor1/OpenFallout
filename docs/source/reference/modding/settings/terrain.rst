@@ -242,3 +242,27 @@ Terrain Settings
 
    Draws the distant objects (buildings, rocks, ...) from the blocks of the level of detail files of the game
    in the cells that are not loaded. Needs game lod. Object paging is not used in the worldspaces that use game lod.
+
+.. omw-setting::
+   :title: game lod normal maps
+   :type: string
+   :range: tangent, flipped, object, none
+   :default: tangent
+
+   How the normal maps of the land in the level of detail files of the game are read.
+   ``tangent`` reads them as the normal maps of objects are read, relative to the surface.
+   ``flipped`` does that with the green channel turned over, and ``object`` takes them as the normals of the world.
+   ``none`` does not use them, so that the land is lit by the shape of its tiles only.
+   Meant for finding which of them draws the land as the game does.
+
+.. omw-setting::
+   :title: game lod debug
+   :type: string
+   :default: (empty)
+
+   Words, separated by spaces or commas, that change how the distant land is drawn, to find faults in it.
+   ``flat`` leaves out the textures and colours each file by what it is (the tiles of 4, 8, 16 and 32 cells red, green,
+   blue and yellow, the blocks of objects magenta and the blocks of high detail cyan), ``wireframe`` draws only the
+   edges of the triangles, ``no-skirt`` leaves out the triangles that hang under the edge of a tile,
+   ``objects-only`` draws the blocks of objects and no land, and ``no-high`` leaves out the blocks of high detail.
+   Words that are none of these are logged and ignored.

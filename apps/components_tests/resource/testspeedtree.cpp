@@ -133,7 +133,8 @@ namespace
             { VFS::Path::NormalizedView("textures/trees/leaves/pineleaves01.dds"), &file },
             { VFS::Path::NormalizedView("textures/pineleaves01.dds"), &file },
         });
-        EXPECT_EQ(Resource::findSpeedTreeImage("PineLeaves01.dds", *vfs).value(), "textures/trees/leaves/pineleaves01.dds");
+        EXPECT_EQ(
+            Resource::findSpeedTreeImage("PineLeaves01.dds", *vfs).value(), "textures/trees/leaves/pineleaves01.dds");
     }
 
     TEST(ResourceSpeedTreeTest, theLeavesComeBeforeTheBillboardsWhenBothHaveTheFile)
@@ -172,6 +173,22 @@ namespace
         EXPECT_EQ(Resource::findSpeedTreeImage("Lost.dds", *vfs).value(), "textures/lost.dds");
     }
 
+    TEST(ResourceSpeedTreeTest, theCardsTakeTheirLightFromAMaterialTheShadersRead)
+    {
+        const osg::ref_ptr<SceneUtil::Material> material = Resource::makeSpeedTreeMaterial();
+        ASSERT_NE(material, nullptr);
+        EXPECT_EQ(material->getDiffuse(), osg::Vec4f(0.55f, 0.55f, 0.55f, 1.f));
+        EXPECT_EQ(material->getAmbient(), material->getDiffuse());
+        EXPECT_EQ(material->getSpecular().x(), 0.f);
+        EXPECT_EQ(material->getVertexColorMode(), SceneUtil::VertexColorModes::None);
+
+        // The visitor of the shaders casts the material of a state set to this class: it must be one
+        osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
+        stateset->setAttributeAndModes(material, osg::StateAttribute::ON);
+        EXPECT_NE(
+            dynamic_cast<const SceneUtil::Material*>(stateset->getAttribute(osg::StateAttribute::MATERIAL)), nullptr);
+    }
+
     TEST(ResourceSpeedTreeTest, theCardsOfATreeAreNotMadeIntoCollision)
     {
         TestingOpenMW::VFSTestFile file("image");
@@ -181,7 +198,8 @@ namespace
         const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
         Resource::ResourceSystem resourceSystem(vfs.get(), 1.0, &encoder.getStatelessEncoder());
         constexpr VFS::Path::NormalizedView tree("trees/oftesttree.spt");
-        resourceSystem.getSceneManager()->setSpeedTree(tree, Resource::SpeedTreeStandIn{ "oftesttree.dds", 400.f, 700.f });
+        resourceSystem.getSceneManager()->setSpeedTree(
+            tree, Resource::SpeedTreeStandIn{ "oftesttree.dds", 400.f, 700.f });
 
         Resource::BulletShapeManager shapes(
             vfs.get(), resourceSystem.getSceneManager(), resourceSystem.getNifFileManager(), 1.0);
