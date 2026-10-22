@@ -56,7 +56,10 @@ namespace ESM4
                     ++mTrace->mOtherItems;
             }
 
-            CharacterArmor take() { return CharacterArmor{ std::move(mArmor), std::move(mFromLists) }; }
+            CharacterArmor take()
+            {
+                return CharacterArmor{ std::move(mArmor), std::move(mFromLists), std::move(mOtherFromLists) };
+            }
 
         private:
             void add(ESM::FormId id)
@@ -77,6 +80,17 @@ namespace ESM4
                     [armor](const ListedArmor& piece) { return piece.mArmor == armor; });
                 if (given == mFromLists.end())
                     mFromLists.push_back({ armor, copies });
+                else
+                    given->mCount = multiply(1, std::uint64_t(given->mCount) + copies);
+            }
+
+            // A thing that is no armour that a list gave: carried as many times as the lists gave it
+            void addOtherFromList(ESM::FormId id, std::uint32_t copies)
+            {
+                const auto given = std::find_if(mOtherFromLists.begin(), mOtherFromLists.end(),
+                    [id](const ListedItem& item) { return item.mItem == id; });
+                if (given == mOtherFromLists.end())
+                    mOtherFromLists.push_back({ id, copies });
                 else
                     given->mCount = multiply(1, std::uint64_t(given->mCount) + copies);
             }
@@ -156,6 +170,9 @@ namespace ESM4
                     }
                     else if (mSource.findLevelledItem(entry.mItem) != nullptr)
                         expand(entry.mItem, depth + 1, static_cast<std::uint32_t>(entry.mCount), copies);
+                    else if (!entry.mItem.isZeroOrUnset())
+                        addOtherFromList(
+                            entry.mItem, multiply(copies, static_cast<std::uint32_t>(std::max(entry.mCount, 1))));
                 }
             }
 
@@ -166,6 +183,7 @@ namespace ESM4
             std::uint32_t mRollsLeft = maxRollsPerCharacter;
             std::vector<const Armor*> mArmor;
             std::vector<ListedArmor> mFromLists;
+            std::vector<ListedItem> mOtherFromLists;
         };
     }
 
@@ -233,9 +251,15 @@ namespace ESM4
         const Npc* statsOwner = templateOwner(chain, Npc::Template_UseStats);
         const int level = actorLevel(statsOwner != nullptr ? *statsOwner : character, playerLevel);
 
+        return inventoryArmor(source, inventoryOwner->mInventory, level, seed, trace);
+    }
+
+    CharacterArmor inventoryArmor(const WornArmorSource& source, const std::vector<InventoryItem>& inventory, int level,
+        std::uint32_t seed, WornArmorTrace* trace)
+    {
         LevelledRandom random(seed);
         ArmorCollector collector(source, level, random, trace);
-        for (const InventoryItem& item : inventoryOwner->mInventory)
+        for (const InventoryItem& item : inventory)
             collector.addEntry(ESM::FormId::fromUint32(item.item), item.count);
         return collector.take();
     }

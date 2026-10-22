@@ -160,6 +160,7 @@ namespace OFMechanics
         bool mAgent = false; // the navigator has been told of an actor of its size, so that it makes a mesh for it
         float mSight = 0.f; // seconds until it looks for the player to go for
         bool mFighting = false; // it was in a fight the last time it was looked at
+        FalloutScript::FormId mDrawn = 0; // the weapon whose animations it was last given in a fight
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -1174,6 +1175,22 @@ namespace OFMechanics
             return apart < 1.f || world.getDistToNearestRayHit(eyes, goal - eyes, apart) >= apart - 1.f;
         }
 
+        /// The animations and the model of the weapon the character holds are the ones it is drawn with
+        void showWeapon(const Frame& frame, FalloutActors::Mind& mind, OFScript::FalloutScripts& scripts)
+        {
+            const OFScript::FalloutScripts::HeldWeapon held = scripts.heldWeapon(mind.mPtr);
+            if (mind.mDrawn == held.mWeapon && mind.mDrawn != 0)
+                return;
+            auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr));
+            if (animation == nullptr)
+                return;
+            // Bare hands are held ready once, the form 0 being no weapon: the fight is the mark
+            if (held.mWeapon == 0 && animation->isWeaponDrawn())
+                return;
+            mind.mDrawn = held.mWeapon;
+            animation->drawWeapon(held.mModel, held.mAnimationType);
+        }
+
         /// A character that fights goes for its target, attacks it from where its weapon reaches, or runs away from it.
         /// A character at peace that goes for the player on sight starts a fight. True when the fight takes the
         /// character's frame, so that the packages wait.
@@ -1184,7 +1201,12 @@ namespace OFMechanics
             if (mind.mPtr == player)
                 return false;
             // The packages go on where they were left once the fight is over: the character goes back to its place
-            const auto over = [&mind] {
+            const auto over = [&mind, &frame] {
+                if (mind.mDrawn != 0 || mind.mFighting)
+                    if (auto* animation
+                        = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                        animation->holsterWeapon();
+                mind.mDrawn = 0;
                 mind.mFighting = false;
                 stopWalking(mind);
                 mind.mAtGoal = false;
@@ -1201,12 +1223,18 @@ namespace OFMechanics
                 mind.mSight -= duration;
                 if (mind.mSight > 0.f)
                     return false;
-                mind.mSight = sightInterval;
+                mind.mSight = static_cast<float>(scripts.detectionInterval());
                 float radius = 0.f;
                 if (!sharesSpace(mind.mPtr, player) || !scripts.attacksPlayerOnSight(mind.mPtr, radius))
                     return false;
-                if (distanceByFloor(mind.position(), frame.mPlayer) > radius
-                    || !canSee(frame.mWorld, mind.position(), frame.mPlayer))
+                if (radius > 0.f)
+                {
+                    // A character with a radius in its AI data goes for the player once it is within it and in sight
+                    if (distanceByFloor(mind.position(), frame.mPlayer) > radius
+                        || !canSee(frame.mWorld, mind.position(), frame.mPlayer))
+                        return false;
+                }
+                else if (scripts.sightOfPlayer(mind.mPtr) != FalloutScript::Detection::Sighting::Seen)
                     return false;
                 Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " sees the player and goes for it";
                 scripts.fightPlayer(mind.mPtr);
@@ -1226,6 +1254,7 @@ namespace OFMechanics
                 mind.mFighting = true;
                 stopWalking(mind);
                 scripts.prepareFight(mind.mPtr);
+                showWeapon(frame, mind, scripts);
             }
 
             const osg::Vec3f target = stance.mTarget.getRefData().getPosition().asVec3();
@@ -1292,7 +1321,13 @@ namespace OFMechanics
                         return false;
                     }
                     faceToward(frame, mind, heading, duration);
-                    scripts.attack(mind.mPtr, stance.mTarget);
+                    const OFScript::FalloutScripts::FireResult shot = scripts.attack(mind.mPtr, stance.mTarget);
+                    // The weapon may have changed (the last round was fired, the character took another)
+                    showWeapon(frame, mind, scripts);
+                    if (shot.mFired)
+                        if (auto* animation
+                            = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                            animation->attack();
                     break;
             }
             return true;

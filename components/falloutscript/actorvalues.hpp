@@ -42,6 +42,7 @@ namespace FalloutScript
         constexpr int firstCondition = 25;
         constexpr int lastCondition = 31;
         constexpr int firstSkill = 32;
+        constexpr int sneak = 42;
         /// Barter first, unarmed last: the 14 skills of the records (the one in the middle of the end is survival in
         /// New Vegas and the unused throwing in Fallout 3)
         constexpr int lastSkill = 45;

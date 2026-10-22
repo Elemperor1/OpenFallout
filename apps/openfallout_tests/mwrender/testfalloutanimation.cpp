@@ -249,4 +249,89 @@ namespace
         EXPECT_FLOAT_EQ(falloutAnimationSpeed(130.f, 0.f), 1.f);
         EXPECT_FLOAT_EQ(falloutAnimationSpeed(130.f, 0.5f), 1.f);
     }
+
+    struct OpenFalloutRenderChooseFalloutWeaponAnimation : Test
+    {
+        const std::string mFolder = "meshes/characters/_male/";
+        std::vector<std::string> files(std::initializer_list<std::string> names) const
+        {
+            std::vector<std::string> result;
+            for (const std::string& name : names)
+                result.push_back(mFolder + name + ".kf");
+            return result;
+        }
+    };
+
+    TEST(OpenFalloutRenderFalloutWeaponPrefix, isTheLettersOfTheAnimationType)
+    {
+        EXPECT_EQ(falloutWeaponPrefix(0), "h2h");
+        EXPECT_EQ(falloutWeaponPrefix(3), "1hp");
+        EXPECT_EQ(falloutWeaponPrefix(4), "2hr");
+        EXPECT_EQ(falloutWeaponPrefix(10), "1lm");
+        EXPECT_EQ(falloutWeaponPrefix(-1), "h2h");
+        EXPECT_EQ(falloutWeaponPrefix(11), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutWeaponAnimation, aGunAttacksWithAttack3AndFallsBackToTheNextOfTheNumbered)
+    {
+        EXPECT_EQ(chooseFalloutWeaponAnimation(
+                      mFolder, 3, FalloutWeaponMove::Attack, files({ "1hpattack3", "1hpattackleft", "2hrattack3" })),
+            "meshes/characters/_male/1hpattack3.kf");
+        EXPECT_EQ(
+            chooseFalloutWeaponAnimation(mFolder, 3, FalloutWeaponMove::Attack, files({ "1hpattack5", "1hpattack4" })),
+            "meshes/characters/_male/1hpattack4.kf");
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 4, FalloutWeaponMove::Attack, files({ "1hpattack3" })), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutWeaponAnimation, aMeleeBlowAlternatesBetweenLeftAndRight)
+    {
+        const auto known = files({ "h2hattackleft_a", "h2hattackright_a", "h2hattackleft_b", "h2hattackpower" });
+        const auto blow = [&](unsigned counter) {
+            return chooseFalloutWeaponAnimation(mFolder, 0, FalloutWeaponMove::Attack, known, counter);
+        };
+        EXPECT_EQ(blow(0), "meshes/characters/_male/h2hattackleft_a.kf");
+        EXPECT_EQ(blow(1), "meshes/characters/_male/h2hattackright_a.kf");
+        EXPECT_EQ(blow(2), "meshes/characters/_male/h2hattackleft_b.kf");
+        EXPECT_EQ(blow(3), "meshes/characters/_male/h2hattackleft_a.kf");
+        // A character with no weapon uses the hands
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, -1, FalloutWeaponMove::Attack, known, 1),
+            "meshes/characters/_male/h2hattackright_a.kf");
+        // A weapon with only the plain files
+        EXPECT_EQ(chooseFalloutWeaponAnimation(
+                      mFolder, 1, FalloutWeaponMove::Attack, files({ "1hmattackright", "1hmattackleft" }), 0),
+            "meshes/characters/_male/1hmattackleft.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutWeaponAnimation, theOtherMovesAreNamedForTheWeaponAndTheMove)
+    {
+        const auto known = files({ "1hpequip", "1hpunequip", "1hpaim", "h2hrecoil", "1hpholster" });
+        const auto move = [&](int type, FalloutWeaponMove which) {
+            return chooseFalloutWeaponAnimation(mFolder, type, which, known);
+        };
+        EXPECT_EQ(move(3, FalloutWeaponMove::Equip), "meshes/characters/_male/1hpequip.kf");
+        EXPECT_EQ(move(3, FalloutWeaponMove::Unequip), "meshes/characters/_male/1hpunequip.kf");
+        EXPECT_EQ(move(3, FalloutWeaponMove::Aim), "meshes/characters/_male/1hpaim.kf");
+        EXPECT_EQ(move(3, FalloutWeaponMove::Recoil), "");
+        EXPECT_EQ(move(0, FalloutWeaponMove::Recoil), "meshes/characters/_male/h2hrecoil.kf");
+        EXPECT_EQ(move(4, FalloutWeaponMove::Equip), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutWeaponAnimation, throwingAndMinesHaveTheirOwnFiles)
+    {
+        const auto known = files({ "1gtattackthrow", "1gtattackthrow2", "1mdplacemine" });
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 8, FalloutWeaponMove::Attack, known),
+            "meshes/characters/_male/1gtattackthrow.kf");
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 9, FalloutWeaponMove::Attack, known),
+            "meshes/characters/_male/1mdplacemine.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutWeaponAnimation, filesOfOtherFoldersAndNothingAreNoAnimation)
+    {
+        EXPECT_EQ(chooseFalloutWeaponAnimation(
+                      mFolder, 3, FalloutWeaponMove::Attack, { "meshes/characters/_male/idleanims/1hpattack3.kf" }),
+            "");
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 3, FalloutWeaponMove::Attack, {}), "");
+        EXPECT_EQ(chooseFalloutWeaponAnimation("", 3, FalloutWeaponMove::Attack, files({ "1hpattack3" })), "");
+        EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 40, FalloutWeaponMove::Attack, files({ "1hpattack3" })), "");
+    }
 }
