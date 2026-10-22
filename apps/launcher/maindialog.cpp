@@ -166,9 +166,9 @@ Launcher::FirstRunDialogResult Launcher::MainDialog::showFirstRunDialog()
         msgBox.setStandardButtons(QMessageBox::NoButton);
         msgBox.setText(
             tr("<html><head/><body><p><b>Welcome to OpenFallout!</b></p>"
-               "<p>It is recommended to run the Installation Wizard.</p>"
-               "<p>The Wizard will let you select an existing Morrowind installation, "
-               "or install Morrowind for OpenFallout to use.</p></body></html>"));
+               "<p>To play Fallout 3, Fallout: New Vegas or Tale of Two Wastelands, skip the Wizard and add the "
+               "Data folder of your copy of the game on the Data Files page.</p>"
+               "<p>The Installation Wizard sets up Morrowind and is not needed for Fallout.</p></body></html>"));
 
         QAbstractButton* wizardButton
             = msgBox.addButton(tr("Run &Installation Wizard"), QMessageBox::AcceptRole); // ActionRole doesn't work?!

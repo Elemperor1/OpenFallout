@@ -4,6 +4,7 @@
 #include <components/fallback/validate.hpp>
 #include <components/files/collections.hpp>
 #include <components/files/configurationmanager.hpp>
+#include <components/files/falloutinstall.hpp>
 #include <components/files/gameini.hpp>
 #include <components/files/openfile.hpp>
 #include <components/misc/osgpluginchecker.hpp>
@@ -100,6 +101,29 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
         dataDirs.push_back(std::move(local));
 
     cfgMgr.filterOutNonExistingPaths(dataDirs);
+
+    // Where nothing names the games (no plugin and no data directory that has their masters), look in the places they
+    // are usually installed to
+    {
+        const StringsVector named = variables["content"].as<StringsVector>();
+        const Files::Collections existing(dataDirs);
+        if (std::none_of(named.begin(), named.end(), ESM4::isPluginName) && !existing.doesExist("FalloutNV.esm")
+            && !existing.doesExist("Fallout3.esm"))
+        {
+            const std::vector<Files::FalloutInstall> installs = Files::findFalloutInstalls();
+            for (const Files::FalloutInstall& install : installs)
+                Log(Debug::Info) << "Found " << Files::falloutGameName(install.mGame) << " in " << install.mData;
+            if (installs.empty())
+                Log(Debug::Warning) << "No data directory has Fallout3.esm or FalloutNV.esm and neither do the places "
+                                       "the games are usually installed to. Name the Data folder of the game with "
+                                       "data=\"...\" in openfallout.cfg or with --data.";
+            else
+            {
+                Log(Debug::Info) << "Using the first as the data directory; data= or --data names another.";
+                dataDirs.insert(dataDirs.begin(), installs.front().mData);
+            }
+        }
+    }
 
     engine.setResourceDir(variables["resources"]
                               .as<Files::MaybeQuotedPath>()
