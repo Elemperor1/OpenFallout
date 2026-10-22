@@ -581,7 +581,7 @@ TREE_ID = 0x983
 TREE_REF_IDS = (0x984, 0x985)  # interior, exterior
 TREE_NAME = "OFTestTree"
 TREE_MODEL = "trees\\OFTestTree.spt"
-TREE_TEXTURE = "trees\\OFTestTree.dds"
+TREE_TEXTURE = "OFTestTree.dds"  # as in the games: a name without a folder, the file is in textures/trees/leaves/
 TREE_COLOUR = (40, 140, 40)
 TREE_SIZE = (160.0, 320.0)
 TREE_PLACE = (-1200.0, 1200.0)
@@ -2685,7 +2685,7 @@ def write(out, animation=True, spline=True):
     ground = out / "textures" / Path(GROUND_TEXTURE.replace("\\", "/")).parent / "oftestground.dds"
     ground.parent.mkdir(parents=True, exist_ok=True)
     ground.write_bytes(ground_texture())
-    leaves = out / "textures" / Path(TREE_TEXTURE.replace("\\", "/"))
+    leaves = out / "textures" / "trees" / "leaves" / TREE_TEXTURE
     leaves.parent.mkdir(parents=True, exist_ok=True)
     leaves.write_bytes(dds_texture((*TREE_COLOUR, 255), 4))
     skeleton = out / "meshes" / Path(SKELETON.replace("\\", "/"))

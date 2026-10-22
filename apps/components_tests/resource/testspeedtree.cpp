@@ -1,4 +1,5 @@
 #include <components/resource/speedtree.hpp>
+#include <components/testing/util.hpp>
 
 #include <gtest/gtest.h>
 
@@ -120,5 +121,50 @@ namespace
             EXPECT_FLOAT_EQ((*coordinates)[card * 4 + 1].x(), expectedLeft[card] + 0.5f);
             EXPECT_FLOAT_EQ((*coordinates)[card * 4 + 1].y(), expectedTop[card] + 0.5f);
         }
+    }
+    TEST(ResourceSpeedTreeTest, theImageOfARecordIsInTheFolderOfTheLeaves)
+    {
+        TestingOpenMW::VFSTestFile file("image");
+        const auto vfs = TestingOpenMW::createTestVFS({
+            { VFS::Path::NormalizedView("textures/trees/leaves/pineleaves01.dds"), &file },
+            { VFS::Path::NormalizedView("textures/pineleaves01.dds"), &file },
+        });
+        EXPECT_EQ(Resource::findSpeedTreeImage("PineLeaves01.dds", *vfs).value(), "textures/trees/leaves/pineleaves01.dds");
+    }
+
+    TEST(ResourceSpeedTreeTest, theLeavesComeBeforeTheBillboardsWhenBothHaveTheFile)
+    {
+        TestingOpenMW::VFSTestFile file("image");
+        const auto vfs = TestingOpenMW::createTestVFS({
+            { VFS::Path::NormalizedView("textures/trees/billboards/euonymusbush01.dds"), &file },
+            { VFS::Path::NormalizedView("textures/trees/leaves/euonymusbush01.dds"), &file },
+        });
+        EXPECT_EQ(Resource::findSpeedTreeImage("EuonymusBush01.dds", *vfs).value(),
+            "textures/trees/leaves/euonymusbush01.dds");
+    }
+
+    TEST(ResourceSpeedTreeTest, theBillboardsAreUsedWhenTheLeavesLackTheFile)
+    {
+        TestingOpenMW::VFSTestFile file("image");
+        const auto vfs = TestingOpenMW::createTestVFS({
+            { VFS::Path::NormalizedView("textures/trees/billboards/oak.dds"), &file },
+        });
+        EXPECT_EQ(Resource::findSpeedTreeImage("Oak.dds", *vfs).value(), "textures/trees/billboards/oak.dds");
+    }
+
+    TEST(ResourceSpeedTreeTest, aNameWithAFolderIsAnOrdinaryTexture)
+    {
+        TestingOpenMW::VFSTestFile file("image");
+        const auto vfs = TestingOpenMW::createTestVFS({
+            { VFS::Path::NormalizedView("textures/trees/oftesttree.dds"), &file },
+            { VFS::Path::NormalizedView("textures/trees/leaves/oftesttree.dds"), &file },
+        });
+        EXPECT_EQ(Resource::findSpeedTreeImage("trees\\OFTestTree.dds", *vfs).value(), "textures/trees/oftesttree.dds");
+    }
+
+    TEST(ResourceSpeedTreeTest, aNameInNoFolderIsLookedForUnderTextures)
+    {
+        const auto vfs = TestingOpenMW::createTestVFS({});
+        EXPECT_EQ(Resource::findSpeedTreeImage("Lost.dds", *vfs).value(), "textures/lost.dds");
     }
 }

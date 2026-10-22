@@ -2,10 +2,18 @@
 #define OPENFALLOUT_COMPONENTS_RESOURCE_SPEEDTREE_H
 
 #include <string>
+#include <string_view>
 
 #include <osg/Geometry>
 #include <osg/Node>
 #include <osg/ref_ptr>
+
+#include <components/vfs/pathutil.hpp>
+
+namespace VFS
+{
+    class Manager;
+}
 
 namespace Resource
 {
@@ -26,6 +34,11 @@ namespace Resource
     constexpr float sSpeedTreeDefaultSize = 512.f;
     /// The number of cards that cross at the trunk
     constexpr unsigned int sSpeedTreeCards = 3;
+
+    /// The ICON of a tree record is a file name without a folder; the images are in textures/trees/leaves/ (the
+    /// leaves) or textures/trees/billboards/, in that order of preference. A name with a folder, or one that is in
+    /// neither, is looked for under textures/ as a texture is.
+    VFS::Path::Normalized findSpeedTreeImage(std::string_view icon, const VFS::Manager& vfs);
 
     /// The images of the trees are sheets of clusters of leaves, each cluster 512 by 512 pixels: 1024 by 512 is two
     /// side by side, 512 by 1024 two one above the other, 1024 by 1024 four.

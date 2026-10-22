@@ -13,12 +13,29 @@
 #include <components/debug/debuglog.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/sceneutil/texturetype.hpp>
+#include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "imagemanager.hpp"
 
 namespace Resource
 {
+    VFS::Path::Normalized findSpeedTreeImage(std::string_view icon, const VFS::Manager& vfs)
+    {
+        const VFS::Path::Normalized name(icon);
+        if (name.value().find(VFS::Path::separator) == std::string::npos)
+        {
+            for (const std::string_view folder : { "textures/trees/leaves", "textures/trees/billboards" })
+            {
+                VFS::Path::Normalized candidate(folder);
+                candidate /= name.value();
+                if (vfs.exists(candidate))
+                    return candidate;
+            }
+        }
+        return Misc::ResourceHelpers::correctTexturePath(name, vfs);
+    }
+
     SpeedTreeClusters getSpeedTreeClusters(int imageWidth, int imageHeight)
     {
         return { .mColumns = std::max(1, imageWidth / sSpeedTreeClusterSize),
@@ -83,8 +100,7 @@ namespace Resource
         osg::ref_ptr<osg::Image> image;
         try
         {
-            image = imageManager.getImage(
-                Misc::ResourceHelpers::correctTexturePath(VFS::Path::Normalized(tree.mTexture), *imageManager.getVFS()));
+            image = imageManager.getImage(findSpeedTreeImage(tree.mTexture, *imageManager.getVFS()));
         }
         catch (const std::exception& error)
         {
