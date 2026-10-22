@@ -146,6 +146,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testsurvey.cpp
     esm4/testtalkingactivator.cpp
     esm4/testterminal.cpp
+    esm4/testtree.cpp
     esm4/testvoicetype.cpp
     esm4/testwater.cpp
     esm4/testweather.cpp
@@ -214,6 +215,7 @@ file(GLOB UNITTEST_SRC_FILES
     resource/testmultiobjectcache.cpp
     resource/testobjectcache.cpp
     resource/testresourcesystem.cpp
+    resource/testspeedtree.cpp
 
     vfs/testarchiveinvalidation.cpp
     vfs/testarchiveorder.cpp

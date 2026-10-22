@@ -130,6 +130,7 @@ add_component_dir (vfs
 add_component_dir (resource
     scenemanager keyframemanager imagemanager animblendrulesmanager bulletshapemanager bulletshape niffilemanager objectcache resourcesystem
     resourcemanager stats animation foreachbulletobject errormarker selectionmarker cachestats bgsmfilemanager
+    speedtree
     )
 
 add_component_dir (shader

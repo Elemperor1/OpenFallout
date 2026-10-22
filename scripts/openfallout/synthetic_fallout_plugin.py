@@ -574,7 +574,18 @@ SAVED_LUCK = 3
 SAVED_KARMA = 40
 SAVED_LUCK_AFTER = 10
 SAVED_KARMA_AFTER = 100
-LAST_ID = 0x982 # the largest form ID of the plugin, which the next object ID of its header follows
+# A tree, which stands in the interior cell and in the exterior cell at TREE_PLACE from where the player starts. The game
+# draws it from a SpeedTree file; the engine draws crossed cards of the image of the record, TREE_SIZE (width, height)
+# large, and has no collision for it. The model file does not exist (the engine never reads it).
+TREE_ID = 0x983
+TREE_REF_IDS = (0x984, 0x985)  # interior, exterior
+TREE_NAME = "OFTestTree"
+TREE_MODEL = "trees\\OFTestTree.spt"
+TREE_TEXTURE = "trees\\OFTestTree.dds"
+TREE_COLOUR = (40, 140, 40)
+TREE_SIZE = (160.0, 320.0)
+TREE_PLACE = (-1200.0, 1200.0)
+LAST_ID = 0x985 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2144,6 +2155,13 @@ def region(name):
                                                                        left, top))])
 
 
+def tree():
+    """The TREE record: its model (a SpeedTree file), the image of its leaves, 32 bytes of tree data that the engine skips
+    and the billboard width and height."""
+    return record(b"TREE", TREE_ID, [zstr(b"EDID", TREE_NAME), zstr(b"MODL", TREE_MODEL), zstr(b"ICON", TREE_TEXTURE),
+                                     sub(b"CNAM", bytes(range(32))), sub(b"BNAM", struct.pack("<2f", *TREE_SIZE))])
+
+
 def exterior_cell():
     """The CELL record of the exterior cell 0,0. DATA of an exterior cell is its flags (0: not an interior, no water), XCLC
     the grid and the flags of the land, XCLR the regions it lists."""
@@ -2172,6 +2190,7 @@ def worldspace():
         refr(EXTERIOR_MARKER_REF_ID, MARKER_ID, (half, half, 0.0)),
         achr(EXTERIOR_NPC_REF_ID, (half + NPC_DISTANCE, half + NPC_DEPTH, 0.0)),
         refr(EXTERIOR_WALL_REF_ID, WALL_ID, (half - WALL_DISTANCE, half + NPC_DEPTH, 0.0)),
+        refr(TREE_REF_IDS[1], TREE_ID, (half + TREE_PLACE[0], half + TREE_PLACE[1], 0.0)),
         *placed_creatures((half, half), {"beast": EXTERIOR_CREATURE_REF_ID, "user": EXTERIOR_CREATURE_USER_REF_ID,
                                          "list": EXTERIOR_CREATURE_LIST_REF_ID}),
         acre(HEIR_REF_IDS["exterior"], HEIR_ID, (half + HEIR_PLACE[0], half + HEIR_PLACE[1], 0.0)),
@@ -2232,6 +2251,7 @@ def plugin():
         achr(NPC_REF_ID, (NPC_DISTANCE, NPC_DEPTH, 0.0)),
         talker_reference(),
         refr(WALL_REF_ID, WALL_ID, (-WALL_DISTANCE, NPC_DEPTH, 0.0)),
+        refr(TREE_REF_IDS[0], TREE_ID, (*TREE_PLACE, 0.0)),
         *placed_creatures((0.0, 0.0), {"beast": CREATURE_REF_ID, "user": CREATURE_USER_REF_ID,
                                       "list": CREATURE_LIST_REF_ID}),
         acre(HEIR_REF_IDS["interior"], HEIR_ID, (*HEIR_PLACE, 0.0)),
@@ -2248,7 +2268,8 @@ def plugin():
     children = group(struct.pack("<I", CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", CELL_ID // 10 % 10), 3, [cell, children])
     block = group(struct.pack("<i", CELL_ID % 10), 2, [sub_block])
-    return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"LGTM", [template])
+    return (header + top_group(b"STAT", [cube, marker, wall, target_marker]) + top_group(b"TREE", [tree()])
+            + top_group(b"LGTM", [template])
             + top_group(b"GLOB", [global_variable(), global_variable(COUNTER_ID, COUNTER_NAME, b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in OBJECT_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in TRIGGER_GLOBALS.values()),
@@ -2664,6 +2685,9 @@ def write(out, animation=True, spline=True):
     ground = out / "textures" / Path(GROUND_TEXTURE.replace("\\", "/")).parent / "oftestground.dds"
     ground.parent.mkdir(parents=True, exist_ok=True)
     ground.write_bytes(ground_texture())
+    leaves = out / "textures" / Path(TREE_TEXTURE.replace("\\", "/"))
+    leaves.parent.mkdir(parents=True, exist_ok=True)
+    leaves.write_bytes(dds_texture((*TREE_COLOUR, 255), 4))
     skeleton = out / "meshes" / Path(SKELETON.replace("\\", "/"))
     skeleton.parent.mkdir(parents=True, exist_ok=True)
     skeleton.write_bytes(placeholder_skeleton.skeleton())

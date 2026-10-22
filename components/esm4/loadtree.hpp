@@ -47,9 +47,14 @@ namespace ESM4
         std::string mEditorId;
         ESM::Path mModel;
 
-        float mBoundRadius;
+        float mBoundRadius = 0.f;
 
+        // The image of the tree seen from afar (a billboard, with an alpha channel that is the shape of the tree) or
+        // its leaves; the game has them for the trees of SpeedTree, which are not read
         std::string mLeafTexture;
+        // BNAM: the size of the billboard of the tree in game units, 0 when the record has none
+        float mBillboardWidth = 0.f;
+        float mBillboardHeight = 0.f;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

@@ -838,11 +838,6 @@ namespace Resource
         const std::string_view ext = Misc::getFileExtension(normalizedFilename.value());
         if (ext == "nif")
             return NifOsg::Loader::load(*nifFileManager->get(normalizedFilename), imageManager, materialMgr);
-        else if (ext == "spt")
-        {
-            Log(Debug::Warning) << "Ignoring SpeedTree data file " << normalizedFilename;
-            return new osg::Node();
-        }
         else
             return loadNonNif(normalizedFilename, *vfs->get(normalizedFilename), imageManager);
     }
@@ -1023,7 +1018,10 @@ namespace Resource
             osg::ref_ptr<osg::Node> loaded;
             try
             {
-                loaded = load(path, mVFS, mImageManager, mNifFileManager, mBgsmFileManager);
+                if (Misc::getFileExtension(path.value()) == "spt")
+                    loaded = loadSpeedTree(path);
+                else
+                    loaded = load(path, mVFS, mImageManager, mNifFileManager, mBgsmFileManager);
             }
             catch (const std::exception& e)
             {
@@ -1060,6 +1058,28 @@ namespace Resource
             mCache->addEntryToObjectCache(path.value(), loaded);
             return loaded;
         }
+    }
+
+    void SceneManager::setSpeedTree(VFS::Path::NormalizedView model, SpeedTreeStandIn tree)
+    {
+        const std::lock_guard lock(mSpeedTreeMutex);
+        mSpeedTrees.insert_or_assign(std::string(model.value()), std::move(tree));
+    }
+
+    osg::ref_ptr<osg::Node> SceneManager::loadSpeedTree(VFS::Path::NormalizedView path)
+    {
+        SpeedTreeStandIn tree;
+        {
+            const std::lock_guard lock(mSpeedTreeMutex);
+            const auto found = mSpeedTrees.find(path.value());
+            if (found == mSpeedTrees.end())
+            {
+                Log(Debug::Warning) << "Ignoring SpeedTree data file " << path << ", no record of a tree names it";
+                return new osg::Node();
+            }
+            tree = found->second;
+        }
+        return makeSpeedTreeStandIn(tree, *mImageManager);
     }
 
     osg::ref_ptr<osg::Node> SceneManager::getInstance(VFS::Path::NormalizedView path)
