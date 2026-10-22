@@ -222,6 +222,12 @@ namespace
         EXPECT_TRUE(without.mShotSound2D.isZeroOrUnset());
         EXPECT_TRUE(without.mDryFireSound.isZeroOrUnset());
 
+        // A first SNAM with no sound is not replaced by the second, which is the shot heard from far away
+        const ESM4::Weapon silent = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP",
+            zString("EDID", "FarOnly") + valueSubRecord<std::uint32_t>("SNAM", 0)
+                + valueSubRecord<std::uint32_t>("SNAM", 0x00010002));
+        EXPECT_TRUE(silent.mShotSound.isZeroOrUnset());
+
         // The weapons of Skyrim use these subrecords for other things
         const ESM4::Weapon skyrim = loadFromAPlugin<ESM4::Weapon>(0.94f, 43, "WEAP", sounds);
         EXPECT_TRUE(skyrim.mShotSound.isZeroOrUnset());

@@ -92,6 +92,8 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
     mFlags = reader.hdr().record.flags;
     std::uint32_t esmVer = reader.esmVersion();
     bool isFONV = esmVer == ESM::VER_132 || esmVer == ESM::VER_133 || esmVer == ESM::VER_134;
+    // A first SNAM that is empty is the shot a weapon lacks; the one that follows it is the other shot
+    bool hasShotSound = false;
 
     while (reader.getSubRecordHeader())
     {
@@ -167,8 +169,11 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("SNAM"):
                 // Fallout 3 and New Vegas: the sound of a shot (a second one, of New Vegas, is the shot heard from far
                 // away, which is left out)
-                if (reader.isFalloutFile() && subHdr.dataSize == 4 && mShotSound.isZeroOrUnset())
+                if (reader.isFalloutFile() && subHdr.dataSize == 4 && !hasShotSound)
+                {
                     reader.getFormId(mShotSound);
+                    hasShotSound = true;
+                }
                 else
                     reader.skipSubRecordData();
                 break;
