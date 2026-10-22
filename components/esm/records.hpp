@@ -71,6 +71,7 @@
 #include <components/esm4/loadhdpt.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadinfo.hpp>
+#include <components/esm4/loadimad.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadkeym.hpp>
 #include <components/esm4/loadland.hpp>
@@ -96,6 +97,7 @@
 #include <components/esm4/loadrcpe.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadregn.hpp>
+#include <components/esm4/loadrepu.hpp>
 #include <components/esm4/loadscol.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsndr.hpp>

@@ -116,6 +116,8 @@ namespace ESM4
 
         bool mIsMapMarker = false;
         std::uint16_t mMapMarker;
+        // FNAM of a map marker (Fallout 3 and New Vegas): 0x01 visible, 0x02 can be travelled to
+        std::uint8_t mMapMarkerFlags = 0;
 
         EnableParent mEsp;
 

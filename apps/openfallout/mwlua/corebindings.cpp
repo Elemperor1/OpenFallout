@@ -1,5 +1,6 @@
 #include "corebindings.hpp"
 
+#include <optional>
 #include <stdexcept>
 
 #include <components/debug/debuglog.hpp>
@@ -15,6 +16,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 
@@ -140,7 +142,17 @@ namespace OFLua
             api["getGMST"] = [lua, gmstStore](const std::string& setting) -> sol::object {
                 const ESM::GameSetting* gmst = gmstStore->search(setting);
                 if (gmst == nullptr)
+                {
+                    // The settings of Fallout are in the records of its own
+                    if (OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts())
+                    {
+                        if (const std::optional<double> number = host->gameSetting(setting))
+                            return sol::make_object<double>(lua, *number);
+                        if (std::string text = host->gameSettingText(setting); !text.empty())
+                            return sol::make_object<std::string>(lua, std::move(text));
+                    }
                     return sol::nil;
+                }
                 const ESM::Variant& value = gmst->mValue;
                 switch (value.getType())
                 {

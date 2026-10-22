@@ -865,6 +865,30 @@ namespace OFScript
                 FalloutScript::readReferenceState(mReferenceState, in, version);
             });
         section(
+            "reputation", FalloutScript::reputationSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReputation(mReputation, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readReputation(mReputation, in, version);
+            });
+        section(
+            "objectstate", FalloutScript::objectStateSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeObjectState(mObjectState, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readObjectState(mObjectState, in, version);
+            });
+        section(
+            "magic", FalloutScript::magicSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeMagic(mMagic, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readMagic(mMagic, in, version);
+            });
+        section(
+            "mapmarkers", FalloutScript::mapMarkersSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeMapMarkers(mMapMarkers, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readMapMarkers(mMapMarkers, in, version);
+            });
+        section(
             "formlists", FalloutScript::formListsSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeFormLists(mFormLists, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
@@ -954,6 +978,11 @@ namespace OFScript
         {
             reader.skipRecord();
             return;
+        }
+        {
+            // Scripts that ask GetGameLoaded are told once that a saved game was loaded
+            const std::lock_guard lock(mSessionMutex);
+            mGameLoaded = true;
         }
         const std::string name = reader.getHNString("NAME");
         std::uint32_t version = 0;

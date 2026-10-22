@@ -7,11 +7,13 @@
 
 namespace FalloutScript
 {
-    /// Where a reference stands: its position in game units and its angles around the x, y and z axes in radians
+    /// Where a reference stands: its position in game units and its angles around the x, y and z axes in radians, and
+    /// how large it is made
     struct Placement
     {
         std::array<double, 3> mPosition{};
         std::array<double, 3> mAngle{};
+        double mScale = 1.0;
     };
 
     /// What the commands that move things ask of the game world. A reference is told by its form id; the host knows
@@ -32,11 +34,13 @@ namespace FalloutScript
         virtual void setPosition(FormId reference, int axis, double value) = 0;
         /// The same for an angle around the axis, in radians
         virtual void setAngle(FormId reference, int axis, double radians) = 0;
+        /// Makes the reference as large as the scale says (already within the limits of the games, 0.01 to 10)
+        virtual void setScale(FormId reference, double scale) = 0;
     };
 
     /// Gives the commands that move things to the interpreter: MoveToMarker (also written MoveTo),
-    /// MoveToMarkerWithFade, GetPos, SetPos, GetAngle and SetAngle. Angles in scripts are degrees. Those that the
-    /// command table does not have are left out.
+    /// MoveToMarkerWithFade, GetPos, SetPos, GetAngle, SetAngle, GetHeadingAngle, GetScale and SetScale. Angles in
+    /// scripts are degrees. Those that the command table does not have are left out.
     void addPlacementCommands(Interpreter& interpreter, PlacementWorld& world);
 }
 

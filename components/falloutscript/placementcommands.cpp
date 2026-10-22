@@ -60,6 +60,22 @@ namespace FalloutScript
             return std::isfinite(value) ? std::clamp(value, -largest, largest) : 0.0;
         }
 
+        /// The angle in degrees from where the reference faces to the direction of the target, from -180 to 180 and
+        /// positive when the target is to the right (clockwise seen from above). The heights do not count. Two
+        /// references on one place give the direction of 270 degrees, which is what the games do.
+        double headingAngle(const Placement& self, const Placement& target)
+        {
+            const double dx = target.mPosition[0] - self.mPosition[0];
+            const double dy = target.mPosition[1] - self.mPosition[1];
+            // The bearing runs from the y axis towards the x axis
+            double bearing;
+            if (dy == 0)
+                bearing = dx > 0 ? pi / 2 : 3 * pi / 2;
+            else
+                bearing = std::atan(dx / dy) + (dy < 0 ? pi : 0.0);
+            return std::remainder(bearing - self.mAngle[2], 2 * pi) * 180.0 / pi;
+        }
+
         void moveToMarker(PlacementWorld& world, CallContext& call)
         {
             const FormId target = formArgument(call, 0);
@@ -95,6 +111,27 @@ namespace FalloutScript
             if (call.mReference == 0 || axis < 0 || !world.placement(call.mReference, where))
                 return 0.0;
             return toDegrees(where.mAngle[axis], axis);
+        });
+        interpreter.setHandler("GetHeadingAngle", [&world](CallContext& call) {
+            Placement self;
+            Placement target;
+            const FormId other = formArgument(call, 0);
+            if (call.mReference == 0 || other == 0 || !world.placement(call.mReference, self)
+                || !world.placement(other, target))
+                return 0.0;
+            return headingAngle(self, target);
+        });
+        interpreter.setHandler("GetScale", [&world](CallContext& call) {
+            Placement where;
+            if (call.mReference == 0 || !world.placement(call.mReference, where))
+                return 0.0;
+            return where.mScale;
+        });
+        // The games hold the scale of a reference between a hundredth and ten
+        interpreter.setHandler("SetScale", [&world](CallContext& call) {
+            if (call.mReference != 0)
+                world.setScale(call.mReference, std::clamp(finite(argument(call, 0)), 0.01, 10.0));
+            return 0.0;
         });
         interpreter.setHandler("SetPos", [&world](CallContext& call) {
             const int axis = axisOf(call, 0);

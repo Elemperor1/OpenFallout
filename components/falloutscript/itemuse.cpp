@@ -186,6 +186,34 @@ namespace FalloutScript
         mActive.push_back(active);
     }
 
+    void ItemUse::setEffectListener(std::function<void(FormId, FormId, FormId, double)> listener)
+    {
+        const std::lock_guard lock(mMutex);
+        mEffectListener = std::move(listener);
+    }
+
+    void ItemUse::cast(FormId actor, const std::vector<ConsumableEffect>& effects)
+    {
+        if (actor == 0)
+            return;
+        std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
+        {
+            const std::lock_guard lock(mMutex);
+            check = mConditions;
+        }
+        for (const ConsumableEffect& effect : effects)
+        {
+            if (!effect.mConditions.empty())
+            {
+                ConditionContext context;
+                context.mSubject = actor;
+                if (!check || !check(effect.mConditions, context))
+                    continue;
+            }
+            applyEffect(actor, effect, 1.0);
+        }
+    }
+
     void ItemUse::setPlayer(FormId player)
     {
         const std::lock_guard lock(mMutex);
@@ -199,6 +227,7 @@ namespace FalloutScript
             return result;
 
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
+        std::function<void(FormId, FormId, FormId, double)> listener;
         PerkEngine* perks = nullptr;
         double bookPoints = 1;
         bool durationNeedsAddiction = false;
@@ -206,6 +235,7 @@ namespace FalloutScript
         {
             const std::lock_guard lock(mMutex);
             check = mConditions;
+            listener = mEffectListener;
             perks = mPerks;
             bookPoints = mBookPoints;
             durationNeedsAddiction = mChemDurationNeedsAddiction;
@@ -242,7 +272,10 @@ namespace FalloutScript
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationValue && !effect.mDetrimental);
                 resistsRadiation = resistsRadiation
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationResistance && !effect.mDetrimental);
-                applyEffect(actor, effect, effect.mHostile ? 1.0 : durationScale);
+                const double scale = effect.mHostile ? 1.0 : durationScale;
+                applyEffect(actor, effect, scale);
+                if (listener && effect.mEffect != 0 && effect.mDuration * scale > 0)
+                    listener(actor, effect.mEffect, item, effect.mDuration * scale);
             }
 
             const bool addictive = consumable.mWithdrawal != 0 && consumable.mAddictionChance > 0;

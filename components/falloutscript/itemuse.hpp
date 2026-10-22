@@ -26,6 +26,8 @@ namespace FalloutScript
     /// One effect of an aid item
     struct ConsumableEffect
     {
+        /// The magic effect (MGEF) the effect is made by, 0 for the engine's own
+        FormId mEffect = 0;
         /// Of the magic effect: 0 modifies an actor value, 34 restores health like a stimpak, 35 restores the limbs
         int mArchetype = 0;
         int mActorValue = -1;
@@ -112,6 +114,13 @@ namespace FalloutScript
         /// Whether the conditions of an effect hold for the character who uses the item
         void setConditions(
             std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check);
+        /// Told of each effect with a duration that an item starts on a character: the magic effect, the item and the
+        /// seconds it lasts
+        void setEffectListener(
+            std::function<void(FormId actor, FormId effect, FormId source, double seconds)> listener);
+        /// The character is hit by the effects of a spell it cast on itself, for the time each lasts (no perk changes
+        /// how long)
+        void cast(FormId actor, const std::vector<ConsumableEffect>& effects);
         /// A number from 0 to 1 that decides whether an addiction happens (a random one by default)
         void setRandom(std::function<double()> random);
         /// The player, whose counters of the Pip-Boy count what is used
@@ -165,6 +174,7 @@ namespace FalloutScript
         PerkEngine* mPerks = nullptr;
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> mConditions;
         std::function<double()> mRandom;
+        std::function<void(FormId, FormId, FormId, double)> mEffectListener;
         double mBookPoints = 1;
         bool mChemDurationNeedsAddiction = false;
         FormId mPlayer = 0;
