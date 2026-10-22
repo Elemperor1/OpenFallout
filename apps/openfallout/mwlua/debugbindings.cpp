@@ -68,7 +68,8 @@ namespace OFLua
 
         // Gives the player an item of Fallout by its form id ("FormId:0x10e3778"), as the AddItem of a script does
         api["giveItem"] = [context](std::string_view form, sol::optional<int> count) {
-            const ESM::FormId* id = ESM::RefId::deserializeText(form).getIf<ESM::FormId>();
+            const ESM::RefId refId = ESM::RefId::deserializeText(form);
+            const ESM::FormId* id = refId.getIf<ESM::FormId>();
             if (id == nullptr)
                 throw std::runtime_error("\"" + std::string(form) + "\" is not a form id");
             context.mLuaManager->addAction([formId = id->toUint32(), number = count.value_or(1)] {
