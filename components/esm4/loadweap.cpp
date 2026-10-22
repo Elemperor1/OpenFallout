@@ -164,6 +164,26 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("ZNAM"):
                 reader.getFormId(mDropSound);
                 break;
+            case ESM::fourCC("SNAM"):
+                // Fallout 3 and New Vegas: the sound of a shot (a second one, of New Vegas, is the shot heard from far
+                // away, which is left out)
+                if (reader.isFalloutFile() && subHdr.dataSize == 4 && mShotSound.isZeroOrUnset())
+                    reader.getFormId(mShotSound);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("XNAM"): // Dawnguard only? Fallout 3 and New Vegas: the sound of a shot for the player
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mShotSound2D);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("TNAM"): // Fallout 3 and New Vegas: the click of a weapon with no ammunition
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mDryFireSound);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("DNAM"):
             {
                 // Fallout 3 and New Vegas: 136 bytes of the game data are the same in both. A few Fallout 3 records
@@ -260,11 +280,8 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("NAM8"):
             case ESM::fourCC("NAM9"):
             case ESM::fourCC("OBND"):
-            case ESM::fourCC("SNAM"):
-            case ESM::fourCC("TNAM"):
             case ESM::fourCC("UNAM"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("XNAM"): // Dawnguard only?
             case ESM::fourCC("NNAM"):
             case ESM::fourCC("REPL"): // FO3
             case ESM::fourCC("MOD2"): // FO3

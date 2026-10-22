@@ -794,6 +794,9 @@ namespace OFScript
         void converse(FalloutScript::FormId speaker, FalloutScript::FormId target, FalloutScript::FormId topic);
         /// The topic of a package: none (0) is the greeting, as it is with the player
         FalloutScript::FormId packageTopic(FalloutScript::FormId topic);
+        /// The files that a sound record (SOUN) plays: its one file, or the files of the folder that it names (the game
+        /// plays one of them); none when the data does not have it. Looked up once.
+        std::vector<std::string> soundFilesOf(FalloutScript::FormId sound);
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -1273,6 +1276,14 @@ namespace OFScript
         /// The seconds until a character can attack again
         std::mutex mFireMutex;
         std::map<FalloutScript::FormId, float> mFireCooldowns;
+        /// The sound of a shot of the weapon that the attacker holds, or the click of it when it has no ammunition: the
+        /// player hears the sound made for it (a 2D one) and the rest are heard from where they stand. Main thread.
+        void playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire);
+        std::mutex mSoundFilesMutex;
+        std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
+        /// The weapons whose sounds were looked for (once is logged, for what the data lacks)
+        std::set<std::pair<FalloutScript::FormId, bool>> mWeaponSoundsLogged;
+        std::mt19937 mWeaponSoundRandom;
         /// How a character behaves in a fight, from its AIDT (the record, or the template it takes it from)
         struct FightTraits
         {

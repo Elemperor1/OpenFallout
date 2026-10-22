@@ -205,6 +205,30 @@ namespace
         EXPECT_EQ(weapon.mSoundLevel, 2u);
     }
 
+    TEST(ESM4CombatDataTest, readsTheSoundsOfAWeaponOfFallout)
+    {
+        // The first SNAM is the shot, a second one (New Vegas) the shot heard from far away, XNAM the shot that the
+        // player hears and TNAM the click of a weapon with no ammunition
+        const std::string sounds = zString("EDID", "Sounds") + valueSubRecord<std::uint32_t>("SNAM", 0x00010001)
+            + valueSubRecord<std::uint32_t>("SNAM", 0x00010002) + valueSubRecord<std::uint32_t>("XNAM", 0x00010003)
+            + valueSubRecord<std::uint32_t>("TNAM", 0x00010004);
+        const ESM4::Weapon weapon = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", sounds);
+        EXPECT_EQ(weapon.mShotSound.toUint32(), 0x00010001u);
+        EXPECT_EQ(weapon.mShotSound2D.toUint32(), 0x00010003u);
+        EXPECT_EQ(weapon.mDryFireSound.toUint32(), 0x00010004u);
+
+        const ESM4::Weapon without = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", zString("EDID", "Silent"));
+        EXPECT_TRUE(without.mShotSound.isZeroOrUnset());
+        EXPECT_TRUE(without.mShotSound2D.isZeroOrUnset());
+        EXPECT_TRUE(without.mDryFireSound.isZeroOrUnset());
+
+        // The weapons of Skyrim use these subrecords for other things
+        const ESM4::Weapon skyrim = loadFromAPlugin<ESM4::Weapon>(0.94f, 43, "WEAP", sounds);
+        EXPECT_TRUE(skyrim.mShotSound.isZeroOrUnset());
+        EXPECT_TRUE(skyrim.mShotSound2D.isZeroOrUnset());
+        EXPECT_TRUE(skyrim.mDryFireSound.isZeroOrUnset());
+    }
+
     TEST(ESM4CombatDataTest, readsALongerGameDataAndLeavesAShorterOne)
     {
         // New Vegas has more after the 136 bytes; the first of them are the same
