@@ -33,8 +33,13 @@ namespace OFRender
 
         unsigned int getNodeMask() override;
 
-        /// Whether the node is drawn from tiles, so that the terrain of the land records is not.
+        /// Whether tiles fill the whole node, so that it is drawn from them and the terrain of the land records is
+        /// not.
         bool replacesTerrain(float size, const osg::Vec2f& center) const;
+
+        /// Whether tiles fill a part of the node only: it has to be taken apart, so that the parts that no tile fills
+        /// keep the terrain of the land records.
+        bool splitsTerrain(float size, const osg::Vec2f& center) const;
 
         const Terrain::LodIndex& getIndex() const { return mIndex; }
 
@@ -42,6 +47,7 @@ namespace OFRender
 
     private:
         osg::ref_ptr<osg::Node> loadTile(const Terrain::LodTile& tile);
+        Terrain::LodIndex::Coverage getTerrainCoverage(float size, const osg::Vec2f& center) const;
         osg::ref_ptr<osg::Node> createChunk(float size, const osg::Vec2f& center, bool compile);
         void addObjects(osg::Group& group, float size, const osg::Vec2f& center);
 

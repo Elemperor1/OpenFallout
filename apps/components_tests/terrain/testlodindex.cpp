@@ -154,6 +154,34 @@ namespace Terrain
             EXPECT_EQ(values(index.getTerrain(0, 0, 64)), sorted(expected));
         }
 
+        TEST(TerrainLodIndex, shouldTellHowMuchOfASquareTheTilesFill)
+        {
+            using Coverage = LodIndex::Coverage;
+            LodIndex index;
+            EXPECT_EQ(index.getTerrainCoverage(8, -8, 8), Coverage::None);
+
+            // three of the four quarters
+            index.add(VFS::Path::Normalized(terrainPath("w", 4, 8, -8)), "w");
+            index.add(VFS::Path::Normalized(terrainPath("w", 4, 12, -8)), "w");
+            index.add(VFS::Path::Normalized(terrainPath("w", 4, 8, -4)), "w");
+            EXPECT_EQ(index.getTerrainCoverage(8, -8, 8), Coverage::Partial);
+            EXPECT_EQ(index.getTerrainCoverage(8, -8, 4), Coverage::Full);
+            EXPECT_EQ(index.getTerrainCoverage(12, -4, 4), Coverage::None);
+
+            index.add(VFS::Path::Normalized(terrainPath("w", 4, 12, -4)), "w");
+            EXPECT_EQ(index.getTerrainCoverage(8, -8, 8), Coverage::Full);
+            // a square twice as large, with only one of its four quarters
+            EXPECT_EQ(index.getTerrainCoverage(8, -8, 16), Coverage::Partial);
+        }
+
+        TEST(TerrainLodIndex, shouldCountATileOfTheSizeAsFullCoverage)
+        {
+            LodIndex index;
+            index.add(VFS::Path::Normalized(terrainPath("w", 16, 0, 0)), "w");
+            EXPECT_EQ(index.getTerrainCoverage(0, 0, 16), LodIndex::Coverage::Full);
+            EXPECT_EQ(index.getTerrainCoverage(0, 0, 8), LodIndex::Coverage::None);
+        }
+
         TEST(TerrainLodIndex, shouldKeepTheTwoSetsOfObjectBlocksApart)
         {
             LodIndex index;

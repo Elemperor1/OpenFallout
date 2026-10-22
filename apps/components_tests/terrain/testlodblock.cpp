@@ -8,6 +8,7 @@
 #include <osg/NodeVisitor>
 
 #include <cstddef>
+#include <limits>
 
 namespace Terrain
 {
@@ -64,6 +65,23 @@ namespace Terrain
             CountTriangles count;
             node.accept(count);
             return count.mTriangles;
+        }
+
+        TEST(TerrainLodBlock, shouldSkipATriangleWithVerticesThatAreNotNumbers)
+        {
+            osg::ref_ptr<osg::Geometry> geometry = makeBlockGeometry(0, 0);
+            osg::Vec3Array& vertices = *static_cast<osg::Vec3Array*>(geometry->getVertexArray());
+            vertices[0].x() = std::numeric_limits<float>::quiet_NaN();
+            vertices[3].y() = std::numeric_limits<float>::infinity();
+            osg::ref_ptr<osg::Group> block(new osg::Group);
+            block->addChild(geometry);
+
+            const auto cells = splitBlockByCell(*block, 0, 0, cellSize);
+            std::size_t triangles = 0;
+            for (const auto& cell : cells)
+                if (cell != nullptr)
+                    triangles += countTriangles(*cell);
+            EXPECT_EQ(triangles, 14u);
         }
 
         TEST(TerrainLodBlock, shouldPutEveryTriangleIntoTheCellItIsIn)
@@ -170,27 +188,58 @@ namespace Terrain
         {
             osg::ref_ptr<osg::Group> tile(new osg::Group);
             tile->addChild(makeSquare(0.f, 0.f, 8 * cellSize));
-            EXPECT_EQ(getLodPlacement(*tile, 8, -16, cellSize), osg::Vec3f(8 * cellSize, -16 * cellSize, 0.f));
+            EXPECT_EQ(getLodPlacement(*tile, 8, -16, 8, cellSize), osg::Vec3f(8 * cellSize, -16 * cellSize, 0.f));
         }
 
         TEST(TerrainLodBlock, placementShouldBeNoneWhenTheVerticesAreInTheWorld)
         {
             osg::ref_ptr<osg::Group> tile(new osg::Group);
             tile->addChild(makeSquare(8 * cellSize, -16 * cellSize, 8 * cellSize));
-            EXPECT_EQ(getLodPlacement(*tile, 8, -16, cellSize), osg::Vec3f());
+            EXPECT_EQ(getLodPlacement(*tile, 8, -16, 8, cellSize), osg::Vec3f());
+        }
+
+        TEST(TerrainLodBlock, placementShouldTellABlockWithGeometryInOnePartOfItsSquare)
+        {
+            // a block of four by four cells at the cell 4, 4 with something only in its north east cell
+            osg::ref_ptr<osg::Group> local(new osg::Group);
+            local->addChild(makeSquare(3 * cellSize, 3 * cellSize, cellSize));
+            EXPECT_EQ(getLodPlacement(*local, 4, 4, 4, cellSize), osg::Vec3f(4 * cellSize, 4 * cellSize, 0.f));
+
+            osg::ref_ptr<osg::Group> world(new osg::Group);
+            world->addChild(makeSquare(7 * cellSize, 7 * cellSize, cellSize));
+            EXPECT_EQ(getLodPlacement(*world, 4, 4, 4, cellSize), osg::Vec3f());
+
+            // and at the south west, in the world, then from zero
+            osg::ref_ptr<osg::Group> southWest(new osg::Group);
+            southWest->addChild(makeSquare(4 * cellSize, 4 * cellSize, cellSize));
+            EXPECT_EQ(getLodPlacement(*southWest, 4, 4, 4, cellSize), osg::Vec3f());
+            osg::ref_ptr<osg::Group> southWestLocal(new osg::Group);
+            southWestLocal->addChild(makeSquare(0.f, 0.f, cellSize));
+            EXPECT_EQ(getLodPlacement(*southWestLocal, 4, 4, 4, cellSize), osg::Vec3f(4 * cellSize, 4 * cellSize, 0.f));
+        }
+
+        TEST(TerrainLodBlock, placementShouldTellABlockWestOfTheOrigin)
+        {
+            osg::ref_ptr<osg::Group> local(new osg::Group);
+            local->addChild(makeSquare(0.f, 0.f, 4 * cellSize));
+            EXPECT_EQ(getLodPlacement(*local, -4, 0, 4, cellSize), osg::Vec3f(-4 * cellSize, 0.f, 0.f));
+
+            osg::ref_ptr<osg::Group> world(new osg::Group);
+            world->addChild(makeSquare(-4 * cellSize, 0.f, 4 * cellSize));
+            EXPECT_EQ(getLodPlacement(*world, -4, 0, 4, cellSize), osg::Vec3f());
         }
 
         TEST(TerrainLodBlock, placementShouldBeNoneAtTheOrigin)
         {
             osg::ref_ptr<osg::Group> tile(new osg::Group);
             tile->addChild(makeSquare(0.f, 0.f, 4 * cellSize));
-            EXPECT_EQ(getLodPlacement(*tile, 0, 0, cellSize), osg::Vec3f());
+            EXPECT_EQ(getLodPlacement(*tile, 0, 0, 4, cellSize), osg::Vec3f());
         }
 
         TEST(TerrainLodBlock, placementShouldBeNoneWithoutGeometry)
         {
             osg::ref_ptr<osg::Group> tile(new osg::Group);
-            EXPECT_EQ(getLodPlacement(*tile, 8, 8, cellSize), osg::Vec3f());
+            EXPECT_EQ(getLodPlacement(*tile, 8, 8, 4, cellSize), osg::Vec3f());
         }
     }
 }

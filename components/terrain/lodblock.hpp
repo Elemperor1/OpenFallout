@@ -21,9 +21,11 @@ namespace Terrain
 
     /// The tiles and the blocks of the games are placed by the translation of their root node, to the south west
     /// corner of the cells they cover, and their vertices run from zero. The loader of NIF files drops the translation
-    /// of a root node. @return the move that puts the node, as it was loaded, where the cell x, y has its south west
-    /// corner; none if its geometry is in the world already.
-    osg::Vec3f getLodPlacement(const osg::Node& node, int x, int y, float cellSize);
+    /// of a root node. @param cells the side of the square the file covers in cells. @return the move that puts the
+    /// node, as it was loaded, where the cell x, y has its south west corner; none if its geometry is in the world
+    /// already, which the middle of the geometry tells (the two squares only touch, so a block with geometry in a part
+    /// of its square is told as well as a full one).
+    osg::Vec3f getLodPlacement(const osg::Node& node, int x, int y, int cells, float cellSize);
 }
 
 #endif

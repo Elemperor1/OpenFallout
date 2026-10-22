@@ -73,6 +73,15 @@ namespace Terrain
         /// down to the smallest level, and above the largest level the squares of that level.
         std::vector<const LodTile*> getTerrain(int x, int y, int size) const;
 
+        /// How much of the square of the given size in cells from the cell x, y the terrain tiles fill.
+        enum class Coverage
+        {
+            None,
+            Partial,
+            Full,
+        };
+        Coverage getTerrainCoverage(int x, int y, int size) const;
+
         /// The same for the blocks of distant objects of the set "high" or of the other set.
         std::vector<const LodTile*> getObjects(int x, int y, int size, bool high) const;
 

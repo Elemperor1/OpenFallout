@@ -51,10 +51,14 @@ namespace Terrain
                     return;
                 const osg::Vec3f center = ((*mVertices)[a] + (*mVertices)[b] + (*mVertices)[c]) / 3.f;
                 const osg::Vec3f world = center * mToWorld;
-                const int x = std::clamp(
-                    static_cast<int>(std::floor(world.x() / mCellSize)) - mFirstCellX, 0, sCellsPerSide - 1);
-                const int y = std::clamp(
-                    static_cast<int>(std::floor(world.y() / mCellSize)) - mFirstCellY, 0, sCellsPerSide - 1);
+                // The vertices come from a file: a coordinate that is not a number or is far out is not made an int
+                if (!std::isfinite(world.x()) || !std::isfinite(world.y()))
+                    return;
+                constexpr float last = static_cast<float>(sCellsPerSide - 1);
+                const int x = static_cast<int>(
+                    std::clamp(std::floor(world.x() / mCellSize) - static_cast<float>(mFirstCellX), 0.f, last));
+                const int y = static_cast<int>(
+                    std::clamp(std::floor(world.y() / mCellSize) - static_cast<float>(mFirstCellY), 0.f, last));
                 const int cell = y * sCellsPerSide + x;
                 if ((mWanted & (1u << cell)) == 0)
                     return;
@@ -137,7 +141,7 @@ namespace Terrain
         return result;
     }
 
-    osg::Vec3f getLodPlacement(const osg::Node& node, int x, int y, float cellSize)
+    osg::Vec3f getLodPlacement(const osg::Node& node, int x, int y, int cells, float cellSize)
     {
         osg::ComputeBoundsVisitor visitor;
         const_cast<osg::Node&>(node).accept(visitor);
@@ -145,9 +149,21 @@ namespace Terrain
         if (!box.valid())
             return osg::Vec3f();
 
+        const float extent = static_cast<float>(cells) * cellSize;
         const osg::Vec3f corner(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, 0.f);
-        const float local = std::abs(box.xMin()) + std::abs(box.yMin());
-        const float world = std::abs(box.xMin() - corner.x()) + std::abs(box.yMin() - corner.y());
-        return local < world ? corner : osg::Vec3f();
+
+        // Whether the middle of the geometry on one axis is in the square that runs from zero rather than the one
+        // that runs from the corner
+        const auto fromZero = [extent](float min, float max, float start) {
+            const float middle = (min + max) / 2.f;
+            return std::abs(middle - extent / 2.f) < std::abs(middle - (start + extent / 2.f));
+        };
+
+        // At the origin the two squares are one
+        if (corner.x() != 0.f)
+            return fromZero(box.xMin(), box.xMax(), corner.x()) ? corner : osg::Vec3f();
+        if (corner.y() != 0.f)
+            return fromZero(box.yMin(), box.yMax(), corner.y()) ? corner : osg::Vec3f();
+        return osg::Vec3f();
     }
 }

@@ -124,6 +124,18 @@ namespace Terrain
         return result;
     }
 
+    LodIndex::Coverage LodIndex::getTerrainCoverage(int x, int y, int size) const
+    {
+        const std::vector<const LodTile*> tiles = getTerrain(x, y, size);
+        if (tiles.empty())
+            return Coverage::None;
+        // The tiles are chosen so that none overlaps another, so their areas add up to the square when it is filled
+        long long area = 0;
+        for (const LodTile* tile : tiles)
+            area += static_cast<long long>(tile->mName.mLevel) * tile->mName.mLevel;
+        return area >= static_cast<long long>(size) * size ? Coverage::Full : Coverage::Partial;
+    }
+
     std::vector<const LodTile*> LodIndex::getObjects(int x, int y, int size, bool high) const
     {
         std::vector<const LodTile*> result;

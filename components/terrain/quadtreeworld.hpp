@@ -88,9 +88,11 @@ namespace Terrain
         };
         void addChunkManager(ChunkManager*);
 
-        /// Leaves the nodes that the function names, given their size and center in cells, to the other chunk
-        /// managers: the terrain of the land records is not made for them.
-        void setTerrainReplaced(std::function<bool(float, const osg::Vec2f&)> replaced);
+        /// Leaves the nodes that `replaced` names, given their size and center in cells, to the other chunk managers:
+        /// the terrain of the land records is not made for them. The nodes that `split` names are filled in part
+        /// only by the other chunk managers, so they are taken apart: their children are filled whole or not at all.
+        void setTerrainReplaced(
+            std::function<bool(float, const osg::Vec2f&)> replaced, std::function<bool(float, const osg::Vec2f&)> split);
 
     private:
         void ensureQuadTreeBuilt();
@@ -102,6 +104,7 @@ namespace Terrain
         osg::ref_ptr<ViewDataMap> mViewDataMap;
 
         std::vector<ChunkManager*> mChunkManagers;
+        std::function<bool(float, const osg::Vec2f&)> mTerrainSplit;
 
         std::mutex mQuadTreeMutex;
         bool mQuadTreeBuilt;

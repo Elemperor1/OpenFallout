@@ -1373,9 +1373,13 @@ namespace OFRender
                 newChunkMgr.mFalloutLod = std::make_unique<FalloutLod>(mResourceSystem->getSceneManager(),
                     std::move(lodIndex), worldspace, Settings::terrain().mGameLodObjects, expiryDelay);
                 const FalloutLod* falloutLod = newChunkMgr.mFalloutLod.get();
-                quadTreeWorld->setTerrainReplaced([falloutLod](float size, const osg::Vec2f& center) {
-                    return falloutLod->replacesTerrain(size, center);
-                });
+                quadTreeWorld->setTerrainReplaced(
+                    [falloutLod](float size, const osg::Vec2f& center) {
+                        return falloutLod->replacesTerrain(size, center);
+                    },
+                    [falloutLod](float size, const osg::Vec2f& center) {
+                        return falloutLod->splitsTerrain(size, center);
+                    });
                 quadTreeWorld->addChunkManager(newChunkMgr.mFalloutLod.get());
                 mResourceSystem->addResourceManager(newChunkMgr.mFalloutLod.get());
                 newChunkMgr.mGameLodDistance = Settings::terrain().mGameLodDistance;

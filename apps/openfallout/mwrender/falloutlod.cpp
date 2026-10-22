@@ -38,14 +38,24 @@ namespace OFRender
         return Mask_Static;
     }
 
-    bool FalloutLod::replacesTerrain(float size, const osg::Vec2f& center) const
+    Terrain::LodIndex::Coverage FalloutLod::getTerrainCoverage(float size, const osg::Vec2f& center) const
     {
         if (size < Terrain::LodIndex::sSmallestLevel)
-            return false;
+            return Terrain::LodIndex::Coverage::None;
         const float half = size / 2.f;
         const int x = static_cast<int>(std::lround(center.x() - half));
         const int y = static_cast<int>(std::lround(center.y() - half));
-        return !mIndex.getTerrain(x, y, static_cast<int>(std::lround(size))).empty();
+        return mIndex.getTerrainCoverage(x, y, static_cast<int>(std::lround(size)));
+    }
+
+    bool FalloutLod::replacesTerrain(float size, const osg::Vec2f& center) const
+    {
+        return getTerrainCoverage(size, center) == Terrain::LodIndex::Coverage::Full;
+    }
+
+    bool FalloutLod::splitsTerrain(float size, const osg::Vec2f& center) const
+    {
+        return getTerrainCoverage(size, center) == Terrain::LodIndex::Coverage::Partial;
     }
 
     osg::ref_ptr<osg::Node> FalloutLod::getChunk(float size, const osg::Vec2f& center, unsigned char /*lod*/,
@@ -69,7 +79,8 @@ namespace OFRender
     {
         osg::ref_ptr<osg::Node> node = mSceneManager->getInstance(VFS::Path::NormalizedView(tile.mPath));
         // The loader of NIF files drops the translation of the root node, which is what places a tile
-        const osg::Vec3f placement = Terrain::getLodPlacement(*node, tile.mName.mX, tile.mName.mY, mCellSize);
+        const osg::Vec3f placement = Terrain::getLodPlacement(
+            *node, tile.mName.mX, tile.mName.mY, tile.mName.mLevel, mCellSize);
         if (placement == osg::Vec3f())
             return node;
         osg::ref_ptr<osg::MatrixTransform> placed(new osg::MatrixTransform(osg::Matrix::translate(placement)));
@@ -88,9 +99,11 @@ namespace OFRender
             const int y = static_cast<int>(std::lround(center.y() - half));
             const int cells = static_cast<int>(std::lround(size));
 
+            // The tiles are drawn only where they fill the node, as it is the only place the land is not
             osg::ref_ptr<osg::Group> terrain(new osg::Group);
-            for (const Terrain::LodTile* tile : mIndex.getTerrain(x, y, cells))
-                terrain->addChild(loadTile(*tile));
+            if (replacesTerrain(size, center))
+                for (const Terrain::LodTile* tile : mIndex.getTerrain(x, y, cells))
+                    terrain->addChild(loadTile(*tile));
             if (terrain->getNumChildren() > 0)
             {
                 terrain->setNodeMask(Mask_Terrain);
