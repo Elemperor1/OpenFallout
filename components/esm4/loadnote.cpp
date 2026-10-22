@@ -29,7 +29,7 @@
 #include <stdexcept>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
 
 void ESM4::Note::load(ESM4::Reader& reader)
 {
@@ -63,13 +63,24 @@ void ESM4::Note::load(ESM4::Reader& reader)
                 reader.getFormId(mDropSound);
                 break;
             case ESM::fourCC("DATA"):
+                if (subHdr.dataSize > 0)
+                    reader.get(mType);
+                if (subHdr.dataSize > 1)
+                    reader.skipSubRecordData(subHdr.dataSize - 1);
+                break;
+            case ESM::fourCC("TNAM"):
+                // A note of voice has the topic that it plays here: the text is for a note of text
+                if (mType == 1 || mType == 255)
+                    reader.getZString(mText);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("MODT"): // Model data
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
             case ESM::fourCC("ONAM"):
             case ESM::fourCC("SNAM"):
-            case ESM::fourCC("TNAM"):
             case ESM::fourCC("XNAM"):
             case ESM::fourCC("OBND"):
             case ESM::fourCC("VMAD"):

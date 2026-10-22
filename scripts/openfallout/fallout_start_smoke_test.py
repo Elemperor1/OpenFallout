@@ -2049,7 +2049,8 @@ local steps = {
         world.players[1]:sendEvent('OFTestArenaFire', {})
         world.players[1]:sendEvent('OFTestArenaFire', { target = find(@BYSTANDER@), once = true })
         local raider = find(@RAIDER@)
-        if raider then raider:teleport(raider.cell, util.vector3(@COMES@)) end
+        -- The raider comes from the north and faces the player: a character does not see what is behind it
+        if raider then raider:teleport(raider.cell, util.vector3(@COMES@), { rotation = util.transform.rotateZ(math.pi) }) end
     end },
     { 5.8, function()
         -- Experience for two levels: the level up screen opens by itself
@@ -2375,6 +2376,19 @@ return {
                 elseif vatsStart and core.getSimulationTime() - vatsStart >= 1.5 then
                     -- The action points come back while V.A.T.S. is closed
                     print('OFTEST', 'arena', 'vatsregen', tostring(vats.state().actionPoints > vatsPoints))
+                    -- The head-up display: what the script of the display is showing, and the things it reads from the
+                    -- engine (the stats, the target under the crosshair, the compass and a note that is not there)
+                    local hud = core.hud
+                    local status, compass = hud.status(), hud.compass()
+                    local state, drawn = I.FalloutHud.state(), I.FalloutHud.compass()
+                    local target = hud.target(vatsTarget)
+                    print('OFTEST', 'arena', 'hud', string.format(
+                        'rads=%.0f/%.0f sneaking=%s sneak=%s drawn=%s compass=%s heading=%s markers=%d limbs=%d messages=%d '
+                            .. 'note=%s', status.rads, status.radsMax, tostring(status.sneaking), status.sneak,
+                        tostring(state ~= nil), tostring(drawn ~= nil), type(compass.heading), #compass.markers,
+                        #status.crippled, #hud.takeMessages(), tostring(hud.noteText(core.pipboy.player()))))
+                    print('OFTEST', 'arena', 'hudtarget', target and string.format('name=%s health=%.0f/%.0f dead=%s',
+                        target.name, target.health, target.maxHealth, tostring(target.dead)) or 'none')
                     vatsFrames, vatsStart = nil, nil
                 end
             end
@@ -3721,6 +3735,33 @@ def check_arena_screens(text):
                         f"should be denied, and a second making should lack scrap: want '{want}', found "
                         f"'{craft.group(1) if craft else 'no line'}'")
     problems += check_arena_vats(text)
+    problems += check_arena_hud(text)
+    return problems
+
+
+def check_arena_hud(text):
+    """The problems with the head-up display: its script is up in the game (the display shows a state), the engine tells
+    the radiation, the sneak meter, the crippled limbs and the compass in the shapes the script reads, and the character
+    under the crosshair has a name and health for the bar of the target."""
+    problems = []
+    hud = re.search(r"OFTEST\tarena\thud\trads=([\d.]+)/([\d.]+) sneaking=(\w+) sneak=(\w+) drawn=(\w+) compass=(\w+) "
+                    r"heading=(\w+) markers=(\d+) limbs=(\d+) messages=(\d+) note=(\w+)$", text, re.M)
+    if not hud:
+        return ["no 'arena hud' line in the log (core.hud or the display did not answer)"]
+    rads, most, sneaking, sneak, drawn, compass, heading, _, _, _, note = hud.groups()
+    if float(most) <= 0 or float(rads) < 0:
+        problems.append(f"the radiation meter should have a most to show: {hud.group(0)}")
+    if (sneaking, sneak) != ("false", "hidden"):
+        problems.append(f"a player that does not sneak is hidden from nobody to tell: {hud.group(0)}")
+    if (drawn, compass, heading) != ("true", "true", "number"):
+        problems.append(f"the display and its compass should be up, with a heading: {hud.group(0)}")
+    if note != "nil":
+        problems.append(f"a form that is no note should have no text: {hud.group(0)}")
+    target = re.search(r"OFTEST\tarena\thudtarget\tname=(.+) health=([\d.]+)/([\d.]+) dead=(\w+)$", text, re.M)
+    if not target:
+        problems.append("no 'arena hudtarget' line in the log (the bar of the target was not read for the dummy)")
+    elif float(target.group(3)) <= 0 or not target.group(1):
+        problems.append(f"the target should have a name and a most health: {target.group(0)}")
     return problems
 
 

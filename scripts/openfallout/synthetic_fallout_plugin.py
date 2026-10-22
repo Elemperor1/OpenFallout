@@ -497,7 +497,7 @@ ARENA_BYSTANDER_PLACE = (0.0, -700.0, 0.0)
 # The raider starts where the player does not see it from, beyond the 2500 units that a character sees, and is put where
 # it can see the player when the test says so
 ARENA_RAIDER_PLACE = (-1800.0, 1800.0, 0.0)
-ARENA_RAIDER_COMES = (0.0, 1400.0, 0.0)
+ARENA_RAIDER_COMES = (0.0, 560.0, 0.0)
 ARENA_RIFLE_DAMAGE = 10
 ARENA_PISTOL_DAMAGE = 10
 ARENA_PISTOL_RANGE = 1200.0

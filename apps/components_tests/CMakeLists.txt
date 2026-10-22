@@ -119,6 +119,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testmenuicon.cpp
     esm4/testmessage.cpp
     esm4/testmodeldata.cpp
+    esm4/testnote.cpp
     esm4/testnpc.cpp
     esm4/testoptionalsubrecords.cpp
     esm4/testpackage.cpp
@@ -178,6 +179,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp
     falloutscript/testmagic.cpp
+    falloutscript/testhud.cpp
     falloutscript/testmapmarkers.cpp
     falloutscript/testobjectstate.cpp
     falloutscript/testpresentation.cpp

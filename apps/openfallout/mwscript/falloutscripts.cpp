@@ -236,9 +236,8 @@ namespace OFScript
         mInterpreter.setHandler("IsSneaking", [this](FalloutScript::CallContext& call) {
             if (call.mReference == 0 || call.mReference != mPlayer || std::this_thread::get_id() != mMainThread)
                 return 0.0;
-            const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
-            return !player.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(player) ? 1.0
-                                                                                                             : 0.0;
+            const OFWorld::Ptr body = OFBase::Environment::get().getWorld()->getPlayerPtr();
+            return !body.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(body) ? 1.0 : 0.0;
         });
         // The trigger it is called on runs its OnTriggerEnter block for the actor it names, as if that actor had walked
         // in
@@ -375,6 +374,13 @@ namespace OFScript
         mPerks.setHealthLowered([this](FalloutScript::FormId owner) { mItemUse.checkHealth(owner); });
         mItemUse.setConditions(conditionsHold);
         mMagic.setConditions(conditionsHold);
+        // A change of karma is told in the message area, with a picture for the kind of change
+        mProgress.setKarmaNotice([this](int amount) {
+            const bool major = std::abs(amount) >= gameSetting("iKarmaChangeThreshold", 250);
+            const std::string kind = std::string(major ? "Major" : "Minor") + (amount < 0 ? "Lost" : "Gained");
+            mHudMessages.push(gameSettingText("sKarma" + kind), gameSettingText("sKarma" + kind + "Image"),
+                FalloutScript::Hud::messageSeconds);
+        });
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
         // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
@@ -473,6 +479,8 @@ namespace OFScript
             mFireCooldowns.clear();
         }
         mWeaponLoops.clear();
+        mHudMessages.clear();
+        mWatchers.clear();
         mReferences.clear();
         mTriggerShapes.clear();
         mTriggers.clear();
@@ -624,6 +632,7 @@ namespace OFScript
             if (gain > 0)
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
+        mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);
         mQuests.update(frametime);
@@ -1041,9 +1050,8 @@ namespace OFScript
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
         // notes during a conversation of Morrowind is hidden
-        runOnMainThread([text] {
-            OFBase::Environment::get().getWindowManager()->messageBox(text, OFGui::ShowInDialogueMode_Never);
-        });
+        // The head-up display prints it in the corner (the display of Fallout takes what is said from the line)
+        mHudMessages.push(text);
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
