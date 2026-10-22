@@ -120,6 +120,12 @@ namespace Resource
             NifBullet::BulletNifLoader loader(mHavokCollision);
             shape = loader.load(*mNifFileManager->get(name));
         }
+        else if (Misc::getFileExtension(name.value()) == "spt")
+        {
+            // The stand-in of a SpeedTree file is a billboard made for drawing: its transparent parts must not
+            // block anyone, and the trunk is not known.
+            return nullptr;
+        }
         else
         {
             // TODO: support .bullet shape files

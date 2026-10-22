@@ -1,5 +1,9 @@
+#include <components/resource/bulletshapemanager.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/resource/scenemanager.hpp>
 #include <components/resource/speedtree.hpp>
 #include <components/testing/util.hpp>
+#include <components/toutf8/toutf8.hpp>
 
 #include <gtest/gtest.h>
 
@@ -166,5 +170,21 @@ namespace
     {
         const auto vfs = TestingOpenMW::createTestVFS({});
         EXPECT_EQ(Resource::findSpeedTreeImage("Lost.dds", *vfs).value(), "textures/lost.dds");
+    }
+
+    TEST(ResourceSpeedTreeTest, theCardsOfATreeAreNotMadeIntoCollision)
+    {
+        TestingOpenMW::VFSTestFile file("image");
+        const auto vfs = TestingOpenMW::createTestVFS({
+            { VFS::Path::NormalizedView("textures/oftesttree.dds"), &file },
+        });
+        const ToUTF8::Utf8Encoder encoder(ToUTF8::WINDOWS_1252);
+        Resource::ResourceSystem resourceSystem(vfs.get(), 1.0, &encoder.getStatelessEncoder());
+        constexpr VFS::Path::NormalizedView tree("trees/oftesttree.spt");
+        resourceSystem.getSceneManager()->setSpeedTree(tree, Resource::SpeedTreeStandIn{ "oftesttree.dds", 400.f, 700.f });
+
+        Resource::BulletShapeManager shapes(
+            vfs.get(), resourceSystem.getSceneManager(), resourceSystem.getNifFileManager(), 1.0);
+        EXPECT_EQ(shapes.getShape(tree), nullptr);
     }
 }
