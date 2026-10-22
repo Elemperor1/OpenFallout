@@ -92,7 +92,8 @@ void main()
         viewNormal = normalize(gl_NormalMatrix * normal);
     else
         viewNormal = normalize(gl_NormalMatrix * passNormal);
-    specularColor *= normalTex.a;
+    if (lodNormalMode != 3)
+        specularColor *= normalTex.a;
 #else
     vec3 viewNormal = normalize(gl_NormalMatrix * passNormal);
 #endif
