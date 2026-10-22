@@ -546,8 +546,12 @@ namespace FalloutScript
 
             // A reference that is not in a loaded cell yet keeps what a loaded game said of it
             const OFScript::PendingSave& pending = *host.mPendingSave;
-            out.count(pending.mReferences.size());
-            for (const auto& [reference, state] : pending.mReferences)
+            // and so does a scale that a script gave to one in a cell that was not loaded
+            std::map<FormId, OFScript::PendingSave::Reference> unloaded = pending.mReferences;
+            for (const auto& [reference, scale] : host.mScales)
+                unloaded[reference].mScale = static_cast<float>(scale);
+            out.count(unloaded.size());
+            for (const auto& [reference, state] : unloaded)
             {
                 out.form(reference);
                 out.boolean(state.mDeleted);
@@ -655,7 +659,12 @@ namespace FalloutScript
                 if (hasCount)
                     state.mCount = count;
                 if (reference)
+                {
                     references[*reference] = state;
+                    // The scripts see the scale the game had given it
+                    if (state.mScale)
+                        host.mScales[*reference] = *state.mScale;
+                }
             }
             const std::size_t objects = in.count(objectBytes);
             for (std::size_t i = 0; i < objects; ++i)

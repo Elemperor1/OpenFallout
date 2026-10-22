@@ -79,12 +79,13 @@ namespace OFScript
         if (manager == nullptr || std::this_thread::get_id() != mMainThread)
             return false;
         const OFWorld::Ptr ptr = reference != 0 ? findReference(reference) : OFWorld::Ptr();
+        // A sound that no one makes is the player's: it is the answer for that reference and for none other
+        const bool unattached = reference == 0 || reference == mPlayer;
         for (const std::string& file : soundFilesOf(sound))
         {
             const VFS::Path::Normalized path(file);
-            // A sound that no one makes is not kept for a reference
             if ((!ptr.isEmpty() && manager->getSoundPlaying(ptr, path))
-                || manager->getSoundPlaying(OFWorld::Ptr(), path))
+                || (unattached && manager->getSoundPlaying(OFWorld::Ptr(), path)))
                 return true;
         }
         return false;
