@@ -382,6 +382,8 @@ namespace OFRender
         sceneRoot->getOrCreateStateSet()->addUniform(new osg::Uniform("distortionStrength", 0.f));
         sceneRoot->getOrCreateStateSet()->addUniform(new osg::Uniform("alpha", 1.f));
         sceneRoot->getOrCreateStateSet()->addUniform(new osg::Uniform("actorFade", 1.f));
+        // The shaders of normal-mapped meshes read it; only the tiles of the distant land of the games change it
+        sceneRoot->getOrCreateStateSet()->addUniform(new osg::Uniform("lodNormalMode", 0));
 
         resourceSystem->getSceneManager()->setUpNormalsRTForStateSet(sceneRoot->getOrCreateStateSet(), true);
 

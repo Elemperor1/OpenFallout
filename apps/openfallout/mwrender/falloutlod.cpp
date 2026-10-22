@@ -54,11 +54,16 @@ namespace OFRender
 
     bool FalloutLod::replacesTerrain(float size, const osg::Vec2f& center) const
     {
+        // The blocks alone: no land from the tiles, and none from the land records either
+        if (mOptions.mDebug.mObjectsOnly && size >= Terrain::LodIndex::sSmallestLevel)
+            return true;
         return getTerrainCoverage(size, center) == Terrain::LodIndex::Coverage::Full;
     }
 
     bool FalloutLod::splitsTerrain(float size, const osg::Vec2f& center) const
     {
+        if (mOptions.mDebug.mObjectsOnly)
+            return false;
         return getTerrainCoverage(size, center) == Terrain::LodIndex::Coverage::Partial;
     }
 
