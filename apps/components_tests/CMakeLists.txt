@@ -66,6 +66,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     files/conversiontests.cpp
     files/testgameini.cpp
+    files/testfalloutinstall.cpp
     files/hash.cpp
 
     toutf8/toutf8.cpp

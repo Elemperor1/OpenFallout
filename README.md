@@ -31,6 +31,7 @@ OpenFallout would not exist without the work of the OpenMW team and its contribu
 Getting Started
 ---------------
 
+* [Running it on your copy of the games](docs/openfallout/playing.md)
 * [Build from source](docs/openfallout/build-baseline.md)
 * [Roadmap](docs/openfallout/gap-audit-and-roadmap.md)
 * [Report a bug](https://github.com/Elemperor1/OpenFallout/issues)
@@ -39,7 +40,7 @@ Getting Started
 The data path
 -------------
 
-The data path tells OpenFallout where to find your Morrowind files. If you run the launcher, OpenFallout should be able to pick up the location of these files on its own, if both Morrowind and OpenFallout are installed properly (installing Morrowind under WINE is considered a proper install).
+OpenFallout needs the `Data` folder of your own copy of Fallout 3, Fallout: New Vegas or Tale of Two Wastelands. With nothing set it looks where Steam, GOG and the usual installers put the games (on macOS and Linux also in the Windows drives of Wine, CrossOver and the like). To name a folder yourself, use `--data` or a `data=` line in `openfallout.cfg`. [docs/openfallout/playing.md](docs/openfallout/playing.md) says how, per system, and how to start a game.
 
 Command line options
 --------------------
