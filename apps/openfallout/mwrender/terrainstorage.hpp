@@ -1,6 +1,7 @@
 #ifndef MWRENDER_TERRAINSTORAGE_H
 #define MWRENDER_TERRAINSTORAGE_H
 
+#include <map>
 #include <memory>
 
 #include <components/esmterrain/storage.hpp>
@@ -32,10 +33,16 @@ namespace OFRender
         /// Get bounds of the whole terrain in cell units
         void getBounds(float& minX, float& maxX, float& minY, float& maxY, ESM::RefId worldspace) override;
 
+        /// The west and south edge of the terrain of the worldspace is moved down to a multiple of `alignment` cells,
+        /// where the nodes of the quad tree and the tiles of the level of detail files of the games start. Called
+        /// before the quad tree of the worldspace is built, and only for worldspaces that draw those tiles.
+        void setBoundsAlignment(ESM::RefId worldspace, int alignment);
+
         LandManager* getLandManager() const;
 
     private:
         std::unique_ptr<LandManager> mLandManager;
+        std::map<ESM::RefId, int> mBoundsAlignment;
 
         Resource::ResourceSystem* mResourceSystem;
     };

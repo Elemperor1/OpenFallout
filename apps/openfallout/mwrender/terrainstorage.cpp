@@ -4,7 +4,6 @@
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadtxst.hpp>
 #include <components/esm4/loadwrld.hpp>
-#include <components/terrain/lodindex.hpp>
 
 #include <cmath>
 
@@ -74,6 +73,7 @@ namespace OFRender
 
         if (ESM::isEsm4Ext(worldspace))
         {
+            const auto alignmentIt = mBoundsAlignment.find(worldspace);
             const ESM4::World* worldRec = esmStore.get<ESM4::World>().find(worldspace);
             if (!worldRec->mParent.isZeroOrUnset() && worldRec->mParentUseFlags & ESM4::World::UseFlag_Land)
                 worldspace = worldRec->mParent;
@@ -89,9 +89,12 @@ namespace OFRender
 
             // The nodes of the quad tree start at the west and south edge, and the tiles of the level of detail files
             // of the game are aligned to a multiple of their size
-            constexpr float alignment = static_cast<float>(Terrain::LodIndex::sLargestLevel);
-            minX = std::floor(minX / alignment) * alignment;
-            minY = std::floor(minY / alignment) * alignment;
+            if (alignmentIt != mBoundsAlignment.end() && alignmentIt->second > 1)
+            {
+                const float alignment = static_cast<float>(alignmentIt->second);
+                minX = std::floor(minX / alignment) * alignment;
+                minY = std::floor(minY / alignment) * alignment;
+            }
         }
         else
         {
@@ -104,6 +107,11 @@ namespace OFRender
         // since grid coords are at cell origin, we need to add 1 cell
         maxX += 1;
         maxY += 1;
+    }
+
+    void TerrainStorage::setBoundsAlignment(ESM::RefId worldspace, int alignment)
+    {
+        mBoundsAlignment[worldspace] = alignment;
     }
 
     LandManager* TerrainStorage::getLandManager() const

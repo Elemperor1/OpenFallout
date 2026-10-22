@@ -1361,6 +1361,8 @@ namespace OFRender
                 lodIndex = Terrain::LodIndex(*mResourceSystem->getVFS(), worldspaceRecord->mEditorId);
         }
         const bool gameLod = !lodIndex.empty();
+        if (gameLod)
+            mTerrainStorage->setBoundsAlignment(worldspace, Terrain::LodIndex::sLargestLevel);
 
         if (distantTerrain || groundcover || gameLod)
         {
