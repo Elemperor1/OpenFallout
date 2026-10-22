@@ -856,6 +856,10 @@ namespace OFScript
         double weaponCardDamage(FalloutScript::FormId weapon);
         /// Whether the weapon takes the ammunition (the one of its record, or one of its list of them)
         bool weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo);
+        /// The ammunition a weapon in the hands of the holder shoots: the one chosen when the weapon takes it, else
+        /// the one of the record, else the first of its list that the holder carries (the first of the list when it
+        /// carries none), 0 when the weapon names none
+        FalloutScript::FormId ammoOfWeapon(const ESM4::Weapon& weapon, FalloutScript::FormId holder);
         /// What one of an item weighs for the player: New Vegas lightens small things (Pack Rat) as the card of the
         /// item and the total of the Pip-Boy tell it
         double carriedWeight(double unit, bool packRat);

@@ -1818,6 +1818,28 @@ namespace OFScript
                 [ammo](const ESM::FormId& object) { return object.toUint32() == ammo; });
     }
 
+    FalloutScript::FormId FalloutScripts::ammoOfWeapon(const ESM4::Weapon& weapon, FalloutScript::FormId holder)
+    {
+        const FalloutScript::FormId chosen = holder != 0 ? mEquipment.ammo(holder) : 0;
+        if (weaponTakesAmmo(weapon, chosen))
+            return chosen;
+        if (mStore.get<ESM4::Ammunition>().search(weapon.mAmmo) != nullptr)
+            return weapon.mAmmo.toUint32();
+        const ESM4::FormIdList* list = mStore.get<ESM4::FormIdList>().search(weapon.mAmmo);
+        if (list == nullptr)
+            return 0;
+        FalloutScript::FormId first = 0;
+        for (const ESM::FormId& object : list->mObjects)
+        {
+            const FalloutScript::FormId candidate = object.toUint32();
+            if (first == 0)
+                first = candidate;
+            if (holder != 0 && mActors.itemCount(holder, candidate) > 0)
+                return candidate;
+        }
+        return first;
+    }
+
     double FalloutScripts::carriedWeight(double unit, bool packRat)
     {
         if (packRat && unit > 0 && unit <= gameSetting("fPackRatThreshold", 2.0))
@@ -2079,13 +2101,17 @@ namespace OFScript
         if (const ESM4::Projectile* projectile = mStore.get<ESM4::Projectile>().search(game.mProjectile))
             stats.mRange = std::max<double>(projectile->gameData().mRange, stats.mRange);
         stats.mAmmoUse = std::max<int>(game.mAmmoUse, 1);
-        // The ammunition it was given, or else the one of the record (not a list of them)
+        // The ammunition it was given, or else the one of the record. The player shoots what the item list shows for
+        // the weapon, which for a list of ammunition is the first of it that the player carries. A character the
+        // player does not play fires a weapon with a list as if it had rounds (prepareFight takes it so too).
         const FalloutScript::FormId chosen = mEquipment.ammo(attacker);
         if (isUsedUp(game))
         {
             stats.mAmmo = stats.mWeapon;
             stats.mAmmoUse = 1;
         }
+        else if (attacker == mPlayer)
+            stats.mAmmo = ammoOfWeapon(*record, attacker);
         else if (chosen != 0)
             stats.mAmmo = chosen;
         else if (mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr)
