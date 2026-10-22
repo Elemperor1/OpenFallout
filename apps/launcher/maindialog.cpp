@@ -167,8 +167,8 @@ Launcher::FirstRunDialogResult Launcher::MainDialog::showFirstRunDialog()
         msgBox.setText(
             tr("<html><head/><body><p><b>Welcome to OpenFallout!</b></p>"
                "<p>To play Fallout 3, Fallout: New Vegas or Tale of Two Wastelands, skip the Wizard and add the "
-               "Data folder of your copy of the game on the Data Files page, then tick the master file of the game "
-               "(Fallout3.esm or FalloutNV.esm) in the list.</p>"
+               "Data folder of your copy of the game on the Data Files page, then pick its master file (Fallout3.esm "
+               "or FalloutNV.esm) as the game file.</p>"
                "<p>The Installation Wizard sets up Morrowind and is not needed for Fallout.</p></body></html>"));
 
         QAbstractButton* wizardButton

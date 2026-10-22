@@ -27,7 +27,7 @@ The configuration folder is `~/.config/openfallout` on Linux (`$XDG_CONFIG_HOME/
 
 Which plugins load: if you name none, the ones the games make active (the base master named in `Fallout_default.ini`, the plugins with a `.NAM` file next to them, and the ones in a `Plugins.txt` given with `--plugins-file`), with their masters. Name plugins with `--content` (or `content=` in `openfallout.cfg`) to choose them yourself. Tale of Two Wastelands: `data="<Data folder of New Vegas>"`, then `data="<output folder of the installer>"`. The rules, one by one, are in [mods and load order](mods-and-load-order.md).
 
-The launcher (`openfallout-launcher`) has a Data Files page that writes these lines for you. It comes from OpenMW and was made for Morrowind; the project has not tried it on the Fallout games, so the command line and `openfallout.cfg` are the way that is known to work.
+The launcher (`openfallout-launcher`) has a Data Files page that writes these lines for you (add the Data folder, then pick `Fallout3.esm` or `FalloutNV.esm` as the game file; adding the folder alone leaves no game file chosen). It comes from OpenMW and was made for Morrowind; the project has not tried it on the Fallout games, so the command line and `openfallout.cfg` are the way that is known to work.
 
 ## Starting a game
 
