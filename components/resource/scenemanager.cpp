@@ -1063,7 +1063,16 @@ namespace Resource
     void SceneManager::setSpeedTree(VFS::Path::NormalizedView model, SpeedTreeStandIn tree)
     {
         const std::lock_guard lock(mSpeedTreeMutex);
-        mSpeedTrees.insert_or_assign(std::string(model.value()), std::move(tree));
+        // The models are cached by path, so records that share a file share one picture: the last one registered
+        const auto [found, inserted] = mSpeedTrees.try_emplace(std::string(model.value()), tree);
+        if (!inserted)
+        {
+            const SpeedTreeStandIn& known = found->second;
+            if (known.mTexture != tree.mTexture || known.mWidth != tree.mWidth || known.mHeight != tree.mHeight)
+                Log(Debug::Warning) << "Two tree records name the SpeedTree file " << model
+                                    << " with different images or sizes, the last one is used for both";
+            found->second = std::move(tree);
+        }
     }
 
     osg::ref_ptr<osg::Node> SceneManager::loadSpeedTree(VFS::Path::NormalizedView path)
