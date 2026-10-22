@@ -76,32 +76,75 @@ local function pick(topic)
     startResponse(view)
 end
 
--- The characters of a word with their widths in letters: the ideographs, kana and hangul of the languages that are
--- written without spaces are about twice as wide as a letter. Text that is not UTF-8 is taken a byte at a time.
+-- The width of a character in the size of the text, as the font of the window draws it (measured on its letters: the
+-- lower case ones are half as wide as the size, the capitals three quarters): the ideographs, kana and hangul of the
+-- languages that are written without spaces are as wide as the size.
+local function charWidth(code)
+    if code < 128 then
+        if code == 32 then
+            return 0.43
+        elseif code >= 97 and code <= 122 or code >= 48 and code <= 57 then
+            return 0.5
+        elseif code >= 65 and code <= 90 then
+            return 0.74
+        elseif code > 32 and code < 127 then
+            return 0.32
+        end
+        return 0.5
+    end
+    return code >= 0x2E80 and 1 or 0.6
+end
+
+-- The characters of a word with their widths. Text that is not UTF-8 is taken a byte at a time.
 local function glyphs(word)
     local list = {}
     local ok = pcall(function()
         for _, code in utf8.codes(word) do
-            list[#list + 1] = { utf8.char(code), code >= 0x2E80 and 2 or 1 }
+            list[#list + 1] = { utf8.char(code), charWidth(code) }
         end
     end)
     if not ok then
         list = {}
         for i = 1, #word do
-            list[i] = { word:sub(i, i), 1 }
+            list[i] = { word:sub(i, i), charWidth(word:byte(i)) }
         end
     end
     return list
 end
 
+-- The text of a response or a topic as the window shows it. The font has no glyph for a control character (it is drawn as
+-- a substitute) and a tag of the markup of the game (<Global=...>, <Alias=...>) is not a word, so both are taken out, as
+-- a line that starts with them shows noise. What was taken out is logged by its kind and count, never as text.
+local reportedMarkup = 0
+local function clean(text)
+    text = tostring(text or '')
+    local tags, controls = {}, 0
+    text = text:gsub('<(%a+)=[^<>\r\n]*>', function(kind)
+        tags[#tags + 1] = kind
+        return ' '
+    end)
+    text = text:gsub('%c', function()
+        controls = controls + 1
+        return ' '
+    end)
+    if (#tags > 0 or controls > 0) and reportedMarkup < 5 then
+        reportedMarkup = reportedMarkup + 1
+        print(string.format('Dialogue text: %d tag(s) [%s] and %d control character(s) taken out', #tags,
+            table.concat(tags, ','), controls))
+    end
+    return text
+end
+
 -- The words of a text in lines that fit the width. Text widgets do not wrap to a width and then grow in height (they
 -- grow in width, past the edge of the screen), and a text edit can wrap but takes the clicks, so the lines are made here
--- with a width for a letter that is on the large side, and each is a widget of its own. A word that is longer than a
--- line (text of a language written without spaces) is cut between its characters.
+-- from the widths of the characters, with some room left over for the letters that are wider than the mean of their
+-- kind, and each is a widget of its own. A word that is longer than a line (text of a language written without spaces)
+-- is cut between its characters.
 local function wrap(text, width)
-    local limit = math.max(8, math.floor(width / (textSize * 0.55)))
+    local limit = math.max(4, width / textSize * 0.92)
+    local space = charWidth(32)
     local lines, current, used = {}, '', 0
-    for word in text:gmatch('%S+') do
+    for word in clean(text):gmatch('%S+') do
         local list = glyphs(word)
         local wordWidth = 0
         for _, glyph in ipairs(list) do
@@ -110,8 +153,8 @@ local function wrap(text, width)
         if wordWidth <= limit then
             if current == '' then
                 current, used = word, wordWidth
-            elseif used + 1 + wordWidth <= limit then
-                current, used = current .. ' ' .. word, used + 1 + wordWidth
+            elseif used + space + wordWidth <= limit then
+                current, used = current .. ' ' .. word, used + space + wordWidth
             else
                 lines[#lines + 1] = current
                 current, used = word, wordWidth
