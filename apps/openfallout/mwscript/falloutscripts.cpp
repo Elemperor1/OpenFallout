@@ -1039,11 +1039,16 @@ namespace OFScript
     {
         if (name == "PCName")
             return mChargen.name();
+        // The sex and race are those of the player now: the ones picked in the making of the character or, before that,
+        // those of the player's record
+        FalloutScript::ActorTraits traits;
+        if (name == "PCSex" || name == "PCRace")
+            traitsOf(mPlayer, traits);
         if (name == "PCSex")
-            return mChargen.female().value_or(false) ? "Female" : "Male";
+            return traits.mFemale ? "Female" : "Male";
         if (name == "PCRace")
         {
-            const ESM4::Race* race = mStore.get<ESM4::Race>().search(refId(mChargen.race()));
+            const ESM4::Race* race = mStore.get<ESM4::Race>().search(refId(traits.mRace));
             return race != nullptr ? race->mFullName : std::string();
         }
 
