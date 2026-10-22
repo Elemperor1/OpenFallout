@@ -21,6 +21,16 @@ namespace FalloutScript
             return c >= '0' && c <= '9';
         }
 
+        bool isNameStart(char c)
+        {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+        }
+
+        bool isNameChar(char c)
+        {
+            return isNameStart(c) || isDigit(c);
+        }
+
         std::size_t number(std::string_view text, std::size_t& position)
         {
             std::size_t value = 0;
@@ -32,10 +42,28 @@ namespace FalloutScript
 
     std::string formatMessage(std::string_view text, const std::vector<double>& values)
     {
+        return formatMessage(text, values, TokenResolver());
+    }
+
+    std::string formatMessage(std::string_view text, const std::vector<double>& values, const TokenResolver& resolve)
+    {
         std::string result;
         std::size_t next = 0;
         for (std::size_t i = 0; i < text.size();)
         {
+            if (text[i] == '&' && resolve && i + 1 < text.size() && isNameStart(text[i + 1]))
+            {
+                std::size_t end = i + 2;
+                while (end < text.size() && isNameChar(text[end]))
+                    ++end;
+                if (end < text.size() && text[end] == ';')
+                    if (const std::optional<std::string> value = resolve(text.substr(i + 1, end - i - 1)))
+                    {
+                        result += *value;
+                        i = end + 1;
+                        continue;
+                    }
+            }
             if (text[i] != '%')
             {
                 result += text[i++];

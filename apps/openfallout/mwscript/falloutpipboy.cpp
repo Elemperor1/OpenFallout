@@ -99,24 +99,7 @@ namespace OFScript
                     row.mClip = weapon->mData.clipSize;
                     if (weapon->mHasGameData)
                         row.mPellets = std::max<int>(weapon->mGame.mProjectileCount, 1);
-                    // The ammunition: the one chosen when the weapon takes it, else the one of the record, else the
-                    // first of its list that the player has (or just the first)
-                    FalloutScript::FormId ammo = mEquipment.ammo(mPlayer);
-                    if (!weaponTakesAmmo(*weapon, ammo))
-                    {
-                        ammo = 0;
-                        if (mStore.get<ESM4::Ammunition>().search(weapon->mAmmo) != nullptr)
-                            ammo = weapon->mAmmo.toUint32();
-                        else if (const ESM4::FormIdList* list = mStore.get<ESM4::FormIdList>().search(weapon->mAmmo))
-                            for (const ESM::FormId& object : list->mObjects)
-                            {
-                                const FalloutScript::FormId candidate = object.toUint32();
-                                if (ammo == 0 || mActors.itemCount(mPlayer, candidate) > 0)
-                                    ammo = candidate;
-                                if (mActors.itemCount(mPlayer, candidate) > 0)
-                                    break;
-                            }
-                    }
+                    const FalloutScript::FormId ammo = ammoOfWeapon(*weapon, mPlayer);
                     if (const ESM4::Ammunition* shot
                         = ammo != 0 ? mStore.get<ESM4::Ammunition>().search(refId(ammo)) : nullptr)
                     {

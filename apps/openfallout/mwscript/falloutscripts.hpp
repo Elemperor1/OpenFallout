@@ -239,6 +239,10 @@ namespace OFScript
         std::optional<double> gameSetting(std::string_view name);
         /// The text of a game setting, empty when the files have none
         std::string gameSettingText(std::string_view name);
+        /// What a token `&name;` of a message stands for: the keys and buttons of the controls (`&sUActnVats;` is the
+        /// key the player presses for V.A.T.S., `&sKBSpace;` the name of that key) and the name, race and sex of the
+        /// player. Gives nothing for a name that is none of them.
+        std::optional<std::string> messageToken(std::string_view name);
 
         /// An item of an inventory, as the Pip-Boy lists it
         struct PipboyItem
@@ -856,6 +860,10 @@ namespace OFScript
         double weaponCardDamage(FalloutScript::FormId weapon);
         /// Whether the weapon takes the ammunition (the one of its record, or one of its list of them)
         bool weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo);
+        /// The ammunition a weapon in the hands of the holder shoots: the one chosen when the weapon takes it, else
+        /// the one of the record, else the first of its list that the holder carries (the first of the list when it
+        /// carries none), 0 when the weapon names none
+        FalloutScript::FormId ammoOfWeapon(const ESM4::Weapon& weapon, FalloutScript::FormId holder);
         /// What one of an item weighs for the player: New Vegas lightens small things (Pack Rat) as the card of the
         /// item and the total of the Pip-Boy tell it
         double carriedWeight(double unit, bool packRat);

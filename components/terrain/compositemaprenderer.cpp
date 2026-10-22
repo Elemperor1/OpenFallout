@@ -8,6 +8,22 @@
 
 namespace Terrain
 {
+    namespace
+    {
+        bool usesMipmaps(const osg::Texture& texture)
+        {
+            switch (texture.getFilter(osg::Texture::MIN_FILTER))
+            {
+                case osg::Texture::NEAREST_MIPMAP_NEAREST:
+                case osg::Texture::LINEAR_MIPMAP_NEAREST:
+                case osg::Texture::NEAREST_MIPMAP_LINEAR:
+                case osg::Texture::LINEAR_MIPMAP_LINEAR:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
 
     CompositeMapRenderer::CompositeMapRenderer()
         : mTargetFrameRate(120)
@@ -122,13 +138,26 @@ namespace Terrain
 
             compositeMap.mDrawables[i] = nullptr;
         }
-        if (compositeMap.mCompiled == compositeMap.mDrawables.size())
+        const bool finished = compositeMap.mCompiled == compositeMap.mDrawables.size();
+        if (finished)
             compositeMap.mDrawables = std::vector<osg::ref_ptr<osg::Drawable>>();
 
         state.haveAppliedAttribute(osg::StateAttribute::VIEWPORT);
 
         GLuint fboId = state.getGraphicsContext() ? state.getGraphicsContext()->getDefaultFboId() : 0;
         ext->glBindFramebuffer(GL_FRAMEBUFFER_EXT, fboId);
+
+        if (finished && usesMipmaps(*compositeMap.mTexture))
+        {
+            // Only the first level of the texture is drawn to, and a map seen from afar or at a low angle is read from
+            // the levels below it, which not every driver makes from the first when it is drawn to
+            if (osg::Texture::TextureObject* object = compositeMap.mTexture->getTextureObject(state.getContextID()))
+            {
+                object->bind();
+                ext->glGenerateMipmap(GL_TEXTURE_2D);
+                state.haveAppliedTextureAttribute(state.getActiveTextureUnit(), osg::StateAttribute::TEXTURE);
+            }
+        }
     }
 
     void CompositeMapRenderer::setMinimumTimeAvailableForCompile(double time)
