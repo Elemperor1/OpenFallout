@@ -130,6 +130,8 @@ namespace SceneUtil
                 debug.mObjectsOnly = true;
             else if (word == "no-high")
                 debug.mNoHigh = true;
+            else if (word == "no-land")
+                debug.mNoLand = true;
             else if (unknown != nullptr)
                 unknown->emplace_back(word);
         }

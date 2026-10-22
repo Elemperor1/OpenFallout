@@ -35,8 +35,9 @@ namespace
     TEST(SceneUtilLodDebug, readsTheWordsSeparatedBySpacesAndCommas)
     {
         std::vector<std::string> unknown;
-        const LodDebug debug = parseLodDebug(" flat,no-skirt  objects-only, sparkle", &unknown);
+        const LodDebug debug = parseLodDebug(" flat,no-skirt  objects-only, no-land sparkle", &unknown);
         EXPECT_TRUE(debug.mFlat);
+        EXPECT_TRUE(debug.mNoLand);
         EXPECT_TRUE(debug.mNoSkirt);
         EXPECT_TRUE(debug.mObjectsOnly);
         EXPECT_FALSE(debug.mWireframe);
@@ -51,8 +52,9 @@ namespace
         EXPECT_FALSE(debug.changesFiles());
         EXPECT_FALSE(debug.mObjectsOnly);
         EXPECT_FALSE(debug.mNoHigh);
+        EXPECT_FALSE(debug.mNoLand);
         // What is drawn is not changed by the words that choose what is loaded
-        EXPECT_FALSE(parseLodDebug("objects-only no-high").changesFiles());
+        EXPECT_FALSE(parseLodDebug("objects-only no-high no-land").changesFiles());
     }
 
     TEST(SceneUtilLodDebug, leavesOutTheSkirtOfATile)
