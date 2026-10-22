@@ -172,3 +172,18 @@ Video Settings
    .. warning::
 
       This setting is only supported on Windows platform. The setting will not be displayed in the in-game menu if not available.
+
+
+.. omw-setting::
+   :title: force vertex buffer objects
+   :type: boolean
+   :range: true, false
+   :default: true
+
+   Draw every mesh from vertex buffer objects instead of OpenGL display lists.
+   The scene is made of many small meshes, and some drivers play display lists back slowly:
+   on macOS the render thread spent most of its time in them.
+   On a Mac with an Apple M3 Pro the frame rate was 1.3 to 1.5 times higher in the open world,
+   and with distant terrain 1.9 to 2.7 times higher, with a third less memory.
+   Turn it off to go back to display lists on a driver where they are faster.
+   The OSG_VERTEX_BUFFER_HINT environment variable of OpenSceneGraph, when set, wins over this setting.

@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_COMPONENTS_TERRAIN_CHUNKMANAGER_H
 #define OPENFALLOUT_COMPONENTS_TERRAIN_CHUNKMANAGER_H
 
+#include <functional>
 #include <tuple>
 
 #include <components/resource/resourcemanager.hpp>
@@ -90,6 +91,9 @@ namespace Terrain
         void setNodeMask(unsigned int mask) { mNodeMask = mask; }
         unsigned int getNodeMask() override { return mNodeMask; }
 
+        /// Leaves the nodes that the function names, given their size and center in cells, to another manager.
+        void setReplaced(std::function<bool(float, const osg::Vec2f&)> replaced) { mReplaced = std::move(replaced); }
+
         void reportStats(unsigned int frameNumber, osg::Stats* stats) const override;
 
         void clearCache() override;
@@ -117,6 +121,8 @@ namespace Terrain
         osg::ref_ptr<osg::StateSet> mMultiPassRoot;
 
         unsigned int mNodeMask;
+
+        std::function<bool(float, const osg::Vec2f&)> mReplaced;
 
         unsigned int mCompositeMapSize;
         float mCompositeMapLevel;

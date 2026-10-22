@@ -38,6 +38,9 @@ namespace Settings
         SettingValue<float> mObjectPagingMinSizeCostMultiplier{ mIndex, "Terrain",
             "object paging min size cost multiplier", makeMaxStrictSanitizerFloat(0) };
         SettingValue<bool> mWaterCulling{ mIndex, "Terrain", "water culling" };
+        SettingValue<bool> mGameLod{ mIndex, "Terrain", "game lod" };
+        SettingValue<float> mGameLodDistance{ mIndex, "Terrain", "game lod distance", makeMaxStrictSanitizerFloat(0) };
+        SettingValue<bool> mGameLodObjects{ mIndex, "Terrain", "game lod objects" };
     };
 }
 

@@ -44,11 +44,13 @@
 
 #include <components/misc/constants.hpp>
 
+#include <components/terrain/lodindex.hpp>
 #include <components/terrain/quadtreeworld.hpp>
 #include <components/terrain/terraingrid.hpp>
 
 #include <components/esm3/loadcell.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadwrld.hpp>
 
 #include <components/debug/debugdraw.hpp>
 #include <components/detournavigator/navigator.hpp>
@@ -56,6 +58,7 @@
 
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
+#include "../mwworld/esmstore.hpp"
 #include "../mwworld/groundcoverstore.hpp"
 #include "../mwworld/scene.hpp"
 
@@ -70,6 +73,7 @@
 #include "actorspaths.hpp"
 #include "camera.hpp"
 #include "effectmanager.hpp"
+#include "falloutlod.hpp"
 #include "fogmanager.hpp"
 #include "groundcover.hpp"
 #include "navmesh.hpp"
@@ -166,19 +170,11 @@ namespace OFRender
 
         void doWork() override
         {
-            try
-            {
-                for (const VFS::Path::Normalized& v : mModels)
-                    mResourceSystem->getSceneManager()->getTemplate(v);
-                for (const VFS::Path::Normalized& v : mTextures)
-                    mResourceSystem->getImageManager()->getImage(v);
-                for (const VFS::Path::Normalized& v : mKeyframes)
-                    mResourceSystem->getKeyframeManager()->get(v);
-            }
-            catch (const std::exception& e)
-            {
-                Log(Debug::Warning) << "Failed to preload common assets: " << e.what();
-            }
+            // Each file is tried on its own: the lists name files of Morrowind that the Fallout games do not have, and
+            // one that is missing must not keep the others (the water textures, say) from being loaded
+            preload(mModels, [this](const VFS::Path::Normalized& v) { mResourceSystem->getSceneManager()->getTemplate(v); });
+            preload(mTextures, [this](const VFS::Path::Normalized& v) { mResourceSystem->getImageManager()->getImage(v); });
+            preload(mKeyframes, [this](const VFS::Path::Normalized& v) { mResourceSystem->getKeyframeManager()->get(v); });
         }
 
         std::vector<VFS::Path::Normalized> mModels;
@@ -186,6 +182,22 @@ namespace OFRender
         std::vector<VFS::Path::Normalized> mKeyframes;
 
     private:
+        template <class Load>
+        static void preload(const std::vector<VFS::Path::Normalized>& paths, const Load& load)
+        {
+            for (const VFS::Path::Normalized& path : paths)
+            {
+                try
+                {
+                    load(path);
+                }
+                catch (const std::exception& e)
+                {
+                    Log(Debug::Verbose) << "Failed to preload common asset " << path << ": " << e.what();
+                }
+            }
+        }
+
         Resource::ResourceSystem* mResourceSystem;
     };
 
@@ -203,6 +215,7 @@ namespace OFRender
         // TODO: Near clip should not need to be bounded like this, but too small values break OSG shadow calculations
         // CPU-side. See issue: #6072
         , mNearClip(Settings::camera().mNearClip)
+        , mRequestedViewDistance(Settings::camera().mViewingDistance)
         , mViewDistance(Settings::camera().mViewingDistance)
         , mFieldOfViewOverridden(false)
         , mFieldOfViewOverride(0.f)
@@ -633,6 +646,7 @@ namespace OFRender
 
     void RenderingManager::enableTerrain(bool enable, ESM::RefId worldspace)
     {
+        float gameLodDistance = 0.f;
         if (!enable)
             mWater->setCullCallback(nullptr);
         else
@@ -645,8 +659,15 @@ namespace OFRender
                 mGroundcover = newChunks.mGroundcover.get();
                 mObjectPaging = newChunks.mObjectPaging.get();
             }
+            gameLodDistance = newChunks.mGameLodDistance;
         }
         mTerrain->enable(enable);
+
+        if (gameLodDistance != mGameLodDistance)
+        {
+            mGameLodDistance = gameLodDistance;
+            setViewDistance(mRequestedViewDistance);
+        }
     }
 
     void RenderingManager::setSkyEnabled(bool enabled)
@@ -1329,7 +1350,21 @@ namespace OFRender
         const bool groundcover = Settings::groundcover().mEnabled && worldspace == ESM::Cell::sDefaultWorldspaceId;
         const bool distantTerrain = Settings::terrain().mDistantTerrain;
         const double expiryDelay = Settings::cells().mCacheExpiryDelay;
-        if (distantTerrain || groundcover)
+
+        // Fallout 3 and New Vegas ship the distant land of their worldspaces
+        Terrain::LodIndex lodIndex;
+        if (Settings::terrain().mGameLod && ESM::isEsm4Ext(worldspace))
+        {
+            const OFWorld::ESMStore& esmStore = *OFBase::Environment::get().getESMStore();
+            const ESM4::World* worldspaceRecord = esmStore.get<ESM4::World>().search(worldspace);
+            if (worldspaceRecord != nullptr && !worldspaceRecord->mEditorId.empty())
+                lodIndex = Terrain::LodIndex(*mResourceSystem->getVFS(), worldspaceRecord->mEditorId);
+        }
+        const bool gameLod = !lodIndex.empty();
+        if (gameLod)
+            mTerrainStorage->setBoundsAlignment(worldspace, Terrain::LodIndex::sLargestLevel);
+
+        if (distantTerrain || groundcover || gameLod)
         {
             const int compMapResolution = Settings::terrain().mCompositeMapResolution;
             const int compMapPower = Settings::terrain().mCompositeMapLevel;
@@ -1340,7 +1375,26 @@ namespace OFRender
             auto quadTreeWorld = std::make_unique<Terrain::QuadTreeWorld>(mSceneRoot, mRootNode, mResourceSystem,
                 mTerrainStorage.get(), Mask_Terrain, Mask_PreCompile, Mask_Debug, compMapResolution, compMapLevel,
                 lodFactor, vertexLodMod, maxCompGeometrySize, debugChunks, worldspace, expiryDelay);
-            if (Settings::terrain().mObjectPaging)
+            if (gameLod)
+            {
+                Log(Debug::Info) << "Drawing the distant land of the worldspace from " << lodIndex.getTerrainCount()
+                                 << " terrain tiles and " << lodIndex.getObjectCount()
+                                 << " blocks of objects of the game";
+                newChunkMgr.mFalloutLod = std::make_unique<FalloutLod>(mResourceSystem->getSceneManager(),
+                    std::move(lodIndex), worldspace, Settings::terrain().mGameLodObjects, expiryDelay);
+                const FalloutLod* falloutLod = newChunkMgr.mFalloutLod.get();
+                quadTreeWorld->setTerrainReplaced(
+                    [falloutLod](float size, const osg::Vec2f& center) {
+                        return falloutLod->replacesTerrain(size, center);
+                    },
+                    [falloutLod](float size, const osg::Vec2f& center) {
+                        return falloutLod->splitsTerrain(size, center);
+                    });
+                quadTreeWorld->addChunkManager(newChunkMgr.mFalloutLod.get());
+                mResourceSystem->addResourceManager(newChunkMgr.mFalloutLod.get());
+                newChunkMgr.mGameLodDistance = Settings::terrain().mGameLodDistance;
+            }
+            else if (Settings::terrain().mObjectPaging)
             {
                 newChunkMgr.mObjectPaging
                     = std::make_unique<ObjectPaging>(mResourceSystem->getSceneManager(), worldspace);
@@ -1512,7 +1566,8 @@ namespace OFRender
 
     void RenderingManager::setViewDistance(float distance, bool delay)
     {
-        mViewDistance = distance;
+        mRequestedViewDistance = distance;
+        mViewDistance = std::max(distance, mGameLodDistance);
 
         if (delay)
         {

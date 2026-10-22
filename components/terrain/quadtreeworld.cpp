@@ -41,13 +41,14 @@ namespace Terrain
     {
     public:
         DefaultLodCallback(float factor, float minSize, float viewDistance, const osg::Vec4i& grid, int cellSizeInUnits,
-            float distanceModifier = 0.f)
+            float distanceModifier = 0.f, const std::function<bool(float, const osg::Vec2f&)>* split = nullptr)
             : mFactor(factor)
             , mMinSize(minSize)
             , mViewDistance(viewDistance)
             , mActiveGrid(grid)
             , mDistanceModifier(distanceModifier)
             , mCellSizeInUnits(cellSizeInUnits)
+            , mSplit(split)
         {
         }
 
@@ -71,6 +72,8 @@ namespace Terrain
             dist = std::max(0.f, dist + mDistanceModifier);
             if (dist > mViewDistance && !activeGrid) // for Scene<->ObjectPaging sync the activegrid must remain loaded
                 return StopTraversal;
+            if (mSplit != nullptr && *mSplit && (*mSplit)(node->getSize(), center))
+                return Deeper;
             return getNativeLodLevel(node, mMinSize)
                     <= convertDistanceToLodLevel(dist, mMinSize, mFactor, mCellSizeInUnits)
                 ? StopTraversalAndUse
@@ -92,6 +95,7 @@ namespace Terrain
         osg::Vec4i mActiveGrid;
         float mDistanceModifier;
         int mCellSizeInUnits;
+        const std::function<bool(float, const osg::Vec2f&)>* mSplit;
     };
 
     class RootNode : public QuadTreeNode
@@ -443,8 +447,18 @@ namespace Terrain
             for (unsigned int i = 0; i < vd->getNumEntries(); ++i)
             {
                 ViewDataEntry& entry = vd->getEntry(i);
-                osg::BoundingBox bb = static_cast<TerrainDrawable*>(entry.mRenderingNode->asGroup()->getChild(0))
-                                          ->getWaterBoundingBox();
+                // The terrain of the land records comes first, but another manager can have taken the node
+                const osg::Group* chunks = entry.mRenderingNode->asGroup();
+                if (!chunks || chunks->getNumChildren() == 0)
+                    continue;
+                const TerrainDrawable* drawable = dynamic_cast<const TerrainDrawable*>(chunks->getChild(0));
+                if (!drawable)
+                {
+                    // Nothing says how much of that land is below the water, so the water has to be drawn
+                    lowZ = highZ;
+                    break;
+                }
+                osg::BoundingBox bb = drawable->getWaterBoundingBox();
                 if (!bb.valid())
                     continue;
                 osg::Vec3f ofs(
@@ -484,8 +498,8 @@ namespace Terrain
         if (needsUpdate)
         {
             vd->reset();
-            DefaultLodCallback lodCallback(
-                mLodFactor, mMinSize, mViewDistance, mActiveGrid, ESM::getCellSize(mWorldspace));
+            DefaultLodCallback lodCallback(mLodFactor, mMinSize, mViewDistance, mActiveGrid,
+                ESM::getCellSize(mWorldspace), 0.f, &mTerrainSplit);
             mRootNode->traverseNodes(vd, viewPoint, &lodCallback);
         }
 
@@ -554,7 +568,8 @@ namespace Terrain
         vd->setViewPoint(viewPoint);
         vd->setActiveGrid(grid);
 
-        DefaultLodCallback lodCallback(mLodFactor, mMinSize, mViewDistance, grid, static_cast<int>(cellWorldSize));
+        DefaultLodCallback lodCallback(
+            mLodFactor, mMinSize, mViewDistance, grid, static_cast<int>(cellWorldSize), 0.f, &mTerrainSplit);
         mRootNode->traverseNodes(vd, viewPoint, &lodCallback);
 
         reporter.addTotal(vd->getNumEntries());
@@ -602,6 +617,13 @@ namespace Terrain
             m->setMaxLodLevel(
                 DefaultLodCallback::convertDistanceToLodLevel(m->getViewDistance() + mViewDataMap->getReuseDistance(),
                     mMinSize, mLodFactor, ESM::getCellSize(mWorldspace)));
+    }
+
+    void QuadTreeWorld::setTerrainReplaced(
+        std::function<bool(float, const osg::Vec2f&)> replaced, std::function<bool(float, const osg::Vec2f&)> split)
+    {
+        mChunkManager->setReplaced(std::move(replaced));
+        mTerrainSplit = std::move(split);
     }
 
     void QuadTreeWorld::rebuildViews()

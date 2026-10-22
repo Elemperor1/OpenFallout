@@ -126,8 +126,10 @@ namespace Resource
         stateset->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
         osg::ref_ptr<osg::Material> material = new osg::Material;
         material->setColorMode(osg::Material::OFF);
-        material->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4f(1.f, 1.f, 1.f, 1.f));
-        material->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(1.f, 1.f, 1.f, 1.f));
+        material->setAmbient(
+            osg::Material::FRONT_AND_BACK, osg::Vec4f(sSpeedTreeLight, sSpeedTreeLight, sSpeedTreeLight, 1.f));
+        material->setDiffuse(
+            osg::Material::FRONT_AND_BACK, osg::Vec4f(sSpeedTreeLight, sSpeedTreeLight, sSpeedTreeLight, 1.f));
         material->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4f(0.f, 0.f, 0.f, 0.f));
         material->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4f(0.f, 0.f, 0.f, 0.f));
         stateset->setAttributeAndModes(material, osg::StateAttribute::ON);

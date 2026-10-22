@@ -143,6 +143,7 @@ add_component_dir (sceneutil
     detourdebugdraw navmesh agentpath animblendrules shadow mwshadowtechnique recastmesh shadowsbin osgacontroller rtt
     screencapture depth color riggeometryosgaextension extradata unrefqueue lightcommon clearcolor
     cullsafeboundsvisitor keyframe nodecallback templateref textkeymap userdata glextensions fog texmat material
+    smoothnormals
     )
 
 add_component_dir (nif
@@ -417,7 +418,7 @@ add_component_dir (translation
 
 add_component_dir (terrain
     storage world buffercache defs terraingrid material terraindrawable texturemanager chunkmanager compositemaprenderer
-    quadtreeworld quadtreenode viewdata cellborder view heightcull
+    quadtreeworld quadtreenode viewdata cellborder view heightcull lodindex lodblock
     )
 
 add_component_dir (loadinglistener

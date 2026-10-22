@@ -255,6 +255,23 @@ namespace
             }
         }
     }
+
+    // The interpolators that blend others or follow a path are placeholders that a sequence of a NiControllerManager
+    // drives, so a controller with one of them has nothing to play on its own: that is not a fault of the file
+    Debug::Level getUnsupportedInterpolatorLevel(Nif::RecordType type)
+    {
+        switch (type)
+        {
+            case Nif::RC_NiBlendBoolInterpolator:
+            case Nif::RC_NiBlendFloatInterpolator:
+            case Nif::RC_NiBlendPoint3Interpolator:
+            case Nif::RC_NiBlendTransformInterpolator:
+            case Nif::RC_NiPathInterpolator:
+                return Debug::Verbose;
+            default:
+                return Debug::Error;
+        }
+    }
 }
 
 namespace NifOsg
@@ -494,8 +511,9 @@ namespace NifOsg
 
                 if (!key->mInterpolator.empty() && key->mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
                 {
-                    Log(Debug::Error) << "Unsupported interpolator type for NiKeyframeController " << key->mRecordIndex
-                                      << " in " << mFilename;
+                    Log(getUnsupportedInterpolatorLevel(key->mInterpolator->mRecordType))
+                        << "Unsupported interpolator type for NiKeyframeController " << key->mRecordIndex << " in "
+                        << mFilename;
                     continue;
                 }
 
@@ -1121,7 +1139,7 @@ namespace NifOsg
                     if (!key->mInterpolator.empty()
                         && key->mInterpolator->mRecordType != Nif::RC_NiTransformInterpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(key->mInterpolator->mRecordType))
                             << "Unsupported interpolator type for NiKeyframeController " << key->mRecordIndex << " in "
                             << mFilename << ": " << key->mInterpolator->mRecordName;
                         continue;
@@ -1149,7 +1167,7 @@ namespace NifOsg
                     if (!visctrl->mInterpolator.empty()
                         && visctrl->mInterpolator->mRecordType != Nif::RC_NiBoolInterpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(visctrl->mInterpolator->mRecordType))
                             << "Unsupported interpolator type for NiVisController " << visctrl->mRecordIndex << " in "
                             << mFilename << ": " << visctrl->mInterpolator->mRecordName;
                         continue;
@@ -1166,7 +1184,7 @@ namespace NifOsg
                     if (!rollctrl->mInterpolator.empty()
                         && rollctrl->mInterpolator->mRecordType != Nif::RC_NiFloatInterpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(rollctrl->mInterpolator->mRecordType))
                             << "Unsupported interpolator type for NiRollController " << rollctrl->mRecordIndex << " in "
                             << mFilename << ": " << rollctrl->mInterpolator->mRecordName;
                         continue;
@@ -1216,7 +1234,7 @@ namespace NifOsg
                     if (!alphactrl->mInterpolator.empty()
                         && alphactrl->mInterpolator->mRecordType != Nif::RC_NiFloatInterpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(alphactrl->mInterpolator->mRecordType))
                             << "Unsupported interpolator type for NiAlphaController " << alphactrl->mRecordIndex
                             << " in " << mFilename << ": " << alphactrl->mInterpolator->mRecordName;
                         continue;
@@ -1241,7 +1259,7 @@ namespace NifOsg
                         continue;
                     if (!interp.empty() && interp->mRecordType != Nif::RC_NiPoint3Interpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(interp->mRecordType))
                             << "Unsupported interpolator type for NiMaterialColorController " << matctrl->mRecordIndex
                             << " in " << mFilename << ": " << interp->mRecordName;
                         continue;
@@ -1319,7 +1337,7 @@ namespace NifOsg
                     if (!flipctrl->mInterpolator.empty()
                         && flipctrl->mInterpolator->mRecordType != Nif::RC_NiFloatInterpolator)
                     {
-                        Log(Debug::Error)
+                        Log(getUnsupportedInterpolatorLevel(flipctrl->mInterpolator->mRecordType))
                             << "Unsupported interpolator type for NiFlipController " << flipctrl->mRecordIndex << " in "
                             << mFilename << ": " << flipctrl->mInterpolator->mRecordName;
                         continue;

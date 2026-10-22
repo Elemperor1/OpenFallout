@@ -31,6 +31,7 @@ namespace Settings
         SettingValue<float> mFramerateLimit{ mIndex, "Video", "framerate limit", makeMaxSanitizerFloat(0) };
         SettingValue<float> mContrast{ mIndex, "Video", "contrast", makeMaxStrictSanitizerFloat(0) };
         SettingValue<float> mGamma{ mIndex, "Video", "gamma", makeMaxStrictSanitizerFloat(0) };
+        SettingValue<bool> mForceVertexBufferObjects{ mIndex, "Video", "force vertex buffer objects" };
     };
 }
 

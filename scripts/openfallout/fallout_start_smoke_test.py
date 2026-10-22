@@ -548,6 +548,40 @@ return {
     "@RAYS@", ", ".join("{ '%s', %g, %g }" % (name, x, z) for name, x, z, _ in TREE_RAYS))
 TREE_RAY = re.compile(r"OFTEST\ttree ray (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\tbase\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
 
+# The distant land is drawn from the tile of the files of the game (a flat square at LOD_TILE_HEIGHT, 8 by 8 cells from the
+# cell 8,0, with land only in the cell 12,0, so that the tile is the only thing there that is level with its height). A ray
+# at what is drawn goes from a point high over the player (over everything that stands there) to one in front of the land
+# of the cell 12,0 and below the tile: it comes to the height of the tile within it, and is hit there by the tile and
+# nothing else. It is cast once, after LOD_RAY_FROM seconds, while the player is in the exterior cell.
+LOD_RAY_FROM = 6.0
+LOD_RAY_START_HEIGHT = 1500.0
+LOD_RAY_END = (44000.0, -300.0)
+LOD_SCRIPT = """\
+local self = require('openfallout.self')
+local nearby = require('openfallout.nearby')
+local util = require('openfallout.util')
+local async = require('openfallout.async')
+
+local elapsed, done = 0, false
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ or not self.cell.isExterior then return end
+            done = true
+            local from = self.position + util.vector3(0, 0, @START_Z@)
+            local to = util.vector3(@END_X@, from.y, @END_Z@)
+            nearby.asyncCastRenderingRay(async:callback(function(res)
+                print('OFTEST', 'lod ray hit=', tostring(res.hit),
+                    res.hit and string.format('%.1f,%.1f,%.1f', res.hitPos.x, res.hitPos.y, res.hitPos.z) or '')
+            end), from, to)
+        end,
+    },
+}
+""".replace("@FROM@", str(LOD_RAY_FROM)).replace("@START_Z@", str(LOD_RAY_START_HEIGHT)).replace("@END_X@", str(LOD_RAY_END[0])).replace("@END_Z@", str(LOD_RAY_END[1]))
+LOD_RAY = re.compile(r"OFTEST\tlod ray hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?")
+
 # Logs where the characters that follow packages are and which way they face, once a second. They are looked up by the form
 # ID of their reference (the interior and the exterior cell each have their own).
 PACKAGE_SCRIPT = """\
@@ -2446,6 +2480,9 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
         stop.wait(0.2)
 
 
+DISPLAY_LISTS = False
+
+
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
                keys=None, new_game=False, load=None, before=(), plugins=True, extra=()):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
@@ -2453,6 +2490,10 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
     `load` is a saved game to start from (`--load-savegame`); `before` are plugins that come before OFTest.esm in the
     load order; `plugins` False names no plugin at all; `extra` are more arguments."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
+    if DISPLAY_LISTS:
+        (home / ".config" / "openfallout").mkdir(parents=True, exist_ok=True)
+        (home / ".config" / "openfallout" / "settings.cfg").write_text(
+            "[Video]\nforce vertex buffer objects = false\n", encoding="ascii")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data),
@@ -2682,6 +2723,8 @@ def check(text, scenario, colours, animated=True):
             problems.append(f"the ray cast west at what is drawn hit something where only the wall is: "
                             f"{wall_render_rays[0].group(0)}")
     problems += check_tree(text, scenario)
+    if scenario.exterior:
+        problems += check_lod(text, scenario)
     side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
@@ -2719,6 +2762,32 @@ def check_tree(text, scenario):
     for line in text.splitlines():
         if "SpeedTree" in line or "of a tree cannot be read" in line:
             problems.append("the log mentions a tree file or image that was not used: " + line.split("]", 1)[-1].strip())
+    return problems
+
+
+def check_lod(text, scenario):
+    """The problems with the distant land: the log says it is drawn from the tile of the files of the game, and the ray
+    that goes through the tile hits it at its height, inside its square."""
+    problems = []
+    if "Drawing the distant land of the worldspace from 1 terrain tiles and 0 blocks of objects" not in text:
+        problems.append("the log does not say that the distant land is drawn from the one tile of the files of the game")
+    rays = [m for m in map(LOD_RAY.search, text.splitlines()) if m]
+    if not rays:
+        problems.append("the script did not log the ray cast at the tile of the distant land")
+        return problems
+    ray = rays[0]
+    level, tile_x, tile_y = plugin.LOD_TILE
+    size = level * plugin.EXTERIOR_CELL_SIZE
+    if ray.group(1) != "true":
+        problems.append(f"the ray cast at the tile of the distant land hit nothing: {ray.group(0)}")
+        return problems
+    x, y, z = float(ray.group(2)), float(ray.group(3)), float(ray.group(4))
+    left, bottom = tile_x * plugin.EXTERIOR_CELL_SIZE, tile_y * plugin.EXTERIOR_CELL_SIZE
+    if abs(z - plugin.LOD_TILE_HEIGHT) > 2.0:
+        problems.append(f"the ray hit the distant land at z={z:.1f}, the tile is at z={plugin.LOD_TILE_HEIGHT:.1f}")
+    if not (left <= x <= left + size and bottom <= y <= bottom + size):
+        problems.append(f"the ray hit at {x:.0f},{y:.0f}, outside the tile ({left:.0f},{bottom:.0f} to "
+                        f"{left + size:.0f},{bottom + size:.0f})")
     return problems
 
 
@@ -4355,10 +4424,15 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
+    parser.add_argument("--display-lists", action="store_true",
+                        help="run with `force vertex buffer objects = false`, the display lists of OpenGL: the engine "
+                             "must not say it draws from vertex buffer objects")
     parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
+    global DISPLAY_LISTS
+    DISPLAY_LISTS = args.display_lists
 
     build = args.build.resolve()
     program = build / "openfallout"
@@ -4378,6 +4452,7 @@ def main():
     (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
     (data / "scripts" / "packagetrack.lua").write_text(PACKAGE_SCRIPT, encoding="ascii")
     (data / "scripts" / "treetest.lua").write_text(TREE_SCRIPT, encoding="ascii")
+    (data / "scripts" / "lodtest.lua").write_text(LOD_SCRIPT, encoding="ascii")
     (data / "scripts" / "followtest.lua").write_text(FOLLOW_SCRIPT, encoding="ascii")
     (data / "scripts" / "questtest.lua").write_text(QUEST_SCRIPT, encoding="ascii")
     (data / "scripts" / "objecttest.lua").write_text(OBJECT_SCRIPT, encoding="ascii")
@@ -4417,6 +4492,7 @@ def main():
         "GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
         "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nPLAYER: scripts/treetest.lua\n"
+        "PLAYER: scripts/lodtest.lua\n"
         "GLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
         "GLOBAL: scripts/gatetest.lua\n", encoding="ascii")
@@ -4439,6 +4515,9 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
+        if DISPLAY_LISTS == ("Drawing from vertex buffer objects" in text):
+            found.append("the setting 'force vertex buffer objects' %s but the engine %s drawing from them"
+                         % ("is off" if DISPLAY_LISTS else "is on", "says it is" if DISPLAY_LISTS else "does not say it is"))
         found += check(text, scenario, colours, animated=not args.no_animation)
         for line in (line for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())
