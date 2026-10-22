@@ -121,7 +121,9 @@
 -- @param openfallout.core#GameObject obj
 
 ---
--- Returns the size of the OpenMW window in pixels as a 2D vector.
+-- Returns the size of the window in the units that widgets are laid out in, as a 2D vector. That is the size in pixels
+-- divided by the scaling factor of the interface, which includes the scale of a screen with more than one pixel per
+-- point.
 -- @function [parent=#ui] screenSize
 -- @return openfallout.util#Vector2
 

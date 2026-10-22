@@ -1,5 +1,7 @@
 #include "uibindings.hpp"
 
+#include <MyGUI_RenderManager.h>
+
 #include <components/lua/util.hpp>
 #include <components/lua_ui/alignment.hpp>
 #include <components/lua_ui/content.hpp>
@@ -344,6 +346,13 @@ namespace OFLua
         };
 
         api["screenSize"] = []() {
+            // The size the widgets are laid out in: the window in pixels divided by the scale of the interface, which
+            // on a screen with more than one pixel per point (a Retina display) is that factor too
+            if (const MyGUI::RenderManager* renderManager = MyGUI::RenderManager::getInstancePtr())
+            {
+                const MyGUI::IntSize size = renderManager->getViewSize();
+                return osg::Vec2f(static_cast<float>(size.width), static_cast<float>(size.height));
+            }
             return osg::Vec2f(
                 static_cast<float>(Settings::video().mResolutionX), static_cast<float>(Settings::video().mResolutionY));
         };
