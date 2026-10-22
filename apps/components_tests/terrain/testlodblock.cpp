@@ -6,6 +6,8 @@
 #include <osg/Group>
 #include <osg/MatrixTransform>
 #include <osg/NodeVisitor>
+#include <osg/StateSet>
+#include <osg/Uniform>
 
 #include <cstddef>
 #include <limits>
@@ -147,6 +149,72 @@ namespace Terrain
             EXPECT_LT(sphere.center().x(), (4 + 3) * cellSize);
             EXPECT_GT(sphere.center().y(), (4 + 1) * cellSize);
             EXPECT_LT(sphere.center().y(), (4 + 2) * cellSize);
+        }
+
+        // Counts the geometries that have a given state set on one of the nodes above them
+        struct CountUnderStateSet : public osg::NodeVisitor
+        {
+            const osg::StateSet* mStateSet;
+            std::size_t mUnder = 0;
+            std::size_t mAll = 0;
+
+            explicit CountUnderStateSet(const osg::StateSet* stateSet)
+                : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+                , mStateSet(stateSet)
+            {
+            }
+
+            void apply(osg::Geometry& geometry) override
+            {
+                ++mAll;
+                for (const osg::Node* node : getNodePath())
+                    if (node->getStateSet() == mStateSet)
+                    {
+                        ++mUnder;
+                        return;
+                    }
+            }
+        };
+
+        TEST(TerrainLodBlock, shouldKeepTheStateOfTheNodesAboveTheGeometry)
+        {
+            osg::ref_ptr<osg::StateSet> blockState(new osg::StateSet);
+            blockState->addUniform(new osg::Uniform("marker", 1));
+            osg::ref_ptr<osg::StateSet> innerState(new osg::StateSet);
+            innerState->addUniform(new osg::Uniform("inner", 2));
+
+            osg::ref_ptr<osg::Group> inner(new osg::Group);
+            inner->setStateSet(innerState);
+            inner->addChild(makeBlockGeometry(0, 0));
+            osg::ref_ptr<osg::MatrixTransform> block(
+                new osg::MatrixTransform(osg::Matrix::translate(4 * cellSize, 4 * cellSize, 0.f)));
+            block->setStateSet(blockState);
+            block->addChild(inner);
+
+            const auto cells = splitBlockByCell(*block, 4, 4, cellSize, (1u << 3) | (1u << 9));
+            for (int cell : { 3, 9 })
+            {
+                ASSERT_NE(cells[cell], nullptr) << cell;
+                CountUnderStateSet outer(blockState);
+                cells[cell]->accept(outer);
+                EXPECT_EQ(outer.mAll, 1u) << cell;
+                EXPECT_EQ(outer.mUnder, 1u) << cell;
+                CountUnderStateSet middle(innerState);
+                cells[cell]->accept(middle);
+                EXPECT_EQ(middle.mUnder, 1u) << cell;
+            }
+        }
+
+        TEST(TerrainLodBlock, shouldNotAddNodesWhenTheNodesAboveHaveNoState)
+        {
+            osg::ref_ptr<osg::Group> block(new osg::Group);
+            block->addChild(makeBlockGeometry(0, 0));
+
+            const auto cells = splitBlockByCell(*block, 0, 0, cellSize, 1u << 5);
+            ASSERT_NE(cells[5], nullptr);
+            ASSERT_NE(cells[5]->asGroup(), nullptr);
+            ASSERT_EQ(cells[5]->asGroup()->getNumChildren(), 1u);
+            EXPECT_NE(cells[5]->asGroup()->getChild(0)->asGeometry(), nullptr);
         }
 
         TEST(TerrainLodBlock, shouldKeepTheGeometryOfTheBlockShared)
