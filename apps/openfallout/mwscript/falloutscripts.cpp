@@ -199,6 +199,7 @@ namespace OFScript
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
         , mCombatRandom(std::random_device()())
+        , mWeaponSoundRandom(std::random_device()())
     {
         mPendingSave = std::make_unique<PendingSave>();
         // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
