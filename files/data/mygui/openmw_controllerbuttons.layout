@@ -22,7 +22,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -38,7 +37,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -54,7 +52,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -70,7 +67,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -86,7 +82,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -102,7 +97,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -118,7 +112,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -134,7 +127,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -150,7 +142,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -166,7 +157,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -182,7 +172,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -198,7 +187,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -214,7 +202,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -230,7 +217,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 
@@ -246,7 +232,6 @@
                     <Property key="Caption" value=""/>
                     <Property key="TextShadow" value="true"/>
                     <Property key="TextShadowColour" value="0 0 0"/>
-                    <Property key="ReadOnly" value="true"/>
                 </Widget>
             </Widget>
 

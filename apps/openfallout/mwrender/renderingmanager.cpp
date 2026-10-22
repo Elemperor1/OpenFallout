@@ -170,19 +170,11 @@ namespace OFRender
 
         void doWork() override
         {
-            try
-            {
-                for (const VFS::Path::Normalized& v : mModels)
-                    mResourceSystem->getSceneManager()->getTemplate(v);
-                for (const VFS::Path::Normalized& v : mTextures)
-                    mResourceSystem->getImageManager()->getImage(v);
-                for (const VFS::Path::Normalized& v : mKeyframes)
-                    mResourceSystem->getKeyframeManager()->get(v);
-            }
-            catch (const std::exception& e)
-            {
-                Log(Debug::Warning) << "Failed to preload common assets: " << e.what();
-            }
+            // Each file is tried on its own: the lists name files of Morrowind that the Fallout games do not have, and
+            // one that is missing must not keep the others (the water textures, say) from being loaded
+            preload(mModels, [this](const VFS::Path::Normalized& v) { mResourceSystem->getSceneManager()->getTemplate(v); });
+            preload(mTextures, [this](const VFS::Path::Normalized& v) { mResourceSystem->getImageManager()->getImage(v); });
+            preload(mKeyframes, [this](const VFS::Path::Normalized& v) { mResourceSystem->getKeyframeManager()->get(v); });
         }
 
         std::vector<VFS::Path::Normalized> mModels;
@@ -190,6 +182,22 @@ namespace OFRender
         std::vector<VFS::Path::Normalized> mKeyframes;
 
     private:
+        template <class Load>
+        static void preload(const std::vector<VFS::Path::Normalized>& paths, const Load& load)
+        {
+            for (const VFS::Path::Normalized& path : paths)
+            {
+                try
+                {
+                    load(path);
+                }
+                catch (const std::exception& e)
+                {
+                    Log(Debug::Verbose) << "Failed to preload common asset " << path << ": " << e.what();
+                }
+            }
+        }
+
         Resource::ResourceSystem* mResourceSystem;
     };
 
