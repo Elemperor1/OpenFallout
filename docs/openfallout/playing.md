@@ -12,7 +12,7 @@ OpenFallout plays Fallout 3, Fallout: New Vegas and Tale of Two Wastelands from 
 With nothing set, OpenFallout looks for the games where they are usually installed, and says so in its log (`Found Fallout: New Vegas in ...`):
 
 - Steam on every system: the library folders that Steam lists, and the folders of `steamapps/common` with "Fallout" in their name. On Windows, Steam's folder comes from the registry; on Linux and macOS, from the usual places (`~/.steam/steam`, `~/.local/share/Steam`, the Flatpak and Snap ones, `~/Library/Application Support/Steam`).
-- GOG, Bethesda's installer, Epic and hand copies: the folders with "Fallout" in their name under `GOG Games`, `Program Files (x86)`, `Program Files`, `Games` and a few others on each hard drive on Windows; under `~/Games` and `~/Applications` on macOS and Linux; and inside the Windows drives of Wine, CrossOver, Bottles, Lutris and Heroic (the `drive_c` folders of their prefixes).
+- GOG, Bethesda's installer, Epic and hand copies: the folders with "Fallout" in their name under `GOG Games`, `Program Files (x86)`, `Program Files`, `Games` and a few others on each hard drive on Windows; under `~/Games` (also `~/Games/Heroic`) and `~/Applications` on macOS and Linux; and inside the Windows drives of Wine, CrossOver, Bottles, Lutris and Heroic (the `drive_c` folders of their prefixes).
 - If both games are found, New Vegas is used. The search only runs when you have named no plugin and no data directory of yours has `Fallout3.esm` or `FalloutNV.esm`.
 
 To use a folder of your own, or when the search finds nothing (the log then says so), name it. Either on the command line:
@@ -33,7 +33,7 @@ The launcher (`openfallout-launcher`) has a Data Files page that writes these li
 
     openfallout --skip-menu --new-game
 
-starts a new game of the game you pointed it at: its opening scene, the making of the character and the first quest. Without these options the main menu opens, and *New Game* does the same. `--start <cell>` (for example `--start WastelandNV:-18,0`, a worldspace and the cell's grid position, or the name of an interior cell) opens a cell directly, which is what the project's own test runs do. `--load-savegame <file>` loads a save.
+starts a new game of the game you pointed it at: its opening scene, the making of the character and the first quest. How far the engine plays from there is in the [roadmap](gap-audit-and-roadmap.md); it is not a finished game yet. Without these options the main menu opens, and *New Game* does the same. `--start <cell>` (for example `--start WastelandNV:-18,0`, a worldspace and the cell's grid position, or the name of an interior cell) opens a cell directly, which is what the project's own test runs do. `--load-savegame <file>` loads a save.
 
 ## Frame rate and picture
 

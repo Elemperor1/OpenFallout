@@ -76,11 +76,12 @@ namespace Files
         {
             std::vector<std::filesystem::path> result;
             std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+            // A folder that can not be read to its end gives what was read; the increment that throws is not used
+            for (std::filesystem::directory_iterator it(folder, error), end; !error && it != end; it.increment(error))
             {
                 std::error_code typeError;
-                if (entry.is_directory(typeError))
-                    result.push_back(entry.path());
+                if (it->is_directory(typeError))
+                    result.push_back(it->path());
             }
             std::sort(result.begin(), result.end());
             return result;
@@ -91,13 +92,13 @@ namespace Files
             const std::filesystem::path& folder, std::string_view name, bool wantFolder)
         {
             std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+            for (std::filesystem::directory_iterator it(folder, error), end; !error && it != end; it.increment(error))
             {
                 std::error_code typeError;
-                if (!Misc::StringUtils::ciEqual(pathToUnicodeString(entry.path().filename()), name))
+                if (!Misc::StringUtils::ciEqual(pathToUnicodeString(it->path().filename()), name))
                     continue;
-                if (wantFolder ? entry.is_directory(typeError) : entry.is_regular_file(typeError))
-                    return entry.path();
+                if (wantFolder ? it->is_directory(typeError) : it->is_regular_file(typeError))
+                    return it->path();
             }
             return std::nullopt;
         }
@@ -336,7 +337,7 @@ namespace Files
 
         // Copies of the files that were put in a folder by hand (not Documents or Desktop: macOS asks the user before
         // a program looks into those)
-        for (const char* parent : { "Games", "Applications" })
+        for (const char* parent : { "Games", "Games/Heroic", "Applications" })
             addIfFolder(parents, home / parent);
 #endif
     }
