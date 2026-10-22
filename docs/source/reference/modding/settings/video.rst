@@ -172,3 +172,16 @@ Video Settings
    .. warning::
 
       This setting is only supported on Windows platform. The setting will not be displayed in the in-game menu if not available.
+
+
+.. omw-setting::
+   :title: force vertex buffer objects
+   :type: boolean
+   :range: true, false
+   :default: false
+
+   Draw every mesh from vertex buffer objects instead of OpenGL display lists.
+   The scene is made of many small meshes, and some drivers play display lists back slowly:
+   on macOS the render thread spends most of its time in them.
+   Turning this on moves that work to the GPU's buffers at the cost of some extra memory.
+   The OSG_VERTEX_BUFFER_HINT environment variable of OpenSceneGraph, when set, wins over this setting.

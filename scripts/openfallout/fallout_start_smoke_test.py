@@ -2480,6 +2480,9 @@ def press_keys_when_logged(log, pattern, keysyms, delay, stop):
         stop.wait(0.2)
 
 
+FORCE_VBO = False
+
+
 def run_engine(program, resources, data, home, runtime, seconds, start, pixels, scripts="walktest.omwscripts",
                keys=None, new_game=False, load=None, before=(), plugins=True, extra=()):
     """Runs the engine on the start for at most `seconds`. `keys` is (a pattern, the keys, the delay): the keys are
@@ -2487,6 +2490,10 @@ def run_engine(program, resources, data, home, runtime, seconds, start, pixels, 
     `load` is a saved game to start from (`--load-savegame`); `before` are plugins that come before OFTest.esm in the
     load order; `plugins` False names no plugin at all; `extra` are more arguments."""
     env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime), LIBGL_ALWAYS_SOFTWARE="1")
+    if FORCE_VBO:
+        (home / ".config" / "openfallout").mkdir(parents=True, exist_ok=True)
+        (home / ".config" / "openfallout" / "settings.cfg").write_text(
+            "[Video]\nforce vertex buffer objects = true\n", encoding="ascii")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)
     command = [str(program), "--resources", str(resources), "--data", str(data),
@@ -4417,10 +4424,14 @@ def main():
                              "has it: the control of the check that the animation moves it")
     parser.add_argument("--key-animation", action="store_true",
                         help="move the foot with two translation keys, not the control points of a B-spline")
+    parser.add_argument("--force-vbo", action="store_true",
+                        help="run with `force vertex buffer objects = true` and check that the engine logs it")
     parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
+    global FORCE_VBO
+    FORCE_VBO = args.force_vbo
 
     build = args.build.resolve()
     program = build / "openfallout"
@@ -4503,6 +4514,8 @@ def main():
         found = []
         if status != 0:
             found.append(f"the engine exited with status {status}")
+        if FORCE_VBO and "Drawing from vertex buffer objects" not in text:
+            found.append("the setting 'force vertex buffer objects' did not turn display lists off")
         found += check(text, scenario, colours, animated=not args.no_animation)
         for line in (line for line in text.splitlines() if "OFTEST" in line):
             print(line.split("]", 1)[-1].strip())

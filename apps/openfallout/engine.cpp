@@ -706,8 +706,19 @@ void OF::Engine::createWindow()
         realizeOperations->add(new Stereo::InitializeStereoOperation(settings));
     }
 
+    if (Settings::video().mForceVertexBufferObjects)
+    {
+        // The state object reads this hint once, while the viewer is realized, so it has to be set before.
+        osg::DisplaySettings* displaySettings = osg::DisplaySettings::instance().get();
+        if (displaySettings->getVertexBufferHint() == osg::DisplaySettings::NO_PREFERENCE)
+            displaySettings->setVertexBufferHint(osg::DisplaySettings::VERTEX_BUFFER_OBJECT);
+    }
+
     mViewer->realize();
     mGlMaxTextureImageUnits = identifyOp->getMaxTextureImageUnits();
+
+    if (graphicsWindow->getState()->useVertexBufferObject(false))
+        Log(Debug::Info) << "Drawing from vertex buffer objects, display lists are off";
 
     mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
