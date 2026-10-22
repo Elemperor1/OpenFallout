@@ -70,6 +70,7 @@
 #include "../mwclass/esm4creature.hpp"
 #include "../mwclass/esm4npc.hpp"
 #include "../mwclass/esm4sources.hpp"
+#include "../mwinput/actions.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwrender/animation.hpp"
@@ -1034,6 +1035,85 @@ namespace OFScript
         }
     }
 
+    std::optional<std::string> FalloutScripts::messageToken(std::string_view name)
+    {
+        if (name == "PCName")
+            return mChargen.name();
+        if (name == "PCSex")
+            return mChargen.female().value_or(false) ? "Female" : "Male";
+        if (name == "PCRace")
+        {
+            const ESM4::Race* race = mStore.get<ESM4::Race>().search(refId(mChargen.race()));
+            return race != nullptr ? race->mFullName : std::string();
+        }
+
+        // The keys of the controls: the key that is bound to the action, as the settings screen lists it. The games
+        // have no key for blocking in the controls of OpenFallout, so its token is the name of the action.
+        static const std::pair<std::string_view, int> actions[] = {
+            { "sUActnForward", OFInput::A_MoveForward },
+            { "sUActnBack", OFInput::A_MoveBackward },
+            { "sUActnSldleft", OFInput::A_MoveLeft },
+            { "sUActnSldright", OFInput::A_MoveRight },
+            { "sUActnJump", OFInput::A_Jump },
+            { "sUActnRun", OFInput::A_Run },
+            { "sUActnToggleRun", OFInput::A_AlwaysRun },
+            { "sUActnCrouch", OFInput::A_Sneak },
+            { "sUActnUse", OFInput::A_Use },
+            { "sUActnGrab", OFInput::A_Activate },
+            { "sUActnMenumode", OFInput::A_Inventory },
+        };
+        for (const auto& [token, action] : actions)
+            if (name == token)
+            {
+                OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
+                if (input == nullptr)
+                    return std::nullopt;
+                return input->joystickLastUsed() ? input->getActionControllerBindingName(action)
+                                                 : input->getActionKeyBindingName(action);
+            }
+        // V.A.T.S. is opened by the V key (falloutvats.lua)
+        if (name == "sUActnVats")
+            return "V";
+        if (name == "sUActnBlock")
+            return "Block";
+
+        // The names of keys and buttons: the setting of the files when it has one, else the name the games set
+        if (name.starts_with("sKB") || name.starts_with("sMouse") || name.starts_with("sDevice")
+            || name.starts_with("sXB"))
+        {
+            std::string text = gameSettingText(name);
+            if (!text.empty() && text.front() != '\\')
+                return text;
+            static const std::pair<std::string_view, std::string_view> buttons[] = {
+                { "sMouseLeftButton", "Mouse1" },
+                { "sMouseRightButton", "Mouse2" },
+                { "sDeviceMouse", "Mouse" },
+                { "sXBABtn", "A" },
+                { "sXBBBtn", "B" },
+                { "sXBXBtn", "X" },
+                { "sXBYBtn", "Y" },
+                { "sXBLStick", "Left Stick" },
+                { "sXBLThumb", "Left Stick" },
+                { "sXBRStick", "Right Stick" },
+                { "sXBRThumb", "Right Stick" },
+                { "sXBLBumper", "LB" },
+                { "sXBRBumper", "RB" },
+                { "sXBDPad", "D-Pad" },
+                { "sXBDPadUp", "D-Pad Up" },
+                { "sXBDPadDown", "D-Pad Down" },
+                { "sXBDPadLeft", "D-Pad Left" },
+                { "sXBDPadRight", "D-Pad Right" },
+            };
+            for (const auto& [token, button] : buttons)
+                if (name == token)
+                    return std::string(button);
+            // sKBSpace, sKBE: the key is named after the rest of the id
+            if (name.starts_with("sKB") && name.size() > 3)
+                return std::string(name.substr(3));
+        }
+        return std::nullopt;
+    }
+
     void FalloutScripts::showMessage(
         FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner)
     {
@@ -1050,7 +1130,8 @@ namespace OFScript
         // they are about the player
         if (!mConditions.holds(record->mConditions, FalloutScript::ConditionContext()))
             return;
-        std::string text = FalloutScript::formatMessage(record->mDescription, values);
+        const auto token = [this](std::string_view name) { return messageToken(name); };
+        std::string text = FalloutScript::formatMessage(record->mDescription, values, token);
         const bool isBox = (record->mMessageFlags & messageBoxFlag) != 0;
         if (text.empty() && !isBox)
             return;
@@ -1064,7 +1145,7 @@ namespace OFScript
             const ESM4::Message::Button& button = record->mButtons[i];
             if (!mConditions.holds(button.mConditions, FalloutScript::ConditionContext()))
                 continue;
-            std::string label = FalloutScript::formatMessage(button.mText, values);
+            std::string label = FalloutScript::formatMessage(button.mText, values, token);
             box.mButtons.push_back(escapeTags(label));
             box.mPlainButtons.push_back(std::move(label));
             box.mNumbers.push_back(static_cast<int>(i));

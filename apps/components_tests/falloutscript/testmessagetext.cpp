@@ -67,4 +67,21 @@ namespace
         EXPECT_EQ(formatMessage("%d", { std::nan("") }), "0");
         EXPECT_EQ(formatMessage("%d", { 1e30 }), "9000000000000000");
     }
+
+    TEST(FalloutScriptMessageTextTest, aNamedTokenTakesWhatTheResolverGives)
+    {
+        const FalloutScript::TokenResolver resolve = [](std::string_view name) -> std::optional<std::string> {
+            if (name == "sUActnVats")
+                return "V";
+            if (name == "PCName")
+                return "Courier";
+            return std::nullopt;
+        };
+        EXPECT_EQ(formatMessage("Open it, &sUActnVats;.", {}, resolve), "Open it, V.");
+        EXPECT_EQ(formatMessage("&PCName; has %.0f", { 3 }, resolve), "Courier has 3");
+        // a name nobody knows, a token with no end and an ampersand that starts none stay as they are
+        EXPECT_EQ(formatMessage("&unknown; &PCName & Q&A; &1;", {}, resolve), "&unknown; &PCName & Q&A; &1;");
+        // without a resolver nothing is replaced
+        EXPECT_EQ(formatMessage("&sUActnVats;", {}), "&sUActnVats;");
+    }
 }

@@ -239,6 +239,10 @@ namespace OFScript
         std::optional<double> gameSetting(std::string_view name);
         /// The text of a game setting, empty when the files have none
         std::string gameSettingText(std::string_view name);
+        /// What a token `&name;` of a message stands for: the keys and buttons of the controls (`&sUActnVats;` is the
+        /// key the player presses for V.A.T.S., `&sKBSpace;` the name of that key) and the name, race and sex of the
+        /// player. Gives nothing for a name that is none of them.
+        std::optional<std::string> messageToken(std::string_view name);
 
         /// An item of an inventory, as the Pip-Boy lists it
         struct PipboyItem
