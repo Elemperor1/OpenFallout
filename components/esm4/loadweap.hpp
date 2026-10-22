@@ -194,6 +194,11 @@ namespace ESM4
 
         ESM::FormId mPickUpSound;
         ESM::FormId mDropSound;
+        // Of Fallout 3 and New Vegas: the sound records (SOUN) of a shot (the first SNAM), of a shot heard by the
+        // player (XNAM) and of the click of an empty weapon (TNAM)
+        ESM::FormId mShotSound;
+        ESM::FormId mShotSound2D;
+        ESM::FormId mDryFireSound;
 
         float mBoundRadius;
 

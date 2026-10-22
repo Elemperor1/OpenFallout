@@ -199,6 +199,7 @@ namespace OFScript
         , mMainThread(std::this_thread::get_id())
         , mRandom(std::random_device()())
         , mCombatRandom(std::random_device()())
+        , mWeaponSoundRandom(std::random_device()())
     {
         mPendingSave = std::make_unique<PendingSave>();
         // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
@@ -2227,6 +2228,16 @@ namespace OFScript
             if (stats.mRounds < stats.mAmmoUse)
             {
                 result.mOutOfAmmo = true;
+                // The player's weapon clicks, as often as it could fire (a trigger that is held down is not heard a
+                // click on every frame); the attack of V.A.T.S. says it is out of ammunition in words
+                if (attacker == mPlayer && !ignoreCooldown)
+                {
+                    {
+                        const std::lock_guard lock(mFireMutex);
+                        mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
+                    }
+                    playWeaponSound(attacker, stats.mWeapon, true);
+                }
                 return result;
             }
             mActors.removeItem(attacker, stats.mAmmo, stats.mAmmoUse);
@@ -2236,6 +2247,7 @@ namespace OFScript
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
         }
+        playWeaponSound(attacker, stats.mWeapon, false);
         const FalloutScript::FormId victim = target.isEmpty() ? 0 : scriptReferenceOf(target);
         if (victim == 0 || victim == attacker)
             return result;
@@ -2260,6 +2272,42 @@ namespace OFScript
         struck.mLimb = limb;
         mCombat.noteHit(victim, struck, true);
         return result;
+    }
+
+    void FalloutScripts::playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire)
+    {
+        if (weapon == 0)
+            return;
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(weapon));
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (record == nullptr || sound == nullptr)
+            return;
+        ESM::FormId id = dryFire ? record->mDryFireSound : record->mShotSound;
+        if (!dryFire && attacker == mPlayer && !record->mShotSound2D.isZeroOrUnset())
+            id = record->mShotSound2D;
+        if (id.isZeroOrUnset())
+            return;
+        const std::vector<std::string> files = soundFilesOf(id.toUint32());
+        if (mWeaponSoundsLogged.emplace(weapon, dryFire, id.toUint32()).second)
+        {
+            // Said once for each weapon and sound: what the data gives, as the file that the game would play
+            if (files.empty())
+                Log(Debug::Warning) << "Weapon " << record->mEditorId << ": the " << (dryFire ? "click" : "shot")
+                                    << " sound " << id.toString() << " has no file";
+            else
+                Log(Debug::Info) << "Weapon " << record->mEditorId << ": " << (dryFire ? "click" : "shot") << " sound "
+                                 << id.toString() << " has " << files.size() << " file(s), the first is " << files[0];
+        }
+        if (files.empty())
+            return;
+        const std::string& file = files.size() == 1
+            ? files[0]
+            : files[std::uniform_int_distribution<std::size_t>(0, files.size() - 1)(mWeaponSoundRandom)];
+        const VFS::Path::Normalized path(file);
+        if (attacker == mPlayer)
+            sound->playSound(path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::NoEnv);
+        else if (const OFWorld::Ptr reference = findReference(attacker); !reference.isEmpty())
+            sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
     }
 
     const FalloutScripts::FightTraits& FalloutScripts::fightTraitsOf(const OFWorld::Ptr& actor)
@@ -2879,41 +2927,61 @@ namespace OFScript
         return mVoiceIndex;
     }
 
+    std::vector<std::string> FalloutScripts::soundFilesOf(FalloutScript::FormId id)
+    {
+        {
+            const std::lock_guard lock(mSoundFilesMutex);
+            const auto found = mSoundFiles.find(id);
+            if (found != mSoundFiles.end())
+                return found->second;
+        }
+        std::vector<std::string> files;
+        if (const ESM4::Sound* sound = mStore.get<ESM4::Sound>().search(refId(id)))
+            if (!sound->mSoundFile.empty())
+                if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                {
+                    const VFS::Manager& vfs = *resources->getVFS();
+                    std::string folder = VFS::Path::normalizeFilename(sound->mSoundFile);
+                    if (!folder.empty() && folder.back() == VFS::Path::separator)
+                    {
+                        // A sound record can name a folder (half of the sound records of New Vegas do), of which the
+                        // game plays one file
+                        if (folder.compare(0, 6, "sound/") != 0)
+                            folder.insert(0, "sound/");
+                        for (const VFS::Path::Normalized& file : vfs.getRecursiveDirectoryIterator(folder))
+                        {
+                            const std::string_view extension = file.extension().value();
+                            if (extension == "wav" || extension == "ogg" || extension == "mp3")
+                                files.push_back(file.value());
+                        }
+                    }
+                    else
+                    {
+                        // As for every sound record: the mp3 a wav was converted to, when that is what there is
+                        constexpr VFS::Path::NormalizedView soundDir("sound");
+                        constexpr VFS::Path::ExtensionView mp3("mp3");
+                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
+                        if (vfs.exists(path))
+                            files.push_back(path.value());
+                    }
+                }
+        const std::lock_guard lock(mSoundFilesMutex);
+        mSoundFiles.emplace(id, files);
+        return files;
+    }
+
     std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)
     {
         // A response can name a sound record (TRDT) to be said in place of a voice file; when its file is there that is
-        // what is said, and when it is not the voice files are looked for as for any other response
+        // what is said (the first one of a folder), and when it is not the voice files are looked for as for any other
+        // response
         if (line.mSound != 0)
-            if (const ESM4::Sound* sound = mStore.get<ESM4::Sound>().search(refId(line.mSound)))
-                if (!sound->mSoundFile.empty())
-                    if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
-                    {
-                        const VFS::Manager& vfs = *resources->getVFS();
-                        std::string folder = VFS::Path::normalizeFilename(sound->mSoundFile);
-                        if (!folder.empty() && folder.back() == VFS::Path::separator)
-                        {
-                            // A sound record can name a folder (40, 108 and 151 of the responses with a sound in the
-                            // three games): the first file in it is said
-                            if (folder.compare(0, 6, "sound/") != 0)
-                                folder.insert(0, "sound/");
-                            for (const VFS::Path::Normalized& file : vfs.getRecursiveDirectoryIterator(folder))
-                            {
-                                const std::string_view extension = file.extension().value();
-                                if (extension == "wav" || extension == "ogg" || extension == "mp3")
-                                    return file.value();
-                            }
-                        }
-                        else
-                        {
-                            // As for every sound record: the mp3 a wav was converted to, when that is what there is
-                            constexpr VFS::Path::NormalizedView soundDir("sound");
-                            constexpr VFS::Path::ExtensionView mp3("mp3");
-                            const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-                                { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
-                            if (vfs.exists(path))
-                                return path.value();
-                        }
-                    }
+        {
+            const std::vector<std::string> files = soundFilesOf(line.mSound);
+            if (!files.empty())
+                return files.front();
+        }
         const FalloutScript::VoiceIndex& index = voices();
         if (index.size() == 0 || line.mInfo == 0)
             return {};
