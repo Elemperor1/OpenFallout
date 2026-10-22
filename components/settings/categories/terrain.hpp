@@ -41,6 +41,9 @@ namespace Settings
         SettingValue<bool> mGameLod{ mIndex, "Terrain", "game lod" };
         SettingValue<float> mGameLodDistance{ mIndex, "Terrain", "game lod distance", makeMaxStrictSanitizerFloat(0) };
         SettingValue<bool> mGameLodObjects{ mIndex, "Terrain", "game lod objects" };
+        SettingValue<std::string> mGameLodNormalMaps{ mIndex, "Terrain", "game lod normal maps",
+            makeEnumSanitizerString({ "tangent", "flipped", "object", "none" }) };
+        SettingValue<std::string> mGameLodDebug{ mIndex, "Terrain", "game lod debug" };
     };
 }
 

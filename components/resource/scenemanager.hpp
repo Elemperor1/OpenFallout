@@ -14,6 +14,7 @@
 #include "speedtree.hpp"
 
 #include <components/sceneutil/lightmanager.hpp>
+#include <components/sceneutil/loddebug.hpp>
 #include <filesystem>
 
 namespace VFS
@@ -201,6 +202,10 @@ namespace Resource
         /// To be called before the model is first loaded.
         void setSpeedTree(VFS::Path::NormalizedView model, SpeedTreeStandIn tree);
 
+        /// What is done to the files of the distant land of the games when they are loaded, to look into how it is
+        /// drawn. To be called before they are first loaded.
+        void setLodDebug(const SceneUtil::LodDebug& debug) { mLodDebug = debug; }
+
     private:
         osg::ref_ptr<osg::Node> loadSpeedTree(VFS::Path::NormalizedView path);
         osg::ref_ptr<Shader::ShaderVisitor> createShaderVisitor(const std::string& shaderPrefix = "objects");
@@ -224,6 +229,8 @@ namespace Resource
         osg::ref_ptr<osgUtil::IncrementalCompileOperation> mIncrementalCompileOperation;
         mutable osg::ref_ptr<osg::Node> mErrorMarker;
         mutable std::once_flag mErrorMarkerFlag;
+
+        SceneUtil::LodDebug mLodDebug;
 
         mutable std::mutex mSpeedTreeMutex;
         std::map<std::string, SpeedTreeStandIn, std::less<>> mSpeedTrees;

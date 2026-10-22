@@ -2,8 +2,10 @@
 
 #include <osg/Group>
 #include <osg/MatrixTransform>
+#include <osg/Uniform>
 #include <osgUtil/IncrementalCompileOperation>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm/util.hpp>
 #include <components/resource/cachestats.hpp>
 #include <components/resource/scenemanager.hpp>
@@ -20,15 +22,17 @@ namespace OFRender
     namespace
     {
         constexpr int sBlockCells = Terrain::LodIndex::sSmallestLevel;
+        /// How many of the nodes that have objects are logged
+        constexpr int sReportedNodes = 12;
     }
 
     FalloutLod::FalloutLod(Resource::SceneManager* sceneManager, Terrain::LodIndex index, ESM::RefId worldspace,
-        bool objects, double expiryDelay)
+        const Options& options, double expiryDelay)
         : Resource::NodeResourceManager<std::pair<osg::Vec2f, float>>(nullptr, expiryDelay)
         , Terrain::QuadTreeWorld::ChunkManager(worldspace)
         , mSceneManager(sceneManager)
         , mIndex(std::move(index))
-        , mObjects(objects)
+        , mOptions(options)
         , mCellSize(static_cast<float>(ESM::getCellSize(worldspace)))
     {
     }
@@ -79,8 +83,8 @@ namespace OFRender
     {
         osg::ref_ptr<osg::Node> node = mSceneManager->getInstance(VFS::Path::NormalizedView(tile.mPath));
         // The loader of NIF files drops the translation of the root node, which is what places a tile
-        const osg::Vec3f placement = Terrain::getLodPlacement(
-            *node, tile.mName.mX, tile.mName.mY, tile.mName.mLevel, mCellSize);
+        const osg::Vec3f placement
+            = Terrain::getLodPlacement(*node, tile.mName.mX, tile.mName.mY, tile.mName.mLevel, mCellSize);
         if (placement == osg::Vec3f())
             return node;
         osg::ref_ptr<osg::MatrixTransform> placed(new osg::MatrixTransform(osg::Matrix::translate(placement)));
@@ -101,29 +105,36 @@ namespace OFRender
 
             // The tiles are drawn only where they fill the node, as it is the only place the land is not
             osg::ref_ptr<osg::Group> terrain(new osg::Group);
-            if (replacesTerrain(size, center))
+            if (!mOptions.mDebug.mObjectsOnly && replacesTerrain(size, center))
                 for (const Terrain::LodTile* tile : mIndex.getTerrain(x, y, cells))
                     terrain->addChild(loadTile(*tile));
             if (terrain->getNumChildren() > 0)
             {
                 terrain->setNodeMask(Mask_Terrain);
+                if (mOptions.mNormalMode != 0)
+                    terrain->getOrCreateStateSet()->addUniform(new osg::Uniform("lodNormalMode", mOptions.mNormalMode));
                 group->addChild(terrain);
             }
 
-            if (mObjects && size <= sLargestObjectsSize)
+            if (mOptions.mObjects && size <= sLargestObjectsSize)
             {
                 osg::ref_ptr<osg::Group> objects(new osg::Group);
                 for (const bool high : { false, true })
+                {
+                    if (high && mOptions.mDebug.mNoHigh)
+                        continue;
                     for (const Terrain::LodTile* tile : mIndex.getObjects(x, y, cells, high))
                         objects->addChild(loadTile(*tile));
+                }
                 if (objects->getNumChildren() > 0)
                 {
                     objects->setNodeMask(Mask_Static);
                     group->addChild(objects);
+                    reportObjects(size, x, y, *objects);
                 }
             }
         }
-        else if (mObjects)
+        else if (mOptions.mObjects)
         {
             addObjects(*group, size, center);
         }
@@ -168,6 +179,8 @@ namespace OFRender
         osg::ref_ptr<osg::Group> objects(new osg::Group);
         for (const bool high : { false, true })
         {
+            if (high && mOptions.mDebug.mNoHigh)
+                continue;
             const Terrain::LodTile* tile
                 = mIndex.find(Terrain::LodTileName::Kind::Objects, sBlockCells, high, blockX, blockY);
             if (tile == nullptr)
@@ -182,6 +195,18 @@ namespace OFRender
             return;
         objects->setNodeMask(Mask_Static);
         group.addChild(objects);
+        reportObjects(size, static_cast<int>(std::lround(left)), static_cast<int>(std::lround(bottom)), *objects);
+    }
+
+    void FalloutLod::reportObjects(float size, int x, int y, osg::Group& objects)
+    {
+        if (mReported.fetch_add(1) >= sReportedNodes)
+            return;
+        // Where the objects are drawn is told in the world's own units, to be compared with where the node is
+        const osg::BoundingSphere bound = objects.getBound();
+        Log(Debug::Info) << "Distant objects of the node of " << size << " cells from " << x << "," << y << ": "
+                         << objects.getNumChildren() << " pieces of blocks, bound centre " << bound.center().x() << ","
+                         << bound.center().y() << "," << bound.center().z() << " radius " << bound.radius();
     }
 
     void FalloutLod::reportStats(unsigned int frameNumber, osg::Stats* stats) const

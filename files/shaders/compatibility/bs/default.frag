@@ -20,6 +20,10 @@ varying vec2 emissiveMapUV;
 #if @normalMap
 uniform sampler2D normalMap;
 varying vec2 normalMapUV;
+// How the normal map is read. Only the distant land of the games sets this, to find out which way its maps are meant
+// to be read: 0 relative to the surface, 1 the same with the green channel turned over, 2 as normals of the world and
+// 3 not at all
+uniform int lodNormalMode;
 #endif
 
 varying float euclideanDepth;
@@ -79,7 +83,15 @@ void main()
 #if @reconstructNormalZ
     normal.z = sqrt(1.0 - dot(normal.xy, normal.xy));
 #endif
-    vec3 viewNormal = normalToView(normal);
+    vec3 viewNormal;
+    if (lodNormalMode == 0)
+        viewNormal = normalToView(normal);
+    else if (lodNormalMode == 1)
+        viewNormal = normalToView(vec3(normal.x, -normal.y, normal.z));
+    else if (lodNormalMode == 2)
+        viewNormal = normalize(gl_NormalMatrix * normal);
+    else
+        viewNormal = normalize(gl_NormalMatrix * passNormal);
     specularColor *= normalTex.a;
 #else
     vec3 viewNormal = normalize(gl_NormalMatrix * passNormal);

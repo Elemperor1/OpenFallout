@@ -5,9 +5,13 @@ The skins and layouts under files/data/mygui were made for Morrowind and look fo
 the mouse pointers and the like in the Morrowind archives. Fallout 3 and New Vegas have none of them, so every frame, button
 and pointer came out as a missing image. The images made here are plain: thin lines in a green that the Pip-Boy of Fallout 3
 uses, on a dark panel; they are the work of this script and of nobody else, so the repository can carry them. They are
-uncompressed 32 bit DDS files without mip maps, written to files/data/textures/.
+uncompressed 32 bit DDS files without mip maps, written to files/data/textures/ (and files/data/icons/ for the few that
+the interface looks for there).
 
-    python3 scripts/openfallout/make_gui_textures.py [output directory]
+    python3 scripts/openfallout/make_gui_textures.py [directory of the data files]
+
+The main menu of Morrowind is a picture and seven buttons whose names are written into their images; the games have none of
+them, so the buttons are made here with their names in a plain letter shape of 5 by 7 dots.
 
 The sizes follow the skins: the border pieces are 2 pixels (the thin and the head block) or 4 pixels (the thick border and
 the frame of a button) across, a piece that tiles along an edge is 8 or 16 pixels long, and a button image has the size that
@@ -139,6 +143,47 @@ SHORT_NAMES = dict(top='top', bottom='bottom', left='left', right='right', top_l
                    top_right='top_right', bottom_left='bottom_left', bottom_right='bottom_right')
 
 
+# The letters of the names on the buttons and of the title of the main menu, 5 dots across and 7 down
+FONT = {
+    'A': ('.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'),
+    'C': ('.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'),
+    'D': ('####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'),
+    'E': ('#####', '#....', '#....', '####.', '#....', '#....', '#####'),
+    'F': ('#####', '#....', '#....', '####.', '#....', '#....', '#....'),
+    'G': ('.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.###.'),
+    'I': ('#####', '..#..', '..#..', '..#..', '..#..', '..#..', '#####'),
+    'L': ('#....', '#....', '#....', '#....', '#....', '#....', '#####'),
+    'M': ('#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'),
+    'N': ('#...#', '##..#', '##..#', '#.#.#', '#..##', '#..##', '#...#'),
+    'O': ('.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'),
+    'P': ('####.', '#...#', '#...#', '####.', '#....', '#....', '#....'),
+    'R': ('####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'),
+    'S': ('.####', '#....', '#....', '.###.', '....#', '....#', '####.'),
+    'T': ('#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'),
+    'U': ('#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'),
+    'V': ('#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'),
+    'W': ('#...#', '#...#', '#...#', '#.#.#', '#.#.#', '##.##', '#...#'),
+    'X': ('#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'),
+}
+
+
+def text_width(text, scale):
+    return len(text) * 6 * scale - scale
+
+
+def draw_text(image, x, y, text, scale, color):
+    """Draws the text in capital letters with its top left corner at x, y; a letter is 5 dots across and 7 down."""
+    for index, letter in enumerate(text):
+        rows = FONT.get(letter)
+        if rows is None:
+            continue
+        for row, dots in enumerate(rows):
+            for column, dot in enumerate(dots):
+                if dot == '#':
+                    image.rect(x + (index * 6 + column) * scale, y + row * scale,
+                               x + (index * 6 + column + 1) * scale, y + (row + 1) * scale, color)
+
+
 def solid(w, h, color):
     return Image(w, h, color)
 
@@ -244,6 +289,105 @@ def glyph_button(w, h, state, glyph):
     return image
 
 
+MENU_BUTTONS = (('return', 'RETURN'), ('newgame', 'NEW GAME'), ('savegame', 'SAVE GAME'), ('loadgame', 'LOAD GAME'),
+                ('options', 'OPTIONS'), ('credits', 'CREDITS'), ('exitgame', 'EXIT'))
+
+
+def menu_button(label, state):
+    """A button of the main menu: its name in capital letters, in the top 48 dots of an image 192 across and 64 down (the
+    menu cuts off the lower 16); lit when the pointer is over it and filled when it is pressed."""
+    image = Image(192, 64)
+    scale = 3
+    width = text_width(label, scale)
+    x, y = (192 - width) // 2, (48 - 7 * scale) // 2
+    if state == 'idle':
+        draw_text(image, x, y, label, scale, with_alpha(ACCENT, 210))
+    elif state == 'over':
+        image.rect(4, 4, 188, 44, with_alpha(PANEL, 200))
+        image.rect(4, 4, 188, 5, with_alpha(ACCENT, 255))
+        image.rect(4, 43, 188, 44, with_alpha(ACCENT, 255))
+        draw_text(image, x, y, label, scale, with_alpha(ACCENT, 255))
+    else:
+        image.rect(4, 4, 188, 44, with_alpha(ACCENT, 255))
+        draw_text(image, x, y, label, scale, with_alpha(PANEL, 255))
+    return image
+
+
+def menu_background():
+    """The picture behind the main menu: a dark panel that is lighter in the middle, with a frame and the name of the engine."""
+    width, height = 384, 216
+    image = Image(width, height)
+    for y in range(height):
+        for x in range(width):
+            d = math.hypot((x - width / 2) / (width / 2), (y - height / 2) / (height / 2))
+            shade = max(0.0, 1.0 - d * 0.8)
+            image.set(x, y, (int(4 + 10 * shade), int(14 + 34 * shade), int(8 + 20 * shade), 255))
+    for d in range(3):
+        a = 255 if d == 0 else 120
+        image.rect(8 + d, 8 + d, width - 8 - d, 9 + d, with_alpha(ACCENT, a))
+        image.rect(8 + d, height - 9 - d, width - 8 - d, height - 8 - d, with_alpha(ACCENT, a))
+        image.rect(8 + d, 8 + d, 9 + d, height - 8 - d, with_alpha(ACCENT, a))
+        image.rect(width - 9 - d, 8 + d, width - 8 - d, height - 8 - d, with_alpha(ACCENT, a))
+    title = 'OPENFALLOUT'
+    scale = 4
+    draw_text(image, (width - text_width(title, scale)) // 2, 40, title, scale, with_alpha(ACCENT, 255))
+    return image
+
+
+def sneak_icon():
+    """The sign of sneaking in the HUD: an eye, 32 x 32."""
+    image = Image(32, 32)
+    for x in range(2, 30):
+        t = (x - 15.5) / 13.5
+        half = 8.0 * max(0.0, 1.0 - t * t)
+        for y in range(32):
+            if abs(y - 15.5) <= half:
+                edge = half - abs(y - 15.5) < 1.5
+                image.set(x, y, with_alpha(ACCENT, 255) if edge else with_alpha(PANEL, 215))
+    for y in range(32):
+        for x in range(32):
+            r = math.hypot(x - 15.5, y - 15.5)
+            if r <= 4.5:
+                image.set(x, y, with_alpha(ACCENT, 255))
+    return image
+
+
+def fist_icon():
+    """The sign of fighting with the hands, for the HUD and the quick keys: a fist, 32 x 32."""
+    image = Image(32, 32)
+    green = with_alpha(ACCENT, 255)
+    for index in range(4):
+        left = 5 + index * 5
+        image.rect(left, 6, left + 4, 16, green)
+    image.rect(5, 16, 25, 26, green)
+    image.rect(2, 14, 7, 22, green)
+    image.rect(7, 18, 23, 24, with_alpha(PANEL, 255))
+    return image
+
+
+def coin_icon():
+    """A bottle cap for the money: a ring with a dot in it, 16 x 16."""
+    image = Image(16, 16)
+    for y in range(16):
+        for x in range(16):
+            r = math.hypot(x - 7.5, y - 7.5)
+            if r <= 7.5:
+                image.set(x, y, with_alpha(ACCENT, 255) if r > 5.5 or r < 2.5 else with_alpha(DIM, 255))
+    return image
+
+
+def hit_flash():
+    """The flash on the screen when the player is hurt: a soft red patch that fades out towards its edge, 128 x 128. The
+    interface shows it in the middle of the screen when there is no bm_player_hit_01.dds."""
+    image = Image(128, 128)
+    for y in range(128):
+        for x in range(128):
+            d = math.hypot(x - 63.5, y - 63.5) / 64.0
+            alpha = int(max(0.0, 1.0 - d) ** 1.3 * 190)
+            image.set(x, y, (200, 20, 20, alpha))
+    return image
+
+
 def build_all():
     images = {}
 
@@ -318,16 +462,35 @@ def build_all():
             base = 122 + int(n * 14)
             ground.set(x, y, (base, base - 22, base - 52, 255))
     images['_land_default'] = ground
+
+    # the main menu: its picture and its buttons, idle, with the pointer over them and pressed
+    images['menu_morrowind'] = menu_background()
+    for name, label in MENU_BUTTONS:
+        images['menu_' + name] = menu_button(label, 'idle')
+        images['menu_%s_over' % name] = menu_button(label, 'over')
+        images['menu_%s_pressed' % name] = menu_button(label, 'pressed')
+
+    # the signs of the HUD, the money and the quick keys, which the interface looks for under icons/
+    images['icons/k/stealth_sneak'] = sneak_icon()
+    images['icons/k/stealth_handtohand'] = fist_icon()
+    images['icons/tx_goldicon'] = coin_icon()
+    images['player_hit_01'] = hit_flash()
     return images
+
+
+def relative_path(name):
+    """Where the image is below the data files: icons/... stay where they are, the rest is under textures/."""
+    return name + '.dds' if name.startswith('icons/') else 'textures/%s.dds' % name
 
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), '..', '..', 'files', 'data', 'textures')
-    os.makedirs(out, exist_ok=True)
+        os.path.dirname(os.path.abspath(__file__)), '..', '..', 'files', 'data')
     images = build_all()
     for name in sorted(images):
-        with open(os.path.join(out, name + '.dds'), 'wb') as f:
+        path = os.path.join(out, relative_path(name))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
             f.write(images[name].to_dds())
     print('wrote %d images to %s' % (len(images), out))
 

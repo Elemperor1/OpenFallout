@@ -591,6 +591,10 @@ TREE_PLACE = (-1200.0, 1200.0)
 # the cells that the player has loaded, so that the quad tree of the worldspace has a node of that size there.
 LOD_TILE = (8, 8, 0)
 LOD_TILE_HEIGHT = -200.0
+# The distant objects: a block of 4 by 4 cells from the cell LOD_BLOCK[0], LOD_BLOCK[1] with a flat square at LOD_BLOCK_HEIGHT in
+# the units of the world, inside the area of the tile, so that the node of the quad tree that draws the tile draws it too
+LOD_BLOCK = (12, 4)
+LOD_BLOCK_HEIGHT = 300.0
 LOD_LAND_CELL = (12, 0)
 LOD_CELL_ID = 0x986
 LOD_LAND_ID = 0x987
@@ -2704,6 +2708,11 @@ def write(out, animation=True, spline=True):
         f"{WORLD_NAME.lower()}.level{level}.x{tile_x}.y{tile_y}.nif")
     lod.parent.mkdir(parents=True, exist_ok=True)
     lod.write_bytes(lod_tile.tile(level, tile_x, tile_y, LOD_TILE_HEIGHT))
+    block_x, block_y = LOD_BLOCK
+    block = out / "meshes" / "landscape" / "lod" / WORLD_NAME.lower() / "blocks" / (
+        f"{WORLD_NAME.lower()}.level4.x{block_x}.y{block_y}.nif")
+    block.parent.mkdir(parents=True, exist_ok=True)
+    block.write_bytes(lod_tile.block(block_x, block_y, LOD_BLOCK_HEIGHT))
     leaves = out / "textures" / "trees" / "leaves" / TREE_TEXTURE
     leaves.parent.mkdir(parents=True, exist_ok=True)
     leaves.write_bytes(dds_texture((*TREE_COLOUR, 255), 4))

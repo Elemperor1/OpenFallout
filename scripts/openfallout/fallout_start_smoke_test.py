@@ -2116,6 +2116,7 @@ for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), 
 ARENA_PLAYER_SCRIPT = """\
 local core = require('openfallout.core')
 local I = require('openfallout.interfaces')
+local nearby = require('openfallout.nearby')
 
 local target, shots, once = nil, 0, false
 local throwing, thrown, planned = nil, 0, 0
@@ -2312,6 +2313,12 @@ return {
                 vatsFrames = vatsFrames + 1
                 local vats = core.vats
                 if vatsFrames == 1 then
+                    -- The characters of Fallout are in the list of the actors near the player, where V.A.T.S. looks
+                    local listed = false
+                    for _, actor in ipairs(nearby.actors) do
+                        if actor == vatsTarget then listed = true end
+                    end
+                    print('OFTEST', 'arena', 'vatslisted', tostring(listed))
                     local state, parts = vats.state(), vats.parts(vatsTarget)
                     local names, chances = {}, {}
                     for _, part in ipairs(parts) do
@@ -2769,8 +2776,28 @@ def check_lod(text, scenario):
     """The problems with the distant land: the log says it is drawn from the tile of the files of the game, and the ray
     that goes through the tile hits it at its height, inside its square."""
     problems = []
-    if "Drawing the distant land of the worldspace from 1 terrain tiles and 0 blocks of objects" not in text:
-        problems.append("the log does not say that the distant land is drawn from the one tile of the files of the game")
+    if "Drawing the distant land of the worldspace from 1 terrain tiles and 1 blocks of objects" not in text:
+        problems.append("the log does not say that the distant land is drawn from the one tile and the one block of the "
+                        "files of the game")
+    # The block of objects is made into a piece of the node of the tile, in the units of the world and where it is
+    # in them: the bound of the piece is the square of the block
+    objects = re.search(r"Distant objects of the node of ([\d.]+) cells from (-?\d+),(-?\d+): (\d+) pieces of blocks, "
+                        r"bound centre (-?[\d.e+]+),(-?[\d.e+]+),(-?[\d.e+]+) radius ([\d.e+]+)", text)
+    if not objects:
+        problems.append("the log does not say that the block of objects is drawn in a node of the quad tree")
+    else:
+        block_x, block_y = plugin.LOD_BLOCK
+        half = 2 * plugin.EXTERIOR_CELL_SIZE
+        centre = tuple(float(objects.group(index)) for index in (5, 6, 7))
+        wanted = ((block_x + 2) * plugin.EXTERIOR_CELL_SIZE, (block_y + 2) * plugin.EXTERIOR_CELL_SIZE,
+                  plugin.LOD_BLOCK_HEIGHT)
+        if any(abs(have - want) > 2.0 for have, want in zip(centre, wanted)):
+            problems.append(f"the block of objects should be drawn where it is in the world, centre {wanted}: "
+                            f"{objects.group(0)}")
+        if int(objects.group(4)) != 1:
+            problems.append(f"the node should have the one block of objects: {objects.group(0)}")
+        if abs(float(objects.group(8)) - half * 2 ** 0.5) > 2.0:
+            problems.append(f"the bound of the block of objects should hold its square: {objects.group(0)}")
     rays = [m for m in map(LOD_RAY.search, text.splitlines()) if m]
     if not rays:
         problems.append("the script did not log the ray cast at the tile of the distant land")
@@ -3708,6 +3735,10 @@ def check_arena_vats(text):
                      r"chances=(.*)$", text, re.M)
     if not info:
         return ["no 'arena vats' line in the log (core.vats did not tell what the player can target)"]
+    listed = re.search(r"OFTEST\tarena\tvatslisted\t(\w+)$", text, re.M)
+    if not listed or listed.group(1) != "true":
+        problems.append("the target of V.A.T.S. should be in nearby.actors, the list that the screen picks its targets "
+                        f"from in the game: {listed.group(0) if listed else 'no line'}")
     usable, can, points, most, cost, parts, chances = info.groups()
     if usable != "true" or can != "true":
         problems.append(f"V.A.T.S. should be usable and the target in front of the player in reach: {info.group(0)}")

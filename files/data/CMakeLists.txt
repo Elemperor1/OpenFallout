@@ -298,6 +298,12 @@ set(FALLBACK_TEXTURES
     textures/menu_button_frame_top.dds
     textures/menu_button_frame_top_left_corner.dds
     textures/menu_button_frame_top_right_corner.dds
+    textures/menu_credits.dds
+    textures/menu_credits_over.dds
+    textures/menu_credits_pressed.dds
+    textures/menu_exitgame.dds
+    textures/menu_exitgame_over.dds
+    textures/menu_exitgame_pressed.dds
     textures/menu_head_block_bottom.dds
     textures/menu_head_block_bottom_left_corner.dds
     textures/menu_head_block_bottom_right_corner.dds
@@ -307,6 +313,19 @@ set(FALLBACK_TEXTURES
     textures/menu_head_block_top.dds
     textures/menu_head_block_top_left_corner.dds
     textures/menu_head_block_top_right_corner.dds
+    textures/menu_loadgame.dds
+    textures/menu_loadgame_over.dds
+    textures/menu_loadgame_pressed.dds
+    textures/menu_morrowind.dds
+    textures/menu_newgame.dds
+    textures/menu_newgame_over.dds
+    textures/menu_newgame_pressed.dds
+    textures/menu_options.dds
+    textures/menu_options_over.dds
+    textures/menu_options_pressed.dds
+    textures/menu_return.dds
+    textures/menu_return_over.dds
+    textures/menu_return_pressed.dds
     textures/menu_rightbuttondown_bottom.dds
     textures/menu_rightbuttondown_bottom_left.dds
     textures/menu_rightbuttondown_bottom_right.dds
@@ -325,6 +344,9 @@ set(FALLBACK_TEXTURES
     textures/menu_rightbuttonup_top.dds
     textures/menu_rightbuttonup_top_left.dds
     textures/menu_rightbuttonup_top_right.dds
+    textures/menu_savegame.dds
+    textures/menu_savegame_over.dds
+    textures/menu_savegame_pressed.dds
     textures/menu_small_energy_bar_bottom.dds
     textures/menu_small_energy_bar_top.dds
     textures/menu_small_energy_bar_vert.dds
@@ -344,6 +366,7 @@ set(FALLBACK_TEXTURES
     textures/menu_thin_border_top.dds
     textures/menu_thin_border_top_left_corner.dds
     textures/menu_thin_border_top_right_corner.dds
+    textures/player_hit_01.dds
     textures/scroll.dds
     textures/target.dds
     textures/tx_cursor.dds
@@ -371,6 +394,9 @@ set(FALLBACK_TEXTURES
     textures/tx_menubook_topics_idle.dds
     textures/tx_menubook_topics_over.dds
     textures/tx_menubook_topics_pressed.dds
+    icons/k/stealth_handtohand.dds
+    icons/k/stealth_sneak.dds
+    icons/tx_goldicon.dds
 )
 
 foreach (f ${FALLBACK_TEXTURES})

@@ -14,6 +14,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <osg/Geometry>
 #include <osgDB/Registry>
 
 #include <array>
@@ -113,6 +114,40 @@ osg::Group {
   }
 }
 )");
+    }
+
+    // The shape of the blocks of distant objects of the games: a triangle shape with a list of segments
+    TEST_F(NifOsgLoaderTest, drawsTheTrianglesOfASegmentedTriShape)
+    {
+        Nif::NiTriShapeData data;
+        data.mRecordType = Nif::RC_NiTriShapeData;
+        data.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(1, 1, 0) };
+        data.mNumTriangles = 1;
+        data.mTriangles = { 0, 1, 2 };
+        Nif::BSSegmentedTriShape shape;
+        init(shape);
+        shape.mRecordType = Nif::RC_BSSegmentedTriShape;
+        shape.mData = Nif::NiGeometryDataPtr(&data);
+        shape.mShaderProperty = Nif::BSShaderPropertyPtr(nullptr);
+        shape.mAlphaProperty = Nif::NiAlphaPropertyPtr(nullptr);
+
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&shape);
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        struct FindGeometry : osg::NodeVisitor
+        {
+            FindGeometry()
+                : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+            {
+            }
+            void apply(osg::Geometry& geometry) override { mGeometry = &geometry; }
+            const osg::Geometry* mGeometry = nullptr;
+        } find;
+        result->accept(find);
+        ASSERT_NE(find.mGeometry, nullptr);
+        ASSERT_EQ(find.mGeometry->getNumPrimitiveSets(), 1u);
+        EXPECT_EQ(find.mGeometry->getPrimitiveSet(0)->getNumIndices(), 3u);
     }
 
     std::string formatOsgNodeForBSShaderProperty(std::string_view shaderPrefix)

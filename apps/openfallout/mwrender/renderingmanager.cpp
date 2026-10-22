@@ -31,6 +31,7 @@
 #include <components/sceneutil/cullsafeboundsvisitor.hpp>
 #include <components/sceneutil/depth.hpp>
 #include <components/sceneutil/lightmanager.hpp>
+#include <components/sceneutil/loddebug.hpp>
 #include <components/sceneutil/material.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/sceneutil/rtt.hpp>
@@ -1380,8 +1381,22 @@ namespace OFRender
                 Log(Debug::Info) << "Drawing the distant land of the worldspace from " << lodIndex.getTerrainCount()
                                  << " terrain tiles and " << lodIndex.getObjectCount()
                                  << " blocks of objects of the game";
-                newChunkMgr.mFalloutLod = std::make_unique<FalloutLod>(mResourceSystem->getSceneManager(),
-                    std::move(lodIndex), worldspace, Settings::terrain().mGameLodObjects, expiryDelay);
+                FalloutLod::Options lodOptions;
+                lodOptions.mObjects = Settings::terrain().mGameLodObjects;
+                const std::string& normalMaps = Settings::terrain().mGameLodNormalMaps.get();
+                if (normalMaps == "flipped")
+                    lodOptions.mNormalMode = 1;
+                else if (normalMaps == "object")
+                    lodOptions.mNormalMode = 2;
+                else if (normalMaps == "none")
+                    lodOptions.mNormalMode = 3;
+                std::vector<std::string> unknownWords;
+                lodOptions.mDebug = SceneUtil::parseLodDebug(Settings::terrain().mGameLodDebug.get(), &unknownWords);
+                for (const std::string& word : unknownWords)
+                    Log(Debug::Warning) << "Ignoring the word '" << word << "' of the setting game lod debug";
+                mResourceSystem->getSceneManager()->setLodDebug(lodOptions.mDebug);
+                newChunkMgr.mFalloutLod = std::make_unique<FalloutLod>(
+                    mResourceSystem->getSceneManager(), std::move(lodIndex), worldspace, lodOptions, expiryDelay);
                 const FalloutLod* falloutLod = newChunkMgr.mFalloutLod.get();
                 quadTreeWorld->setTerrainReplaced(
                     [falloutLod](float size, const osg::Vec2f& center) {

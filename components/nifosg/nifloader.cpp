@@ -1736,7 +1736,8 @@ namespace NifOsg
 
             if (!hasPartitions)
             {
-                if (niGeometry->mRecordType == Nif::RC_NiTriShape || nifNode->mRecordType == Nif::RC_BSLODTriShape)
+                if (niGeometry->mRecordType == Nif::RC_NiTriShape || nifNode->mRecordType == Nif::RC_BSLODTriShape
+                    || nifNode->mRecordType == Nif::RC_BSSegmentedTriShape)
                 {
                     auto data = static_cast<const Nif::NiTriShapeData*>(niGeometryData);
                     const std::vector<unsigned short>& triangles = data->mTriangles;
