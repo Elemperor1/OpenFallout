@@ -1,5 +1,6 @@
 #include "scriptbuilder.hpp"
 
+#include <components/falloutscript/extendercommands.hpp>
 #include <components/falloutscript/presentation.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
@@ -30,18 +31,24 @@ namespace
     constexpr std::uint16_t OpRemoveImageSpaceModifier = 0x1192;
     constexpr std::uint16_t OpAbs = 0x1221;
     constexpr std::uint16_t OpIsImageSpaceActive = 0x1232;
+    constexpr std::uint16_t OpIsSoundPlaying = 0x278A;
 
     class FakeWorld : public FalloutScript::PresentationWorld
     {
     public:
         std::vector<std::pair<FormId, FormId>> mPlayed;
         std::set<FormId> mPlaying;
+        std::vector<FormId> mAskedFrom;
         std::map<FormId, double> mDurations{ { flash, 2.0 }, { blur, 0.0 } };
         std::vector<int> mAchievements;
         bool mMusic = false;
 
         void playSound(FormId sound, FormId reference) override { mPlayed.emplace_back(sound, reference); }
-        bool isSoundPlaying(FormId sound, FormId) override { return mPlaying.count(sound) != 0; }
+        bool isSoundPlaying(FormId sound, FormId reference) override
+        {
+            mAskedFrom.push_back(reference);
+            return mPlaying.count(sound) != 0;
+        }
         bool isMusicPlaying() override { return mMusic; }
         double imageSpaceDuration(FormId modifier) override
         {
@@ -53,7 +60,14 @@ namespace
 
     struct Runner
     {
-        FalloutScript::CommandTable mCommands = FalloutScript::vanillaCommands(FalloutScript::Game::NewVegas);
+        static FalloutScript::CommandTable table()
+        {
+            FalloutScript::CommandTable result = FalloutScript::vanillaCommands(FalloutScript::Game::NewVegas);
+            FalloutScript::addExtenderCommands(result, FalloutScript::Game::NewVegas);
+            return result;
+        }
+
+        FalloutScript::CommandTable mCommands = table();
         TestHost mHost;
         FalloutScript::Interpreter mInterpreter{ mHost, mCommands };
         FakeWorld mWorld;
@@ -80,6 +94,17 @@ namespace
         EXPECT_THAT(run.mWorld.mPlayed,
             ElementsAre(
                 std::make_pair(shout, FormId(0)), std::make_pair(shout, guard), std::make_pair(shout, FormId(0))));
+    }
+
+    TEST(FalloutScriptPresentationTest, a_sound_is_asked_for_on_the_reference_of_the_argument_or_the_one_called_on)
+    {
+        Runner run;
+        run.mWorld.mPlaying.insert(shout);
+        EXPECT_EQ(run.call(OpIsSoundPlaying, 0, { shout, guard }), 1.0);
+        EXPECT_EQ(run.call(OpIsSoundPlaying, clerk, { shout }), 1.0);
+        EXPECT_EQ(run.call(OpIsSoundPlaying, clerk, { shout, guard }), 1.0);
+        EXPECT_EQ(run.call(OpIsSoundPlaying, 0, { flash }), 0.0);
+        EXPECT_THAT(run.mWorld.mAskedFrom, ElementsAre(guard, clerk, guard, FormId(0)));
     }
 
     TEST(FalloutScriptPresentationTest, an_image_space_modifier_is_active_for_its_duration)

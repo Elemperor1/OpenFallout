@@ -104,8 +104,9 @@ namespace FalloutScript
         const int before = levelLocked(reputation, side, cap, limit);
         Sides& sides = mSides[reputation];
         double& points = side == 1 ? sides.mPositive : sides.mNegative;
-        // The cap holds the side from above only: a side that scripts put lower stays where it is
-        points = std::min(points + amount, cap);
+        // The cap holds the side from above only: a side that scripts put lower stays where it is, and a reputation
+        // without a cap (as the levels read it) has none to hold
+        points = cap > 0 ? std::min(points + amount, cap) : points + amount;
         result.mApplied = true;
         result.mSide = side;
         result.mLevelChanged = before != levelOf(points, cap, limit);

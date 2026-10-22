@@ -7,6 +7,9 @@
 #include <set>
 #include <vector>
 
+#include <components/esm4/script.hpp>
+
+#include "conditions.hpp"
 #include "interpreter.hpp"
 #include "saveaccess.hpp"
 #include "savestate.hpp"
@@ -26,6 +29,8 @@ namespace FalloutScript
         double mDuration = 0;
         /// Hurts the value (the flag of the magic effect)
         bool mDetrimental = false;
+        /// The effect is on the character only when these hold for it (none: always)
+        std::vector<ESM4::TargetCondition> mConditions;
     };
 
     struct SpellInfo
@@ -64,11 +69,15 @@ namespace FalloutScript
         using Modifier = std::function<void(FormId actor, int actorValue, double amount)>;
         /// Makes the changes that the effects of a cast spell have on the actor values of the character
         using Caster = std::function<void(FormId actor, FormId spell)>;
+        /// Whether the conditions of an effect hold for the character who has it
+        using ConditionCheck = std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)>;
 
         explicit Magic(MagicRecords& records);
 
         void setModifier(Modifier modifier);
         void setCaster(Caster caster);
+        /// Without it an effect that has conditions is never on a character
+        void setConditions(ConditionCheck check);
 
         /// Forgets everything, as for a new game
         void clear();
@@ -107,10 +116,14 @@ namespace FalloutScript
             double mDelta = 0;
         };
 
+        /// Takes the effects of a spell whose conditions do not hold for the character out of its record
+        void dropFailing(FormId actor, SpellInfo& info);
+
         MagicRecords& mRecords;
         std::mutex mMutex;
         Modifier mModifier;
         Caster mCaster;
+        ConditionCheck mConditions;
         std::map<FormId, std::set<FormId>> mSpells;
         std::vector<Running> mRunning;
     };

@@ -364,6 +364,7 @@ namespace OFScript
         // A character that lived on the health of a perk that is gone is dead (or has fallen) once it is gone
         mPerks.setHealthLowered([this](FalloutScript::FormId owner) { mItemUse.checkHealth(owner); });
         mItemUse.setConditions(conditionsHold);
+        mMagic.setConditions(conditionsHold);
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
         // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
@@ -442,6 +443,7 @@ namespace OFScript
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        mScales.clear();
         mMade.clear();
         mMadeIds.clear();
         {
@@ -855,6 +857,17 @@ namespace OFScript
         moves.swap(mPendingMoves);
         for (const auto& [reference, move] : moves)
             applyMove(reference, move);
+        // The objects that were given a scale while their cell was not loaded, whose cell is loaded now
+        for (auto it = mScales.begin(); it != mScales.end();)
+        {
+            if (const OFWorld::Ptr ptr = findReference(it->first); !ptr.isEmpty())
+            {
+                OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(it->second));
+                it = mScales.erase(it);
+            }
+            else
+                ++it;
+        }
         // Every object has its script before any of them runs OnLoad, so that they can reach each other
         std::vector<std::pair<FalloutScript::FormId, bool>> toggle;
         toggle.swap(mPendingToggle);
@@ -4237,6 +4250,9 @@ namespace OFScript
 
     double FalloutScripts::scaleOf(FalloutScript::FormId reference)
     {
+        // What a script asked for and the object has not been given yet is its scale for the scripts
+        if (const auto asked = mScales.find(reference); asked != mScales.end())
+            return asked->second;
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty())
             return ptr.getCellRef().getScale();
@@ -4259,9 +4275,11 @@ namespace OFScript
             const OFWorld::Ptr ptr = findReference(reference);
             if (ptr.isEmpty())
             {
-                log("SetScale: " + FalloutScript::hex(reference) + " is in no loaded cell");
+                // The object gets the scale when its cell is loaded
+                mScales[reference] = scale;
                 return;
             }
+            mScales.erase(reference);
             OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(scale));
         });
     }

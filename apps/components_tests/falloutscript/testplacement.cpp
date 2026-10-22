@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -64,9 +65,12 @@ namespace
         };
 
         std::map<FormId, Placement> mPlaces;
+        std::set<FormId> mActors{ guard };
         std::vector<Move> mMoves;
         std::vector<Set> mSets;
         std::vector<std::pair<FormId, double>> mScales;
+
+        bool isActor(FormId reference) override { return mActors.count(reference) != 0; }
 
         bool placement(FormId reference, Placement& result) override
         {
@@ -247,6 +251,14 @@ namespace
         EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, guard, true, {}), 0.0);
         setup.mWorld.mPlaces[marker] = from;
         EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, 0, false, { { marker, {}, false } }), 0.0);
+    }
+
+    TEST(FalloutScriptPlacementTest, the_heading_angle_of_something_that_is_no_character_is_zero)
+    {
+        Runner setup;
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { 100, 0, 0 }), 90.0, 1e-9);
+        // The marker is placed, and it is no character that could face anything
+        EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, marker, true, { { guard, {}, false } }), 0.0);
     }
 
     TEST(FalloutScriptPlacementTest, the_scale_of_a_reference_is_what_the_host_says)

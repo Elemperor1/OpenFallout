@@ -37,6 +37,31 @@ namespace FalloutScript
         mCaster = std::move(caster);
     }
 
+    void Magic::setConditions(ConditionCheck check)
+    {
+        const std::lock_guard lock(mMutex);
+        mConditions = std::move(check);
+    }
+
+    void Magic::dropFailing(FormId actor, SpellInfo& info)
+    {
+        ConditionCheck check;
+        {
+            const std::lock_guard lock(mMutex);
+            check = mConditions;
+        }
+        // The conditions are asked outside the lock: they call back into the host
+        info.mEffects.erase(std::remove_if(info.mEffects.begin(), info.mEffects.end(),
+                                [&](const SpellEffect& effect) {
+                                    if (effect.mConditions.empty())
+                                        return false;
+                                    ConditionContext context;
+                                    context.mSubject = actor;
+                                    return !check || !check(effect.mConditions, context);
+                                }),
+            info.mEffects.end());
+    }
+
     void Magic::clear()
     {
         const std::lock_guard lock(mMutex);
@@ -49,6 +74,8 @@ namespace FalloutScript
         SpellInfo info;
         if (actor == 0 || !mRecords.spell(spell, info))
             return false;
+        if (appliedWhenAdded(info.mType))
+            dropFailing(actor, info);
         Modifier modifier;
         std::vector<std::pair<int, double>> changes;
         {
@@ -127,6 +154,8 @@ namespace FalloutScript
         SpellInfo info;
         if (actor == 0 || !mRecords.spell(spell, info) || info.mType == typeAbility)
             return;
+        // An effect whose conditions do not hold is not on the character, and the caster leaves it out as well
+        dropFailing(actor, info);
         Caster caster;
         {
             const std::lock_guard lock(mMutex);

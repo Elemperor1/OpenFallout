@@ -235,7 +235,8 @@ namespace OFScript
             effect.mMagnitude = made.mMagnitude;
             effect.mDuration = made.mDuration;
             effect.mDetrimental = made.mDetrimental;
-            info.mEffects.push_back(effect);
+            effect.mConditions = made.mConditions;
+            info.mEffects.push_back(std::move(effect));
         }
         return true;
     }

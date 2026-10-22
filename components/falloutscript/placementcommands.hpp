@@ -25,6 +25,8 @@ namespace FalloutScript
 
         /// Where the reference is, false when the host does not know the reference
         virtual bool placement(FormId reference, Placement& result) = 0;
+        /// Whether the reference is a character or a creature
+        virtual bool isActor(FormId reference) = 0;
         /// Moves the reference to the place of the target, in the cell of the target, with the offsets added to the
         /// position. The reference turns to face as the target does.
         virtual void moveTo(FormId reference, FormId target, const std::array<double, 3>& offset) = 0;

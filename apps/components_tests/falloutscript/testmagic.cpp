@@ -23,10 +23,14 @@ namespace
     constexpr FormId ability = 0x00100001;
     constexpr FormId disease = 0x00100002;
     constexpr FormId blast = 0x00100003;
+    constexpr FormId gatedAbility = 0x00100004;
+    constexpr FormId gatedBlast = 0x00100005;
     constexpr FormId notASpell = 0x00100099;
     constexpr FormId strengthBoost = 0x00200001;
     constexpr FormId sickness = 0x00200002;
     constexpr FormId fire = 0x00200003;
+    constexpr FormId gatedBoost = 0x00200004;
+    constexpr FormId gatedFire = 0x00200005;
 
     constexpr std::uint16_t OpAddSpell = 0x101C;
     constexpr std::uint16_t OpRemoveSpell = 0x101D;
@@ -54,6 +58,17 @@ namespace
             flame.mType = 0;
             flame.mEffects.push_back({ fire, 0, FalloutScript::ActorValue::health, 5, 10, true });
             mSpells[blast] = flame;
+            // Effects that are on the character only while a condition holds
+            SpellInfo gatedBoostSpell;
+            gatedBoostSpell.mType = 4;
+            gatedBoostSpell.mEffects.push_back({ gatedBoost, 0, FalloutScript::ActorValue::strength, 2, 0, false });
+            gatedBoostSpell.mEffects.back().mConditions.emplace_back();
+            mSpells[gatedAbility] = gatedBoostSpell;
+            SpellInfo gatedFlame;
+            gatedFlame.mType = 0;
+            gatedFlame.mEffects.push_back({ gatedFire, 0, FalloutScript::ActorValue::health, 5, 10, true });
+            gatedFlame.mEffects.back().mConditions.emplace_back();
+            mSpells[gatedBlast] = gatedFlame;
         }
 
         bool spell(FormId spell, SpellInfo& info) override
@@ -154,6 +169,39 @@ namespace
         run.mMagic.update(6);
         EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 0.0);
         EXPECT_EQ(run.call(OpIsSpellTarget, courier, { blast }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_is_on_the_character_only_while_its_conditions_hold)
+    {
+        Runner run;
+        // Nothing to ask the conditions: they do not hold
+        run.call(OpCastImmediateOnSelf, courier, { gatedBlast });
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedFire }), 0.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { gatedBlast }), 0.0);
+
+        bool holds = false;
+        std::vector<FormId> asked;
+        run.mMagic.setConditions(
+            [&](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext& context) {
+                asked.push_back(context.mSubject);
+                return holds;
+            });
+        run.call(OpAddSpell, courier, { gatedAbility });
+        EXPECT_TRUE(run.mChanges.empty());
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedBoost }), 0.0);
+        EXPECT_THAT(asked, ElementsAre(courier));
+
+        run.call(OpCastImmediateOnSelf, courier, { gatedBlast });
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedFire }), 0.0);
+
+        holds = true;
+        run.call(OpCastImmediateOnSelf, courier, { gatedBlast });
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedFire }), 1.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { gatedBlast }), 1.0);
+
+        run.call(OpRemoveSpell, courier, { gatedAbility });
+        run.call(OpAddSpell, courier, { gatedAbility });
+        EXPECT_THAT(run.mChanges, ElementsAre(Pair(FalloutScript::ActorValue::strength, 2.0)));
     }
 
     TEST(FalloutScriptMagicTest, an_ability_is_no_spell_to_cast_and_cast_does_nothing)

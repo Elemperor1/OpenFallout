@@ -109,6 +109,16 @@ namespace
         EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 1 }), 80.0);
     }
 
+    TEST(FalloutScriptReputationTest, a_record_without_a_cap_holds_no_side_back)
+    {
+        Runner run;
+        run.mRecords.mCaps[ncr] = 0.0;
+        run.call(OpAddReputation, { ncr, 1, 5 });
+        run.call(OpAddReputation, { ncr, 1, 5 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 1 }), 24.0);
+        EXPECT_THAT(run.mMessages, SizeIs(2));
+    }
+
     TEST(FalloutScriptReputationTest, a_step_or_side_that_is_none_changes_nothing)
     {
         Runner run;

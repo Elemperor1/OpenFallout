@@ -81,7 +81,11 @@ namespace FalloutScript
         // The commands of JIP LN NVSE that the intro of Tale of Two Wastelands asks the sound with
         interpreter.setHandler("IsSoundPlaying", [&world](CallContext& call) {
             const FormId sound = formArgument(call, 0);
-            return sound != 0 && world.isSoundPlaying(sound, call.mReference) ? 1.0 : 0.0;
+            // The reference the sound comes from is the second argument; without it the one the command is called on
+            FormId source = formArgument(call, 1);
+            if (source == 0)
+                source = call.mReference;
+            return sound != 0 && world.isSoundPlaying(sound, source) ? 1.0 : 0.0;
         });
         interpreter.setHandler("IsMusicPlaying", [&world](CallContext&) { return world.isMusicPlaying() ? 1.0 : 0.0; });
         interpreter.setHandler("ApplyImageSpaceModifier", [&presentation, &world](CallContext& call) {

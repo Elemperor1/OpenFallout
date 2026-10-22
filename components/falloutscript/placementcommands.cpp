@@ -112,12 +112,13 @@ namespace FalloutScript
                 return 0.0;
             return toDegrees(where.mAngle[axis], axis);
         });
+        // The executables answer for characters and creatures only
         interpreter.setHandler("GetHeadingAngle", [&world](CallContext& call) {
             Placement self;
             Placement target;
             const FormId other = formArgument(call, 0);
-            if (call.mReference == 0 || other == 0 || !world.placement(call.mReference, self)
-                || !world.placement(other, target))
+            if (call.mReference == 0 || other == 0 || !world.isActor(call.mReference)
+                || !world.placement(call.mReference, self) || !world.placement(other, target))
                 return 0.0;
             return headingAngle(self, target);
         });
