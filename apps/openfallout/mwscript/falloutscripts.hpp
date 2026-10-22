@@ -205,6 +205,10 @@ namespace OFScript
         /// has no number for scripts.
         bool pickUp(const OFWorld::Ptr& item, const OFWorld::Ptr& actor);
 
+        /// The player is given items out of nothing, as the AddItem of a script does (a tool of developers, to try out
+        /// what needs a weapon, ammunition or armor in hand). False for a form that is no item.
+        bool givePlayerItem(FalloutScript::FormId item, int count);
+
         /// What characters carry, hold and wear. The inventory of the player is what scripts and pick-ups gave it.
         FalloutScript::ActorState& actors() { return mActors; }
         FalloutScript::Equipment& equipment() { return mEquipment; }

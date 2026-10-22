@@ -411,8 +411,12 @@ namespace ESMTerrain
             auto found = textureIndicesMap.find(texId);
             if (found != textureIndicesMap.end())
                 return blendmaps[found->second]->data();
-            Terrain::LayerInfo info
-                = texId.isZeroOrUnset() ? land->getEsm4DefaultLayerInfo() : getLandTextureLayerInfo(texId);
+            // A layer that points at a record that is not in the data (a few of Fallout 3 do) is drawn with the default
+            // texture of the cell, which is what the games do
+            const bool known = !texId.isZeroOrUnset() && getEsm4LandTexture(texId) != nullptr;
+            if (!texId.isZeroOrUnset() && !known)
+                Log(Debug::Warning) << "LandTexture not found: " << texId.toString() << ", using the default texture";
+            Terrain::LayerInfo info = known ? getLandTextureLayerInfo(texId) : land->getEsm4DefaultLayerInfo();
             osg::ref_ptr<osg::Image> image(new osg::Image);
             image->allocateImage(blendmapSize, blendmapSize, 1, GL_ALPHA, GL_UNSIGNED_BYTE);
             std::memset(image->data(), 0, image->getTotalDataSize());

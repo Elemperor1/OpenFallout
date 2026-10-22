@@ -1646,6 +1646,15 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::givePlayerItem(FalloutScript::FormId item, int count)
+    {
+        FalloutScript::ItemInfo info;
+        if (mPlayer == 0 || count <= 0 || !itemInfo(item, info))
+            return false;
+        mActors.addItem(mPlayer, item, count);
+        return true;
+    }
+
     double FalloutScripts::gameSetting(std::string_view name, double fallback)
     {
         const std::lock_guard lock(mDerivedSettingsMutex);

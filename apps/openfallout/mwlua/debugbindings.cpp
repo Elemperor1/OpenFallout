@@ -8,6 +8,8 @@
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/world.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "../mwinput/actions.hpp"
 
 #include "../mwrender/postprocessor.hpp"
@@ -17,7 +19,11 @@
 #include <components/resource/scenemanager.hpp>
 #include <components/shader/shadermanager.hpp>
 
+#include <components/esm/refid.hpp>
 #include <components/lua/luastate.hpp>
+
+#include <stdexcept>
+#include <string>
 
 namespace OFLua
 {
@@ -59,6 +65,17 @@ namespace OFLua
         api["isMWScriptEnabled"] = []() { return OFBase::Environment::get().getWorld()->getScriptsEnabled(); };
 
         api["reloadLua"] = []() { OFBase::Environment::get().getLuaManager()->reloadAllScripts(); };
+
+        // Gives the player an item of Fallout by its form id ("FormId:0x10e3778"), as the AddItem of a script does
+        api["giveItem"] = [context](std::string_view form, sol::optional<int> count) {
+            const ESM::FormId* id = ESM::RefId::deserializeText(form).getIf<ESM::FormId>();
+            if (id == nullptr)
+                throw std::runtime_error("\"" + std::string(form) + "\" is not a form id");
+            context.mLuaManager->addAction([formId = id->toUint32(), number = count.value_or(1)] {
+                if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                    scripts->givePlayerItem(formId, number);
+            });
+        };
 
         // Same code path as the screenshot key. Deferred, because the screenshot is captured
         // on the next frame and the input manager is not safe to touch from a Lua thread.
