@@ -177,7 +177,8 @@ namespace
     {
         const osg::ref_ptr<SceneUtil::Material> material = Resource::makeSpeedTreeMaterial();
         ASSERT_NE(material, nullptr);
-        EXPECT_EQ(material->getDiffuse(), osg::Vec4f(0.55f, 0.55f, 0.55f, 1.f));
+        EXPECT_EQ(material->getDiffuse(),
+            osg::Vec4f(Resource::sSpeedTreeLight, Resource::sSpeedTreeLight, Resource::sSpeedTreeLight, 1.f));
         EXPECT_EQ(material->getAmbient(), material->getDiffuse());
         EXPECT_EQ(material->getSpecular().x(), 0.f);
         EXPECT_EQ(material->getVertexColorMode(), SceneUtil::VertexColorModes::None);

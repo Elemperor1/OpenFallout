@@ -1905,6 +1905,14 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
+        // The blow that hurts the player flashes the screen red, as the fall and the drowning of the engine do
+        if (victim == mPlayer && dealt > 0)
+        {
+            runOnMainThread([] {
+                if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                    windows->activateHitOverlay();
+            });
+        }
         if (limb >= 0)
         {
             // The condition of the part goes down by the damage after the armor and before the multiplier of the part,

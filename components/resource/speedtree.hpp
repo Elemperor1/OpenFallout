@@ -36,8 +36,9 @@ namespace Resource
     /// The number of cards that cross at the trunk
     constexpr unsigned int sSpeedTreeCards = 3;
     /// The share of the ambient and the sunlight that a card takes. The cards face up for the light, which gave them
-    /// both in full: the Mac measured the first ones two to three times lighter than their images and yellow.
-    constexpr float sSpeedTreeLight = 0.55f;
+    /// both in full: the Mac measured the first ones two to three times lighter than their images and yellow, and at
+    /// 0.55 the leaves a half as light as their images.
+    constexpr float sSpeedTreeLight = 0.9f;
 
     /// The ICON of a tree record is a file name without a folder; the images are in textures/trees/leaves/ (the
     /// leaves) or textures/trees/billboards/, in that order of preference. A name with a folder, or one that is in
