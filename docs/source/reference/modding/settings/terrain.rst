@@ -264,5 +264,7 @@ Terrain Settings
    ``flat`` leaves out the textures and colours each file by what it is (the tiles of 4, 8, 16 and 32 cells red, green,
    blue and yellow, the blocks of objects magenta and the blocks of high detail cyan), ``wireframe`` draws only the
    edges of the triangles, ``no-skirt`` leaves out the triangles that hang under the edge of a tile,
-   ``objects-only`` draws the blocks of objects and no land, and ``no-high`` leaves out the blocks of high detail.
+   ``objects-only`` draws the blocks of objects and no land in the nodes of four cells and more, ``no-high`` leaves out
+   the blocks of high detail, ``no-land`` draws no land at all, not even in the loaded cells, and ``no-records`` draws the tiles but
+   not the land of the records, whatever the size of the node.
    Words that are none of these are logged and ignored.

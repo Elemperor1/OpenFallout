@@ -67,6 +67,13 @@
 -- @function [parent=#Debug] reloadLua
 
 ---
+-- Gives the player an item of a Fallout game, as the AddItem of a script does (nothing in a game that is not
+-- Fallout, or for a form that is no item).
+-- @function [parent=#Debug] giveItem
+-- @param #string form the form id of the item, as core.getFormId writes one (for example "FormId:0x10e3778")
+-- @param #number count how many (1 when not given)
+
+---
 -- Takes a screenshot, as if the screenshot key had been pressed. The screenshot is
 -- captured on the next frame and written asynchronously to the screenshots directory
 -- in the user data folder, using the configured screenshot format. Quitting the game

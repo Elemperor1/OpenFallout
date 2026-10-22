@@ -54,6 +54,8 @@ namespace OFRender
 
     bool FalloutLod::replacesTerrain(float size, const osg::Vec2f& center) const
     {
+        if (mOptions.mDebug.mNoLand || mOptions.mDebug.mNoRecords)
+            return true;
         // The blocks alone: no land from the tiles, and none from the land records either
         if (mOptions.mDebug.mObjectsOnly && size >= Terrain::LodIndex::sSmallestLevel)
             return true;
@@ -110,7 +112,7 @@ namespace OFRender
 
             // The tiles are drawn only where they fill the node, as it is the only place the land is not
             osg::ref_ptr<osg::Group> terrain(new osg::Group);
-            if (!mOptions.mDebug.mObjectsOnly && replacesTerrain(size, center))
+            if (!mOptions.mDebug.mObjectsOnly && !mOptions.mDebug.mNoLand && replacesTerrain(size, center))
                 for (const Terrain::LodTile* tile : mIndex.getTerrain(x, y, cells))
                     terrain->addChild(loadTile(*tile));
             if (terrain->getNumChildren() > 0)

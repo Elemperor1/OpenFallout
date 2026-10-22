@@ -143,7 +143,7 @@ function render()
         math.floor(state.maxActionPoints + 0.5), state.weapon ~= '' and state.weapon or 'Fists',
         math.floor(state.cost + 0.5)), colors.normalColor, textSize - 2))
 
-    -- The targets: the one that is picked has its parts below
+    -- The targets, two to a row so that a name and its health fit: the one that is picked has its parts below
     local cells = {}
     for index, actor in ipairs(targets) do
         local info = vats.describe(actor)
@@ -152,9 +152,12 @@ function render()
         cells[#cells + 1] = widgets.cell(widgets.clickable(label, function()
             picked = index
             render()
-        end, { color = index == picked and colors.pickedColor or colors.normalColor }), 190)
+        end, { color = index == picked and colors.pickedColor or colors.normalColor }), math.floor(width / 2) - 8)
+        if #cells == 2 or index == #targets then
+            add(widgets.row(table.unpack(cells)))
+            cells = {}
+        end
     end
-    add(widgets.row(table.unpack(cells)))
 
     local target = targets[picked]
     local parts = target and vats.parts(target) or {}
@@ -165,9 +168,11 @@ function render()
         local crippled = part.condition <= 0
         -- A perk can take the chance over 100 (it is capped before the perks): a hit is sure then, and 100 is what shows
         local shown = math.min(part.chance, 100)
-        local text = string.format('%s  %d%%%s', part.target, math.floor(shown + 0.5), crippled and '  crippled' or '')
+        -- The name of the part, and the bone it is aimed at where the data gives it none
+        local partName = part.name ~= '' and part.name or part.target
+        local text = string.format('%s  %d%%%s', partName, math.floor(shown + 0.5), crippled and '  crippled' or '')
         add(widgets.clickable(text, function()
-            queue[#queue + 1] = { target = target, part = part.index, name = part.target, chance = part.chance }
+            queue[#queue + 1] = { target = target, part = part.index, name = partName, chance = part.chance }
             render()
         end, { enabled = left >= state.cost and part.chance > 0, color = colors.normalColor }))
     end
