@@ -113,14 +113,20 @@ local function glyphs(word)
 end
 
 -- The text of a response or a topic as the window shows it. The font has no glyph for a control character (it is drawn as
--- a substitute) and a tag of the markup of the game (<Global=...>, <Alias=...>) is not a word, so both are taken out, as
--- a line that starts with them shows noise. What was taken out is logged by its kind and count, never as text.
+-- a substitute), a tag of the markup of the game (<Global=...>, <Alias=...>) is not a word, and a note in braces (15% of
+-- the answers of New Vegas start with one, a word or two glued to the first word of the sentence, and no game text or
+-- script of this engine reads them; taken to be a note of the author, not text for the player), so all three are taken
+-- out, as a line that starts with them shows noise. What was taken out is logged by its kind and count, never as text.
 local reportedMarkup = 0
 local function clean(text)
     text = tostring(text or '')
     local tags, controls = {}, 0
     text = text:gsub('<(%a+)=[^<>\r\n]*>', function(kind)
         tags[#tags + 1] = kind
+        return ' '
+    end)
+    text = text:gsub('{[^{}\r\n]*}', function()
+        tags[#tags + 1] = 'note'
         return ' '
     end)
     text = text:gsub('%c', function()
