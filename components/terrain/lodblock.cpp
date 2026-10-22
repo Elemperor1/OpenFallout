@@ -111,10 +111,23 @@ namespace Terrain
                     part->setComputeBoundingBoxCallback(new FixedBound(sort.mBounds[cell]));
 
                     osg::ref_ptr<osg::Node> node = part;
+                    // The textures, material and shaders of a block are on the nodes above its geometry, and a
+                    // part is drawn white and unlit without them
+                    const osg::NodePath& path = getNodePath();
+                    for (auto it = path.rbegin() + 1; it != path.rend(); ++it)
+                    {
+                        osg::StateSet* stateSet = (*it)->getStateSet();
+                        if (stateSet == nullptr)
+                            continue;
+                        osg::ref_ptr<osg::Group> holder(new osg::Group);
+                        holder->setStateSet(stateSet);
+                        holder->addChild(node);
+                        node = holder;
+                    }
                     if (!sort.mToWorld.isIdentity())
                     {
                         osg::ref_ptr<osg::MatrixTransform> transform(new osg::MatrixTransform(sort.mToWorld));
-                        transform->addChild(part);
+                        transform->addChild(node);
                         node = transform;
                     }
                     if (!mCells[cell])
