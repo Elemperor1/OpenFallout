@@ -170,17 +170,20 @@ namespace FalloutScript
 
     bool ObjectState::ghost(FormId actor)
     {
-        const std::lock_guard lock(mMutex);
-        return mGhosts.count(actor) != 0;
+        {
+            const std::lock_guard lock(mMutex);
+            const auto found = mGhosts.find(actor);
+            if (found != mGhosts.end())
+                return found->second;
+        }
+        return mRecords.recordGhost(actor);
     }
 
     void ObjectState::setGhost(FormId actor, bool isGhost)
     {
+        // A character that the record makes a ghost stays one until a script says it is not
         const std::lock_guard lock(mMutex);
-        if (isGhost)
-            mGhosts.insert(actor);
-        else
-            mGhosts.erase(actor);
+        mGhosts[actor] = isGhost;
     }
 
     bool ObjectState::questObject(FormId base)
@@ -258,7 +261,7 @@ namespace FalloutScript
             writeOwners(out, state.mCellOwners);
             writeFlags(out, state.mCellPublic);
             writeSet(out, state.mIgnoreCrime);
-            writeSet(out, state.mGhosts);
+            writeFlags(out, state.mGhosts);
             writeFlags(out, state.mQuestObjects);
             writeSet(out, state.mTeammates);
             writeSet(out, state.mEnemyFactions);
@@ -271,7 +274,7 @@ namespace FalloutScript
             std::map<FormId, FormId> cellOwners = readOwners(in);
             std::map<FormId, bool> cellPublic = readFlags(in);
             std::set<FormId> ignoreCrime = readSet(in);
-            std::set<FormId> ghosts = readSet(in);
+            std::map<FormId, bool> ghosts = readFlags(in);
             std::map<FormId, bool> questObjects = readFlags(in);
             std::set<FormId> teammates = readSet(in);
             std::set<FormId> enemyFactions = readSet(in);

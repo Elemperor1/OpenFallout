@@ -32,6 +32,8 @@ namespace FalloutScript
         virtual FormId recordCellOwner(FormId cell) = 0;
         /// Whether the record of the cell makes it a public place
         virtual bool recordCellPublic(FormId cell) = 0;
+        /// Whether the record of the character or creature makes it a ghost
+        virtual bool recordGhost(FormId /*actor*/) { return false; }
     };
 
     /// What scripts mark: whose a thing is, which characters crime does not touch, which are ghosts, which things the
@@ -87,7 +89,8 @@ namespace FalloutScript
         std::map<FormId, FormId> mCellOwners;
         std::map<FormId, bool> mCellPublic;
         std::set<FormId> mIgnoreCrime;
-        std::set<FormId> mGhosts;
+        /// Only what scripts set: an actor that is not here is the record's
+        std::map<FormId, bool> mGhosts;
         std::map<FormId, bool> mQuestObjects;
         std::set<FormId> mTeammates;
         std::set<FormId> mEnemyFactions;

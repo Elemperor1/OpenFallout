@@ -41,11 +41,26 @@ namespace OFScript
     {
         // A script that names a character by its reference means the character
         const ESM::FormId id = ESM::FormId::fromUint32(form);
+        if (id.isZeroOrUnset())
+            return form;
+        bool character = form == mPlayer || mStore.get<ESM4::ActorCharacter>().search(id) != nullptr
+            || mStore.get<ESM4::ActorCreature>().search(id) != nullptr;
+        if (!character)
+        {
+            // A character that a script placed has no record of its own: it is of the base it was asked for
+            FalloutScript::FormId asked = 0;
+            {
+                const std::lock_guard lock(mMadeMutex);
+                if (const auto made = mMadeBases.find(form); made != mMadeBases.end())
+                    asked = made->second;
+            }
+            const ESM::FormId from = ESM::FormId::fromUint32(asked);
+            character = !from.isZeroOrUnset()
+                && (mStore.get<ESM4::Npc>().search(from) != nullptr
+                    || mStore.get<ESM4::Creature>().search(from) != nullptr);
+        }
         ESM::FormId base;
-        if (!id.isZeroOrUnset()
-            && (form == mPlayer || mStore.get<ESM4::ActorCharacter>().search(id) != nullptr
-                || mStore.get<ESM4::ActorCreature>().search(id) != nullptr)
-            && baseOf(form, base) && !base.isZeroOrUnset())
+        if (character && baseOf(form, base) && !base.isZeroOrUnset())
             return numberOf(base);
         return form;
     }
@@ -76,5 +91,14 @@ namespace OFScript
         const ESM::FormId id = ESM::FormId::fromUint32(cell);
         const ESM4::Cell* record = id.isZeroOrUnset() ? nullptr : mStore.get<ESM4::Cell>().search(id);
         return record != nullptr && (record->mCellFlags & ESM4::CELL_Public) != 0;
+    }
+
+    bool FalloutScripts::recordGhost(FalloutScript::FormId actor)
+    {
+        ESM::FormId base;
+        if (!baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base);
+        return creature != nullptr && (creature->mBaseConfig.fo3.flags & ESM4::Creature::FO3_IsGhost) != 0;
     }
 }

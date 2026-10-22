@@ -791,6 +791,7 @@ namespace OFScript
         FalloutScript::FormId recordOwner(FalloutScript::FormId reference) override;
         FalloutScript::FormId recordCellOwner(FalloutScript::FormId cell) override;
         bool recordCellPublic(FalloutScript::FormId cell) override;
+        bool recordGhost(FalloutScript::FormId actor) override;
         bool reputation(FalloutScript::FormId reputation, double& cap, std::string& name) override;
         double setting(std::string_view name, double fallback) override;
         /// Tells the player that a reputation went up

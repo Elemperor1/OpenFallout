@@ -52,6 +52,7 @@ namespace
         std::map<FormId, FormId> mOwners;
         std::map<FormId, FormId> mCellOwners;
         std::set<FormId> mPublic;
+        std::set<FormId> mGhostRecords;
 
         bool isActor(FormId reference) override { return mActors.count(reference) != 0; }
         FormId player() override { return ::player; }
@@ -74,6 +75,7 @@ namespace
             return found == mCellOwners.end() ? 0 : found->second;
         }
         bool recordCellPublic(FormId id) override { return mPublic.count(id) != 0; }
+        bool recordGhost(FormId actor) override { return mGhostRecords.count(actor) != 0; }
     };
 
     struct Runner
@@ -178,6 +180,27 @@ namespace
         EXPECT_EQ(run.call(OpGetIsGhost, guard), 0.0);
         run.call(OpSetGhost, crate, { 1 });
         EXPECT_FALSE(run.mState.ghost(crate));
+    }
+
+    TEST(FalloutScriptObjectStateTest, a_creature_that_its_record_makes_a_ghost_stays_one_until_a_script_says_it_is_not)
+    {
+        Runner run;
+        run.mRecords.mGhostRecords.insert(guard);
+        EXPECT_EQ(run.call(OpGetIsGhost, guard), 1.0);
+        EXPECT_EQ(run.call(OpGetIsGhost, other), 0.0);
+        run.call(OpSetGhost, guard, { 0 });
+        EXPECT_EQ(run.call(OpGetIsGhost, guard), 0.0);
+
+        // What the script said is kept in a saved game, also when it is that the record is wrong
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeObjectState(run.mState, out);
+        Runner again;
+        again.mRecords.mGhostRecords.insert(guard);
+        EXPECT_EQ(again.call(OpGetIsGhost, guard), 1.0);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readObjectState(again.mState, in, FalloutScript::objectStateSectionVersion);
+        EXPECT_EQ(again.call(OpGetIsGhost, guard), 0.0);
     }
 
     TEST(FalloutScriptObjectStateTest, the_quest_mark_is_on_the_form_and_not_on_a_reference)
