@@ -1,5 +1,6 @@
 #include "speedtree.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -18,8 +19,19 @@
 
 namespace Resource
 {
-    osg::ref_ptr<osg::Geometry> makeCrossedCards(float width, float height, unsigned int cards)
+    SpeedTreeClusters getSpeedTreeClusters(int imageWidth, int imageHeight)
     {
+        return { .mColumns = std::max(1, imageWidth / sSpeedTreeClusterSize),
+            .mRows = std::max(1, imageHeight / sSpeedTreeClusterSize) };
+    }
+
+    osg::ref_ptr<osg::Geometry> makeCrossedCards(
+        float width, float height, unsigned int cards, SpeedTreeClusters clusters)
+    {
+        clusters.mColumns = std::max(1, clusters.mColumns);
+        clusters.mRows = std::max(1, clusters.mRows);
+        const auto clusterCount = static_cast<unsigned int>(clusters.mColumns * clusters.mRows);
+
         osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
         osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
         osg::ref_ptr<osg::Vec2Array> coordinates = new osg::Vec2Array;
@@ -35,10 +47,15 @@ namespace Resource
             vertices->push_back(along);
             vertices->push_back(along + osg::Vec3f(0.f, 0.f, height));
             vertices->push_back(-along + osg::Vec3f(0.f, 0.f, height));
-            coordinates->push_back(osg::Vec2f(0.f, 1.f));
-            coordinates->push_back(osg::Vec2f(1.f, 1.f));
-            coordinates->push_back(osg::Vec2f(1.f, 0.f));
-            coordinates->push_back(osg::Vec2f(0.f, 0.f));
+            const auto cluster = static_cast<int>(card % clusterCount);
+            const float left = static_cast<float>(cluster % clusters.mColumns) / static_cast<float>(clusters.mColumns);
+            const float right = left + 1.f / static_cast<float>(clusters.mColumns);
+            const float top = static_cast<float>(cluster / clusters.mColumns) / static_cast<float>(clusters.mRows);
+            const float bottom = top + 1.f / static_cast<float>(clusters.mRows);
+            coordinates->push_back(osg::Vec2f(left, bottom));
+            coordinates->push_back(osg::Vec2f(right, bottom));
+            coordinates->push_back(osg::Vec2f(right, top));
+            coordinates->push_back(osg::Vec2f(left, top));
             // lit as the crown of a tree is, from above, whichever side of the card is seen
             for (int i = 0; i < 4; ++i)
                 normals->push_back(osg::Vec3f(0.f, 0.f, 1.f));
@@ -78,7 +95,8 @@ namespace Resource
 
         const float width = tree.mWidth > 0.f ? tree.mWidth : sSpeedTreeDefaultSize;
         const float height = tree.mHeight > 0.f ? tree.mHeight : sSpeedTreeDefaultSize;
-        osg::ref_ptr<osg::Geometry> geometry = makeCrossedCards(width, height, sSpeedTreeCards);
+        osg::ref_ptr<osg::Geometry> geometry
+            = makeCrossedCards(width, height, sSpeedTreeCards, getSpeedTreeClusters(image->s(), image->t()));
 
         osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D(image);
         texture->setTextureSize(image->s(), image->t());
