@@ -41,9 +41,10 @@ The settings are in `settings.cfg` in the configuration folder. The ones that ma
 
 | Setting | What it does |
 |---|---|
-| `[Camera] viewing distance` | How far the world is drawn, in game units (one cell is 4096). The default is 7168, so distant hills are lost in fog. |
+| `[Camera] viewing distance` | How far the world is drawn, in game units (one cell is 4096). The default is 7168, so distant hills are lost in fog. In a worldspace that has distant land files (next row) it is raised to `game lod distance`. |
+| `[Terrain] game lod = true` | Draws the land and the buildings beyond the loaded cells from the level of detail files that Fallout 3 and New Vegas ship (`meshes/landscape/lod`). `game lod distance` (65536) says how far, `game lod objects = false` leaves out the buildings. Worldspaces without those files, and `game lod = false`, use `distant terrain`. |
 | `[Terrain] distant terrain = true` | Draws the land beyond the loaded cells. Off by default, because it costs a lot of frame rate and memory. |
-| `[Video] force vertex buffer objects = true` | Draws all meshes from vertex buffers instead of OpenGL display lists. Display lists are slow to play back on some drivers (macOS). |
+| `[Video] force vertex buffer objects` | On by default: all meshes are drawn from vertex buffers instead of OpenGL display lists, which are slow to play back on some drivers (on macOS the frame rate was 1.3 to 2.7 times higher). |
 | `[Video] vsync mode`, `framerate limit` | As in any game. |
 | `[Video] window mode`, `resolution x`, `resolution y` | The window. |
 
