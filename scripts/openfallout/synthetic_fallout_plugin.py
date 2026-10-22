@@ -41,6 +41,7 @@ import fallout_script
 import furniture_marker
 import havok_wall
 import idle_animation
+import lod_tile
 import placeholder_skeleton
 import skinned_box
 
@@ -585,7 +586,15 @@ TREE_TEXTURE = "OFTestTree.dds"  # as in the games: a name without a folder, the
 TREE_COLOUR = (40, 140, 40)
 TREE_SIZE = (160.0, 320.0)
 TREE_PLACE = (-1200.0, 1200.0)
-LAST_ID = 0x985 # the largest form ID of the plugin, which the next object ID of its header follows
+# The distant land: the worldspace has a tile of the level of detail files of the game, one of the level LOD_TILE[0] from the
+# cell LOD_TILE[1], LOD_TILE[2] (a flat square at LOD_TILE_HEIGHT), and land in the cell LOD_LAND_CELL under it, far from
+# the cells that the player has loaded, so that the quad tree of the worldspace has a node of that size there.
+LOD_TILE = (8, 8, 0)
+LOD_TILE_HEIGHT = -200.0
+LOD_LAND_CELL = (12, 0)
+LOD_CELL_ID = 0x986
+LOD_LAND_ID = 0x987
+LAST_ID = 0x987 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2204,7 +2213,12 @@ def worldspace():
         group(struct.pack("<I", DRY_CELL_ID), 9, [land(DRY_LAND_ID)])])
     grid = struct.pack("<hh", 0, 0)
     sub_block = group(grid, 5, [cell, children, water_cell, water_children, dry_cell, dry_children])
-    block = group(grid, 4, [sub_block])
+    lod_cell = record(b"CELL", LOD_CELL_ID, [zstr(b"EDID", WORLD_NAME + "LodCell"), sub(b"DATA", b"\x00"),
+                                             sub(b"XCLC", struct.pack("<iiI", *LOD_LAND_CELL, 0))])
+    lod_children = group(struct.pack("<I", LOD_CELL_ID), 6, [
+        group(struct.pack("<I", LOD_CELL_ID), 9, [land(LOD_LAND_ID)])])
+    far_sub_block = group(struct.pack("<hh", 0, LOD_LAND_CELL[0] // 8), 5, [lod_cell, lod_children])
+    block = group(grid, 4, [sub_block, far_sub_block])
     return [wrld, group(struct.pack("<I", WORLD_ID), 1, [block])]
 
 
@@ -2685,6 +2699,11 @@ def write(out, animation=True, spline=True):
     ground = out / "textures" / Path(GROUND_TEXTURE.replace("\\", "/")).parent / "oftestground.dds"
     ground.parent.mkdir(parents=True, exist_ok=True)
     ground.write_bytes(ground_texture())
+    level, tile_x, tile_y = LOD_TILE
+    lod = out / "meshes" / "landscape" / "lod" / WORLD_NAME.lower() / (
+        f"{WORLD_NAME.lower()}.level{level}.x{tile_x}.y{tile_y}.nif")
+    lod.parent.mkdir(parents=True, exist_ok=True)
+    lod.write_bytes(lod_tile.tile(level, tile_x, tile_y, LOD_TILE_HEIGHT))
     leaves = out / "textures" / "trees" / "leaves" / TREE_TEXTURE
     leaves.parent.mkdir(parents=True, exist_ok=True)
     leaves.write_bytes(dds_texture((*TREE_COLOUR, 255), 4))

@@ -443,8 +443,18 @@ namespace Terrain
             for (unsigned int i = 0; i < vd->getNumEntries(); ++i)
             {
                 ViewDataEntry& entry = vd->getEntry(i);
-                osg::BoundingBox bb = static_cast<TerrainDrawable*>(entry.mRenderingNode->asGroup()->getChild(0))
-                                          ->getWaterBoundingBox();
+                // The terrain of the land records comes first, but another manager can have taken the node
+                const osg::Group* chunks = entry.mRenderingNode->asGroup();
+                if (!chunks || chunks->getNumChildren() == 0)
+                    continue;
+                const TerrainDrawable* drawable = dynamic_cast<const TerrainDrawable*>(chunks->getChild(0));
+                if (!drawable)
+                {
+                    // Nothing says how much of that land is below the water, so the water has to be drawn
+                    lowZ = highZ;
+                    break;
+                }
+                osg::BoundingBox bb = drawable->getWaterBoundingBox();
                 if (!bb.valid())
                     continue;
                 osg::Vec3f ofs(
@@ -602,6 +612,11 @@ namespace Terrain
             m->setMaxLodLevel(
                 DefaultLodCallback::convertDistanceToLodLevel(m->getViewDistance() + mViewDataMap->getReuseDistance(),
                     mMinSize, mLodFactor, ESM::getCellSize(mWorldspace)));
+    }
+
+    void QuadTreeWorld::setTerrainReplaced(std::function<bool(float, const osg::Vec2f&)> replaced)
+    {
+        mChunkManager->setReplaced(std::move(replaced));
     }
 
     void QuadTreeWorld::rebuildViews()

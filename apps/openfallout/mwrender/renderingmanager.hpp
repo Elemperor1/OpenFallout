@@ -107,6 +107,7 @@ namespace OFRender
     class ActorsPaths;
     class RecastMesh;
     class ObjectPaging;
+    class FalloutLod;
     class Groundcover;
     class PostProcessor;
 
@@ -309,6 +310,9 @@ namespace OFRender
             std::unique_ptr<Terrain::World> mTerrain;
             std::unique_ptr<ObjectPaging> mObjectPaging;
             std::unique_ptr<Groundcover> mGroundcover;
+            std::unique_ptr<FalloutLod> mFalloutLod;
+            /// How far the worldspace is drawn from the level of detail files of the game, zero without them
+            float mGameLodDistance = 0.f;
         };
 
         WorldspaceChunkMgr& getWorldspaceChunkMgr(ESM::RefId worldspace);
@@ -370,6 +374,10 @@ namespace OFRender
         float mNightEyeFactor;
 
         float mNearClip;
+        /// What was asked for, as opposed to mViewDistance, which a worldspace that has the level of detail files of the
+        /// game raises to how far they are drawn
+        float mRequestedViewDistance;
+        float mGameLodDistance = 0.f;
         float mViewDistance;
         bool mFieldOfViewOverridden;
         float mFieldOfViewOverride;

@@ -4,6 +4,7 @@
 #include "terraingrid.hpp"
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -86,6 +87,10 @@ namespace Terrain
             unsigned int mMaxLodLevel = ~0u;
         };
         void addChunkManager(ChunkManager*);
+
+        /// Leaves the nodes that the function names, given their size and center in cells, to the other chunk
+        /// managers: the terrain of the land records is not made for them.
+        void setTerrainReplaced(std::function<bool(float, const osg::Vec2f&)> replaced);
 
     private:
         void ensureQuadTreeBuilt();

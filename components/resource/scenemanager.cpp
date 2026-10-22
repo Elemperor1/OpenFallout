@@ -47,6 +47,7 @@
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/optimizer.hpp>
 #include <components/sceneutil/riggeometryosgaextension.hpp>
+#include <components/sceneutil/smoothnormals.hpp>
 #include <components/sceneutil/templateref.hpp>
 #include <components/sceneutil/util.hpp>
 #include <components/sceneutil/visitor.hpp>
@@ -884,6 +885,9 @@ namespace Resource
         }
     };
 
+    // Triangles taller than this are skirts: two cells
+    constexpr float sLodSkirtHeight = 8192.f;
+
     static bool canOptimize(std::string_view filename)
     {
         const std::string_view::size_type slashpos = filename.find_last_of('/');
@@ -1028,6 +1032,11 @@ namespace Resource
                 Log(Debug::Error) << "Failed to load '" << path << "': " << e.what() << ", using marker_error instead";
                 loaded = cloneErrorMarker();
             }
+
+            // The distant land of the games comes without normals, and the lighting and the normal maps need them. The
+            // tiles of land have skirts that hang from their edges to far below the ground
+            if (path.value().starts_with("meshes/landscape/lod/"))
+                SceneUtil::generateMissingNormals(*loaded, sLodSkirtHeight);
 
             // set filtering settings
             SetFilterSettingsVisitor setFilterSettingsVisitor(mMinFilter, mMagFilter, mMaxAnisotropy);

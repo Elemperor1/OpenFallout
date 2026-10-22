@@ -4,6 +4,9 @@
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadtxst.hpp>
 #include <components/esm4/loadwrld.hpp>
+#include <components/terrain/lodindex.hpp>
+
+#include <cmath>
 
 #include "../mwbase/environment.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -83,6 +86,12 @@ namespace OFRender
                     BoundUnion(minX, maxX, minY, maxY, static_cast<float>(landPos.mX), static_cast<float>(landPos.mY));
                 }
             }
+
+            // The nodes of the quad tree start at the west and south edge, and the tiles of the level of detail files
+            // of the game are aligned to a multiple of their size
+            constexpr float alignment = static_cast<float>(Terrain::LodIndex::sLargestLevel);
+            minX = std::floor(minX / alignment) * alignment;
+            minY = std::floor(minY / alignment) * alignment;
         }
         else
         {

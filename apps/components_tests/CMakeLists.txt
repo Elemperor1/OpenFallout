@@ -217,11 +217,15 @@ file(GLOB UNITTEST_SRC_FILES
     resource/testresourcesystem.cpp
     resource/testspeedtree.cpp
 
+    terrain/testlodblock.cpp
+    terrain/testlodindex.cpp
+
     vfs/testarchiveinvalidation.cpp
     vfs/testarchiveorder.cpp
     vfs/testpathutil.cpp
 
     sceneutil/osgacontroller.cpp
+    sceneutil/smoothnormals.cpp
     sceneutil/userdata.cpp
 
     bsa/testbsafile.cpp

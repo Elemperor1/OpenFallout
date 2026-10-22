@@ -61,6 +61,9 @@ namespace Terrain
     osg::ref_ptr<osg::Node> ChunkManager::getChunk(float size, const osg::Vec2f& center, unsigned char lod,
         unsigned int lodFlags, bool activeGrid, const osg::Vec3f& viewPoint, bool compile)
     {
+        if (mReplaced && mReplaced(size, center))
+            return nullptr;
+
         // Override lod with the vertexLodMod adjusted value.
         // TODO: maybe we can refactor this code by moving all vertexLodMod code into this class.
         lod = static_cast<unsigned char>(lodFlags >> (4 * 4));

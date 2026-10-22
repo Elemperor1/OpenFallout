@@ -212,3 +212,33 @@ Terrain Settings
    evaluated to be below any visible terrain chunk, potentially improving performance in many scenes.
 
    You may want to opt out of it if it causes framerate instability or inappropriately invisible water on your setup.
+
+.. omw-setting::
+   :title: game lod
+   :type: boolean
+   :range: true, false
+   :default: true
+
+   Draws the distant land of Fallout 3 and New Vegas worldspaces from the level of detail files of the game
+   (the folder meshes/landscape/lod of the worldspace) instead of building it from the land records.
+   The land of the cells next to the player is still made from the records.
+   A worldspace without those files, such as one that only a mod adds, keeps using distant terrain.
+
+.. omw-setting::
+   :title: game lod distance
+   :type: float32
+   :range: >0
+   :default: 65536.0
+
+   How far the distant land of the game is drawn, in game units (4096 units are one cell).
+   In worldspaces that use game lod the viewing distance is raised to this value.
+   Higher values show more of the world and cost more frame time and memory.
+
+.. omw-setting::
+   :title: game lod objects
+   :type: boolean
+   :range: true, false
+   :default: true
+
+   Draws the distant objects (buildings, rocks, ...) from the blocks of the level of detail files of the game
+   in the cells that are not loaded. Needs game lod. Object paging is not used in the worldspaces that use game lod.
