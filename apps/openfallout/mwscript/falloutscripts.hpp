@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -1281,8 +1282,9 @@ namespace OFScript
         void playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire);
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
-        /// The weapons whose sounds were looked for (once is logged, for what the data lacks)
-        std::set<std::pair<FalloutScript::FormId, bool>> mWeaponSoundsLogged;
+        /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player and
+        /// the rest hear different shots of a weapon). Each is logged once, for what the data lacks
+        std::set<std::tuple<FalloutScript::FormId, bool, std::uint32_t>> mWeaponSoundsLogged;
         std::mt19937 mWeaponSoundRandom;
         /// How a character behaves in a fight, from its AIDT (the record, or the template it takes it from)
         struct FightTraits

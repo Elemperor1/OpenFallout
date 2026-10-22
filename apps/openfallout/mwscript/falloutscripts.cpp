@@ -2287,9 +2287,9 @@ namespace OFScript
         if (id.isZeroOrUnset())
             return;
         const std::vector<std::string> files = soundFilesOf(id.toUint32());
-        if (mWeaponSoundsLogged.emplace(weapon, dryFire).second)
+        if (mWeaponSoundsLogged.emplace(weapon, dryFire, id.toUint32()).second)
         {
-            // Said once for each weapon: what the data gives, as the file that the game would play
+            // Said once for each weapon and sound: what the data gives, as the file that the game would play
             if (files.empty())
                 Log(Debug::Warning) << "Weapon " << record->mEditorId << ": the " << (dryFire ? "click" : "shot")
                                     << " sound " << id.toString() << " has no file";
