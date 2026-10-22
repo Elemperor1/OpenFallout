@@ -123,6 +123,33 @@ namespace
         EXPECT_EQ(installs[3].mData, games / "Fallout3" / "data");
     }
 
+#ifndef _WIN32
+    TEST(FilesFalloutInstallTest, readsTheDrivesOfWindowsThatSteamInAWinePrefixNames)
+    {
+        const auto dir = TestingOpenMW::outputDirPath("falloutinstall_wine");
+        const auto prefix = dir / "bottle";
+        const auto steam = prefix / "drive_c" / "Program Files (x86)" / "Steam";
+        const auto disk = dir / "disk";
+        touch(steam / "steamapps" / "common" / "Fallout 3 goty" / "Data" / "Fallout3.esm");
+        touch(disk / "SteamLibrary" / "steamapps" / "common" / "Fallout New Vegas" / "Data" / "FalloutNV.esm");
+        std::filesystem::create_directories(prefix / "dosdevices");
+        std::filesystem::remove(prefix / "dosdevices" / "d:");
+        std::filesystem::create_directory_symlink(disk, prefix / "dosdevices" / "d:");
+        write(steam / "steamapps" / "libraryfolders.vdf",
+            "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"C:\\\\Program Files (x86)\\\\Steam\"\n\t}\n"
+            "\t\"1\"\n\t{\n\t\t\"path\"\t\t\"D:\\\\SteamLibrary\"\n\t}\n"
+            "\t\"2\"\n\t{\n\t\t\"path\"\t\t\"E:\\\\Nothing\"\n\t}\n}\n");
+
+        const auto installs = Files::findFalloutInstalls({ steam }, {});
+        ASSERT_THAT(installs, SizeIs(2));
+        EXPECT_EQ(installs[0].mGame, FalloutGame::NewVegas);
+        EXPECT_TRUE(std::filesystem::equivalent(
+            installs[0].mData, disk / "SteamLibrary" / "steamapps" / "common" / "Fallout New Vegas" / "Data"));
+        EXPECT_EQ(installs[1].mGame, FalloutGame::Fallout3);
+        EXPECT_EQ(installs[1].mData, steam / "steamapps" / "common" / "Fallout 3 goty" / "Data");
+    }
+#endif
+
     TEST(FilesFalloutInstallTest, listsACopyOnceWhereTwoPlacesLeadToIt)
     {
         const auto dir = TestingOpenMW::outputDirPath("falloutinstall_twice");

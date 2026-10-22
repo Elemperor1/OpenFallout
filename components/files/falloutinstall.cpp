@@ -5,6 +5,7 @@
 #include <components/misc/strings/lower.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <fstream>
 #include <system_error>
@@ -140,6 +141,35 @@ namespace Files
                 addFolder(folders, folder);
         }
 
+        /// The Wine prefix (the folder with a drive_c in it) that `path` is in, if it is in one
+        std::optional<std::filesystem::path> winePrefixOf(std::filesystem::path path)
+        {
+            for (; path.has_relative_path(); path = path.parent_path())
+            {
+                std::error_code error;
+                if (std::filesystem::is_directory(path / "drive_c", error))
+                    return path;
+            }
+            return std::nullopt;
+        }
+
+        /// A library that Steam, running in the Wine prefix `prefix`, wrote as `D:\SteamLibrary`, as the folder of this
+        /// computer: the C drive is the drive_c of the prefix, the other drives are what its dosdevices/d: lead to
+        std::filesystem::path windowsPathInPrefix(
+            const std::filesystem::path& prefix, const std::filesystem::path& library)
+        {
+            const std::string text = pathToUnicodeString(library);
+            if (text.size() < 2 || text[1] != ':' || !std::isalpha(static_cast<unsigned char>(text[0])))
+                return library;
+            const char letter = static_cast<char>(std::tolower(static_cast<unsigned char>(text[0])));
+            std::string rest = text.substr(2);
+            std::replace(rest.begin(), rest.end(), '\\', '/');
+            const std::filesystem::path drive
+                = letter == 'c' ? prefix / "drive_c" : prefix / "dosdevices" / (std::string(1, letter) + ':');
+            const std::size_t start = rest.find_first_not_of('/');
+            return start == std::string::npos ? drive : drive / pathFromUnicodeString(rest.substr(start));
+        }
+
         /// The libraries of the Steam installation in `root`, `root` itself first
         std::vector<std::filesystem::path> steamLibraries(const std::filesystem::path& root)
         {
@@ -156,8 +186,12 @@ namespace Files
                 {
                     std::string text(static_cast<std::size_t>(size), '\0');
                     if (std::ifstream stream(*file, std::ios::binary); stream.read(text.data(), text.size()))
+                    {
+                        // A Steam that runs in Wine names its libraries by the drives of Windows
+                        const std::optional<std::filesystem::path> prefix = winePrefixOf(root);
                         for (std::filesystem::path& library : parseSteamLibraries(text))
-                            addFolder(libraries, std::move(library));
+                            addFolder(libraries, prefix ? windowsPathInPrefix(*prefix, library) : std::move(library));
+                    }
                 }
             }
             return libraries;
@@ -278,8 +312,9 @@ namespace Files
         if (home.empty())
             return;
         // The Steam client of Linux (the games run through Proton, but their files are in the library) and of macOS
-        for (const char* steam : { ".steam/steam", ".local/share/Steam", ".var/app/com.valvesoftware.Steam/.local/share/Steam",
-                 "snap/steam/common/.local/share/Steam", "Library/Application Support/Steam" })
+        for (const char* steam :
+            { ".steam/steam", ".local/share/Steam", ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+                "snap/steam/common/.local/share/Steam", "Library/Application Support/Steam" })
             addIfFolder(steamRoots, home / steam);
 
         // The Windows drives of Wine and the programs built on it, which hold Steam, GOG and Bethesda's installers

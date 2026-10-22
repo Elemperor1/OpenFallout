@@ -23,7 +23,7 @@ or once and for all in `openfallout.cfg` in your configuration folder, one line 
 
     data="/path/to/Fallout New Vegas/Data"
 
-The configuration folder is `~/.config/openfallout` on Linux, `~/Library/Preferences/openfallout` on macOS and `Documents\My Games\OpenFallout` on Windows. The settings file `settings.cfg` and the log `openfallout.log` are in the same folder. Saves and screenshots go to the data folder instead: `~/.local/share/openfallout` on Linux, `~/Library/Application Support/openfallout` on macOS, the same folder as the configuration on Windows.
+The configuration folder is `~/.config/openfallout` on Linux (`$XDG_CONFIG_HOME/openfallout` if you have set that variable), `~/Library/Preferences/openfallout` on macOS and `Documents\My Games\OpenFallout` on Windows. The settings file `settings.cfg` and the log `openfallout.log` are in the same folder. Saves and screenshots go to the data folder instead: `~/.local/share/openfallout` on Linux (`$XDG_DATA_HOME/openfallout`), `~/Library/Application Support/openfallout` on macOS, the same folder as the configuration on Windows.
 
 Which plugins load: if you name none, the ones the games make active (the base master named in `Fallout_default.ini`, the plugins with a `.NAM` file next to them, and the ones in a `Plugins.txt` given with `--plugins-file`), with their masters. Name plugins with `--content` (or `content=` in `openfallout.cfg`) to choose them yourself. Tale of Two Wastelands: `data="<Data folder of New Vegas>"`, then `data="<output folder of the installer>"`. The rules, one by one, are in [mods and load order](mods-and-load-order.md).
 
