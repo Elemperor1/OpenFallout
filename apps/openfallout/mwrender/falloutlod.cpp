@@ -54,7 +54,7 @@ namespace OFRender
 
     bool FalloutLod::replacesTerrain(float size, const osg::Vec2f& center) const
     {
-        if (mOptions.mDebug.mNoLand)
+        if (mOptions.mDebug.mNoLand || mOptions.mDebug.mNoRecords)
             return true;
         // The blocks alone: no land from the tiles, and none from the land records either
         if (mOptions.mDebug.mObjectsOnly && size >= Terrain::LodIndex::sSmallestLevel)

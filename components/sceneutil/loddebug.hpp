@@ -30,6 +30,9 @@ namespace SceneUtil
         /// "no-land": draws no land at all, not the tiles and not the land of the records, whatever the size of the
         /// node, so the loaded cells have none either
         bool mNoLand = false;
+        /// "no-records": draws the tiles but not the land of the records, whatever the size of the node, so the loaded
+        /// cells have none and the places no tile covers are empty
+        bool mNoRecords = false;
 
         bool changesFiles() const { return mFlat || mWireframe || mNoSkirt; }
     };
