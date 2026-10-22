@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_RESOURCE_SCENEMANAGER_H
 
 #include <array>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -10,6 +11,7 @@
 #include <osg/ref_ptr>
 
 #include "resourcemanager.hpp"
+#include "speedtree.hpp"
 
 #include <components/sceneutil/lightmanager.hpp>
 #include <filesystem>
@@ -195,7 +197,12 @@ namespace Resource
 
         void setWeatherParticleOcclusion(bool value) { mWeatherParticleOcclusion = value; }
 
+        /// A SpeedTree file (.spt) is not read: the model of that path is drawn from the record of the tree instead.
+        /// To be called before the model is first loaded.
+        void setSpeedTree(VFS::Path::NormalizedView model, SpeedTreeStandIn tree);
+
     private:
+        osg::ref_ptr<osg::Node> loadSpeedTree(VFS::Path::NormalizedView path);
         osg::ref_ptr<Shader::ShaderVisitor> createShaderVisitor(const std::string& shaderPrefix = "objects");
         osg::ref_ptr<osg::Node> loadErrorMarker();
         osg::ref_ptr<osg::Node> cloneErrorMarker();
@@ -217,6 +224,9 @@ namespace Resource
         osg::ref_ptr<osgUtil::IncrementalCompileOperation> mIncrementalCompileOperation;
         mutable osg::ref_ptr<osg::Node> mErrorMarker;
         mutable std::once_flag mErrorMarkerFlag;
+
+        mutable std::mutex mSpeedTreeMutex;
+        std::map<std::string, SpeedTreeStandIn, std::less<>> mSpeedTrees;
 
         osg::Texture::FilterMode mMinFilter;
         osg::Texture::FilterMode mMagFilter;

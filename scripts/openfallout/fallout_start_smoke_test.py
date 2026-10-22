@@ -491,6 +491,63 @@ return {
 }
 """ % (plugin.WALK_VELOCITY, plugin.RUN_VELOCITY, WALK_FOR, RUN_FOR)
 
+# The tree is drawn from the record of the tree (crossed cards as wide and as high as its billboard size and no more),
+# since the file of a SpeedTree is not read. Rays go along the y axis through the tree, from 300 units on one side of it to
+# 300 on the other, at the offsets and heights of TREE_RAYS; what is drawn of it is hit or not as its size says. The rays
+# are cast once, after TREE_RAYS_FROM seconds, at the tree of the cell the player is in.
+TREE_RAYS_FROM = 8.0
+# name, offset along x from the middle of the tree, height above its foot, whether the ray hits the cards. The cards cross
+# in the middle of the tree; the first is as wide as the billboard along x, so a ray goes through it at x = 0 and at any
+# offset less than half the width, and misses all of them beyond, and above the height of the billboard.
+TREE_RAYS = (
+    ("middle", 0.0, plugin.TREE_SIZE[1] / 2, True),
+    ("wide", plugin.TREE_SIZE[0] / 2 - 10.0, plugin.TREE_SIZE[1] / 2, True),
+    ("beyond", plugin.TREE_SIZE[0] / 2 + 10.0, plugin.TREE_SIZE[1] / 2, False),
+    ("high", 0.0, plugin.TREE_SIZE[1] - 20.0, True),
+    ("above", 0.0, plugin.TREE_SIZE[1] + 20.0, False),
+)
+TREE_SCRIPT = """\
+local nearby = require('openfallout.nearby')
+local core = require('openfallout.core')
+local util = require('openfallout.util')
+local async = require('openfallout.async')
+
+local ids = { @IDS@ }
+local rays = { @RAYS@ }
+local elapsed, done = 0, false
+local function fmt(v) return string.format('%.1f,%.1f,%.1f', v.x, v.y, v.z) end
+
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            if done or elapsed < @FROM@ then return end
+            for _, id in ipairs(ids) do
+                -- the reference of the other cell is not available, which shows when its position is asked for
+                local ok, base = pcall(function()
+                    return nearby.getObjectByFormId(core.getFormId('OFTest.esm', id)).position
+                end)
+                if ok and base then
+                    done = true
+                    print('OFTEST', 'tree at', fmt(base))
+                    for _, ray in ipairs(rays) do
+                        local from = base + util.vector3(ray[2], 300, ray[3])
+                        local to = base + util.vector3(ray[2], -300, ray[3])
+                        nearby.asyncCastRenderingRay(async:callback(function(res)
+                            print('OFTEST', 'tree ray ' .. ray[1] .. ' hit=', tostring(res.hit),
+                                res.hit and fmt(res.hitPos) or '', 'base', fmt(base))
+                        end), from, to)
+                    end
+                    return
+                end
+            end
+        end,
+    },
+}
+""".replace("@FROM@", str(TREE_RAYS_FROM)).replace("@IDS@", ", ".join(str(i) for i in plugin.TREE_REF_IDS)).replace(
+    "@RAYS@", ", ".join("{ '%s', %g, %g }" % (name, x, z) for name, x, z, _ in TREE_RAYS))
+TREE_RAY = re.compile(r"OFTEST\ttree ray (\w+) hit=\t(\w+)\t(?:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+))?\tbase\t(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+
 # Logs where the characters that follow packages are and which way they face, once a second. They are looked up by the form
 # ID of their reference (the interior and the exterior cell each have their own).
 PACKAGE_SCRIPT = """\
@@ -2624,6 +2681,7 @@ def check(text, scenario, colours, animated=True):
         if wall_render_rays[0].group(1) != "false":
             problems.append(f"the ray cast west at what is drawn hit something where only the wall is: "
                             f"{wall_render_rays[0].group(0)}")
+    problems += check_tree(text, scenario)
     side_rays = [m for m in map(WATER_SIDE_RAY_LINE.search, text.splitlines()) if m]
     if not side_rays or side_rays[0].group(1) != "false":
         problems.append("the ray cast along just under the water and across the edge of its cell hit something, "
@@ -2633,6 +2691,34 @@ def check(text, scenario, colours, animated=True):
     problems += check_objects(whole, scenario)
     if "Quitting peacefully" not in whole:
         problems.append("the log does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_tree(text, scenario):
+    """The problems with the tree: it is drawn at the width and the height of the billboard of its record (the rays that
+    go through the cards hit them, the others do not), where the plugin put it, and the log has no word of a SpeedTree
+    file that was ignored or an image that cannot be read."""
+    problems = []
+    rays = {m.group(1): m for m in map(TREE_RAY.search, text.splitlines()) if m}
+    want_base = (scenario.origin[0] + plugin.TREE_PLACE[0], scenario.origin[1] + plugin.TREE_PLACE[1])
+    for name, _, _, hits in TREE_RAYS:
+        ray = rays.get(name)
+        if ray is None:
+            problems.append(f"the script did not log the ray '{name}' cast at the tree")
+            continue
+        base_x, base_y = float(ray.group(6)), float(ray.group(7))
+        if abs(base_x - want_base[0]) > 2.0 or abs(base_y - want_base[1]) > 2.0:
+            problems.append(f"the tree is at {base_x:.0f},{base_y:.0f}, the plugin put it at {want_base[0]:.0f},"
+                            f"{want_base[1]:.0f}")
+        if (ray.group(2) == "true") != hits:
+            problems.append(f"the ray '{name}' at the tree should {'hit' if hits else 'miss'} the cards of the billboard "
+                            f"({plugin.TREE_SIZE[0]:.0f} x {plugin.TREE_SIZE[1]:.0f}): {ray.group(0)}")
+        elif hits and abs(float(ray.group(4)) - base_y) > 2.0:
+            problems.append(f"the ray '{name}' at the tree hit it at y={float(ray.group(4)):.1f}, the cards cross at "
+                            f"y={base_y:.1f}")
+    for line in text.splitlines():
+        if "SpeedTree" in line or "of a tree cannot be read" in line:
+            problems.append("the log mentions a tree file or image that was not used: " + line.split("]", 1)[-1].strip())
     return problems
 
 
@@ -4291,6 +4377,7 @@ def main():
     (data / "scripts" / "walktest.lua").write_text(WALK_SCRIPT, encoding="ascii")
     (data / "scripts" / "personwalk.lua").write_text(PERSON_SCRIPT, encoding="ascii")
     (data / "scripts" / "packagetrack.lua").write_text(PACKAGE_SCRIPT, encoding="ascii")
+    (data / "scripts" / "treetest.lua").write_text(TREE_SCRIPT, encoding="ascii")
     (data / "scripts" / "followtest.lua").write_text(FOLLOW_SCRIPT, encoding="ascii")
     (data / "scripts" / "questtest.lua").write_text(QUEST_SCRIPT, encoding="ascii")
     (data / "scripts" / "objecttest.lua").write_text(OBJECT_SCRIPT, encoding="ascii")
@@ -4329,7 +4416,8 @@ def main():
         "PLAYER: scripts/autoplay.lua\nPLAYER: scripts/newgameplayer.lua\nGLOBAL: scripts/autoplayworld.lua\n"
         "GLOBAL: scripts/newgametest.lua\n", encoding="ascii")
     (data / "walktest.omwscripts").write_text(
-        "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nGLOBAL: scripts/personwalk.lua\n"
+        "PLAYER: scripts/walktest.lua\nPLAYER: scripts/packagetrack.lua\nPLAYER: scripts/treetest.lua\n"
+        "GLOBAL: scripts/personwalk.lua\n"
         "GLOBAL: scripts/followtest.lua\nGLOBAL: scripts/questtest.lua\nGLOBAL: scripts/objecttest.lua\n"
         "GLOBAL: scripts/gatetest.lua\n", encoding="ascii")
 

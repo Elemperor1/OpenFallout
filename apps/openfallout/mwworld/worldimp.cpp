@@ -39,7 +39,9 @@
 #include <components/files/collections.hpp>
 
 #include <components/resource/bulletshape.hpp>
+#include <components/esm4/loadtree.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/scenemanager.hpp>
 
 #include <components/sceneutil/lightmanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
@@ -233,6 +235,16 @@ namespace OFWorld
         mStore.setUp();
         mStore.validateRecords(mReaders);
         mStore.movePlayerRecord();
+
+        // The trees of Fallout are SpeedTree files, which are not read: each is drawn from its record. The scene manager
+        // is asked for the model by its path in the archives, which is the one of the record under meshes/.
+        for (const ESM4::Tree& tree : mStore.get<ESM4::Tree>())
+        {
+            if (!tree.mModel.empty() && !tree.mLeafTexture.empty())
+                mResourceSystem->getSceneManager()->setSpeedTree(
+                    Misc::ResourceHelpers::correctMeshPath(tree.mModel.getNormalized()),
+                    Resource::SpeedTreeStandIn{ tree.mLeafTexture, tree.mBillboardWidth, tree.mBillboardHeight });
+        }
 
         mSwimHeightScale = mStore.get<ESM::GameSetting>().find("fSwimHeightScale")->mValue.getFloat();
     }
