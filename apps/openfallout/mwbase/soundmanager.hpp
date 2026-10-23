@@ -58,6 +58,9 @@ namespace OFSound
         NoPlayerLocal = 1 << 3, /* (3D only) Don't play the sound local to the listener even if the
                                  * player is making it. */
         NoScaling = 1 << 4, /* Don't scale audio with simulation time */
+        Overlap = 1 << 10, /* Do not stop an earlier copy of the same sound that still plays (a weapon that fires
+                            * faster than its shot sounds) */
+        OverlapNoEnv = Overlap | NoEnv,
         NoEnvNoScaling = NoEnv | NoScaling,
         LoopNoEnv = Loop | NoEnv,
         LoopNoEnvNoScaling = Loop | NoEnv | NoScaling,

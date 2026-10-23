@@ -208,19 +208,21 @@ namespace
     TEST(ESM4CombatDataTest, readsTheSoundsOfAWeaponOfFallout)
     {
         // The first SNAM is the shot, a second one (New Vegas) the shot heard from far away, XNAM the shot that the
-        // player hears and TNAM the click of a weapon with no ammunition
+        // player hears, TNAM the click of a weapon with no ammunition and NAM7 the loop of an automatic weapon
         const std::string sounds = zString("EDID", "Sounds") + valueSubRecord<std::uint32_t>("SNAM", 0x00010001)
             + valueSubRecord<std::uint32_t>("SNAM", 0x00010002) + valueSubRecord<std::uint32_t>("XNAM", 0x00010003)
-            + valueSubRecord<std::uint32_t>("TNAM", 0x00010004);
+            + valueSubRecord<std::uint32_t>("TNAM", 0x00010004) + valueSubRecord<std::uint32_t>("NAM7", 0x00010005);
         const ESM4::Weapon weapon = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", sounds);
         EXPECT_EQ(weapon.mShotSound.toUint32(), 0x00010001u);
         EXPECT_EQ(weapon.mShotSound2D.toUint32(), 0x00010003u);
         EXPECT_EQ(weapon.mDryFireSound.toUint32(), 0x00010004u);
+        EXPECT_EQ(weapon.mLoopSound.toUint32(), 0x00010005u);
 
         const ESM4::Weapon without = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", zString("EDID", "Silent"));
         EXPECT_TRUE(without.mShotSound.isZeroOrUnset());
         EXPECT_TRUE(without.mShotSound2D.isZeroOrUnset());
         EXPECT_TRUE(without.mDryFireSound.isZeroOrUnset());
+        EXPECT_TRUE(without.mLoopSound.isZeroOrUnset());
 
         // A first SNAM with no sound is not replaced by the second, which is the shot heard from far away
         const ESM4::Weapon silent = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP",
@@ -233,6 +235,7 @@ namespace
         EXPECT_TRUE(skyrim.mShotSound.isZeroOrUnset());
         EXPECT_TRUE(skyrim.mShotSound2D.isZeroOrUnset());
         EXPECT_TRUE(skyrim.mDryFireSound.isZeroOrUnset());
+        EXPECT_TRUE(skyrim.mLoopSound.isZeroOrUnset());
     }
 
     TEST(ESM4CombatDataTest, readsALongerGameDataAndLeavesAShorterOne)

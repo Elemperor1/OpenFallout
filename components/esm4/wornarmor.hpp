@@ -74,19 +74,33 @@ namespace ESM4
         std::uint32_t mCount = 0;
     };
 
+    // An item that is no armour (a weapon, ammunition, a chem, money ...) that levelled lists gave a character, and
+    // how many of it
+    struct ListedItem
+    {
+        ESM::FormId mItem;
+        std::uint32_t mCount = 0;
+    };
+
     // The armour that a character has: the pieces to wear (each once, in the order of its inventory), and the pieces
     // that its levelled lists gave with the number of each, whether it can wear them or not. The pieces that the
-    // inventory itself lists are in the first only; their count is the count of the inventory entry.
+    // inventory itself lists are in the first only; their count is the count of the inventory entry. The things the
+    // lists gave that are no armour are in the last, in the order they were given.
     struct CharacterArmor
     {
         std::vector<const Armor*> mArmor;
         std::vector<ListedArmor> mFromLists;
+        std::vector<ListedItem> mOtherFromLists;
     };
 
     // The armour that the character has: the pieces its inventory lists, and those that its levelled lists give for
     // the level of the character. A list is chosen from with the seed, so that the same character is always dressed
     // the same and two characters of one list are not.
     CharacterArmor characterArmor(const WornArmorSource& source, const Npc& character, int playerLevel,
+        std::uint32_t seed, WornArmorTrace* trace = nullptr);
+
+    // The same for an inventory that is not a character's (a creature's): what its levelled lists give for the level
+    CharacterArmor inventoryArmor(const WornArmorSource& source, const std::vector<InventoryItem>& inventory, int level,
         std::uint32_t seed, WornArmorTrace* trace = nullptr);
 
     // The armour that the character wears, in the order of its inventory (characterArmor(...).mArmor)

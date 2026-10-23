@@ -189,6 +189,12 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("NAM7"): // Fallout 3 and New Vegas: the loop of the attack of a minigun or a flamer
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mLoopSound);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("DNAM"):
             {
                 // Fallout 3 and New Vegas: 136 bytes of the game data are the same in both. A few Fallout 3 records
@@ -299,7 +305,6 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("MO4C"):
             case ESM::fourCC("MO4F"): // First person model data end
             case ESM::fourCC("BIPL"): // FO3
-            case ESM::fourCC("NAM7"): // FO3
             case ESM::fourCC("MOD3"): // FO3
             case ESM::fourCC("MO3T"): // FO3
             case ESM::fourCC("MO3S"): // FO3

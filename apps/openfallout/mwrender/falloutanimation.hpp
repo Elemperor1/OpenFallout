@@ -64,6 +64,36 @@ namespace OFRender
     /// character that moves at `speed`: the ratio of the two, kept within what looks right, 1 when the animation has no
     /// velocity
     float falloutAnimationSpeed(float speed, float velocity);
+
+    /// The letters in front of the names of the animation files of a weapon, by the animation type of its record
+    /// (0 to 10: bare hands, one-handed and two-handed melee, one-handed pistol, two-handed rifle, automatic, handle,
+    /// launcher, grenade throw and the two mines, as FalloutNV.exe lists them at 0x11977A8). A negative type is a
+    /// character with no weapon, which uses the hands. Empty for a type that is none of those.
+    std::string_view falloutWeaponPrefix(int animationType);
+
+    /// What a character does with the weapon in its hands
+    enum class FalloutWeaponMove
+    {
+        /// One attack: the files differ with the type, and a melee weapon takes them in turn (`counter` counts them)
+        Attack,
+        /// Taking the weapon out
+        Equip,
+        /// Putting it away
+        Unequip,
+        /// Holding it ready, in a loop
+        Aim,
+        /// Reeling from a blow
+        Recoil,
+    };
+
+    /// The animation file of a character for a move with a weapon, among the paths of the files in the folder of its
+    /// skeleton (lower case, as the virtual file system lists them): the file named by the prefix of the weapon type
+    /// and the move (`1hpattack3.kf`, `h2hattackleft_a.kf`, `2hrequip.kf`). Guns attack with `attack3` and, when the
+    /// files have no such, the next of `attack4` to `attack8`; a melee weapon and bare hands take, in turn, the files
+    /// of the left and the right blow (`attackleft_a`, `attackright_a`, then the second variants and those without a
+    /// variant); a thrown weapon takes `attackthrow` and its numbered forms. Empty when the files have none.
+    std::string chooseFalloutWeaponAnimation(std::string_view folder, int animationType, FalloutWeaponMove move,
+        const std::vector<std::string>& files, unsigned counter = 0);
 }
 
 #endif

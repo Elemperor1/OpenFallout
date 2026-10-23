@@ -1,6 +1,8 @@
 #include "falloutactoranimation.hpp"
 
 #include <algorithm>
+#include <map>
+#include <memory>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -9,6 +11,7 @@
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/nodecallback.hpp>
 #include <components/sceneutil/skeleton.hpp>
+#include <components/sceneutil/visitor.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/pathutil.hpp>
 #include <components/vfs/recursivedirectoryiterator.hpp>
@@ -83,6 +86,24 @@ namespace OFRender
         double mStart = -1.0;
     };
 
+    namespace
+    {
+        /// The animation files (.kf, lower case paths) under a folder, listed once for all the characters that share it
+        const std::vector<std::string>& animationFilesOf(const VFS::Manager& vfs, const std::string& folder)
+        {
+            static std::map<std::string, std::vector<std::string>> cache;
+            const auto found = cache.find(folder);
+            if (found != cache.end())
+                return found->second;
+            constexpr VFS::Path::ExtensionView kf("kf");
+            std::vector<std::string> files;
+            for (const VFS::Path::Normalized& name : vfs.getRecursiveDirectoryIterator(folder))
+                if (name.extension() == kf)
+                    files.push_back(name.value());
+            return cache.emplace(folder, std::move(files)).first->second;
+        }
+    }
+
     FalloutActorAnimation::FalloutActorAnimation(
         const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
         : Animation(ptr, std::move(parentNode), resourceSystem)
@@ -150,11 +171,8 @@ namespace OFRender
         if (folder.empty())
             return;
 
-        constexpr VFS::Path::ExtensionView kf("kf");
-        std::vector<std::string> files;
-        for (const VFS::Path::Normalized& name : mResourceSystem->getVFS()->getRecursiveDirectoryIterator(folder))
-            if (name.extension() == kf)
-                files.push_back(name.value());
+        mSkeletonPath = skeleton;
+        const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), folder);
 
         bool playing = false;
         const std::string idle = chooseFalloutIdle(folder, files);
@@ -272,5 +290,104 @@ namespace OFRender
             part = group;
         }
         return part;
+    }
+
+    std::string FalloutActorAnimation::playWeaponMove(FalloutWeaponMove move, int priority, bool loop)
+    {
+        if (mObjectRoot == nullptr || mSkeletonPath.empty())
+            return {};
+        const std::string folder = falloutAnimationFolder(mSkeletonPath);
+        const std::string file = chooseFalloutWeaponAnimation(
+            folder, mWeaponType, move, animationFilesOf(*mResourceSystem->getVFS(), folder), mAttacks);
+        if (file.empty())
+            return {};
+        std::string group;
+        if (const auto known = mWeaponGroups.find(file); known != mWeaponGroups.end())
+            group = known->second;
+        else
+        {
+            group = addAnimation(file, mSkeletonPath);
+            mWeaponGroups.emplace(file, group);
+        }
+        if (group.empty())
+            return {};
+        // One that was playing and has not ended starts again
+        if (isPlaying(group))
+            disable(group);
+        play(group, OFRender::AnimPriority(priority), OFRender::BlendMask_UpperBody, !loop, 1.f, "start", "stop", 0.f,
+            loop ? ~0u : 0u, false);
+        return group;
+    }
+
+    void FalloutActorAnimation::drawWeapon(std::string_view model, int animationType)
+    {
+        if (mObjectRoot == nullptr)
+            return;
+        holsterWeapon();
+        mWeaponType = animationType;
+        mDrawn = true;
+
+        if (!model.empty())
+        {
+            // The weapon sits on the hand: the node the games name for it, else the hand itself
+            osg::Group* hand = nullptr;
+            for (const char* name : { "Weapon", "Bip01 R Hand" })
+            {
+                SceneUtil::FindByNameVisitor find(name);
+                mObjectRoot->accept(find);
+                if (find.mFoundNode != nullptr)
+                {
+                    hand = find.mFoundNode;
+                    break;
+                }
+            }
+            if (hand == nullptr)
+                Log(Debug::Warning) << "The weapon " << model << " has no hand to be in on "
+                                    << mPtr.getCellRef().getRefId();
+            else
+            {
+                mWeaponNode = mResourceSystem->getSceneManager()->getInstance(
+                    Misc::ResourceHelpers::correctMeshPath(VFS::Path::Normalized(model)), hand);
+                mWeaponParent = hand;
+                Log(Debug::Verbose) << "Weapon " << model << " is in the hand " << hand->getName() << " of "
+                                    << mPtr.getCellRef().getRefId();
+            }
+        }
+
+        // A weapon is taken out and then held ready; bare hands are only held ready
+        if (animationType >= 0)
+            playWeaponMove(FalloutWeaponMove::Equip, OFMechanics::Priority_Weapon, false);
+        mAimGroup = playWeaponMove(FalloutWeaponMove::Aim, OFMechanics::Priority_Hit, true);
+    }
+
+    void FalloutActorAnimation::holsterWeapon()
+    {
+        if (!mDrawn)
+            return;
+        mDrawn = false;
+        if (!mAimGroup.empty())
+        {
+            disable(mAimGroup);
+            mAimGroup.clear();
+        }
+        if (mWeaponNode != nullptr && mWeaponParent != nullptr)
+            mWeaponParent->removeChild(mWeaponNode);
+        mWeaponNode = nullptr;
+        mWeaponParent = nullptr;
+    }
+
+    void FalloutActorAnimation::attack()
+    {
+        if (!mDrawn)
+            return;
+        playWeaponMove(FalloutWeaponMove::Attack, OFMechanics::Priority_Weapon, false);
+        ++mAttacks;
+    }
+
+    void FalloutActorAnimation::flinch()
+    {
+        if (isDown())
+            return;
+        playWeaponMove(FalloutWeaponMove::Recoil, OFMechanics::Priority_Block, false);
     }
 }
