@@ -232,6 +232,51 @@ namespace
         EXPECT_TRUE(falloutFollowRuns(200.f + falloutFollowRunBeyond + 1.f, 200.f));
     }
 
+    TEST(FalloutPackagesTest, aGoalThatUsesFurnitureArrivesAtTheEntryWhateverRadiusThePackageLooksIn)
+    {
+        EXPECT_FLOAT_EQ(falloutGoalRadius(350, ESM4::PackageBehaviour::Use), falloutSmallestArrival);
+        EXPECT_FLOAT_EQ(falloutGoalRadius(0, ESM4::PackageBehaviour::Use), falloutSmallestArrival);
+        EXPECT_FLOAT_EQ(falloutGoalRadius(350, ESM4::PackageBehaviour::Escort), falloutLargestArrival);
+    }
+
+    TEST(FalloutPackagesTest, aCharacterTakesTheNearestPieceOfFurnitureThatHasRoomInReach)
+    {
+        const auto at = [](float x, int free) {
+            FalloutCandidate candidate;
+            candidate.mOrigin = candidate.mPlace = osg::Vec3f(x, 0.f, 0.f);
+            candidate.mFree = free;
+            return candidate;
+        };
+        const std::vector<FalloutCandidate> candidates = {
+            at(100.f, 0), // near the character, but taken
+            at(200.f, 1), at(900.f, 2), // out of reach of the center
+            at(150.f, -1), // more are on their way to it than it has places
+        };
+        const osg::Vec3f center(0.f, 0.f, 0.f);
+        const osg::Vec3f from(120.f, 0.f, 0.f);
+        EXPECT_EQ(falloutChooseCandidate(candidates, center, 350.f, from), 1);
+        // A radius of 0 looks everywhere
+        EXPECT_EQ(falloutChooseCandidate(candidates, center, 0.f, from), 1);
+        EXPECT_EQ(falloutChooseCandidate(candidates, center, 0.f, osg::Vec3f(800.f, 0.f, 0.f)), 2);
+        EXPECT_EQ(falloutChooseCandidate(candidates, center, 50.f, from), -1);
+        EXPECT_EQ(falloutChooseCandidate({}, center, 350.f, from), -1);
+        // The first of two that are as near
+        const std::vector<FalloutCandidate> tied = { at(10.f, 1), at(-10.f, 1) };
+        EXPECT_EQ(falloutChooseCandidate(tied, center, 0.f, center), 0);
+    }
+
+    TEST(FalloutPackagesTest, anEscortWaitsForTheOneItEscortsOnceItIsFarBehind)
+    {
+        EXPECT_FLOAT_EQ(falloutEscortWait(0), 2.f * falloutDefaultFollow);
+        EXPECT_FLOAT_EQ(falloutEscortWait(150), falloutSmallestEscortWait);
+        EXPECT_FLOAT_EQ(falloutEscortWait(500), 1000.f);
+        const float wait = 500.f;
+        EXPECT_TRUE(falloutEscortMoves(wait, wait, false));
+        EXPECT_FALSE(falloutEscortMoves(wait + 1.f, wait, false));
+        EXPECT_TRUE(falloutEscortMoves(wait + falloutFollowSlack, wait, true));
+        EXPECT_FALSE(falloutEscortMoves(wait + falloutFollowSlack + 1.f, wait, true));
+    }
+
     TEST(FalloutPackagesTest, thePlayerReferenceIsForm14OfTheFirstPlugin)
     {
         // (the scripts that the engine adds come first in the list of content files)

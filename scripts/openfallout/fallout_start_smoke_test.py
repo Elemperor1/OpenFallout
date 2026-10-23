@@ -1330,6 +1330,26 @@ local function sitter(tag)
     print('OFTEST', 'sitter', tag, tostring(world.globals.@SITTER_GLOBAL@),
         ok and seat and string.format('%.0f', (object.position - seat.position):length()) or 'no sitter')
 end
+-- The finders took a chair each: the number of chairs the script of each sees it use, and the chair it is nearest to
+local function finders(tag)
+    local function find(id)
+        local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+        return ok and object:isValid() and object or nil
+    end
+    local chairs = { find(@FINDER_CHAIR_0@), find(@FINDER_CHAIR_1@), find(@FINDER_CHAIR_2@) }
+    local seats = { @FINDER_GLOBAL_0@, @FINDER_GLOBAL_1@ }
+    for index, id in ipairs({ @FINDER_REF_0@, @FINDER_REF_1@ }) do
+        local object = find(id)
+        local nearest, distance = 0, 1e9
+        for number, chair in ipairs(chairs) do
+            if object and chair and (object.position - chair.position):length() < distance then
+                nearest, distance = number, (object.position - chair.position):length()
+            end
+        end
+        print('OFTEST', 'finder', tag, index, tostring(world.globals[seats[index]]), nearest,
+            string.format('%.0f', distance))
+    end
+end
 -- Where the player is from the chair (across, along: the chair is not turned), and the way it faces
 local function sits(tag)
     local object, player = chair(), world.players[1]
@@ -1360,7 +1380,7 @@ local steps = {
     { 9.0, function() sits('away') end },
     { 12.5, function() occupied('before') takeSitterChair() end },
     { 13.5, function() occupied('after') end },
-    { 15.0, function() sitter('later') core.quit() end },
+    { 15.0, function() sitter('later') finders('later') core.quit() end },
 }
 
 return {
@@ -1382,7 +1402,14 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
                   .replace("@LEAVES@", plugin.TRIGGER_GLOBALS["leaves"][1])
                   .replace("@SITS@", plugin.TRIGGER_GLOBALS["sits"][1]).replace("@CHAIR@", str(plugin.FURNITURE_REF_ID))
                   .replace("@SITTER_GLOBAL@", plugin.SITTER_GLOBAL[1]).replace("@SITTER_CHAIR@", str(plugin.SITTER_CHAIR_REF_ID))
-                  .replace("@SITTER@", str(plugin.SITTER_REF_ID)))
+                  .replace("@SITTER@", str(plugin.SITTER_REF_ID))
+                  .replace("@FINDER_CHAIR_0@", str(plugin.FINDER_CHAIR_REF_IDS[0]))
+                  .replace("@FINDER_CHAIR_1@", str(plugin.FINDER_CHAIR_REF_IDS[1]))
+                  .replace("@FINDER_CHAIR_2@", str(plugin.FINDER_CHAIR_REF_IDS[2]))
+                  .replace("@FINDER_GLOBAL_0@", repr(plugin.FINDER_GLOBALS[0][1]))
+                  .replace("@FINDER_GLOBAL_1@", repr(plugin.FINDER_GLOBALS[1][1]))
+                  .replace("@FINDER_REF_0@", str(plugin.FINDER_REF_IDS[0]))
+                  .replace("@FINDER_REF_1@", str(plugin.FINDER_REF_IDS[1])))
 
 # Saves: a script of the world waits for the quests of the plugin to run, sets a global, asks the script of the menu for a
 # save, changes the state (the global, and quest C, which has not been started) and asks the menu for the game to be loaded
@@ -3420,6 +3447,22 @@ def check_triggers(text):
         if later[0][1] == "no sitter" or abs(int(later[0][1]) - entry_distance) > 15:
             problems.append("a character in a chair should stay there, on the entry of its marker, while its package for "
                             f"it is on, not walk on to the package that comes after: {later[0]}")
+    # The two finders each took a chair near the marker of their Find package, not the same one, and not the far one
+    seen = re.findall(r"OFTEST\tfinder\tlater\t(\d+)\t(\d+)\t(\d+)\t(\d+)$", text, re.M)
+    if len(seen) != 2:
+        problems.append(f"expected two 'finder later' lines: {seen}")
+    else:
+        for index, uses, nearest, distance in seen:
+            if uses != "1":
+                problems.append(f"finder {index} should use one chair, its script sees {uses}")
+            if nearest not in ("1", "2"):
+                problems.append(f"finder {index} should sit in a chair within the radius of its package, not chair "
+                                f"{nearest}")
+            entry_distance = math.hypot(*plugin.FURNITURE_ENTRY[0][:2])
+            if abs(int(distance) - entry_distance) > 15:
+                problems.append(f"finder {index} should stand on the entry of its chair: {distance}")
+        if seen[0][2] == seen[1][2]:
+            problems.append(f"the two finders took the same chair: {seen}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

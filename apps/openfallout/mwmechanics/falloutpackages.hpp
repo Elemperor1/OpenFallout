@@ -25,6 +25,8 @@ namespace OFMechanics
         /// The distance from the center at which a character that goes there has arrived (Stay) or the radius of the
         /// circle in which it goes about (Roam)
         float mRadius = 0.f;
+        /// What a Use package takes: the piece of furniture that the character goes to and uses when it is there
+        ESM::FormId mTarget;
     };
 
     /// The smallest and largest distances from the center of the place, in game units, at which a character has
@@ -36,8 +38,42 @@ namespace OFMechanics
     constexpr float falloutLargestRoam = 2048.f;
     constexpr float falloutDefaultRoam = 512.f;
 
-    /// The radius of a goal from the radius that the location of the package (PLDT) names
+    /// The radius of a goal from the radius that the location of the package (PLDT) names. A package that uses
+    /// furniture names the radius it looks in, not the one it arrives at: the character goes to the entry of the
+    /// marker.
     float falloutGoalRadius(std::int32_t locationRadius, ESM4::PackageBehaviour behaviour);
+
+    /// A piece of furniture (or anything else) that a Find or Use Item At package may take
+    struct FalloutCandidate
+    {
+        /// Where it is, which the radius of the package is measured from
+        osg::Vec3f mOrigin;
+        /// Where the character stands to use it
+        osg::Vec3f mPlace;
+        /// How many more characters can use it: its places that no one uses less those that others are on their way to
+        int mFree = 0;
+    };
+
+    /// The radius, in game units, that a package that names none looks for furniture in
+    constexpr float falloutDefaultSearch = 512.f;
+
+    /// The one that a character at `from` takes: the nearest place to `from` of the candidates that can serve one more
+    /// character and are within `radius` of `center` across the ground (a radius of 0 or less takes any), -1 when there
+    /// is none. A tie goes to the first in the list.
+    int falloutChooseCandidate(const std::vector<FalloutCandidate>& candidates, const osg::Vec3f& center, float radius,
+        const osg::Vec3f& from);
+
+    /// The object type (PTDT of type 2) that is furniture
+    constexpr int falloutFurnitureObjectType = 11;
+
+    /// How far behind the one it escorts a character that escorts goes on, whatever distance the package names (many
+    /// name none): twice the distance a follower keeps, at least this
+    constexpr float falloutSmallestEscortWait = 400.f;
+    float falloutEscortWait(std::int32_t packageDistance);
+
+    /// Whether the escort goes on to the place: one that stands still goes on when the one it escorts is within `wait`,
+    /// and one that goes on stops when it is farther than `wait` and the slack
+    bool falloutEscortMoves(float away, float wait, bool moving);
 
     /// A place in the circle of the goal, at the height of its center, that every place of the circle is as likely to
     /// be chosen

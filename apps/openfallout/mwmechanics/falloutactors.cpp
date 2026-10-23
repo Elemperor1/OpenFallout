@@ -232,6 +232,8 @@ namespace OFMechanics
             /// What the packages of the actors do that scripts are told of, which they are after all the actors have
             /// had their turn: a script that runs in the middle of it can give an actor a package or move it
             std::vector<PendingEvent>* mEvents = nullptr;
+            /// Every actor that has a mind, for the pieces of furniture that others are on their way to
+            const std::map<const OFWorld::LiveCellRefBase*, std::unique_ptr<FalloutActors::Mind>>* mMinds = nullptr;
         };
 
         const std::vector<const ESM4::AIPackage*>& packagesOf(const OFWorld::Ptr& ptr)
@@ -344,6 +346,10 @@ namespace OFMechanics
                     return "goes about";
                 case ESM4::PackageBehaviour::Talk:
                     return "goes and talks";
+                case ESM4::PackageBehaviour::Use:
+                    return "goes and uses furniture";
+                case ESM4::PackageBehaviour::Escort:
+                    return "escorts";
                 default:
                     return "does nothing";
             }
@@ -561,6 +567,126 @@ namespace OFMechanics
 
     namespace
     {
+        /// How many characters other than `mind` are on their way to use the furniture
+        int claimsOn(const Frame& frame, const FalloutActors::Mind& mind, const ESM::RefNum& furniture)
+        {
+            int claims = 0;
+            if (frame.mMinds != nullptr)
+                for (const auto& [key, other] : *frame.mMinds)
+                    if (other.get() != &mind && other->mPackage != nullptr && !other->mAtGoal
+                        && other->mGoal.mBehaviour == ESM4::PackageBehaviour::Use && other->mGoal.mTarget == furniture)
+                        ++claims;
+            return claims;
+        }
+
+        /// Tells once that a package is left out, as the packages that run scripts are the ones a quest waits for
+        bool leftOut(const FalloutActors::Mind& mind, const ESM4::AIPackage& package, const std::string& why)
+        {
+            if (mind.mSkipTold.insert(&package).second)
+                Log(hasEvents(package) ? Debug::Info : Debug::Verbose)
+                    << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId() << ": left out, "
+                    << why;
+            return false;
+        }
+
+        /// The furniture a Find or Use Item At package takes, and where the character goes to use it: the one the
+        /// package names, or the nearest in the cell that has room and is within the radius of the place of the
+        /// package. A piece that a character is on its way to has one place less. False when there is none (the
+        /// package is not on then), or the package names something that is not furniture.
+        bool findFurniture(const Frame& frame, const FalloutActors::Mind& mind, const ESM4::AIPackage& package,
+            FalloutGoal& goal, bool& hasFacing, float& facing)
+        {
+            if (frame.mScripts == nullptr)
+                return false;
+            const int kind = package.mTarget.type;
+            if (kind != 0 && kind != 1 && kind != 2)
+                return leftOut(mind, package, "it names nothing to take");
+            if (kind == 2 && package.mTarget.target != static_cast<std::uint32_t>(falloutFurnitureObjectType))
+                return leftOut(mind, package,
+                    "it takes an object of type " + std::to_string(package.mTarget.target)
+                        + ", of which only furniture (11) is done");
+
+            // Where it looks
+            osg::Vec3f center = mind.mPtr.getCellRef().getPosition().asVec3();
+            if (package.mLocation.type == ESM4::Location_NearCurrent)
+                center = mind.position();
+            else if (package.mLocation.type == ESM4::Location_NearReference)
+            {
+                const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
+                    ESM::RefNum(ESM::FormId::fromUint32(package.mLocation.location)));
+                if (place.isEmpty() || !place.getRefData().isEnabled() || !sharesSpace(mind.mPtr, place))
+                    return false;
+                center = place.getRefData().getPosition().asVec3();
+            }
+            const float radius
+                = package.mLocation.radius > 0 ? static_cast<float>(package.mLocation.radius) : falloutDefaultSearch;
+
+            std::vector<OFWorld::Ptr> furniture;
+            if (kind == 0)
+            {
+                const OFWorld::Ptr named = OFBase::Environment::get().getWorldModel()->getPtr(
+                    ESM::RefNum(ESM::FormId::fromUint32(package.mTarget.target)));
+                if (named.isEmpty() || !named.getRefData().isEnabled() || !sharesSpace(mind.mPtr, named))
+                    return false;
+                if (named.getType() != ESM4::Furniture::sRecordId)
+                    return leftOut(mind, package, "it uses something that is not furniture");
+                furniture.push_back(named);
+            }
+            else
+            {
+                OFWorld::CellStore* cell = mind.mPtr.getCell();
+                if (cell == nullptr)
+                    return false;
+                const ESM::FormId wanted = ESM::FormId::fromUint32(package.mTarget.target);
+                cell->forEachType<ESM4::Furniture>([&](const OFWorld::Ptr& ptr) {
+                    if (!ptr.getRefData().isEnabled() || ptr.getCellRef().getCount() <= 0)
+                        return true;
+                    if (kind == 1 && ptr.get<ESM4::Furniture>()->mBase->mId != wanted)
+                        return true;
+                    // A piece out of reach, or on another floor, is no candidate
+                    if (!isNear(ptr.getRefData().getPosition().asVec3(), center, radius))
+                        return true;
+                    furniture.push_back(ptr);
+                    return true;
+                });
+            }
+
+            std::vector<FalloutCandidate> candidates;
+            candidates.reserve(furniture.size());
+            for (const OFWorld::Ptr& piece : furniture)
+            {
+                FalloutCandidate candidate;
+                candidate.mOrigin = piece.getRefData().getPosition().asVec3();
+                candidate.mPlace = candidate.mOrigin;
+                float heading = 0.f;
+                frame.mScripts->furnitureSeat(mind.mPtr, piece, candidate.mPlace, heading);
+                candidate.mFree = frame.mScripts->freeFurniturePlaces(piece)
+                    + (frame.mScripts->usesFurniture(mind.mPtr, piece) ? 1 : 0)
+                    - claimsOn(frame, mind, piece.getCellRef().getRefNum());
+                candidates.push_back(candidate);
+            }
+
+            int chosen = -1;
+            if (mind.mPackage == &package)
+            {
+                // The one it is on its way to, or sits in, stays its choice for as long as it can have it
+                for (std::size_t i = 0; i < furniture.size(); ++i)
+                    if (candidates[i].mFree > 0 && furniture[i].getCellRef().getRefNum() == mind.mGoal.mTarget)
+                        chosen = static_cast<int>(i);
+            }
+            // The package names the piece: it goes to it whatever the radius
+            if (chosen < 0)
+                chosen = falloutChooseCandidate(candidates, center, kind == 0 ? 0.f : radius, mind.position());
+            if (chosen < 0)
+                return false;
+
+            goal.mCenter = candidates[chosen].mPlace;
+            goal.mTarget = furniture[chosen].getCellRef().getRefNum();
+            hasFacing = false;
+            facing = 0.f;
+            return true;
+        }
+
         /// Where the package sends the actor: false when it cannot be done here (the reference it names is not in a
         /// cell that is loaded, or is not where the actor can go)
         bool makeGoal(const Frame& frame, const FalloutActors::Mind& mind, const ESM4::AIPackage& package,
@@ -605,6 +731,29 @@ namespace OFMechanics
                             << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
                             << ": left out, the one it talks to ("
                             << ESM::RefId(ESM::FormId::fromUint32(package.mTarget.target)) << ") is not around";
+                    return false;
+                }
+            }
+
+            if (goal.mBehaviour == ESM4::PackageBehaviour::Use)
+                return findFurniture(frame, mind, package, goal, hasFacing, facing);
+
+            if (goal.mBehaviour == ESM4::PackageBehaviour::Escort && package.mTarget.type == 0)
+            {
+                // The one it escorts has to be around, or the package is not on. A package that names no one to
+                // escort (an object of a kind) goes to its place alone.
+                const ESM::RefNum target = ESM::FormId::fromUint32(package.mTarget.target);
+                following.mPlayer
+                    = falloutIsPlayerReference(target, falloutFirstPlugin(frame.mWorld.getContentFiles()));
+                following.mRef = target;
+                following.mDistance = falloutEscortWait(package.mTarget.distance);
+                osg::Vec3f position;
+                if (!followPosition(frame, mind.mPtr, following, position))
+                {
+                    if (mind.mSkipTold.insert(&package).second)
+                        Log(hasEvents(package) ? Debug::Info : Debug::Verbose)
+                            << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
+                            << ": left out, the one it escorts (" << target << ") is not around";
                     return false;
                 }
             }
@@ -885,13 +1034,18 @@ namespace OFMechanics
 
             if (chosen.mPackage == mind.mPackage)
             {
-                // A place that the package names by a reference goes with it when something moves the reference
-                if (chosen.mPackage != nullptr && chosen.mPackage->mLocation.type == ESM4::Location_NearReference)
+                // A place that the package names by a reference goes with it when something moves the reference, and
+                // a package that looks for furniture follows its choice
+                if (chosen.mPackage != nullptr
+                    && (chosen.mPackage->mLocation.type == ESM4::Location_NearReference
+                        || chosen.mGoal.mBehaviour == ESM4::PackageBehaviour::Use))
                 {
                     mind.mHasFacing = chosen.mHasFacing;
                     mind.mFacing = chosen.mFacing;
-                    if ((chosen.mGoal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
+                    if (!(chosen.mGoal.mTarget == mind.mGoal.mTarget)
+                        || (chosen.mGoal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
                     {
+                        mind.mGoal.mTarget = chosen.mGoal.mTarget;
                         mind.mGoal.mCenter = chosen.mGoal.mCenter;
                         mind.mAtGoal = false;
                         mind.mPathRetry = 0.f;
@@ -959,19 +1113,40 @@ namespace OFMechanics
                 << ")";
         }
 
-        /// A character has got to the place of its Travel package: the package is done, once
+        /// A character has got to the place of its Travel, Find, Use Item At or Escort package: the package is done,
+        /// once
         void finishTravel(const Frame& frame, FalloutActors::Mind& mind)
         {
             const ESM4::AIPackage* package = mind.mPackage;
-            if (package == nullptr || package->mData.type != ESM4::Package_Travel || mind.mDone.count(package) != 0)
+            if (package == nullptr || mind.mDone.count(package) != 0)
+                return;
+            const bool uses = mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use;
+            // Eating and sleeping are done on furniture: they are never done as such, the character stays on it
+            const bool beds = package->mData.type == ESM4::Package_Eat || package->mData.type == ESM4::Package_Sleep;
+            if (package->mData.type != ESM4::Package_Travel && !uses && !beds
+                && mind.mGoal.mBehaviour != ESM4::PackageBehaviour::Escort)
                 return;
             // A character that has got to a piece of furniture uses it, and the script of the package is told after
             // that, as the games tell it when the character is in place
-            if (package->mLocation.type == ESM4::Location_NearReference && frame.mScripts != nullptr)
+            if (uses && frame.mScripts != nullptr)
+            {
+                const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(mind.mGoal.mTarget);
+                if (place.isEmpty() || !frame.mScripts->useFurniture(mind.mPtr, place, true))
+                {
+                    // Someone else got there first: it looks for another piece, soon
+                    mind.mAtGoal = false;
+                    mind.mGoal.mTarget = ESM::RefNum();
+                    mind.mWait = pathRetryTime;
+                    mind.mReview = 0.f;
+                    return;
+                }
+            }
+            else if (package->mLocation.type == ESM4::Location_NearReference && frame.mScripts != nullptr)
             {
                 const OFWorld::Ptr place = OFBase::Environment::get().getWorldModel()->getPtr(
                     ESM::RefNum(ESM::FormId::fromUint32(package->mLocation.location)));
                 if (!place.isEmpty() && place.getType() == ESM4::Furniture::sRecordId
+                    && !frame.mScripts->usesFurniture(mind.mPtr, place)
                     && !frame.mScripts->useFurniture(mind.mPtr, place, true))
                 {
                     // Every place of it is taken: the package is not done, and the character tries again later
@@ -980,6 +1155,8 @@ namespace OFMechanics
                     return;
                 }
             }
+            if (beds)
+                return;
             mind.mDone.insert(package);
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
@@ -989,6 +1166,22 @@ namespace OFMechanics
 
     namespace
     {
+        /// Whether a package that cannot be walked is done by putting the character at its place: those that a quest
+        /// waits for the character to be at
+        bool jumpsToPlace(const ESM4::AIPackage& package)
+        {
+            switch (ESM4::packageBehaviour(package.mData.type))
+            {
+                case ESM4::PackageBehaviour::Use:
+                case ESM4::PackageBehaviour::Escort:
+                    return true;
+                case ESM4::PackageBehaviour::Talk:
+                    return package.mLocation.type == ESM4::Location_NearReference;
+                default:
+                    return package.mData.type == ESM4::Package_Travel;
+            }
+        }
+
         /// A character that has a package that tells scripts what happens to it cannot get to its place: that is
         /// logged, and a Travel package that it has failed twice is done by putting the character at the place, since a
         /// quest waits for it (the way may be one that the navigator does not know, or the character cannot walk)
@@ -996,7 +1189,7 @@ namespace OFMechanics
         {
             const ESM4::AIPackage& package = *mind.mPackage;
             ++mind.mFailures;
-            const bool jump = package.mData.type == ESM4::Package_Travel && mind.mFailures >= failuresBeforeJump;
+            const bool jump = mind.mFailures >= failuresBeforeJump && jumpsToPlace(package);
             Log(Debug::Info) << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
                              << ": no way to get there ("
                              << (walker(frame.mWorld, mind.mPtr) == nullptr ? "it cannot walk"
@@ -1028,7 +1221,10 @@ namespace OFMechanics
                     // It cannot get there; it tries again after a while
                     stopWalking(mind);
                     mind.mWait = giveUpTime;
-                    if (mind.mPackage != nullptr && hasEvents(*mind.mPackage))
+                    // A character that cannot walk to a piece of furniture is put on it whatever the package tells
+                    // scripts: they read whether it sits
+                    if (mind.mPackage != nullptr
+                        && (hasEvents(*mind.mPackage) || mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use))
                         failToGetThere(frame, mind);
                     else
                         ++mind.mFailures;
@@ -1380,7 +1576,7 @@ namespace OFMechanics
         const OFWorld::TimeStamp now = world.getTimeStamp();
         std::vector<PendingEvent> events;
         Frame frame{ world, falloutClock(now.getHour(), now.getDay()), player.getRefData().getPosition().asVec3(),
-            Settings::navigator().mEnable, OFBase::Environment::get().getFalloutScripts(), &events };
+            Settings::navigator().mEnable, OFBase::Environment::get().getFalloutScripts(), &events, &mMinds };
         duration = std::min(duration, longestStep);
         const float range = static_cast<float>(Settings::game().mActorsProcessingRange);
 
@@ -1414,6 +1610,12 @@ namespace OFMechanics
             }
             mind.mSeenAlive = true;
 
+            // A character in a piece of furniture holds the pose of its entry
+            if (frame.mScripts != nullptr)
+                if (auto* animation
+                    = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                    animation->setPose(frame.mScripts->furnitureKindOf(mind.mPtr));
+
             // A fight comes before the packages
             if (frame.mScripts != nullptr && fight(frame, mind, duration))
                 continue;
@@ -1434,12 +1636,46 @@ namespace OFMechanics
                 case ESM4::PackageBehaviour::Stay:
                 {
                     // Something else (a script) moved it from where it stood, up or down as well: it goes back
-                    if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance)
+                    if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance
+                        && !(frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr)))
                         mind.mAtGoal = false;
                     if (!mind.mAtGoal && mind.mWait <= 0.f && goToPlace(frame, mind, duration))
                         finishTravel(frame, mind);
-                    if (mind.mAtGoal && mind.mHasFacing)
+                    if (mind.mAtGoal && mind.mHasFacing
+                        && !(frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr)))
                         faceToward(frame, mind, mind.mFacing, duration);
+                    break;
+                }
+                case ESM4::PackageBehaviour::Use:
+                {
+                    // Something else moved it from the furniture it was led to: it goes back
+                    if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance
+                        && !(frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr)))
+                        mind.mAtGoal = false;
+                    if (!mind.mAtGoal && mind.mWait <= 0.f && goToPlace(frame, mind, duration))
+                        finishTravel(frame, mind);
+                    break;
+                }
+                case ESM4::PackageBehaviour::Escort:
+                {
+                    // It leads the way: it waits for the one it escorts when that one is far behind
+                    const bool hasTarget = mind.mFollowing.mPlayer || mind.mFollowing.mRef.isSet();
+                    if (mind.mAtGoal && (mind.position() - mind.mRestPlace).length() > waypointDistance)
+                        mind.mAtGoal = false;
+                    if (hasTarget && !mind.mAtGoal)
+                    {
+                        osg::Vec3f target;
+                        if (!followPosition(frame, mind.mPtr, mind.mFollowing, target)
+                            || !falloutEscortMoves(
+                                distanceByFloor(mind.position(), target), mind.mFollowing.mDistance, mind.mWalking))
+                        {
+                            if (mind.mWalking)
+                                stopWalking(mind);
+                            break;
+                        }
+                    }
+                    if (!mind.mAtGoal && mind.mWait <= 0.f && goToPlace(frame, mind, duration))
+                        finishTravel(frame, mind);
                     break;
                 }
                 case ESM4::PackageBehaviour::Talk:

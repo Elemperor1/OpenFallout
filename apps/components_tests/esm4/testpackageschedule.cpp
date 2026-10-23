@@ -156,9 +156,11 @@ namespace
         for (const int type : std::initializer_list<int>{ ESM4::Package_Follow, ESM4::Package_Accompany })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Follow) << type;
         EXPECT_EQ(ESM4::packageBehaviour(ESM4::Package_Dialogue), ESM4::PackageBehaviour::Talk);
-        for (const int type : std::initializer_list<int>{ ESM4::Package_Find, ESM4::Package_Escort,
-                 ESM4::Package_UseItemAt, ESM4::Package_Ambush, ESM4::Package_FleeNotCombat, ESM4::Package_CastMagic,
-                 ESM4::Package_UseWeapon, 99, -1 })
+        for (const int type : std::initializer_list<int>{ ESM4::Package_Find, ESM4::Package_UseItemAt })
+            EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::Use) << type;
+        EXPECT_EQ(ESM4::packageBehaviour(ESM4::Package_Escort), ESM4::PackageBehaviour::Escort);
+        for (const int type : std::initializer_list<int>{ ESM4::Package_Ambush, ESM4::Package_FleeNotCombat,
+                 ESM4::Package_CastMagic, ESM4::Package_UseWeapon, 99, -1 })
             EXPECT_EQ(ESM4::packageBehaviour(type), ESM4::PackageBehaviour::None) << type;
     }
 
@@ -167,13 +169,14 @@ namespace
         const ESM4::PackageClock noon = clock(12.f);
 
         EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Sandbox), noon), ESM4::PackageSkip::None);
-        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Find), noon), ESM4::PackageSkip::Behaviour);
+        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Ambush), noon), ESM4::PackageSkip::Behaviour);
+        EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Find), noon), ESM4::PackageSkip::None);
         EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Follow), noon), ESM4::PackageSkip::None);
         EXPECT_EQ(
             ESM4::packageSkip(package(ESM4::Package_Sandbox, schedule(20, 2)), noon), ESM4::PackageSkip::Schedule);
         // A package of no use is skipped whatever its schedule says
         EXPECT_EQ(
-            ESM4::packageSkip(package(ESM4::Package_Escort, schedule(20, 2)), noon), ESM4::PackageSkip::Behaviour);
+            ESM4::packageSkip(package(ESM4::Package_UseWeapon, schedule(20, 2)), noon), ESM4::PackageSkip::Behaviour);
         // and one that talks is followed like the others
         EXPECT_EQ(ESM4::packageSkip(package(ESM4::Package_Dialogue), noon), ESM4::PackageSkip::None);
 
@@ -203,7 +206,7 @@ namespace
         const ESM4::AIPackage sleep = package(ESM4::Package_Sleep, schedule(22, 8));
         ESM4::AIPackage quest = package(ESM4::Package_Travel);
         quest.mTargetConditions.emplace_back();
-        const ESM4::AIPackage escort = package(ESM4::Package_Escort);
+        const ESM4::AIPackage escort = package(ESM4::Package_Ambush);
         const ESM4::AIPackage work = package(ESM4::Package_Sandbox, schedule(8, 12));
         const ESM4::AIPackage idle = package(ESM4::Package_Wander);
         const std::vector<const ESM4::AIPackage*> list{ nullptr, &quest, &escort, &sleep, &work, &idle };

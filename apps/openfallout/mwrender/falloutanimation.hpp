@@ -94,6 +94,15 @@ namespace OFRender
     /// variant); a thrown weapon takes `attackthrow` and its numbered forms. Empty when the files have none.
     std::string chooseFalloutWeaponAnimation(std::string_view folder, int animationType, FalloutWeaponMove move,
         const std::vector<std::string>& files, unsigned counter = 0);
+
+    /// The animation a character holds while it uses a piece of furniture whose marker entry is of the kind (the
+    /// position reference byte of the entry in the model of the furniture: 1 and 2 beds, 3 and 4 beds on the floor, 5
+    /// and 6 sleeping on the floor, 10 to 14 and 16, 17 and 20 sitting, 15 a stool, 18 restrained, 19 leaning on a
+    /// wall), chosen among the paths of the files in the folder of its skeleton (lower case, as the virtual file
+    /// system lists them): the loop of the pose that the games keep in the folder `idleanims` (`dynamicidle_sit.kf`,
+    /// `dynamicidle_sleep.kf`). The games also play a file to get in and one to get out, chosen among the idles by
+    /// their conditions; those are not played. Empty when the kind has no pose or the files do not have it.
+    std::string chooseFalloutPose(std::string_view folder, int entryKind, const std::vector<std::string>& files);
 }
 
 #endif

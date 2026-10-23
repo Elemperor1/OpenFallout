@@ -782,6 +782,14 @@ namespace OFScript
         /// Whether the actor uses some furniture now (a character does not leave it for another package that has
         /// become eligible, as the games keep a seated character in its chair until the package that sat it ends)
         bool usesFurniture(const OFWorld::Ptr& actor) const;
+        /// Whether the actor uses this furniture now
+        bool usesFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture) const;
+        /// The kind of the entry of the furniture the actor uses (the position reference byte of the model: 1 to 9
+        /// lying, 10 to 20 sitting), 0 when it uses none
+        int furnitureKindOf(const OFWorld::Ptr& actor) const;
+        /// How many more characters can use the furniture: the entries of its marker that the record enables and that
+        /// no one uses (0 when the model has none)
+        int freeFurniturePlaces(const OFWorld::Ptr& furniture);
 
         /// The AI packages that scripts gave the character, the last given first (those that no content file has a
         /// record of are left out)

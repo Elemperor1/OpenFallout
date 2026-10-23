@@ -56,6 +56,11 @@ namespace ESM4
                 return PackageBehaviour::Follow;
             case Package_Dialogue:
                 return PackageBehaviour::Talk;
+            case Package_Find:
+            case Package_UseItemAt:
+                return PackageBehaviour::Use;
+            case Package_Escort:
+                return PackageBehaviour::Escort;
             default:
                 return PackageBehaviour::None;
         }
