@@ -62,11 +62,11 @@ namespace FalloutScript
         virtual FormId parentCell(FormId reference) = 0;
         /// The worldspace of that cell, 0 for a cell inside a building
         virtual FormId parentWorldspace(FormId reference) = 0;
-        /// True the first time the script asks after the game was started, and not again until it is started anew;
-        /// the script is told apart by its address
-        virtual bool gameRestarted(const void* script) = 0;
-        /// True the first time the script asks after a saved game was loaded, and not again until the next load
-        virtual bool gameLoaded(const void* script) = 0;
+        /// True the first time a script asks after the program was started, and not again until it is started anew;
+        /// the script is the form of the script, so that every object that has it is told once between them
+        virtual bool gameRestarted(FormId script) = 0;
+        /// True the first time a script asks after a game was started or loaded, and not again until the next one
+        virtual bool gameLoaded(FormId script) = 0;
     };
 
     /// Gives the commands IsInInterior, HasLoaded3D, IsRaining, IsPCSleeping, GetInZone,

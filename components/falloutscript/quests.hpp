@@ -147,7 +147,7 @@ namespace FalloutScript
         QuestState* find(FormId quest);
         const QuestState* find(FormId quest) const;
 
-        std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
+        std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition, FormId form = 0);
         void makeInstance(FormId id, QuestState& quest);
         void advance(float seconds, std::uint16_t blockType, const BlockFilter& filter = {});
         void runEntry(FormId quest, const ESM4::QuestLogEntry& entry);

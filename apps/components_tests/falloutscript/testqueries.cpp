@@ -47,9 +47,8 @@ namespace
         std::map<std::string, double> mSettings;
         std::map<FormId, FormId> mCells;
         std::map<FormId, FormId> mWorldspaces;
-        std::set<const void*> mRestarted;
-        std::set<const void*> mLoaded3;
-        bool mGameWasLoaded = false;
+        std::set<FormId> mRestarted;
+        std::set<FormId> mLoaded3;
 
         bool inInterior(FormId reference) override { return mInteriors.count(reference) != 0; }
         bool hasLoaded3D(FormId reference) override { return mLoaded.count(reference) != 0; }
@@ -71,8 +70,8 @@ namespace
             const auto found = mWorldspaces.find(reference);
             return found == mWorldspaces.end() ? 0 : found->second;
         }
-        bool gameRestarted(const void* script) override { return mRestarted.insert(script).second; }
-        bool gameLoaded(const void* script) override { return mGameWasLoaded && mLoaded3.insert(script).second; }
+        bool gameRestarted(FormId script) override { return mRestarted.insert(script).second; }
+        bool gameLoaded(FormId script) override { return mLoaded3.insert(script).second; }
         std::optional<double> gameSetting(std::string_view name) override
         {
             const auto found = mSettings.find(std::string(name));
@@ -258,8 +257,6 @@ namespace
         Runner run;
         EXPECT_EQ(run.call(OpGetGameRestarted, 0), 1.0);
         EXPECT_EQ(run.call(OpGetGameRestarted, 0), 0.0);
-        EXPECT_EQ(run.call(OpGetGameLoaded, 0), 0.0);
-        run.mWorld.mGameWasLoaded = true;
         EXPECT_EQ(run.call(OpGetGameLoaded, 0), 1.0);
         EXPECT_EQ(run.call(OpGetGameLoaded, 0), 0.0);
     }

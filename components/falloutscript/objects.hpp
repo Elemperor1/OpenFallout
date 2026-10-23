@@ -111,7 +111,7 @@ namespace FalloutScript
             FormId mPrevious;
         };
 
-        std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition);
+        std::shared_ptr<const Script> prepared(const ESM4::ScriptDefinition& definition, FormId form = 0);
         void run(const std::set<FormId>& references, std::uint16_t blockType, const BlockFilter& filter = {});
 
         /// The variables that a saved game held for the script of a reference whose script has not been given to it yet

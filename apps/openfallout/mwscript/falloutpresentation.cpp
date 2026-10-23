@@ -131,15 +131,15 @@ namespace OFScript
         return worldspaceOf(reference);
     }
 
-    bool FalloutScripts::gameRestarted(const void* script)
+    bool FalloutScripts::gameRestarted(FalloutScript::FormId script)
     {
         const std::lock_guard lock(mSessionMutex);
         return mRestartAsked.insert(script).second;
     }
 
-    bool FalloutScripts::gameLoaded(const void* script)
+    bool FalloutScripts::gameLoaded(FalloutScript::FormId script)
     {
         const std::lock_guard lock(mSessionMutex);
-        return mGameLoaded && mLoadAsked.insert(script).second;
+        return mLoadAsked.insert(script).second;
     }
 }

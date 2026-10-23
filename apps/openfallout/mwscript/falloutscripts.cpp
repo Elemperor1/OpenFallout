@@ -492,10 +492,9 @@ namespace OFScript
         mPresentation.clear();
         mMagic.clear();
         {
+            // A new game and a loaded game are both told to the scripts once; the program was started only once
             const std::lock_guard lock(mSessionMutex);
-            mRestartAsked.clear();
             mLoadAsked.clear();
-            mGameLoaded = false;
         }
         mFormLists.clear();
         mProgress.clear();

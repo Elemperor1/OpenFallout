@@ -56,6 +56,14 @@ namespace
         EXPECT_EQ(script.variables()[3].mKind, VariableKind::Float);
     }
 
+    TEST(FalloutScriptScriptTest, aScriptKnowsTheFormItWasPreparedFor)
+    {
+        const ScriptBuilder builder = withCode(scriptName());
+        EXPECT_EQ(Script::prepare(builder.definition(), commandsOfTests(), 0x1234).form(), 0x1234u);
+        // The result of a line of dialogue is no form of its own
+        EXPECT_EQ(prepareScript(builder).form(), 0u);
+    }
+
     TEST(FalloutScriptScriptTest, aVariableThatOnlyAReferenceNamesStillExists)
     {
         ScriptBuilder builder;

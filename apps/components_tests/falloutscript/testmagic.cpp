@@ -175,6 +175,18 @@ namespace
         EXPECT_EQ(run.call(OpIsSpellTarget, courier, { blast }), 0.0);
     }
 
+    TEST(FalloutScriptMagicTest, a_cast_goes_on_when_the_spell_that_was_learned_is_taken_away)
+    {
+        Runner run;
+        run.call(OpAddSpell, courier, { blast });
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        run.call(OpRemoveSpell, courier, { blast });
+        EXPECT_FALSE(run.mMagic.hasSpell(courier, blast));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 1.0);
+        run.mMagic.update(12);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 0.0);
+    }
+
     TEST(FalloutScriptMagicTest, an_effect_is_on_the_character_only_while_its_conditions_hold)
     {
         Runner run;

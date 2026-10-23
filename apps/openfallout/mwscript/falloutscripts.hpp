@@ -783,8 +783,8 @@ namespace OFScript
         void achievement(int id) override;
         FalloutScript::FormId parentCell(FalloutScript::FormId reference) override;
         FalloutScript::FormId parentWorldspace(FalloutScript::FormId reference) override;
-        bool gameRestarted(const void* script) override;
-        bool gameLoaded(const void* script) override;
+        bool gameRestarted(FalloutScript::FormId script) override;
+        bool gameLoaded(FalloutScript::FormId script) override;
         bool isActor(FalloutScript::FormId reference) override;
         FalloutScript::FormId playerBase() override;
         FalloutScript::FormId ownerForm(FalloutScript::FormId form) override;
@@ -1162,11 +1162,12 @@ namespace OFScript
         FalloutScript::ObjectState mObjectState;
         FalloutScript::MapMarkers mMapMarkers;
         FalloutScript::Presentation mPresentation;
-        /// Which scripts have been told that the game was started anew or loaded (GetGameRestarted, GetGameLoaded)
+        /// Which script forms have been told that the program was started or that a game was started or loaded
+        /// (GetGameRestarted, GetGameLoaded): the first set lasts as long as the program, the second until the next
+        /// game is started or loaded
         std::mutex mSessionMutex;
-        std::set<const void*> mRestartAsked;
-        std::set<const void*> mLoadAsked;
-        bool mGameLoaded = false;
+        std::set<FalloutScript::FormId> mRestartAsked;
+        std::set<FalloutScript::FormId> mLoadAsked;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
         FalloutScript::PerkEngine mPerks;

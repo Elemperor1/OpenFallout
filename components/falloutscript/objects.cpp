@@ -22,11 +22,11 @@ namespace FalloutScript
     {
     }
 
-    std::shared_ptr<const Script> ObjectScripts::prepared(const ESM4::ScriptDefinition& definition)
+    std::shared_ptr<const Script> ObjectScripts::prepared(const ESM4::ScriptDefinition& definition, FormId form)
     {
         auto& script = mPrepared[&definition];
         if (!script)
-            script = std::make_shared<const Script>(Script::prepare(definition, mInterpreter.commands()));
+            script = std::make_shared<const Script>(Script::prepare(definition, mInterpreter.commands(), form));
         return script;
     }
 
@@ -44,7 +44,7 @@ namespace FalloutScript
                 mInterpreter.host().log("The script " + hex(script) + " of an object is not known");
             return nullptr;
         }
-        std::shared_ptr<const Script> prepared = this->prepared(record->mScript);
+        std::shared_ptr<const Script> prepared = this->prepared(record->mScript, script);
         if (!prepared->usable())
         {
             if (mReported.insert(script).second)

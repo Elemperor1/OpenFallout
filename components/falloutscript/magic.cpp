@@ -118,7 +118,8 @@ namespace FalloutScript
             modifier = mModifier;
             for (auto it = mRunning.begin(); it != mRunning.end();)
             {
-                if (it->mActor == actor && it->mSource == spell)
+                // What a cast of the spell started runs out on its own; only what the spell itself keeps goes now
+                if (it->mActor == actor && it->mSource == spell && it->mRemaining <= 0)
                 {
                     if (it->mActorValue >= 0)
                         changes.emplace_back(it->mActorValue, -it->mDelta);

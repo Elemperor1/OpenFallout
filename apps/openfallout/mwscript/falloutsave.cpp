@@ -994,11 +994,6 @@ namespace OFScript
             reader.skipRecord();
             return;
         }
-        {
-            // Scripts that ask GetGameLoaded are told once that a saved game was loaded
-            const std::lock_guard lock(mSessionMutex);
-            mGameLoaded = true;
-        }
         const std::string name = reader.getHNString("NAME");
         std::uint32_t version = 0;
         reader.getHNT(version, "VERS");
