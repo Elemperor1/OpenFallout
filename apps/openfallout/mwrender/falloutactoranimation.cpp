@@ -424,6 +424,28 @@ namespace OFRender
         Log(Debug::Verbose) << mPtr.getCellRef().getRefId() << " holds the pose " << file;
     }
 
+    bool FalloutActorAnimation::playIdle(const std::string& file)
+    {
+        if (mObjectRoot == nullptr || mSkeletonPath.empty() || isDown() || file.empty())
+            return false;
+        std::string group;
+        if (const auto known = mIdleGroups.find(file); known != mIdleGroups.end())
+            group = known->second;
+        else
+        {
+            group = addAnimation(file, mSkeletonPath);
+            mIdleGroups.emplace(file, group);
+        }
+        if (group.empty())
+            return false;
+        // One that was playing and has not ended starts again
+        if (isPlaying(group))
+            disable(group);
+        play(group, OFRender::AnimPriority(OFMechanics::Priority_Scripted), OFRender::BlendMask_All, true, 1.f, "start",
+            "stop", 0.f, 0u, false);
+        return true;
+    }
+
     void FalloutActorAnimation::flinch()
     {
         if (isDown())

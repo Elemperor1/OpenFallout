@@ -19,6 +19,12 @@ namespace FalloutScript
         /// Whether the sound is playing now, from the reference (the player for 0)
         virtual bool isSoundPlaying(FormId sound, FormId reference) = 0;
         virtual bool isMusicPlaying() = 0;
+        /// Has the music of the game be the track of the music type record, which replaces what plays and goes back to
+        /// the playlist when it ends. False when the record has no file.
+        virtual bool playMusic(FormId track) = 0;
+        /// The sky has the weather at once; with `hold` it keeps it, whatever the region says, until it is released
+        virtual void forceWeather(FormId weather, bool hold) = 0;
+        virtual void releaseWeather() = 0;
         /// How long an image space modifier lasts, in seconds; 0 when the files do not say
         virtual double imageSpaceDuration(FormId modifier) = 0;
         /// An achievement of the game was earned (the number is the id the script names)
@@ -55,8 +61,9 @@ namespace FalloutScript
         std::map<FormId, FormId> mLooks;
     };
 
-    /// Gives the commands PlaySound, PlaySound3D, IsSoundPlaying, IsMusicPlaying, ApplyImageSpaceModifier,
-    /// RemoveImageSpaceModifier, IsImageSpaceActive, Look, StopLook, AddAchievement and Abs to the interpreter. Those
+    /// Gives the commands PlaySound, PlaySound3D, IsSoundPlaying, IsMusicPlaying, PlayMusic, ForceWeather,
+    /// ReleaseWeatherOverride, ApplyImageSpaceModifier, RemoveImageSpaceModifier, IsImageSpaceActive, Look, StopLook,
+    /// AddAchievement and Abs to the interpreter. Those
     /// that the command table does not have are left out.
     void addPresentationCommands(Interpreter& interpreter, Presentation& presentation, PresentationWorld& world);
 }

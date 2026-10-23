@@ -26,6 +26,9 @@ namespace FalloutScript
         virtual bool playGroup(FormId reference, std::string_view group, bool restart) = 0;
         /// Whether a group plays on the model of the reference: the named one, or any when the name is empty
         virtual bool isGroupPlaying(FormId reference, std::string_view group) = 0;
+        /// Has the character or creature play an idle record, named by its editor id (any case) or by the form (when
+        /// the name is empty), once. False when the records or the files have no such idle for it.
+        virtual bool playIdle(FormId reference, std::string_view name, FormId idle) = 0;
     };
 
     /// What GetOpenState gives

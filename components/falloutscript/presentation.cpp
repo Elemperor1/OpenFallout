@@ -88,6 +88,23 @@ namespace FalloutScript
             return sound != 0 && world.isSoundPlaying(sound, source) ? 1.0 : 0.0;
         });
         interpreter.setHandler("IsMusicPlaying", [&world](CallContext&) { return world.isMusicPlaying() ? 1.0 : 0.0; });
+        interpreter.setHandler("PlayMusic", [&world](CallContext& call) {
+            if (const FormId track = formArgument(call, 0); track != 0)
+                world.playMusic(track);
+            return 0.0;
+        });
+        // The weather comes at once. With a second argument that is not 0 it also stays, whatever the region says,
+        // until ReleaseWeatherOverride (the executable sets the weather of the sky in the one case and its override in
+        // the other).
+        interpreter.setHandler("ForceWeather", [&world](CallContext& call) {
+            if (const FormId weather = formArgument(call, 0); weather != 0)
+                world.forceWeather(weather, intArgument(call, 1) != 0);
+            return 0.0;
+        });
+        interpreter.setHandler("ReleaseWeatherOverride", [&world](CallContext&) {
+            world.releaseWeather();
+            return 0.0;
+        });
         interpreter.setHandler("ApplyImageSpaceModifier", [&presentation, &world](CallContext& call) {
             if (const FormId modifier = formArgument(call, 0); modifier != 0)
                 presentation.applyImageSpace(modifier, world.imageSpaceDuration(modifier));

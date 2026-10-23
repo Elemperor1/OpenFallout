@@ -64,6 +64,7 @@
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/reputation.hpp>
 #include <components/falloutscript/saveaccess.hpp>
+#include <components/falloutscript/switches.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 #include <components/falloutscript/vats.hpp>
@@ -82,6 +83,7 @@ namespace ESM
 namespace ESM4
 {
     struct AIPackage;
+    struct IdleAnimation;
     struct Weapon;
 }
 
@@ -993,6 +995,9 @@ namespace OFScript
         void playSound(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
         bool isSoundPlaying(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
         bool isMusicPlaying() override;
+        bool playMusic(FalloutScript::FormId track) override;
+        void forceWeather(FalloutScript::FormId weather, bool hold) override;
+        void releaseWeather() override;
         double imageSpaceDuration(FalloutScript::FormId modifier) override;
         void achievement(int id) override;
         FalloutScript::FormId parentCell(FalloutScript::FormId reference) override;
@@ -1032,6 +1037,9 @@ namespace OFScript
         bool hasGroup(FalloutScript::FormId reference, std::string_view group) override;
         bool playGroup(FalloutScript::FormId reference, std::string_view group, bool restart) override;
         bool isGroupPlaying(FalloutScript::FormId reference, std::string_view group) override;
+        bool playIdle(FalloutScript::FormId reference, std::string_view name, FalloutScript::FormId idle) override;
+        /// The idle record named by its editor id, or the form when the name is empty; null when there is none
+        const ESM4::IdleAnimation* findIdle(std::string_view name, FalloutScript::FormId form);
         /// The animation of the object a reference stands for, when it is in the scene and is no character
         OFRender::ObjectAnimation* objectAnimationOf(FalloutScript::FormId reference);
         /// Gives the collision back to the doors that are closed again
@@ -1376,6 +1384,7 @@ namespace OFScript
         FalloutScript::ObjectState mObjectState;
         FalloutScript::MapMarkers mMapMarkers;
         FalloutScript::Presentation mPresentation;
+        FalloutScript::Switches mSwitches;
         /// Which script forms have been told that the program was started or that a game was started or loaded
         /// (GetGameRestarted, GetGameLoaded): the first set lasts as long as the program, the second until the next
         /// game is started or loaded
@@ -1681,6 +1690,12 @@ namespace OFScript
         std::optional<std::vector<PlacedMarker>> mPlacedMarkers;
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
+        /// The idle records by editor id (lower case), made when the first PlayIdle asks, and the idles that a PlayIdle
+        /// could not play (told once in the log)
+        std::mutex mIdleMutex;
+        bool mIdlesIndexed = false;
+        std::map<std::string, ESM::FormId> mIdlesByName;
+        std::set<std::string> mIdleProblems;
         /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player
         /// and the rest hear different shots of a weapon). Each is logged once, for what the data lacks
         std::set<std::tuple<FalloutScript::FormId, bool, std::uint32_t>> mWeaponSoundsLogged;

@@ -429,6 +429,13 @@ namespace OFWorld
          * @param ID of the weather setting to shift to
          */
         void changeWeather(ESM::RefId regionID, ESM::RefId weatherID);
+        /// A script forces a weather (ForceWeather): the sky has it at once, without a transition. With `hold` it
+        /// keeps it, whatever the region says, until the override is released; without, the next change of weather
+        /// replaces it.
+        void overrideWeather(ESM::RefId weatherID, bool hold);
+        /// The weather of the region is picked again at the next update
+        void releaseWeatherOverride();
+        bool isWeatherOverridden() const { return !mOverride.empty(); }
         void modRegion(ESM::RefId regionID, const std::map<ESM::RefId, uint8_t>& chances);
         const std::map<ESM::RefId, uint8_t>& getRegionChances(ESM::RefId regionID) const;
         void playerTeleported(const ESM::RefId& playerRegion, bool isExterior);
@@ -511,6 +518,10 @@ namespace OFWorld
         ESM::RefId mCurrentWeather;
         ESM::RefId mNextWeather;
         ESM::RefId mQueuedWeather;
+        /// The weather a script holds, empty for none
+        ESM::RefId mOverride;
+        /// The override was released and the weather of the region has not been brought back yet
+        bool mOverrideReleased = false;
         std::map<ESM::RefId, RegionWeather> mRegions;
         OFRender::WeatherResult mResult;
 

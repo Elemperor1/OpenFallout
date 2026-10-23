@@ -32,6 +32,9 @@ namespace
     constexpr std::uint16_t OpAbs = 0x1221;
     constexpr std::uint16_t OpIsImageSpaceActive = 0x1232;
     constexpr std::uint16_t OpIsSoundPlaying = 0x278A;
+    constexpr std::uint16_t OpPlayMusic = 0x11FF;
+    constexpr std::uint16_t OpForceWeather = 0x112D;
+    constexpr std::uint16_t OpReleaseWeatherOverride = 0x1158;
 
     class FakeWorld : public FalloutScript::PresentationWorld
     {
@@ -42,6 +45,9 @@ namespace
         std::map<FormId, double> mDurations{ { flash, 2.0 }, { blur, 0.0 } };
         std::vector<int> mAchievements;
         bool mMusic = false;
+        std::vector<FormId> mTracks;
+        std::vector<std::pair<FormId, bool>> mForced;
+        int mReleased = 0;
 
         void playSound(FormId sound, FormId reference) override { mPlayed.emplace_back(sound, reference); }
         bool isSoundPlaying(FormId sound, FormId reference) override
@@ -50,6 +56,13 @@ namespace
             return mPlaying.count(sound) != 0;
         }
         bool isMusicPlaying() override { return mMusic; }
+        bool playMusic(FormId track) override
+        {
+            mTracks.push_back(track);
+            return true;
+        }
+        void forceWeather(FormId weather, bool hold) override { mForced.emplace_back(weather, hold); }
+        void releaseWeather() override { ++mReleased; }
         double imageSpaceDuration(FormId modifier) override
         {
             const auto found = mDurations.find(modifier);
@@ -163,6 +176,21 @@ namespace
         EXPECT_EQ(run.call(OpAbs, 0, { -3.5 }), 3.5);
         EXPECT_EQ(run.call(OpAbs, 0, { 2 }), 2.0);
         EXPECT_EQ(run.call(OpAbs, 0, {}), 0.0);
+    }
+
+    TEST(FalloutScriptPresentationTest, music_and_weather_are_handed_to_the_host)
+    {
+        Runner run;
+        run.call(OpPlayMusic, 0, { shout });
+        run.call(OpPlayMusic, 0, {});
+        EXPECT_THAT(run.mWorld.mTracks, ElementsAre(shout));
+        // The second argument has the weather stay until it is released
+        run.call(OpForceWeather, 0, { flash });
+        run.call(OpForceWeather, 0, { blur, 1 });
+        run.call(OpForceWeather, 0, {});
+        EXPECT_THAT(run.mWorld.mForced, ElementsAre(std::make_pair(flash, false), std::make_pair(blur, true)));
+        run.call(OpReleaseWeatherOverride, 0, {});
+        EXPECT_EQ(run.mWorld.mReleased, 1);
     }
 
     TEST(FalloutScriptPresentationTest, clearing_forgets_the_modifiers_and_the_looks)

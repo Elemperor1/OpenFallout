@@ -320,6 +320,8 @@ namespace OFWorld
         ///< \return Resulting mode
 
         void changeWeather(ESM::RefId region, ESM::RefId id) override;
+        void forceWeather(ESM::RefId id, bool hold) override;
+        void releaseWeatherOverride() override;
 
         const OFWorld::WeatherStore& getAllWeather() const override;
 

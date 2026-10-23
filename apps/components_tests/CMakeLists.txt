@@ -107,6 +107,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testlock.cpp
     esm4/testhungerstage.cpp
     esm4/testimagespace.cpp
+    esm4/testidlemusic.cpp
     esm4/testimagespacemodifier.cpp
     esm4/testimpactdata.cpp
     esm4/testimpactdataset.cpp
@@ -189,6 +190,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testpresentation.cpp
     falloutscript/testqueries.cpp
     falloutscript/testreferencestate.cpp
+    falloutscript/testswitches.cpp
     falloutscript/testreputation.cpp
     falloutscript/testsavecharacters.cpp
     falloutscript/testsaveworld.cpp

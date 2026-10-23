@@ -936,6 +936,12 @@ namespace OFScript
                 mPendingSave->mTriggers = FalloutScript::readTriggers(in, version);
             });
         section(
+            "switches", FalloutScript::switchesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeSwitches(mSwitches, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readSwitches(mSwitches, in, version);
+            });
+        section(
             "openstates", FalloutScript::openStatesSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeOpenStates(mOpenStates, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {

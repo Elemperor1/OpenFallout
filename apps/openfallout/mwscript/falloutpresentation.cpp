@@ -6,10 +6,15 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadimad.hpp>
+#include <components/esm4/loadmusc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/misc/resourcehelpers.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/vfs/manager.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/soundmanager.hpp"
+#include "../mwbase/world.hpp"
 #include "../mwworld/esmstore.hpp"
 
 namespace OFScript
@@ -95,6 +100,54 @@ namespace OFScript
     {
         OFBase::SoundManager* manager = OFBase::Environment::get().getSoundManager();
         return manager != nullptr && std::this_thread::get_id() == mMainThread && manager->isMusicPlaying();
+    }
+
+    bool FalloutScripts::playMusic(FalloutScript::FormId track)
+    {
+        const ESM::FormId id = ESM::FormId::fromUint32(track);
+        const ESM4::Music* record = id.isZeroOrUnset() ? nullptr : mStore.get<ESM4::Music>().search(id);
+        if (record == nullptr || record->mMusicFile.empty())
+            return false;
+        const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
+        if (resources == nullptr)
+            return false;
+        // The file is named from the folder of the music, as the sound records name theirs from the folder of the
+        // sounds
+        constexpr VFS::Path::NormalizedView musicDir("music");
+        constexpr VFS::Path::ExtensionView mp3("mp3");
+        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
+            { { musicDir } }, VFS::Path::toNormalized(record->mMusicFile), *resources->getVFS(), mp3);
+        if (!resources->getVFS()->exists(path))
+        {
+            Log(Debug::Warning) << "The music " << record->mEditorId << " has no file " << path;
+            return false;
+        }
+        Log(Debug::Info) << "Script music: " << record->mEditorId << " plays " << path;
+        // The track replaces what plays, with the fade of the sound manager, and the playlist goes on when it ends
+        runOnMainThread([path] {
+            if (OFBase::SoundManager* manager = OFBase::Environment::get().getSoundManager())
+                manager->streamMusic(path, OFSound::MusicType::MWScript);
+        });
+        return true;
+    }
+
+    void FalloutScripts::forceWeather(FalloutScript::FormId weather, bool hold)
+    {
+        const ESM::FormId id = ESM::FormId::fromUint32(weather);
+        if (id.isZeroOrUnset())
+            return;
+        runOnMainThread([id, hold] {
+            if (OFBase::World* world = OFBase::Environment::get().getWorld())
+                world->forceWeather(id, hold);
+        });
+    }
+
+    void FalloutScripts::releaseWeather()
+    {
+        runOnMainThread([] {
+            if (OFBase::World* world = OFBase::Environment::get().getWorld())
+                world->releaseWeatherOverride();
+        });
     }
 
     double FalloutScripts::imageSpaceDuration(FalloutScript::FormId modifier)

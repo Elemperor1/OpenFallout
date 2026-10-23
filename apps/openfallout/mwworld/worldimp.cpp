@@ -1859,6 +1859,16 @@ namespace OFWorld
         mWeatherManager->changeWeather(region, id);
     }
 
+    void World::forceWeather(ESM::RefId id, bool hold)
+    {
+        mWeatherManager->overrideWeather(id, hold);
+    }
+
+    void World::releaseWeatherOverride()
+    {
+        mWeatherManager->releaseWeatherOverride();
+    }
+
     void World::modRegion(ESM::RefId regionid, const std::map<ESM::RefId, uint8_t>& chances)
     {
         mWeatherManager->modRegion(regionid, chances);

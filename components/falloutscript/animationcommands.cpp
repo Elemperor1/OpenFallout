@@ -92,6 +92,18 @@ namespace FalloutScript
             }
             return world.isGroupPlaying(call.mReference, group) ? 1.0 : 0.0;
         });
+        // The compiled call holds the editor id of the idle as a string, which the executable looks up when the command
+        // runs (a form is accepted too). It gives no value to scripts.
+        interpreter.setHandler("PlayIdle", [&world](CallContext& call) {
+            if (call.mReference == 0 || call.mArguments.empty())
+                return 0.0;
+            const Value& idle = call.mArguments[0];
+            if (idle.mIsText)
+                world.playIdle(call.mReference, idle.mText, 0);
+            else if (const FormId form = formArgument(call, 0); form != 0)
+                world.playIdle(call.mReference, {}, form);
+            return 0.0;
+        });
         interpreter.setHandler("GetOpenState", [&states, &world](CallContext& call) {
             return call.mReference != 0 ? static_cast<double>(states.stateOf(call.mReference, world)) : 0.0;
         });

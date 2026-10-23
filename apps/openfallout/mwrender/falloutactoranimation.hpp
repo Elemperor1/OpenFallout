@@ -59,6 +59,10 @@ namespace OFRender
         /// games play an animation to get in and to get out, which are not played here.
         void setPose(int entryKind);
 
+        /// A script has the actor play an animation file once over what it does (the idle of a PlayIdle), after which
+        /// it goes on as it was. False when the files have nothing to play on its skeleton, or it is down.
+        bool playIdle(const std::string& file);
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
@@ -105,6 +109,8 @@ namespace OFRender
         int mPoseKind = 0;
         std::string mPoseGroup;
         std::map<std::string, std::string> mPoseGroups;
+        /// The animations that scripts had it play, by file
+        std::map<std::string, std::string> mIdleGroups;
 
         std::string mWalkGroup;
         std::string mRunGroup;
