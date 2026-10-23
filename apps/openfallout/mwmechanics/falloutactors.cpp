@@ -98,6 +98,9 @@ namespace OFMechanics
         constexpr float fightRepathDistance = 60.f;
         // A character that runs away goes this far at a time, in the direction away from the one it runs from
         constexpr float fleeStep = 600.f;
+        // A shot or a throw is shown with the weapon that made it: when it used the weapon up and the character took
+        // another, the next weapon is drawn this many seconds later
+        constexpr float shotShownFor = 0.8f;
 
         enum class Walk
         {
@@ -161,6 +164,7 @@ namespace OFMechanics
         float mSight = 0.f; // seconds until it looks for the player to go for
         bool mFighting = false; // it was in a fight the last time it was looked at
         FalloutScript::FormId mDrawn = 0; // the weapon whose animations it was last given in a fight
+        float mShowAfter = 0.f; // seconds until the weapon it holds is drawn, after a shot that used the last one up
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -1184,8 +1188,9 @@ namespace OFMechanics
             auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr));
             if (animation == nullptr)
                 return;
-            // Bare hands are held ready once, the form 0 being no weapon: the fight is the mark
-            if (held.mWeapon == 0 && animation->isWeaponDrawn())
+            // Bare hands are held ready once, the form 0 being no weapon: the fight is the mark. A weapon that was
+            // drawn (a gun that is used up) is put away by the hands that take its place.
+            if (held.mWeapon == 0 && mind.mDrawn == 0 && animation->isWeaponDrawn())
                 return;
             mind.mDrawn = held.mWeapon;
             animation->drawWeapon(held.mModel, held.mAnimationType);
@@ -1207,6 +1212,7 @@ namespace OFMechanics
                         = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
                         animation->holsterWeapon();
                 mind.mDrawn = 0;
+                mind.mShowAfter = 0.f;
                 mind.mFighting = false;
                 stopWalking(mind);
                 mind.mAtGoal = false;
@@ -1321,13 +1327,33 @@ namespace OFMechanics
                         return false;
                     }
                     faceToward(frame, mind, heading, duration);
+                    if (mind.mShowAfter > 0.f)
+                    {
+                        mind.mShowAfter -= duration;
+                        if (mind.mShowAfter <= 0.f)
+                            showWeapon(frame, mind, scripts);
+                    }
                     const OFScript::FalloutScripts::FireResult shot = scripts.attack(mind.mPtr, stance.mTarget);
-                    // The weapon may have changed (the last round was fired, the character took another)
-                    showWeapon(frame, mind, scripts);
-                    if (shot.mFired)
-                        if (auto* animation
-                            = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
-                            animation->attack();
+                    if (!shot.mFired)
+                    {
+                        // The weapon may have changed without a shot (it was empty, the character took another)
+                        if (mind.mShowAfter <= 0.f)
+                            showWeapon(frame, mind, scripts);
+                        break;
+                    }
+                    // The weapon that fired is the one that is shown with the shot, which has used it up when it was
+                    // the last round or the last grenade and the character took another: that one is drawn after the
+                    // shot
+                    if (mind.mShowAfter > 0.f)
+                    {
+                        mind.mShowAfter = 0.f;
+                        showWeapon(frame, mind, scripts);
+                    }
+                    if (auto* animation
+                        = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                        animation->attack();
+                    if (scripts.heldWeapon(mind.mPtr).mWeapon != mind.mDrawn)
+                        mind.mShowAfter = shotShownFor;
                     break;
             }
             return true;
