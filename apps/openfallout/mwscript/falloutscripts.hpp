@@ -949,7 +949,8 @@ namespace OFScript
         /// What one effect of an item or a spell is, false for one that is of no use
         bool effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made);
         /// The character takes the effects of a spell it cast on itself
-        void castSpell(FalloutScript::FormId actor, FalloutScript::FormId spell);
+        void castSpell(FalloutScript::FormId actor, FalloutScript::FormId spell,
+            const std::vector<FalloutScript::SpellEffect>& kept);
         bool book(FalloutScript::FormId item, FalloutScript::BookInfo& result) override;
         std::vector<FalloutScript::FormId> recipesOf(FalloutScript::FormId category) override;
         bool recipe(FalloutScript::FormId id, FalloutScript::Recipe& result) override;

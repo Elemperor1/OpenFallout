@@ -201,17 +201,23 @@ namespace OFScript
         return true;
     }
 
-    void FalloutScripts::castSpell(FalloutScript::FormId actor, FalloutScript::FormId spell)
+    void FalloutScripts::castSpell(
+        FalloutScript::FormId actor, FalloutScript::FormId, const std::vector<FalloutScript::SpellEffect>& kept)
     {
-        const ESM4::Spell* record = mStore.get<ESM4::Spell>().search(refId(spell));
-        if (record == nullptr)
-            return;
+        // The conditions were asked once, by Magic, when it chose these effects; they are not asked again
         std::vector<FalloutScript::ConsumableEffect> effects;
-        for (const ESM4::EffectEntry& entry : record->mEffects)
+        for (const FalloutScript::SpellEffect& effect : kept)
         {
             FalloutScript::ConsumableEffect made;
-            if (effectOf(entry, made))
-                effects.push_back(std::move(made));
+            made.mEffect = effect.mEffect;
+            made.mArchetype = effect.mArchetype;
+            made.mActorValue = effect.mActorValue;
+            made.mMagnitude = effect.mMagnitude;
+            made.mDuration = effect.mDuration;
+            made.mDetrimental = effect.mDetrimental;
+            made.mHostile = effect.mHostile;
+            made.mRecover = effect.mRecover;
+            effects.push_back(std::move(made));
         }
         mItemUse.cast(actor, effects);
     }
@@ -235,6 +241,8 @@ namespace OFScript
             effect.mMagnitude = made.mMagnitude;
             effect.mDuration = made.mDuration;
             effect.mDetrimental = made.mDetrimental;
+            effect.mHostile = made.mHostile;
+            effect.mRecover = made.mRecover;
             effect.mConditions = made.mConditions;
             info.mEffects.push_back(std::move(effect));
         }

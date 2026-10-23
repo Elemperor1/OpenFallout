@@ -91,12 +91,16 @@ namespace
         Magic mMagic{ mRecords };
         std::vector<std::pair<int, double>> mChanges;
         std::vector<FormId> mCast;
+        std::vector<std::size_t> mCastEffects;
 
         Runner()
         {
             mMagic.setModifier(
                 [this](FormId, int actorValue, double amount) { mChanges.emplace_back(actorValue, amount); });
-            mMagic.setCaster([this](FormId, FormId spell) { mCast.push_back(spell); });
+            mMagic.setCaster([this](FormId, FormId spell, const std::vector<FalloutScript::SpellEffect>& effects) {
+                mCast.push_back(spell);
+                mCastEffects.push_back(effects.size());
+            });
             FalloutScript::addMagicCommands(mInterpreter, mMagic, mRecords);
         }
 
@@ -202,6 +206,24 @@ namespace
         run.call(OpRemoveSpell, courier, { gatedAbility });
         run.call(OpAddSpell, courier, { gatedAbility });
         EXPECT_THAT(run.mChanges, ElementsAre(Pair(FalloutScript::ActorValue::strength, 2.0)));
+    }
+
+    TEST(FalloutScriptMagicTest, a_condition_that_changes_is_asked_once_and_the_caster_gets_what_was_kept)
+    {
+        Runner run;
+        int asked = 0;
+        // Holds the first time it is asked only, like a chance
+        run.mMagic.setConditions([&](const std::vector<ESM4::TargetCondition>&,
+                                     const FalloutScript::ConditionContext&) { return ++asked == 1; });
+        run.call(OpCastImmediateOnSelf, courier, { gatedBlast });
+        EXPECT_EQ(asked, 1);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedFire }), 1.0);
+        EXPECT_THAT(run.mCastEffects, ElementsAre(1u));
+
+        // The second cast fails its condition: nothing runs and the caster is given nothing
+        run.call(OpCastImmediateOnSelf, courier, { gatedBlast });
+        EXPECT_EQ(asked, 2);
+        EXPECT_THAT(run.mCastEffects, ElementsAre(1u, 0u));
     }
 
     TEST(FalloutScriptMagicTest, an_ability_is_no_spell_to_cast_and_cast_does_nothing)

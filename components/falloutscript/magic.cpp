@@ -174,7 +174,7 @@ namespace FalloutScript
             }
         }
         if (caster)
-            caster(actor, spell);
+            caster(actor, spell, info.mEffects);
     }
 
     void Magic::noteEffect(FormId actor, FormId effect, FormId source, double seconds)

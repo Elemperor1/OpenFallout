@@ -29,6 +29,10 @@ namespace FalloutScript
         double mDuration = 0;
         /// Hurts the value (the flag of the magic effect)
         bool mDetrimental = false;
+        /// The magic effect is hostile (its first flag)
+        bool mHostile = false;
+        /// A change that is undone when the effect ends (the flag of the magic effect)
+        bool mRecover = false;
         /// The effect is on the character only when these hold for it (none: always)
         std::vector<ESM4::TargetCondition> mConditions;
     };
@@ -68,7 +72,8 @@ namespace FalloutScript
         /// Changes an actor value of a character by an amount
         using Modifier = std::function<void(FormId actor, int actorValue, double amount)>;
         /// Makes the changes that the effects of a cast spell have on the actor values of the character
-        using Caster = std::function<void(FormId actor, FormId spell)>;
+        /// The effects are the ones whose conditions held when the spell was cast, and are not asked again
+        using Caster = std::function<void(FormId actor, FormId spell, const std::vector<SpellEffect>& effects)>;
         /// Whether the conditions of an effect hold for the character who has it
         using ConditionCheck = std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)>;
 

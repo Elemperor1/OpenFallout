@@ -375,7 +375,8 @@ namespace OFScript
         mMagic.setModifier([this](FalloutScript::FormId actor, int actorValue, double amount) {
             mActorValues.modify(actor, actorValue, amount);
         });
-        mMagic.setCaster([this](FalloutScript::FormId actor, FalloutScript::FormId spell) { castSpell(actor, spell); });
+        mMagic.setCaster([this](FalloutScript::FormId actor, FalloutScript::FormId spell,
+                             const std::vector<FalloutScript::SpellEffect>& kept) { castSpell(actor, spell, kept); });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
             return mConditions.holds(conditions, FalloutScript::ConditionContext());
