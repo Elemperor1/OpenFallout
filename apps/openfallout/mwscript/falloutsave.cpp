@@ -546,8 +546,15 @@ namespace FalloutScript
 
             // A reference that is not in a loaded cell yet keeps what a loaded game said of it
             const OFScript::PendingSave& pending = *host.mPendingSave;
-            out.count(pending.mReferences.size());
-            for (const auto& [reference, state] : pending.mReferences)
+            // and so does a scale that a script gave to one in a cell that was not loaded
+            std::map<FormId, OFScript::PendingSave::Reference> unloaded = pending.mReferences;
+            {
+                const std::lock_guard lock(host.mScalesMutex);
+                for (const auto& [reference, scale] : host.mScales)
+                    unloaded[reference].mScale = static_cast<float>(scale);
+            }
+            out.count(unloaded.size());
+            for (const auto& [reference, state] : unloaded)
             {
                 out.form(reference);
                 out.boolean(state.mDeleted);
@@ -655,7 +662,15 @@ namespace FalloutScript
                 if (hasCount)
                     state.mCount = count;
                 if (reference)
+                {
                     references[*reference] = state;
+                    // The scripts see the scale the game had given it
+                    if (state.mScale)
+                    {
+                        const std::lock_guard lock(host.mScalesMutex);
+                        host.mScales[*reference] = *state.mScale;
+                    }
+                }
             }
             const std::size_t objects = in.count(objectBytes);
             for (std::size_t i = 0; i < objects; ++i)
@@ -863,6 +878,30 @@ namespace OFScript
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReferenceState(mReferenceState, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readReferenceState(mReferenceState, in, version);
+            });
+        section(
+            "reputation", FalloutScript::reputationSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReputation(mReputation, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readReputation(mReputation, in, version);
+            });
+        section(
+            "objectstate", FalloutScript::objectStateSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeObjectState(mObjectState, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readObjectState(mObjectState, in, version);
+            });
+        section(
+            "magic", FalloutScript::magicSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeMagic(mMagic, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readMagic(mMagic, in, version);
+            });
+        section(
+            "mapmarkers", FalloutScript::mapMarkersSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeMapMarkers(mMapMarkers, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readMapMarkers(mMapMarkers, in, version);
             });
         section(
             "formlists", FalloutScript::formListsSectionVersion,

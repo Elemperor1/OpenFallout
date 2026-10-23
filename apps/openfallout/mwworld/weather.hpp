@@ -176,6 +176,12 @@ namespace OFWorld
         // Does it come from a WTHR record of Fallout?
         bool mFromRecord = false;
 
+        // What scripts ask of a weather of Fallout (IsRaining): its classification bits (0x01 pleasant, 0x02 cloudy,
+        // 0x04 rainy, 0x08 snow) and where in a change to or from it the rain begins and ends, in 255 steps
+        std::uint8_t mClassification = 0;
+        std::uint8_t mPrecipitationBeginFadeIn = 0;
+        std::uint8_t mPrecipitationEndFadeOut = 0;
+
         // Where the fog starts and ends, in game units. Only the weathers of Fallout say it (mHasFogRange), the others
         // use mLandFogDepth, a share of the view distance.
         bool mHasFogRange = false;

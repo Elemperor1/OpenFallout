@@ -286,11 +286,11 @@ namespace FalloutScript
         return it != mQuests.end() ? &it->second : nullptr;
     }
 
-    std::shared_ptr<const Script> QuestManager::prepared(const ESM4::ScriptDefinition& definition)
+    std::shared_ptr<const Script> QuestManager::prepared(const ESM4::ScriptDefinition& definition, FormId form)
     {
         auto& script = mPrepared[&definition];
         if (!script)
-            script = std::make_shared<const Script>(Script::prepare(definition, mInterpreter.commands()));
+            script = std::make_shared<const Script>(Script::prepare(definition, mInterpreter.commands(), form));
         return script;
     }
 
@@ -301,7 +301,7 @@ namespace FalloutScript
         const ESM4::Script* record = mRecords.findScript(quest.mRecord->mQuestScript.toUint32());
         if (record == nullptr)
             return;
-        std::shared_ptr<const Script> script = prepared(record->mScript);
+        std::shared_ptr<const Script> script = prepared(record->mScript, record->mId.toUint32());
         if (!script->usable())
         {
             log("The script " + hex(record->mId.toUint32()) + " of the quest " + hex(id)

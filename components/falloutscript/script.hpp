@@ -144,7 +144,11 @@ namespace FalloutScript
     public:
         /// Never throws: a script that can not be taken apart is kept with its problem and does nothing when run.
         /// The prepared calls point into `commands`, which has to outlive the script.
-        static Script prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands);
+        static Script prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands, FormId form = 0);
+
+        /// The script form it was prepared for, 0 for one that is no form of its own (the result of a line of
+        /// dialogue or of a stage)
+        FormId form() const { return mForm; }
 
         ScriptProblem problem() const { return mProblem; }
         ESM4::ScriptCode::Error decodeError() const { return mProgram.mError; }
@@ -177,6 +181,7 @@ namespace FalloutScript
         std::vector<Branch> mBranches; // by the index of the statement
         std::vector<ReferenceSlot> mReferences;
         std::vector<Variable> mVariables;
+        FormId mForm = 0;
         std::uint16_t mType = 0;
         bool mIsResult = false;
         ScriptProblem mProblem = ScriptProblem::None;

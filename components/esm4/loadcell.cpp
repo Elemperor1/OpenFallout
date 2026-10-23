@@ -213,6 +213,9 @@ void ESM4::Cell::load(ESM4::Reader& reader)
             case ESM::fourCC("XCAS"):
                 reader.getFormId(mAcousticSpace);
                 break;
+            case ESM::fourCC("XEZN"):
+                reader.getFormId(mEncounterZone);
+                break;
             case ESM::fourCC("TVDT"):
             case ESM::fourCC("MHDT"):
             case ESM::fourCC("XCGD"):
@@ -222,7 +225,6 @@ void ESM4::Cell::load(ESM4::Reader& reader)
             case ESM::fourCC("XWCU"):
             case ESM::fourCC("XWCN"):
             case ESM::fourCC("XCIM"):
-            case ESM::fourCC("XEZN"):
             case ESM::fourCC("XWEM"):
             case ESM::fourCC("XILL"):
             case ESM::fourCC("XRNK"):

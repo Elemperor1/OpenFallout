@@ -105,6 +105,7 @@ namespace ESM4
     struct GlobalVariable;
     struct Hair;
     struct HeadPart;
+    struct ImageSpaceModifier;
     struct Ingredient;
     struct ItemMod;
     struct Key;
@@ -131,6 +132,7 @@ namespace ESM4
     struct RecipeCategory;
     struct Reference;
     struct Region;
+    struct Reputation;
     struct Script;
     struct Sound;
     struct SoundReference;
@@ -181,16 +183,17 @@ namespace OFWorld
             Store<ESM4::DefaultObj>, Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>, Store<ESM4::Door>,
             Store<ESM4::Explosion>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
             Store<ESM4::FormIdList>, Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>,
-            Store<ESM4::HeadPart>, Store<ESM4::Ingredient>, Store<ESM4::ItemMod>, Store<ESM4::Key>, Store<ESM4::Land>,
-            Store<ESM4::LandTexture>, Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>,
-            Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>, Store<ESM4::MagicEffect>,
-            Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>, Store<ESM4::Note>,
-            Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>, Store<ESM4::Potion>, Store<ESM4::Projectile>,
-            Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Recipe>, Store<ESM4::RecipeCategory>,
-            Store<ESM4::Reference>, Store<ESM4::Region>, Store<ESM4::Script>, Store<ESM4::Sound>,
-            Store<ESM4::SoundReference>, Store<ESM4::Spell>, Store<ESM4::Static>, Store<ESM4::StaticCollection>,
-            Store<ESM4::TalkingActivator>, Store<ESM4::Terminal>, Store<ESM4::TextureSet>, Store<ESM4::Tree>,
-            Store<ESM4::VoiceType>, Store<ESM4::Water>, Store<ESM4::Weapon>, Store<ESM4::Weather>, Store<ESM4::World>>;
+            Store<ESM4::HeadPart>, Store<ESM4::ImageSpaceModifier>, Store<ESM4::Ingredient>, Store<ESM4::ItemMod>,
+            Store<ESM4::Key>, Store<ESM4::Land>, Store<ESM4::LandTexture>, Store<ESM4::LevelledCreature>,
+            Store<ESM4::LevelledItem>, Store<ESM4::LevelledNpc>, Store<ESM4::Light>, Store<ESM4::LightingTemplate>,
+            Store<ESM4::MagicEffect>, Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>,
+            Store<ESM4::Note>, Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>, Store<ESM4::Potion>,
+            Store<ESM4::Projectile>, Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Recipe>,
+            Store<ESM4::RecipeCategory>, Store<ESM4::Reference>, Store<ESM4::Region>, Store<ESM4::Reputation>,
+            Store<ESM4::Script>, Store<ESM4::Sound>, Store<ESM4::SoundReference>, Store<ESM4::Spell>,
+            Store<ESM4::Static>, Store<ESM4::StaticCollection>, Store<ESM4::TalkingActivator>, Store<ESM4::Terminal>,
+            Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::VoiceType>, Store<ESM4::Water>, Store<ESM4::Weapon>,
+            Store<ESM4::Weather>, Store<ESM4::World>>;
 
     private:
         template <typename T>

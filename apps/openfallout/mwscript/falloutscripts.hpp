@@ -20,6 +20,7 @@
 
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
+#include <components/esm4/effectlist.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
@@ -41,17 +42,23 @@
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/limbs.hpp>
+#include <components/falloutscript/magic.hpp>
+#include <components/falloutscript/mapmarkers.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/objectstate.hpp>
 #include <components/falloutscript/packagecommands.hpp>
 #include <components/falloutscript/perks.hpp>
 #include <components/falloutscript/pipboy.hpp>
 #include <components/falloutscript/placementcommands.hpp>
 #include <components/falloutscript/playercontrols.hpp>
 #include <components/falloutscript/playerprogress.hpp>
+#include <components/falloutscript/presentation.hpp>
+#include <components/falloutscript/queries.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
+#include <components/falloutscript/reputation.hpp>
 #include <components/falloutscript/saveaccess.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
@@ -122,9 +129,15 @@ namespace OFScript
                                  private FalloutScript::DialogueRecords,
                                  private FalloutScript::ActorValueRecords,
                                  private FalloutScript::ReferenceRecords,
+                                 private FalloutScript::ReputationRecords,
+                                 private FalloutScript::ObjectStateRecords,
+                                 private FalloutScript::MapMarkerRecords,
+                                 private FalloutScript::PresentationWorld,
+                                 private FalloutScript::MagicRecords,
                                  private FalloutScript::FormListRecords,
                                  private FalloutScript::PackageWorld,
                                  private FalloutScript::PlacementWorld,
+                                 private FalloutScript::QueryWorld,
                                  private FalloutScript::MessageWorld,
                                  private FalloutScript::ControlsWorld,
                                  private FalloutScript::CombatWorld,
@@ -237,7 +250,7 @@ namespace OFScript
         /// reached one) is handed out after it
         void finishLevelUp();
         /// The value of a game setting (GMST) by its editor id, none when the files have no such setting
-        std::optional<double> gameSetting(std::string_view name);
+        std::optional<double> gameSetting(std::string_view name) override;
         /// The text of a game setting, empty when the files have none
         std::string gameSettingText(std::string_view name);
         /// What a token `&name;` of a message stands for: the keys and buttons of the controls (`&sUActnVats;` is the
@@ -748,12 +761,48 @@ namespace OFScript
         void evaluatePackage(FalloutScript::FormId actor) override;
         void resetAI(FalloutScript::FormId actor) override;
         FalloutScript::FormId currentPackage(FalloutScript::FormId actor) override;
+        int currentPackageType(FalloutScript::FormId actor) override;
+        bool currentPackageOffersServices(FalloutScript::FormId actor) override;
 
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
         void moveTo(FalloutScript::FormId reference, FalloutScript::FormId target,
             const std::array<double, 3>& offset) override;
         void setPosition(FalloutScript::FormId reference, int axis, double value) override;
         void setAngle(FalloutScript::FormId reference, int axis, double radians) override;
+        void setScale(FalloutScript::FormId reference, double scale) override;
+        /// How large the reference is: as the world has it when its cell is loaded, else as its record says
+        double scaleOf(FalloutScript::FormId reference);
+
+        bool markerFlags(FalloutScript::FormId marker, std::uint8_t& flags) override;
+        /// Tells the player that a map marker was uncovered
+        void markerShown(FalloutScript::FormId marker);
+        void playSound(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
+        bool isSoundPlaying(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
+        bool isMusicPlaying() override;
+        double imageSpaceDuration(FalloutScript::FormId modifier) override;
+        void achievement(int id) override;
+        FalloutScript::FormId parentCell(FalloutScript::FormId reference) override;
+        FalloutScript::FormId parentWorldspace(FalloutScript::FormId reference) override;
+        bool gameRestarted(FalloutScript::FormId script) override;
+        bool gameLoaded(FalloutScript::FormId script) override;
+        bool isActor(FalloutScript::FormId reference) override;
+        FalloutScript::FormId playerBase() override;
+        FalloutScript::FormId ownerForm(FalloutScript::FormId form) override;
+        FalloutScript::FormId recordOwner(FalloutScript::FormId reference) override;
+        FalloutScript::FormId recordCellOwner(FalloutScript::FormId cell) override;
+        bool recordCellPublic(FalloutScript::FormId cell) override;
+        bool recordGhost(FalloutScript::FormId actor) override;
+        bool reputation(FalloutScript::FormId reputation, double& cap, std::string& name) override;
+        double setting(std::string_view name, double fallback) override;
+        /// Tells the player that a reputation went up
+        void reputationChanged(const FalloutScript::Reputation::Bump& bump);
+
+        bool inInterior(FalloutScript::FormId reference) override;
+        bool hasLoaded3D(FalloutScript::FormId reference) override;
+        FalloutScript::SkyWeather sky() override;
+        bool playerSleeping() override { return mPlayerSleeping; }
+        bool inZone(FalloutScript::FormId reference, FalloutScript::FormId zone) override;
+        bool talksThroughActivator(FalloutScript::FormId actor) override;
 
         void showMessage(
             FalloutScript::FormId message, const std::vector<double>& values, FalloutScript::FormId owner) override;
@@ -896,6 +945,12 @@ namespace OFScript
         std::vector<FalloutScript::FormId> perks() override;
         bool abilityEffects(FalloutScript::FormId ability, std::vector<FalloutScript::AbilityEffect>& effects) override;
         bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
+        bool spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info) override;
+        /// What one effect of an item or a spell is, false for one that is of no use
+        bool effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made);
+        /// The character takes the effects of a spell it cast on itself
+        void castSpell(FalloutScript::FormId actor, FalloutScript::FormId spell,
+            const std::vector<FalloutScript::SpellEffect>& kept);
         bool book(FalloutScript::FormId item, FalloutScript::BookInfo& result) override;
         std::vector<FalloutScript::FormId> recipesOf(FalloutScript::FormId category) override;
         bool recipe(FalloutScript::FormId id, FalloutScript::Recipe& result) override;
@@ -1103,10 +1158,21 @@ namespace OFScript
         std::map<FalloutScript::FormId, FalloutScript::FormId> mItemHolders;
         FalloutScript::ActorValues mActorValues;
         FalloutScript::ReferenceState mReferenceState;
+        FalloutScript::Reputation mReputation;
+        FalloutScript::ObjectState mObjectState;
+        FalloutScript::MapMarkers mMapMarkers;
+        FalloutScript::Presentation mPresentation;
+        /// Which script forms have been told that the program was started or that a game was started or loaded
+        /// (GetGameRestarted, GetGameLoaded): the first set lasts as long as the program, the second until the next
+        /// game is started or loaded
+        std::mutex mSessionMutex;
+        std::set<FalloutScript::FormId> mRestartAsked;
+        std::set<FalloutScript::FormId> mLoadAsked;
         FalloutScript::FormLists mFormLists;
         FalloutScript::PlayerProgress mProgress;
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
+        FalloutScript::Magic mMagic;
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
         std::atomic<bool> mVatsOpen{ false };
@@ -1184,6 +1250,8 @@ namespace OFScript
         /// own thread, the conversations from the thread of the frame)
         std::mutex mTalkingActorMutex;
         std::map<FalloutScript::FormId, FalloutScript::FormId> mTalkingActors;
+        /// Whether the player sleeps (IsPCSleeping): set by the rest of the player, which does not exist yet
+        bool mPlayerSleeping = false;
         /// The objects that follow the state of another one (their enable parent)
         FalloutScript::EnableParents mEnableParents;
         bool mEnableParentsRead = false;
@@ -1204,6 +1272,11 @@ namespace OFScript
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;
         std::map<FalloutScript::FormId, Move> mRelocations;
+        /// The scale scripts gave to objects that have not been given it yet (their cell was not loaded, or the world
+        /// is changed at the start of the next frame): they get it when they can, and scripts see it from the call on,
+        /// whichever thread they run on
+        std::map<FalloutScript::FormId, double> mScales;
+        std::mutex mScalesMutex;
         /// The objects PlaceAtMe made. Scripts name one by a number of its own (0xFF and a counter, as the games do),
         /// which is not the id the world gave it. An object that is asked for waits for the start of the next frame.
         std::map<FalloutScript::FormId, MadeObject> mPendingMade;
@@ -1282,8 +1355,8 @@ namespace OFScript
         void playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire);
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
-        /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player and
-        /// the rest hear different shots of a weapon). Each is logged once, for what the data lacks
+        /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player
+        /// and the rest hear different shots of a weapon). Each is logged once, for what the data lacks
         std::set<std::tuple<FalloutScript::FormId, bool, std::uint32_t>> mWeaponSoundsLogged;
         std::mt19937 mWeaponSoundRandom;
         /// How a character behaves in a fight, from its AIDT (the record, or the template it takes it from)

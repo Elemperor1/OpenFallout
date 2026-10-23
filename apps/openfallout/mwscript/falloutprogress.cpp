@@ -167,28 +167,84 @@ namespace OFScript
         for (const ESM4::EffectEntry& entry : potion->mEffects)
         {
             FalloutScript::ConsumableEffect made;
-            made.mMagnitude = entry.mData.mMagnitude;
-            made.mDuration = entry.mData.mDuration;
-            made.mConditions = entry.mConditions;
-            const ESM4::MagicEffect* effect = mStore.get<ESM4::MagicEffect>().search(entry.mBaseEffect);
-            if (effect != nullptr)
-            {
-                made.mArchetype = static_cast<int>(effect->mData.mArchetype);
-                made.mActorValue = effect->mData.mActorValue;
-                made.mDetrimental = (effect->mData.mEffectFlags & effectDetrimental) != 0;
-                made.mHostile = (effect->mData.mEffectFlags & effectHostile) != 0;
-                made.mRecover = (effect->mData.mEffectFlags & effectRecovers) != 0;
-            }
-            else if (entry.mBaseEffect.mIndex == engineRestoreHealth)
-            {
-                // The executable makes this effect itself: it restores health
-                made.mActorValue = AV::health;
-            }
-            else
+            if (effectOf(entry, made))
+                result.mEffects.push_back(std::move(made));
+        }
+        return true;
+    }
+
+    bool FalloutScripts::effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made)
+    {
+        made = FalloutScript::ConsumableEffect();
+        made.mEffect = numberOf(entry.mBaseEffect);
+        made.mMagnitude = entry.mData.mMagnitude;
+        made.mDuration = entry.mData.mDuration;
+        made.mConditions = entry.mConditions;
+        const ESM4::MagicEffect* effect = mStore.get<ESM4::MagicEffect>().search(entry.mBaseEffect);
+        if (effect != nullptr)
+        {
+            made.mArchetype = static_cast<int>(effect->mData.mArchetype);
+            made.mActorValue = effect->mData.mActorValue;
+            made.mDetrimental = (effect->mData.mEffectFlags & effectDetrimental) != 0;
+            made.mHostile = (effect->mData.mEffectFlags & effectHostile) != 0;
+            made.mRecover = (effect->mData.mEffectFlags & effectRecovers) != 0;
+        }
+        else if (entry.mBaseEffect.mIndex == engineRestoreHealth)
+        {
+            // The executable makes this effect itself: it restores health
+            made.mActorValue = AV::health;
+        }
+        else
+            return false;
+        if (!FalloutScript::ActorValues::isValid(made.mActorValue))
+            made.mActorValue = entry.mData.mActorValue;
+        return true;
+    }
+
+    void FalloutScripts::castSpell(
+        FalloutScript::FormId actor, FalloutScript::FormId, const std::vector<FalloutScript::SpellEffect>& kept)
+    {
+        // The conditions were asked once, by Magic, when it chose these effects; they are not asked again
+        std::vector<FalloutScript::ConsumableEffect> effects;
+        for (const FalloutScript::SpellEffect& effect : kept)
+        {
+            FalloutScript::ConsumableEffect made;
+            made.mEffect = effect.mEffect;
+            made.mArchetype = effect.mArchetype;
+            made.mActorValue = effect.mActorValue;
+            made.mMagnitude = effect.mMagnitude;
+            made.mDuration = effect.mDuration;
+            made.mDetrimental = effect.mDetrimental;
+            made.mHostile = effect.mHostile;
+            made.mRecover = effect.mRecover;
+            effects.push_back(std::move(made));
+        }
+        mItemUse.cast(actor, effects);
+    }
+
+    bool FalloutScripts::spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info)
+    {
+        const ESM4::Spell* record = mStore.get<ESM4::Spell>().search(refId(spell));
+        if (record == nullptr)
+            return false;
+        info = FalloutScript::SpellInfo();
+        info.mType = static_cast<int>(record->mData.mType);
+        for (const ESM4::EffectEntry& entry : record->mEffects)
+        {
+            FalloutScript::ConsumableEffect made;
+            if (!effectOf(entry, made))
                 continue;
-            if (!FalloutScript::ActorValues::isValid(made.mActorValue))
-                made.mActorValue = entry.mData.mActorValue;
-            result.mEffects.push_back(std::move(made));
+            FalloutScript::SpellEffect effect;
+            effect.mEffect = made.mEffect;
+            effect.mArchetype = made.mArchetype;
+            effect.mActorValue = made.mActorValue;
+            effect.mMagnitude = made.mMagnitude;
+            effect.mDuration = made.mDuration;
+            effect.mDetrimental = made.mDetrimental;
+            effect.mHostile = made.mHostile;
+            effect.mRecover = made.mRecover;
+            effect.mConditions = made.mConditions;
+            info.mEffects.push_back(std::move(effect));
         }
         return true;
     }
@@ -268,7 +324,11 @@ namespace OFScript
         for (const FalloutScript::FormId owner : mPerkOwners)
             mPerks.refresh(owner);
         if (frametime > 0)
+        {
             mItemUse.update(frametime);
+            mPresentation.update(frametime);
+            mMagic.update(frametime);
+        }
     }
 
     void FalloutScripts::awardKillExperience(FalloutScript::FormId victim)

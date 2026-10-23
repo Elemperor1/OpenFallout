@@ -270,6 +270,9 @@ namespace OFWorld
         using Time = ESM4::Weather::TimeOfDay;
 
         mFromRecord = true;
+        mClassification = record.mData.mClassification;
+        mPrecipitationBeginFadeIn = record.mData.mPrecipitationBeginFadeIn;
+        mPrecipitationEndFadeOut = record.mData.mPrecipitationEndFadeOut;
         mName = record.mEditorId;
         // No clouds is an empty name, not the texture of Morrowind's clear weather that this was made from
         mCloudTexture = std::string(record.cloudTexture());

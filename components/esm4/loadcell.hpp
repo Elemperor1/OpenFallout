@@ -95,6 +95,7 @@ namespace ESM4
 
         ESM::FormId mMusic; // FO3/FONV
         ESM::FormId mAcousticSpace; // FO3/FONV
+        ESM::FormId mEncounterZone; // XEZN, FO3/FONV
         // TES4: 0 = default, 1 = public, 2 = dungeon
         // FO3/FONV have more types (not sure how they are used, however)
         std::uint8_t mMusicType = 0;

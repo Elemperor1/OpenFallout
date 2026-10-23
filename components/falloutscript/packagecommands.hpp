@@ -27,10 +27,18 @@ namespace FalloutScript
         /// The package the character follows now (0 for none, and for a character the host does not know or can not
         /// tell about)
         virtual FormId currentPackage(FormId /*actor*/) { return 0; }
+        /// The type of the package the character follows now (the number the record gives it), -1 for none
+        virtual int currentPackageType(FormId /*actor*/) { return -1; }
+        /// Whether the package the character follows now is one that offers the character's services (to trade)
+        virtual bool currentPackageOffersServices(FormId /*actor*/) { return false; }
     };
 
+    /// What GetCurrentAIPackage answers for a type of package that the record gives, -1 for one it has no number for
+    int currentPackageNumber(int type);
+
     /// Gives the commands about packages to the interpreter: AddScriptPackage, RemoveScriptPackage,
-    /// EvaluatePackage, GetIsCurrentPackage and ResetAI. Those that the command table does not have are left out.
+    /// EvaluatePackage, GetIsCurrentPackage, GetCurrentAIPackage, GetOffersServicesNow and ResetAI. Those that the
+    /// command table does not have are left out.
     void addPackageCommands(Interpreter& interpreter, PackageWorld& world);
 }
 

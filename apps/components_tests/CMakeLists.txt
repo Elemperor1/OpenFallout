@@ -115,6 +115,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testloadscreen.cpp
     esm4/testloadscreentype.cpp
     esm4/testmagiceffect.cpp
+    esm4/testmapmarker.cpp
     esm4/testmenuicon.cpp
     esm4/testmessage.cpp
     esm4/testmodeldata.cpp
@@ -175,7 +176,13 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testfurniture.cpp
     falloutscript/testplacement.cpp
     falloutscript/testplayerprogress.cpp
+    falloutscript/testmagic.cpp
+    falloutscript/testmapmarkers.cpp
+    falloutscript/testobjectstate.cpp
+    falloutscript/testpresentation.cpp
+    falloutscript/testqueries.cpp
     falloutscript/testreferencestate.cpp
+    falloutscript/testreputation.cpp
     falloutscript/testsavecharacters.cpp
     falloutscript/testsaveworld.cpp
     falloutscript/testsavestate.cpp

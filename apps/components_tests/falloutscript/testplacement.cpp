@@ -7,8 +7,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
 #include <map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -33,7 +35,10 @@ namespace
     constexpr std::uint16_t OpGetPos = 0x1006;
     constexpr std::uint16_t OpSetPos = 0x1007;
     constexpr std::uint16_t OpGetAngle = 0x1008;
+    constexpr std::uint16_t OpGetHeadingAngle = 0x1063;
     constexpr std::uint16_t OpSetAngle = 0x1009;
+    constexpr std::uint16_t OpGetScale = 0x1018;
+    constexpr std::uint16_t OpSetScale = 0x113C;
     constexpr std::uint16_t OpMoveToMarker = 0x109E;
     constexpr std::uint16_t OpMoveToMarkerWithFade = 0x124F;
 
@@ -60,8 +65,12 @@ namespace
         };
 
         std::map<FormId, Placement> mPlaces;
+        std::set<FormId> mActors{ guard };
         std::vector<Move> mMoves;
         std::vector<Set> mSets;
+        std::vector<std::pair<FormId, double>> mScales;
+
+        bool isActor(FormId reference) override { return mActors.count(reference) != 0; }
 
         bool placement(FormId reference, Placement& result) override
         {
@@ -85,6 +94,7 @@ namespace
             if (mPlaces.count(reference) != 0)
                 mSets.push_back({ reference, true, axis, radians });
         }
+        void setScale(FormId reference, double scale) override { mScales.emplace_back(reference, scale); }
     };
 
     struct Runner
@@ -185,6 +195,97 @@ namespace
         EXPECT_NEAR(setup.variable(4), 90.0, 1e-4);
         // The heading is told from 0 to 360
         EXPECT_NEAR(setup.variable(5), 270.0, 1e-4);
+    }
+
+    double headingAngle(
+        Runner& setup, const std::array<double, 3>& self, double heading, const std::array<double, 3>& target)
+    {
+        Placement from;
+        from.mPosition = self;
+        from.mAngle = { 0, 0, heading };
+        Placement to;
+        to.mPosition = target;
+        setup.mWorld.mPlaces[guard] = from;
+        setup.mWorld.mPlaces[marker] = to;
+        return setup.mInterpreter.call(OpGetHeadingAngle, guard, true, { { marker, {}, false } });
+    }
+
+    TEST(FalloutScriptPlacementTest, the_heading_angle_is_positive_for_a_target_on_the_right)
+    {
+        Runner setup;
+        // Facing the y axis, which is heading 0
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { 0, 100, 0 }), 0.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { 100, 0, 0 }), 90.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { -100, 0, 0 }), -90.0, 1e-9);
+        EXPECT_NEAR(std::abs(headingAngle(setup, { 0, 0, 0 }, 0, { 0, -100, 0 })), 180.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { 100, 100, 0 }), 45.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { -100, -100, 0 }), -135.0, 1e-9);
+    }
+
+    TEST(FalloutScriptPlacementTest, the_heading_angle_counts_from_where_the_reference_faces)
+    {
+        Runner setup;
+        // Facing the x axis
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, pi / 2, { 100, 0, 0 }), 0.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, pi / 2, { 0, 100, 0 }), -90.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, pi / 2, { 0, -100, 0 }), 90.0, 1e-9);
+        // The place of the reference is where the target is measured from, and the heights do not count
+        EXPECT_NEAR(headingAngle(setup, { 50, 50, 5000 }, 0, { 150, 50, -3000 }), 90.0, 1e-9);
+        // A heading outside of a turn is the same heading
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 5 * pi / 2, { 100, 0, 0 }), 0.0, 1e-9);
+    }
+
+    TEST(FalloutScriptPlacementTest, two_references_on_one_place_are_at_270_degrees_as_in_the_games)
+    {
+        Runner setup;
+        EXPECT_NEAR(headingAngle(setup, { 10, 20, 0 }, 0, { 10, 20, 7 }), -90.0, 1e-9);
+        EXPECT_NEAR(headingAngle(setup, { 10, 20, 0 }, -pi / 2, { 10, 20, 7 }), 0.0, 1e-9);
+    }
+
+    TEST(FalloutScriptPlacementTest, the_heading_angle_of_something_not_placed_is_zero)
+    {
+        Runner setup;
+        Placement from;
+        setup.mWorld.mPlaces[guard] = from;
+        EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, guard, true, { { marker, {}, false } }), 0.0);
+        EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, guard, true, {}), 0.0);
+        setup.mWorld.mPlaces[marker] = from;
+        EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, 0, false, { { marker, {}, false } }), 0.0);
+    }
+
+    TEST(FalloutScriptPlacementTest, the_heading_angle_of_something_that_is_no_character_is_zero)
+    {
+        Runner setup;
+        EXPECT_NEAR(headingAngle(setup, { 0, 0, 0 }, 0, { 100, 0, 0 }), 90.0, 1e-9);
+        // The marker is placed, and it is no character that could face anything
+        EXPECT_EQ(setup.mInterpreter.call(OpGetHeadingAngle, marker, true, { { guard, {}, false } }), 0.0);
+    }
+
+    TEST(FalloutScriptPlacementTest, the_scale_of_a_reference_is_what_the_host_says)
+    {
+        Runner setup;
+        Placement place;
+        place.mScale = 1.5;
+        setup.mWorld.mPlaces[guard] = place;
+        EXPECT_EQ(setup.mInterpreter.call(OpGetScale, guard, true, {}), 1.5);
+        EXPECT_EQ(setup.mInterpreter.call(OpGetScale, 0, false, {}), 0.0);
+        EXPECT_EQ(setup.mInterpreter.call(OpGetScale, marker, true, {}), 0.0);
+    }
+
+    TEST(FalloutScriptPlacementTest, a_scale_is_held_between_a_hundredth_and_ten)
+    {
+        Runner setup;
+        setup.mInterpreter.call(OpSetScale, guard, true, { { 2.5, {}, false } });
+        setup.mInterpreter.call(OpSetScale, guard, true, { { 0.0, {}, false } });
+        setup.mInterpreter.call(OpSetScale, guard, true, { { 50.0, {}, false } });
+        setup.mInterpreter.call(OpSetScale, guard, true, { { -3.0, {}, false } });
+        setup.mInterpreter.call(OpSetScale, 0, false, { { 2.0, {}, false } });
+        ASSERT_EQ(setup.mWorld.mScales.size(), 4u);
+        EXPECT_EQ(setup.mWorld.mScales[0].second, 2.5);
+        EXPECT_EQ(setup.mWorld.mScales[1].second, 0.01);
+        EXPECT_EQ(setup.mWorld.mScales[2].second, 10.0);
+        EXPECT_EQ(setup.mWorld.mScales[3].second, 0.01);
+        EXPECT_EQ(setup.mWorld.mScales[0].first, guard);
     }
 
     TEST(FalloutScriptPlacementTest, a_reference_the_host_does_not_know_is_nowhere)

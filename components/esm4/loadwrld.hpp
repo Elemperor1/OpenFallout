@@ -126,6 +126,7 @@ namespace ESM4
 
         // ----------------------
         ESM::FormId mMusic;
+        ESM::FormId mEncounterZone; // XEZN
 
         std::uint16_t mParentUseFlags{ 0 };
 

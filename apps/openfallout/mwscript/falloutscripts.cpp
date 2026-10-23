@@ -42,6 +42,7 @@
 #include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/loadweap.hpp>
+#include <components/esm4/loadwrld.hpp>
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/extendercommands.hpp>
@@ -82,6 +83,7 @@
 #include "../mwworld/player.hpp"
 #include "../mwworld/ptr.hpp"
 #include "../mwworld/scene.hpp"
+#include "../mwworld/weather.hpp"
 #include "../mwworld/worldmodel.hpp"
 
 #include "falloutsavepending.hpp"
@@ -186,9 +188,13 @@ namespace OFScript
         , mEquipment(*this, mActors)
         , mActorValues(this)
         , mReferenceState(*this)
+        , mReputation(*this)
+        , mObjectState(*this)
+        , mMapMarkers(*this)
         , mFormLists(*this)
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
+        , mMagic(*this)
         , mCrafting(*this, mActors, mActorValues)
         , mLimbs(*this, mActorValues)
         , mChargen(game)
@@ -212,6 +218,7 @@ namespace OFScript
             mInterpreter, mObjects, *this, [this] { return std::uniform_int_distribution<int>(0, 99)(mRandom); });
         FalloutScript::addPackageCommands(mInterpreter, *this);
         FalloutScript::addPlacementCommands(mInterpreter, *this);
+        FalloutScript::addQueryCommands(mInterpreter, *this);
         FalloutScript::addMessageCommands(mInterpreter, *this);
         FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
@@ -223,7 +230,28 @@ namespace OFScript
             const auto found = mItemHolders.find(call.mReference);
             return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
         });
+        // The trigger it is called on runs its OnTriggerEnter block for the actor it names, as if that actor had walked
+        // in
+        mInterpreter.setHandler("EnterTrigger", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId trigger = call.mReference;
+            const FalloutScript::FormId actor = FalloutScript::formArgument(call, 0);
+            if (trigger != 0 && actor != 0)
+                runOnMainThread([this, trigger, actor] {
+                    const FalloutScript::BlockFilter filter = [actor](const FalloutScript::Block& block) {
+                        return FalloutScript::blockIsForForm(block, actor);
+                    };
+                    mObjects.trigger(trigger, FalloutScript::BlockType::OnTriggerEnter, actor, filter);
+                });
+            return 0.0;
+        });
         FalloutScript::addReferenceStateCommands(mInterpreter, mReferenceState);
+        FalloutScript::addReputationCommands(mInterpreter, mReputation,
+            [this](const FalloutScript::Reputation::Bump& bump) { reputationChanged(bump); });
+        FalloutScript::addObjectStateCommands(mInterpreter, mObjectState, *this);
+        FalloutScript::addMapMarkerCommands(
+            mInterpreter, mMapMarkers, [this](FalloutScript::FormId marker) { markerShown(marker); });
+        FalloutScript::addPresentationCommands(mInterpreter, mPresentation, *this);
+        FalloutScript::addMagicCommands(mInterpreter, mMagic, *this);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         // The perks that change what experience is gained apply to what scripts reward as well
@@ -336,8 +364,19 @@ namespace OFScript
         // A character that lived on the health of a perk that is gone is dead (or has fallen) once it is gone
         mPerks.setHealthLowered([this](FalloutScript::FormId owner) { mItemUse.checkHealth(owner); });
         mItemUse.setConditions(conditionsHold);
+        mMagic.setConditions(conditionsHold);
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
+        // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
+        // item does it, and what an ability or a disease changes stays until it is taken away
+        mItemUse.setEffectListener(
+            [this](FalloutScript::FormId actor, FalloutScript::FormId effect, FalloutScript::FormId source,
+                double seconds) { mMagic.noteEffect(actor, effect, source, seconds); });
+        mMagic.setModifier([this](FalloutScript::FormId actor, int actorValue, double amount) {
+            mActorValues.modify(actor, actorValue, amount);
+        });
+        mMagic.setCaster([this](FalloutScript::FormId actor, FalloutScript::FormId spell,
+                             const std::vector<FalloutScript::SpellEffect>& kept) { castSpell(actor, spell, kept); });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
             return mConditions.holds(conditions, FalloutScript::ConditionContext());
@@ -405,6 +444,10 @@ namespace OFScript
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        {
+            const std::lock_guard lock(mScalesMutex);
+            mScales.clear();
+        }
         mMade.clear();
         mMadeIds.clear();
         {
@@ -443,6 +486,16 @@ namespace OFScript
         mLimbs.clear();
         mVatsOpen = false;
         mReferenceState.clear();
+        mReputation.clear();
+        mObjectState.clear();
+        mMapMarkers.clear();
+        mPresentation.clear();
+        mMagic.clear();
+        {
+            // A new game and a loaded game are both told to the scripts once; the program was started only once
+            const std::lock_guard lock(mSessionMutex);
+            mLoadAsked.clear();
+        }
         mFormLists.clear();
         mProgress.clear();
         {
@@ -807,6 +860,24 @@ namespace OFScript
         moves.swap(mPendingMoves);
         for (const auto& [reference, move] : moves)
             applyMove(reference, move);
+        // The objects that were given a scale while their cell was not loaded, whose cell is loaded now
+        std::vector<std::pair<FalloutScript::FormId, double>> scales;
+        {
+            const std::lock_guard lock(mScalesMutex);
+            for (auto it = mScales.begin(); it != mScales.end();)
+            {
+                if (!findReference(it->first).isEmpty())
+                {
+                    scales.emplace_back(it->first, it->second);
+                    it = mScales.erase(it);
+                }
+                else
+                    ++it;
+            }
+        }
+        for (const auto& [reference, scale] : scales)
+            if (const OFWorld::Ptr ptr = findReference(reference); !ptr.isEmpty())
+                OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(scale));
         // Every object has its script before any of them runs OnLoad, so that they can reach each other
         std::vector<std::pair<FalloutScript::FormId, bool>> toggle;
         toggle.swap(mPendingToggle);
@@ -1168,6 +1239,39 @@ namespace OFScript
         box.mText = escapeTags(box.mPlainText);
         // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
         // is queued in the next frame
+        ++mMessageBoxCount;
+        runOnMainThread([this, box = std::move(box)]() mutable {
+            mMessageQueue.push_back(std::move(box));
+            updateMessageBoxes();
+        });
+    }
+
+    void FalloutScripts::reputationChanged(const FalloutScript::Reputation::Bump& bump)
+    {
+        // The line under the name of the reputation tells which side went up
+        const std::string gain = gameSettingText(bump.mSide == 1 ? "sRepPositiveGain" : "sRepNegativeGain");
+        std::string text = bump.mName;
+        if (!gain.empty())
+            text += (text.empty() ? "" : "\n") + gain;
+        if (!text.empty())
+        {
+            Log(Debug::Info) << "Reputation: " << text;
+            tellPlayer(escapeTags(text));
+        }
+        if (!bump.mLevelChanged)
+            return;
+        // A side that reached its next level also gets a box, which is named by the levels of both sides
+        static constexpr std::array<const char*, 4> levels{ "None", "One", "Two", "Three" };
+        const std::string key = std::string("sRepTitlePos") + levels[std::clamp(bump.mPositiveLevel, 0, 3)] + "Neg"
+            + levels[std::clamp(bump.mNegativeLevel, 0, 3)];
+        const std::string title = gameSettingText(key);
+        const std::string description = gameSettingText(key + "Desc");
+        if (title.empty() && description.empty())
+            return;
+        MessageBox box;
+        box.mPlainText = title.empty() ? description : description.empty() ? title : title + "\n\n" + description;
+        box.mText = escapeTags(box.mPlainText);
+        Log(Debug::Info) << "Reputation level: " << key;
         ++mMessageBoxCount;
         runOnMainThread([this, box = std::move(box)]() mutable {
             mMessageQueue.push_back(std::move(box));
@@ -3943,6 +4047,21 @@ namespace OFScript
         return numberOf(OFBase::Environment::get().getMechanicsManager()->falloutPackageOf(ptr));
     }
 
+    int FalloutScripts::currentPackageType(FalloutScript::FormId actor)
+    {
+        const FalloutScript::FormId package = currentPackage(actor);
+        const ESM4::AIPackage* record = package != 0 ? mStore.get<ESM4::AIPackage>().search(refId(package)) : nullptr;
+        return record != nullptr ? record->mData.type : -1;
+    }
+
+    bool FalloutScripts::currentPackageOffersServices(FalloutScript::FormId actor)
+    {
+        const FalloutScript::FormId package = currentPackage(actor);
+        const ESM4::AIPackage* record = package != 0 ? mStore.get<ESM4::AIPackage>().search(refId(package)) : nullptr;
+        // The first flag of a package
+        return record != nullptr && (record->mData.flags & 0x1) != 0;
+    }
+
     std::vector<const ESM4::AIPackage*> FalloutScripts::scriptPackages(const OFWorld::Ptr& actor) const
     {
         std::vector<const ESM4::AIPackage*> result;
@@ -4135,7 +4254,54 @@ namespace OFScript
             result.mPosition[axis] = place.mPosition[axis];
             result.mAngle[axis] = place.mAngle[axis];
         }
+        result.mScale = scaleOf(reference);
         return true;
+    }
+
+    double FalloutScripts::scaleOf(FalloutScript::FormId reference)
+    {
+        // What a script asked for and the object has not been given yet is its scale for the scripts
+        {
+            const std::lock_guard lock(mScalesMutex);
+            if (const auto asked = mScales.find(reference); asked != mScales.end())
+                return asked->second;
+        }
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (!ptr.isEmpty())
+            return ptr.getCellRef().getScale();
+        const ESM::FormId id = ESM::FormId::fromUint32(reference);
+        if (id.isZeroOrUnset())
+            return 1.0;
+        if (const ESM4::Reference* record = mStore.get<ESM4::Reference>().search(id))
+            return record->mScale;
+        if (const ESM4::ActorCharacter* record = mStore.get<ESM4::ActorCharacter>().search(id))
+            return record->mScale;
+        if (const ESM4::ActorCreature* record = mStore.get<ESM4::ActorCreature>().search(id))
+            return record->mScale;
+        return 1.0;
+    }
+
+    void FalloutScripts::setScale(FalloutScript::FormId reference, double scale)
+    {
+        // The scripts see the scale from the call on, whichever thread this runs on
+        {
+            const std::lock_guard lock(mScalesMutex);
+            mScales[reference] = scale;
+        }
+        // The world is not changed while scripts run on another thread
+        runOnMainThread([this, reference, scale] {
+            const OFWorld::Ptr ptr = findReference(reference);
+            // An object whose cell is not loaded gets the scale when it is
+            if (ptr.isEmpty())
+                return;
+            {
+                // A later call has its own entry (and its own turn), which stays
+                const std::lock_guard lock(mScalesMutex);
+                if (const auto asked = mScales.find(reference); asked != mScales.end() && asked->second == scale)
+                    mScales.erase(asked);
+            }
+            OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(scale));
+        });
     }
 
     void FalloutScripts::moveTo(
@@ -4181,6 +4347,89 @@ namespace OFScript
         move.mWhere.mAngle[axis] = static_cast<float>(radians);
         move.mParts = Move::AngleX << axis;
         askForMove(reference, move);
+    }
+
+    bool FalloutScripts::inInterior(FalloutScript::FormId reference)
+    {
+        Place place;
+        if (reference == 0 || !whereIs(reference, place))
+            return false;
+        // The record says it for a cell that is not loaded as well
+        const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
+        if (const ESM4::Cell* record = id != nullptr ? mStore.get<ESM4::Cell>().search(*id) : nullptr)
+            return !record->isExterior();
+        const OFWorld::CellStore* cell = cellAt(place);
+        return cell != nullptr && !cell->isExterior();
+    }
+
+    bool FalloutScripts::hasLoaded3D(FalloutScript::FormId reference)
+    {
+        // The model of an object is in the scene while its cell is and while it is enabled
+        const OFWorld::Ptr ptr = findReference(reference);
+        return !ptr.isEmpty() && ptr.getRefData().isEnabled() && ptr.getRefData().getBaseNode() != nullptr;
+    }
+
+    FalloutScript::SkyWeather FalloutScripts::sky()
+    {
+        const auto weatherOf = [](const OFWorld::Weather& weather) {
+            FalloutScript::SkyWeather::Weather result;
+            result.mPresent = true;
+            result.mClassification = weather.mClassification;
+            result.mPrecipitationBeginFadeIn = weather.mPrecipitationBeginFadeIn;
+            result.mPrecipitationEndFadeOut = weather.mPrecipitationEndFadeOut;
+            return result;
+        };
+        FalloutScript::SkyWeather result;
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr)
+            return result;
+        try
+        {
+            // The weather of the manager is the one that is left while it changes to the next, and the factor is the
+            // share of it that is left (1 at the start of a change); the games say it the other way round
+            const OFWorld::Weather& current = world->getCurrentWeather();
+            if (const OFWorld::Weather* next = world->getNextWeather())
+            {
+                result.mOutgoing = weatherOf(current);
+                result.mCurrent = weatherOf(*next);
+                result.mFraction = 1.0 - std::clamp(static_cast<double>(world->getWeatherTransition()), 0.0, 1.0);
+            }
+            else
+                result.mCurrent = weatherOf(current);
+        }
+        catch (const std::exception&)
+        {
+            // No weather has been chosen yet: the sky holds none
+            return FalloutScript::SkyWeather();
+        }
+        return result;
+    }
+
+    bool FalloutScripts::inZone(FalloutScript::FormId reference, FalloutScript::FormId zone)
+    {
+        Place place;
+        const ESM::FormId wanted = ESM::FormId::fromUint32(zone);
+        if (wanted.isZeroOrUnset() || !whereIs(reference, place))
+            return false;
+        // The zone of the cell, else that of the worldspace; the reference's own zone is not what the games ask
+        const ESM::FormId* id = place.mCell.getIf<ESM::FormId>();
+        const ESM4::Cell* cell = id != nullptr ? mStore.get<ESM4::Cell>().search(*id) : nullptr;
+        if (cell == nullptr)
+            return false;
+        if (!cell->mEncounterZone.isZeroOrUnset())
+            return cell->mEncounterZone == wanted;
+        const ESM::FormId* worldId = cell->mParent.getIf<ESM::FormId>();
+        const ESM4::World* world = worldId != nullptr ? mStore.get<ESM4::World>().search(*worldId) : nullptr;
+        return world != nullptr && world->mEncounterZone == wanted;
+    }
+
+    bool FalloutScripts::talksThroughActivator(FalloutScript::FormId actor)
+    {
+        const std::lock_guard lock(mTalkingActorMutex);
+        for (const auto& [activator, speaker] : mTalkingActors)
+            if (speaker == actor)
+                return true;
+        return false;
     }
 
     void FalloutScripts::queueMove(

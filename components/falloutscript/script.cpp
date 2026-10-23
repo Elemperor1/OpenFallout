@@ -52,9 +52,10 @@ namespace FalloutScript
         }
     }
 
-    Script Script::prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands)
+    Script Script::prepare(const ESM4::ScriptDefinition& definition, const CommandTable& commands, FormId form)
     {
         Script script;
+        script.mForm = form;
         script.mType = definition.scriptHeader.type;
         script.mCode = definition.compiledScript;
 

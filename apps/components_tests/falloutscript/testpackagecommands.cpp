@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -31,6 +32,8 @@ namespace
     constexpr std::uint16_t OpRemoveScriptPackage = 0x1098;
     constexpr std::uint16_t OpGetIsCurrentPackage = 0x10A1;
     constexpr std::uint16_t OpResetAI = 0x11FA;
+    constexpr std::uint16_t OpGetCurrentAIPackage = 0x106E;
+    constexpr std::uint16_t OpGetOffersServicesNow = 0x10FF;
 
     class FakeActors : public FalloutScript::PackageWorld
     {
@@ -39,6 +42,8 @@ namespace
         std::vector<FormId> mEvaluated;
         std::vector<FormId> mReset;
         std::map<FormId, FormId> mCurrent;
+        std::map<FormId, int> mTypes;
+        std::set<FormId> mOffering;
 
         void addScriptPackage(FormId actor, FormId package) override { mPackages[actor].push_back(package); }
         void removeScriptPackage(FormId actor) override
@@ -53,6 +58,12 @@ namespace
             const auto found = mCurrent.find(actor);
             return found != mCurrent.end() ? found->second : 0;
         }
+        int currentPackageType(FormId actor) override
+        {
+            const auto found = mTypes.find(actor);
+            return found != mTypes.end() ? found->second : -1;
+        }
+        bool currentPackageOffersServices(FormId actor) override { return mOffering.count(actor) != 0; }
     };
 
     struct Runner
@@ -171,5 +182,37 @@ namespace
         // someone who follows nothing follows no package
         EXPECT_EQ(instance->variable(3), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, the_kind_of_the_current_package_is_told_in_the_numbers_of_the_games)
+    {
+        Runner run;
+        const auto kind
+            = [&run](FormId actor) { return run.mInterpreter.call(OpGetCurrentAIPackage, actor, true, {}); };
+        EXPECT_EQ(kind(guard), -1.0);
+        run.mActors.mTypes[guard] = 0;
+        EXPECT_EQ(kind(guard), 0.0);
+        run.mActors.mTypes[guard] = 5;
+        EXPECT_EQ(kind(guard), 13.0);
+        run.mActors.mTypes[guard] = 12;
+        EXPECT_EQ(kind(guard), 36.0);
+        run.mActors.mTypes[guard] = 17;
+        EXPECT_EQ(kind(guard), -1.0);
+        run.mActors.mTypes[guard] = 31;
+        EXPECT_EQ(kind(guard), 32.0);
+        run.mActors.mTypes[guard] = 32;
+        EXPECT_EQ(kind(guard), -1.0);
+        EXPECT_EQ(run.mInterpreter.call(OpGetCurrentAIPackage, 0, false, {}), -1.0);
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, a_character_offers_its_services_when_its_package_does)
+    {
+        Runner run;
+        const auto offers
+            = [&run](FormId actor) { return run.mInterpreter.call(OpGetOffersServicesNow, actor, true, {}); };
+        EXPECT_EQ(offers(guard), 0.0);
+        run.mActors.mOffering.insert(guard);
+        EXPECT_EQ(offers(guard), 1.0);
+        EXPECT_EQ(offers(otherGuard), 0.0);
     }
 }

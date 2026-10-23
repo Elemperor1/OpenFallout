@@ -138,6 +138,9 @@ void ESM4::World::load(ESM4::Reader& reader)
             case ESM::fourCC("ZNAM"):
                 reader.getFormId(mMusic);
                 break;
+            case ESM::fourCC("XEZN"):
+                reader.getFormId(mEncounterZone);
+                break;
             case ESM::fourCC("PNAM"):
                 reader.get(mParentUseFlags);
                 break;
@@ -145,7 +148,6 @@ void ESM4::World::load(ESM4::Reader& reader)
             case ESM::fourCC("RNAM"): // multiple
             case ESM::fourCC("MHDT"):
             case ESM::fourCC("LTMP"):
-            case ESM::fourCC("XEZN"):
             case ESM::fourCC("XLCN"):
             case ESM::fourCC("NAM3"):
             case ESM::fourCC("NAM4"):
