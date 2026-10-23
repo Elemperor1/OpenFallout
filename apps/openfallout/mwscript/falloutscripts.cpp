@@ -443,7 +443,10 @@ namespace OFScript
         mPendingLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
-        mScales.clear();
+        {
+            const std::lock_guard lock(mScalesMutex);
+            mScales.clear();
+        }
         mMade.clear();
         mMadeIds.clear();
         {
@@ -858,16 +861,23 @@ namespace OFScript
         for (const auto& [reference, move] : moves)
             applyMove(reference, move);
         // The objects that were given a scale while their cell was not loaded, whose cell is loaded now
-        for (auto it = mScales.begin(); it != mScales.end();)
+        std::vector<std::pair<FalloutScript::FormId, double>> scales;
         {
-            if (const OFWorld::Ptr ptr = findReference(it->first); !ptr.isEmpty())
+            const std::lock_guard lock(mScalesMutex);
+            for (auto it = mScales.begin(); it != mScales.end();)
             {
-                OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(it->second));
-                it = mScales.erase(it);
+                if (!findReference(it->first).isEmpty())
+                {
+                    scales.emplace_back(it->first, it->second);
+                    it = mScales.erase(it);
+                }
+                else
+                    ++it;
             }
-            else
-                ++it;
         }
+        for (const auto& [reference, scale] : scales)
+            if (const OFWorld::Ptr ptr = findReference(reference); !ptr.isEmpty())
+                OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(scale));
         // Every object has its script before any of them runs OnLoad, so that they can reach each other
         std::vector<std::pair<FalloutScript::FormId, bool>> toggle;
         toggle.swap(mPendingToggle);
@@ -4251,8 +4261,11 @@ namespace OFScript
     double FalloutScripts::scaleOf(FalloutScript::FormId reference)
     {
         // What a script asked for and the object has not been given yet is its scale for the scripts
-        if (const auto asked = mScales.find(reference); asked != mScales.end())
-            return asked->second;
+        {
+            const std::lock_guard lock(mScalesMutex);
+            if (const auto asked = mScales.find(reference); asked != mScales.end())
+                return asked->second;
+        }
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty())
             return ptr.getCellRef().getScale();
@@ -4270,16 +4283,23 @@ namespace OFScript
 
     void FalloutScripts::setScale(FalloutScript::FormId reference, double scale)
     {
+        // The scripts see the scale from the call on, whichever thread this runs on
+        {
+            const std::lock_guard lock(mScalesMutex);
+            mScales[reference] = scale;
+        }
         // The world is not changed while scripts run on another thread
         runOnMainThread([this, reference, scale] {
             const OFWorld::Ptr ptr = findReference(reference);
+            // An object whose cell is not loaded gets the scale when it is
             if (ptr.isEmpty())
-            {
-                // The object gets the scale when its cell is loaded
-                mScales[reference] = scale;
                 return;
+            {
+                // A later call has its own entry (and its own turn), which stays
+                const std::lock_guard lock(mScalesMutex);
+                if (const auto asked = mScales.find(reference); asked != mScales.end() && asked->second == scale)
+                    mScales.erase(asked);
             }
-            mScales.erase(reference);
             OFBase::Environment::get().getWorld()->scaleObject(ptr, static_cast<float>(scale));
         });
     }

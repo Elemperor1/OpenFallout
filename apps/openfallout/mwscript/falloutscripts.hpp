@@ -1270,8 +1270,11 @@ namespace OFScript
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;
         std::map<FalloutScript::FormId, Move> mRelocations;
-        /// The scale scripts gave to objects whose cell was not loaded: they get it when it is
+        /// The scale scripts gave to objects that have not been given it yet (their cell was not loaded, or the world
+        /// is changed at the start of the next frame): they get it when they can, and scripts see it from the call on,
+        /// whichever thread they run on
         std::map<FalloutScript::FormId, double> mScales;
+        std::mutex mScalesMutex;
         /// The objects PlaceAtMe made. Scripts name one by a number of its own (0xFF and a counter, as the games do),
         /// which is not the id the world gave it. An object that is asked for waits for the start of the next frame.
         std::map<FalloutScript::FormId, MadeObject> mPendingMade;

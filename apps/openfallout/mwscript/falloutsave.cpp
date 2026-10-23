@@ -548,8 +548,11 @@ namespace FalloutScript
             const OFScript::PendingSave& pending = *host.mPendingSave;
             // and so does a scale that a script gave to one in a cell that was not loaded
             std::map<FormId, OFScript::PendingSave::Reference> unloaded = pending.mReferences;
-            for (const auto& [reference, scale] : host.mScales)
-                unloaded[reference].mScale = static_cast<float>(scale);
+            {
+                const std::lock_guard lock(host.mScalesMutex);
+                for (const auto& [reference, scale] : host.mScales)
+                    unloaded[reference].mScale = static_cast<float>(scale);
+            }
             out.count(unloaded.size());
             for (const auto& [reference, state] : unloaded)
             {
@@ -663,7 +666,10 @@ namespace FalloutScript
                     references[*reference] = state;
                     // The scripts see the scale the game had given it
                     if (state.mScale)
+                    {
+                        const std::lock_guard lock(host.mScalesMutex);
                         host.mScales[*reference] = *state.mScale;
+                    }
                 }
             }
             const std::size_t objects = in.count(objectBytes);
