@@ -184,6 +184,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testmagic.cpp
     falloutscript/testhud.cpp
     falloutscript/testmapmarkers.cpp
+    falloutscript/testaimemory.cpp
     falloutscript/testobjectstate.cpp
     falloutscript/testpresentation.cpp
     falloutscript/testqueries.cpp

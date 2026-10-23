@@ -306,6 +306,18 @@ namespace OFScript
                 converse(speaker, target, topic);
             return 0.0;
         });
+        mInterpreter.setHandler("Autosave", [this](FalloutScript::CallContext&) {
+            requestSave(SaveRequest::Autosave);
+            return 1.0;
+        });
+        mInterpreter.setHandler("ForceSave", [this](FalloutScript::CallContext&) {
+            requestSave(SaveRequest::ForceSave);
+            return 1.0;
+        });
+        mInterpreter.setHandler("SystemSave", [this](FalloutScript::CallContext&) {
+            requestSave(SaveRequest::SystemSave);
+            return 1.0;
+        });
         mInterpreter.setHandler("Say", [this](FalloutScript::CallContext& call) {
             sayTopic(
                 call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
@@ -459,6 +471,7 @@ namespace OFScript
         }
         mPendingToggle.clear();
         mPendingLoad.clear();
+        mLoadWhenEnabled.clear();
         mPendingMoves.clear();
         mRelocations.clear();
         {
@@ -487,6 +500,9 @@ namespace OFScript
         mTriggers.clear();
         mTriggerActors.clear();
         mScriptPackages.clear();
+        mAi.clear();
+        // A save asked for by the game that is left must not be made in the one that is loaded or started
+        mSaveRequests.store(0);
         *mPendingSave = PendingSave();
         {
             const std::lock_guard lock(mFurnitureMutex);
@@ -598,6 +614,7 @@ namespace OFScript
         updateMessageBoxes();
         updateVoices(frametime);
         raiseNothingSaid();
+        runSaveRequests();
         // The screens of locks, terminals and rest, and the time they run, go on while a screen stops the world
         updateInteraction(frametime);
         if (paused)
@@ -927,7 +944,11 @@ namespace OFScript
             if (disabled)
                 OFBase::Environment::get().getWorld()->disable(ptr);
             else
+            {
                 OFBase::Environment::get().getWorld()->enable(ptr);
+                if (mLoadWhenEnabled.erase(reference) != 0)
+                    mPendingLoad.push_back(reference);
+            }
         }
         std::vector<FalloutScript::FormId> load;
         load.swap(mPendingLoad);
@@ -938,6 +959,9 @@ namespace OFScript
                 continue;
             if (leftLoadedCells(reference))
                 mReferences.erase(reference);
+            else if (isDisabled(reference))
+                // A disabled object has no model in the world: its OnLoad blocks run when it is enabled
+                mLoadWhenEnabled.insert(reference);
             else
                 mObjects.setLoaded(reference, true);
         }
@@ -949,6 +973,7 @@ namespace OFScript
             if (const FalloutScript::FormId reference = referenceOf(ptr); reference != 0)
             {
                 mObjects.setLoaded(reference, false);
+                mLoadWhenEnabled.erase(reference);
                 mReferences.erase(reference);
                 mTriggerShapes.erase(reference);
                 mTriggers.remove(reference);
@@ -1030,7 +1055,11 @@ namespace OFScript
         if (disabled)
             OFBase::Environment::get().getWorld()->disable(ptr);
         else
+        {
             OFBase::Environment::get().getWorld()->enable(ptr);
+            if (mLoadWhenEnabled.erase(reference) != 0)
+                mPendingLoad.push_back(reference);
+        }
     }
 
     void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
@@ -4328,6 +4357,28 @@ namespace OFScript
             if (const ESM4::AIPackage* package = mStore.get<ESM4::AIPackage>().search(refId(*it)))
                 result.push_back(package);
         return result;
+    }
+
+    bool FalloutScripts::setEnabled(const OFWorld::Ptr& ptr, bool enabled)
+    {
+        if (ptr.isEmpty() || !ptr.isInCell() || ptr == OFBase::Environment::get().getWorld()->getPlayerPtr())
+            return false;
+        const FalloutScript::FormId reference = referenceOf(ptr);
+        if (reference == 0)
+            return false;
+        applyDisabled(reference, !enabled);
+        return true;
+    }
+
+    void FalloutScripts::rememberAi(const OFWorld::Ptr& actor, FalloutScript::AiState state)
+    {
+        mAi.set(referenceOf(actor), std::move(state));
+    }
+
+    std::optional<FalloutScript::AiState> FalloutScripts::savedAi(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId reference = referenceOf(actor);
+        return reference != 0 ? mAi.find(reference) : std::nullopt;
     }
 
     bool FalloutScripts::packageConditionsHold(const ESM4::AIPackage& package, const OFWorld::Ptr& actor)

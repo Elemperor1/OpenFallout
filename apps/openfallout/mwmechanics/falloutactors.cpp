@@ -4,6 +4,7 @@
 #include <cmath>
 #include <deque>
 #include <limits>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -18,6 +19,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/packageschedule.hpp>
+#include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/fightai.hpp>
 #include <components/settings/values.hpp>
 
@@ -177,6 +179,9 @@ namespace OFMechanics
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
         /// A package that is done and has nothing after it is over for the actor, and its Change script has been told
         bool mChangeTold = false;
+        /// The package was kept in a saved game: its goal is made when the packages are looked at first, without the
+        /// character beginning it again
+        bool mNeedsGoal = false;
         int mWaitingFor = 0; // why a Dialogue package stands still (a waitFor constant), once told in the log
         /// The Dialogue packages that are on and that are left out because the one to talk to is not around, once told
         /// in the log
@@ -213,6 +218,74 @@ namespace OFMechanics
 
     namespace
     {
+        /// The number a saved game knows a record or reference by, 0 for one that has none
+        FalloutScript::FormId savedNumber(const ESM::FormId& form)
+        {
+            if (form.isZeroOrUnset() || !form.hasContentFile() || form.mContentFile > 0xfe)
+                return 0;
+            return form.toUint32();
+        }
+
+        /// What a saved game keeps of the mind of a character
+        FalloutScript::AiState stateOf(const FalloutActors::Mind& mind)
+        {
+            FalloutScript::AiState state;
+            for (const ESM4::AIPackage* package : mind.mDone)
+                if (const FalloutScript::FormId id = savedNumber(package->mId); id != 0)
+                    state.mDone.push_back(id);
+            std::sort(state.mDone.begin(), state.mDone.end());
+            if (mind.mPackage != nullptr)
+                state.mPackage = savedNumber(mind.mPackage->mId);
+            state.mChangeTold = mind.mChangeTold;
+            if (mind.mCommanded)
+            {
+                state.mFollows = true;
+                state.mFollowsPlayer = mind.mFollowing.mPlayer;
+                state.mFollowTarget = savedNumber(mind.mFollowing.mRef);
+                state.mFollowDistance = mind.mFollowing.mDistance;
+                // The one it follows has no number a save can name: it follows nobody after a load
+                if (!state.mFollowsPlayer && state.mFollowTarget == 0)
+                    state.mFollows = false;
+            }
+            return state;
+        }
+
+        /// Gives the saved game what the mind of the character holds now
+        void keepState(const FalloutActors::Mind& mind)
+        {
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                scripts->rememberAi(mind.mPtr, stateOf(mind));
+        }
+
+        /// Takes back what a saved game kept of the character, or what it held before its cell was unloaded: the
+        /// packages that were done are still done, and the one that it followed is followed without being begun again
+        void restoreState(FalloutActors::Mind& mind)
+        {
+            OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            if (scripts == nullptr)
+                return;
+            const std::optional<FalloutScript::AiState> saved = scripts->savedAi(mind.mPtr);
+            if (!saved)
+                return;
+            const auto find = [&mind](FalloutScript::FormId id) -> const ESM4::AIPackage* {
+                for (const auto* list : { &mind.mScripted, &mind.mPackages })
+                    for (const ESM4::AIPackage* package : *list)
+                        if (savedNumber(package->mId) == id)
+                            return package;
+                return nullptr;
+            };
+            for (const FalloutScript::FormId id : saved->mDone)
+                if (const ESM4::AIPackage* package = find(id))
+                    mind.mDone.insert(package);
+            if (saved->mPackage != 0)
+                if (const ESM4::AIPackage* package = find(saved->mPackage))
+                {
+                    mind.mPackage = package;
+                    mind.mNeedsGoal = true;
+                    mind.mChangeTold = saved->mChangeTold;
+                }
+        }
+
         struct PendingEvent
         {
             OFWorld::Ptr mActor;
@@ -432,8 +505,20 @@ namespace OFMechanics
         remove(ptr);
         if (!handles(ptr))
             return;
-        // A command from a script outlives the cell: the character takes it up again when the cell is loaded
-        const auto command = mCommands.find(ptr.getCellRef().getRefNum());
+        // A command from a script outlives the cell: the character takes it up again when the cell is loaded, and
+        // when the game is loaded, from what the saved game kept of it
+        const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
+        if (mCommands.count(refNum) == 0)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (const std::optional<FalloutScript::AiState> saved = scripts->savedAi(ptr); saved && saved->mFollows)
+                {
+                    Command command;
+                    command.mPlayer = saved->mFollowsPlayer;
+                    command.mTarget = ESM::FormId::fromUint32(saved->mFollowTarget);
+                    command.mDistance = saved->mFollowDistance;
+                    mCommands[refNum] = command;
+                }
+        const auto command = mCommands.find(refNum);
         if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty() && !needsMind(ptr))
             return;
         Mind& mind = makeMind(ptr);
@@ -448,6 +533,7 @@ namespace OFMechanics
             ^ refNum.mIndex ^ 0x9E3779B97F4A7C15ull;
         Mind& mind = *mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packagesOf(ptr), seed)).first->second;
         mind.mScripted = scriptPackagesOf(ptr);
+        restoreState(mind);
         registerAgent(mind);
         return mind;
     }
@@ -493,6 +579,7 @@ namespace OFMechanics
         obey(mind, command);
         if (const ESM::RefNum refNum = ptr.getCellRef().getRefNum(); refNum.isSet())
             mCommands[refNum] = command;
+        keepState(mind);
     }
 
     void FalloutActors::obey(Mind& mind, const Command& command)
@@ -514,7 +601,16 @@ namespace OFMechanics
         mCommands.erase(ptr.getCellRef().getRefNum());
         const auto found = mMinds.find(ptr.mRef);
         if (found == mMinds.end() || !found->second->mCommanded)
+        {
+            // A character whose cell is not loaded is told to stop in the saved game
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (std::optional<FalloutScript::AiState> saved = scripts->savedAi(ptr); saved && saved->mFollows)
+                {
+                    saved->mFollows = false;
+                    scripts->rememberAi(ptr, *saved);
+                }
             return;
+        }
         Mind& mind = *found->second;
         mind.mCommanded = false;
         mind.mFollowing = Mind::Following();
@@ -522,6 +618,7 @@ namespace OFMechanics
         mind.mGoal = FalloutGoal();
         mind.mReview = 0.f;
         stopWalking(mind);
+        keepState(mind);
     }
 
     void FalloutActors::remove(const OFWorld::Ptr& ptr)
@@ -1034,6 +1131,15 @@ namespace OFMechanics
 
             if (chosen.mPackage == mind.mPackage)
             {
+                // The package that a saved game kept goes on from where the character is, without a new beginning
+                if (mind.mNeedsGoal && chosen.mPackage != nullptr)
+                {
+                    mind.mGoal = chosen.mGoal;
+                    mind.mFollowing = chosen.mFollowing;
+                    mind.mHasFacing = chosen.mHasFacing;
+                    mind.mFacing = chosen.mFacing;
+                }
+                mind.mNeedsGoal = false;
                 // A place that the package names by a reference goes with it when something moves the reference, and
                 // a package that looks for furniture follows its choice
                 if (chosen.mPackage != nullptr
@@ -1059,6 +1165,7 @@ namespace OFMechanics
                     && mind.mDone.count(chosen.mPackage) != 0)
                 {
                     mind.mChangeTold = true;
+                    keepState(mind);
                     raise(frame, mind.mPtr, *chosen.mPackage, OFScript::FalloutScripts::PackageEvent::Change);
                 }
                 return;
@@ -1102,7 +1209,9 @@ namespace OFMechanics
             mind.mFailures = 0;
             mind.mWait = 0.f;
             mind.mPathRetry = 0.f;
+            mind.mNeedsGoal = false;
             stopWalking(mind);
+            keepState(mind);
             // The packages that run scripts are the ones a quest waits for: they are told even if the log is not
             Log(chosen.mPackage != nullptr && hasEvents(*chosen.mPackage) ? Debug::Info : Debug::Verbose)
                 << "Package of " << mind.mPtr.getCellRef().getRefId() << " at " << frame.mClock.mHour
@@ -1158,6 +1267,7 @@ namespace OFMechanics
             if (beds)
                 return;
             mind.mDone.insert(package);
+            keepState(mind);
             raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
             // The packages are looked at again at once: the next one is followed
             mind.mReview = 0.f;
@@ -1298,6 +1408,7 @@ namespace OFMechanics
                     return;
                 mind.mSpoke = false;
                 mind.mDone.insert(package);
+                keepState(mind);
                 raise(frame, mind.mPtr, *package, OFScript::FalloutScripts::PackageEvent::Done);
                 mind.mReview = 0.f;
                 return;
