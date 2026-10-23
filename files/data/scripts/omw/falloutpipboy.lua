@@ -1,8 +1,9 @@
 -- The Pip-Boy of the player in Fallout 3 and New Vegas: the tabs STAT (status, S.P.E.C.I.A.L., skills, perks), INV (the
--- inventory by kind of item) and DATA (the quests), and the screen of a level up. What a character is and carries is the
--- engine's (core.pipboy); this script shows it in the window "Inventory", which it takes over from the one of Morrowind
--- for content that has a Pip-Boy, and gives the choices of the player back. The windows that Morrowind shows beside the
--- inventory are left empty. There is no map, no radio, no repair and no hot keys yet.
+-- inventory by kind of item) and DATA (the quests and the map), and the screen of a level up. What a character is and
+-- carries is the engine's (core.pipboy); this script shows it in the window "Inventory", which it takes over from the
+-- one of Morrowind for content that has a Pip-Boy, and gives the choices of the player back. The windows that Morrowind
+-- shows beside the inventory are left empty. The map is a list of the places found, to travel to (core.interact); there
+-- is no radio, no repair and no hot keys yet.
 local core = require('openfallout.core')
 local input = require('openfallout.input')
 local ui = require('openfallout.ui')
@@ -47,6 +48,8 @@ local listLength = 0
 local tabs = { 'stat', 'inv', 'data' }
 local statTabs = { 'status', 'special', 'skills', 'perks' }
 local invTabs = { 'weapons', 'apparel', 'aid', 'misc', 'ammo' }
+local dataTabs = { 'quests', 'map' }
+local dataTab = 'quests'
 
 local render
 local widgets
@@ -510,8 +513,37 @@ local function questLines()
     return lines
 end
 
+-- The places the player has found; one that can be travelled to takes the player there when it is picked
+local function mapLines()
+    local lines = {}
+    local markers = core.interact.map()
+    for _, marker in ipairs(markers) do
+        local m = marker
+        local away = m.distance >= 0 and string.format('%d', math.floor(m.distance / 100 + 0.5)) or ''
+        lines[#lines + 1] = line(widgets.row(
+            widgets.cell(widgets.clickable(m.name ~= '' and m.name or 'Unknown', function()
+                local why = core.interact.travel(m.id)
+                if why == '' then
+                    closeWindow()
+                end
+            end, { enabled = m.travel }), 340),
+            widgets.label(away, colors.hintColor)))
+    end
+    if #markers == 0 then
+        lines[1] = line(widgets.label('No places found', colors.hintColor))
+    end
+    return lines
+end
+
 local function dataPage(add)
-    listWindow(add, questLines())
+    tabRow(add, dataTabs, dataTab, function(name)
+        return name == 'quests' and 'QUESTS' or 'MAP'
+    end, function(name)
+        dataTab = name
+        offset = 1
+        render()
+    end)
+    listWindow(add, dataTab == 'map' and mapLines() or questLines())
 end
 
 -- The level up works as the menu of the games does (menu code 1027): the skills first, where every point has to be spent

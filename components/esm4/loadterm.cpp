@@ -170,7 +170,19 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
-            case ESM::fourCC("DNAM"): // difficulty
+            case ESM::fourCC("DNAM"):
+                // Fallout: the difficulty, the flags, the server type and a byte of padding; the later games differ
+                if (subHdr.dataSize == 4)
+                {
+                    std::uint8_t padding;
+                    reader.get(mDifficulty);
+                    reader.get(mTerminalFlags);
+                    reader.get(mServerType);
+                    reader.get(padding);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("CIS1"):
             case ESM::fourCC("CIS2"):
             case ESM::fourCC("MODT"): // Model data

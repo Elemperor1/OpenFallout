@@ -22,6 +22,7 @@
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadnpc.hpp>
+#include <components/esm4/loadterm.hpp>
 
 #include <components/settings/values.hpp>
 
@@ -638,6 +639,16 @@ namespace OFLua
         // using furniture already gets up, whichever furniture it activates
         if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
         {
+            // A lock that the player can not open stops the activation: its screen opens in place of the door or the
+            // container
+            if (scripts->lockStops(object, actor))
+                return;
+            if (object.getType() == ESM4::Terminal::sRecordId)
+            {
+                scripts->openTerminal(object, actor);
+                mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
+                return;
+            }
             if (object.getType() == ESM4::Furniture::sRecordId)
                 scripts->activateFurniture(actor, object);
             // A door of Fallout that is no teleport door opens, and closes when it is open

@@ -266,10 +266,8 @@ void ESM4::Reference::load(ESM4::Reader& reader)
                 ESM::FormId keyForm;
                 reader.getFormId(keyForm);
                 mKey = keyForm;
-                reader.get(dummy); // flag?
-                reader.get(dummy);
-                reader.get(dummy);
-                reader.get(dummy);
+                // The flags: 0x04 makes the level grow with the level of the character (Fallout 3 and New Vegas)
+                reader.get(mLockFlags);
                 if (subHdr.dataSize == 16)
                     reader.skipSubRecordData(4); // Oblivion (sometimes), flag?
                 else if (subHdr.dataSize == 20) // Skyrim, FO3

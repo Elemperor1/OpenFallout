@@ -130,6 +130,8 @@ namespace ESM4
         TeleportDest mDoor;
         bool mIsLocked = false;
         std::int8_t mLockLevel = 0;
+        /// The flags of the lock (XLOC, 4 bytes after the key): 0x04 is a leveled lock
+        std::uint32_t mLockFlags = 0;
         /// Fallout: a door that is open until something closes it (the empty subrecord ONAM)
         bool mOpenByDefault = false;
         ESM::FormId mKey;

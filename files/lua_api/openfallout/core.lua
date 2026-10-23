@@ -1536,6 +1536,151 @@
 -- @field #string name
 
 ---
+-- @{#Interact}: the locks, the terminals, waiting and sleeping, and the map of Fallout 3 and New Vegas. The engine
+-- keeps what the player has open (a lock in front of it, a terminal, the screen of the hours) and the screens read it
+-- and give the choices of the player back. Not available in load scripts.
+-- @field [parent=#core] #Interact interact
+
+---
+-- @type Interact
+
+---
+-- The lock the player has in front of it (it activated a locked door or container and has no key for it).
+-- @function [parent=#Interact] lock
+-- @return #InteractLock Nothing when no lock is open.
+
+---
+-- @type InteractLock
+-- @field #string reference The form id of the door or container.
+-- @field #string name
+-- @field #string word How hard the lock is, in the words of the game settings (sLockLevelName*).
+-- @field #number level The level of the lock for the player's level.
+-- @field #boolean keyOnly Whether only a key opens it.
+-- @field #number pins The bobby pins the player has.
+-- @field #number skill The Lockpick skill of the player.
+-- @field #number chance The chance, from 0 to 1, that a bobby pin opens the lock. A stand-in: the minigame of the
+-- games is not made.
+-- @field #number serial Another for each lock that is opened.
+
+---
+-- The player tries a bobby pin on the lock. A pin that does not open it breaks. The lock opens, the player is given
+-- the experience of picking a lock of that kind, and the door or container is activated again.
+-- @function [parent=#Interact] pick
+-- @return #string "opened", "broke", "nopins" or "keyonly"; "" when no lock is open.
+
+---
+-- @function [parent=#Interact] closeLock
+
+---
+-- The number of the terminal that is open, 0 for none. It changes with everything the screen of the terminal shows.
+-- @function [parent=#Interact] terminalSerial
+-- @return #number
+
+---
+-- The terminal the player has open.
+-- @function [parent=#Interact] terminal
+-- @return #InteractTerminal Nothing when none is open.
+
+---
+-- @type InteractTerminal
+-- @field #string name
+-- @field #string body The text it shows: its own, or the result of the line that was chosen.
+-- @field #list<#InteractTerminalLine> lines The lines of the menu whose conditions hold.
+-- @field #boolean canGoBack Whether Back goes to a menu above (else it leaves the terminal).
+-- @field #boolean hacking Whether the terminal is closed and the game of hacking is on.
+-- @field #number hackLevel From 0 to 4.
+-- @field #list<#string> words The words of the game of hacking.
+-- @field #list<#InteractGuess> guesses
+-- @field #number attempts The guesses that are left.
+-- @field #number lockout The seconds before the terminal can be tried again, 0 when it can.
+-- @field #number serial
+
+---
+-- @type InteractTerminalLine
+-- @field #number index The number that goes to `choose`.
+-- @field #string text
+
+---
+-- @type InteractGuess
+-- @field #string word
+-- @field #number likeness How many letters are where they are in the password.
+
+---
+-- The player chooses a line of the menu of the terminal (the result script of the line runs).
+-- @function [parent=#Interact] choose
+-- @param #number index The `index` of the line.
+
+---
+-- The player goes back in the terminal, or leaves it from its first menu.
+-- @function [parent=#Interact] back
+
+---
+-- The player guesses a word of the game of hacking.
+-- @function [parent=#Interact] guess
+-- @param #number word Its place in `words`, from 1.
+-- @return #number The likeness of the word, -1 when no guess was made.
+
+---
+-- @function [parent=#Interact] closeTerminal
+
+---
+-- The player wants to wait (the Wait key calls this). A refusal (hostile characters near, and the like) is printed.
+-- @function [parent=#Interact] requestWait
+
+---
+-- The screen of waiting or sleeping that was asked for (the Wait key, or a bed the player activated).
+-- @function [parent=#Interact] rest
+-- @return #InteractRest Nothing when none is asked for.
+
+---
+-- @type InteractRest
+-- @field #boolean sleeping
+-- @field #number serial
+
+---
+-- Starts to wait or sleep for that many hours (1 to 24). The hours pass at four for each second of play.
+-- @function [parent=#Interact] startRest
+-- @param #number hours
+-- @return #string Why not, "" when it began.
+
+---
+-- @function [parent=#Interact] restProgress
+-- @return #InteractRestProgress
+
+---
+-- @type InteractRestProgress
+-- @field #boolean active
+-- @field #boolean sleeping
+-- @field #number done The hours that passed.
+-- @field #number total
+-- @field #string stopped Why it ended before the hours were over, "" when it did not.
+-- @field #number ended Another for each rest that ended.
+
+---
+-- Ends the rest where it is, or closes the screen of the hours.
+-- @function [parent=#Interact] cancelRest
+
+---
+-- The places on the map that the player has found.
+-- @function [parent=#Interact] map
+-- @return #list<#InteractMarker>
+
+---
+-- @type InteractMarker
+-- @field #string id The form id of the marker.
+-- @field #string name
+-- @field #number x
+-- @field #number y
+-- @field #boolean travel Whether the player can travel there.
+-- @field #number distance Along the floor, -1 when the player is not outside in the same world.
+
+---
+-- The player travels to a marker at once: the time of the trip passes and the player is put there.
+-- @function [parent=#Interact] travel
+-- @param #string marker The form id of the marker.
+-- @return #string Why not, "" when the player went.
+
+---
 -- @{#Pipboy}: what the player's character is and carries, for the screens of the Pip-Boy, the level up and the loot of
 -- containers in Fallout 3 or New Vegas. The holders of items are told by their form ids, as `core.getFormId` writes
 -- one; the player when it is left out. The words are those of the game settings of the files. Not available in load

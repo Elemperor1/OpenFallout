@@ -62,11 +62,14 @@ namespace
     {
         const std::string data = zString("EDID", "Text of EDID") + zString("FULL", "Text of FULL")
             + zString("DESC", "Text of DESC") + subRecord("SNAM", formIdData(0x00010001))
-            + subRecord("DNAM", "\x02\x00\x00\x00") + firstItem() + secondItem();
+            + subRecord("DNAM", std::string("\x02\x01\x03\x00", 4)) + firstItem() + secondItem();
         const std::vector<ESM4::Terminal> result = loadRecords<ESM4::Terminal>("TERM", record("TERM", 1, data));
 
         ASSERT_EQ(result.size(), 1u);
         const ESM4::Terminal& terminal = result[0];
+        EXPECT_EQ(terminal.mDifficulty, 2);
+        EXPECT_EQ(terminal.mTerminalFlags, 1);
+        EXPECT_EQ(terminal.mServerType, 3);
         EXPECT_EQ(terminal.mEditorId, "Text of EDID");
         EXPECT_EQ(terminal.mFullName, "Text of FULL");
         EXPECT_EQ(terminal.mText, "Text of DESC");

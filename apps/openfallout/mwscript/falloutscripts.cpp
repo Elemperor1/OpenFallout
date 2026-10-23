@@ -40,6 +40,7 @@
 #include <components/esm4/loadregn.hpp>
 #include <components/esm4/loadscpt.hpp>
 #include <components/esm4/loadsoun.hpp>
+#include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadvtyp.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
@@ -582,6 +583,8 @@ namespace OFScript
         updateMessageBoxes();
         updateVoices(frametime);
         raiseNothingSaid();
+        // The screens of locks, terminals and rest, and the time they run, go on while a screen stops the world
+        updateInteraction(frametime);
         if (paused)
         {
             // The game is stopped with no window open (a script of Lua paused the world): nothing runs
@@ -3738,7 +3741,26 @@ namespace OFScript
         locked = record->mIsLocked;
         // The level is a byte that the games use up to 255 (a key is needed)
         level = static_cast<std::uint8_t>(record->mLockLevel);
+        // A terminal is closed until it is hacked, unless its record says it is not
+        if (!locked)
+        {
+            if (const ESM4::Terminal* terminal = mStore.get<ESM4::Terminal>().search(record->mBaseObj))
+            {
+                locked = (terminal->mTerminalFlags & 0x02) == 0;
+                level = 0;
+            }
+        }
         return true;
+    }
+
+    bool FalloutScripts::isBedFor(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture)
+    {
+        if (furniture.isEmpty() || furniture.getType() != ESM4::Furniture::sRecordId)
+            return false;
+        const std::optional<FalloutScript::FurnitureSeat> seat
+            = chooseSeat(scriptReferenceOf(actor), furniture, actor.getRefData().getPosition().asVec3());
+        // The entries of a bed say 1 to 9
+        return seat && seat->mRef >= 1 && seat->mRef <= 9;
     }
 
     bool FalloutScripts::formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries)
@@ -4088,6 +4110,9 @@ namespace OFScript
             return;
         if (usesFurniture(actor))
             leaveFurniture(actor);
+        else if (scriptReferenceOf(actor) == mPlayer && isBedFor(actor, furniture))
+            // The player lies down on a bed by choosing how long to sleep
+            requestRest(true, referenceOf(furniture));
         else
             useFurniture(actor, furniture, true);
     }
