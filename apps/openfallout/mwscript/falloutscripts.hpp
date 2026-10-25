@@ -1482,8 +1482,10 @@ namespace OFScript
         /// whose scripts run OnLoad
         std::vector<std::pair<FalloutScript::FormId, bool>> mPendingToggle;
         std::vector<FalloutScript::FormId> mPendingLoad;
-        /// The objects that are loaded and disabled: their OnLoad blocks wait until they are enabled
+        /// The objects that are loaded and disabled: their OnLoad blocks wait until they are enabled (their GameMode
+        /// blocks do not wait), and those enabled since, whose OnLoad blocks run at the start of the next frame
         std::set<FalloutScript::FormId> mLoadWhenEnabled;
+        std::vector<FalloutScript::FormId> mPendingEnabledLoad;
         /// Where scripts put objects: those that are waiting for the start of the next frame (the world is not changed
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;

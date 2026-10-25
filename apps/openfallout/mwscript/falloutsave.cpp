@@ -992,7 +992,9 @@ namespace OFScript
                     states->quickSave("Autosave");
                     break;
                 case SaveRequest::ForceSave:
-                    states->saveGame("Forced save");
+                    // The slot of an earlier one is used again, as for the other two: a game that asks for it often
+                    // must not fill the disk
+                    states->quickSave("Forced save");
                     break;
                 case SaveRequest::SystemSave:
                     states->quickSave("System save");

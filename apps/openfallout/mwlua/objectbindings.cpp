@@ -156,7 +156,12 @@ namespace OFLua
                 newPtr.getCellRef().setPosition(newPtr.getRefData().getPosition());
             }
             if (!newPtr.getRefData().isEnabled())
-                world->enable(newPtr);
+            {
+                // The OnLoad blocks that waited for the enabling run, and the objects that follow this one follow
+                OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+                if (scripts == nullptr || !scripts->setEnabled(newPtr, true))
+                    world->enable(newPtr);
+            }
             OFBase::Environment::get().getLuaManager()->objectTeleported(newPtr);
         }
 

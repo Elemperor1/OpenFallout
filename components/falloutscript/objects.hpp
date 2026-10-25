@@ -44,9 +44,10 @@ namespace FalloutScript
         /// Whether the script of the reference has a block for the event (one the filter accepts, when it is given)
         bool hasBlock(FormId reference, std::uint16_t blockType, const BlockFilter& filter = {}) const;
 
-        /// A reference is loaded or not loaded. Loading it runs its OnLoad blocks, unless it was loaded already.
-        /// Nothing happens for a reference that has no script.
-        void setLoaded(FormId reference, bool loaded);
+        /// A reference is loaded or not loaded. Loading it runs its OnLoad blocks, unless it was loaded already or
+        /// `runOnLoad` is false (the caller runs them later, with trigger()): its GameMode and MenuMode blocks run in
+        /// either case. Nothing happens for a reference that has no script.
+        void setLoaded(FormId reference, bool loaded, bool runOnLoad = true);
         bool loaded(FormId reference) const;
         /// All the references that are loaded, whatever blocks their scripts have
         std::vector<FormId> loadedReferences() const { return std::vector<FormId>(mLoaded.begin(), mLoaded.end()); }

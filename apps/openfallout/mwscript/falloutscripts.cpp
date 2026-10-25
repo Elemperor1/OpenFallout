@@ -472,6 +472,7 @@ namespace OFScript
         mPendingToggle.clear();
         mPendingLoad.clear();
         mLoadWhenEnabled.clear();
+        mPendingEnabledLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
         {
@@ -947,7 +948,7 @@ namespace OFScript
             {
                 OFBase::Environment::get().getWorld()->enable(ptr);
                 if (mLoadWhenEnabled.erase(reference) != 0)
-                    mPendingLoad.push_back(reference);
+                    mPendingEnabledLoad.push_back(reference);
             }
         }
         std::vector<FalloutScript::FormId> load;
@@ -960,10 +961,25 @@ namespace OFScript
             if (leftLoadedCells(reference))
                 mReferences.erase(reference);
             else if (isDisabled(reference))
-                // A disabled object has no model in the world: its OnLoad blocks run when it is enabled
+            {
+                // A disabled object has no model in the world: its OnLoad blocks run when it is enabled, but its
+                // GameMode and MenuMode blocks run from now on
+                mObjects.setLoaded(reference, true, false);
                 mLoadWhenEnabled.insert(reference);
+            }
             else
                 mObjects.setLoaded(reference, true);
+        }
+        std::vector<FalloutScript::FormId> enabled;
+        enabled.swap(mPendingEnabledLoad);
+        for (const FalloutScript::FormId reference : enabled)
+        {
+            if (mReferences.count(reference) == 0 || !mObjects.loaded(reference))
+                continue;
+            if (isDisabled(reference))
+                mLoadWhenEnabled.insert(reference);
+            else
+                mObjects.trigger(reference, FalloutScript::BlockType::OnLoad);
         }
     }
 
@@ -1058,7 +1074,7 @@ namespace OFScript
         {
             OFBase::Environment::get().getWorld()->enable(ptr);
             if (mLoadWhenEnabled.erase(reference) != 0)
-                mPendingLoad.push_back(reference);
+                mPendingEnabledLoad.push_back(reference);
         }
     }
 

@@ -47,3 +47,4 @@ Saves Settings
 
    Whether the command ``ForceSave`` of the scripts of Fallout 3 and New Vegas saves the game.
    It is the ``bAllowScriptedForceSave`` setting of those games.
+   The saves are named "Forced save", and once ``max quicksaves`` of them exist the oldest is replaced, as for a quicksave.
