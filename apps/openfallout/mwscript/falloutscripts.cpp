@@ -526,6 +526,20 @@ namespace OFScript
             const std::lock_guard lock(mRecipeMutex);
             mRecipeMenu.reset();
         }
+        {
+            // The screens of a lock and a terminal, a rest that runs and the door that waits to be activated belong to
+            // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
+            const std::lock_guard lock(mInteractionMutex);
+            mLockScreen.reset();
+            mTerminal.reset();
+            mReactivate.reset();
+            mDiscoveryTimer = 0;
+            mPlayerSleeping = false;
+            RestState rest;
+            rest.mSerial = mRest.mSerial;
+            rest.mEnded = mRest.mEnded;
+            mRest = rest;
+        }
         mPerks.clear();
         mItemUse.clear();
         mPerkOwners.clear();

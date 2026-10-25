@@ -632,7 +632,10 @@ LOD_BLOCK_HEIGHT = 300.0
 LOD_LAND_CELL = (12, 0)
 LOD_CELL_ID = 0x986
 LOD_LAND_ID = 0x987
-LAST_ID = 0x995 # the largest form ID of the plugin, which the next object ID of its header follows
+MAP_FIND_REF_ID = 0x996 # a map marker in the open world, hidden until the player walks up to it
+MAP_FIND_PLACE = (200.0, 300.0)
+MAP_FIND_NAME = "Test Find"
+LAST_ID = 0x996 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -1515,7 +1518,7 @@ def scripted_object(kind):
 def object_refs(kind, origin):
     """The references of the scripted object and of the cube its script disables, around the origin of the cell."""
     x, y = origin
-    return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
+    refs = [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
             refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
             refr(FOLLOWER_REF_IDS[kind], CUBE_ID, (x + FOLLOWER_PLACE[0], y + FOLLOWER_PLACE[1], CUBE / 2),
                  enable_parent=(VICTIM_REF_IDS[kind], 0)),
@@ -1536,6 +1539,14 @@ def object_refs(kind, origin):
             refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2),
                  linked=DOOMED_REF_IDS[kind]),
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
+    if kind == "exterior":
+        # The cell of an exterior has an id as well: whether the player is in the open world, and so finds the place by
+        # walking up to it, is for the engine to ask of the cell and not of the id
+        marker = [sub(b"XMRK", b""), sub(b"FNAM", b"\x00"), zstr(b"FULL", MAP_FIND_NAME),
+                  sub(b"TNAM", struct.pack("<H", 0))]
+        refs.append(refr(MAP_FIND_REF_ID, TARGET_MARKER_ID, (x + MAP_FIND_PLACE[0], y + MAP_FIND_PLACE[1], 0.0),
+                         extra=marker))
+    return refs
 
 
 def saved_refs():

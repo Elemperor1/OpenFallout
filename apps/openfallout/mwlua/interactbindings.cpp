@@ -33,7 +33,8 @@ namespace OFLua
         {
             if (text.empty())
                 return 0;
-            const ESM::FormId* form = ESM::RefId::deserializeText(text).getIf<ESM::FormId>();
+            const ESM::RefId id = ESM::RefId::deserializeText(text);
+            const ESM::FormId* form = id.getIf<ESM::FormId>();
             if (form == nullptr)
                 throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
             return form->toUint32();

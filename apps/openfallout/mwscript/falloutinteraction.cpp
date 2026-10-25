@@ -278,7 +278,10 @@ namespace OFScript
         const ESM4::Terminal::MenuItem& item = record->mMenuItems[static_cast<std::size_t>(index)];
         FalloutScript::ConditionContext context;
         context.mSubject = mPlayer;
-        if (!mConditions.holds(item.mConditions, context))
+        // Only a line that the screen shows is one to choose: it has text, and the conditions of the menu and of the
+        // line hold
+        if (item.mText.empty() || !mConditions.holds(record->mConditions, context)
+            || !mConditions.holds(item.mConditions, context))
             return;
 
         // The result script of the line runs first, then the note, then what the line shows
@@ -502,6 +505,7 @@ namespace OFScript
         const bool placed = !player.isEmpty() && player.isInCell();
         if (placed)
             here = player.getRefData().getPosition().asVec3();
+        const bool outside = placed && inOpenWorld(mPlayer);
         for (const PlacedMarker& marker : placedMarkers())
         {
             const int state = mMapMarkers.state(marker.mId);
@@ -513,7 +517,7 @@ namespace OFScript
             entry.mPosition = marker.mPosition;
             entry.mTravel = state == 2;
             entry.mDistance = -1;
-            if (placed && marker.mWorldspace == space && parentCell(mPlayer) == 0)
+            if (outside && marker.mWorldspace == space)
             {
                 const osg::Vec3f away = marker.mPosition - here;
                 entry.mDistance = std::sqrt(away.x() * away.x() + away.y() * away.y());
@@ -547,8 +551,9 @@ namespace OFScript
         conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;
         conditions.mInAir = world.isFlying(player);
         // A cell inside that the records forbid to travel from
+        const bool outside = inOpenWorld(mPlayer);
         const FalloutScript::FormId cell = parentCell(mPlayer);
-        if (cell != 0)
+        if (!outside && cell != 0)
         {
             const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
             conditions.mCellForbids = record != nullptr && (record->mCellFlags & ESM4::CELL_NoTravel) != 0;
@@ -563,7 +568,7 @@ namespace OFScript
         // The time the trip takes: from where the player stands when that is in the space of the marker, else the
         // trip is as long as the longest one
         double distance = 20000;
-        if (worldspaceOf(mPlayer) == target->mWorldspace && cell == 0)
+        if (outside && worldspaceOf(mPlayer) == target->mWorldspace)
         {
             const osg::Vec3f away = target->mPosition - player.getRefData().getPosition().asVec3();
             distance = std::sqrt(away.x() * away.x() + away.y() * away.y());
@@ -691,6 +696,15 @@ namespace OFScript
         ++mRest.mEnded;
     }
 
+    bool FalloutScripts::inOpenWorld(FalloutScript::FormId reference)
+    {
+        Place place;
+        if (!whereIs(reference, place))
+            return false;
+        const OFWorld::CellStore* cell = cellAt(place);
+        return cell != nullptr && cell->isExterior();
+    }
+
     void FalloutScripts::discoverMarkers(float frametime)
     {
         mDiscoveryTimer += frametime;
@@ -698,19 +712,20 @@ namespace OFScript
             return;
         mDiscoveryTimer = 0;
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
-        if (player.isEmpty() || !player.isInCell() || parentCell(mPlayer) != 0)
+        if (player.isEmpty() || !player.isInCell() || !inOpenWorld(mPlayer))
             return;
         const FalloutScript::FormId space = worldspaceOf(mPlayer);
         const osg::Vec3f here = player.getRefData().getPosition().asVec3();
         const double reach = gameSetting("iMapMarkerRevealDistance", 1000);
         for (const PlacedMarker& marker : placedMarkers())
         {
-            if (marker.mWorldspace != space || mMapMarkers.state(marker.mId) != 0)
+            if (marker.mWorldspace != space || mMapMarkers.state(marker.mId) == 2)
                 continue;
             const osg::Vec3f away = marker.mPosition - here;
             if (std::sqrt(away.x() * away.x() + away.y() * away.y()) > reach)
                 continue;
-            // Walking up to a place finds it, and lets the player travel back to it
+            // Walking up to a place finds it (one that a script only showed on the map too), and lets the player travel
+            // back to it
             if (mMapMarkers.show(marker.mId, true))
             {
                 markerShown(marker.mId);

@@ -1573,6 +1573,9 @@ namespace OFScript
         bool isBedFor(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
         /// The map markers the player walks up to are found
         void discoverMarkers(float frametime);
+        /// Whether the reference is in a cell of the open world (the cell of an exterior has an id as well, so the id
+        /// does not say)
+        bool inOpenWorld(FalloutScript::FormId reference);
         /// The text of a game setting, the fallback when the files have none
         std::string wordOf(std::string_view setting, std::string_view fallback);
         /// Why the player can not wait or sleep now, empty when it can

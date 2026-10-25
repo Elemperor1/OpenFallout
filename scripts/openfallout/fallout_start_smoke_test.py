@@ -1755,6 +1755,14 @@ return {
                     tostring(g.@DEAD@))
                 print('OFTEST', 'object player', tostring(g.@PLAYER_RANK@))
                 print('OFTEST', 'object listed', tostring(g.@LISTED@))
+                -- A place on the map that the player walked up to in the open world is found and can be travelled to
+                local mapped, markers = pcall(core.interact.map)
+                local found = nil
+                for _, marker in ipairs(mapped and markers or {}) do
+                    if marker.name == '@MAP_FIND@' then found = marker end
+                end
+                print('OFTEST', 'object map', mapped and string.format('found=%s travel=%s', tostring(found ~= nil),
+                    tostring(found and found.travel)) or tostring(markers))
                 -- The locks the script saw and changed, the cube it destroyed and deleted, and the list it added to
                 print('OFTEST', 'object locks', tostring(g.@LOCKED@), tostring(g.@LOCK_LEVEL@), tostring(g.@UNLOCKED@),
                     tostring(g.@RELOCKED@), tostring(g.@RELOCK_LEVEL@))
@@ -1880,6 +1888,7 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
                  .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
                  .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
+                 .replace("@MAP_FIND@", plugin.MAP_FIND_NAME)
                  .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
                  .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
                  .replace("@DOOMED@", ", ".join(map(str, plugin.DOOMED_REF_IDS.values())))
@@ -4325,6 +4334,11 @@ def check_objects(text, scenario):
     if found is not None and found != [str(plugin.PLAYER_RANK)]:
         problems.append("the script should see the player in the first faction with the rank that the record of the "
                         f"player gives ({plugin.PLAYER_RANK}): " + str(found))
+    found = one("map")
+    expected = ["found=true travel=true" if scenario.exterior else "found=false travel=nil"]
+    if found is not None and found != expected:
+        problems.append("the place on the map in the open world should have been found by walking up to it (and none "
+                        f"inside, where there is none): {expected}: " + str(found))
     found = one("listed")
     if found is not None and found != [str(plugin.CREATURE_ITEMS)]:
         problems.append("the script should see the creature that is placed as a levelled list with the suits of the "
