@@ -30,6 +30,11 @@ local function watch(name)
 end
 for _, name in ipairs(QUESTS) do watch(name) end
 for _, gate in ipairs(config.gates) do watch(gate.quest) end
+-- A quest that only ends the run is followed too
+local finishing = {}
+for name in pairs(DONE) do table.insert(finishing, name) end
+table.sort(finishing)
+for _, name in ipairs(finishing) do watch(name) end
 -- What stops the world, told when it changes: the tags that pause it (the screens do, with the tag ui)
 local pausedNow = ''
 local elapsed = 0

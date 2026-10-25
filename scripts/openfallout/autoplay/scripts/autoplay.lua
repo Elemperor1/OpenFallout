@@ -39,7 +39,8 @@ local picks = {}
 local lastStatus = 0
 local lockSerial, lockWaited, lockTries = nil, 0, 0
 local terminalWaited, terminalSteps = 0, 0
--- How often each line of each terminal was picked, by the name of the terminal and the number of the line
+-- How often each line of each menu was picked at the terminal that is open, by the menu (its name and its lines) and the number
+-- of the line; forgotten when the terminal is left
 local linePicks = {}
 local restWaited = 0
 -- What the player is shooting at: the object, its form id (as core.getFormId writes it), how many shots it may take, whether
@@ -193,6 +194,7 @@ end
 local function answerTerminal(dt)
     if core.interact.terminalSerial() == 0 then
         terminalWaited, terminalSteps = 0, 0
+        linePicks = {}
         return
     end
     terminalWaited = terminalWaited + dt
@@ -219,9 +221,13 @@ local function answerTerminal(dt)
             core.interact.guess(word)))
         return
     end
+    -- Two menus can have the same name, so the lines are part of what tells them apart
+    local texts = { terminal.name }
+    for _, line in ipairs(terminal.lines) do table.insert(texts, line.text) end
+    local menu = table.concat(texts, '\n')
     local best, bestCount
     for _, line in ipairs(terminal.lines) do
-        local count = linePicks[terminal.name .. ' ' .. line.index] or 0
+        local count = linePicks[menu .. '\n' .. line.index] or 0
         if bestCount == nil or count < bestCount then best, bestCount = line, count end
     end
     if best == nil or bestCount >= MAX_PICKS then
@@ -234,7 +240,7 @@ local function answerTerminal(dt)
         end
         return
     end
-    linePicks[terminal.name .. ' ' .. best.index] = bestCount + 1
+    linePicks[menu .. '\n' .. best.index] = bestCount + 1
     log('terminal line', string.format('lines=%d pick=%d count=%d', #terminal.lines, best.index, bestCount + 1))
     core.interact.choose(best.index)
 end
