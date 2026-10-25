@@ -111,6 +111,8 @@ namespace OFRender
         std::map<std::string, std::string> mPoseGroups;
         /// The animations that scripts had it play, by file
         std::map<std::string, std::string> mIdleGroups;
+        /// The group of the idle it stands in, which a script does not play over
+        std::string mDefaultIdleGroup;
 
         std::string mWalkGroup;
         std::string mRunGroup;

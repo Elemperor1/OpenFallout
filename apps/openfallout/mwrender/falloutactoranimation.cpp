@@ -188,6 +188,7 @@ namespace OFRender
                 // on without end; one that clamps has none, and stays on its last frame
                 play(group, OFRender::AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false, 1.f,
                     "start", "stop", 0.f, ~0u, false);
+                mDefaultIdleGroup = group;
                 playing = true;
             }
         }
@@ -438,6 +439,10 @@ namespace OFRender
         }
         if (group.empty())
             return false;
+        // A file that is the idle it stands in, or one of the gaits, is already what it plays: a one-shot of the same
+        // group would end and take the group with it, and nothing starts it again
+        if (group == mDefaultIdleGroup || group == mWalkGroup || group == mRunGroup || group == mPoseGroup)
+            return true;
         // One that was playing and has not ended starts again
         if (isPlaying(group))
             disable(group);
