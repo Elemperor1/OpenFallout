@@ -115,16 +115,16 @@ return {
         -- The switches in the reactor room (cell 0x02A186, which no door of the data leads to: the player is taken there): the
         -- script of each switch sets 110 and counts one more, and at the third sets 120 (GetOpenState is 3 for an object that
         -- is no door), so the three are activated at once and both stages come in the same frame (Mac round 7: no stand-in
-        -- was needed). The player is taken back to the atrium (by the overseer's terminal, not into the trigger of the office,
-        -- whose script sets 60 again) before the guards that 110 sends there get to the player; the door in the atrium that
-        -- leads to the entrance, where the control pod is, is used by the player first: the pod is in another cell
+        -- was needed). The control pod is in the entrance (cell 0x024512), behind the door of the atrium (0x05398D): a Very Hard
+        -- lock (100) with no key, which only stage 145 unlocks, and the player has no bobby pins, so the player is taken to where
+        -- the door leads (its arrival place, Mac round 10J) and goes to the pod from there. The guards that 110 sends to the
+        -- atrium do not get to the player
         { quest = 'CG04', stage = 60, file = 'Fallout3.esm', cell = 0x02A186, at = { -1351.0, -3092.4, 7954.9 }, how = 'teleport',
             tries = 1 },
         { quest = 'CG04', stage = 60, file = 'Fallout3.esm', refs = { 0x02987C, 0x0660C0, 0x0660C1 }, how = 'activate',
             gap = 5 },
-        { quest = 'CG04', stage = 120, file = 'Fallout3.esm', cell = 0x024511, at = { -4640.0, -508.0, 8488.0 },
-            how = 'teleport', tries = 1, settle = 2, gap = 2 },
-        { quest = 'CG04', stage = 120, file = 'Fallout3.esm', ref = 0x05398D, how = 'activate', tries = 1, gap = 5 },
+        { quest = 'CG04', stage = 120, file = 'Fallout3.esm', cell = 0x024512, at = { 10752.0, 2516.0, 2560.0 },
+            how = 'teleport', tries = 1, settle = 2, gap = 5 },
         { quest = 'CG04', stage = 120, file = 'Fallout3.esm', ref = 0x02987D, how = 'activate' },
         { quest = 'CG04', stage = 142, file = 'Fallout3.esm', ref = 0x0230E4, how = 'activate' },
         { quest = 'CG04', stage = 145, file = 'Fallout3.esm', ref = 0x024720, how = 'activate' },
