@@ -14,6 +14,8 @@
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "../mwworld/class.hpp"
 #include "../mwworld/globals.hpp"
 #include "../mwworld/player.hpp"
@@ -218,6 +220,14 @@ namespace OFInput
     {
         if (!OFBase::Environment::get().getInputManager()->getControlSwitch("playercontrols"))
             return;
+
+        // Fallout waits on a screen of its own (core.interact), which the host asks for
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+        {
+            if (!OFBase::Environment::get().getWindowManager()->isGuiMode())
+                scripts->requestRest(false, 0);
+            return;
+        }
 
         if (!OFBase::Environment::get().getWindowManager()->getRestEnabled()
             || OFBase::Environment::get().getWindowManager()->isGuiMode())

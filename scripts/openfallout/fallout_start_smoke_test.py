@@ -1755,6 +1755,14 @@ return {
                     tostring(g.@DEAD@))
                 print('OFTEST', 'object player', tostring(g.@PLAYER_RANK@))
                 print('OFTEST', 'object listed', tostring(g.@LISTED@))
+                -- A place on the map that the player walked up to in the open world is found and can be travelled to
+                local mapped, markers = pcall(core.interact.map)
+                local found = nil
+                for _, marker in ipairs(mapped and markers or {}) do
+                    if marker.name == '@MAP_FIND@' then found = marker end
+                end
+                print('OFTEST', 'object map', mapped and string.format('found=%s travel=%s', tostring(found ~= nil),
+                    tostring(found and found.travel)) or tostring(markers))
                 -- The locks the script saw and changed, the cube it destroyed and deleted, and the list it added to
                 print('OFTEST', 'object locks', tostring(g.@LOCKED@), tostring(g.@LOCK_LEVEL@), tostring(g.@UNLOCKED@),
                     tostring(g.@RELOCKED@), tostring(g.@RELOCK_LEVEL@))
@@ -1880,6 +1888,7 @@ OBJECT_SCRIPT = (OBJECT_SCRIPT
                  .replace("@SLEEPER@", ", ".join(map(str, plugin.SLEEPER_REF_IDS.values())))
                  .replace("@SETTER@", ", ".join(map(str, plugin.SETTER_REF_IDS.values())))
                  .replace("@TRAVELLER@", ", ".join(map(str, plugin.TRAVELLER_REF_IDS.values())))
+                 .replace("@MAP_FIND@", plugin.MAP_FIND_NAME)
                  .replace("@CROSSER@", ", ".join(map(str, plugin.CROSSER_REF_IDS.values())))
                  .replace("@CROSSED@", plugin.MOVE_GLOBALS["crossed"][1])
                  .replace("@DOOMED@", ", ".join(map(str, plugin.DOOMED_REF_IDS.values())))
@@ -2068,7 +2077,18 @@ table.insert(steps, { 21, function() stage(@GRENADES@) end })
 table.insert(steps, { 22, function()
     world.players[1]:sendEvent('OFTestArenaThrow', { target = find(@BYSTANDER@), count = 3 })
 end })
-table.insert(steps, { 25, core.quit })
+-- The fights are over: the characters of the arena go, so that nobody stops the player from resting, and the player is
+-- given the bobby pins; then the player script tries the locks, terminals, rest and map
+local function interactNow()
+    for _, id in ipairs({ @RAIDER@, @BYSTANDER@, @TARGET@, @DUMMY@ }) do
+        local object = find(id)
+        if object then print('OFTEST', 'arena', 'removed', id, tostring(pcall(function() object:remove() end))) end
+    end
+    stage(@PINS@)
+    world.players[1]:sendEvent('OFTestArenaInteract', {})
+end
+table.insert(steps, { 30, interactNow })
+table.insert(steps, { 120, core.quit })
 
 return {
     engineHandlers = {
@@ -2095,6 +2115,13 @@ return {
         OFTestArenaVatsOpen = function()
             world.players[1]:sendEvent('OpenVats', { targets = { find(@TARGET@) } })
         end,
+        OFTestArenaActivate = function(data)
+            local object = find(data.id)
+            if object then object:activateBy(world.players[1]) end
+        end,
+        OFTestArenaQuit = function()
+            core.quit()
+        end,
     },
 }
 """
@@ -2104,7 +2131,7 @@ for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES)
                       ("@TARGET@", str(plugin.ARENA_TARGET_REF_ID)),
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
-                      ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)),
+                      ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)), ("@PINS@", str(plugin.ARENA_PINS_STAGE)),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -2132,11 +2159,220 @@ local levelEscape = nil
 local craftFrames = nil
 -- V.A.T.S.: the target, the frames since it was asked for, and the action points after the attacks
 local vatsTarget, vatsFrames, vatsPoints, vatsStart = nil, nil, 0, nil
+-- The locks, terminals, rest and map: steps that do something and wait for the engine to answer
+local self = require('openfallout.self')
+local interactSteps, interactIndex, interactFrames, interactSettle = nil, 0, 0, 0
+local function say(tag, text) print('OFTEST', 'arena', 'interact', tag, text) end
+local function activate(id) return function() core.sendGlobalEvent('OFTestArenaActivate', { id = id }) end end
+local function pinCount()
+    for _, item in ipairs(core.pipboy.items()) do
+        if item.name == 'Bobby Pin' then return item.count end
+    end
+    return 0
+end
+local function likeness(a, b)
+    local same = 0
+    for i = 1, math.min(#a, #b) do
+        if a:sub(i, i) == b:sub(i, i) then same = same + 1 end
+    end
+    return same
+end
+-- Spends the attempts on words that cannot be the password: the first guess is free to be any, then only a word that
+-- disagrees with a likeness is tried. True when the attempts are gone, the terminal is open, or no such word is left.
+local function spendStep()
+    local terminal = core.interact.terminal()
+    if not terminal or not terminal.hacking then return true end
+    if terminal.lockout > 0 or terminal.attempts <= 0 then return true end
+    if #terminal.guesses == 0 then
+        core.interact.guess(1)
+        return false
+    end
+    for index, word in ipairs(terminal.words) do
+        local tried, fits = false, true
+        for _, guess in ipairs(terminal.guesses) do
+            if guess.word == word then tried = true end
+            if likeness(word, guess.word) ~= guess.likeness then fits = false end
+        end
+        if not tried and not fits then
+            core.interact.guess(index)
+            return false
+        end
+    end
+    return true
+end
+local function lockSummary()
+    local terminal = core.interact.terminal()
+    if not terminal then return 'none' end
+    return string.format('hacking=%s locked=%s', tostring(terminal.hacking), tostring((terminal.lockout or 0) > 0))
+end
+-- Guesses the word that agrees with every likeness so far, as a player does
+local function solveStep()
+    local terminal = core.interact.terminal()
+    if not terminal or not terminal.hacking then return true end
+    if terminal.lockout > 0 or terminal.attempts <= 0 then return false end
+    for index, word in ipairs(terminal.words) do
+        local fits = true
+        for _, guess in ipairs(terminal.guesses) do
+            if guess.word == word or likeness(word, guess.word) ~= guess.likeness then fits = false end
+        end
+        if fits then
+            core.interact.guess(index)
+            return false
+        end
+    end
+    return false
+end
+local function lineSummary(terminal)
+    if not terminal then return 'none' end
+    return string.format('lines=%d back=%s hacking=%s body=%s', #terminal.lines, tostring(terminal.canGoBack),
+        tostring(terminal.hacking), terminal.body)
+end
+local gameTime, experience, pinsBefore, results = 0, 0, 0, {}
+local function interactionSteps()
+    local I2 = core.interact
+    return {
+        -- A lock that only its key opens: the screen tells so and the pin does nothing
+        { run = activate(@KEYONLY@), done = function() return I2.lock() ~= nil end },
+        { settle = 10 },
+        { run = function()
+            local lock = I2.lock()
+            say('keyonly', string.format('word=%s level=%d keyOnly=%s mode=%s pick=%s', lock.word, lock.level,
+                tostring(lock.keyOnly), tostring(I.UI.getMode()), I2.pick()))
+            I2.closeLock()
+        end, done = function() return I2.lock() == nil end },
+        { settle = 10 },
+        { run = function() say('keyonlyclosed', 'mode=' .. tostring(I.UI.getMode())) end },
+        -- A lock that bobby pins open
+        { run = function()
+            pinsBefore, experience = pinCount(), core.pipboy.stats().experience
+            core.sendGlobalEvent('OFTestArenaActivate', { id = @PICKDOOR@ })
+        end, done = function() return I2.lock() ~= nil end },
+        { settle = 10 },
+        { run = function()
+            local lock = I2.lock()
+            say('pickdoor', string.format('word=%s level=%d keyOnly=%s pins=%d chance=%.2f mode=%s', lock.word,
+                lock.level, tostring(lock.keyOnly), lock.pins, lock.chance, tostring(I.UI.getMode())))
+            local tries = 0
+            while tries < 12 do
+                tries = tries + 1
+                local result = I2.pick()
+                results[#results + 1] = result
+                if result ~= 'broke' then break end
+            end
+            say('picked', string.format('results=%s pinsBefore=%d pinsAfter=%d', table.concat(results, ','), pinsBefore,
+                pinCount()))
+        end },
+        { settle = 90 },
+        { run = function()
+            say('pickdoorgone', string.format('lock=%s mode=%s experience=%d', tostring(I2.lock() ~= nil),
+                tostring(I.UI.getMode()), core.pipboy.stats().experience - experience))
+        end },
+        -- A container whose key the player carries opens without a lock screen
+        { run = activate(@CHEST@), done = function() return core.pipboy.loot() ~= nil end },
+        { settle = 10 },
+        { run = function()
+            local loot = core.pipboy.loot()
+            say('chest', string.format('lock=%s loot=%s mode=%s', tostring(I2.lock() ~= nil),
+                tostring(loot ~= nil and #core.pipboy.items(loot.holder) or -1), tostring(I.UI.getMode())))
+            core.pipboy.closeLoot()
+        end, done = function() return core.pipboy.loot() == nil end },
+        { settle = 10 },
+        -- A terminal that is open: its menu, a line that shows a result, back, and out
+        { run = activate(@OPENTERMINAL@), done = function() return I2.terminalSerial() ~= 0 end },
+        { settle = 10 },
+        { run = function()
+            say('terminal', lineSummary(I2.terminal()) .. ' mode=' .. tostring(I.UI.getMode()))
+            I2.choose(I2.terminal().lines[1].index)
+        end },
+        { settle = 3 },
+        { run = function()
+            say('terminalresult', lineSummary(I2.terminal()))
+            I2.back()
+        end },
+        { settle = 3 },
+        { run = function()
+            say('terminalback', lineSummary(I2.terminal()))
+            I2.back()
+        end, done = function() return I2.terminalSerial() == 0 end },
+        { settle = 10 },
+        { run = function() say('terminalgone', 'mode=' .. tostring(I.UI.getMode())) end },
+        -- A terminal that is closed: hacked until its password is found, then its menus
+        { run = activate(@TERMINAL@), done = function() return I2.terminalSerial() ~= 0 end },
+        { settle = 10 },
+        { run = function()
+            local terminal = I2.terminal()
+            say('hack', string.format('hacking=%s level=%d words=%d length=%d attempts=%d mode=%s',
+                tostring(terminal.hacking), terminal.hackLevel, #terminal.words, #(terminal.words[1] or ''),
+                terminal.attempts, tostring(I.UI.getMode())))
+        end },
+        -- Attempts spent on words that are not the password lock the terminal; leaving its screen and coming back does
+        -- not end the wait
+        { poll = spendStep, limit = 600 },
+        { run = function() say('lockout', lockSummary()) I2.closeTerminal() end,
+          done = function() return I2.terminalSerial() == 0 end },
+        { settle = 10 },
+        { run = activate(@TERMINAL@), done = function() return I2.terminalSerial() ~= 0 end },
+        { settle = 10 },
+        { run = function() say('lockoutback', lockSummary()) end },
+        { poll = solveStep, limit = 1500 },
+        { settle = 10 },
+        { run = function()
+            say('hacked', lineSummary(I2.terminal()))
+            I2.choose(1)
+        end },
+        { settle = 3 },
+        { run = function()
+            say('submenu', lineSummary(I2.terminal()))
+            I2.choose(0)
+        end },
+        { settle = 3 },
+        { run = function() say('subresult', lineSummary(I2.terminal())) I2.closeTerminal() end,
+          done = function() return I2.terminalSerial() == 0 end },
+        { settle = 10 },
+        -- Waiting two hours
+        { run = function()
+            gameTime = core.getGameTime()
+            I2.requestWait()
+        end, done = function() return I2.rest() ~= nil end },
+        { settle = 10 },
+        { run = function()
+            local request = I2.rest()
+            say('rest', string.format('sleeping=%s mode=%s why=[%s]', tostring(request and request.sleeping),
+                tostring(I.UI.getMode()), I2.startRest(2)))
+        end },
+        { poll = function() return not I2.restProgress().active end, limit = 900 },
+        { settle = 10 },
+        { run = function()
+            local progress = I2.restProgress()
+            say('rested', string.format('hours=%.2f done=%.2f stopped=[%s] screen=%s mode=%s',
+                (core.getGameTime() - gameTime) / 3600, progress.done, progress.stopped, tostring(I2.rest() ~= nil),
+                tostring(I.UI.getMode())))
+        end },
+        -- Travelling to a place on the map
+        { run = function()
+            local markers = I2.map()
+            local marker = markers[1]
+            gameTime = core.getGameTime()
+            say('map', string.format('count=%d name=%s travel=%s', #markers, marker and marker.name or 'none',
+                tostring(marker and marker.travel)))
+            say('travel', 'why=[' .. (marker and I2.travel(marker.id) or 'none') .. ']')
+        end },
+        { settle = 30 },
+        { run = function()
+            say('arrived', string.format('hours=%.2f x=%.0f y=%.0f', (core.getGameTime() - gameTime) / 3600,
+                self.position.x, self.position.y))
+            core.sendGlobalEvent('OFTestArenaQuit', {})
+        end },
+    }
+end
 
 return {
     eventHandlers = {
         OFTestArenaThrow = function(data)
             throwing, thrown, planned = data.target, 0, data.count
+        end,
+        OFTestArenaInteract = function()
+            interactSteps, interactIndex, interactFrames, interactSettle = interactionSteps(), 0, 0, 0
         end,
         OFTestArenaPipboy = function()
             local pipboy = core.pipboy
@@ -2194,6 +2430,34 @@ return {
     engineHandlers = {
         -- Called in the frames while a screen stops the game as well
         onFrame = function()
+            if interactSteps then
+                -- One step at a time: it runs once, then the frames it waits for pass (settle), or the engine answers
+                -- (done, or poll which is called every frame), or it gives up after `limit` frames
+                local step = interactSteps[interactIndex + 1]
+                if step == nil then
+                    interactSteps = nil
+                elseif interactSettle > 0 then
+                    interactSettle = interactSettle - 1
+                else
+                    interactFrames = interactFrames + 1
+                    local finished = true
+                    if step.settle and interactFrames == 1 then
+                        interactSettle = step.settle
+                    elseif step.poll then
+                        finished = step.poll()
+                    else
+                        if interactFrames == 1 and step.run then step.run() end
+                        finished = (not step.done) or step.done()
+                    end
+                    if not finished and interactFrames > (step.limit or 400) then
+                        say('timeout', 'step ' .. tostring(interactIndex + 1))
+                        finished = true
+                    end
+                    if finished and not (step.settle and interactFrames == 1) then
+                        interactIndex, interactFrames = interactIndex + 1, 0
+                    end
+                end
+            end
             if pipboyFrames then
                 pipboyFrames = pipboyFrames + 1
                 if pipboyFrames == 5 then
@@ -2420,6 +2684,10 @@ return {
     },
 }
 """
+for _name, _value in (("@KEYONLY@", plugin.ARENA_KEYONLY_DOOR_REF_ID), ("@PICKDOOR@", plugin.ARENA_PICK_DOOR_REF_ID),
+                      ("@CHEST@", plugin.ARENA_CHEST_REF_ID), ("@TERMINAL@", plugin.ARENA_TERMINAL_REF_ID),
+                      ("@OPENTERMINAL@", plugin.ARENA_OPEN_TERMINAL_REF_ID)):
+    ARENA_PLAYER_SCRIPT = ARENA_PLAYER_SCRIPT.replace(_name, str(_value))
 
 
 def start_xvfb():
@@ -3736,6 +4004,7 @@ def check_arena_screens(text):
                         f"'{craft.group(1) if craft else 'no line'}'")
     problems += check_arena_vats(text)
     problems += check_arena_hud(text)
+    problems += check_arena_interact(text)
     return problems
 
 
@@ -3762,6 +4031,81 @@ def check_arena_hud(text):
         problems.append("no 'arena hudtarget' line in the log (the bar of the target was not read for the dummy)")
     elif float(target.group(3)) <= 0 or not target.group(1):
         problems.append(f"the target should have a name and a most health: {target.group(0)}")
+    return problems
+
+
+def check_arena_interact(text):
+    """The problems with the locks, terminals, waiting and the map: the screens open and close the mode, a lock that only a
+    key opens stays shut, a lock that bobby pins open opens (a pin that fails breaks, and the experience comes), the chest
+    opens for its key, a terminal that is open shows its menus, one that is closed is hacked and then shows its menus, two
+    hours of waiting pass, and the marker of the map takes the player there."""
+    problems = []
+
+    def line(tag):
+        found = re.search(r"OFTEST\tarena\tinteract\t" + tag + r"\t(.*)$", text, re.M)
+        if not found:
+            problems.append(f"no 'arena interact {tag}' line in the log")
+        return found.group(1) if found else ""
+
+    timeout = re.search(r"OFTEST\tarena\tinteract\ttimeout\t(.*)$", text, re.M)
+    if timeout:
+        problems.append(f"a step of the locks, terminals, rest and map did not get its answer: {timeout.group(1)}")
+
+    def expect(tag, want, pattern=None):
+        got = line(tag)
+        if got and not re.fullmatch(pattern or re.escape(want), got):
+            problems.append(f"'interact {tag}' should be '{want}': {got}")
+        return got
+
+    expect("keyonly", "word=Requires Key level=255 keyOnly=true mode=Interface pick=keyonly",
+           r"word=.+ level=255 keyOnly=true mode=Interface pick=keyonly")
+    expect("keyonlyclosed", "mode=nil")
+    expect("pickdoor", "level 25, not key only, 12 pins, a chance, the screen up",
+                 r"word=.+ level=25 keyOnly=false pins=12 chance=0\.\d\d mode=Interface")
+    picked = line("picked")
+    results = re.fullmatch(r"results=([a-z,]+) pinsBefore=(\d+) pinsAfter=(\d+)", picked)
+    if picked and not results:
+        problems.append(f"'interact picked' has an unexpected shape: {picked}")
+    elif results:
+        tries = results.group(1).split(",")
+        broken = tries.count("broke")
+        if tries[-1] != "opened" or int(results.group(2)) - int(results.group(3)) != broken:
+            problems.append(f"the pins should open the lock in the end, and each pin that failed should be gone: {picked}")
+    expect("pickdoorgone", f"lock=false mode=nil experience={plugin.ARENA_PICK_XP}",
+           rf"lock=false mode=nil experience={plugin.ARENA_PICK_XP}")
+    expect("chest", "no lock screen, the chest opens with its thing in it", r"lock=false loot=1 mode=Interface")
+    welcome = "Welcome to the test terminal."
+    expect("terminal", "the open terminal shows its menu", rf"lines=1 back=false hacking=false body={re.escape(welcome)} "
+           r"mode=Interface")
+    expect("terminalresult", "the line shows its result", r"lines=0 back=true hacking=false body=Door log: all quiet\.")
+    expect("terminalback", "back is the menu again", rf"lines=1 back=false hacking=false body={re.escape(welcome)}")
+    expect("terminalgone", "mode=nil")
+    expect("hack", "the closed terminal starts the game of hacking",
+           r"hacking=true level=0 words=\d+ length=\d+ attempts=4 mode=Interface")
+    # A terminal whose attempts were spent stays locked when its screen is left and opened again (a first guess that
+    # happens to be the password, or too few words that disagree to spend the attempts on, leave nothing to check)
+    locked = line("lockout")
+    back = line("lockoutback")
+    if locked == "hacking=true locked=true" and back != locked:
+        problems.append(f"a terminal that is locked up should still be locked after leaving and coming back: {back}")
+    elif locked == "hacking=false locked=false" and back != locked:
+        problems.append(f"a terminal that was hacked should stay open after leaving and coming back: {back}")
+    expect("hacked", "the password opens the terminal", rf"lines=2 back=false hacking=false body={re.escape(welcome)}")
+    expect("submenu", "a line goes to another menu", r"lines=1 back=true hacking=false body=Second menu\.")
+    expect("subresult", "the line shows its result", r"lines=0 back=true hacking=false body=Second result\.")
+    expect("rest", "waiting asks for its screen and starts", r"sleeping=false mode=Interface why=\[\]")
+    rested = line("rested")
+    found = re.fullmatch(r"hours=([\d.]+) done=([\d.]+) stopped=\[\] screen=false mode=nil", rested)
+    if rested and (not found or not 2.0 <= float(found.group(1)) <= 2.2 or abs(float(found.group(2)) - 2.0) > 0.01):
+        problems.append(f"two hours of waiting should pass in the game and the screen should be gone: {rested}")
+    expect("map", "the marker is found and can be travelled to", r"count=1 name=Test Landmark travel=true")
+    expect("travel", "why=[]")
+    arrived = line("arrived")
+    found = re.fullmatch(r"hours=([\d.]+) x=(-?\d+) y=(-?\d+)", arrived)
+    # The arena is a cell inside, so the trip is the longest one (4 hours), and it ends at the marker
+    if arrived and (not found or not 3.9 <= float(found.group(1)) <= 4.1 or abs(int(found.group(2)) + 600) > 60
+                    or abs(int(found.group(3)) + 600) > 60):
+        problems.append(f"the trip should take four hours and end at the marker (-600, -600): {arrived}")
     return problems
 
 
@@ -4035,6 +4379,11 @@ def check_objects(text, scenario):
     if found is not None and found != [str(plugin.PLAYER_RANK)]:
         problems.append("the script should see the player in the first faction with the rank that the record of the "
                         f"player gives ({plugin.PLAYER_RANK}): " + str(found))
+    found = one("map")
+    expected = ["found=true travel=true" if scenario.exterior else "found=false travel=nil"]
+    if found is not None and found != expected:
+        problems.append("the place on the map in the open world should have been found by walking up to it (and none "
+                        f"inside, where there is none): {expected}: " + str(found))
     found = one("listed")
     if found is not None and found != [str(plugin.CREATURE_ITEMS)]:
         problems.append("the script should see the creature that is placed as a levelled list with the suits of the "
@@ -4667,8 +5016,9 @@ def main():
         runtime = work / "arena" / "runtime"
         runtime.mkdir(mode=0o700)
         print("== arena: --start", plugin.ARENA_CELL_NAME)
-        status, _ = run_engine(program, build / "resources", data, home, runtime, args.seconds, plugin.ARENA_CELL_NAME, [],
-                               "arenatest.omwscripts")
+        # The locks, terminals, rest and map come after the fights and take a while on a slow display
+        status, _ = run_engine(program, build / "resources", data, home, runtime, max(args.seconds, 150),
+                               plugin.ARENA_CELL_NAME, [], "arenatest.omwscripts")
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         print(f"log: {log}")

@@ -40,6 +40,7 @@
 #include <components/falloutscript/equipment.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
+#include <components/falloutscript/hacking.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
@@ -378,6 +379,121 @@ namespace OFScript
         std::optional<Loot> loot();
         /// The player is done with what it had open
         void closeLoot();
+
+        // ---- Locks, terminals, waiting and sleeping, the map (M10 slice 4) ----
+        // What the player has open is kept here and read by the screens of Lua (core.interact), which show it and give
+        // the choices of the player back. A number that is another for each time something is opened tells the screen
+        // that it is a new one.
+
+        /// The player activates a door or a container. When it is locked and the player carries its key the lock is
+        /// opened and the activation goes on; else the screen of the lock opens (or the player is told that only a key
+        /// opens it) and the activation stops: true.
+        bool lockStops(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// The lock the player has in front of it: what it is, how hard, and what the player has to open it
+        struct LockScreen
+        {
+            FalloutScript::FormId mReference = 0;
+            std::string mName;
+            /// The word for how hard the lock is (sLockLevelName*)
+            std::string mWord;
+            int mLevel = 0;
+            /// Only a key opens it
+            bool mKeyOnly = false;
+            /// The bobby pins the player has, the Lockpick skill and the chance that a pin opens the lock
+            int mPins = 0;
+            double mSkill = 0;
+            double mChance = 0;
+            int mSerial = 0;
+        };
+        std::optional<LockScreen> lockScreen();
+        /// The player tries a bobby pin on the lock: "opened", "broke", "nopins" or "keyonly"; empty when no lock is
+        /// open. The player is told by the line of messages, and the activation goes on when the lock opens.
+        std::string pickLock();
+        void closeLockScreen();
+
+        /// The player activates a terminal: it opens, or the game of hacking starts when it is closed and the player
+        /// has not got its password. False for an object that is no terminal.
+        bool openTerminal(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        struct TerminalLine
+        {
+            int mIndex = 0;
+            std::string mText;
+        };
+        struct HackGuess
+        {
+            std::string mWord;
+            int mLikeness = 0;
+        };
+        /// What the terminal shows: its text (or the result of the line that was chosen), the lines of its menu that
+        /// the player may choose, and while it is closed the words of the game of hacking
+        struct TerminalScreen
+        {
+            FalloutScript::FormId mTerminal = 0;
+            std::string mName;
+            std::string mBody;
+            std::vector<TerminalLine> mLines;
+            /// A menu above this one, or a result to go back from; else Back leaves the terminal
+            bool mCanGoBack = false;
+            bool mHacking = false;
+            int mHackLevel = 0;
+            std::vector<std::string> mWords;
+            std::vector<HackGuess> mGuesses;
+            int mAttempts = 0;
+            /// Seconds before the terminal can be tried again after the attempts were spent
+            double mLockout = 0;
+            int mSerial = 0;
+        };
+        /// The number of the screen of the terminal that is open, 0 when none is; another for each change
+        int terminalSerial();
+        std::optional<TerminalScreen> terminalScreen();
+        /// The player chooses a line of the menu (the number the line has in the screen)
+        void terminalChoose(int index);
+        /// The player goes back, or leaves the terminal from its first menu
+        void terminalBack();
+        /// The player guesses a word of the game of hacking (its place in the words); the likeness of it, -1 when the
+        /// guess was not made
+        int hackGuess(int word);
+        void closeTerminal();
+
+        /// What the screen of waiting and sleeping shows: it was asked for (the Wait key, or a bed)
+        struct RestScreen
+        {
+            bool mSleeping = false;
+            FalloutScript::FormId mBed = 0;
+            int mSerial = 0;
+        };
+        /// The player wants to wait, or lies down on a bed (a bed that is no bed for the player is refused here)
+        void requestRest(bool sleeping, FalloutScript::FormId bed);
+        std::optional<RestScreen> restScreen();
+        /// The player starts to wait or sleep for that many hours; the text of why not, empty when it began
+        std::string startRest(double hours);
+        struct RestProgress
+        {
+            bool mActive = false;
+            bool mSleeping = false;
+            double mDone = 0;
+            double mTotal = 0;
+            /// Why it ended before the hours were over (empty when it ran out)
+            std::string mStopped;
+            /// Another number for each rest that ended, so that the screen sees it end
+            int mEnded = 0;
+        };
+        RestProgress restProgress();
+        /// The player stops waiting or sleeping, or leaves the screen
+        void cancelRest();
+
+        /// The map markers the player has found, with where the player stands: for the map of the Pip-Boy
+        struct MapEntry
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            osg::Vec3f mPosition;
+            bool mTravel = false;
+            double mDistance = 0;
+        };
+        std::vector<MapEntry> mapEntries();
+        /// The player goes to a marker at once: the text of why not, empty when it did
+        std::string travelTo(FalloutScript::FormId marker);
 
         /// The menu of recipes the player has open at a workbench, a reloading bench or a campfire (ShowRecipeMenu):
         /// the category, its name, and a number that is another for each time a menu is opened. Nothing when none is.
@@ -1319,8 +1435,8 @@ namespace OFScript
         /// own thread, the conversations from the thread of the frame)
         std::mutex mTalkingActorMutex;
         std::map<FalloutScript::FormId, FalloutScript::FormId> mTalkingActors;
-        /// Whether the player sleeps (IsPCSleeping): set by the rest of the player, which does not exist yet
-        bool mPlayerSleeping = false;
+        /// Whether the player sleeps (IsPCSleeping)
+        std::atomic<bool> mPlayerSleeping{ false };
         /// The objects that follow the state of another one (their enable parent)
         FalloutScript::EnableParents mEnableParents;
         bool mEnableParentsRead = false;
@@ -1404,6 +1520,82 @@ namespace OFScript
         std::mutex mLootMutex;
         std::optional<Loot> mLoot;
         int mLootSerial = 0;
+        /// The lock, the terminal and the rest that the player has open, under mInteractionMutex
+        std::mutex mInteractionMutex;
+        std::optional<LockScreen> mLockScreen;
+        int mLockSerial = 0;
+        struct TerminalState
+        {
+            FalloutScript::FormId mReference = 0;
+            /// The terminals (their records) the player went through; the menu that is shown is the last
+            std::vector<FalloutScript::FormId> mPath;
+            /// The result of a line that was chosen, shown in place of the text of the menu
+            std::string mResult;
+            bool mShowingResult = false;
+            /// The game of hacking, while the terminal is closed
+            std::unique_ptr<FalloutScript::Hacking::Puzzle> mPuzzle;
+            std::vector<HackGuess> mGuesses;
+            double mLockout = 0;
+            int mHackLevel = 0;
+            int mSerial = 0;
+        };
+        std::optional<TerminalState> mTerminal;
+        int mTerminalSerial = 0;
+        /// The seconds that are left before a terminal whose screen was left can be tried again (a terminal that is
+        /// open keeps its own), counted down while the screen is closed. Under mInteractionMutex.
+        std::unordered_map<FalloutScript::FormId, double> mTerminalCooldowns;
+        /// Closes the screen of the terminal and keeps what is left of its lockout; mInteractionMutex held
+        void leaveTerminal();
+        struct RestState
+        {
+            bool mOpen = false;
+            bool mSleeping = false;
+            FalloutScript::FormId mBed = 0;
+            int mSerial = 0;
+            bool mActive = false;
+            double mTotal = 0;
+            double mDone = 0;
+            std::string mStopped;
+            int mEnded = 0;
+            /// The player stopped it: it ends where it is, in the next frame
+            bool mFinish = false;
+        };
+        RestState mRest;
+        /// A door or container whose lock was just opened, and the seconds before it is activated again
+        struct Reactivation
+        {
+            FalloutScript::FormId mReference = 0;
+            double mDelay = 0;
+        };
+        std::optional<Reactivation> mReactivate;
+        float mDiscoveryTimer = 0;
+        /// The hours of waiting that pass for each second of play while the player waits or sleeps
+        static constexpr double sRestHoursPerSecond = 4.0;
+        /// Moves the game of hacking, waiting and sleeping on; every frame, even while a screen stops the world
+        void updateInteraction(float frametime);
+        void updateRest(float frametime);
+        /// Whether the furniture is a bed that the actor would lie on
+        bool isBedFor(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
+        /// The map markers the player walks up to are found
+        void discoverMarkers(float frametime);
+        /// Whether the reference is in a cell of the open world (the cell of an exterior has an id as well, so the id
+        /// does not say)
+        bool inOpenWorld(FalloutScript::FormId reference);
+        /// The text of a game setting, the fallback when the files have none
+        std::string wordOf(std::string_view setting, std::string_view fallback);
+        /// Why the player can not wait or sleep now, empty when it can
+        std::string restRefusalText(bool sleeping, FalloutScript::FormId bed);
+        /// The text of a terminal with the tokens of it filled in
+        std::string terminalFormat(const std::string& text);
+        /// The things that make fast travel and waiting impossible, as far as the host can tell
+        bool hostilesNearPlayer();
+        /// Whether the player is in the air: not on the ground, not in water, not held up by flight
+        bool playerInAir();
+        /// Whether two cells are the same place for eyes, for the compass and for a fight: one cell, or two exterior
+        /// cells of one worldspace (an interior is a cell of its own)
+        static bool sharesSpace(const OFWorld::CellStore* a, const OFWorld::CellStore* b);
+        /// The bobby pin, as a form of the file the player is in (see masterForm)
+        static constexpr FalloutScript::FormId sBobbyPin = 0x0000000A;
         /// The menu of recipes the player has open, under mRecipeMutex
         std::mutex mRecipeMutex;
         std::optional<RecipeMenu> mRecipeMenu;

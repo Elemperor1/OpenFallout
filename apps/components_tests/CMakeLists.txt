@@ -104,6 +104,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testfaction.cpp
     esm4/testformidlist.cpp
     esm4/testlinkedreference.cpp
+    esm4/testlock.cpp
     esm4/testhungerstage.cpp
     esm4/testimagespace.cpp
     esm4/testimagespacemodifier.cpp
@@ -166,6 +167,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcrafting.cpp
     falloutscript/testdamage.cpp
     falloutscript/testdetection.cpp
+    falloutscript/testhacking.cpp
+    falloutscript/testinteraction.cpp
     falloutscript/testderivedstats.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp

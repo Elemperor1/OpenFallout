@@ -69,6 +69,12 @@ namespace ESM4
         std::vector<MenuItem> mMenuItems;
         std::vector<TargetCondition> mConditions; // CTDA before the first menu item
 
+        /// DNAM in Fallout 3 and New Vegas: how hard the terminal is to hack (0 very easy to 4 very hard), and its
+        /// flags (0x01 the difficulty grows with the level of the character, 0x02 it is unlocked), then the server type
+        std::uint8_t mDifficulty = 0;
+        std::uint8_t mTerminalFlags = 0;
+        std::uint8_t mServerType = 0;
+
         ESM::FormId mScriptId;
         ESM::FormId mPasswordNote;
         ESM::FormId mSound;

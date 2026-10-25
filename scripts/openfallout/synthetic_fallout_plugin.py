@@ -478,6 +478,7 @@ ARENA_DUMMY_ITEM_COUNT = 5  # rounds the dummy carries, for the loot window
 # The bench of the arena (New Vegas crafting): a category with a sub-category, a recipe the player can make (it takes
 # scrap and gives rounds) and one that needs more skill than the player has; the stage gives the scrap and shows the menu
 ARENA_CRAFT_STAGE = 13
+ARENA_PINS_STAGE = 14  # gives the player the bobby pins
 ARENA_CATEGORY_ID = 0x94E
 ARENA_SUB_CATEGORY_ID = 0x94F
 ARENA_RECIPE_ID = 0x950
@@ -523,6 +524,39 @@ ARENA_OTHER_AMMO_ID = 0x956
 ARENA_KEY_NAME = "Test Key"
 ARENA_OTHER_AMMO_NAME = "Test Slugs"
 ARENA_OTHER_AMMO_COUNT = 3
+# The locks, terminals and map of the arena (M10 slice 4). The bobby pin is the Lockpick of the first master (form 0x0A in
+# both games); a door that a pin opens (level 25, easy), a chest that its key opens (the key is in ARENA_KEY_ID) and a door
+# only a key opens (level 255); a terminal that has to be hacked, one that does not, and the menu a line of the first goes to;
+# a map marker the player can travel to
+BOBBY_PIN_ID = 0x0A
+ARENA_PICK_DOOR_ID = 0x988
+ARENA_CHEST_ID = 0x989
+ARENA_KEYONLY_DOOR_ID = 0x98A
+ARENA_TERMINAL_ID = 0x98B
+ARENA_TERMINAL_MENU_ID = 0x98C
+ARENA_OPEN_TERMINAL_ID = 0x98D
+ARENA_PICK_DOOR_REF_ID = 0x98E
+ARENA_CHEST_REF_ID = 0x98F
+ARENA_KEYONLY_DOOR_REF_ID = 0x990
+ARENA_TERMINAL_REF_ID = 0x991
+ARENA_OPEN_TERMINAL_REF_ID = 0x992
+ARENA_MAP_MARKER_REF_ID = 0x993
+ARENA_LOCK_PLACES = {ARENA_PICK_DOOR_REF_ID: (-300.0, 300.0, 0.0), ARENA_CHEST_REF_ID: (-300.0, -300.0, 0.0),
+                     ARENA_KEYONLY_DOOR_REF_ID: (-300.0, 0.0, 0.0), ARENA_TERMINAL_REF_ID: (200.0, 600.0, 0.0),
+                     ARENA_OPEN_TERMINAL_REF_ID: (200.0, -600.0, 0.0)}
+ARENA_MAP_MARKER_PLACE = (-600.0, -600.0, 0.0)
+ARENA_MAP_MARKER_NAME = "Test Landmark"
+ARENA_PICK_DOOR_LEVEL = 25
+ARENA_BOBBY_PINS = 12
+# The hacking retry time of the files is ten seconds; the arena shortens it so that a hack that runs out of attempts is tried
+# again within the check
+ARENA_HACK_RETRY_MS = 1000
+ARENA_GMST_ID = 0x994  # and the next
+ARENA_PICK_XP = 7  # the experience for picking a lock of the easy kind
+ARENA_TERMINAL_TEXT = "Welcome to the test terminal."
+ARENA_TERMINAL_RESULT = "Door log: all quiet."
+ARENA_TERMINAL_MENU_TEXT = "Second menu."
+ARENA_TERMINAL_MENU_RESULT = "Second result."
 # The body part data every character has (the BPTD of the games with the number 0x1D, in the first master): the name of the
 # part, what V.A.T.S. calls it (empty: it can not be aimed at), the damage multiplier, the share of the health that the part
 # stands for, the actor value of its condition (the head is the condition of perception, the torso of endurance, the left arm
@@ -598,7 +632,10 @@ LOD_BLOCK_HEIGHT = 300.0
 LOD_LAND_CELL = (12, 0)
 LOD_CELL_ID = 0x986
 LOD_LAND_ID = 0x987
-LAST_ID = 0x987 # the largest form ID of the plugin, which the next object ID of its header follows
+MAP_FIND_REF_ID = 0x996 # a map marker in the open world, hidden until the player walks up to it
+MAP_FIND_PLACE = (200.0, 300.0)
+MAP_FIND_NAME = "Test Find"
+LAST_ID = 0x996 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -934,8 +971,8 @@ def top_group(code, children):
 
 
 def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_level=None, linked=None,
-         primitive=None, enable_parent=None, count=None, flags=0):
-    subs = [sub(b"NAME", struct.pack("<I", base))]
+         primitive=None, enable_parent=None, count=None, flags=0, lock_key=0, lock_flags=0, extra=()):
+    subs = [sub(b"NAME", struct.pack("<I", base)), *extra]
     if count is not None:
         subs.append(sub(b"XCNT", struct.pack("<i", count)))
     if enable_parent is not None:
@@ -947,7 +984,7 @@ def refr(form_id, base, position, scale=None, rotation=(0.0, 0.0, 0.0), lock_lev
         subs.append(sub(b"XPRM", struct.pack("<3f3ffI", *bounds, 0.0, 0.5, 1.0, 0.1, kind)))
     if lock_level is not None:
         # level, 3 unused bytes, the key (none), 4 bytes of flags and 8 more, as Fallout 3 writes the 20 bytes of a lock
-        subs.append(sub(b"XLOC", struct.pack("<B3xI4x8x", lock_level, 0)))
+        subs.append(sub(b"XLOC", struct.pack("<B3xII8x", lock_level, lock_key, lock_flags)))
     if linked is not None:
         subs.append(sub(b"XLKR", struct.pack("<I", linked)))
     if scale is not None:
@@ -1481,7 +1518,7 @@ def scripted_object(kind):
 def object_refs(kind, origin):
     """The references of the scripted object and of the cube its script disables, around the origin of the cell."""
     x, y = origin
-    return [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
+    refs = [refr(SCRIPTED_REF_IDS[kind], SCRIPTED_IDS[kind], (x + SCRIPTED_PLACE[0], y + SCRIPTED_PLACE[1], 0.0)),
             refr(VICTIM_REF_IDS[kind], CUBE_ID, (x + VICTIM_PLACE[0], y + VICTIM_PLACE[1], CUBE / 2)),
             refr(FOLLOWER_REF_IDS[kind], CUBE_ID, (x + FOLLOWER_PLACE[0], y + FOLLOWER_PLACE[1], CUBE / 2),
                  enable_parent=(VICTIM_REF_IDS[kind], 0)),
@@ -1502,6 +1539,14 @@ def object_refs(kind, origin):
             refr(LOCKER_REF_IDS[kind], CUBE_ID, (x + LOCKER_PLACE[0], y + LOCKER_PLACE[1], CUBE / 2),
                  linked=DOOMED_REF_IDS[kind]),
             refr(DOOMED_REF_IDS[kind], CUBE_ID, (x + DOOMED_PLACE[0], y + DOOMED_PLACE[1], CUBE / 2))]
+    if kind == "exterior":
+        # The cell of an exterior has an id as well: whether the player is in the open world, and so finds the place by
+        # walking up to it, is for the engine to ask of the cell and not of the id
+        marker = [sub(b"XMRK", b""), sub(b"FNAM", b"\x00"), zstr(b"FULL", MAP_FIND_NAME),
+                  sub(b"TNAM", struct.pack("<H", 0))]
+        refs.append(refr(MAP_FIND_REF_ID, TARGET_MARKER_ID, (x + MAP_FIND_PLACE[0], y + MAP_FIND_PLACE[1], 0.0),
+                         extra=marker))
+    return refs
 
 
 def saved_refs():
@@ -2323,7 +2368,12 @@ def plugin():
                                                  watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest(), saved_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
-            + top_group(b"MISC", [arena_scrap()])
+            + top_group(b"MISC", [arena_scrap(), arena_bobby_pin()])
+            + top_group(b"DOOR", [arena_door(ARENA_PICK_DOOR_ID, "OFTestArenaPickDoor"),
+                                  arena_door(ARENA_KEYONLY_DOOR_ID, "OFTestArenaKeyDoor")])
+            + top_group(b"CONT", [arena_chest()])
+            + top_group(b"TERM", arena_terminals())
+            + top_group(b"GMST", arena_game_settings())
             + top_group(b"KEYM", [arena_key()])
             + top_group(b"RCCT", arena_categories())
             + top_group(b"RCPE", arena_recipes())
@@ -2506,11 +2556,14 @@ def arena_quest():
     craft_forms = [PLAYER_REFERENCE, ARENA_SCRAP_ID, ARENA_CATEGORY_ID, ARENA_DUMMY_REF_ID]
     craft = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_SCRAP_GIVEN)),
              sf.call_on(4, sf.SHOW_RECIPE_MENU, sf.form_argument(3))]
+    pin_forms = [PLAYER_REFERENCE, BOBBY_PIN_ID]
+    pins = [sf.call_on(1, sf.ADD_ITEM, sf.form_argument(2), sf.int_argument(ARENA_BOBBY_PINS))]
     entries = [(ARENA_SETUP_STAGE, "The rifle is in hand.", 0, [], setup, forms),
                (ARENA_LEVEL_STAGE, "The player gains experience.", 0, [],
                 [sf.call(sf.REWARD_XP, sf.int_argument(ARENA_LEVEL_XP))], forms),
                (ARENA_GRENADE_STAGE, "The grenades are in hand.", 0, [], grenades, grenade_forms),
-               (ARENA_CRAFT_STAGE, "The bench is used.", 0, [], craft, craft_forms)]
+               (ARENA_CRAFT_STAGE, "The bench is used.", 0, [], craft, craft_forms),
+               (ARENA_PINS_STAGE, "The player has bobby pins.", 0, [], pins, pin_forms)]
     entries += [(stage, "The game is read.", 0, [], probe, forms) for stage in ARENA_PROBE_STAGES]
     return quest(ARENA_QUEST_ID, ARENA_QUEST_NAME, "OpenFallout Test Arena", 0, entries)
 
@@ -2532,12 +2585,75 @@ def arena_people():
     return [dummy, raider, bystander, target]
 
 
+def arena_bobby_pin():
+    """The bobby pin: a MISC item with the number the games give it (the value and the weight, 8 bytes)."""
+    return record(b"MISC", BOBBY_PIN_ID, [zstr(b"EDID", "Lockpick"), zstr(b"FULL", "Bobby Pin"),
+                                          sub(b"DATA", struct.pack("<if", 1, 0.0))])
+
+
+def arena_door(form_id, name):
+    """A DOOR record with no model (a door the player can only meet in front of its lock)."""
+    return record(b"DOOR", form_id, [zstr(b"EDID", name), zstr(b"FULL", name)])
+
+
+def arena_chest():
+    """A CONT record with the flags and the weight (5 bytes) and one thing in it, the rounds."""
+    return record(b"CONT", ARENA_CHEST_ID, [zstr(b"EDID", "OFTestArenaChest"), zstr(b"FULL", "Test Chest"),
+                                            sub(b"DATA", struct.pack("<Bf", 0, 0.0)),
+                                            sub(b"CNTO", struct.pack("<Ii", ARENA_AMMO_ID, 4))])
+
+
+def arena_terminal(form_id, name, text, difficulty, flags, items):
+    """A TERM record: the difficulty of hacking it, its flags (0x02: unlocked) and a menu of (text, result, submenu)."""
+    subs = [zstr(b"EDID", name), zstr(b"FULL", name), zstr(b"DESC", text), sub(b"DNAM", bytes([difficulty, flags, 0, 0]))]
+    for item_text, result, submenu in items:
+        subs.append(zstr(b"ITXT", item_text))
+        if result:
+            subs.append(zstr(b"RNAM", result))
+        subs.append(sub(b"ANAM", b"\x00"))
+        if submenu:
+            subs.append(sub(b"TNAM", struct.pack("<I", submenu)))
+    return record(b"TERM", form_id, subs)
+
+
+def arena_terminals():
+    return [arena_terminal(ARENA_TERMINAL_ID, "OFTestArenaTerminal", ARENA_TERMINAL_TEXT, 0, 0,
+                           [("Read the log", ARENA_TERMINAL_RESULT, 0), ("Other menu", "", ARENA_TERMINAL_MENU_ID)]),
+            arena_terminal(ARENA_TERMINAL_MENU_ID, "OFTestArenaTerminalMenu", ARENA_TERMINAL_MENU_TEXT, 0, 2,
+                           [("Read the second", ARENA_TERMINAL_MENU_RESULT, 0)]),
+            arena_terminal(ARENA_OPEN_TERMINAL_ID, "OFTestArenaOpenTerminal", ARENA_TERMINAL_TEXT, 0, 2,
+                           [("Read the log", ARENA_TERMINAL_RESULT, 0)])]
+
+
+def arena_game_settings():
+    """The game settings the arena changes (a GMST of the number kind: the name starts with i, and the value is 4 bytes)."""
+    return [record(b"GMST", ARENA_GMST_ID, [zstr(b"EDID", "iHackingRetryMilliseconds"),
+                                            sub(b"DATA", struct.pack("<i", ARENA_HACK_RETRY_MS))]),
+            record(b"GMST", ARENA_GMST_ID + 1, [zstr(b"EDID", "iXPLevelPickLockEasy"),
+                                                sub(b"DATA", struct.pack("<i", ARENA_PICK_XP))])]
+
+
+def arena_lock_refs():
+    """The locked doors and chest, the terminals and the map marker."""
+    marker = [sub(b"XMRK", b""), sub(b"FNAM", b"\x03"), zstr(b"FULL", ARENA_MAP_MARKER_NAME), sub(b"TNAM", struct.pack("<H", 0))]
+    return [refr(ARENA_PICK_DOOR_REF_ID, ARENA_PICK_DOOR_ID, ARENA_LOCK_PLACES[ARENA_PICK_DOOR_REF_ID],
+                 lock_level=ARENA_PICK_DOOR_LEVEL),
+            refr(ARENA_CHEST_REF_ID, ARENA_CHEST_ID, ARENA_LOCK_PLACES[ARENA_CHEST_REF_ID], lock_level=255,
+                 lock_key=ARENA_KEY_ID),
+            refr(ARENA_KEYONLY_DOOR_REF_ID, ARENA_KEYONLY_DOOR_ID, ARENA_LOCK_PLACES[ARENA_KEYONLY_DOOR_REF_ID],
+                 lock_level=255),
+            refr(ARENA_TERMINAL_REF_ID, ARENA_TERMINAL_ID, ARENA_LOCK_PLACES[ARENA_TERMINAL_REF_ID]),
+            refr(ARENA_OPEN_TERMINAL_REF_ID, ARENA_OPEN_TERMINAL_ID, ARENA_LOCK_PLACES[ARENA_OPEN_TERMINAL_REF_ID]),
+            refr(ARENA_MAP_MARKER_REF_ID, TARGET_MARKER_ID, ARENA_MAP_MARKER_PLACE, extra=marker)]
+
+
 def arena_cell():
     """The interior cell of the arena with its references: the floor, the entry marker, the dummy east of the start and the
     raider in the far corner."""
     xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
+    # Flags: interior, and "can travel from here" (an interior without it forbids fast travel)
     cell = record(b"CELL", ARENA_CELL_ID, [zstr(b"EDID", ARENA_CELL_NAME), zstr(b"FULL", "OpenFallout Test Arena"),
-                                           sub(b"DATA", b"\x01"), sub(b"XCLL", xcll)])
+                                           sub(b"DATA", b"\x05"), sub(b"XCLL", xcll)])
     refs = group(struct.pack("<I", ARENA_CELL_ID), 9, [
         refr(ARENA_FLOOR_REF_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),
@@ -2545,7 +2661,7 @@ def arena_cell():
         achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
         achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID),
         achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID),
-        refr(AUTOPLAY_TARGET_REF_ID, AUTOPLAY_TARGET_ID, AUTOPLAY_TARGET_PLACE)])
+        refr(AUTOPLAY_TARGET_REF_ID, AUTOPLAY_TARGET_ID, AUTOPLAY_TARGET_PLACE), *arena_lock_refs()])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])
     return group(struct.pack("<i", ARENA_CELL_ID % 10), 2, [sub_block])
