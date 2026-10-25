@@ -22,6 +22,10 @@
 return {
     settle = 20,
     tries = 2,
+    -- The run goes on past the intro to these stages (the first stages of the quest that follows it), and ends after `limit` real
+    -- seconds whatever happens (the intro of Fallout 3 takes about 1,600 s)
+    finish = { MQ01 = 50, VMQ01 = 100 },
+    limit = 5400,
     saves = {
         after = 5,
         resaveAfter = 3,
@@ -139,5 +143,42 @@ return {
         -- Stage 115 is Doc's farewell: his package of the Dialogue type (VCG01DocMitchellFarewellDialogueStart) makes him talk
         -- to the player, and the talk ends the intro (stage 200). If it stops here, activating Doc starts the same talk:
         -- { quest = 'VCG01', stage = 115, file = 'FalloutNV.esm', ref = 0x104C0F, how = 'activate', tries = 1 },
+        --
+        -- After the intro (M10 slice 7; Mac round 10G and 10H, static): the first stages of the quest that follows.
+        -- Fallout 3 and Tale of Two Wastelands, MQ01 (the same references; the player stands in the Wasteland at the vault door,
+        -- three cells from Megaton, and none of these places has a door to walk to from there). Stage 10 goes to 20 when a
+        -- resident of Megaton is asked about the father (the topic is in the list of Confessor Cromwell, in a house that is a
+        -- cell of its own); 20 goes to 40 at the terminal in Moriarty's saloon (average, hacked; its second line sets 40) or in
+        -- the talk with Moriarty (four topics deep, the last with a Speechcraft check); 40 goes to 50 when the player is in the
+        -- box of the ambush in Washington (a child of the exterior cell ChevyChaseOrigin), or in that of its failsafe
+        { quest = 'MQ01', stage = 10, file = 'Fallout3.esm', cell = 0x003A2D, at = { 1500.0, -121.0, -256.0 },
+            how = 'teleport', tries = 1 },
+        { quest = 'MQ01', stage = 10, file = 'Fallout3.esm', ref = 0x003B48, how = 'activate', gap = 10 },
+        { quest = 'MQ01', stage = 10, how = 'setstage', to = 20, settle = 300 }, -- the topic, if it is not picked
+        { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', cell = 0x003A35, at = { 1850.0, -304.0, -46.0 }, how = 'teleport',
+            tries = 1 },
+        { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', ref = 0x003F91, how = 'activate', tries = 1, gap = 10 },
+        { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', cell = 0x003A35, at = { 1230.0, 118.0, -128.0 }, how = 'teleport',
+            tries = 1, gap = 150 },
+        { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', ref = 0x003B3C, how = 'activate', gap = 10 },
+        { quest = 'MQ01', stage = 20, how = 'setstage', to = 40, settle = 400 }, -- the terminal and the talk, if neither does it
+        { quest = 'MQ01', stage = 40, file = 'Fallout3.esm', cell = 0x01C646, at = { 54689.0, -17655.0, 11653.0 },
+            how = 'teleport', tries = 1 },
+        { quest = 'MQ01', stage = 40, file = 'Fallout3.esm', cell = 0x01C646, at = { 56699.0, -19093.0, 11739.0 },
+            how = 'teleport', tries = 1, gap = 60 },
+        { quest = 'MQ01', stage = 40, how = 'setstage', to = 50, settle = 300 }, -- the ambush, if neither box brings it about
+        -- New Vegas, VMQ01 (the player stands in Goodsprings): Novac is far, but the terminal there (an interior; unlocked,
+        -- one line that sets 50) can be reached by the cell; 50 goes to 100 in the box of the trigger in the restaurant of
+        -- the Tops (it completes the quest whatever its stage), or in the talk with Jessup in Boulder City
+        { quest = 'VMQ01', stage = 10, file = 'FalloutNV.esm', cell = 0x0CAE84, at = { 2700.0, 1167.0, 9023.0 },
+            how = 'teleport', tries = 1 },
+        { quest = 'VMQ01', stage = 10, file = 'FalloutNV.esm', ref = 0x0CCFD4, how = 'activate', gap = 10 },
+        { quest = 'VMQ01', stage = 10, how = 'setstage', to = 50, settle = 300 }, -- the terminal, if it does not do it
+        { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', cell = 0x165E81, at = { 2630.0, 2675.0, 10052.0 },
+            how = 'teleport', tries = 1 },
+        { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', cell = 0x1716CA, at = { 2060.0, -351.0, 11393.0 },
+            how = 'teleport', tries = 1, gap = 60 },
+        { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', ref = 0x10C0BF, how = 'activate', gap = 10 },
+        { quest = 'VMQ01', stage = 50, how = 'setstage', to = 100, settle = 400 }, -- the trigger and the talk, if neither does it
     },
 }

@@ -6,9 +6,9 @@ as it is), picks the topics of a conversation (the one it has picked least often
 conversation where every topic has been picked twice, or that has none to pick and says nothing, is ended as the Goodbye
 button would end it), and logs what it did in lines that start with `AUTOPLAY` (counts and
 numbers, no text of the game). The world script logs the stage of the quests of the two intros each time one changes and
-quits when the intro is over (`CG04` or `VCG01` stage 200, or the main quest starts: `MQ01` or `VMQ01` stage 10) or after
-forty minutes. The player script logs `AUTOPLAY status` every five seconds (the screen that is open, whether the world is paused,
-the cell and the place of the player) and the world script logs `AUTOPLAY world` when what pauses the world changes, so that a run
+quits when the run is over (without a `finish` in the table: `CG04` or `VCG01` stage 200, or the main quest starts, `MQ01` or
+`VMQ01` stage 10; the table that is shipped asks for more, see below) or after forty minutes (ninety, with the shipped table).
+The player script logs `AUTOPLAY status` every five seconds (the screen that is open, whether the world is paused, the cell and the place of the player) and the world script logs `AUTOPLAY world` when what pauses the world changes, so that a run
 that stands still can be told from one that waits.
 
 Some stages wait for the player to walk into a trigger volume, to activate an object, to talk to a character or to shoot at
@@ -20,6 +20,12 @@ activating a character starts a talk), `fire` makes the player shoot at it with 
 stopped), `teleport` takes the player to a place `at` in a cell of the plugin (a room that no door of the data leads to). A gate
 is tried twice (its own `tries` if it has one). A gate can have a `settle` (how long the quest stands still first) and a `gap` (the
 real seconds since the gate before it): of the gates that are ready, the first of the table goes first.
+
+The gates after the intros bring the main quest on: at `MQ01` stage 10 the player goes to the house of Cromwell in Megaton and
+talks to him, at 20 to the terminal and then Moriarty in his saloon (`teleport` to the cell, then `activate`), at 40 to the trigger
+volumes of Chevy Chase; at `VMQ01` stage 10 to the terminal of Novac, at 50 to the Tops
+restaurant and the Khan hideout of Boulder City. Each of these stages also has a `setstage` row with a long `settle`, which is
+only reached when the rows before it did not bring the quest on.
 
 A gate can also put the quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, and for what a gate
 before it should have brought about. Such a stand-in has a `settle` of its own (a minute for most, so a run that waits is not stalled), and each one that the log shows was used is
@@ -34,8 +40,9 @@ opens the lock, the pins are gone or after forty tries: `lock close`). A termina
 it, guessing a word that agrees with every likeness so far (`hack`, `hack close` when no word fits); a menu is walked through, each
 line twice at most, then Back and then out (`terminal line`, `terminal back`, `terminal close`). The screen that asks how long to
 wait or sleep is answered with one hour (`rest`). The table of the gates can set `finish` (the quests and stages at which the run
-ends, in place of the end of the intro: `{ MQ01 = 50, VMQ01 = 50 }`) and `limit` (the real seconds after which it ends whatever
-happens). `AUTOPLAY intro done` is logged once when `CG04` or `VCG01` reaches stage 200, also when the run goes on.
+ends, in place of the end of the intro: the shipped table has `{ MQ01 = 50, VMQ01 = 100 }`, so a run plays the intro and the first
+stages of the main quest) and `limit` (the real seconds after which it ends whatever happens; 5400 in the shipped table).
+`AUTOPLAY intro done` is logged once when `CG04` or `VCG01` reaches stage 200, also when the run goes on.
 
 ```
 openfallout --skip-menu --new-game --content Fallout3.esm \
