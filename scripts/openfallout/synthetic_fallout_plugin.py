@@ -632,10 +632,10 @@ LOD_BLOCK_HEIGHT = 300.0
 LOD_LAND_CELL = (12, 0)
 LOD_CELL_ID = 0x986
 LOD_LAND_ID = 0x987
-MAP_FIND_REF_ID = 0x996 # a map marker in the open world, hidden until the player walks up to it
+MAP_FIND_REF_ID = 0x9A3 # a map marker in the open world, hidden until the player walks up to it
 MAP_FIND_PLACE = (200.0, 300.0)
 MAP_FIND_NAME = "Test Find"
-LAST_ID = 0x996 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x9A3 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -681,6 +681,21 @@ SITTER_MARKER_REF_ID = 0x91D
 SITTER_REF_ID = 0x91E
 SITTER_GLOBAL = (0x91F, "OFTestSitterInChair")
 SITTER_PLACES = {"sitter": (-300.0, -1200.0), "chair": (-300.0, -1400.0), "marker": (-300.0, -1000.0)}
+# Finders: two characters with the same Find package (type 0), which looks for furniture (its target is an object type, 11) within
+# FINDER_RADIUS of a marker. Two chairs are within that radius and one is not: each finder takes a chair of its own (the one that
+# the other is on its way to is not free) and the far chair stays empty. The script of each finder sets its global to how many
+# of the three chairs it uses.
+FINDER_IDS = (0x996, 0x997)
+FINDER_SCRIPT_IDS = (0x998, 0x999)
+FINDER_GLOBALS = ((0x99A, "OFTestFinderOne"), (0x99B, "OFTestFinderTwo"))
+FINDER_PACKAGE_ID = 0x99C
+FINDER_MARKER_REF_ID = 0x99D
+FINDER_CHAIR_REF_IDS = (0x99E, 0x99F, 0x9A0) # two near the marker, one far
+FINDER_REF_IDS = (0x9A1, 0x9A2)
+FINDER_RADIUS = 350
+FINDER_OBJECT_TYPE_FURNITURE = 11
+FINDER_PLACES = {"marker": (900.0, -1500.0), "chairs": ((800.0, -1500.0), (1000.0, -1500.0), (900.0, -950.0)),
+                 "finders": ((880.0, -1650.0), (920.0, -1650.0))}
 # A speaker: a character with a Dialogue package of the kind Say To, which sends it to the player (it stops within
 # SPEAKER_DISTANCE of the player) to say a topic with one response, once. The package is done when the line is over, and its
 # script counts that.
@@ -798,6 +813,7 @@ PACKAGE_FOLLOW = 1
 PLAYER_REFERENCE = 0x14
 NIGHT_START = 22
 NIGHT_HOURS = 4
+PACKAGE_FIND = 0
 PACKAGE_TRAVEL = 6
 PACKAGE_WANDER = 5
 PACKAGE_GUARD = 14
@@ -1632,6 +1648,38 @@ def sitter_references():
             refr(SITTER_MARKER_REF_ID, TARGET_MARKER_ID, at("marker"))]
 
 
+def finder_scripts():
+    """The scripts of the finders (SCPT records of type 0): every frame each sets its global to how many chairs it uses."""
+    sf = fallout_script
+    records = []
+    for index, script_id in enumerate(FINDER_SCRIPT_IDS):
+        script = sf.Script(0)
+        chairs = [script.form(form_id) for form_id in FINDER_CHAIR_REF_IDS]
+        seat = script.form(FINDER_GLOBALS[index][0])
+        uses = (sf.call_token(sf.IS_CURRENT_FURNITURE_REF, sf.form_argument(chairs[0]))
+                + sf.call_token(sf.IS_CURRENT_FURNITURE_REF, sf.form_argument(chairs[1])) + sf.operator("+")
+                + sf.call_token(sf.IS_CURRENT_FURNITURE_REF, sf.form_argument(chairs[2])) + sf.operator("+"))
+        script.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.GAME_MODE, sf.set_to(sf.global_target(seat), uses)))
+        records.append(record(b"SCPT", script_id, [zstr(b"EDID", f"OFTestFinderScript{index + 1}"),
+                                                    *sf.sub_records(script)]))
+    return records
+
+
+def finder_packages():
+    """The Find package of the finders: furniture (the object type) within a radius of the marker."""
+    return [package(FINDER_PACKAGE_ID, "OFTestFind", PACKAGE_FIND, (LOCATION_NEAR_REFERENCE, FINDER_MARKER_REF_ID),
+                    FINDER_RADIUS, target=(2, FINDER_OBJECT_TYPE_FURNITURE))]
+
+
+def finder_references():
+    """The marker, the three chairs and the finders, in the interior cell."""
+    return [refr(FINDER_MARKER_REF_ID, TARGET_MARKER_ID, (*FINDER_PLACES["marker"], 0.0)),
+            *(refr(form_id, FURNITURE_ID, (*place, 0.0))
+              for form_id, place in zip(FINDER_CHAIR_REF_IDS, FINDER_PLACES["chairs"])),
+            *(achr(form_id, (*place, 0.0), base)
+              for form_id, place, base in zip(FINDER_REF_IDS, FINDER_PLACES["finders"], FINDER_IDS))]
+
+
 def speaker_packages():
     return [package(SPEAKER_PACKAGE_ID, "OFTestSpeak", PACKAGE_DIALOGUE, target=(0, PLAYER_REFERENCE),
                     distance=SPEAKER_DISTANCE, dialogue=(SPEAK_TOPIC_ID, DIALOGUE_SAY_TO),
@@ -2324,6 +2372,7 @@ def plugin():
         trigger_reference(),
         furniture_reference(),
         *sitter_references(),
+        *finder_references(),
         *speaker_references(),
         *intercom_references(),
         *mod_target_references(),
@@ -2345,6 +2394,7 @@ def plugin():
                                   *(global_variable(form_id, name, b"l")
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   global_variable(SITTER_GLOBAL[0], SITTER_GLOBAL[1], b"l"),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in FINDER_GLOBALS),
                                   global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l", MOD_BASE_VALUE),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
@@ -2364,7 +2414,7 @@ def plugin():
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
-                                                 new_game_script(), trigger_script(), sitter_script(), watch_script("interior"),
+                                                 new_game_script(), trigger_script(), sitter_script(), *finder_scripts(), watch_script("interior"),
                                                  watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest(), saved_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
@@ -2394,10 +2444,13 @@ def plugin():
             + top_group(b"BPTD", [body_parts()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", [*packages(), *sitter_packages(), *speaker_packages(), *intercom_packages()])
+            + top_group(b"PACK", [*packages(), *sitter_packages(), *finder_packages(), *speaker_packages(),
+                                  *intercom_packages()])
             + top_group(b"NPC_", [person(), *package_people(), *arena_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
+                                  *(person(base, f"OFTestFinder{index + 1}", [FINDER_PACKAGE_ID], dressed=False,
+                                           script=FINDER_SCRIPT_IDS[index]) for index, base in enumerate(FINDER_IDS)),
                                   person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
                                   person(INTERCOM_USER_ID, "OFTestIntercomUser", [INTERCOM_PACKAGE_ID],
                                          dressed=False),

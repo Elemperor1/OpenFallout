@@ -248,4 +248,52 @@ namespace OFRender
             return first({ "placemine", "placemine2" });
         return first({ "attack3", "attack4", "attack5", "attack6", "attack7", "attack8", "attackloop" });
     }
+
+    std::string chooseFalloutPose(std::string_view folder, int entryKind, const std::vector<std::string>& files)
+    {
+        std::string_view stem;
+        switch (entryKind)
+        {
+            case 1:
+            case 2:
+                stem = "dynamicidle_sleep";
+                break;
+            case 3:
+            case 4:
+                stem = "floorbeddynamicidle";
+                break;
+            case 5:
+            case 6:
+                stem = "floorsleepdynamicidle";
+                break;
+            case 15:
+                stem = "dynamicidle_sitstool";
+                break;
+            case 18:
+                stem = "dynamicidle_restrainedsit";
+                break;
+            case 19:
+                stem = "dynamicidle_walllean";
+                break;
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 16:
+            case 17:
+            case 20:
+                stem = "dynamicidle_sit";
+                break;
+            default:
+                return {};
+        }
+        if (folder.empty())
+            return {};
+        const std::string ending = "/" + std::string(stem) + std::string(sExtension);
+        for (const std::string& path : files)
+            if (path.starts_with(folder) && path.ends_with(ending))
+                return path;
+        return {};
+    }
 }

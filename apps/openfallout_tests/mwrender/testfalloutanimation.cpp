@@ -250,6 +250,29 @@ namespace
         EXPECT_FLOAT_EQ(falloutAnimationSpeed(130.f, 0.5f), 1.f);
     }
 
+    TEST(OpenFalloutRenderChooseFalloutPose, isTheLoopOfThePoseInTheIdleAnimationsFolder)
+    {
+        const std::string folder = "meshes/characters/_male/";
+        const std::vector<std::string> files = { folder + "idleanims/dynamicidle_sit.kf",
+            folder + "idleanims/dynamicidle_sleep.kf", folder + "idleanims/dynamicidle_sitstool.kf",
+            folder + "idleanims/chair_forwardenter.kf", folder + "locomotion/mtforward.kf" };
+        // A chair on any of its sides, and the other seats
+        for (const int kind : { 10, 11, 12, 13, 14, 16, 17, 20 })
+            EXPECT_EQ(chooseFalloutPose(folder, kind, files), folder + "idleanims/dynamicidle_sit.kf") << kind;
+        EXPECT_EQ(chooseFalloutPose(folder, 15, files), folder + "idleanims/dynamicidle_sitstool.kf");
+        // A bed
+        EXPECT_EQ(chooseFalloutPose(folder, 1, files), folder + "idleanims/dynamicidle_sleep.kf");
+        EXPECT_EQ(chooseFalloutPose(folder, 2, files), folder + "idleanims/dynamicidle_sleep.kf");
+        // The files that this folder does not have, and the kinds without a pose
+        EXPECT_EQ(chooseFalloutPose(folder, 3, files), "");
+        EXPECT_EQ(chooseFalloutPose(folder, 19, files), "");
+        EXPECT_EQ(chooseFalloutPose(folder, 22, files), "");
+        EXPECT_EQ(chooseFalloutPose(folder, 0, files), "");
+        EXPECT_EQ(chooseFalloutPose("", 14, files), "");
+        // The files of another folder are not used
+        EXPECT_EQ(chooseFalloutPose("meshes/creatures/robobrain/", 14, files), "");
+    }
+
     struct OpenFalloutRenderChooseFalloutWeaponAnimation : Test
     {
         const std::string mFolder = "meshes/characters/_male/";

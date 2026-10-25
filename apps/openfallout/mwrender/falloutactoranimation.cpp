@@ -384,6 +384,46 @@ namespace OFRender
         ++mAttacks;
     }
 
+    void FalloutActorAnimation::setPose(int entryKind)
+    {
+        if (entryKind < 0)
+            entryKind = 0;
+        if (entryKind == mPoseKind)
+            return;
+        // It gets up: the idle animation plays on below, and the gait is the one it was in
+        if (!mPoseGroup.empty())
+        {
+            disable(mPoseGroup);
+            mPoseGroup.clear();
+        }
+        mPoseKind = entryKind;
+        if (entryKind == 0 || mObjectRoot == nullptr || mSkeletonPath.empty() || isDown())
+            return;
+
+        const std::string folder = falloutAnimationFolder(mSkeletonPath);
+        const std::string file
+            = chooseFalloutPose(folder, entryKind, animationFilesOf(*mResourceSystem->getVFS(), folder));
+        if (file.empty())
+        {
+            Log(Debug::Verbose) << mPtr.getCellRef().getRefId() << " has no pose for the furniture entry " << entryKind;
+            return;
+        }
+        std::string group;
+        if (const auto known = mPoseGroups.find(file); known != mPoseGroups.end())
+            group = known->second;
+        else
+        {
+            group = addAnimation(file, mSkeletonPath);
+            mPoseGroups.emplace(file, group);
+        }
+        if (group.empty())
+            return;
+        play(group, OFRender::AnimPriority(OFMechanics::Priority_Movement), OFRender::BlendMask_All, false, 1.f,
+            "start", "stop", 0.f, ~0u, false);
+        mPoseGroup = group;
+        Log(Debug::Verbose) << mPtr.getCellRef().getRefId() << " holds the pose " << file;
+    }
+
     void FalloutActorAnimation::flinch()
     {
         if (isDown())

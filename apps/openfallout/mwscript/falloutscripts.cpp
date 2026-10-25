@@ -4154,6 +4154,45 @@ namespace OFScript
         return user != 0 && mFurniture.count(user) != 0;
     }
 
+    bool FalloutScripts::usesFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture) const
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const FalloutScript::FormId seat = referenceOf(furniture);
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(user);
+        return user != 0 && seat != 0 && found != mFurniture.end() && found->second.mFurniture == seat;
+    }
+
+    int FalloutScripts::furnitureKindOf(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        const std::lock_guard lock(mFurnitureMutex);
+        const auto found = mFurniture.find(user);
+        return user != 0 && found != mFurniture.end() ? found->second.mKind : 0;
+    }
+
+    int FalloutScripts::freeFurniturePlaces(const OFWorld::Ptr& furniture)
+    {
+        if (furniture.isEmpty() || furniture.getType() != ESM4::Furniture::sRecordId)
+            return 0;
+        const std::vector<FalloutScript::FurnitureEntry> entries = furnitureEntries(furniture);
+        const FalloutScript::FormId seat = referenceOf(furniture);
+        std::uint32_t used = 0;
+        {
+            const std::lock_guard lock(mFurnitureMutex);
+            for (const auto& [user, use] : mFurniture)
+                if (use.mFurniture == seat && use.mEntry >= 0
+                    && static_cast<std::size_t>(use.mEntry) < FalloutScript::maxFurnitureEntries)
+                    used |= 1u << use.mEntry;
+        }
+        const std::uint32_t flags = furniture.get<ESM4::Furniture>()->mBase->mActiveMarkerFlags;
+        int free = 0;
+        for (std::size_t i = 0; i < entries.size() && i < FalloutScript::maxFurnitureEntries; ++i)
+            if (FalloutScript::furnitureEntryEnabled(flags, i) && (used & (1u << i)) == 0)
+                ++free;
+        return free;
+    }
+
     FalloutScript::FormId FalloutScripts::currentFurniture(FalloutScript::FormId actor)
     {
         const std::lock_guard lock(mFurnitureMutex);

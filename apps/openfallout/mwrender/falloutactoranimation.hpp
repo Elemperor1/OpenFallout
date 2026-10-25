@@ -54,6 +54,11 @@ namespace OFRender
         /// A blow hits the actor and it reels, when the files have the animation for it
         void flinch();
 
+        /// The actor sits, lies or leans in the furniture whose entry is of the kind (0: it does not), holding the pose
+        /// that the files have for it. It is put in the place of the entry by whoever puts it in the furniture; the
+        /// games play an animation to get in and to get out, which are not played here.
+        void setPose(int entryKind);
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
@@ -95,6 +100,11 @@ namespace OFRender
         int mWeaponType = -1;
         unsigned mAttacks = 0;
         bool mDrawn = false;
+
+        /// The pose it holds in furniture: the kind of the entry and the group that plays
+        int mPoseKind = 0;
+        std::string mPoseGroup;
+        std::map<std::string, std::string> mPoseGroups;
 
         std::string mWalkGroup;
         std::string mRunGroup;

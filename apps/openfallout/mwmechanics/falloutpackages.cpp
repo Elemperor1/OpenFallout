@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 
 #include <osg/Math>
 
@@ -22,12 +23,49 @@ namespace OFMechanics
 
     float falloutGoalRadius(std::int32_t locationRadius, ESM4::PackageBehaviour behaviour)
     {
+        if (behaviour == ESM4::PackageBehaviour::Use)
+            return falloutSmallestArrival;
         if (behaviour == ESM4::PackageBehaviour::Roam)
             return locationRadius <= 0
                 ? falloutDefaultRoam
                 : std::clamp(static_cast<float>(locationRadius), falloutSmallestRoam, falloutLargestRoam);
         return std::clamp(
             static_cast<float>(std::max(locationRadius, 0)), falloutSmallestArrival, falloutLargestArrival);
+    }
+
+    int falloutChooseCandidate(
+        const std::vector<FalloutCandidate>& candidates, const osg::Vec3f& center, float radius, const osg::Vec3f& from)
+    {
+        int chosen = -1;
+        float nearest = std::numeric_limits<float>::max();
+        for (std::size_t i = 0; i < candidates.size(); ++i)
+        {
+            const FalloutCandidate& candidate = candidates[i];
+            if (candidate.mFree <= 0)
+                continue;
+            if (radius > 0.f
+                && (osg::Vec2f(candidate.mOrigin.x(), candidate.mOrigin.y()) - osg::Vec2f(center.x(), center.y()))
+                        .length()
+                    > radius)
+                continue;
+            const float away = (candidate.mPlace - from).length();
+            if (away < nearest)
+            {
+                nearest = away;
+                chosen = static_cast<int>(i);
+            }
+        }
+        return chosen;
+    }
+
+    float falloutEscortWait(std::int32_t packageDistance)
+    {
+        return std::max(2.f * falloutFollowDistance(packageDistance), falloutSmallestEscortWait);
+    }
+
+    bool falloutEscortMoves(float away, float wait, bool moving)
+    {
+        return moving ? away <= wait + falloutFollowSlack : away <= wait;
     }
 
     osg::Vec3f falloutRoamPoint(const FalloutGoal& goal, ESM4::LevelledRandom& random)
