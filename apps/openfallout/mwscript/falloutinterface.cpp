@@ -36,6 +36,15 @@ namespace OFScript
             return !ptr.isEmpty()
                 && (ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId);
         }
+
+        /// Whether two cells are the same place for eyes and for the compass: one cell, or two exterior cells of one
+        /// worldspace (an interior is a cell of its own)
+        bool sharesSpace(const OFWorld::CellStore* a, const OFWorld::CellStore* b)
+        {
+            return a == b
+                || (a != nullptr && b != nullptr && a->isExterior() && b->isExterior()
+                    && a->getCell()->getWorldSpace() == b->getCell()->getWorldSpace());
+        }
     }
 
     void FalloutScripts::watchPlayer(const OFWorld::Ptr& watcher)
@@ -50,7 +59,7 @@ namespace OFScript
             mWatchers.forget(self);
             return;
         }
-        if (mActors.isDead(self) || mCombat.unconscious(self) || watcher.getCell() != player.getCell())
+        if (mActors.isDead(self) || mCombat.unconscious(self) || !sharesSpace(watcher.getCell(), player.getCell()))
         {
             mWatchers.forget(self);
             return;
@@ -198,7 +207,14 @@ namespace OFScript
                     candidates.push_back({ &target, state.mRecord->mQuestName });
             }
         });
-        const FalloutScript::FormId playerCell = parentCell(mPlayer);
+        // The cell of an exterior has an id as well: whether the player is in the open world is what its cell says
+        Place playerPlace;
+        if (!whereIs(mPlayer, playerPlace))
+            return result;
+        const OFWorld::CellStore* playerCell = cellAt(playerPlace);
+        if (playerCell == nullptr)
+            return result;
+        const bool outside = playerCell->isExterior();
         const FalloutScript::FormId playerSpace = worldspaceOf(mPlayer);
         std::set<FalloutScript::FormId> shown;
         FalloutScript::ConditionContext context;
@@ -206,16 +222,16 @@ namespace OFScript
         for (const Candidate& candidate : candidates)
         {
             const FalloutScript::FormId target = candidate.mTarget->mTarget.toUint32();
-            if (target == 0 || !shown.insert(target).second
+            if (target == 0 || shown.count(target) != 0
                 || !mConditions.holds(candidate.mTarget->mTargetConditions, context))
                 continue;
             Place there;
             if (!whereIs(target, there))
                 continue;
             // The same cell inside, the same worldspace outside
-            const FalloutScript::FormId cell = parentCell(target);
-            if (cell != playerCell || (playerCell == 0 && worldspaceOf(target) != playerSpace))
+            if (!sharesSpace(cellAt(there), playerCell))
                 continue;
+            shown.insert(target);
             HudMarker marker;
             marker.mKind = HudMarker::Quest;
             marker.mName = candidate.mName;
@@ -224,7 +240,7 @@ namespace OFScript
 
         // The places the player has found: the map markers that are shown, in this worldspace, within the distance the
         // games show them from
-        if (playerCell == 0)
+        if (outside)
         {
             const double most = gameSetting("iMapMarkerVisibleDistance", 20000);
             for (const PlacedMarker& placed : placedMarkers())
@@ -248,7 +264,7 @@ namespace OFScript
             if (mActors.isDead(attacker))
                 continue;
             const OFWorld::Ptr enemy = findReference(attacker);
-            if (enemy.isEmpty() || !enemy.isInCell() || enemy.getCell() != player.getCell())
+            if (enemy.isEmpty() || !enemy.isInCell() || !sharesSpace(enemy.getCell(), player.getCell()))
                 continue;
             const std::size_t before = result.size();
             HudMarker marker;

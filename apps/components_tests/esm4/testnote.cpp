@@ -48,6 +48,17 @@ namespace
         EXPECT_EQ(records[0].mText, "Early.");
     }
 
+    TEST(ESM4NoteTest, dropsATopicThatComesBeforeTheTypeOfAVoiceNote)
+    {
+        const std::vector<ESM4::Note> records = loadRecords<ESM4::Note>("NOTE",
+            record("NOTE", 7,
+                valueSubRecord<std::uint32_t>("TNAM", 0x00010001) + valueSubRecord<std::uint8_t>("DATA", 3)));
+
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].mType, 3);
+        EXPECT_TRUE(records[0].mText.empty());
+    }
+
     TEST(ESM4NoteTest, hasNoTypeAndNoTextWithoutThem)
     {
         const std::vector<ESM4::Note> records

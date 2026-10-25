@@ -67,6 +67,9 @@ void ESM4::Note::load(ESM4::Reader& reader)
                     reader.get(mType);
                 if (subHdr.dataSize > 1)
                     reader.skipSubRecordData(subHdr.dataSize - 1);
+                // A topic that came before the type is not a text
+                if (mType != 1 && mType != 255)
+                    mText.clear();
                 break;
             case ESM::fourCC("TNAM"):
                 // A note of voice has the topic that it plays here: the text is for a note of text

@@ -139,7 +139,8 @@ namespace OFLua
         // The text of a note of text (the form id of the note as `core.getFormId` writes one), with the names of keys
         // and the like in it filled in
         api["noteText"] = [](std::string_view note) -> sol::optional<std::string> {
-            const ESM::FormId* form = ESM::RefId::deserializeText(note).getIf<ESM::FormId>();
+            const ESM::RefId id = ESM::RefId::deserializeText(note);
+            const ESM::FormId* form = id.getIf<ESM::FormId>();
             if (form == nullptr)
                 throw std::runtime_error("\"" + std::string(note) + "\" is not a form id");
             const std::optional<std::string> text = scripts().noteText(form->toUint32());
