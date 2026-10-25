@@ -2177,6 +2177,34 @@ local function likeness(a, b)
     end
     return same
 end
+-- Spends the attempts on words that cannot be the password: the first guess is free to be any, then only a word that
+-- disagrees with a likeness is tried. True when the attempts are gone, the terminal is open, or no such word is left.
+local function spendStep()
+    local terminal = core.interact.terminal()
+    if not terminal or not terminal.hacking then return true end
+    if terminal.lockout > 0 or terminal.attempts <= 0 then return true end
+    if #terminal.guesses == 0 then
+        core.interact.guess(1)
+        return false
+    end
+    for index, word in ipairs(terminal.words) do
+        local tried, fits = false, true
+        for _, guess in ipairs(terminal.guesses) do
+            if guess.word == word then tried = true end
+            if likeness(word, guess.word) ~= guess.likeness then fits = false end
+        end
+        if not tried and not fits then
+            core.interact.guess(index)
+            return false
+        end
+    end
+    return true
+end
+local function lockSummary()
+    local terminal = core.interact.terminal()
+    if not terminal then return 'none' end
+    return string.format('hacking=%s locked=%s', tostring(terminal.hacking), tostring((terminal.lockout or 0) > 0))
+end
 -- Guesses the word that agrees with every likeness so far, as a player does
 local function solveStep()
     local terminal = core.interact.terminal()
@@ -2277,6 +2305,15 @@ local function interactionSteps()
                 tostring(terminal.hacking), terminal.hackLevel, #terminal.words, #(terminal.words[1] or ''),
                 terminal.attempts, tostring(I.UI.getMode())))
         end },
+        -- Attempts spent on words that are not the password lock the terminal; leaving its screen and coming back does
+        -- not end the wait
+        { poll = spendStep, limit = 600 },
+        { run = function() say('lockout', lockSummary()) I2.closeTerminal() end,
+          done = function() return I2.terminalSerial() == 0 end },
+        { settle = 10 },
+        { run = activate(@TERMINAL@), done = function() return I2.terminalSerial() ~= 0 end },
+        { settle = 10 },
+        { run = function() say('lockoutback', lockSummary()) end },
         { poll = solveStep, limit = 1500 },
         { settle = 10 },
         { run = function()
@@ -4045,6 +4082,14 @@ def check_arena_interact(text):
     expect("terminalgone", "mode=nil")
     expect("hack", "the closed terminal starts the game of hacking",
            r"hacking=true level=0 words=\d+ length=\d+ attempts=4 mode=Interface")
+    # A terminal whose attempts were spent stays locked when its screen is left and opened again (a first guess that
+    # happens to be the password, or too few words that disagree to spend the attempts on, leave nothing to check)
+    locked = line("lockout")
+    back = line("lockoutback")
+    if locked == "hacking=true locked=true" and back != locked:
+        problems.append(f"a terminal that is locked up should still be locked after leaving and coming back: {back}")
+    elif locked == "hacking=false locked=false" and back != locked:
+        problems.append(f"a terminal that was hacked should stay open after leaving and coming back: {back}")
     expect("hacked", "the password opens the terminal", rf"lines=2 back=false hacking=false body={re.escape(welcome)}")
     expect("submenu", "a line goes to another menu", r"lines=1 back=true hacking=false body=Second menu\.")
     expect("subresult", "the line shows its result", r"lines=0 back=true hacking=false body=Second result\.")

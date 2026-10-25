@@ -200,6 +200,16 @@ namespace OFScript
         }
         {
             const std::lock_guard lock(mInteractionMutex);
+            // The time to wait does not end by leaving the screen and coming back
+            const auto cooling = mTerminalCooldowns.find(reference);
+            if (cooling != mTerminalCooldowns.end())
+            {
+                if (state.mPuzzle)
+                    state.mLockout = cooling->second;
+                mTerminalCooldowns.erase(cooling);
+            }
+            if (mTerminal)
+                leaveTerminal();
             state.mSerial = ++mTerminalSerial;
             mTerminal = std::move(state);
         }
@@ -312,7 +322,7 @@ namespace OFScript
             return;
         TerminalState& state = *mTerminal;
         if (state.mPuzzle)
-            mTerminal.reset();
+            leaveTerminal();
         else if (state.mShowingResult)
         {
             state.mShowingResult = false;
@@ -325,7 +335,14 @@ namespace OFScript
             state.mSerial = ++mTerminalSerial;
         }
         else
-            mTerminal.reset();
+            leaveTerminal();
+    }
+
+    void FalloutScripts::leaveTerminal()
+    {
+        if (mTerminal && mTerminal->mPuzzle && mTerminal->mLockout > 0)
+            mTerminalCooldowns[mTerminal->mReference] = mTerminal->mLockout;
+        mTerminal.reset();
     }
 
     int FalloutScripts::hackGuess(int word)
@@ -358,7 +375,7 @@ namespace OFScript
     void FalloutScripts::closeTerminal()
     {
         const std::lock_guard lock(mInteractionMutex);
-        mTerminal.reset();
+        leaveTerminal();
     }
 
     // ---- Waiting and sleeping ----
@@ -374,11 +391,19 @@ namespace OFScript
                 continue;
             // One that was removed or disabled is no threat, whatever it was doing
             const OFWorld::Ptr enemy = findReference(attacker);
-            if (!enemy.isEmpty() && enemy.isInCell() && enemy.getCell() == player.getCell()
+            if (!enemy.isEmpty() && enemy.isInCell() && sharesSpace(enemy.getCell(), player.getCell())
                 && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0)
                 return true;
         }
         return false;
+    }
+
+    bool FalloutScripts::playerInAir()
+    {
+        OFBase::World& world = *OFBase::Environment::get().getWorld();
+        const OFWorld::Ptr player = world.getPlayerPtr();
+        // The test the mechanics use for a fall: isFlying is about the ability to fly, not about touching the ground
+        return !player.isEmpty() && !world.isOnGround(player) && !world.isSwimming(player) && !world.isFlying(player);
     }
 
     std::string FalloutScripts::restRefusalText(bool sleeping, FalloutScript::FormId bed)
@@ -393,10 +418,11 @@ namespace OFScript
         conditions.mSleeping = sleeping;
         conditions.mHostilesNear = hostilesNearPlayer();
         conditions.mUnderwater = world.isSwimming(player);
-        conditions.mInAir = world.isFlying(player);
+        conditions.mInAir = playerInAir();
         if (sleeping && bed != 0)
         {
-            const FalloutScript::FormId owner = recordOwner(bed);
+            // What a script made of the bed counts, so the owner is not the one the record names
+            const FalloutScript::FormId owner = mObjectState.owner(bed);
             conditions.mOwnedBed = owner != 0 && owner != playerBase();
         }
         const std::optional<std::string> refusal = Interaction::restRefusal(conditions);
@@ -549,7 +575,7 @@ namespace OFScript
         conditions.mScriptBlocked = !mMapMarkers.fastTravelAllowed();
         const PipboyStats stats = pipboyStats();
         conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;
-        conditions.mInAir = world.isFlying(player);
+        conditions.mInAir = playerInAir();
         // A cell inside that the records forbid to travel from
         const bool outside = inOpenWorld(mPlayer);
         const FalloutScript::FormId cell = parentCell(mPlayer);
@@ -632,6 +658,18 @@ namespace OFScript
                 }
                 else if (static_cast<int>(std::ceil(mTerminal->mLockout)) != before)
                     mTerminal->mSerial = ++mTerminalSerial;
+            }
+        }
+
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            for (auto cooling = mTerminalCooldowns.begin(); cooling != mTerminalCooldowns.end();)
+            {
+                cooling->second -= frametime;
+                if (cooling->second <= 0)
+                    cooling = mTerminalCooldowns.erase(cooling);
+                else
+                    ++cooling;
             }
         }
 

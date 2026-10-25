@@ -37,14 +37,13 @@ namespace OFScript
                 && (ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId);
         }
 
-        /// Whether two cells are the same place for eyes and for the compass: one cell, or two exterior cells of one
-        /// worldspace (an interior is a cell of its own)
-        bool sharesSpace(const OFWorld::CellStore* a, const OFWorld::CellStore* b)
-        {
-            return a == b
-                || (a != nullptr && b != nullptr && a->isExterior() && b->isExterior()
-                    && a->getCell()->getWorldSpace() == b->getCell()->getWorldSpace());
-        }
+    }
+
+    bool FalloutScripts::sharesSpace(const OFWorld::CellStore* a, const OFWorld::CellStore* b)
+    {
+        return a == b
+            || (a != nullptr && b != nullptr && a->isExterior() && b->isExterior()
+                && a->getCell()->getWorldSpace() == b->getCell()->getWorldSpace());
     }
 
     void FalloutScripts::watchPlayer(const OFWorld::Ptr& watcher)

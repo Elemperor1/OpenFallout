@@ -532,6 +532,7 @@ namespace OFScript
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
             mTerminal.reset();
+            mTerminalCooldowns.clear();
             mReactivate.reset();
             mDiscoveryTimer = 0;
             mPlayerSleeping = false;

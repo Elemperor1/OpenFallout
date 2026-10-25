@@ -1541,6 +1541,11 @@ namespace OFScript
         };
         std::optional<TerminalState> mTerminal;
         int mTerminalSerial = 0;
+        /// The seconds that are left before a terminal whose screen was left can be tried again (a terminal that is
+        /// open keeps its own), counted down while the screen is closed. Under mInteractionMutex.
+        std::unordered_map<FalloutScript::FormId, double> mTerminalCooldowns;
+        /// Closes the screen of the terminal and keeps what is left of its lockout; mInteractionMutex held
+        void leaveTerminal();
         struct RestState
         {
             bool mOpen = false;
@@ -1584,6 +1589,11 @@ namespace OFScript
         std::string terminalFormat(const std::string& text);
         /// The things that make fast travel and waiting impossible, as far as the host can tell
         bool hostilesNearPlayer();
+        /// Whether the player is in the air: not on the ground, not in water, not held up by flight
+        bool playerInAir();
+        /// Whether two cells are the same place for eyes, for the compass and for a fight: one cell, or two exterior
+        /// cells of one worldspace (an interior is a cell of its own)
+        static bool sharesSpace(const OFWorld::CellStore* a, const OFWorld::CellStore* b);
         /// The bobby pin, as a form of the file the player is in (see masterForm)
         static constexpr FalloutScript::FormId sBobbyPin = 0x0000000A;
         /// The menu of recipes the player has open, under mRecipeMutex
