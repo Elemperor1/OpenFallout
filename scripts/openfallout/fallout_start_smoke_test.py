@@ -1306,17 +1306,21 @@ return {
 """
 AUTOPLAY_END = 70
 AUTOPLAY_PINNED = 22
-# The player script of that test asks to wait once the screens of the terminals are done (autoplay.lua answers the question
-# of how long)
+# The player script of that test asks to wait once the screens of both terminals have been left (autoplay.lua answers the
+# question of how long)
 AUTOPLAY_WAIT_AT = 40
 AUTOPLAY_PLAYER_SCRIPT = f"""\
 local core = require('openfallout.core')
 
 local asked, gameTime, waited = false, nil, false
+local terminalOpen, terminalsLeft = false, 0
 return {{
     engineHandlers = {{
         onFrame = function()
-            if not asked and core.getSimulationTime() >= {AUTOPLAY_WAIT_AT} then
+            local open = core.interact.terminalSerial() ~= 0
+            if terminalOpen and not open then terminalsLeft = terminalsLeft + 1 end
+            terminalOpen = open
+            if not asked and not open and terminalsLeft >= 2 and core.getSimulationTime() >= {AUTOPLAY_WAIT_AT} then
                 asked = true
                 gameTime = core.getGameTime()
                 core.interact.requestWait()
