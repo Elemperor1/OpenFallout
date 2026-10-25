@@ -2651,8 +2651,9 @@ def arena_cell():
     """The interior cell of the arena with its references: the floor, the entry marker, the dummy east of the start and the
     raider in the far corner."""
     xcll = lighting(AMBIENT, DIRECTIONAL, CELL_FOG, FOG_NEAR, CELL_FOG_FAR)
+    # Flags: interior, and "can travel from here" (an interior without it forbids fast travel)
     cell = record(b"CELL", ARENA_CELL_ID, [zstr(b"EDID", ARENA_CELL_NAME), zstr(b"FULL", "OpenFallout Test Arena"),
-                                           sub(b"DATA", b"\x01"), sub(b"XCLL", xcll)])
+                                           sub(b"DATA", b"\x05"), sub(b"XCLL", xcll)])
     refs = group(struct.pack("<I", ARENA_CELL_ID), 9, [
         refr(ARENA_FLOOR_REF_ID, CUBE_ID, (0.0, 0.0, -CUBE * FLOOR_SCALE / 2), FLOOR_SCALE),
         refr(ARENA_MARKER_REF_ID, MARKER_ID, (0.0, 0.0, 0.0)),

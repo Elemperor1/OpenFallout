@@ -9,6 +9,7 @@
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadterm.hpp>
+#include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/messagetext.hpp>
@@ -576,13 +577,20 @@ namespace OFScript
         const PipboyStats stats = pipboyStats();
         conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;
         conditions.mInAir = playerInAir();
-        // A cell inside that the records forbid to travel from
+        // The place the records forbid to travel from: an interior unless its flag "can travel from here" is set (the
+        // flag the plugin code names CELL_NoTravel), a worldspace that has the flag that forbids it. The executable
+        // reads the same bit of the cells outside too, which is not done here.
         const bool outside = inOpenWorld(mPlayer);
         const FalloutScript::FormId cell = parentCell(mPlayer);
-        if (!outside && cell != 0)
+        if (outside)
+        {
+            const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(worldspaceOf(mPlayer)));
+            conditions.mCellForbids = space != nullptr && (space->mWorldFlags & ESM4::World::WLD_NoFastTravel) != 0;
+        }
+        else if (cell != 0)
         {
             const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
-            conditions.mCellForbids = record != nullptr && (record->mCellFlags & ESM4::CELL_NoTravel) != 0;
+            conditions.mCellForbids = record != nullptr && (record->mCellFlags & ESM4::CELL_NoTravel) == 0;
         }
         if (const std::optional<std::string> refusal = Interaction::travelRefusal(conditions))
         {
