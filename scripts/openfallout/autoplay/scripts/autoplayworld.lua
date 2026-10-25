@@ -7,12 +7,17 @@ local util = require('openfallout.util')
 local world = require('openfallout.world')
 local config = require('scripts.autoplaygates')
 
--- The quests of the two intros, by editor id, and the stage of the main quest at which the intro is over
+-- The quests of the two intros, by editor id, and the stage of the main quest at which the intro is over. The table of the gates
+-- can name other stages at which the run ends (`finish`: quest and stage) and another time limit (`limit`, real seconds),
+-- for a run that goes on past the intro.
 local QUESTS = { 'CG00', 'CG01', 'CG02', 'CG03', 'CG04', 'CGTutorial', 'MQ01', 'VCG00', 'VCG01', 'VCG02', 'VCG03', 'VCG04',
     'VMQ01' }
-local DONE = { MQ01 = 10, VMQ01 = 10, CG04 = 200, VCG01 = 200 }
+local DONE = config.finish or { MQ01 = 10, VMQ01 = 10, CG04 = 200, VCG01 = 200 }
 -- Real seconds after which the run ends whatever happens
-local LIMIT = 2400
+local LIMIT = config.limit or 2400
+-- The stage at which each intro is over, logged once when a run goes on past it (`intro over` is for the end of the run)
+local INTRO_END = { CG04 = 200, VCG01 = 200 }
+local introLogged = {}
 
 local last, changed, tries = {}, {}, {}
 -- The quests that are followed: those of the intros, and any other that a gate waits for
@@ -25,6 +30,11 @@ local function watch(name)
 end
 for _, name in ipairs(QUESTS) do watch(name) end
 for _, gate in ipairs(config.gates) do watch(gate.quest) end
+-- A quest that only ends the run is followed too
+local finishing = {}
+for name in pairs(DONE) do table.insert(finishing, name) end
+table.sort(finishing)
+for _, name in ipairs(finishing) do watch(name) end
 -- What stops the world, told when it changes: the tags that pause it (the screens do, with the tag ui)
 local pausedNow = ''
 local elapsed = 0
@@ -99,8 +109,12 @@ return {
                         changed[name] = real
                         print('AUTOPLAY', 'quest', name, state, string.format('game=%.1f real=%.1f', elapsed, real))
                     end
+                    if INTRO_END[name] and quest.stage >= INTRO_END[name] and not introLogged[name] then
+                        introLogged[name] = true
+                        print('AUTOPLAY', 'intro done', name, string.format('real=%.1f', real))
+                    end
                     if DONE[name] and quest.stage >= DONE[name] then
-                        print('AUTOPLAY', 'intro over', name)
+                        print('AUTOPLAY', 'intro over', name, string.format('real=%.1f', real))
                         core.quit()
                     end
                 end
