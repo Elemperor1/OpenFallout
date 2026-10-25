@@ -486,6 +486,23 @@ namespace OFScript
             tellPlayer(refusal);
             return refusal;
         }
+        if (sleeping && bed != 0)
+        {
+            // The player lies on the bed all the time it sleeps, as far as GetSleeping and the questions about the
+            // furniture of a character are asked
+            const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
+            const OFWorld::Ptr furniture = findReference(bed);
+            if (!player.isEmpty() && !furniture.isEmpty())
+            {
+                const std::lock_guard furnitureLock(mFurnitureMutex);
+                FurnitureUse& use = mFurniture[mPlayer];
+                use.mFurniture = bed;
+                use.mPlace = player.getRefData().getPosition().asVec3();
+                use.mFurniturePlace = furniture.getRefData().getPosition().asVec3();
+                use.mEntry = -1;
+                use.mKind = 1;
+            }
+        }
         const std::lock_guard lock(mInteractionMutex);
         mRest.mActive = true;
         mRest.mTotal = std::clamp(hours, 1.0, 24.0);
@@ -688,6 +705,7 @@ namespace OFScript
     void FalloutScripts::updateRest(float frametime)
     {
         bool sleeping = false;
+        FalloutScript::FormId bed = 0;
         double step = 0;
         bool finish = false;
         {
@@ -695,6 +713,7 @@ namespace OFScript
             if (!mRest.mActive)
                 return;
             sleeping = mRest.mSleeping;
+            bed = mRest.mBed;
             finish = mRest.mFinish;
             step = std::min(mRest.mTotal - mRest.mDone, static_cast<double>(frametime) * sRestHoursPerSecond);
         }
@@ -730,6 +749,14 @@ namespace OFScript
             mActorValues.restore(mPlayer, AV::health, most * done / 8.0);
         }
         mPlayerSleeping = false;
+        if (sleeping)
+        {
+            // The player gets up from the bed
+            const std::lock_guard furnitureLock(mFurnitureMutex);
+            const auto found = mFurniture.find(mPlayer);
+            if (found != mFurniture.end() && found->second.mFurniture == bed)
+                mFurniture.erase(found);
+        }
         const int hours = static_cast<int>(std::floor(done + 1e-9));
         if (stopped.empty() && hours > 0)
             tellPlayer(std::string(sleeping ? "You slept " : "You waited ") + std::to_string(hours)
