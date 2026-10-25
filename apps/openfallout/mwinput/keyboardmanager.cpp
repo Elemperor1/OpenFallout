@@ -59,7 +59,9 @@ namespace OFInput
         if (!input->controlsDisabled() && !consumed)
             mBindingsManager->keyPressed(arg);
 
-        if (!consumed)
+        // Tab moves the key focus of the windows, which takes it from the scripts: but the screen that a script draws
+        // (V.A.T.S.) cycles its choices with it, so it reaches the scripts however the windows took it
+        if (!consumed || kc == MyGUI::KeyCode::Tab)
         {
             OFBase::Environment::get().getLuaManager()->inputEvent(
                 { OFBase::LuaManager::InputEvent::KeyPressed, arg.keysym });

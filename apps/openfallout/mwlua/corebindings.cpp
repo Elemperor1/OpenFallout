@@ -27,6 +27,7 @@
 #include "coremwscriptbindings.hpp"
 #include "dialoguebindings.hpp"
 #include "factionbindings.hpp"
+#include "hudbindings.hpp"
 #include "landbindings.hpp"
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
@@ -132,6 +133,8 @@ namespace OFLua
                 "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
             api["combat"] = context.cachePackage(
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
+            api["hud"]
+                = context.cachePackage("openfallout_core_hud", [context]() { return initCoreHudBindings(context); });
             api["pipboy"] = context.cachePackage(
                 "openfallout_core_pipboy", [context]() { return initCorePipboyBindings(context); });
             api["vats"]

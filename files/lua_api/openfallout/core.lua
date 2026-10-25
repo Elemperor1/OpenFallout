@@ -1463,6 +1463,79 @@
 -- @field #boolean crippled Whether the part of the body that was hit is crippled now.
 
 ---
+-- @{#Hud}: what the head-up display of Fallout 3 and New Vegas shows besides the stats of the player (see
+-- @{#Pipboy}.stats): the messages, the radiation, the sneak meter, the crippled limbs, the character in the crosshair
+-- and the compass. Not available in load scripts.
+-- @field [parent=#core] #Hud hud
+
+---
+-- @type Hud
+
+---
+-- The messages that were printed since this was last called, oldest first.
+-- @function [parent=#Hud] takeMessages
+-- @return #list<#HudMessage>
+
+---
+-- The text of a note of text, with the `&name;` tokens in it (the key an action is bound to, the name of the player)
+-- filled in.
+-- @function [parent=#Hud] noteText
+-- @param #string note The form id of the note, as `core.getFormId` writes one.
+-- @return #string Nothing for a form that is no note or has no text.
+
+---
+-- @type HudMessage
+-- @field #string text
+-- @field #string icon The path of the picture that goes with the text, "" for none.
+-- @field #number seconds How long the line stays.
+
+---
+-- The meters that are not the stats of the player.
+-- @function [parent=#Hud] status
+-- @return #HudStatus
+
+---
+-- @type HudStatus
+-- @field #number rads The radiation of the player.
+-- @field #number radsMax The most the radiation meter shows.
+-- @field #boolean sneaking Whether the player sneaks (the sneak meter is shown then).
+-- @field #string sneak What the characters around make of the player: "hidden", "caution", "detected" or "danger".
+-- @field #string sneakText The word the games print for it.
+-- @field #boolean weaponDrawn
+-- @field #list<#string> crippled The textures (names under Interface\Stats) of the limbs that are crippled.
+
+---
+-- The character or creature that an object is, for the bar of the target under the crosshair.
+-- @function [parent=#Hud] target
+-- @param #Object object
+-- @return #HudTarget Nothing for an object that is no character or creature.
+
+---
+-- @type HudTarget
+-- @field #string name
+-- @field #number health
+-- @field #number maxHealth
+-- @field #boolean dead
+-- @field #boolean hostile Whether it fights the player.
+
+---
+-- The way the player faces and the things in the window of the compass.
+-- @function [parent=#Hud] compass
+-- @return #HudCompass
+
+---
+-- @type HudCompass
+-- @field #number heading Degrees clockwise from north.
+-- @field #list<#HudMarker> markers
+
+---
+-- @type HudMarker
+-- @field #string kind "quest", "landmark" or "enemy".
+-- @field #number share Where in the window it is: 0 at the left edge, 1 at the right.
+-- @field #number distance How far away it is along the floor.
+-- @field #string name
+
+---
 -- @{#Pipboy}: what the player's character is and carries, for the screens of the Pip-Boy, the level up and the loot of
 -- containers in Fallout 3 or New Vegas. The holders of items are told by their form ids, as `core.getFormId` writes
 -- one; the player when it is left out. The words are those of the game settings of the files. Not available in load

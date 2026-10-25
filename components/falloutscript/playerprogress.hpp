@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_PLAYERPROGRESS_H
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_PLAYERPROGRESS_H
 
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -88,6 +89,9 @@ namespace FalloutScript
         /// Changes the karma, which stays within the limits
         void rewardKarma(int amount);
         int karma() const;
+        /// Called with the amount that was asked for each time the karma is changed (the games tell the player in a
+        /// message, which says more when the change is large)
+        void setKarmaNotice(std::function<void(int)> notice);
 
         /// The character gets the perk one rank higher than it has it
         void addPerk(FormId character, FormId perk);
@@ -113,6 +117,7 @@ namespace FalloutScript
         LevellingRules mRules = defaultRules();
         int mExperience = 0;
         int mKarma = 0;
+        std::function<void(int)> mKarmaNotice;
         /// The level up to which the points have been handed out
         int mAwardedLevel = 1;
         int mSkillPoints = 0;

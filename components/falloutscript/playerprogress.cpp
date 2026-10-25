@@ -203,9 +203,21 @@ namespace FalloutScript
 
     void PlayerProgress::rewardKarma(int amount)
     {
+        std::function<void(int)> notice;
+        {
+            const std::lock_guard lock(mMutex);
+            const std::int64_t sum = static_cast<std::int64_t>(mKarma) + amount;
+            mKarma = static_cast<int>(std::clamp<std::int64_t>(sum, -karmaLimit, karmaLimit));
+            notice = mKarmaNotice;
+        }
+        if (notice && amount != 0)
+            notice(amount);
+    }
+
+    void PlayerProgress::setKarmaNotice(std::function<void(int)> notice)
+    {
         const std::lock_guard lock(mMutex);
-        const std::int64_t sum = static_cast<std::int64_t>(mKarma) + amount;
-        mKarma = static_cast<int>(std::clamp<std::int64_t>(sum, -karmaLimit, karmaLimit));
+        mKarmaNotice = std::move(notice);
     }
 
     int PlayerProgress::karma() const

@@ -54,6 +54,12 @@ namespace ESM4
         ESM::FormId mPickUpSound;
         ESM::FormId mDropSound;
 
+        /// What the note holds: 0 a sound, 1 a text, 2 an image, 3 a voice (the first byte of DATA, 255 when the record
+        /// has none)
+        std::uint8_t mType = 255;
+        /// The text of a note of text (TNAM), with the `&name;` tokens of the games still in it
+        std::string mText;
+
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
 

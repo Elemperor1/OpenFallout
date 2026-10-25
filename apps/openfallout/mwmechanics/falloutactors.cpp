@@ -165,6 +165,7 @@ namespace OFMechanics
         bool mFighting = false; // it was in a fight the last time it was looked at
         FalloutScript::FormId mDrawn = 0; // the weapon whose animations it was last given in a fight
         float mShowAfter = 0.f; // seconds until the weapon it holds is drawn, after a shot that used the last one up
+        float mWatch = 0.f; // seconds until it looks for the player again, for the sneak meter
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -1205,6 +1206,12 @@ namespace OFMechanics
             const OFWorld::Ptr player = frame.mWorld.getPlayerPtr();
             if (mind.mPtr == player)
                 return false;
+            // What the character makes of the player is kept for the sneak meter
+            if ((mind.mWatch -= duration) <= 0.f)
+            {
+                mind.mWatch = static_cast<float>(scripts.detectionInterval());
+                scripts.watchPlayer(mind.mPtr);
+            }
             // The packages go on where they were left once the fight is over: the character goes back to its place
             const auto over = [&mind, &frame] {
                 if (mind.mDrawn != 0 || mind.mFighting)

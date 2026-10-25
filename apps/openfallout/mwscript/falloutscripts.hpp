@@ -40,6 +40,7 @@
 #include <components/falloutscript/equipment.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
+#include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/limbs.hpp>
@@ -566,6 +567,58 @@ namespace OFScript
         FalloutScript::Detection::Sighting sightOfPlayer(const OFWorld::Ptr& watcher);
         /// The seconds between the looks of a character that looks for the player (fDetectionTimerSetting)
         double detectionInterval();
+        /// A character looks for the player when its turn comes (every detectionInterval), and what it made of the
+        /// player is kept for the sneak meter. Only characters near enough to tell are looked at. Main thread.
+        void watchPlayer(const OFWorld::Ptr& watcher);
+
+        /// The head-up display. The line of messages the games print in the corner (a reference to it: the display
+        /// takes what was said, other code says things).
+        FalloutScript::Hud::MessageLine& hudMessages() { return mHudMessages; }
+        /// What the meters of the display that are not the player's stats show
+        struct HudStatus
+        {
+            double mRads = 0;
+            double mRadsMax = 1000;
+            bool mSneaking = false;
+            FalloutScript::Hud::Sneak mSneak = FalloutScript::Hud::Sneak::Hidden;
+            std::string mSneakText;
+            /// The names of the textures of the limbs that are crippled (under Interface\Stats)
+            std::vector<std::string> mCrippled;
+            bool mWeaponDrawn = false;
+        };
+        HudStatus hudStatus();
+        /// The character or creature that the crosshair is on: its name, health and whether it fights the player. False
+        /// for anything that is not one.
+        struct HudTarget
+        {
+            std::string mName;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+            bool mHostile = false;
+            bool mDead = false;
+        };
+        bool hudTarget(const OFWorld::Ptr& target, HudTarget& result);
+        /// A thing the compass shows
+        struct HudMarker
+        {
+            enum Kind
+            {
+                Quest,
+                Landmark,
+                Enemy,
+            };
+            Kind mKind = Landmark;
+            /// Where in the window of the compass (0 is its left edge, 1 its right edge)
+            double mShare = 0.5;
+            double mDistance = 0;
+            std::string mName;
+        };
+        /// The things in the window of the compass, for the way the player faces now (`heading` is that, in degrees
+        /// clockwise from north)
+        std::vector<HudMarker> hudCompass(double& heading);
+        /// The text of a note of text, the `&name;` tokens in it filled in the way the messages are (none when the form
+        /// is no note or holds no text)
+        std::optional<std::string> noteText(FalloutScript::FormId note);
         /// The weapon in the hands of the character, for the animations: its form (0 for bare hands), the model
         /// path of its record and the animation type of its record (-1 for bare hands)
         struct HeldWeapon
@@ -1381,6 +1434,21 @@ namespace OFScript
             float mRemaining = 0.f;
         };
         std::map<FalloutScript::FormId, WeaponLoop> mWeaponLoops;
+        /// What is printed in the corner of the screen, what the characters around make of the player, and the clock
+        /// (seconds of play) that the second is told by
+        FalloutScript::Hud::MessageLine mHudMessages;
+        FalloutScript::Hud::Watchers mWatchers;
+        double mHudTime = 0;
+        /// Every map marker the content files place: the reference, where it is and its name. Read once.
+        struct PlacedMarker
+        {
+            FalloutScript::FormId mId = 0;
+            FalloutScript::FormId mWorldspace = 0;
+            osg::Vec3f mPosition;
+            std::string mName;
+        };
+        const std::vector<PlacedMarker>& placedMarkers();
+        std::optional<std::vector<PlacedMarker>> mPlacedMarkers;
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
         /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player
