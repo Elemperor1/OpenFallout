@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_MWRENDER_FALLOUTACTORANIMATION_H
 #define OPENFALLOUT_MWRENDER_FALLOUTACTORANIMATION_H
 
+#include <map>
 #include <string>
 #include <string_view>
 
@@ -39,6 +40,20 @@ namespace OFRender
         void die(bool fallen);
         bool isDown() const { return mFall != nullptr; }
 
+        /// The actor takes a weapon in its hands: the model is put on its hand, the animation of the weapon's type
+        /// takes it out and then holds it ready. The type is the animation type of the weapon record (0 to 10); a
+        /// negative one is bare hands (creatures too), which only hold their hands ready. Any weapon it had is put away
+        /// first.
+        void drawWeapon(std::string_view model, int animationType);
+        /// The weapon goes out of the hands
+        void holsterWeapon();
+        bool isWeaponDrawn() const { return mDrawn; }
+
+        /// One attack with what it holds: a gun fires, a melee weapon or the hands swing in turn left and right
+        void attack();
+        /// A blow hits the actor and it reels, when the files have the animation for it
+        void flinch();
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
@@ -59,6 +74,10 @@ namespace OFRender
         /// this skeleton
         std::string addAnimation(const std::string& file, const std::string& skeleton);
 
+        /// Adds the animation file of the weapon move, if there is one, and plays it once over the body above the waist
+        /// at the priority. Empty when the files have none.
+        std::string playWeaponMove(FalloutWeaponMove move, int priority, bool loop);
+
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
         void setGait(FalloutGait gait);
@@ -66,6 +85,16 @@ namespace OFRender
         osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
         /// The transform that the body falls with, when it has died
         osg::ref_ptr<osg::MatrixTransform> mFall;
+
+        /// The weapon in the hands: the model on the hand, the animation type of the record and the move it makes
+        osg::ref_ptr<osg::Node> mWeaponNode;
+        osg::ref_ptr<osg::Group> mWeaponParent;
+        std::string mAimGroup;
+        std::map<std::string, std::string> mWeaponGroups;
+        std::string mSkeletonPath;
+        int mWeaponType = -1;
+        unsigned mAttacks = 0;
+        bool mDrawn = false;
 
         std::string mWalkGroup;
         std::string mRunGroup;

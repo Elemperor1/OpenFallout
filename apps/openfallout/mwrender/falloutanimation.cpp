@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <iterator>
 
 #include <components/misc/strings/lower.hpp>
 
@@ -181,5 +182,70 @@ namespace OFRender
         if (!(velocity > 1.f))
             return 1.f;
         return std::clamp(speed / velocity, sMinAnimationSpeed, sMaxAnimationSpeed);
+    }
+
+    std::string_view falloutWeaponPrefix(int animationType)
+    {
+        static constexpr std::string_view prefixes[]
+            = { "h2h", "1hm", "2hm", "1hp", "2hr", "2ha", "2hh", "2hl", "1gt", "1md", "1lm" };
+        if (animationType < 0)
+            return prefixes[0];
+        return static_cast<std::size_t>(animationType) < std::size(prefixes) ? prefixes[animationType]
+                                                                             : std::string_view();
+    }
+
+    std::string chooseFalloutWeaponAnimation(std::string_view folder, int animationType, FalloutWeaponMove move,
+        const std::vector<std::string>& files, unsigned counter)
+    {
+        const std::string_view prefix = falloutWeaponPrefix(animationType);
+        if (prefix.empty() || folder.empty())
+            return {};
+        const auto has = [&](const std::string& stem) {
+            const std::string path = std::string(folder) + stem + std::string(sExtension);
+            return std::ranges::find(files, path) != files.end();
+        };
+        const auto named = [&](std::string_view name) { return std::string(prefix) + std::string(name); };
+        const auto first = [&](std::initializer_list<std::string_view> names) -> std::string {
+            for (const std::string_view name : names)
+                if (has(named(name)))
+                    return std::string(folder) + named(name) + std::string(sExtension);
+            return {};
+        };
+
+        switch (move)
+        {
+            case FalloutWeaponMove::Equip:
+                return first({ "equip" });
+            case FalloutWeaponMove::Unequip:
+                return first({ "unequip" });
+            case FalloutWeaponMove::Aim:
+                return first({ "aim" });
+            case FalloutWeaponMove::Recoil:
+                return first({ "recoil" });
+            case FalloutWeaponMove::Attack:
+                break;
+        }
+
+        // The blows of the melee weapons and of the hands: left and right in turn, the first variant of each first
+        const bool melee
+            = animationType < 0 || animationType == 0 || animationType == 1 || animationType == 2 || animationType == 6;
+        if (melee)
+        {
+            std::vector<std::string_view> blows;
+            for (const std::string_view name : { "attackleft_a", "attackright_a", "attackleft_b", "attackright_b",
+                     "attackleft", "attackright", "attack3" })
+                if (has(named(name)))
+                    blows.push_back(name);
+            if (blows.empty())
+                return {};
+            const std::string_view blow = blows[counter % blows.size()];
+            return std::string(folder) + named(blow) + std::string(sExtension);
+        }
+        if (animationType == 8)
+            return first({ "attackthrow", "attackthrow2", "attackthrow3", "attackthrow4", "attackthrow5",
+                "attackthrow6", "attackthrow7", "attackthrow8" });
+        if (animationType == 9 || animationType == 10)
+            return first({ "placemine", "placemine2" });
+        return first({ "attack3", "attack4", "attack5", "attack6", "attack7", "attack8", "attackloop" });
     }
 }

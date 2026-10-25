@@ -199,6 +199,9 @@ namespace ESM4
         ESM::FormId mShotSound;
         ESM::FormId mShotSound2D;
         ESM::FormId mDryFireSound;
+        // The sound that goes on while an automatic weapon is fired without a pause (NAM7, the attack loop of a minigun
+        // or a flamer)
+        ESM::FormId mLoopSound;
 
         float mBoundRadius;
 

@@ -75,6 +75,7 @@
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwrender/animation.hpp"
+#include "../mwrender/falloutactoranimation.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -229,6 +230,15 @@ namespace OFScript
         mInterpreter.setHandler("GetContainer", [this](FalloutScript::CallContext& call) {
             const auto found = mItemHolders.find(call.mReference);
             return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
+        });
+        // Whether the character moves with the stance of sneaking: the player's stance is the key it holds, and the
+        // others do not sneak (a package that makes them is not read yet)
+        mInterpreter.setHandler("IsSneaking", [this](FalloutScript::CallContext& call) {
+            if (call.mReference == 0 || call.mReference != mPlayer || std::this_thread::get_id() != mMainThread)
+                return 0.0;
+            const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
+            return !player.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(player) ? 1.0
+                                                                                                             : 0.0;
         });
         // The trigger it is called on runs its OnTriggerEnter block for the actor it names, as if that actor had walked
         // in
@@ -462,6 +472,7 @@ namespace OFScript
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns.clear();
         }
+        mWeaponLoops.clear();
         mReferences.clear();
         mTriggerShapes.clear();
         mTriggers.clear();
@@ -1641,9 +1652,21 @@ namespace OFScript
         ESM::FormId base;
         if (!baseOf(holder, base))
             return false;
-        const auto take = [&items](const std::vector<ESM4::InventoryItem>& inventory) {
+        // A levelled list among the entries is not an item: what it gives is added below
+        const auto take = [this, &items](const std::vector<ESM4::InventoryItem>& inventory) {
             for (const ESM4::InventoryItem& item : inventory)
-                items.emplace_back(item.item, static_cast<std::int32_t>(item.count));
+                if (mStore.get<ESM4::LevelledItem>().search(ESM::FormId::fromUint32(item.item)) == nullptr)
+                    items.emplace_back(item.item, static_cast<std::int32_t>(item.count));
+        };
+        const auto give = [&items](FalloutScript::FormId piece, std::uint32_t copies) {
+            const auto count = static_cast<std::int32_t>(std::min<std::uint32_t>(copies, 0x7FFFFFFF));
+            const auto listed
+                = std::find_if(items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; });
+            if (listed == items.end())
+                items.emplace_back(piece, count);
+            else
+                listed->second = static_cast<std::int32_t>(
+                    std::min<std::int64_t>(std::int64_t(listed->second) + count, 0x7FFFFFFF));
         };
         if (base.isZeroOrUnset())
             return true;
@@ -1653,33 +1676,48 @@ namespace OFScript
             // The inventory is the one of the record that has it: a template that a levelled list of characters gives
             // is followed with the seed of the reference, as the armor the character is shown wearing is
             take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseInventory, seed).mInventory);
-            // The armor that the levelled lists of the inventory give is carried as well, as many of each piece as
-            // they gave, whether the character can wear it or not (what is worn is for startingArmor to say). The
-            // pieces that the inventory lists itself are in it already.
+            // What the levelled lists of the inventory give is carried as well, as many of each as they gave: armor,
+            // whether the character can wear it or not (what is worn is for startingArmor to say), and weapons,
+            // ammunition and the rest. The pieces that the inventory lists itself are in it already.
             if (npc->mIsFONV)
             {
                 const OFClass::StoreWornArmorSource source(mStore);
-                for (const ESM4::ListedArmor& given :
-                    ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed).mFromLists)
-                {
-                    const FalloutScript::FormId piece = numberOf(given.mArmor->mId);
-                    const auto count = static_cast<std::int32_t>(std::min<std::uint32_t>(given.mCount, 0x7FFFFFFF));
-                    const auto listed = std::find_if(
-                        items.begin(), items.end(), [piece](const auto& item) { return item.first == piece; });
-                    if (listed == items.end())
-                        items.emplace_back(piece, count);
-                    else
-                        listed->second = static_cast<std::int32_t>(
-                            std::min<std::int64_t>(std::int64_t(listed->second) + count, 0x7FFFFFFF));
-                }
+                const ESM4::CharacterArmor given
+                    = ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+                for (const ESM4::ListedArmor& piece : given.mFromLists)
+                    give(numberOf(piece.mArmor->mId), piece.mCount);
+                for (const ESM4::ListedItem& item : given.mOtherFromLists)
+                    if (const FalloutScript::FormId form = numberOf(item.mItem); form != 0)
+                        give(form, item.mCount);
             }
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed).mInventory);
+            const std::vector<ESM4::InventoryItem>& inventory
+                = templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed).mInventory;
+            take(inventory);
+            const OFClass::StoreWornArmorSource source(mStore);
+            const ESM4::CharacterArmor given
+                = ESM4::inventoryArmor(source, inventory, OFClass::ESM4Impl::sDefaultLevel, seed);
+            for (const ESM4::ListedArmor& piece : given.mFromLists)
+                give(numberOf(piece.mArmor->mId), piece.mCount);
+            for (const ESM4::ListedItem& item : given.mOtherFromLists)
+                if (const FalloutScript::FormId form = numberOf(item.mItem); form != 0)
+                    give(form, item.mCount);
         }
         else if (const ESM4::Container* container = mStore.get<ESM4::Container>().search(base))
+        {
+            // The contents of a container are the same: a list gives what it gives, once
             take(container->mInventory);
+            const OFClass::StoreWornArmorSource source(mStore);
+            const ESM4::CharacterArmor given
+                = ESM4::inventoryArmor(source, container->mInventory, OFClass::ESM4Impl::sDefaultLevel, seed);
+            for (const ESM4::ListedArmor& piece : given.mFromLists)
+                give(numberOf(piece.mArmor->mId), piece.mCount);
+            for (const ESM4::ListedItem& item : given.mOtherFromLists)
+                if (const FalloutScript::FormId form = numberOf(item.mItem); form != 0)
+                    give(form, item.mCount);
+        }
         return true;
     }
 
@@ -1862,6 +1900,14 @@ namespace OFScript
         // Whoever fights the target knows where it is
         if (mCombat.target(viewer) == target)
             return true;
+        // In the world the games' equation says; otherwise (a reference that is not in a loaded cell) the distance does
+        if (std::this_thread::get_id() == mMainThread)
+        {
+            const OFWorld::Ptr watcher = findReference(viewer);
+            const OFWorld::Ptr seen = findReference(target);
+            if (!watcher.isEmpty() && watcher.isInCell() && !seen.isEmpty() && seen.isInCell())
+                return sightOf(watcher, seen) == FalloutScript::Detection::Sighting::Seen;
+        }
         double apart = 0;
         return distance(viewer, target, apart) && apart <= sightDistance();
     }
@@ -2047,7 +2093,9 @@ namespace OFScript
         const auto cannotStrike = [this](FalloutScript::FormId actor) {
             return actor != 0 && (mActors.isDead(actor) || mCombat.unconscious(actor));
         };
-        if (victim == 0 || victim == attacker || mActors.isDead(victim) || cannotStrike(attacker))
+        // A ghost is hit by nothing: the function that deals a blow skips it
+        if (victim == 0 || victim == attacker || mActors.isDead(victim) || mObjectState.ghost(victim)
+            || cannotStrike(attacker))
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
@@ -2161,6 +2209,16 @@ namespace OFScript
         }
         if (mActorValues.current(victim, AV::health) > 0)
         {
+            // A character that is hit reels, when its files have an animation for it
+            if (dealt > 0 && victim != mPlayer)
+                runOnMainThread([this, victim] {
+                    const OFWorld::Ptr ptr = findReference(victim);
+                    if (ptr.isEmpty())
+                        return;
+                    if (auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(
+                            OFBase::Environment::get().getWorld()->getAnimation(ptr)))
+                        animation->flinch();
+                });
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0 && !tolerated)
             {
@@ -2351,16 +2409,28 @@ namespace OFScript
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
         }
-        playWeaponSound(attacker, stats.mWeapon, false);
+        // A weapon with a sound for its loop (a minigun, a flamer) plays that for as long as it fires
+        if (!keepWeaponLoop(attacker, stats.mWeapon, stats.mInterval))
+            playWeaponSound(attacker, stats.mWeapon, false);
         const FalloutScript::FormId victim = target.isEmpty() ? 0 : scriptReferenceOf(target);
         if (victim == 0 || victim == attacker)
             return result;
         if (chance < 1.0)
         {
             // The shot went wide
-            const std::lock_guard lock(mCombatRandomMutex);
-            if (std::uniform_real_distribution<double>(0.0, 1.0)(mCombatRandom) >= chance)
+            bool missed = false;
+            {
+                const std::lock_guard lock(mCombatRandomMutex);
+                missed = std::uniform_real_distribution<double>(0.0, 1.0)(mCombatRandom) >= chance;
+            }
+            if (missed)
+            {
+                // A weapon in hand has a sound for a blow that finds nothing (the same one as the click of a gun
+                // without rounds, which is what its data call a failed attack)
+                if (stats.mMelee)
+                    playWeaponSound(attacker, stats.mWeapon, true);
                 return result;
+            }
         }
         result.mHit = true;
         if (victim == mPlayer || isCharacterOrCreature(target))
@@ -2396,11 +2466,13 @@ namespace OFScript
         {
             // Said once for each weapon and sound: what the data gives, as the file that the game would play
             if (files.empty())
-                Log(Debug::Warning) << "Weapon " << record->mEditorId << ": the " << (dryFire ? "click" : "shot")
-                                    << " sound " << id.toString() << " has no file";
+                Log(Debug::Warning) << "Weapon " << record->mEditorId << ": the "
+                                    << (dryFire ? "click or miss" : "shot") << " sound " << id.toString()
+                                    << " has no file";
             else
-                Log(Debug::Info) << "Weapon " << record->mEditorId << ": " << (dryFire ? "click" : "shot") << " sound "
-                                 << id.toString() << " has " << files.size() << " file(s), the first is " << files[0];
+                Log(Debug::Info) << "Weapon " << record->mEditorId << ": " << (dryFire ? "click or miss" : "shot")
+                                 << " sound " << id.toString() << " has " << files.size() << " file(s), the first is "
+                                 << files[0];
         }
         if (files.empty())
             return;
@@ -2408,10 +2480,78 @@ namespace OFScript
             ? files[0]
             : files[std::uniform_int_distribution<std::size_t>(0, files.size() - 1)(mWeaponSoundRandom)];
         const VFS::Path::Normalized path(file);
+        // A weapon that fires faster than its sound lasts does not cut the shot before off
         if (attacker == mPlayer)
-            sound->playSound(path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::NoEnv);
+            sound->playSound(path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::OverlapNoEnv);
         else if (const OFWorld::Ptr reference = findReference(attacker); !reference.isEmpty())
-            sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
+            sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Overlap);
+    }
+
+    bool FalloutScripts::keepWeaponLoop(FalloutScript::FormId attacker, FalloutScript::FormId weapon, double interval)
+    {
+        if (weapon == 0)
+            return false;
+        // It stays a little longer than the time between two shots, so that the shots of a character that does not
+        // lose its target do not leave gaps in it
+        const float keep = static_cast<float>(std::max(2.0 * interval, 0.25));
+        const auto running = mWeaponLoops.find(attacker);
+        if (running != mWeaponLoops.end())
+        {
+            if (running->second.mWeapon == weapon)
+            {
+                running->second.mRemaining = keep;
+                return true;
+            }
+            stopWeaponLoop(attacker);
+        }
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(weapon));
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (record == nullptr || sound == nullptr || record->mLoopSound.isZeroOrUnset())
+            return false;
+        const std::uint32_t id = record->mLoopSound.toUint32();
+        const std::vector<std::string> files = soundFilesOf(id);
+        if (mWeaponSoundsLogged.emplace(weapon, false, id).second)
+        {
+            if (files.empty())
+                Log(Debug::Warning) << "Weapon " << record->mEditorId << ": the loop sound "
+                                    << record->mLoopSound.toString() << " has no file";
+            else
+                Log(Debug::Info) << "Weapon " << record->mEditorId << ": loop sound " << record->mLoopSound.toString()
+                                 << " has " << files.size() << " file(s), the first is " << files[0];
+        }
+        if (files.empty())
+            return false;
+        OFBase::World& world = *OFBase::Environment::get().getWorld();
+        const OFWorld::Ptr reference = attacker == mPlayer ? world.getPlayerPtr() : findReference(attacker);
+        if (reference.isEmpty())
+            return false;
+        const VFS::Path::Normalized path(files[0]);
+        // The player hears its own weapon in 2D, which the sound manager does for the reference of the player
+        const OFSound::PlayMode mode = attacker == mPlayer ? OFSound::PlayMode::LoopNoEnv : OFSound::PlayMode::Loop;
+        if (sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, mode) == nullptr)
+            return false;
+        WeaponLoop loop;
+        loop.mWeapon = weapon;
+        loop.mFile = files[0];
+        loop.mRemaining = keep;
+        mWeaponLoops[attacker] = std::move(loop);
+        return true;
+    }
+
+    void FalloutScripts::stopWeaponLoop(FalloutScript::FormId attacker)
+    {
+        const auto found = mWeaponLoops.find(attacker);
+        if (found == mWeaponLoops.end())
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (sound != nullptr && world != nullptr)
+        {
+            const OFWorld::Ptr reference = attacker == mPlayer ? world->getPlayerPtr() : findReference(attacker);
+            if (!reference.isEmpty())
+                sound->stopSound3D(reference, VFS::Path::Normalized(found->second.mFile));
+        }
+        mWeaponLoops.erase(found);
     }
 
     const FalloutScripts::FightTraits& FalloutScripts::fightTraitsOf(const OFWorld::Ptr& actor)
@@ -2460,8 +2600,9 @@ namespace OFScript
             return stance;
         OFBase::World& world = *OFBase::Environment::get().getWorld();
         const OFWorld::Ptr target = targetId == mPlayer ? world.getPlayerPtr() : findReference(targetId);
+        // A ghost is not a target, and a fight with a character that became one ends
         if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(targetId)
-            || mCombat.unconscious(targetId))
+            || mCombat.unconscious(targetId) || mObjectState.ghost(targetId))
         {
             // Nobody goes for a target that is gone
             mCombat.stop(self);
@@ -2545,6 +2686,24 @@ namespace OFScript
         mEquipment.setWeaponDrawn(self, true);
     }
 
+    FalloutScripts::HeldWeapon FalloutScripts::heldWeapon(const OFWorld::Ptr& actor)
+    {
+        HeldWeapon result;
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        if (self == 0)
+            return result;
+        const WeaponStats stats = weaponStats(self);
+        if (stats.mWeapon == 0)
+            return result;
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon));
+        if (record == nullptr)
+            return result;
+        result.mWeapon = stats.mWeapon;
+        result.mModel = record->mModel.getOriginal();
+        result.mAnimationType = record->mHasGameData ? static_cast<int>(record->mGame.mAnimationType) : -1;
+        return result;
+    }
+
     bool FalloutScripts::isAggressive(const OFWorld::Ptr& actor)
     {
         return fightTraitsOf(actor).mAggression != FalloutScript::FightAI::Aggression::unaggressive;
@@ -2560,8 +2719,9 @@ namespace OFScript
     {
         namespace AV = FalloutScript::ActorValue;
         const FalloutScript::FormId self = scriptReferenceOf(actor);
+        // A player who is a ghost is not noticed
         if (self == 0 || self == mPlayer || mActors.isDead(self) || mActors.isDead(mPlayer) || mCombat.unconscious(self)
-            || mCombat.restrained(self) || mCombat.inCombat(self))
+            || mCombat.restrained(self) || mCombat.inCombat(self) || mObjectState.ghost(mPlayer))
             return false;
         const FightTraits& traits = fightTraitsOf(actor);
         if (traits.mAggression == FalloutScript::FightAI::Aggression::unaggressive)
@@ -2587,7 +2747,7 @@ namespace OFScript
         }
         if (!FalloutScript::FightAI::attacksOnSight(traits.mAggression, standing))
             return false;
-        radius = traits.mRadius > 0.f ? traits.mRadius : static_cast<float>(sightDistance());
+        radius = traits.mRadius;
         return true;
     }
 
@@ -2636,6 +2796,15 @@ namespace OFScript
                 it->second -= frametime;
                 it = it->second <= 0 ? mFireCooldowns.erase(it) : std::next(it);
             }
+        }
+        {
+            // The loop of a weapon ends a moment after the last shot
+            std::vector<FalloutScript::FormId> ended;
+            for (auto& [attacker, loop] : mWeaponLoops)
+                if ((loop.mRemaining -= frametime) <= 0)
+                    ended.push_back(attacker);
+            for (const FalloutScript::FormId attacker : ended)
+                stopWeaponLoop(attacker);
         }
         {
             // A character that wakes has its health back before any blow or fight can see it up: both steps are one

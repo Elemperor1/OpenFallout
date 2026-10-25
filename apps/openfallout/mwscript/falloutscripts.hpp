@@ -34,6 +34,7 @@
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
 #include <components/falloutscript/derivedstats.hpp>
+#include <components/falloutscript/detection.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/enableparents.hpp>
 #include <components/falloutscript/equipment.hpp>
@@ -557,8 +558,23 @@ namespace OFScript
         /// character with no weapon and no melee weapon in its inventory fights with its hands), and draws it
         void prepareFight(const OFWorld::Ptr& actor);
         /// Whether the character, which is at peace, goes for the player when it sees it: from its aggression and how
-        /// its factions stand to the player. `radius` is how near the player has to be.
+        /// its factions stand to the player. `radius` is the radius its AI data names, within which it sees the player
+        /// whatever the stealth equation says, 0 when it has none.
         bool attacksPlayerOnSight(const OFWorld::Ptr& actor, float& radius);
+        /// How well the character sees or hears the player: the stealth equation of the games with the sneak and the
+        /// movement of the player, the light on it and the distance, and a view cone and a line of sight
+        FalloutScript::Detection::Sighting sightOfPlayer(const OFWorld::Ptr& watcher);
+        /// The seconds between the looks of a character that looks for the player (fDetectionTimerSetting)
+        double detectionInterval();
+        /// The weapon in the hands of the character, for the animations: its form (0 for bare hands), the model
+        /// path of its record and the animation type of its record (-1 for bare hands)
+        struct HeldWeapon
+        {
+            FalloutScript::FormId mWeapon = 0;
+            std::string mModel;
+            int mAnimationType = -1;
+        };
+        HeldWeapon heldWeapon(const OFWorld::Ptr& actor);
         /// The character goes for the player
         void fightPlayer(const OFWorld::Ptr& actor);
         /// The character attacks the target with the weapon it holds, as far as its skill allows it to hit. A
@@ -1353,6 +1369,18 @@ namespace OFScript
         /// The sound of a shot of the weapon that the attacker holds, or the click of it when it has no ammunition: the
         /// player hears the sound made for it (a 2D one) and the rest are heard from where they stand. Main thread.
         void playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire);
+        /// The loop of an automatic weapon (NAM7) goes on while the character keeps firing and stops a moment after it
+        /// stops; every shot renews it. False when the weapon has no loop that can be played (the shot sound is then
+        /// played for each shot). Main thread.
+        bool keepWeaponLoop(FalloutScript::FormId attacker, FalloutScript::FormId weapon, double interval);
+        void stopWeaponLoop(FalloutScript::FormId attacker);
+        struct WeaponLoop
+        {
+            FalloutScript::FormId mWeapon = 0;
+            std::string mFile;
+            float mRemaining = 0.f;
+        };
+        std::map<FalloutScript::FormId, WeaponLoop> mWeaponLoops;
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
         /// The sounds of weapons that were looked for: the weapon, whether it is the click, and the sound (the player
@@ -1368,9 +1396,14 @@ namespace OFScript
         };
         const FightTraits& fightTraitsOf(const OFWorld::Ptr& actor);
         std::map<FalloutScript::FormId, FightTraits> mFightTraits;
-        /// How far a character sees another one (fSneakMaxDistance of the files, which is where the games stop looking
-        /// for a sneaking one; the light and the sneak skill of the target are not taken into account)
+        /// How far a character sees another one when the stealth equation can not be asked (fSneakMaxDistance of the
+        /// files, which is where the games stop looking for a sneaking one)
         double sightDistance();
+        /// How well the watcher sees or hears the target, by the stealth equation. In the world only.
+        FalloutScript::Detection::Sighting sightOf(const OFWorld::Ptr& watcher, const OFWorld::Ptr& target);
+        /// How brightly the character is lit, from 0 to 100: the sky by the hour outside, the ambient light of the cell
+        /// inside (the lamps are not counted)
+        double lightOn(const OFWorld::Ptr& target);
         /// One blow at a time reaches the health and the fights of a character
         std::mutex mStrikeMutex;
         /// The date the world starts at (the initial values of GameYear, GameMonth and GameDay), read when the first

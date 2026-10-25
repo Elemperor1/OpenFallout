@@ -510,8 +510,10 @@ namespace OFSound
         if (!mOutput->isInitialized())
             return nullptr;
 
-        // Only one copy of given sound can be played at time, so stop previous copy
-        stopSound(sfx, OFWorld::ConstPtr());
+        // Only one copy of given sound can be played at time, so stop previous copy (unless the caller wants them
+        // to overlap)
+        if (!(mode & PlayMode::Overlap))
+            stopSound(sfx, OFWorld::ConstPtr());
 
         SoundPtr sound = getSoundRef();
         sound->init([&] {
@@ -566,8 +568,10 @@ namespace OFSound
         if (!mOutput->isInitialized())
             return nullptr;
 
-        // Only one copy of given sound can be played at time on ptr, so stop previous copy
-        stopSound(sfx, ptr);
+        // Only one copy of given sound can be played at time on ptr, so stop previous copy (unless the caller wants
+        // them to overlap)
+        if (!(mode & PlayMode::Overlap))
+            stopSound(sfx, ptr);
 
         const osg::Vec3f objpos(ptr.getRefData().getPosition().asVec3());
         const float squaredDist = (mListenerPos - objpos).length2();

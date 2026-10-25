@@ -321,6 +321,40 @@ namespace
         EXPECT_THAT(counts(armor.mFromLists), UnorderedElementsAre(Pair(0x1002u, 1u), Pair(0x1003u, 4u)));
     }
 
+    TEST(ESM4WornArmorTest, aListGivesWeaponsAndAmmunitionAsWellAsArmour)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        // a list of a weapon, a list that uses all (a rifle and sixty rounds), and a thing that is no record at all
+        source.addList(0x1010, { { 1, 0x3001 }, { 3, 0x3002 } });
+        source.addList(0x1011, { { 1, 0x3003 }, { 1, 0x3004 }, { 1, 0x1001 } }, 0x04);
+        source.mLevelledItems.at(id(0x1011)).mLvlObject[1].count = 60;
+        const ESM4::Npc& npc = source.addNpc(0x2001, { 0x1010, 0x1011 }, 0, 0, 5);
+
+        const ESM4::CharacterArmor given = ESM4::characterArmor(source, npc, playerLevel, 1);
+
+        // the first list gives the weapon of the highest level at or below the level of the character
+        std::map<std::uint32_t, std::uint32_t> others;
+        for (const ESM4::ListedItem& item : given.mOtherFromLists)
+            others[item.mItem.mIndex] += item.mCount;
+        EXPECT_THAT(others, UnorderedElementsAre(Pair(0x3002u, 1u), Pair(0x3003u, 1u), Pair(0x3004u, 60u)));
+        EXPECT_THAT(counts(given.mFromLists), UnorderedElementsAre(Pair(0x1001u, 1u)));
+    }
+
+    TEST(ESM4WornArmorTest, anInventoryThatIsNotACharactersGivesWhatItsListsGiveForTheLevel)
+    {
+        TestSource source;
+        source.addList(0x1010, { { 1, 0x3001 }, { 8, 0x3002 } });
+        const std::vector<ESM4::InventoryItem> inventory{ { 0x1010, 1 }, { 0x3099, 2 } };
+
+        const ESM4::CharacterArmor low = ESM4::inventoryArmor(source, inventory, 5, 1);
+        ASSERT_EQ(low.mOtherFromLists.size(), 1u);
+        EXPECT_EQ(low.mOtherFromLists[0].mItem, id(0x3001));
+        const ESM4::CharacterArmor high = ESM4::inventoryArmor(source, inventory, 10, 1);
+        ASSERT_EQ(high.mOtherFromLists.size(), 1u);
+        EXPECT_EQ(high.mOtherFromLists[0].mItem, id(0x3002));
+    }
+
     TEST(ESM4WornArmorTest, addsUpAPieceThatTwoListsGive)
     {
         TestSource source;
