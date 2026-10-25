@@ -1343,6 +1343,8 @@ namespace OFScript
         /// The action is done at once on the thread of the frame, and in the next frame on any other.
         void runOnMainThread(std::function<void()> action);
         void applyDisabled(FalloutScript::FormId reference, bool disabled);
+        /// Whether the object is disabled now, not counting what another thread has asked for and is not done yet
+        bool isDisabledNow(FalloutScript::FormId reference);
         /// Enables or disables the object alone, where it is or when its cell is loaded
         void applyDisabledAlone(FalloutScript::FormId reference, bool disabled);
         /// Who has whom for an enable parent, read from the records the first time it is asked for
