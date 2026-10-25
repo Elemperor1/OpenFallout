@@ -28,6 +28,14 @@ namespace FalloutScript
             { 0x14AC, "GetGameLoaded", false },
             { 0x278A, "IsSoundPlaying", false, "12 4?" },
             { 0x2862, "IsMusicPlaying", false, "61?" },
+            // The ones of Tale of Two Wastelands' own plugin that its generic handler, its start button and its
+            // statistics script call (names and arguments read from the source text and the compiled calls of the
+            // scripts): a switch, a statistic by name, a form, and two event handlers of a script for a form or a list
+            { 0x3808, "TTW_EnableRadioFix", false, "1" },
+            { 0x31EE, "InitExtraMiscStat", false, "0" },
+            { 0x28D7, "InitRockItLauncher", false, "21" },
+            { 0x28B0, "SetOnProjectileImpactEventHandler", false, "21 1 21" },
+            { 0x28B3, "SetOnUseAidItemEventHandler", false, "21 1 21" },
         };
     }
 

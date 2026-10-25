@@ -28,7 +28,6 @@
 */
 #include "loadmusc.hpp"
 
-#include <stdexcept>
 
 #include "reader.hpp"
 //#include "writer.hpp"
@@ -56,7 +55,9 @@ void ESM4::Music::load(ESM4::Reader& reader)
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::MUSC::load - Unknown subrecord " + ESM::printName(subHdr.typeId));
+                // Only the file of the track is needed
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

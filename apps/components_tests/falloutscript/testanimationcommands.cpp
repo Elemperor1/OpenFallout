@@ -11,6 +11,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -45,6 +46,7 @@ namespace
         std::set<std::pair<FormId, std::string>> mPlaying;
         std::vector<std::pair<FormId, std::string>> mPlayed;
         std::vector<bool> mRestarted;
+        std::vector<std::tuple<FormId, std::string, FormId>> mIdles;
 
         bool hasGroup(FormId reference, std::string_view group) override
         {
@@ -68,6 +70,12 @@ namespace
                 if (owner == reference && (group.empty() || name == group))
                     return true;
             return false;
+        }
+
+        bool playIdle(FormId reference, std::string_view name, FormId idle) override
+        {
+            mIdles.emplace_back(reference, std::string(name), idle);
+            return true;
         }
 
         void finish(FormId reference, const std::string& group) { mPlaying.erase({ reference, group }); }
@@ -121,6 +129,24 @@ namespace
     Bytes flag(int value)
     {
         return arguments(1).add(intArg(value));
+    }
+
+    TEST(FalloutScriptAnimationCommandsTest, an_idle_is_played_by_its_name_or_its_form)
+    {
+        Runner run;
+        FalloutScript::Value named;
+        named.mText = "SitDown";
+        named.mIsText = true;
+        run.mInterpreter.call(0x1190, gate, true, { named });
+        FalloutScript::Value form;
+        form.mNumber = 0x3BCC;
+        run.mInterpreter.call(0x1190, gate, true, { form });
+        // On no one, or with nothing to play, it does nothing
+        run.mInterpreter.call(0x1190, 0, false, { named });
+        run.mInterpreter.call(0x1190, gate, true, {});
+        ASSERT_EQ(run.mAnimations.mIdles.size(), 2u);
+        EXPECT_EQ(run.mAnimations.mIdles[0], std::make_tuple(gate, std::string("SitDown"), FormId(0)));
+        EXPECT_EQ(run.mAnimations.mIdles[1], std::make_tuple(gate, std::string(), FormId(0x3BCC)));
     }
 
     TEST(FalloutScriptAnimationGroupsTest, names_the_groups_that_scripts_call_by_number)

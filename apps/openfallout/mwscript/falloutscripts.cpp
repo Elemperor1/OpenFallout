@@ -26,6 +26,7 @@
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadglob.hpp>
 #include <components/esm4/loadgmst.hpp>
+#include <components/esm4/loadidle.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadmesg.hpp>
@@ -261,6 +262,7 @@ namespace OFScript
         FalloutScript::addMapMarkerCommands(
             mInterpreter, mMapMarkers, [this](FalloutScript::FormId marker) { markerShown(marker); });
         FalloutScript::addPresentationCommands(mInterpreter, mPresentation, *this);
+        FalloutScript::addSwitchCommands(mInterpreter, mSwitches);
         FalloutScript::addMagicCommands(mInterpreter, mMagic, *this);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
@@ -269,8 +271,6 @@ namespace OFScript
             rewardExperience(FalloutScript::intArgument(call, 0));
             return 0.0;
         });
-        // The games have a mode of play that has no counterpart here
-        mInterpreter.setHandler("IsHardcore", [](FalloutScript::CallContext&) { return 0.0; });
         // The menu of a workbench, a reloading bench or a campfire is for the player; the screen shows it. The call
         // comes from the script of the bench (the reference is the bench) or from a quest (none), so none is refused.
         mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
@@ -527,6 +527,7 @@ namespace OFScript
         mObjectState.clear();
         mMapMarkers.clear();
         mPresentation.clear();
+        mSwitches.clear();
         mMagic.clear();
         {
             // A new game and a loaded game are both told to the scripts once; the program was started only once
@@ -4091,6 +4092,59 @@ namespace OFScript
     {
         const OFRender::ObjectAnimation* animation = objectAnimationOf(reference);
         return animation != nullptr && animation->isScriptedPlaying(group);
+    }
+
+    const ESM4::IdleAnimation* FalloutScripts::findIdle(std::string_view name, FalloutScript::FormId form)
+    {
+        const auto& idles = mStore.get<ESM4::IdleAnimation>();
+        if (name.empty())
+            return form != 0 ? idles.search(refId(form)) : nullptr;
+        const std::lock_guard lock(mIdleMutex);
+        if (!mIdlesIndexed)
+        {
+            for (const ESM4::IdleAnimation& idle : idles)
+                if (!idle.mEditorId.empty())
+                    mIdlesByName.emplace(Misc::StringUtils::lowerCase(idle.mEditorId), idle.mId);
+            mIdlesIndexed = true;
+        }
+        const auto found = mIdlesByName.find(Misc::StringUtils::lowerCase(name));
+        return found == mIdlesByName.end() ? nullptr : idles.search(found->second);
+    }
+
+    bool FalloutScripts::playIdle(FalloutScript::FormId reference, std::string_view name, FalloutScript::FormId idle)
+    {
+        const ESM4::IdleAnimation* record = findIdle(name, idle);
+        const std::string called = name.empty() ? FalloutScript::hex(idle) : std::string(name);
+        const auto cannot = [&](const std::string& why) {
+            const std::lock_guard lock(mIdleMutex);
+            if (mIdleProblems.insert(called).second)
+                Log(Debug::Info) << "PlayIdle " << called << ": " << why;
+            return false;
+        };
+        if (record == nullptr)
+            return cannot("no such idle record");
+        // The idles that hold others (a folder of the tree, which the games pick from by the conditions of its
+        // children) name no animation
+        if (record->mModel.empty())
+            return cannot("the idle holds other idles and has no animation file; none is chosen");
+        std::string file = record->mModel.getNormalized().value();
+        if (file.compare(0, 7, "meshes/") != 0)
+            file.insert(0, "meshes/");
+        runOnMainThread([this, reference, file, called] {
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (ptr.isEmpty() || !ptr.isInCell())
+                return;
+            auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(
+                OFBase::Environment::get().getWorld()->getAnimation(ptr));
+            if (animation != nullptr && !animation->playIdle(file))
+            {
+                const std::lock_guard lock(mIdleMutex);
+                if (mIdleProblems.insert(called).second)
+                    Log(Debug::Info) << "PlayIdle " << called << ": " << file
+                                     << " has nothing to play on the character";
+            }
+        });
+        return true;
     }
 
     void FalloutScripts::settleDoor(const OFWorld::Ptr& door, FalloutScript::FormId reference)

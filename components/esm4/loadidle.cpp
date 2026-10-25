@@ -26,7 +26,6 @@
 */
 #include "loadidle.hpp"
 
-#include <stdexcept>
 
 #include "reader.hpp"
 //#include "writer.hpp"
@@ -92,8 +91,10 @@ void ESM4::IdleAnimation::load(ESM4::Reader& reader)
                 reader.skipSubRecordData();
                 break;
             default:
-                throw std::runtime_error("ESM4::IDLE::load - Unknown subrecord " + std::to_string(subHdr.typeId) + " "
-                    + ESM::printName(subHdr.typeId));
+                // The records of the games have only the ones above; a record from a plugin may have more, which an
+                // animation that is played by its name does not need
+                reader.skipSubRecordData();
+                break;
         }
     }
 }

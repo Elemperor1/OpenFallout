@@ -188,6 +188,7 @@ namespace OFRender
                 // on without end; one that clamps has none, and stays on its last frame
                 play(group, OFRender::AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false, 1.f,
                     "start", "stop", 0.f, ~0u, false);
+                mDefaultIdleGroup = group;
                 playing = true;
             }
         }
@@ -422,6 +423,32 @@ namespace OFRender
             "start", "stop", 0.f, ~0u, false);
         mPoseGroup = group;
         Log(Debug::Verbose) << mPtr.getCellRef().getRefId() << " holds the pose " << file;
+    }
+
+    bool FalloutActorAnimation::playIdle(const std::string& file)
+    {
+        if (mObjectRoot == nullptr || mSkeletonPath.empty() || isDown() || file.empty())
+            return false;
+        std::string group;
+        if (const auto known = mIdleGroups.find(file); known != mIdleGroups.end())
+            group = known->second;
+        else
+        {
+            group = addAnimation(file, mSkeletonPath);
+            mIdleGroups.emplace(file, group);
+        }
+        if (group.empty())
+            return false;
+        // A file that is the idle it stands in, or one of the gaits, is already what it plays: a one-shot of the same
+        // group would end and take the group with it, and nothing starts it again
+        if (group == mDefaultIdleGroup || group == mWalkGroup || group == mRunGroup || group == mPoseGroup)
+            return true;
+        // One that was playing and has not ended starts again
+        if (isPlaying(group))
+            disable(group);
+        play(group, OFRender::AnimPriority(OFMechanics::Priority_Scripted), OFRender::BlendMask_All, true, 1.f, "start",
+            "stop", 0.f, 0u, false);
+        return true;
     }
 
     void FalloutActorAnimation::flinch()

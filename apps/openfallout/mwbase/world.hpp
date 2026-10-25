@@ -226,6 +226,11 @@ namespace OFBase
 
         virtual void changeWeather(ESM::RefId region, ESM::RefId id) = 0;
 
+        /// A script forces the weather (ForceWeather): the sky has it at once, and with `hold` keeps it whatever the
+        /// region says until it is released
+        virtual void forceWeather(ESM::RefId id, bool hold) = 0;
+        virtual void releaseWeatherOverride() = 0;
+
         virtual const OFWorld::WeatherStore& getAllWeather() const = 0;
 
         virtual int getCurrentWeatherScriptId() const = 0;

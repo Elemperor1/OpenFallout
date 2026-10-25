@@ -1007,6 +1007,23 @@ namespace OFWorld
         stopSounds();
     }
 
+    void WeatherManager::overrideWeather(ESM::RefId weatherID, bool hold)
+    {
+        if (weatherID.empty() || mWeatherStore->search(weatherID) == nullptr)
+            return;
+        forceWeather(weatherID);
+        mOverride = hold ? weatherID : ESM::RefId();
+        mOverrideReleased = false;
+    }
+
+    void WeatherManager::releaseWeatherOverride()
+    {
+        if (mOverride.empty())
+            return;
+        mOverride = ESM::RefId();
+        mOverrideReleased = true;
+    }
+
     void WeatherManager::changeWeather(ESM::RefId regionID, ESM::RefId weatherID)
     {
         // In Morrowind, this seems to have the following behavior, when applied to the current region:
@@ -1090,8 +1107,17 @@ namespace OFWorld
         {
             // Add new transitions when either the player's current external region changes.
             const bool hadRegion = !mCurrentRegion.empty();
-            if (updateWeatherTime() || updateWeatherRegion(player.getCell()->getCell()->getRegion()))
+            const bool regionChanged
+                = updateWeatherTime() || updateWeatherRegion(player.getCell()->getCell()->getRegion());
+            if (!mOverride.empty())
             {
+                // The weather a script holds stays whatever the region says; the transition of a region is not made
+                if (mCurrentWeather != mOverride || inTransition())
+                    forceWeather(mOverride);
+            }
+            else if (regionChanged || mOverrideReleased)
+            {
+                mOverrideReleased = false;
                 auto it = mRegions.find(mCurrentRegion);
                 if (it != mRegions.end())
                 {
@@ -1406,6 +1432,8 @@ namespace OFWorld
         stopSounds();
 
         mCurrentRegion = ESM::RefId();
+        mOverride = ESM::RefId();
+        mOverrideReleased = false;
         mTimePassed = 0.0f;
         mWeatherUpdateTime = 0.0f;
         forceWeather(ESM::Weather::indexToRefId(0));

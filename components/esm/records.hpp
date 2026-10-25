@@ -69,9 +69,10 @@
 #include <components/esm4/loadgmst.hpp>
 #include <components/esm4/loadhair.hpp>
 #include <components/esm4/loadhdpt.hpp>
+#include <components/esm4/loadidle.hpp>
+#include <components/esm4/loadimad.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadinfo.hpp>
-#include <components/esm4/loadimad.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadkeym.hpp>
 #include <components/esm4/loadland.hpp>
@@ -85,6 +86,7 @@
 #include <components/esm4/loadmgef.hpp>
 #include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadmstt.hpp>
+#include <components/esm4/loadmusc.hpp>
 #include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadotft.hpp>
