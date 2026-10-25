@@ -1242,6 +1242,11 @@ return {{
 # first of the table goes first, so the gaps are the same).
 AUTOPLAY_GATE = "quest = '{quest}', stage = {stage}, file = 'OFTest.esm'".format(
     quest=plugin.ARENA_QUEST_NAME, stage=plugin.ARENA_SETUP_STAGE)
+# The gates of the last stage: the player has the bobby pins (the stage that gives them), and autoplay.lua answers the screens
+# that the doors and terminals open: it picks the lock until it opens, walks through the menu of a terminal that is open, and
+# hacks the one that is closed
+AUTOPLAY_PINS_GATE = "quest = '{quest}', stage = {stage}, file = 'OFTest.esm'".format(
+    quest=plugin.ARENA_QUEST_NAME, stage=plugin.ARENA_PINS_STAGE)
 AUTOPLAY_GATES = f"""\
 return {{
     settle = 1,
@@ -1252,6 +1257,9 @@ return {{
         {{ {AUTOPLAY_GATE}, cell = {plugin.AUTOPLAY_ROOM_CELL_ID}, at = {{ {", ".join(map(str, plugin.AUTOPLAY_ROOM_AT))} }}, how = 'teleport', gap = 4 }},
         {{ {AUTOPLAY_GATE}, refs = {{ {", ".join(map(str, plugin.AUTOPLAY_SWITCH_REF_IDS))} }}, how = 'activate', gap = 4 }},
         {{ {AUTOPLAY_GATE}, cell = {plugin.ARENA_CELL_ID}, at = {{ 0.0, 0.0, 0.0 }}, how = 'teleport', gap = 4 }},
+        {{ {AUTOPLAY_PINS_GATE}, ref = {plugin.ARENA_PICK_DOOR_REF_ID}, how = 'activate' }},
+        {{ {AUTOPLAY_PINS_GATE}, ref = {plugin.ARENA_OPEN_TERMINAL_REF_ID}, how = 'activate', gap = 10 }},
+        {{ {AUTOPLAY_PINS_GATE}, ref = {plugin.ARENA_TERMINAL_REF_ID}, how = 'activate', gap = 12 }},
     }},
 }}
 """
@@ -1262,7 +1270,7 @@ AUTOPLAY_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
 
-local elapsed, nextReport, started = 0, 0, false
+local elapsed, nextReport, started, pinned = 0, 0, false, false
 local function report()
     local g, player = world.globals, world.players[1]
     print('OFTEST', 'autoplay', 'state', string.format('t=%.0f targetHits=%.0f dummyHits=%.0f deaths=%.0f switches=%.0f cell=%s',
@@ -1278,6 +1286,12 @@ return {
                 local quest = world.quests.find('@QUEST@')
                 print('OFTEST', 'autoplay', 'stage', tostring(quest ~= nil and quest:setStage(@SETUP@)))
             end
+            -- the five gates of the first stage are done by now: the player gets the pins and the gates of the screens come
+            if not pinned and elapsed >= @PINNED@ then
+                pinned = true
+                local quest = world.quests.find('@QUEST@')
+                print('OFTEST', 'autoplay', 'pins', tostring(quest ~= nil and quest:setStage(@PINS@)))
+            end
             if elapsed >= nextReport then
                 nextReport = nextReport + 2
                 report()
@@ -1290,8 +1304,33 @@ return {
     },
 }
 """
-AUTOPLAY_END = 30
+AUTOPLAY_END = 70
+AUTOPLAY_PINNED = 22
+# The player script of that test asks to wait once the screens of the terminals are done (autoplay.lua answers the question
+# of how long)
+AUTOPLAY_WAIT_AT = 40
+AUTOPLAY_PLAYER_SCRIPT = f"""\
+local core = require('openfallout.core')
+
+local asked, gameTime, waited = false, nil, false
+return {{
+    engineHandlers = {{
+        onFrame = function()
+            if not asked and core.getSimulationTime() >= {AUTOPLAY_WAIT_AT} then
+                asked = true
+                gameTime = core.getGameTime()
+                core.interact.requestWait()
+            end
+            if asked and not waited and gameTime ~= nil and core.interact.restProgress().ended > 0 then
+                waited = true
+                print('OFTEST', 'autoplay', 'waited', string.format('hours=%.2f', (core.getGameTime() - gameTime) / 3600))
+            end
+        end,
+    }},
+}}
+"""
 AUTOPLAY_SCRIPT = (AUTOPLAY_SCRIPT.replace("@QUEST@", plugin.ARENA_QUEST_NAME).replace("@SETUP@", str(plugin.ARENA_SETUP_STAGE))
+                   .replace("@PINS@", str(plugin.ARENA_PINS_STAGE)).replace("@PINNED@", str(AUTOPLAY_PINNED))
                    .replace("@END@", str(AUTOPLAY_END)).replace("@TARGET_HITS@", plugin.AUTOPLAY_GLOBALS["target_hits"][1])
                    .replace("@SWITCHES@", plugin.AUTOPLAY_GLOBALS["switches"][1])
                    .replace("@HITS@", plugin.ARENA_GLOBALS["hits"][1]).replace("@DEATHS@", plugin.ARENA_GLOBALS["deaths"][1]))
@@ -3906,7 +3945,8 @@ def check_autoplay(text):
     given (OnDeath once), the script of the switches hears three activations, and the player is in the arena again at the end."""
     problems = []
     for line in text.splitlines():
-        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|AUTOPLAY\tfire error", line, re.I):
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error|AUTOPLAY\tfire error|AUTOPLAY\tscreens error",
+                     line, re.I):
             problems.append(line)
     if re.search(r"OFTEST\tautoplay\tstage\ttrue$", text, re.M) is None:
         problems.append("the quest of the arena was not put at the stage that gives the rifle")
@@ -3914,9 +3954,12 @@ def check_autoplay(text):
     expected = [("fire", f"ref={plugin.AUTOPLAY_TARGET_REF_ID:06X}"), ("fire", f"ref={plugin.ARENA_DUMMY_REF_ID:06X}"),
                 ("teleport", f"cell={plugin.AUTOPLAY_ROOM_CELL_ID:06X}"),
                 ("activate", f"ref={plugin.AUTOPLAY_SWITCH_REF_IDS[0]:06X}"),
-                ("teleport", f"cell={plugin.ARENA_CELL_ID:06X}")]
+                ("teleport", f"cell={plugin.ARENA_CELL_ID:06X}"),
+                ("activate", f"ref={plugin.ARENA_PICK_DOOR_REF_ID:06X}"),
+                ("activate", f"ref={plugin.ARENA_OPEN_TERMINAL_REF_ID:06X}"),
+                ("activate", f"ref={plugin.ARENA_TERMINAL_REF_ID:06X}")]
     if [(how, target) for how, _, target, _, _ in gates] != expected:
-        problems.append(f"autoplay should run its five gates, in order: {gates}")
+        problems.append(f"autoplay should run its eight gates, in order: {gates}")
     for how, _, target, _, result in gates:
         if result != "ok":
             problems.append(f"the gate {how} {target} did not work: {result}")
@@ -3939,6 +3982,33 @@ def check_autoplay(text):
         problems.append(f"the dummy should have been hit and have died once (OnHit, OnDeath): {last}")
     if last[4] != 3:
         problems.append(f"the script of the switches should have heard three activations: {last}")
+    # The screens that the last three gates open are answered by autoplay.lua: the lock is picked until it opens, the open
+    # terminal is walked through and left, and the closed one is hacked and walked through too
+    if re.search(r"OFTEST\tautoplay\tpins\ttrue$", text, re.M) is None:
+        problems.append("the quest of the arena was not put at the stage that gives the bobby pins")
+    if len(re.findall(r"AUTOPLAY\tlock\t", text)) != 1:
+        problems.append("autoplay should have seen one lock screen")
+    picks = re.findall(r"AUTOPLAY\tlock pick\t(\w+)", text)
+    if not picks or picks[-1] != "opened" or any(result != "broke" for result in picks[:-1]):
+        problems.append(f"autoplay should have picked the lock until it opened: {picks}")
+    if re.search(r"AUTOPLAY\tlock close", text):
+        problems.append("autoplay should not have had to leave the lock screen")
+    if not re.search(r"AUTOPLAY\thack\t", text):
+        problems.append("autoplay should have guessed words of the closed terminal")
+    if re.search(r"AUTOPLAY\thack close", text):
+        problems.append("autoplay should have found the password of the closed terminal")
+    if len(re.findall(r"AUTOPLAY\tterminal line\t", text)) < 3:
+        problems.append("autoplay should have picked lines of the menus of both terminals")
+    if not re.search(r"AUTOPLAY\tterminal (back|close)\t", text):
+        problems.append("autoplay should have left a terminal")
+    if not re.search(r"AUTOPLAY\trest\tsleeping=false\tstarted", text):
+        problems.append("autoplay should have answered the question of how long to wait")
+    waited = re.search(r"OFTEST\tautoplay\twaited\thours=([\d.]+)", text)
+    if waited is None or not 0.9 <= float(waited.group(1)) <= 1.5:
+        problems.append(f"the player should have waited an hour: {waited.group(0) if waited else None}")
+    modes = re.findall(r"AUTOPLAY\tstatus\tmode=(\S+)", text)
+    if modes and modes[-1] != "nil":
+        problems.append(f"a screen should not be left open at the end: mode={modes[-1]}")
     cells = {state[5] for state in states}
     if len(cells) != 2:
         problems.append(f"the player should have been in two cells (the arena, the room, and the arena again): {sorted(cells)}")
@@ -5087,11 +5157,14 @@ def main():
             shutil.copy(AUTOPLAY / "scripts" / name, gate_data / "scripts" / name)
         (gate_data / "scripts" / "autoplaygates.lua").write_text(AUTOPLAY_GATES, encoding="ascii")
         (gate_data / "scripts" / "autoplaytest.lua").write_text(AUTOPLAY_SCRIPT, encoding="ascii")
+        (gate_data / "scripts" / "autoplaywait.lua").write_text(AUTOPLAY_PLAYER_SCRIPT, encoding="ascii")
         (gate_data / "autoplaytest.omwscripts").write_text(
-            "PLAYER: scripts/autoplay.lua\nGLOBAL: scripts/autoplayworld.lua\nGLOBAL: scripts/autoplaytest.lua\n", encoding="ascii")
+            "PLAYER: scripts/autoplay.lua\nPLAYER: scripts/autoplaywait.lua\nGLOBAL: scripts/autoplayworld.lua\n"
+            "GLOBAL: scripts/autoplaytest.lua\n", encoding="ascii")
         print("== autoplay: --start", plugin.ARENA_CELL_NAME)
-        status, _ = run_engine(program, build / "resources", gate_data, home, runtime, args.seconds, plugin.ARENA_CELL_NAME, [],
-                               "autoplaytest.omwscripts")
+        # The screens of the last gates take their time (the world stands still while they are open)
+        status, _ = run_engine(program, build / "resources", gate_data, home, runtime, max(args.seconds, 180),
+                               plugin.ARENA_CELL_NAME, [], "autoplaytest.omwscripts")
         log = home / ".config" / "openfallout" / "openfallout.log"
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
         print(f"log: {log}")

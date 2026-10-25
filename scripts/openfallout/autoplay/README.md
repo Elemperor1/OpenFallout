@@ -28,6 +28,15 @@ out of Vault 101 leaves with its last button). The table holds the references th
 something else (the characters finishing their packages, the timers of the intros) is left as it is, and the quest line shows where
 the run stopped.
 
+The tool also answers the screens that the quests after the intro come to. A lock screen (a door or container that is locked) is
+picked with bobby pins until it opens (`AUTOPLAY lock`, `lock pick` with the result of each pin; the screen is left when only a key
+opens the lock, the pins are gone or after forty tries: `lock close`). A terminal that is closed is hacked the way a player does
+it, guessing a word that agrees with every likeness so far (`hack`, `hack close` when no word fits); a menu is walked through, each
+line twice at most, then Back and then out (`terminal line`, `terminal back`, `terminal close`). The screen that asks how long to
+wait or sleep is answered with one hour (`rest`). The table of the gates can set `finish` (the quests and stages at which the run
+ends, in place of the end of the intro: `{ MQ01 = 50, VMQ01 = 50 }`) and `limit` (the real seconds after which it ends whatever
+happens). `AUTOPLAY intro done` is logged once when `CG04` or `VCG01` reaches stage 200, also when the run goes on.
+
 ```
 openfallout --skip-menu --new-game --content Fallout3.esm \
     --data scripts/openfallout/autoplay --content autoplay.omwscripts
