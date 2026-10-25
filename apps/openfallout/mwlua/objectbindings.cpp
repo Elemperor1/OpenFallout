@@ -18,6 +18,7 @@
 #include "../mwworld/worldmodel.hpp"
 
 #include "../mwrender/renderingmanager.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "../mwmechanics/creaturestats.hpp"
 
@@ -155,7 +156,12 @@ namespace OFLua
                 newPtr.getCellRef().setPosition(newPtr.getRefData().getPosition());
             }
             if (!newPtr.getRefData().isEnabled())
-                world->enable(newPtr);
+            {
+                // The OnLoad blocks that waited for the enabling run, and the objects that follow this one follow
+                OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+                if (scripts == nullptr || !scripts->setEnabled(newPtr, true))
+                    world->enable(newPtr);
+            }
             OFBase::Environment::get().getLuaManager()->objectTeleported(newPtr);
         }
 
@@ -378,6 +384,11 @@ namespace OFLua
                         return;
                     if (object.ptr().isInCell())
                     {
+                        // The objects that have this one for their enable parent follow it, as when a script of the
+                        // game does it
+                        OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+                        if (scripts != nullptr && scripts->setEnabled(object.ptr(), enable))
+                            return;
                         if (enable)
                             OFBase::Environment::get().getWorld()->enable(object.ptr());
                         else

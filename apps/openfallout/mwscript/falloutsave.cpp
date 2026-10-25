@@ -11,12 +11,16 @@
 #include <components/falloutscript/savescripts.hpp>
 #include <components/falloutscript/savestate.hpp>
 #include <components/falloutscript/saveworld.hpp>
+#include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/luamanager.hpp"
+#include "../mwbase/statemanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/globals.hpp"
 #include "../mwworld/manualref.hpp"
 #include "../mwworld/worldmodel.hpp"
 
@@ -825,6 +829,10 @@ namespace OFScript
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                     Access::readPackages(*this, in, version);
                 } });
+        sections.push_back({ "ai", FalloutScript::aiSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeAi(mAi, out); },
+            [this](
+                FalloutScript::SaveReader& in, std::uint32_t version) { FalloutScript::readAi(mAi, in, version); } });
         // The order is the order of reading: the values of the actors before the perks that added to them
         const auto section = [&sections](const char* name, std::uint32_t version,
                                  std::function<void(FalloutScript::SaveWriter&)> write,
@@ -947,6 +955,53 @@ namespace OFScript
                     Access::readReferences(*this, in, version);
                 } });
         return sections;
+    }
+
+    void FalloutScripts::requestSave(SaveRequest request)
+    {
+        // The switches of the games, which a request obeys when it is made
+        const bool allowed = request == SaveRequest::ForceSave ? Settings::saves().mAllowScriptedForceSave.get()
+                                                               : Settings::saves().mAllowScriptedAutosave.get();
+        if (allowed)
+            mSaveRequests.fetch_or(1u << static_cast<unsigned>(request));
+    }
+
+    void FalloutScripts::runSaveRequests()
+    {
+        const unsigned requested = mSaveRequests.load();
+        if (requested == 0)
+            return;
+        const OFBase::Environment& environment = OFBase::Environment::get();
+        OFBase::StateManager* states = environment.getStateManager();
+        OFBase::WindowManager* windows = environment.getWindowManager();
+        // The request waits while a menu is open, a character is being made, or no game runs
+        if (states == nullptr || windows == nullptr || states->getState() != OFBase::StateManager::State_Running
+            || environment.getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) != -1
+            || !windows->isSavingAllowed())
+            return;
+        // One in a frame, in the order of the games
+        for (const SaveRequest request : { SaveRequest::Autosave, SaveRequest::ForceSave, SaveRequest::SystemSave })
+        {
+            const unsigned bit = 1u << static_cast<unsigned>(request);
+            if ((requested & bit) == 0)
+                continue;
+            mSaveRequests.fetch_and(~bit);
+            switch (request)
+            {
+                case SaveRequest::Autosave:
+                    states->quickSave("Autosave");
+                    break;
+                case SaveRequest::ForceSave:
+                    // The slot of an earlier one is used again, as for the other two: a game that asks for it often
+                    // must not fill the disk
+                    states->quickSave("Forced save");
+                    break;
+                case SaveRequest::SystemSave:
+                    states->quickSave("System save");
+                    break;
+            }
+            return;
+        }
     }
 
     FalloutScripts::SavedPlayer FalloutScripts::savedPlayer()

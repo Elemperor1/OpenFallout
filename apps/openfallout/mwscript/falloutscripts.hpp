@@ -24,6 +24,7 @@
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/animationcommands.hpp>
 #include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/chargen.hpp>
@@ -794,6 +795,26 @@ namespace OFScript
         /// The AI packages that scripts gave the character, the last given first (those that no content file has a
         /// record of are left out)
         std::vector<const ESM4::AIPackage*> scriptPackages(const OFWorld::Ptr& actor) const;
+        /// Enables or disables a reference of a cell that is loaded as the commands of scripts do: the objects that
+        /// have it for their enable parent follow it. Must be called on the main thread. False for one that has no
+        /// number a script can use (the player, an object that is in no cell), which the caller enables or disables
+        /// itself.
+        bool setEnabled(const OFWorld::Ptr& ptr, bool enabled);
+        /// What the AI of the character keeps that a saved game holds (the packages it has done, the one it follows,
+        /// the order to follow somebody), kept while its cell is unloaded and written to the saved game. A character
+        /// that has no number a script can use is not kept.
+        void rememberAi(const OFWorld::Ptr& actor, FalloutScript::AiState state);
+        std::optional<FalloutScript::AiState> savedAi(const OFWorld::Ptr& actor) const;
+
+        /// The games' commands that save the game ask for it, and the save is made in the first frame in which the
+        /// interface allows one: one request of each kind is kept, and one is carried out in each frame
+        enum class SaveRequest : std::uint8_t
+        {
+            Autosave,
+            ForceSave,
+            SystemSave,
+        };
+        void requestSave(SaveRequest request);
         /// Whether the conditions of the package hold for the character. A package that has none holds.
         bool packageConditionsHold(const ESM4::AIPackage& package, const OFWorld::Ptr& actor);
 
@@ -1461,6 +1482,10 @@ namespace OFScript
         /// whose scripts run OnLoad
         std::vector<std::pair<FalloutScript::FormId, bool>> mPendingToggle;
         std::vector<FalloutScript::FormId> mPendingLoad;
+        /// The objects that are loaded and disabled: their OnLoad blocks wait until they are enabled (their GameMode
+        /// blocks do not wait), and those enabled since, whose OnLoad blocks run at the start of the next frame
+        std::set<FalloutScript::FormId> mLoadWhenEnabled;
+        std::vector<FalloutScript::FormId> mPendingEnabledLoad;
         /// Where scripts put objects: those that are waiting for the start of the next frame (the world is not changed
         /// in the middle of a script), and those whose cell was not loaded at the time, which hold until it is
         std::map<FalloutScript::FormId, Move> mPendingMoves;
@@ -1485,6 +1510,9 @@ namespace OFScript
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
+        FalloutScript::AiMemory mAi;
+        /// The kinds of save that scripts asked for and that were not made yet, one bit for each
+        std::atomic<unsigned> mSaveRequests{ 0 };
         /// The state of a loaded game that is put back when the cells and the frame it needs come
         std::unique_ptr<PendingSave> mPendingSave;
         /// The furniture that an actor uses, and where the actor was put on it: it stops using it when it is more than
@@ -1581,6 +1609,8 @@ namespace OFScript
         static constexpr double sRestHoursPerSecond = 4.0;
         /// Moves the game of hacking, waiting and sleeping on; every frame, even while a screen stops the world
         void updateInteraction(float frametime);
+        /// Makes the save that a script asked for, when the interface allows one
+        void runSaveRequests();
         void updateRest(float frametime);
         /// Whether the furniture is a bed that the actor would lie on
         bool isBedFor(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);

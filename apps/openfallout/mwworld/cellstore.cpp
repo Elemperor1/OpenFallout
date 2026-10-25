@@ -349,6 +349,20 @@ namespace OFWorld
     namespace
     {
         template <class T>
+        bool isEnabled(const T& ref, const ESMStore& store);
+
+        /// Whether a reference that follows `parent` is enabled with it
+        template <class P>
+        bool followsParent(const P& parent, bool inversed, const ESMStore& store)
+        {
+            const bool parentDisabled = parent.mFlags & ESM4::Rec_Disabled;
+            if (parentDisabled != inversed)
+                return false;
+
+            return isEnabled(parent, store);
+        }
+
+        template <class T>
         bool isEnabled(const T& ref, const ESMStore& store)
         {
             if (ref.mEsp.parent.isZeroOrUnset())
@@ -360,15 +374,15 @@ namespace OFWorld
             //  - every time when the parent is enabled/disabled we should also enable/disable
             //        all objects that are linked to it.
             // But for now we assume that the parent remains in its initial state.
+            // The parent is a reference of any kind: a character or a creature can be one as well as an object
+            const bool inversed = ref.mEsp.flags & ESM4::EnableParent::Flag_Inversed;
             if (const ESM4::Reference* parentRef = store.get<ESM4::Reference>().searchStatic(ref.mEsp.parent))
-            {
-                const bool parentDisabled = parentRef->mFlags & ESM4::Rec_Disabled;
-                const bool inversed = ref.mEsp.flags & ESM4::EnableParent::Flag_Inversed;
-                if (parentDisabled != inversed)
-                    return false;
-
-                return isEnabled(*parentRef, store);
-            }
+                return followsParent(*parentRef, inversed, store);
+            if (const ESM4::ActorCharacter* parentChar
+                = store.get<ESM4::ActorCharacter>().searchStatic(ref.mEsp.parent))
+                return followsParent(*parentChar, inversed, store);
+            if (const ESM4::ActorCreature* parentCrea = store.get<ESM4::ActorCreature>().searchStatic(ref.mEsp.parent))
+                return followsParent(*parentCrea, inversed, store);
 
             return true;
         }

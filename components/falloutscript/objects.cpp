@@ -89,7 +89,7 @@ namespace FalloutScript
         return found != mObjects.end() && hasBlockOfType(found->second.mInstance->script(), blockType, filter);
     }
 
-    void ObjectScripts::setLoaded(FormId reference, bool loaded)
+    void ObjectScripts::setLoaded(FormId reference, bool loaded, bool runOnLoad)
     {
         const auto found = mObjects.find(reference);
         if (found == mObjects.end() || found->second.mLoaded == loaded)
@@ -108,7 +108,8 @@ namespace FalloutScript
             mUpdating.insert(reference);
         if (object.mHasMenuMode)
             mMenuUpdating.insert(reference);
-        trigger(reference, BlockType::OnLoad);
+        if (runOnLoad)
+            trigger(reference, BlockType::OnLoad);
     }
 
     bool ObjectScripts::loaded(FormId reference) const

@@ -443,6 +443,24 @@ namespace
         EXPECT_TRUE(setup.mObjects.loaded(crate));
     }
 
+    TEST(FalloutScriptObjectsTest, a_reference_loaded_without_on_load_runs_game_mode_and_on_load_waits_for_the_caller)
+    {
+        Runner setup;
+        setup.addCountingScript();
+        setup.mObjects.add(crate, scriptOfCrates);
+
+        setup.mObjects.setLoaded(crate, true, false);
+        setup.mObjects.update();
+        EXPECT_TRUE(setup.mObjects.loaded(crate));
+        EXPECT_EQ(setup.variable(crate, 1), 1);
+        EXPECT_EQ(setup.variable(crate, 2), 0);
+
+        EXPECT_TRUE(setup.mObjects.trigger(crate, BlockType::OnLoad));
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+        setup.mObjects.setLoaded(crate, true); // already loaded: nothing runs again
+        EXPECT_EQ(setup.variable(crate, 2), 1);
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_keeps_its_variables_when_it_is_unloaded)
     {
         Runner setup;
