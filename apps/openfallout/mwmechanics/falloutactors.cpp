@@ -1223,12 +1223,14 @@ namespace OFMechanics
         }
 
         /// A character has got to the place of its Travel, Find, Use Item At or Escort package: the package is done,
-        /// once
+        /// once. One that was done already (its cell was unloaded and loaded again, so it stands where it sat) takes
+        /// the furniture again, and nobody is told.
         void finishTravel(const Frame& frame, FalloutActors::Mind& mind)
         {
             const ESM4::AIPackage* package = mind.mPackage;
-            if (package == nullptr || mind.mDone.count(package) != 0)
+            if (package == nullptr)
                 return;
+            const bool done = mind.mDone.count(package) != 0;
             const bool uses = mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use;
             // Eating and sleeping are done on furniture: they are never done as such, the character stays on it
             const bool beds = package->mData.type == ESM4::Package_Eat || package->mData.type == ESM4::Package_Sleep;
@@ -1264,7 +1266,7 @@ namespace OFMechanics
                     return;
                 }
             }
-            if (beds)
+            if (beds || done)
                 return;
             mind.mDone.insert(package);
             keepState(mind);
