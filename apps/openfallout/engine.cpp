@@ -539,11 +539,6 @@ void OF::Engine::createWindow()
 
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, Settings::video().mMinimizeOnFocusLoss ? "1" : "0");
 
-    // A run that must stay behind the other applications (the background runs on the Mac set SDL_MAC_BACKGROUND_APP):
-    // the window is shown without being activated, and SDLUtil::GraphicsWindowSDL2::raiseWindow does nothing
-    if (SDL_GetHintBoolean(SDL_HINT_MAC_BACKGROUND_APP, SDL_FALSE))
-        SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
-
     checkSDLError(SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8));
     checkSDLError(SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8));
     checkSDLError(SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8));

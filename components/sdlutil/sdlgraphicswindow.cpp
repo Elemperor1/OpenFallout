@@ -1,6 +1,5 @@
 #include "sdlgraphicswindow.hpp"
 
-#include <SDL_hints.h>
 #include <SDL_video.h>
 
 #ifdef OPENFALLOUT_GL4ES_MANUAL_INIT
@@ -294,9 +293,6 @@ namespace SDLUtil
 
     void GraphicsWindowSDL2::raiseWindow()
     {
-        // A background run (SDL_MAC_BACKGROUND_APP) does not take the front
-        if (SDL_GetHintBoolean(SDL_HINT_MAC_BACKGROUND_APP, SDL_FALSE))
-            return;
         SDL_RaiseWindow(mWindow);
     }
 
