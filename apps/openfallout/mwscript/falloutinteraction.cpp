@@ -45,6 +45,20 @@ namespace OFScript
         return text.empty() ? std::string(fallback) : text;
     }
 
+    std::string FalloutScripts::refusalWord(const std::string& setting)
+    {
+        std::string text = gameSettingText(setting);
+        // The files spell the setting for hostile characters without the e (sNoWaitHostilActorsNear)
+        const std::size_t hostile = setting.find("HostileActors");
+        if (text.empty() && hostile != std::string::npos)
+        {
+            std::string name = setting;
+            name.erase(hostile + 6, 1);
+            text = gameSettingText(name);
+        }
+        return text;
+    }
+
     std::string FalloutScripts::terminalFormat(const std::string& text)
     {
         return FalloutScript::formatMessage(text, {}, [this](std::string_view name) { return messageToken(name); });
@@ -429,14 +443,8 @@ namespace OFScript
         const std::optional<std::string> refusal = Interaction::restRefusal(conditions);
         if (!refusal)
             return std::string();
-        std::string text = gameSettingText(*refusal);
-        // The executable spells the setting for hostile characters without the e
-        if (text.empty() && refusal->find("HostileActors") != std::string::npos)
-        {
-            std::string name = *refusal;
-            name.erase(name.find("HostileActors") + 6, 1);
-            text = gameSettingText(name);
-        }
+        const std::string text = refusalWord(*refusal);
+        log("Rest refused: " + *refusal + (text.empty() ? " (the files have no text for it)" : ""));
         return text.empty() ? std::string(sleeping ? "You cannot sleep now." : "You cannot wait now.") : text;
     }
 
@@ -611,7 +619,10 @@ namespace OFScript
         }
         if (const std::optional<std::string> refusal = Interaction::travelRefusal(conditions))
         {
-            std::string text = wordOf(*refusal, "You cannot travel now.");
+            std::string text = refusalWord(*refusal);
+            log("Travel refused: " + *refusal + (text.empty() ? " (the files have no text for it)" : ""));
+            if (text.empty())
+                text = "You cannot travel now.";
             tellPlayer(text);
             return text;
         }

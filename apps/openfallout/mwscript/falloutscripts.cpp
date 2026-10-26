@@ -475,6 +475,7 @@ namespace OFScript
         mPendingEnabledLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        mSneakingLogged = false;
         {
             const std::lock_guard lock(mScalesMutex);
             mScales.clear();

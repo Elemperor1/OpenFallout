@@ -178,7 +178,9 @@ return {
             how = 'teleport', tries = 1 },
         { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', cell = 0x1716CA, at = { 2060.0, -351.0, 11393.0 },
             how = 'teleport', tries = 1, gap = 60 },
-        { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', ref = 0x10C0BF, how = 'activate', gap = 10 },
+        -- Jessup stands in the cell of the second teleport, so he is not there to be talked to before it (Mac round 10K: both
+        -- tries came ten seconds after the first teleport and found no such object); the gap puts this row after it
+        { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', ref = 0x10C0BF, how = 'activate', gap = 80 },
         { quest = 'VMQ01', stage = 50, how = 'setstage', to = 100, settle = 400 }, -- the trigger and the talk, if neither does it
     },
 }

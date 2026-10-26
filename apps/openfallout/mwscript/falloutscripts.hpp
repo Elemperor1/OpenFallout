@@ -1632,6 +1632,9 @@ namespace OFScript
         bool inOpenWorld(FalloutScript::FormId reference);
         /// The text of a game setting, the fallback when the files have none
         std::string wordOf(std::string_view setting, std::string_view fallback);
+        /// The text of the setting that names why the player can not wait, sleep or travel (with the spelling of the
+        /// files for hostile characters tried as well), empty when the files have none
+        std::string refusalWord(const std::string& setting);
         /// Why the player can not wait or sleep now, empty when it can
         std::string restRefusalText(bool sleeping, FalloutScript::FormId bed);
         /// The text of a terminal with the tokens of it filled in
@@ -1680,6 +1683,8 @@ namespace OFScript
         FalloutScript::Hud::MessageLine mHudMessages;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
+        /// Whether the log last said that the player sneaks (it says when that changes)
+        bool mSneakingLogged = false;
         /// Every map marker the content files place: the reference, where it is and its name. Read once.
         struct PlacedMarker
         {

@@ -86,6 +86,11 @@ namespace OFScript
         status.mRadsMax = gameSetting("fRadiationMax", 1000);
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         status.mSneaking = !player.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(player);
+        if (status.mSneaking != mSneakingLogged)
+        {
+            mSneakingLogged = status.mSneaking;
+            log(status.mSneaking ? "Player sneaks" : "Player stops sneaking");
+        }
         status.mSneak = mWatchers.status(mHudTime);
         const char* setting = "sSneakHidden";
         switch (status.mSneak)
