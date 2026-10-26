@@ -39,7 +39,10 @@ picked with bobby pins until it opens (`AUTOPLAY lock`, `lock pick` with the res
 opens the lock, the pins are gone or after forty tries: `lock close`). A terminal that is closed is hacked the way a player does
 it, guessing a word that agrees with every likeness so far (`hack`, `hack close` when no word fits); a menu is walked through, each
 line twice at most, then Back and then out (`terminal line`, `terminal back`, `terminal close`). The screen that asks how long to
-wait or sleep is answered with one hour (`rest`). The table of the gates can set `finish` (the quests and stages at which the run
+wait or sleep is answered with one hour (`rest`). The screen of a level up, which stops the world until it is left, gets the skill
+points of the level spent on the skills in the order of the list, as many as each can take, and the first perk the player qualifies
+for, if the level gives one (`level`: the level of the player, the points, how many were spent, the perk; `level stuck` when nothing could be given
+and the screen is left alone). The table of the gates can set `finish` (the quests and stages at which the run
 ends, in place of the end of the intro: the shipped table has `{ MQ01 = 50, VMQ01 = 100 }`, so a run plays the intro and the first
 stages of the main quest) and `limit` (the real seconds after which it ends whatever happens; 5400 in the shipped table).
 `AUTOPLAY intro done` is logged once when `CG04` or `VCG01` reaches stage 200, also when the run goes on.

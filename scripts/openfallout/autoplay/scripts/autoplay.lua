@@ -2,7 +2,7 @@
 -- screens of character creation, picks the topics of a conversation (the one it has picked least often with the
 -- character, the first of them) and ends it when it has picked them all twice, shoots at what the world script tells it to
 -- (the weapon is the player's), picks locks, hacks and walks through terminals, waits when a bed or the Wait key asks how
--- long, and logs each of these in lines that
+-- long, spends the points of a level up, and logs each of these in lines that
 -- start with AUTOPLAY (counts and numbers, no text of the game). It is a developer tool, not part of the game: it is loaded with
 --     openfallout --data scripts/openfallout/autoplay --content autoplay.omwscripts ...
 -- The scripts of the data folder are of the player (this file) and of the world (autoplayworld.lua, which follows the quests).
@@ -261,7 +261,48 @@ local function answerRest(dt)
     if refused then core.interact.cancelRest() end
 end
 
--- The three screens above need the content of Fallout 3 or New Vegas; an error in one of them is logged once and they are left
+-- The screen of a level up (falloutpipboy.lua opens it, and the world stops until it is left): the points of the level go to the
+-- skills in the order of the list, as many as each can take, a perk is picked if one is offered (the first the player qualifies
+-- for), and the screen is left; the Pip-Boy script then hands out the next level, if the experience reached one. A level whose
+-- points nothing can take (every skill at 100, no perk) is logged once and the screen is left alone.
+local levelWaited, levelStuck = 0, false
+local function answerLevelUp(dt)
+    local pipboy = core.pipboy
+    if levelStuck or not pipboy.available() or I.UI.getMode() ~= 'Interface' then
+        levelWaited = 0
+        return
+    end
+    local stats = pipboy.stats()
+    local offered = stats.perkPoints > 0 and pipboy.offeredPerks() or {}
+    if stats.skillPoints <= 0 and #offered == 0 then
+        levelWaited = 0
+        return
+    end
+    levelWaited = levelWaited + dt
+    if levelWaited < DELAY then return end
+    levelWaited = 0
+    local left, perk = stats.skillPoints, nil
+    for _, skill in ipairs(pipboy.skills()) do
+        if left <= 0 then break end
+        left = left - pipboy.spendSkillPoints(skill.number, left)
+    end
+    for _, offer in ipairs(offered) do
+        if offer.available ~= false and pipboy.choosePerk(offer.id) then
+            perk = offer.id
+            break
+        end
+    end
+    log('level', string.format('playerLevel=%d skillPoints=%d spent=%d perk=%s', stats.level, stats.skillPoints,
+        stats.skillPoints - left, tostring(perk)))
+    if left == stats.skillPoints and not perk then
+        levelStuck = true
+        log('level stuck')
+        return
+    end
+    I.UI.removeMode('Interface')
+end
+
+-- The screens above need the content of Fallout 3 or New Vegas; an error in one of them is logged once and they are left
 local screensBroken = false
 local function answerScreens(dt)
     if screensBroken then return end
@@ -269,6 +310,7 @@ local function answerScreens(dt)
         answerLock(dt)
         answerTerminal(dt)
         answerRest(dt)
+        answerLevelUp(dt)
     end)
     if not ok then
         screensBroken = true

@@ -1270,7 +1270,7 @@ AUTOPLAY_SCRIPT = """\
 local world = require('openfallout.world')
 local core = require('openfallout.core')
 
-local elapsed, nextReport, started, pinned = 0, 0, false, false
+local elapsed, nextReport, started, pinned, leveled = 0, 0, false, false, false
 local function report()
     local g, player = world.globals, world.players[1]
     print('OFTEST', 'autoplay', 'state', string.format('t=%.0f targetHits=%.0f dummyHits=%.0f deaths=%.0f switches=%.0f cell=%s',
@@ -1292,6 +1292,13 @@ return {
                 local quest = world.quests.find('@QUEST@')
                 print('OFTEST', 'autoplay', 'pins', tostring(quest ~= nil and quest:setStage(@PINS@)))
             end
+            -- the experience of two levels comes once the screens of the terminals are done: the screen of each level
+            -- stops the game until autoplay.lua has spent its points
+            if not leveled and elapsed >= @LEVELED@ then
+                leveled = true
+                local quest = world.quests.find('@QUEST@')
+                print('OFTEST', 'autoplay', 'experience', tostring(quest ~= nil and quest:setStage(@LEVEL@)))
+            end
             if elapsed >= nextReport then
                 nextReport = nextReport + 2
                 report()
@@ -1304,8 +1311,9 @@ return {
     },
 }
 """
-AUTOPLAY_END = 70
+AUTOPLAY_END = 80
 AUTOPLAY_PINNED = 22
+AUTOPLAY_LEVELED = 60
 # The player script of that test asks to wait once the screens of both terminals have been left (autoplay.lua answers the
 # question of how long)
 AUTOPLAY_WAIT_AT = 40
@@ -1335,6 +1343,7 @@ return {{
 """
 AUTOPLAY_SCRIPT = (AUTOPLAY_SCRIPT.replace("@QUEST@", plugin.ARENA_QUEST_NAME).replace("@SETUP@", str(plugin.ARENA_SETUP_STAGE))
                    .replace("@PINS@", str(plugin.ARENA_PINS_STAGE)).replace("@PINNED@", str(AUTOPLAY_PINNED))
+                   .replace("@LEVELED@", str(AUTOPLAY_LEVELED)).replace("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE))
                    .replace("@END@", str(AUTOPLAY_END)).replace("@TARGET_HITS@", plugin.AUTOPLAY_GLOBALS["target_hits"][1])
                    .replace("@SWITCHES@", plugin.AUTOPLAY_GLOBALS["switches"][1])
                    .replace("@HITS@", plugin.ARENA_GLOBALS["hits"][1]).replace("@DEATHS@", plugin.ARENA_GLOBALS["deaths"][1]))
@@ -4010,6 +4019,14 @@ def check_autoplay(text):
     waited = re.search(r"OFTEST\tautoplay\twaited\thours=([\d.]+)", text)
     if waited is None or not 0.9 <= float(waited.group(1)) <= 1.5:
         problems.append(f"the player should have waited an hour: {waited.group(0) if waited else None}")
+    # The experience of two levels opens the screen of each, which autoplay.lua answers by spending the points of the level
+    if re.search(r"OFTEST\tautoplay\texperience\ttrue$", text, re.M) is None:
+        problems.append("the quest of the arena was not put at the stage that rewards the experience")
+    levels = re.findall(r"AUTOPLAY\tlevel\tplayerLevel=(\d+) skillPoints=(\d+) spent=(\d+) perk=(\S+)", text)
+    if len(levels) != 2 or any(int(points) < 1 or points != spent for _, points, spent, _ in levels):
+        problems.append(f"autoplay should have spent all the points of the two levels, one screen each: {levels}")
+    if re.search(r"AUTOPLAY\tlevel stuck", text):
+        problems.append("autoplay should not have been stuck at a level up")
     modes = re.findall(r"AUTOPLAY\tstatus\tmode=(\S+)", text)
     if modes and modes[-1] != "nil":
         problems.append(f"a screen should not be left open at the end: mode={modes[-1]}")
