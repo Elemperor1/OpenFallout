@@ -5,8 +5,9 @@
 -- `refs`), 'fire' makes the player shoot at it with the weapon in hand (`shots` times, or, with `untilDead`, until it is
 -- dead; autoplay.lua does the shooting), 'teleport' takes the player to the cell `cell` of the plugin at the place `at` (for
 -- a room the data has no door to), 'setstage' puts the quest at the stage `to` (a stand-in for what the engine cannot bring
--- about yet). A gate is tried `tries` times at most (its own `tries` if it has one: activating a piece of furniture a second
--- time gets the player up from it). A gate can have its own `settle` (the quest has to stand still that long first) and its own
+-- about yet; since the Mac rounds 10K and 10L the table has one, CG03 stage 55). A gate is tried `tries` times at most (its
+-- own `tries` if it has one: activating a piece of furniture a second time gets the player up from it). A gate can have its
+-- own `settle` (the quest has to stand still that long first) and its own
 -- `gap` (the real seconds since the gate before it): the stand-ins that come after the gate that is meant to bring the stage
 -- about are given a minute, so that what the engine does by itself is not covered up. The log says which gates were used
 -- ("AUTOPLAY gate setstage ..."): each stand-in that is used is something the engine lacks.
@@ -69,12 +70,10 @@ return {
         { quest = 'CG02', stage = 20, file = 'Fallout3.esm', ref = 0x0300F2, how = 'activate' },
         { quest = 'CG02', stage = 21, file = 'Fallout3.esm', ref = 0x031649, how = 'activate' },
         { quest = 'CG02', stage = 35, file = 'Fallout3.esm', ref = 0x031D48, how = 'activate', tries = 1 },
-        { quest = 'CG02', stage = 35, how = 'setstage', to = 38, settle = 60 }, -- the intercom, if its talk does not do it
         { quest = 'CG02', stage = 38, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 40, file = 'Fallout3.esm', ref = 0x0300E8, how = 'activate' },
         { quest = 'CG02', stage = 42, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 44, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
-        { quest = 'CG02', stage = 44, how = 'setstage', to = 50, settle = 60 }, -- the Dad's walk to the range, if he does not
         { quest = 'CG02', stage = 50, file = 'Fallout3.esm', ref = 0x0304EB, how = 'fire', shots = 3, tries = 1 },
         { quest = 'CG02', stage = 55, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 60, file = 'Fallout3.esm', ref = 0x0306CD, how = 'fire', shots = 20, untilDead = true,
@@ -82,26 +81,24 @@ return {
         { quest = 'CG02', stage = 70, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
         { quest = 'CG02', stage = 80, file = 'Fallout3.esm', ref = 0x060C81, how = 'walk' },
         -- The classroom (CG03): the Dad, the trigger by the door, Amata, Mr. Brotch (who offers the test, which needs the player
-        -- to sit at a desk: the stand-in at 42 takes the way of the player who skips it), the triggers by the desks and the door
+        -- to sit at a desk), the triggers by the desks and the door
         { quest = 'CG03', stage = 6, file = 'Fallout3.esm', ref = 0x01CE3A, how = 'activate' },
         { quest = 'CG03', stage = 10, file = 'Fallout3.esm', ref = 0x057AEB, how = 'walk' },
         { quest = 'CG03', stage = 15, file = 'Fallout3.esm', ref = 0x01CE25, how = 'activate' },
-        { quest = 'CG03', stage = 20, how = 'setstage', to = 25, settle = 60 }, -- the talk of Amata and Butch, if it stops
         { quest = 'CG03', stage = 25, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate' },
-        { quest = 'CG03', stage = 42, how = 'setstage', to = 45 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         { quest = 'CG03', stage = 55, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         -- The script of the classroom trigger waits for the seven classmates to be sitting, which their packages of the type Find
-        -- bring about (the engine does not follow those yet)
+        -- bring about. The one stand-in that is left: the packages run (M10 slice 5) but the stage does not come by itself; the
+        -- Mac rounds 10I, 10K and 10L used it once in each run of Fallout 3 and Tale of Two Wastelands (at about 800 s)
         { quest = 'CG03', stage = 55, how = 'setstage', to = 60, settle = 60 },
         { quest = 'CG03', stage = 70, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate', settle = 90 }, -- Mr. Brotch again
         { quest = 'CG03', stage = 80, file = 'Fallout3.esm', ref = 0x02B797, how = 'walk' },
-        -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight: the stand-in), Butch, the trigger in
+        -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight), Butch, the trigger in
         -- the atrium, the Overseer, Amata, the trigger by the reactor, the three switches, the control pod, Amata, and the door
         -- out, whose box needs its last button (boxes above)
         { quest = 'CG04', stage = 3, file = 'Fallout3.esm', ref = 0x0230E4, how = 'activate' },
         { quest = 'CG04', stage = 10, file = 'Fallout3.esm', ref = 0x02A325, how = 'walk' },
-        { quest = 'CG04', stage = 12, how = 'setstage', to = 15 },
         { quest = 'CG04', stage = 15, file = 'Fallout3.esm', ref = 0x02A325, how = 'walk' },
         { quest = 'CG04', stage = 18, file = 'Fallout3.esm', ref = 0x0230E3, how = 'activate' },
         { quest = 'CG04', stage = 20, file = 'Fallout3.esm', ref = 0x0230E3, how = 'activate' },
@@ -144,7 +141,8 @@ return {
         -- to the player, and the talk ends the intro (stage 200). If it stops here, activating Doc starts the same talk:
         -- { quest = 'VCG01', stage = 115, file = 'FalloutNV.esm', ref = 0x104C0F, how = 'activate', tries = 1 },
         --
-        -- After the intro (M10 slice 7; Mac round 10G and 10H, static): the first stages of the quest that follows.
+        -- After the intro (M10 slice 7; Mac round 10G and 10H, static): the first stages of the quest that follows. Rounds 10K
+        -- and 10L ran them: no stage needs a stand-in (MQ01 stage 50 at about 1,700 s, VMQ01 stage 100 at about 460 s).
         -- Fallout 3 and Tale of Two Wastelands, MQ01 (the same references; the player stands in the Wasteland at the vault door,
         -- three cells from Megaton, and none of these places has a door to walk to from there). Stage 10 goes to 20 when a
         -- resident of Megaton is asked about the father (the topic is in the list of Confessor Cromwell, in a house that is a
@@ -154,26 +152,22 @@ return {
         { quest = 'MQ01', stage = 10, file = 'Fallout3.esm', cell = 0x003A2D, at = { 1500.0, -121.0, -256.0 },
             how = 'teleport', tries = 1 },
         { quest = 'MQ01', stage = 10, file = 'Fallout3.esm', ref = 0x003B48, how = 'activate', gap = 10 },
-        { quest = 'MQ01', stage = 10, how = 'setstage', to = 20, settle = 300 }, -- the topic, if it is not picked
         { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', cell = 0x003A35, at = { 1850.0, -304.0, -46.0 }, how = 'teleport',
             tries = 1 },
         { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', ref = 0x003F91, how = 'activate', tries = 1, gap = 10 },
         { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', cell = 0x003A35, at = { 1230.0, 118.0, -128.0 }, how = 'teleport',
             tries = 1, gap = 150 },
         { quest = 'MQ01', stage = 20, file = 'Fallout3.esm', ref = 0x003B3C, how = 'activate', gap = 10 },
-        { quest = 'MQ01', stage = 20, how = 'setstage', to = 40, settle = 400 }, -- the terminal and the talk, if neither does it
         { quest = 'MQ01', stage = 40, file = 'Fallout3.esm', cell = 0x01C646, at = { 54689.0, -17655.0, 11653.0 },
             how = 'teleport', tries = 1 },
         { quest = 'MQ01', stage = 40, file = 'Fallout3.esm', cell = 0x01C646, at = { 56699.0, -19093.0, 11739.0 },
             how = 'teleport', tries = 1, gap = 60 },
-        { quest = 'MQ01', stage = 40, how = 'setstage', to = 50, settle = 300 }, -- the ambush, if neither box brings it about
         -- New Vegas, VMQ01 (the player stands in Goodsprings): Novac is far, but the terminal there (an interior; unlocked,
         -- one line that sets 50) can be reached by the cell; 50 goes to 100 in the box of the trigger in the restaurant of
         -- the Tops (it completes the quest whatever its stage), or in the talk with Jessup in Boulder City
         { quest = 'VMQ01', stage = 10, file = 'FalloutNV.esm', cell = 0x0CAE84, at = { 2700.0, 1167.0, 9023.0 },
             how = 'teleport', tries = 1 },
         { quest = 'VMQ01', stage = 10, file = 'FalloutNV.esm', ref = 0x0CCFD4, how = 'activate', gap = 10 },
-        { quest = 'VMQ01', stage = 10, how = 'setstage', to = 50, settle = 300 }, -- the terminal, if it does not do it
         { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', cell = 0x165E81, at = { 2630.0, 2675.0, 10052.0 },
             how = 'teleport', tries = 1 },
         { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', cell = 0x1716CA, at = { 2060.0, -351.0, 11393.0 },
@@ -181,6 +175,5 @@ return {
         -- Jessup stands in the cell of the second teleport, so he is not there to be talked to before it (Mac round 10K: both
         -- tries came ten seconds after the first teleport and found no such object); the gap puts this row after it
         { quest = 'VMQ01', stage = 50, file = 'FalloutNV.esm', ref = 0x10C0BF, how = 'activate', gap = 80 },
-        { quest = 'VMQ01', stage = 50, how = 'setstage', to = 100, settle = 400 }, -- the trigger and the talk, if neither does it
     },
 }

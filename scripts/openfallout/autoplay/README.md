@@ -24,12 +24,15 @@ real seconds since the gate before it): of the gates that are ready, the first o
 The gates after the intros bring the main quest on: at `MQ01` stage 10 the player goes to the house of Cromwell in Megaton and
 talks to him, at 20 to the terminal and then Moriarty in his saloon (`teleport` to the cell, then `activate`), at 40 to the trigger
 volumes of Chevy Chase; at `VMQ01` stage 10 to the terminal of Novac, at 50 to the Tops
-restaurant and the Khan hideout of Boulder City. Each of these stages also has a `setstage` row with a long `settle`, which is
-only reached when the rows before it did not bring the quest on.
+restaurant and the Khan hideout of Boulder City. None of these stages has a `setstage` row any more: Mac rounds 10K and 10L
+played them on the real data without one (`MQ01` stage 50 at about 1,700 s in Fallout 3 and Tale of Two Wastelands, `VMQ01`
+stage 100 at about 460 s in New Vegas).
 
 A gate can also put the quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, and for what a gate
-before it should have brought about. Such a stand-in has a `settle` of its own (a minute for most, so a run that waits is not stalled), and each one that the log shows was used is
-something the engine does not do yet. The table also names the button of a message box that is not the first (the box at the door
+before it should have brought about. Such a stand-in has a `settle` of its own (a minute, so a run that waits is not stalled), and
+each one that the log shows was used is something the engine does not do yet. The table has one left: `CG03` stage 55, in
+Fallout 3 and Tale of Two Wastelands, where the packages of the classroom do not bring the stage about. The table also
+names the button of a message box that is not the first (the box at the door
 out of Vault 101 leaves with its last button). The table holds the references that the static surveys found; a stage that waits for
 something else (the characters finishing their packages, the timers of the intros) is left as it is, and the quest line shows where
 the run stopped.
