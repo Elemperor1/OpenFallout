@@ -475,6 +475,7 @@ namespace OFScript
         mPendingEnabledLoad.clear();
         mPendingMoves.clear();
         mRelocations.clear();
+        mSneakingLogged = false;
         {
             const std::lock_guard lock(mScalesMutex);
             mScales.clear();
@@ -1037,6 +1038,11 @@ namespace OFScript
             if (const auto asked = mDeferredDisabled.find(reference); asked != mDeferredDisabled.end())
                 return asked->second;
         }
+        return isDisabledNow(reference);
+    }
+
+    bool FalloutScripts::isDisabledNow(FalloutScript::FormId reference)
+    {
         const OFWorld::Ptr ptr = findReference(reference);
         if (!ptr.isEmpty())
             return !ptr.getRefData().isEnabled();
@@ -1081,6 +1087,8 @@ namespace OFScript
 
     void FalloutScripts::applyDisabled(FalloutScript::FormId reference, bool disabled)
     {
+        // A script that disables the same object every frame is told once, not every time
+        const bool changed = isDisabledNow(reference) != disabled;
         applyDisabledAlone(reference, disabled);
         // The objects that have this one for their enable parent follow it, and theirs follow them
         std::size_t followed = 0;
@@ -1089,7 +1097,7 @@ namespace OFScript
             applyDisabledAlone(follower, followerDisabled);
             ++followed;
         }
-        if (followed > 0)
+        if (followed > 0 && changed)
             Log(Debug::Info) << "Enable parent " << std::hex << reference << std::dec << " "
                              << (disabled ? "disabled" : "enabled") << ": " << followed << " objects follow";
     }

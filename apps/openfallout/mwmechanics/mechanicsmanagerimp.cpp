@@ -387,6 +387,10 @@ namespace OFMechanics
             return true;
 
         OFBase::World* world = OFBase::Environment::get().getWorld();
+        // The stance is what a Fallout character sneaks by: the controller of the animations has no say in it (Mac
+        // round 10K: the player held the sneak control and never counted as sneaking)
+        if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+            return !world->isSwimming(ptr) && !world->isFlying(ptr);
         return !world->isOnGround(ptr) && !world->isSwimming(ptr) && !world->isFlying(ptr);
     }
 

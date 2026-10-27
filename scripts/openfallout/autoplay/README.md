@@ -24,12 +24,15 @@ real seconds since the gate before it): of the gates that are ready, the first o
 The gates after the intros bring the main quest on: at `MQ01` stage 10 the player goes to the house of Cromwell in Megaton and
 talks to him, at 20 to the terminal and then Moriarty in his saloon (`teleport` to the cell, then `activate`), at 40 to the trigger
 volumes of Chevy Chase; at `VMQ01` stage 10 to the terminal of Novac, at 50 to the Tops
-restaurant and the Khan hideout of Boulder City. Each of these stages also has a `setstage` row with a long `settle`, which is
-only reached when the rows before it did not bring the quest on.
+restaurant and the Khan hideout of Boulder City. None of these stages has a `setstage` row any more: Mac rounds 10K and 10L
+played them on the real data without one (`MQ01` stage 50 at about 1,700 s in Fallout 3 and Tale of Two Wastelands, `VMQ01`
+stage 100 at about 460 s in New Vegas).
 
 A gate can also put the quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, and for what a gate
-before it should have brought about. Such a stand-in has a `settle` of its own (a minute for most, so a run that waits is not stalled), and each one that the log shows was used is
-something the engine does not do yet. The table also names the button of a message box that is not the first (the box at the door
+before it should have brought about. Such a stand-in has a `settle` of its own (a minute, so a run that waits is not stalled), and
+each one that the log shows was used is something the engine does not do yet. The table has one left: `CG03` stage 55, in
+Fallout 3 and Tale of Two Wastelands, where the packages of the classroom do not bring the stage about. The table also
+names the button of a message box that is not the first (the box at the door
 out of Vault 101 leaves with its last button). The table holds the references that the static surveys found; a stage that waits for
 something else (the characters finishing their packages, the timers of the intros) is left as it is, and the quest line shows where
 the run stopped.
@@ -39,7 +42,10 @@ picked with bobby pins until it opens (`AUTOPLAY lock`, `lock pick` with the res
 opens the lock, the pins are gone or after forty tries: `lock close`). A terminal that is closed is hacked the way a player does
 it, guessing a word that agrees with every likeness so far (`hack`, `hack close` when no word fits); a menu is walked through, each
 line twice at most, then Back and then out (`terminal line`, `terminal back`, `terminal close`). The screen that asks how long to
-wait or sleep is answered with one hour (`rest`). The table of the gates can set `finish` (the quests and stages at which the run
+wait or sleep is answered with one hour (`rest`). The screen of a level up, which stops the world until it is left, gets the skill
+points of the level spent on the skills in the order of the list, as many as each can take, and the first perk the player qualifies
+for, if the level gives one (`level`: the level of the player, the points, how many were spent, the perk; `level stuck` when nothing could be given
+and the screen is left alone). The table of the gates can set `finish` (the quests and stages at which the run
 ends, in place of the end of the intro: the shipped table has `{ MQ01 = 50, VMQ01 = 100 }`, so a run plays the intro and the first
 stages of the main quest) and `limit` (the real seconds after which it ends whatever happens; 5400 in the shipped table).
 `AUTOPLAY intro done` is logged once when `CG04` or `VCG01` reaches stage 200, also when the run goes on.
