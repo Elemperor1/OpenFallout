@@ -166,6 +166,22 @@ namespace OFRender
         // on it means the idle was lost, and it is started again.
         if (isDown() || mDefaultIdleGroup.empty())
             return;
+        // And an idle that has nothing for a part of the body leaves it in that pose whatever plays: said once for
+        // each kind of idle and skeleton, since starting it again changes nothing
+        if (!mCoverageChecked && isPlaying(mDefaultIdleGroup))
+        {
+            mCoverageChecked = true;
+            std::string missing;
+            for (int group = 0; group < Num_BoneGroups; ++group)
+                if (!hasControllersFor(mDefaultIdleGroup, static_cast<BoneGroup>(group)))
+                    missing += (missing.empty() ? "" : ", ") + std::to_string(group);
+            if (!missing.empty()
+                && firstTimeFor("coverage\n" + mDefaultIdleGroup + "\n" + mSkeletonPath + "\n" + missing))
+                Log(Debug::Warning) << "T-pose watch: the idle " << mDefaultIdleGroup << " of " << mSkeletonPath
+                                    << " has no animation for the bone groups " << missing
+                                    << "; they stay in the pose of the skeleton file (seen on "
+                                    << mPtr.getCellRef().getRefId() << ")";
+        }
         bool bare = false;
         for (int group = 0; group < Num_BoneGroups; ++group)
             bare = bare || getActiveGroup(static_cast<BoneGroup>(group)).empty();

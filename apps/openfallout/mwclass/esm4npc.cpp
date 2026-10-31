@@ -89,8 +89,15 @@ namespace OFClass
         const std::vector<ESM4::Race::BodyPart>& body = isFemale ? race.mBodyPartsFemale : race.mBodyPartsMale;
         for (std::size_t i = 0; i < body.size() && i < sBodySlots.size(); ++i)
             if (!body[i].mesh.empty() && (covered & sBodySlots[i]) == 0)
-                result.mParts.push_back({ body[i].mesh, falloutTexturePath(body[i].texture),
+            {
+                // The picture of the upper body may be the one of its own entry, or the fourth entry that has only a
+                // picture
+                std::string_view texture = body[i].texture;
+                if (i == 0 && texture.empty() && body.size() > sBodySlots.size())
+                    texture = body[sBodySlots.size()].texture;
+                result.mParts.push_back({ body[i].mesh, falloutTexturePath(texture),
                     i == 0 ? FalloutPartKind::Body : FalloutPartKind::Hand });
+            }
 
         // Everything of the face goes with the head: it is not there under a piece that covers the head
         if ((covered & ESM4::Armor::FO3_Head) == 0)

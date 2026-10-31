@@ -224,6 +224,25 @@ namespace OFClass
             expect(8, "suit\\jumpsuit.nif", "", FalloutPartKind::Worn);
         }
 
+        TEST(OFClassNpcPartsTest, theSkinOfTheUpperBodyMayBeTheFourthEntryThatHasOnlyAPicture)
+        {
+            // humanRace() has the picture of the skin in the fourth entry, none in the first
+            ESM4::Race race = humanRace();
+            FalloutNpcParts parts = falloutNpcParts(race, false, nullptr, {}, {});
+            ASSERT_FALSE(parts.mParts.empty());
+            EXPECT_EQ(parts.mParts.front().mKind, FalloutPartKind::Body);
+            EXPECT_EQ(parts.mParts.front().mTexture, "textures/male/skin.dds");
+            parts = falloutNpcParts(race, true, nullptr, {}, {});
+            EXPECT_EQ(parts.mParts.front().mTexture, "textures/female/skin.dds");
+
+            // one that names a picture on the upper body itself keeps it
+            race.mBodyPartsMale[0].texture = "Characters\\Male\\UpperBodyMale.dds";
+            parts = falloutNpcParts(race, false, nullptr, {}, {});
+            EXPECT_EQ(parts.mParts.front().mTexture, "textures/Characters/Male/UpperBodyMale.dds");
+            // and the hands do not take the picture of the fourth entry
+            EXPECT_EQ(parts.mParts[1].mTexture, "");
+        }
+
         TEST(OFClassNpcPartsTest, theUpperBodyOfTheRaceIsTheBodyAndTheTextureOfTheBodyAloneIsNotAPart)
         {
             const ESM4::Race race = humanRace();

@@ -120,6 +120,8 @@ namespace OFRender
         /// How long a part of the body has had no animation, and whether that has been said
         float mBareTime = 0.f;
         bool mBareReported = false;
+        /// Whether the idle was looked at for a part of the body that it has nothing for
+        bool mCoverageChecked = false;
 
         std::string mWalkGroup;
         std::string mRunGroup;

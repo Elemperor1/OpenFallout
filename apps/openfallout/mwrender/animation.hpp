@@ -437,6 +437,10 @@ namespace OFRender
         /// Returns the group name of the animation currently active on that bone group.
         std::string_view getActiveGroup(BoneGroup boneGroup) const;
 
+        /// Whether the animation group, when it is in the states, has a controller for a node of that bone group. A
+        /// bone group with none keeps the pose of the skeleton while the group is what is active on it.
+        bool hasControllersFor(std::string_view groupname, BoneGroup boneGroup) const;
+
         /// Get the absolute position in the animation track of the first text key with the given group.
         float getStartTime(const std::string& groupname) const;
 
