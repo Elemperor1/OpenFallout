@@ -202,6 +202,9 @@ end))
 
 input.registerTriggerHandler('Journal', async:callback(function()
     if not uiAllowed() then return end
+    -- Fallout has no journal: its quests are on the DATA page of the Pip-Boy (the left bumper of a pad and the J key
+    -- would open the book of Morrowind)
+    if core.pipboy and core.pipboy.available() then return end
 
     if I.UI.getMode() == I.UI.MODE.Journal then
         I.UI.removeMode(I.UI.MODE.Journal)

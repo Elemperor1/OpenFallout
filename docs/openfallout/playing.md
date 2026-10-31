@@ -35,6 +35,26 @@ The launcher (`openfallout-launcher`) has a Data Files page that writes these li
 
 starts a new game of the game you pointed it at: its opening scene, the making of the character and the first quest. How far the engine plays from there is in the [roadmap](gap-audit-and-roadmap.md); it is not a finished game yet. Without these options the main menu opens, and *New Game* does the same. `--start <cell>` (for example `--start WastelandNV:-18,0`, a worldspace and the cell's grid position, or the name of an interior cell) opens a cell directly, which is what the project's own test runs do. `--load-savegame <file>` loads a save.
 
+## Game controller
+
+A controller that the operating system shows as a game controller (Xbox, PlayStation and Switch Pro pads, by cable or Bluetooth) is read through SDL, as in OpenMW, and `[Input] enable controller` is on by default. **None of this has been tried with a real pad yet**: the buttons below are what the code does and what the smoke test sends to the screens as events; a round with the pad in hand is still to be done. Each press that a Fallout screen acts on is logged as `Pad: screen=... button=... key=...` (the first 200 of a run), which is how to see what a pad did.
+
+In the world (the bindings OpenMW gives a pad): left stick walks, right stick looks, right trigger attacks, left trigger jumps, A activates, X draws or puts away the weapon, a click of the left stick sneaks, a click of the right stick changes the view, B opens the Pip-Boy, Start opens the menu, RB waits, the Guide button saves quickly, and (new) LB opens V.A.T.S. Y does nothing in Fallout. These are the defaults: the bindings file that an earlier run saved in the configuration folder (`input_v3.xml`) keeps the buttons it has.
+
+On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock, waiting): the left stick moves the pointer, A clicks what it is over and B leaves the screen (all three are the engine's). The right stick does not scroll a list; the D-pad, the bumpers, Y and X do what keys do:
+
+| Screen | D-pad | LB / RB | Y | X |
+|---|---|---|---|---|
+| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA) | a page up or down | use the thing picked (equip, eat, read) | drop it |
+| Conversation | up and down pick a topic | a page of topics | say the topic picked; carry on while a character speaks | |
+| V.A.T.S. | left and right pick the character, up and down the part | the character before or after | queue an attack on the part picked (the first press shows which part is picked) | attack: carry out the queue |
+| Container | up and down pick a thing | a page | take it (the first press shows which is picked) | take everything |
+| Bench | up and down pick a recipe, left and right a kind | a page | make it | |
+| Lock | | | put in a bobby pin | |
+| Waiting | left and right change the hours | | begin | |
+
+The terminal (menus and the hacking game), the making of the character (the name still needs a keyboard) and the screen of a level up are used with the pointer and A only. The quests are on the DATA page of the Pip-Boy: the journal of Morrowind (the J key, and LB by the old default) opens nothing in Fallout now.
+
 ## Frame rate and picture
 
 The settings are in `settings.cfg` in the configuration folder. The ones that matter most:

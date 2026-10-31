@@ -10,6 +10,7 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local pad = require('scripts.omw.falloutpad')
 
 local pipboy = core.pipboy
 
@@ -767,6 +768,67 @@ local function pickedItem()
     return sortedItems(invTab)[selected]
 end
 
+-- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
+-- over it takes the keys and the buttons)
+local function press(code)
+    if not visible or view ~= 'pipboy' or I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    if dropPrompt then
+        -- The quantity of a drop is asked: the keys change it
+        if code == input.KEY.UpArrow or code == input.KEY.RightArrow then
+            promptStep(1)
+        elseif code == input.KEY.DownArrow or code == input.KEY.LeftArrow then
+            promptStep(-1)
+        elseif code == input.KEY.PageUp then
+            promptStep(5)
+        elseif code == input.KEY.PageDown then
+            promptStep(-5)
+        elseif code == input.KEY.Enter then
+            promptDone(true)
+        elseif code == input.KEY.Backspace then
+            promptDone(false)
+        else
+            return
+        end
+        render()
+        return
+    end
+    if code == input.KEY.LeftArrow then
+        switchTab(-1)
+    elseif code == input.KEY.RightArrow then
+        switchTab(1)
+    elseif code == input.KEY.DownArrow then
+        scroll(1)
+    elseif code == input.KEY.UpArrow then
+        scroll(-1)
+    elseif code == input.KEY.PageDown then
+        scroll(listLines)
+    elseif code == input.KEY.PageUp then
+        scroll(-listLines)
+    elseif code == input.KEY.Enter then
+        local item = pickedItem()
+        if item then
+            useItem(item)
+            render()
+        end
+    elseif code == input.KEY.D then
+        local item = pickedItem()
+        if item then
+            dropItem(item)
+            render()
+        end
+    elseif code == input.KEY.Backspace and keyring then
+        keyring = false
+        offset, selected = 1, 1
+        render()
+    end
+end
+
+-- X drops the item; the other buttons stand for the keys of every screen
+local onPad = pad.handler('pipboy', function() return visible and view == 'pipboy' and I.UI.getMode() == 'Interface' end, press,
+    { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
+
 return {
     engineHandlers = {
         onFrame = function(dt)
@@ -818,65 +880,21 @@ return {
             end
         end,
         onKeyPress = function(key)
-            if not visible or view ~= 'pipboy' then
-                return
-            end
-            if dropPrompt then
-                -- The quantity of a drop is asked: the keys change it
-                if key.code == input.KEY.UpArrow or key.code == input.KEY.RightArrow then
-                    promptStep(1)
-                elseif key.code == input.KEY.DownArrow or key.code == input.KEY.LeftArrow then
-                    promptStep(-1)
-                elseif key.code == input.KEY.PageUp then
-                    promptStep(5)
-                elseif key.code == input.KEY.PageDown then
-                    promptStep(-5)
-                elseif key.code == input.KEY.Enter then
-                    promptDone(true)
-                elseif key.code == input.KEY.Backspace then
-                    promptDone(false)
-                else
-                    return
-                end
-                render()
-                return
-            end
-            if key.code == input.KEY.LeftArrow then
-                switchTab(-1)
-            elseif key.code == input.KEY.RightArrow then
-                switchTab(1)
-            elseif key.code == input.KEY.DownArrow then
-                scroll(1)
-            elseif key.code == input.KEY.UpArrow then
-                scroll(-1)
-            elseif key.code == input.KEY.PageDown then
-                scroll(listLines)
-            elseif key.code == input.KEY.PageUp then
-                scroll(-listLines)
-            elseif key.code == input.KEY.Enter then
-                local item = pickedItem()
-                if item then
-                    useItem(item)
-                    render()
-                end
-            elseif key.code == input.KEY.D then
-                local item = pickedItem()
-                if item then
-                    dropItem(item)
-                    render()
-                end
-            elseif key.code == input.KEY.Backspace and keyring then
-                keyring = false
-                offset, selected = 1, 1
-                render()
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
             if vertical > 0 then
                 scroll(-1)
             elseif vertical < 0 then
                 scroll(1)
             end
+        end,
+    },
+    eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
         end,
     },
 }

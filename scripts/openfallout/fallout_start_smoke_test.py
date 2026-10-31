@@ -2198,6 +2198,10 @@ return {
             local object = find(data.id)
             if object then object:activateBy(world.players[1]) end
         end,
+        -- A button of the game controller, pressed for the player: the screens hear it as they hear the buttons of a pad
+        OFTestArenaPad = function(data)
+            world.players[1]:sendEvent('PadButton', data)
+        end,
         OFTestArenaQuit = function()
             core.quit()
         end,
@@ -2238,11 +2242,28 @@ local levelEscape = nil
 local craftFrames = nil
 -- V.A.T.S.: the target, the frames since it was asked for, and the action points after the attacks
 local vatsTarget, vatsFrames, vatsPoints, vatsStart = nil, nil, 0, nil
+local vatsPadSent, bumperFrames = 0, nil
 -- The locks, terminals, rest and map: steps that do something and wait for the engine to answer
 local self = require('openfallout.self')
 local interactSteps, interactIndex, interactFrames, interactSettle = nil, 0, 0, 0
 local function say(tag, text) print('OFTEST', 'arena', 'interact', tag, text) end
 local function activate(id) return function() core.sendGlobalEvent('OFTestArenaActivate', { id = id }) end end
+local input = require('openfallout.input')
+local function press(button) return function() core.sendGlobalEvent('OFTestArenaPad', { button = button }) end end
+-- How many of a thing the player carries, by its name
+local function have(name)
+    local total = 0
+    for _, item in ipairs(core.pipboy.items()) do
+        if item.name == name then total = total + item.count end
+    end
+    return total
+end
+local chestSlugs, chestRounds = 0, 0
+local function chestSummary()
+    local loot = core.pipboy.loot()
+    return string.format('items=%d slugs=%d rounds=%d', loot and #core.pipboy.items(loot.holder) or -1,
+        have('Test Slugs') - chestSlugs, have('Test Rounds') - chestRounds)
+end
 local function pinCount()
     for _, item in ipairs(core.pipboy.items()) do
         if item.name == 'Bobby Pin' then return item.count end
@@ -2353,9 +2374,39 @@ local function interactionSteps()
             local loot = core.pipboy.loot()
             say('chest', string.format('lock=%s loot=%s mode=%s', tostring(I2.lock() ~= nil),
                 tostring(loot ~= nil and #core.pipboy.items(loot.holder) or -1), tostring(I.UI.getMode())))
+            chestSlugs, chestRounds = have('Test Slugs'), have('Test Rounds')
+        end },
+        -- A menu opened over the screen takes the buttons: Y does not take anything behind it
+        { run = function() I.UI.addMode('MainMenu') end },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.DPadDown) },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.Y) },
+        { settle = 10 },
+        { run = function()
+            say('chestmenu', 'mode=' .. tostring(I.UI.getMode()) .. ' ' .. chestSummary())
+            I.UI.removeMode('MainMenu')
+        end, done = function() return I.UI.getMode() == 'Interface' end },
+        { settle = 10 },
+        -- The pad: the first press of down picks out the first thing, the second the next, Y takes it, X takes the rest
+        { run = press(input.CONTROLLER_BUTTON.DPadDown) },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.DPadDown) },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.Y) },
+        { settle = 10 },
+        { run = function() say('chestpad1', chestSummary()) end },
+        { run = press(input.CONTROLLER_BUTTON.X) },
+        { settle = 10 },
+        { run = function()
+            say('chestpad2', chestSummary())
             core.pipboy.closeLoot()
         end, done = function() return core.pipboy.loot() == nil end },
         { settle = 10 },
+        -- The journal of Morrowind is not Fallout's: the trigger of the left bumper and the J key opens nothing
+        { run = function() input.activateTrigger('Journal') end },
+        { settle = 10 },
+        { run = function() say('journal', 'mode=' .. tostring(I.UI.getMode())) end },
         -- A terminal that is open: its menu, a line that shows a result, back, and out
         { run = activate(@OPENTERMINAL@), done = function() return I2.terminalSerial() ~= 0 end },
         { settle = 10 },
@@ -2557,6 +2608,15 @@ return {
                     lootFrames = nil
                 end
             end
+            if bumperFrames then
+                bumperFrames = bumperFrames + 1
+                if bumperFrames == 20 then
+                    print('OFTEST', 'arena', 'vatsbumper', string.format('mode=%s open=%s', tostring(I.UI.getMode()),
+                        tostring(core.vats.state().open)))
+                    if I.UI.getMode() ~= nil then I.UI.removeMode('Interface') end
+                    bumperFrames = nil
+                end
+            end
             if levelFrames then
                 levelFrames = levelFrames + 1
                 -- The screen of the level up opens by itself when the engine has told of the levels
@@ -2656,6 +2716,13 @@ return {
             if vatsFrames then
                 vatsFrames = vatsFrames + 1
                 local vats = core.vats
+                -- The pad drives the screen once it is open: down to the first part and to the second (the head), Y queues
+                -- the attack on it (the screen is left with Escape later, which drops the queue)
+                if vatsFrames < 35 and vatsFrames % 4 == 0 and vatsPadSent < 3 and vats.state().open then
+                    vatsPadSent = vatsPadSent + 1
+                    core.sendGlobalEvent('OFTestArenaPad', { button = ({ input.CONTROLLER_BUTTON.DPadDown,
+                        input.CONTROLLER_BUTTON.DPadDown, input.CONTROLLER_BUTTON.Y })[vatsPadSent] })
+                end
                 if vatsFrames == 1 then
                     -- The characters of Fallout are in the list of the actors near the player, where V.A.T.S. looks
                     local listed = false
@@ -2680,11 +2747,11 @@ return {
                     else
                         core.sendGlobalEvent('OFTestArenaVatsOpen', {})
                     end
-                elseif vatsFrames == 15 then
+                elseif vatsFrames == 35 then
                     print('OFTEST', 'arena', 'vatsscreen', string.format('mode=%s open=%s', tostring(I.UI.getMode()),
                         tostring(vats.state().open)))
                     I.UI.removeMode('Interface')
-                elseif vatsFrames == 17 then
+                elseif vatsFrames == 37 then
                     print('OFTEST', 'arena', 'vatsclosed', string.format('mode=%s open=%s', tostring(I.UI.getMode()),
                         tostring(vats.state().open)))
                     -- Attacks at the head until one hits (the points allow three)
@@ -2719,6 +2786,10 @@ return {
                 elseif vatsStart and core.getSimulationTime() - vatsStart >= 1.5 then
                     -- The action points come back while V.A.T.S. is closed
                     print('OFTEST', 'arena', 'vatsregen', tostring(vats.state().actionPoints > vatsPoints))
+                    -- The left bumper opens the screen on the characters in sight (the raider may be; if none is, it says so
+                    -- and stays shut); the screen is closed again below
+                    core.sendGlobalEvent('OFTestArenaPad', { button = input.CONTROLLER_BUTTON.LeftShoulder })
+                    bumperFrames = 0
                     -- The head-up display: what the script of the display is showing, and the things it reads from the
                     -- engine (the stats, the target under the crosshair, the compass and a note that is not there)
                     local hud = core.hud
@@ -4207,7 +4278,12 @@ def check_arena_interact(text):
             problems.append(f"the pins should open the lock in the end, and each pin that failed should be gone: {picked}")
     expect("pickdoorgone", f"lock=false mode=nil experience={plugin.ARENA_PICK_XP}",
            rf"lock=false mode=nil experience={plugin.ARENA_PICK_XP}")
-    expect("chest", "no lock screen, the chest opens with its thing in it", r"lock=false loot=1 mode=Interface")
+    expect("chest", "no lock screen, the chest opens with its things in it", r"lock=false loot=2 mode=Interface")
+    # The pad: down twice picks out the slugs (the things are listed by name), Y takes them, X takes the rest
+    expect("chestmenu", "a menu over the screen takes the buttons, nothing is taken", "mode=MainMenu items=2 slugs=0 rounds=0")
+    expect("chestpad1", "the slugs are taken", rf"items=1 slugs={plugin.ARENA_CHEST_SLUGS} rounds=0")
+    expect("chestpad2", "the rounds are taken", rf"items=0 slugs={plugin.ARENA_CHEST_SLUGS} rounds={plugin.ARENA_CHEST_ROUNDS}")
+    expect("journal", "the trigger of the journal opens no window in Fallout", "mode=nil")
     welcome = "Welcome to the test terminal."
     expect("terminal", "the open terminal shows its menu", rf"lines=1 back=false hacking=false body={re.escape(welcome)} "
            r"mode=Interface")
@@ -4290,6 +4366,17 @@ def check_arena_vats(text):
     regen = re.search(r"OFTEST\tarena\tvatsregen\t(\w+)$", text, re.M)
     if not regen or regen.group(1) != "true":
         problems.append("the action points should come back while V.A.T.S. is closed")
+    # The pad: two presses of down pick out the head, Y queues the attack on it; the left bumper opens the screen
+    if len(re.findall(r"Pad: screen=vats button=\d+ key=\d+$", text, re.M)) != 3:
+        problems.append("the three buttons sent to the open screen of V.A.T.S. (down, down, Y) should each be logged once")
+    if len(re.findall(r"V\.A\.T\.S\.: queued Head 95%$", text, re.M)) != 1:
+        problems.append("down, down and Y should have queued one attack at the head (95 percent) on the screen")
+    if not re.search(r"Pad: screen=vats button=\d+ key=open$", text, re.M):
+        problems.append("the left bumper should have opened V.A.T.S. in the world (it is logged when the screen is tried)")
+    bumper = re.search(r"OFTEST\tarena\tvatsbumper\t(.*)$", text, re.M)
+    if not bumper or bumper.group(1) not in ("mode=Interface open=true", "mode=nil open=false"):
+        problems.append("the left bumper should leave V.A.T.S. open on the characters in sight, or shut when there are none, "
+                        f"and the game not paused for good: {bumper.group(1) if bumper else 'no line'}")
     return problems
 
 

@@ -7,6 +7,7 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local pad = require('scripts.omw.falloutpad')
 
 local pipboy = core.pipboy
 
@@ -29,6 +30,8 @@ local message = ''
 local offset = 1
 local listLines = 10
 local listLength = 0
+-- The sub-categories and the recipes of the list as the last drawing had them, for the keys
+local subNames, listedRecipes = {}, {}
 
 local render
 local widgets
@@ -95,6 +98,19 @@ local function itemLine(item, needed)
     return widgets.label(countText(item), color, textSize - 2)
 end
 
+-- Makes the recipe and says how it went
+local function make(recipe)
+    local outcome = pipboy.craft(recipe.id)
+    if outcome == 'made' then
+        message = recipe.name .. ' made'
+    elseif outcome == 'skill' then
+        message = 'Your skill is too low'
+    elseif outcome == 'items' then
+        message = 'You do not have enough'
+    end
+    render()
+end
+
 function render()
     destroyElement()
     local menu = pipboy.recipes()
@@ -134,12 +150,14 @@ function render()
         add(widgets.row(table.unpack(cells)))
     end
 
+    subNames = subs
     local listed = {}
     for _, recipe in ipairs(menu.recipes) do
         if tab == nil or recipe.subCategoryName == tab then
             listed[#listed + 1] = recipe
         end
     end
+    listedRecipes = listed
     listLength = #listed
     if #listed == 0 then
         add(widgets.label('Nothing to make', colors.hintColor))
@@ -191,15 +209,7 @@ function render()
     end
     add(widgets.row(
         widgets.cell(widgets.clickable('Make', function()
-            local outcome = pipboy.craft(pickedRecipe.id)
-            if outcome == 'made' then
-                message = pickedRecipe.name .. ' made'
-            elseif outcome == 'skill' then
-                message = 'Your skill is too low'
-            elseif outcome == 'items' then
-                message = 'You do not have enough'
-            end
-            render()
+            make(pickedRecipe)
         end, { enabled = pickedRecipe ~= nil and pickedRecipe.status == 'ready', color = colors.titleColor }), 140),
         widgets.clickable('Close', leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
@@ -215,6 +225,77 @@ local function scroll(by)
         render()
     end
 end
+
+-- The recipe that is picked in the list of the drawing: its place
+local function pickedIndex()
+    for index, recipe in ipairs(listedRecipes) do
+        if recipe.id == selected then
+            return index
+        end
+    end
+    return 1
+end
+
+-- Picks the next recipe (down when `by` is positive), and moves the list with it when the recipe is not shown
+local function moveRecipe(by)
+    if not element or #listedRecipes == 0 then
+        return
+    end
+    local index = math.max(1, math.min(#listedRecipes, pickedIndex() + by))
+    selected = listedRecipes[index].id
+    message = ''
+    if index < offset then
+        offset = index
+    elseif index > offset + listLines - 1 then
+        offset = index - listLines + 1
+    end
+    render()
+end
+
+-- Shows the recipes of the next sub-category (after the last one, all of them)
+local function moveTab(by)
+    if not element or #subNames == 0 then
+        return
+    end
+    local index = 0
+    for place, name in ipairs(subNames) do
+        if name == tab then
+            index = place
+        end
+    end
+    index = (index + by) % (#subNames + 1)
+    tab, offset = index > 0 and subNames[index] or nil, 1
+    render()
+end
+
+-- What a key (or a button of the pad that stands for one) does while the menu is there: up and down pick a recipe,
+-- left and right a sub-category, Enter makes the recipe
+local function press(code)
+    -- (a menu opened over the screen takes the keys and the buttons)
+    if not element or I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    if code == input.KEY.DownArrow then
+        moveRecipe(1)
+    elseif code == input.KEY.UpArrow then
+        moveRecipe(-1)
+    elseif code == input.KEY.PageDown then
+        moveRecipe(listLines)
+    elseif code == input.KEY.PageUp then
+        moveRecipe(-listLines)
+    elseif code == input.KEY.RightArrow then
+        moveTab(1)
+    elseif code == input.KEY.LeftArrow then
+        moveTab(-1)
+    elseif code == input.KEY.Enter then
+        local recipe = listedRecipes[pickedIndex()]
+        if recipe then
+            make(recipe)
+        end
+    end
+end
+
+local onPad = pad.handler('craft', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press)
 
 local function sync()
     local menu = pipboy.recipes()
@@ -238,19 +319,9 @@ return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            if not element then
-                return
-            end
-            if key.code == input.KEY.DownArrow then
-                scroll(1)
-            elseif key.code == input.KEY.UpArrow then
-                scroll(-1)
-            elseif key.code == input.KEY.PageDown then
-                scroll(listLines)
-            elseif key.code == input.KEY.PageUp then
-                scroll(-listLines)
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
             if vertical > 0 then
                 scroll(-1)
@@ -260,6 +331,10 @@ return {
         end,
     },
     eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
+        end,
         -- However the screen is left (the button, Escape, a script), the menu is closed
         UiModeChanged = function(data)
             if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then

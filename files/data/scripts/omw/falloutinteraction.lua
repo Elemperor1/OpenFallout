@@ -7,6 +7,7 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+local pad = require('scripts.omw.falloutpad')
 local widgetModule = require('scripts.omw.falloutwidgets')
 
 local interact = core.interact
@@ -105,6 +106,21 @@ local function widthOf(share, least)
     return math.max(least, math.floor(ui.screenSize().x * share))
 end
 
+-- A bobby pin in the lock
+local function pickLock()
+    local result = interact.pick()
+    if result == 'opened' then
+        leave()
+        return
+    elseif result == 'broke' then
+        notice = 'Your bobby pin broke.'
+    elseif result == 'nopins' then
+        notice = 'You have no bobby pins.'
+    end
+    shownPins = nil
+    render()
+end
+
 -- The lock of a door or a container
 local function renderLock()
     local lock = interact.lock()
@@ -125,19 +141,7 @@ local function renderLock()
         add(widgets.label(notice, noticeColor))
     end
     add(widgets.row(
-        widgets.cell(widgets.clickable('Pick the lock', function()
-            local result = interact.pick()
-            if result == 'opened' then
-                leave()
-                return
-            elseif result == 'broke' then
-                notice = 'Your bobby pin broke.'
-            elseif result == 'nopins' then
-                notice = 'You have no bobby pins.'
-            end
-            shownPins = nil
-            render()
-        end, { enabled = not lock.keyOnly and lock.pins > 0, color = colors.titleColor }), 200),
+        widgets.cell(widgets.clickable('Pick the lock', pickLock, { enabled = not lock.keyOnly and lock.pins > 0, color = colors.titleColor }), 200),
         widgets.clickable(word('sLeave', 'Leave'), leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
 end
@@ -199,6 +203,20 @@ local function renderTerminal()
     element = ui.create(widgets.panel(rows))
 end
 
+-- The wait or sleep of the hours that were chosen begins
+local function startRest()
+    local why = interact.startRest(hours)
+    if why ~= '' then
+        notice = why
+    else
+        notice = ''
+        endedBefore = interact.restProgress().ended
+        screen = 'resting'
+        shownTenths = nil
+    end
+    render()
+end
+
 -- The hours to wait or sleep
 local function renderRest(request)
     widgets = widgetModule.new(update)
@@ -220,18 +238,7 @@ local function renderRest(request)
         add(widgets.label(notice, noticeColor))
     end
     add(widgets.row(
-        widgets.cell(widgets.clickable(title, function()
-            local why = interact.startRest(hours)
-            if why ~= '' then
-                notice = why
-            else
-                notice = ''
-                endedBefore = interact.restProgress().ended
-                screen = 'resting'
-                shownTenths = nil
-            end
-            render()
-        end, { color = colors.titleColor }), 200),
+        widgets.cell(widgets.clickable(title, startRest, { color = colors.titleColor }), 200),
         widgets.clickable(word('sCancel', 'Cancel'), leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
 end
@@ -331,23 +338,47 @@ local function sync()
     end
 end
 
+-- What a key (or a button of the pad that stands for one) does: on the screen of the hours left and right change them
+-- and Enter begins the wait; on the screen of a lock Enter puts a bobby pin in
+local function press(code)
+    -- (a menu opened over the screen takes the keys and the buttons)
+    if I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    if screen == 'rest' then
+        if code == input.KEY.LeftArrow then
+            hours = math.max(1, hours - 1)
+            render()
+        elseif code == input.KEY.RightArrow then
+            hours = math.min(24, hours + 1)
+            render()
+        elseif code == input.KEY.Enter then
+            startRest()
+        end
+    elseif screen == 'lock' and code == input.KEY.Enter then
+        local lock = interact.lock()
+        if lock and not lock.keyOnly and lock.pins > 0 then
+            pickLock()
+        end
+    end
+end
+
+local onPad = pad.handler('interaction',
+    function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' end, press)
+
 return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            if screen ~= 'rest' then
-                return
-            end
-            if key.code == input.KEY.LeftArrow then
-                hours = math.max(1, hours - 1)
-                render()
-            elseif key.code == input.KEY.RightArrow then
-                hours = math.min(24, hours + 1)
-                render()
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
     },
     eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
+        end,
         -- However the screen is left (the button, Escape, a script), what was open is closed
         UiModeChanged = function(data)
             if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then
