@@ -348,8 +348,9 @@ namespace OFRender
             // The form id is written in hexadecimal and leaves the stream in it; the numbers here are not
             std::ostringstream ref;
             ref << mPtr.getCellRef().getRefId();
-            Log(Debug::Info) << "Look of " << ref.str() << ": " << race->mEditorId << (isFemale ? " female" : " male")
-                             << ", " << inserted << " parts"
+            // (the stream of the log stays in the base that an earlier line left it in)
+            Log(Debug::Info) << std::dec << "Look of " << ref.str() << ": " << race->mEditorId
+                             << (isFemale ? " female" : " male") << ", " << inserted << " parts"
                              << (missing != 0 ? " (" + std::to_string(missing) + " not found)" : std::string())
                              << ", hair " << (hair != nullptr ? hair->mEditorId : std::string("none"))
                              << (parts.mHatOn ? " (under a hat)" : "") << ", " << morphed << " meshes morphed, face "

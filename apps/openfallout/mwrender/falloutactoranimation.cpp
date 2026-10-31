@@ -1,11 +1,17 @@
 #include "falloutactoranimation.hpp"
 
 #include <algorithm>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <vector>
+
+#include <osg/ComputeBoundsVisitor>
+#include <osg/Matrix>
+#include <osg/Transform>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -13,6 +19,8 @@
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/nodecallback.hpp>
+#include <components/sceneutil/riggeometry.hpp>
+#include <components/sceneutil/riggeometryosgaextension.hpp>
 #include <components/sceneutil/skeleton.hpp>
 #include <components/sceneutil/visitor.hpp>
 #include <components/vfs/manager.hpp>
@@ -100,6 +108,84 @@ namespace OFRender
             static std::set<std::string> told;
             const std::lock_guard lock(mutex);
             return told.insert(key).second;
+        }
+
+        /// Finds out whether a part has meshes that are skinned to the bones of a skeleton
+        class FindSkinnedMesh : public osg::NodeVisitor
+        {
+        public:
+            FindSkinnedMesh()
+                : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+            {
+            }
+
+            void apply(osg::Drawable& drawable) override
+            {
+                if (dynamic_cast<SceneUtil::RigGeometry*>(&drawable) != nullptr
+                    || dynamic_cast<SceneUtil::RigGeometryHolder*>(&drawable) != nullptr)
+                    mSkinned = true;
+            }
+
+            bool mSkinned = false;
+        };
+
+        /// Says in numbers where a part that is not skinned has been put: the box of its meshes in the frame of the
+        /// node that holds it, that node's place and turn in the character, and the box in the frame of the character
+        /// (feet at 0, up is z). Empty for a part that is skinned, which needs no placing.
+        std::string describePlacement(osg::Node& part, const osg::Node* characterRoot, const std::string& bone)
+        {
+            FindSkinnedMesh skin;
+            part.accept(skin);
+            if (skin.mSkinned)
+                return {};
+
+            osg::ComputeBoundsVisitor bounds;
+            part.accept(bounds);
+            const osg::BoundingBox box = bounds.getBoundingBox();
+
+            osg::Matrix parentToCharacter;
+            const osg::NodePathList paths = part.getParentalNodePaths(const_cast<osg::Node*>(characterRoot));
+            if (!paths.empty() && paths.front().size() > 1)
+            {
+                osg::NodePath path = paths.front();
+                path.pop_back();
+                parentToCharacter = osg::computeLocalToWorld(path);
+            }
+
+            const auto vec = [](std::ostringstream& out, const osg::Vec3d& v) {
+                out << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
+            };
+            std::ostringstream out;
+            out << std::fixed << std::setprecision(2);
+            out << (bone.empty() ? std::string("not skinned and on no bone") : "on the bone " + bone);
+            if (!box.valid())
+            {
+                out << ", no mesh";
+                return out.str();
+            }
+            out << ", box in the frame of what holds it ";
+            vec(out, box._min);
+            out << " to ";
+            vec(out, box._max);
+
+            const osg::Quat turn = parentToCharacter.getRotate();
+            out << ", that frame in the character: at ";
+            vec(out, parentToCharacter.getTrans());
+            out << " with x towards ";
+            vec(out, turn * osg::Vec3d(1.0, 0.0, 0.0));
+            out << ", y towards ";
+            vec(out, turn * osg::Vec3d(0.0, 1.0, 0.0));
+            out << ", z towards ";
+            vec(out, turn * osg::Vec3d(0.0, 0.0, 1.0));
+
+            osg::BoundingBoxd inCharacter;
+            for (int corner = 0; corner < 8; ++corner)
+                inCharacter.expandBy(osg::Vec3d(box.corner(corner)) * parentToCharacter);
+            out << ", box in the character ";
+            vec(out, inCharacter._min);
+            out << " to ";
+            vec(out, inCharacter._max);
+            return out.str();
         }
 
         /// The animation files (.kf, lower case paths) under a folder, listed once for all the characters that share it
@@ -401,6 +487,15 @@ namespace OFRender
                                         << ", which the skeleton of " << mPtr.getCellRef().getRefId()
                                         << " does not have; it stays where the character is";
             }
+        }
+
+        // Where the parts that are not skinned ended up, once for each model: what to read when one is in the wrong
+        // place
+        if (firstTimeFor("placed\n" + std::string(model)))
+        {
+            const std::string where = describePlacement(*part, mObjectRoot, attachTo);
+            if (!where.empty())
+                Log(Debug::Info) << "Placed " << model << ": " << where;
         }
         return part;
     }
