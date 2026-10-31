@@ -3,7 +3,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "triggervolumes.hpp"
@@ -51,6 +53,42 @@ namespace FalloutScript
     /// the heading of the entry added to that of the reference. This is what the games do to the entry before a
     /// character is put on it.
     FurnitureSeat furnitureSeat(const FurnitureEntry& entry, std::size_t index, const FurniturePlacement& placement);
+
+    /// How far the games move a character from the entry of a marker to where it stays when it has sat down or lain
+    /// down: the net movement of the animation that carries it onto the furniture (the settings
+    /// fFurnitureMarker<ref>Delta... of the files, for the kind of use the entry says). The marker is on the floor
+    /// where the character stands to begin; the seat is a step away from it.
+    struct FurnitureDelta
+    {
+        /// In the space of the character at the entry, x to its right and y to its front
+        float mX = 0;
+        float mY = 0;
+        float mZ = 0;
+        /// The turn in radians, added to the heading of the entry
+        float mHeading = 0;
+    };
+
+    /// The deltas by the entry ref (the byte of the marker)
+    class FurnitureDeltas
+    {
+    public:
+        /// Reads the settings of the files named fFurnitureMarker<ref><something that ends in X, Y or Z, or says
+        /// heading>, by their names in lower case. The ones that are not there are zero, as in the exe.
+        static FurnitureDeltas fromGameSettings(const std::map<std::string, double>& settings);
+
+        FurnitureDelta of(std::uint8_t ref) const;
+
+        /// How many refs have a setting
+        std::size_t size() const { return mDeltas.size(); }
+
+    private:
+        std::map<std::uint8_t, FurnitureDelta> mDeltas;
+    };
+
+    /// Where a character stays once it has settled on the furniture that it began to use at `entry`: the entry moved
+    /// by the delta, turned like the entry (the same turn as the reference of a furniture has), the vertical part
+    /// scaled by the size of the reference less one as the exe does, and the heading of the delta added.
+    FurnitureSeat settledSeat(const FurnitureSeat& entry, const FurnitureDelta& delta, float scale);
 
     /// The entry that a character at `from` uses: the nearest of those the record enables that are not marked in
     /// `used` (one bit for each entry). None when there is no such entry.

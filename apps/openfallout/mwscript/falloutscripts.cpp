@@ -3914,6 +3914,20 @@ namespace OFScript
         return actor == OFBase::Environment::get().getWorld()->getPlayerPtr() ? mPlayer : referenceOf(actor);
     }
 
+    namespace
+    {
+        FalloutScript::FurniturePlacement furniturePlacementOf(const OFWorld::Ptr& furniture)
+        {
+            const ESM::Position& position = furniture.getRefData().getPosition();
+            FalloutScript::FurniturePlacement placement;
+            placement.mPosition = { position.pos[0], position.pos[1], position.pos[2] };
+            for (int axis = 0; axis < 3; ++axis)
+                placement.mRotation[axis] = position.rot[axis];
+            placement.mScale = furniture.getCellRef().getScale();
+            return placement;
+        }
+    }
+
     std::vector<FalloutScript::FurnitureEntry> FalloutScripts::furnitureEntries(const OFWorld::Ptr& furniture)
     {
         const ESM4::Furniture& record = *furniture.get<ESM4::Furniture>()->mBase;
@@ -3974,14 +3988,54 @@ namespace OFScript
                     && static_cast<std::size_t>(use.mEntry) < FalloutScript::maxFurnitureEntries)
                     used |= 1u << use.mEntry;
         }
-        const ESM::Position& position = furniture.getRefData().getPosition();
-        FalloutScript::FurniturePlacement placement;
-        placement.mPosition = { position.pos[0], position.pos[1], position.pos[2] };
-        for (int axis = 0; axis < 3; ++axis)
-            placement.mRotation[axis] = position.rot[axis];
-        placement.mScale = furniture.getCellRef().getScale();
         return FalloutScript::chooseFurnitureSeat(entries, furniture.get<ESM4::Furniture>()->mBase->mActiveMarkerFlags,
-            used, placement, { from.x(), from.y(), from.z() });
+            used, furniturePlacementOf(furniture), { from.x(), from.y(), from.z() });
+    }
+
+    const FalloutScript::FurnitureDeltas& FalloutScripts::furnitureDeltas()
+    {
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        if (!mFurnitureDeltas)
+        {
+            mFurnitureDeltas = FalloutScript::FurnitureDeltas::fromGameSettings(gameSettingValues());
+            Log(Debug::Info) << "Furniture: the files say how a character moves onto the seat for "
+                             << mFurnitureDeltas->size() << " kinds of entry";
+        }
+        return *mFurnitureDeltas;
+    }
+
+    FalloutScript::FurnitureSeat FalloutScripts::settledOn(
+        const FalloutScript::FurnitureSeat& entry, const OFWorld::Ptr& furniture)
+    {
+        return FalloutScript::settledSeat(entry, furnitureDeltas().of(entry.mRef), furniture.getCellRef().getScale());
+    }
+
+    void FalloutScripts::standUpFrom(FalloutScript::FormId user, const OFWorld::Ptr& actor, int entry,
+        FalloutScript::FormId furnitureRef, const osg::Vec3f& sat)
+    {
+        // The games play the animation of getting up, which ends where the one of sitting down began. Only a character
+        // that is still where it sat is put there: one that was moved or has walked off is where it is.
+        constexpr float stillThere = 32.f;
+        const OFWorld::Ptr furniture = findReference(furnitureRef);
+        if (entry < 0 || actor.isEmpty() || furniture.isEmpty() || furniture.getType() != ESM4::Furniture::sRecordId
+            || (actor.getRefData().getPosition().asVec3() - sat).length() > stillThere)
+            return;
+        const std::vector<FalloutScript::FurnitureEntry> entries = furnitureEntries(furniture);
+        if (static_cast<std::size_t>(entry) >= entries.size())
+            return;
+        const FalloutScript::FurnitureSeat at = FalloutScript::furnitureSeat(
+            entries[entry], static_cast<std::size_t>(entry), furniturePlacementOf(furniture));
+        Place userPlace;
+        Place furniturePlace;
+        if (!whereIs(user, userPlace) || !whereIs(furnitureRef, furniturePlace)
+            || !inOneSpace(furniturePlace, userPlace))
+            return;
+        // Where it stands, the way it faces
+        Move move;
+        move.mWhere = userPlace;
+        move.mWhere.mPosition = osg::Vec3f(at.mPosition.x, at.mPosition.y, at.mPosition.z);
+        move.mParts = Move::PositionX | Move::PositionY | Move::PositionZ;
+        askForMove(user, move);
     }
 
     bool FalloutScripts::furnitureSeat(
@@ -4023,8 +4077,11 @@ namespace OFScript
             move.mParts = Move::PositionX | Move::PositionY | Move::PositionZ;
             if (entry)
             {
-                move.mWhere.mPosition = osg::Vec3f(entry->mPosition.x, entry->mPosition.y, entry->mPosition.z);
-                move.mWhere.mAngle.z() = entry->mHeading;
+                // The entry is where the character stands to begin: the games carry it from there onto the seat, and
+                // it is put on the seat, since nothing here walks it the last steps
+                const FalloutScript::FurnitureSeat settled = settledOn(*entry, furniture);
+                move.mWhere.mPosition = osg::Vec3f(settled.mPosition.x, settled.mPosition.y, settled.mPosition.z);
+                move.mWhere.mAngle.z() = settled.mHeading;
                 move.mParts |= Move::AngleZ;
             }
             where = move.mWhere.mPosition;
@@ -4242,16 +4299,18 @@ namespace OFScript
     void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)
     {
         const FalloutScript::FormId user = scriptReferenceOf(actor);
-        FalloutScript::FormId seat = 0;
+        FurnitureUse use;
         {
             const std::lock_guard lock(mFurnitureMutex);
             const auto found = mFurniture.find(user);
             if (found == mFurniture.end())
                 return;
-            seat = found->second.mFurniture;
+            use = found->second;
             mFurniture.erase(found);
         }
-        Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " gets up from " << FalloutScript::hex(seat);
+        Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " gets up from "
+                         << FalloutScript::hex(use.mFurniture);
+        standUpFrom(user, actor, use.mEntry, use.mFurniture, use.mPlace);
     }
 
     bool FalloutScripts::usesFurniture(const OFWorld::Ptr& actor) const

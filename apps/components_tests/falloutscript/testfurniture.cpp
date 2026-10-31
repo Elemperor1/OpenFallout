@@ -3,16 +3,21 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <map>
+#include <string>
 #include <vector>
 
 namespace
 {
     using FalloutScript::chooseFurnitureSeat;
+    using FalloutScript::FurnitureDelta;
+    using FalloutScript::FurnitureDeltas;
     using FalloutScript::FurnitureEntry;
     using FalloutScript::furnitureEntryEnabled;
     using FalloutScript::FurniturePlacement;
     using FalloutScript::furnitureSeat;
     using FalloutScript::Point;
+    using FalloutScript::settledSeat;
 
     constexpr float pi = 3.14159265f;
 
@@ -109,5 +114,94 @@ namespace
         EXPECT_FALSE(chooseFurnitureSeat({}, 0b11, 0, placement, { 0, 0, 0 }).has_value());
         // A flag for an entry the model does not have is no entry
         EXPECT_FALSE(chooseFurnitureSeat(entries, 0b100, 0, placement, { 0, 0, 0 }).has_value());
+    }
+
+    // The settings of New Vegas for the refs of the chairs, in the form the files have them
+    const std::map<std::string, double> chairSettings{
+        { "ffurnituremarker11deltax", 2.6068 },
+        { "ffurnituremarker11deltay", 53.961 },
+        { "ffurnituremarker11deltaz", -28.948 },
+        { "ffurnituremarker11headingdelta", -1.5708 },
+        { "ffurnituremarker12deltax", 2.6669 },
+        { "ffurnituremarker12deltay", 53.6492 },
+        { "ffurnituremarker12deltaz", -28.948 },
+        { "ffurnituremarker12headingdelta", 1.5708 },
+        { "ffurnituremarker14deltax", 2.4809 },
+        { "ffurnituremarker14deltay", 57.3572 },
+        { "ffurnituremarker14deltaz", -28.948 },
+        { "ffurnituremarker14headingdelta", 3.1416 },
+        { "ffurnituremarker15deltax", -16.3983 },
+        { "ffurnituremarker15deltay", 49.5436 },
+        { "ffurnituremarker15deltaz", -7.9503 },
+        { "ffurnituremarker15headingdelta", 0 },
+        { "ffurniturefoo", 3 },
+        { "fai furniture", 5 },
+    };
+
+    TEST(FalloutFurniture, theDeltasAreReadFromTheSettingsOfEachRef)
+    {
+        const FurnitureDeltas deltas = FurnitureDeltas::fromGameSettings(chairSettings);
+        EXPECT_EQ(deltas.size(), 4u);
+        const FurnitureDelta front = deltas.of(14);
+        EXPECT_FLOAT_EQ(front.mX, 2.4809f);
+        EXPECT_FLOAT_EQ(front.mY, 57.3572f);
+        EXPECT_FLOAT_EQ(front.mZ, -28.948f);
+        EXPECT_FLOAT_EQ(front.mHeading, 3.1416f);
+        EXPECT_FLOAT_EQ(deltas.of(11).mHeading, -1.5708f);
+        // A ref the files have no setting for does not move the character
+        const FurnitureDelta none = deltas.of(1);
+        EXPECT_FLOAT_EQ(none.mX, 0);
+        EXPECT_FLOAT_EQ(none.mY, 0);
+        EXPECT_FLOAT_EQ(none.mHeading, 0);
+        EXPECT_EQ(FurnitureDeltas::fromGameSettings({}).size(), 0u);
+    }
+
+    TEST(FalloutFurniture, aSettingMayNameTheHeadingOtherwise)
+    {
+        const FurnitureDeltas deltas = FurnitureDeltas::fromGameSettings(
+            { { "ffurnituremarker13deltaangle", 0.5 }, { "ffurnituremarker13deltax", 1 } });
+        EXPECT_FLOAT_EQ(deltas.of(13).mHeading, 0.5f);
+        EXPECT_FLOAT_EQ(deltas.of(13).mX, 1);
+    }
+
+    TEST(FalloutFurniture, aCharacterThatHasSatDownIsOnTheSeatOfTheFurnitureWhicheverWayItIsTurned)
+    {
+        // The entries of the chair and the stool of the games: the left, right and front of a chair, and a stool
+        const FurnitureEntry left = entry(-51.9f, -0.5f, -26.f, 1.570f, 11);
+        const FurnitureEntry right = entry(51.3f, -0.5f, -26.f, 4.712f, 12);
+        const FurnitureEntry front = entry(-0.3f, 54.6f, -26.f, 3.141f, 14);
+        const FurnitureEntry stool = entry(20.5f, -41.f, -24.1f, 0.f, 15);
+        const FurnitureDeltas deltas = FurnitureDeltas::fromGameSettings(chairSettings);
+        for (const float yaw : { 0.f, 0.7f, 2.f, -1.3f, 3.5f })
+        {
+            const FurniturePlacement placement = placedAt(100, 200, 50, yaw);
+            const std::pair<const FurnitureEntry*, std::uint8_t> uses[]
+                = { { &left, 11 }, { &right, 12 }, { &front, 14 }, { &stool, 15 } };
+            for (const auto& [use, ref] : uses)
+            {
+                const auto entrySeat = furnitureSeat(*use, 0, placement);
+                const auto seat = settledSeat(entrySeat, deltas.of(ref), 1.f);
+                // a few units from the origin of the furniture, which is the seat; the stool is a little off it
+                EXPECT_NEAR(seat.mPosition.x, 100, 9) << int(ref) << " at " << yaw;
+                EXPECT_NEAR(seat.mPosition.y, 200, 9) << int(ref) << " at " << yaw;
+                // at the level of the entry: the animation of sitting lowers the pelvis
+                EXPECT_FLOAT_EQ(seat.mPosition.z, entrySeat.mPosition.z);
+                // and it faces the front of the furniture whichever side it came from: the heading of the reference
+                const float turn = seat.mHeading - yaw;
+                EXPECT_NEAR(std::sin(turn), 0.f, 0.01f) << int(ref) << " at " << yaw;
+                EXPECT_NEAR(std::cos(turn), 1.f, 0.01f) << int(ref) << " at " << yaw;
+                EXPECT_EQ(seat.mRef, ref);
+            }
+        }
+    }
+
+    TEST(FalloutFurniture, theVerticalDeltaIsScaledByTheSizeOfTheReferenceLessOne)
+    {
+        FurnitureDelta delta;
+        delta.mZ = -10;
+        const auto entrySeat = furnitureSeat(entry(0, 0, 5), 0, placedAt(0, 0, 0));
+        EXPECT_FLOAT_EQ(settledSeat(entrySeat, delta, 1.f).mPosition.z, 5);
+        EXPECT_FLOAT_EQ(settledSeat(entrySeat, delta, 1.5f).mPosition.z, 0);
+        EXPECT_FLOAT_EQ(settledSeat(entrySeat, delta, 0.5f).mPosition.z, 10);
     }
 }

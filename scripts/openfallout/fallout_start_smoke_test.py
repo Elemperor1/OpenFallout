@@ -3479,6 +3479,16 @@ def check_chargen(text):
     return problems
 
 
+def furniture_seat():
+    """Where a character that has sat down is from the middle of the chair (across, along; the chair is not turned): the entry
+    of the marker moved by the settings of the games, turned like the entry (clockwise seen from above)."""
+    (entry_x, entry_y, _), orientation, _ = plugin.FURNITURE_ENTRY
+    delta_x, delta_y = plugin.FURNITURE_DELTA[:2]
+    turn = orientation / 1000.0
+    return (entry_x + delta_x * math.cos(turn) + delta_y * math.sin(turn),
+            entry_y - delta_x * math.sin(turn) + delta_y * math.cos(turn))
+
+
 def check_triggers(text):
     """The problems with the trigger volume: the player is not in the box at first; the box, turned a quarter, takes a
     point along y and not one along x; coming in runs OnTriggerEnter for the player and for anyone once, and the person
@@ -3535,14 +3545,17 @@ def check_triggers(text):
             problems.append(f"the player who sat down should be put at the chair: {sat['sat']}")
         else:
             across, along, up, yaw = (float(value) for value in where)
-            # On the entry of the marker of the model (the chair is not turned): beside the chair, facing as the entry says
+            # On the seat: the entry of the marker of the model (the chair is not turned) moved by the settings of the
+            # games for the kind of the entry, facing as the entry says turned by their heading
             (entry_x, entry_y, _), orientation, _ = plugin.FURNITURE_ENTRY
-            if abs(across - entry_x) > 5 or abs(along - entry_y) > 5 or abs(up) > 5:
-                problems.append("the player who sat down should be put on the entry of the marker of the chair "
-                                f"({entry_x:.0f}, {entry_y:.0f}) from it, not at the middle of it: {sat['sat']}")
-            if abs(yaw - orientation / 1000.0) > 0.3:
-                problems.append(f"the player should face as the entry of the chair says ({orientation / 1000.0}): "
-                                f"{sat['sat']}")
+            seat_x, seat_y = furniture_seat()
+            if abs(across - seat_x) > 5 or abs(along - seat_y) > 5 or abs(up) > 5:
+                problems.append("the player who sat down should be put on the seat, the entry of the marker of the chair "
+                                f"({entry_x:.0f}, {entry_y:.0f}) moved by the settings of the games to "
+                                f"({seat_x:.0f}, {seat_y:.0f}) from it: {sat['sat']}")
+            facing = orientation / 1000.0 + plugin.FURNITURE_DELTA[3]
+            if abs(yaw - facing) > 0.3:
+                problems.append(f"the player should face as the seat says ({facing}): {sat['sat']}")
         if sat["away"][0] != 0:
             problems.append("a player who was moved away from the chair should not use it any more (IsCurrentFurnitureRef "
                             f"0): {sat['away']}")
@@ -3565,11 +3578,11 @@ def check_triggers(text):
     else:
         if later[0][0] != "1":
             problems.append(f"a character that has got to a chair by its package should use it: {later[0]}")
-        # It stands on the entry of the marker of the chair, which is that far from the middle of the chair
-        entry_distance = math.hypot(*plugin.FURNITURE_ENTRY[0][:2])
+        # It is on the seat of the chair, which is that far from the middle of the chair
+        entry_distance = math.hypot(*furniture_seat())
         if later[0][1] == "no sitter" or abs(int(later[0][1]) - entry_distance) > 15:
-            problems.append("a character in a chair should stay there, on the entry of its marker, while its package for "
-                            f"it is on, not walk on to the package that comes after: {later[0]}")
+            problems.append("a character in a chair should stay there, on its seat, while its package for it is on, not "
+                            f"walk on to the package that comes after: {later[0]}")
     # The two finders each took a chair near the marker of their Find package, not the same one, and not the far one
     seen = re.findall(r"OFTEST\tfinder\tlater\t(\d+)\t(\d+)\t(\d+)\t(\d+)$", text, re.M)
     if len(seen) != 2:
@@ -3581,9 +3594,9 @@ def check_triggers(text):
             if nearest not in ("1", "2"):
                 problems.append(f"finder {index} should sit in a chair within the radius of its package, not chair "
                                 f"{nearest}")
-            entry_distance = math.hypot(*plugin.FURNITURE_ENTRY[0][:2])
+            entry_distance = math.hypot(*furniture_seat())
             if abs(int(distance) - entry_distance) > 15:
-                problems.append(f"finder {index} should stand on the entry of its chair: {distance}")
+                problems.append(f"finder {index} should be on the seat of its chair: {distance}")
         if seen[0][2] == seen[1][2]:
             problems.append(f"the two finders took the same chair: {seen}")
     if "Quitting peacefully" not in text:

@@ -1,6 +1,7 @@
 #include "furniture.hpp"
 
 #include <cmath>
+#include <string_view>
 
 namespace FalloutScript
 {
@@ -60,6 +61,63 @@ namespace FalloutScript
         seat.mHeading = placement.mRotation[2] + entry.mHeading;
         seat.mRef = entry.mRef;
         seat.mIndex = index;
+        return seat;
+    }
+
+    FurnitureDeltas FurnitureDeltas::fromGameSettings(const std::map<std::string, double>& settings)
+    {
+        constexpr std::string_view prefix = "ffurnituremarker";
+        FurnitureDeltas result;
+        for (auto it = settings.lower_bound(std::string(prefix)); it != settings.end(); ++it)
+        {
+            const std::string_view name = it->first;
+            if (!name.starts_with(prefix))
+                break;
+            std::size_t i = prefix.size();
+            int ref = 0;
+            std::size_t digits = 0;
+            while (i < name.size() && name[i] >= '0' && name[i] <= '9' && digits < 4)
+            {
+                ref = ref * 10 + (name[i] - '0');
+                ++i;
+                ++digits;
+            }
+            if (digits == 0 || digits > 3 || ref > 255)
+                continue;
+            const std::string_view rest = name.substr(i);
+            const auto value = static_cast<float>(it->second);
+            FurnitureDelta delta = result.of(static_cast<std::uint8_t>(ref));
+            if (rest.find("head") != std::string_view::npos || rest.find("angle") != std::string_view::npos)
+                delta.mHeading = value;
+            else if (rest.ends_with('x'))
+                delta.mX = value;
+            else if (rest.ends_with('y'))
+                delta.mY = value;
+            else if (rest.ends_with('z'))
+                delta.mZ = value;
+            else
+                continue;
+            result.mDeltas[static_cast<std::uint8_t>(ref)] = delta;
+        }
+        return result;
+    }
+
+    FurnitureDelta FurnitureDeltas::of(std::uint8_t ref) const
+    {
+        const auto found = mDeltas.find(ref);
+        return found != mDeltas.end() ? found->second : FurnitureDelta{};
+    }
+
+    FurnitureSeat settledSeat(const FurnitureSeat& entry, const FurnitureDelta& delta, float scale)
+    {
+        // Like the offset of an entry: clockwise seen from above, by the heading the character has at the entry
+        const float c = std::cos(entry.mHeading);
+        const float s = std::sin(entry.mHeading);
+        FurnitureSeat seat = entry;
+        seat.mPosition.x += delta.mX * c + delta.mY * s;
+        seat.mPosition.y += -delta.mX * s + delta.mY * c;
+        seat.mPosition.z += (scale - 1.f) * delta.mZ;
+        seat.mHeading = entry.mHeading + delta.mHeading;
         return seat;
     }
 
