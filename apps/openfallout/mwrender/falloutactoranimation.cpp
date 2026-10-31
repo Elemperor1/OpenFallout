@@ -379,19 +379,20 @@ namespace OFRender
         const std::string attachTo = attachmentName(*part);
         if (!attachTo.empty())
         {
+            // The part is out of the scene while the bone is looked for, so that the bone is one of the skeleton of
+            // the character and never a node of the part itself (which the part would then be put under)
+            const std::vector<osg::ref_ptr<osg::Group>> parents(part->getParents().begin(), part->getParents().end());
+            for (const osg::ref_ptr<osg::Group>& parent : parents)
+                parent->removeChild(part);
             SceneUtil::FindByNameVisitor find(attachTo);
             mObjectRoot->accept(find);
             osg::Group* bone = find.mFoundNode;
-            // The bone is on the skeleton of the character, and never in the part itself (a part has none of its own
-            // that it names)
-            if (bone != nullptr && bone != part.get())
-            {
-                for (osg::Group* parent : std::vector<osg::Group*>(part->getParents()))
-                    parent->removeChild(part);
+            if (bone != nullptr)
                 bone->addChild(part);
-            }
             else
             {
+                for (const osg::ref_ptr<osg::Group>& parent : parents)
+                    parent->addChild(part);
                 static std::mutex sReportedMutex;
                 static std::set<std::string> sReported;
                 const std::lock_guard lock(sReportedMutex);

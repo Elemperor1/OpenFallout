@@ -86,6 +86,9 @@ namespace FalloutScript
                 continue;
             const std::string_view rest = name.substr(i);
             const auto value = static_cast<float>(it->second);
+            // A setting of the plugin that is not a number, or too large for one, moves no one
+            if (!std::isfinite(value))
+                continue;
             FurnitureDelta delta = result.of(static_cast<std::uint8_t>(ref));
             if (rest.find("head") != std::string_view::npos || rest.find("angle") != std::string_view::npos)
                 delta.mHeading = value;

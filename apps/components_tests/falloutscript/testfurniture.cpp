@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
@@ -154,6 +155,24 @@ namespace
         EXPECT_FLOAT_EQ(none.mY, 0);
         EXPECT_FLOAT_EQ(none.mHeading, 0);
         EXPECT_EQ(FurnitureDeltas::fromGameSettings({}).size(), 0u);
+    }
+
+    TEST(FalloutFurniture, aSettingThatIsNotAFiniteNumberMovesNoOne)
+    {
+        const double inf = std::numeric_limits<double>::infinity();
+        const FurnitureDeltas deltas = FurnitureDeltas::fromGameSettings({
+            { "ffurnituremarker11deltax", std::numeric_limits<double>::quiet_NaN() },
+            { "ffurnituremarker11deltay", inf },
+            { "ffurnituremarker11deltaz", 1e300 },
+            { "ffurnituremarker11headingdelta", -inf },
+            { "ffurnituremarker12deltax", 2 },
+        });
+        const FurnitureDelta bad = deltas.of(11);
+        EXPECT_FLOAT_EQ(bad.mX, 0);
+        EXPECT_FLOAT_EQ(bad.mY, 0);
+        EXPECT_FLOAT_EQ(bad.mZ, 0);
+        EXPECT_FLOAT_EQ(bad.mHeading, 0);
+        EXPECT_FLOAT_EQ(deltas.of(12).mX, 2);
     }
 
     TEST(FalloutFurniture, aSettingMayNameTheHeadingOtherwise)
