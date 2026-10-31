@@ -12,6 +12,7 @@
 
 #include <osg/Image>
 #include <osg/Node>
+#include <osg/Quat>
 #include <osg/Vec3f>
 
 namespace VFS
@@ -70,6 +71,18 @@ namespace OFRender
     /// and beard of a character, and the hats, on the bone "Bip01 Head" by the extra data "Prn" of the file, since
     /// these parts are not skinned. Empty when the model names none.
     std::string attachmentName(osg::Node& part);
+
+    /// The turn that the node of the file with the extra data "Prn" has (the identity when the model has none). The
+    /// optimizer folds it into the meshes of the model, so the part itself no longer shows it.
+    osg::Quat attachmentRotation(osg::Node& part);
+
+    /// The turn to put between a bone and a part that is not skinned, so that the part is in the frame of the head
+    /// model (the axes of the world, the origin on the bone) when the bone is at rest. The files of these parts
+    /// hold their vertices in that frame, and the eyes and mouth have the turn of the bone undone in their own root
+    /// (`partRoot`) while the hair, eyebrows and beards have none; the result is the same for both: the turn that
+    /// sits on the bone, then the one of the file, then the meshes give the identity. `boneRest` is the turn of the
+    /// bone in the character at rest, `partRoot` the one of `attachmentRotation`.
+    osg::Quat attachmentFrame(const osg::Quat& boneRest, const osg::Quat& partRoot);
 
     /// The morphs of the .egm file that goes with a model (a path as the race and the hair records name it). The file
     /// is read once. Null when there is none, or when it is not valid, which is said once in the log.

@@ -142,6 +142,38 @@ osg::Group {
         EXPECT_EQ(attachTo, "Bip01 Head");
     }
 
+    // The turn of that node is folded into the meshes when the model is optimized: a part is put on its bone by it
+    TEST_F(NifOsgLoaderTest, keepsTheTurnOfTheNodeThatAModelAsksToBeAttachedTo)
+    {
+        Nif::NiStringExtraData extra;
+        init(extra);
+        extra.mName = "Prn";
+        extra.mData = "Bip01 Head";
+        extra.mRecordType = Nif::RC_NiStringExtraData;
+        Nif::NiNode node;
+        init(node);
+        node.mExtra = Nif::ExtraPtr(&extra);
+        // A quarter of a turn about z, as a file writes it (acting on column vectors): x goes to y
+        node.mTransform.mRotation.mValues[0][0] = 0.f;
+        node.mTransform.mRotation.mValues[0][1] = -1.f;
+        node.mTransform.mRotation.mValues[1][0] = 1.f;
+        node.mTransform.mRotation.mValues[1][1] = 0.f;
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&node);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::Group* root = result->asGroup();
+        ASSERT_NE(root, nullptr);
+        ASSERT_EQ(root->getNumChildren(), 1u);
+        osg::Quat turn;
+        ASSERT_TRUE(root->getChild(0)->getUserValue(Misc::OsgUserValues::sAttachRotation, turn));
+        const osg::Vec3d moved = turn * osg::Vec3d(1.0, 0.0, 0.0);
+        EXPECT_NEAR(moved.x(), 0.0, 1e-5);
+        EXPECT_NEAR(moved.y(), 1.0, 1e-5);
+        EXPECT_NEAR(moved.z(), 0.0, 1e-5);
+    }
+
     TEST_F(NifOsgLoaderTest, doesNotNameANodeToAttachToForOtherExtraData)
     {
         Nif::NiStringExtraData extra;

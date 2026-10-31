@@ -225,12 +225,14 @@ namespace OFRender
                 if (node.getUserValue(Misc::OsgUserValues::sAttachTo, name) && !name.empty())
                 {
                     mName = std::move(name);
+                    node.getUserValue(Misc::OsgUserValues::sAttachRotation, mRotation);
                     return;
                 }
                 traverse(node);
             }
 
             std::string mName;
+            osg::Quat mRotation;
         };
     }
 
@@ -239,6 +241,18 @@ namespace OFRender
         FindAttachment find;
         part.accept(find);
         return std::move(find.mName);
+    }
+
+    osg::Quat attachmentRotation(osg::Node& part)
+    {
+        FindAttachment find;
+        part.accept(find);
+        return find.mRotation;
+    }
+
+    osg::Quat attachmentFrame(const osg::Quat& boneRest, const osg::Quat& partRoot)
+    {
+        return boneRest.inverse() * partRoot.inverse();
     }
 
     std::size_t replaceDiffuseMap(osg::Node& part, osg::Image* image)

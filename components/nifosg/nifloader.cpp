@@ -867,7 +867,13 @@ namespace NifOsg
                     // The model of a part that is not skinned (the hair and eyes of a character, a hat) names the
                     // node of the skeleton that the game attaches it to
                     if (Misc::StringUtils::ciEqual(sd->mName, "Prn") && !sd->mData.empty())
+                    {
                         node->setUserValue(Misc::OsgUserValues::sAttachTo, sd->mData);
+                        // The turn of this node goes into the meshes when the model is optimized, and a part is put
+                        // on its bone by what the file holds
+                        node->setUserValue(
+                            Misc::OsgUserValues::sAttachRotation, nifNode->mTransform.toMatrix().getRotate());
+                    }
 
                     // String markers may contain important information
                     // affecting the entire subtree of this obj

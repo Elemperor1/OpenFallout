@@ -9,6 +9,8 @@
 
 #include <osg/Geometry>
 #include <osg/Group>
+#include <osg/Matrix>
+#include <osg/Quat>
 #include <osg/Texture2D>
 #include <osg/Uniform>
 
@@ -521,5 +523,57 @@ namespace
 
         EXPECT_TRUE(attachmentName(*root).empty());
         EXPECT_TRUE(attachmentName(*blank).empty());
+    }
+    namespace
+    {
+        // A turn as the files write it: nine numbers, row by row, acting on column vectors
+        osg::Quat turnOfFile(const float (&m)[9])
+        {
+            osg::Matrix matrix;
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j)
+                    matrix(i, j) = m[j * 3 + i];
+            return matrix.getRotate();
+        }
+
+        // The rotation of Bip01 Head in the rest pose of the skeleton, and the root of the eye files, that holds the
+        // turn back (the numbers of the files of New Vegas)
+        constexpr float sHeadAtRest[9]
+            = { 0.f, 0.000001f, -1.f, 0.002847f, 0.999996f, 0.000001f, 0.999996f, -0.002847f, 0.f };
+        constexpr float sEyeRoot[9]
+            = { 0.000002f, 0.002413f, 0.999997f, 0.f, 0.999997f, -0.002413f, -1.f, 0.f, 0.000002f };
+
+        void expectNear(const osg::Vec3d& actual, const osg::Vec3d& expected, double tolerance)
+        {
+            EXPECT_NEAR(actual.x(), expected.x(), tolerance);
+            EXPECT_NEAR(actual.y(), expected.y(), tolerance);
+            EXPECT_NEAR(actual.z(), expected.z(), tolerance);
+        }
+    }
+
+    TEST(OpenFalloutRenderAttachmentFrame, leavesAnEyeAloneThatHasTheTurnOfTheBoneUndoneInItsRoot)
+    {
+        const osg::Quat bone = turnOfFile(sHeadAtRest);
+        const osg::Quat root = turnOfFile(sEyeRoot);
+        const osg::Quat frame = attachmentFrame(bone, root);
+
+        // Nothing to put in between
+        EXPECT_GT(std::abs(frame.w()), 0.99999);
+        // The left eye of the head model is where the head model has it: to the left, in front, above the bone
+        const osg::Vec3d eye(-2.193, 6.608, 7.106);
+        expectNear(bone * (frame * (root * eye)), eye, 0.01);
+    }
+
+    TEST(OpenFalloutRenderAttachmentFrame, turnsAPartThatHasNoTurnInItsRootBackIntoTheHeadModel)
+    {
+        const osg::Quat bone = turnOfFile(sHeadAtRest);
+        const osg::Quat frame = attachmentFrame(bone, osg::Quat());
+
+        // A quarter of a turn: the hair of the files is in the frame of the head model, which the bone turns away
+        EXPECT_NEAR(std::abs(frame.w()), std::sqrt(0.5), 0.001);
+        // Hair at 8.3 units above the origin of the head stays above it instead of landing at the side
+        const osg::Vec3d hair(0.004, 0.561, 8.331);
+        expectNear(bone * (frame * hair), hair, 0.01);
+        expectNear(bone * hair, osg::Vec3d(-8.331, 0.561 + 0.0237, 0.0), 0.05);
     }
 }

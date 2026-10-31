@@ -1,6 +1,7 @@
 #include "falloutactoranimation.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <map>
 #include <memory>
@@ -11,6 +12,7 @@
 
 #include <osg/ComputeBoundsVisitor>
 #include <osg/Matrix>
+#include <osg/MatrixTransform>
 #include <osg/Transform>
 
 #include <components/debug/debuglog.hpp>
@@ -474,7 +476,24 @@ namespace OFRender
             mObjectRoot->accept(find);
             osg::Group* bone = find.mFoundNode;
             if (bone != nullptr)
-                bone->addChild(part);
+            {
+                // The vertices of these parts are in the frame of the head model, not in that of the bone, which the
+                // bone is turned from by 90 degrees: the turn that gets them there is put between the two
+                osg::Quat boneRest;
+                const osg::NodePathList paths = bone->getParentalNodePaths(mObjectRoot.get());
+                if (!paths.empty())
+                    boneRest = osg::computeLocalToWorld(paths.front()).getRotate();
+                const osg::Quat frame = attachmentFrame(boneRest, attachmentRotation(*part));
+                if (std::abs(frame.w()) < 0.99999)
+                {
+                    osg::ref_ptr<osg::MatrixTransform> turn = new osg::MatrixTransform(osg::Matrix::rotate(frame));
+                    turn->setName("PartFrame");
+                    turn->addChild(part);
+                    bone->addChild(turn);
+                }
+                else
+                    bone->addChild(part);
+            }
             else
             {
                 for (const osg::ref_ptr<osg::Group>& parent : parents)
