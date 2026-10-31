@@ -881,6 +881,11 @@ namespace Resource
                 return false;
             if (isReservedName(node->getName()))
                 return false;
+            // A model that names the node of a skeleton it is attached to (the hair of a character, a hat) holds
+            // that on its root, which would be gone with the root when the root is merged into its parent
+            std::string attachTo;
+            if (node->getUserValue(Misc::OsgUserValues::sAttachTo, attachTo))
+                return false;
 
             return (option & optimizer->getPermissibleOptimizationsForObject(node)) != 0;
         }

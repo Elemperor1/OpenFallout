@@ -177,6 +177,22 @@ namespace OFClass
             EXPECT_EQ(models.back(), "suit\\hat.nif");
         }
 
+        TEST(OFClassNpcPartsTest, theHairAndTheHeadPartsOfTheCharacterAreMarkedForTheHead)
+        {
+            const ESM4::Race race = humanRace();
+            const ESM4::Hair hair = hairOf("hair\\bob.nif");
+            const ESM4::HeadPart beard = headPartOf("hair\\beard.nif");
+            const FalloutNpcParts parts = falloutNpcParts(race, false, &hair, { &beard }, {});
+            std::size_t marked = 0;
+            for (const FalloutNpcPart& part : parts.mParts)
+            {
+                const bool named = part.mKind == FalloutPartKind::Hair || part.mKind == FalloutPartKind::HeadPart;
+                EXPECT_EQ(part.mForHead, named) << part.mModel;
+                marked += part.mForHead ? 1 : 0;
+            }
+            EXPECT_EQ(marked, 2u);
+        }
+
         TEST(OFClassNpcPartsTest, aPieceWornOnTheHeadIsMarkedForTheHead)
         {
             const ESM4::Race race = humanRace();

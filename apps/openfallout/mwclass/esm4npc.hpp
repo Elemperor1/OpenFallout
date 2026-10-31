@@ -70,7 +70,7 @@ namespace OFClass
         std::string mModel; ///< a path under meshes, as the record names it
         std::string mTexture; ///< the picture that the record gives it, a path under textures; empty when it has none
         FalloutPartKind mKind = FalloutPartKind::Worn;
-        bool mForHead = false; ///< a piece that is worn on the head (a hat, glasses, a mask)
+        bool mForHead = false; ///< a piece for the head (hair, eyebrows, beards, a hat, glasses, a mask)
     };
 
     struct FalloutNpcParts

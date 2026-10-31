@@ -117,11 +117,12 @@ namespace OFClass
             }
             for (const ESM4::HeadPart* part : headParts)
                 if (part != nullptr && !part->mModel.empty())
-                    result.mParts.push_back({ part->mModel.getOriginal(), std::string(), FalloutPartKind::HeadPart });
+                    result.mParts.push_back(
+                        { part->mModel.getOriginal(), std::string(), FalloutPartKind::HeadPart, true });
         }
         if (hair != nullptr && !hair->mModel.empty() && (covered & ESM4::Armor::FO3_Hair) == 0)
             result.mParts.push_back(
-                { hair->mModel.getOriginal(), falloutTexturePath(hair->mIcon), FalloutPartKind::Hair });
+                { hair->mModel.getOriginal(), falloutTexturePath(hair->mIcon), FalloutPartKind::Hair, true });
 
         // The slots of the head: what is worn there hangs on the head bone when its file does not say where it goes
         constexpr std::uint32_t headSlots = ESM4::Armor::FO3_Head | ESM4::Armor::FO3_Hair | ESM4::Armor::FO3_Headband
