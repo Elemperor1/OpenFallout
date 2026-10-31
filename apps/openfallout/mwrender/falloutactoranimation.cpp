@@ -167,14 +167,16 @@ namespace OFRender
         if (isDown() || mDefaultIdleGroup.empty())
             return;
         // And an idle that has nothing for a part of the body leaves it in that pose whatever plays: said once for
-        // each kind of idle and skeleton, since starting it again changes nothing
+        // each kind of idle and skeleton, since starting it again changes nothing. Only for the people: the bone
+        // groups are those of their skeleton, and the animals and the machines do not have arms to leave out.
         if (!mCoverageChecked && isPlaying(mDefaultIdleGroup))
         {
             mCoverageChecked = true;
             std::string missing;
-            for (int group = 0; group < Num_BoneGroups; ++group)
-                if (!hasControllersFor(mDefaultIdleGroup, static_cast<BoneGroup>(group)))
-                    missing += (missing.empty() ? "" : ", ") + std::to_string(group);
+            if (mPtr.getType() == ESM4::Npc::sRecordId)
+                for (int group = 0; group < Num_BoneGroups; ++group)
+                    if (!hasControllersFor(mDefaultIdleGroup, static_cast<BoneGroup>(group)))
+                        missing += (missing.empty() ? "" : ", ") + std::to_string(group);
             if (!missing.empty()
                 && firstTimeFor("coverage\n" + mDefaultIdleGroup + "\n" + mSkeletonPath + "\n" + missing))
                 Log(Debug::Warning) << "T-pose watch: the idle " << mDefaultIdleGroup << " of " << mSkeletonPath
