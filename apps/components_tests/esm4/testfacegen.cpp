@@ -348,6 +348,14 @@ namespace
         EXPECT_FALSE(ESM4::decodeSkinImage(ESM4::SkinPixelFormat::Dxt5, bytes.data(), bytes.size(), 4, 4, image));
         EXPECT_FALSE(ESM4::decodeSkinImage(ESM4::SkinPixelFormat::Dxt1, bytes.data(), bytes.size(), 0, 4, image));
         EXPECT_FALSE(ESM4::decodeSkinImage(ESM4::SkinPixelFormat::Dxt1, nullptr, 8, 4, 4, image));
+        // A file that declares a huge picture and holds a few bytes is refused, and the picture stays as it was
+        ESM4::SkinImage untouched;
+        EXPECT_FALSE(
+            ESM4::decodeSkinImage(ESM4::SkinPixelFormat::Rgba, bytes.data(), bytes.size(), 8192, 8192, untouched));
+        EXPECT_TRUE(untouched.mPixels.empty());
+        EXPECT_FALSE(
+            ESM4::decodeSkinImage(ESM4::SkinPixelFormat::Dxt5, bytes.data(), bytes.size(), 8192, 8192, untouched));
+        EXPECT_TRUE(untouched.mPixels.empty());
     }
 
     TEST(ESM4SkinImageTest, readsTheFourColoursOfABlockOfDxt1)

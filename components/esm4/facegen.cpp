@@ -414,6 +414,31 @@ namespace ESM4
             return false;
         const std::size_t pixels = static_cast<std::size_t>(width) * height;
 
+        // What the picture needs is known from its format: a file that declares more than it holds is refused before
+        // anything is made for it
+        const std::size_t blocks = static_cast<std::size_t>((width + 3) / 4) * ((height + 3) / 4);
+        std::size_t required = 0;
+        switch (format)
+        {
+            case SkinPixelFormat::Rgb:
+            case SkinPixelFormat::Bgr:
+                required = pixels * 3;
+                break;
+            case SkinPixelFormat::Rgba:
+            case SkinPixelFormat::Bgra:
+                required = pixels * 4;
+                break;
+            case SkinPixelFormat::Dxt1:
+                required = blocks * 8;
+                break;
+            case SkinPixelFormat::Dxt3:
+            case SkinPixelFormat::Dxt5:
+                required = blocks * 16;
+                break;
+        }
+        if (required == 0 || size < required)
+            return false;
+
         image.mWidth = width;
         image.mHeight = height;
         image.mPixels.assign(pixels * 3, 0);

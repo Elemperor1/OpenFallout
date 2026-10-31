@@ -158,6 +158,9 @@ namespace OFRender
                 skin = true;
                 tint = images.mBodyTint;
                 break;
+            case Kind::Face:
+                // The mouth, the teeth and the tongue have the picture that the race names for them
+                break;
             case Kind::Hair:
             case Kind::HeadPart:
                 break;
