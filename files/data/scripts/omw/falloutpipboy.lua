@@ -768,9 +768,10 @@ local function pickedItem()
     return sortedItems(invTab)[selected]
 end
 
--- What a key (or a button of the pad that stands for one) does on the screen
+-- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
+-- over it takes the keys and the buttons)
 local function press(code)
-    if not visible or view ~= 'pipboy' then
+    if not visible or view ~= 'pipboy' or I.UI.getMode() ~= 'Interface' then
         return
     end
     if dropPrompt then
@@ -825,7 +826,7 @@ local function press(code)
 end
 
 -- X drops the item; the other buttons stand for the keys of every screen
-local onPad = pad.handler('pipboy', function() return visible and view == 'pipboy' end, press,
+local onPad = pad.handler('pipboy', function() return visible and view == 'pipboy' and I.UI.getMode() == 'Interface' end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
 
 return {

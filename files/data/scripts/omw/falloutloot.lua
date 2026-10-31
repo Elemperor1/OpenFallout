@@ -145,6 +145,9 @@ local function scroll(by)
     local moved = math.max(1, math.min(math.max(1, listLength - listLines + 1), offset + by))
     if moved ~= offset then
         offset = moved
+        -- the thing that was picked out may be out of view now: the keys start again from what is shown
+        selectFocus = false
+        selected = math.max(offset, math.min(selected, offset + listLines - 1))
         render()
     end
 end
@@ -184,10 +187,12 @@ local function takeSelected()
     if not item then
         return
     end
-    if selectFocus then
+    if selectFocus and selected >= offset and selected <= offset + listLines - 1 then
         pipboy.transfer(loot.holder, pipboy.player(), item.id, item.count)
     else
+        -- nothing is picked out, or it is not shown: bring the pick into view, and take nothing
         selectFocus = true
+        selected = math.max(offset, math.min(selected, offset + listLines - 1))
     end
     render()
 end
@@ -195,7 +200,8 @@ end
 -- What a key (or a button of the pad that stands for one) does while the screen is there: the arrows and pages pick a
 -- thing, Enter takes it and R takes everything
 local function press(code)
-    if not element then
+    -- (a menu opened over the screen takes the keys and the buttons)
+    if not element or I.UI.getMode() ~= 'Interface' then
         return
     end
     if code == input.KEY.DownArrow then
@@ -214,7 +220,7 @@ local function press(code)
 end
 
 -- On the pad Y takes the thing and X takes everything
-local onPad = pad.handler('loot', function() return element ~= nil end, press,
+local onPad = pad.handler('loot', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.R })
 
 local function sync()

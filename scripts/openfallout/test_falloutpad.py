@@ -134,6 +134,15 @@ class ScriptsTest(unittest.TestCase):
             for module in re.findall(r"require\('scripts\.omw\.(\w+)'\)", path.read_text(encoding="utf-8")):
                 self.assertIn("scripts/omw/%s.lua" % module, listed, module)
 
+    def test_a_menu_over_a_screen_takes_the_keys_and_the_buttons(self):
+        # A screen keeps its element when the main menu opens over it, so its keys and buttons act only while its mode
+        # is the top one
+        for screen, mode in (("pipboy", "Interface"), ("dialogue", "Dialogue"), ("vats", "Interface"),
+                             ("loot", "Interface"), ("craft", "Interface"), ("interaction", "Interface")):
+            text = (SCRIPTS / ("fallout%s.lua" % screen)).read_text(encoding="utf-8")
+            self.assertGreaterEqual(text.count("I.UI.getMode() ~= '%s'" % mode), 1, screen)
+            self.assertIn("I.UI.getMode() == '%s'" % mode, text, screen)
+
     def test_the_keys_of_a_screen_and_the_buttons_go_through_one_function(self):
         for screen in SCREENS:
             text = (SCRIPTS / ("fallout%s.lua" % screen)).read_text(encoding="utf-8")

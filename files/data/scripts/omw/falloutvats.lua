@@ -324,7 +324,8 @@ end
 local function press(code)
     if code == input.KEY.V and not modeOpen and controlsAllowed() then
         open()
-    elseif not element then
+    elseif not element or I.UI.getMode() ~= 'Interface' then
+        -- (a menu opened over the screen takes the keys and the buttons)
         return
     elseif code == input.KEY.Enter then
         go()
@@ -343,7 +344,7 @@ end
 
 -- On the pad Y queues the attack on the part and X carries the queue out; the left bumper opens the screen (the bumpers
 -- pick the character while it is open)
-local handlePad = pad.handler('vats', function() return element ~= nil end, press,
+local handlePad = pad.handler('vats', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press,
     { [input.CONTROLLER_BUTTON.Y] = input.KEY.Space, [input.CONTROLLER_BUTTON.X] = input.KEY.Enter })
 
 local function onPad(button)

@@ -2376,6 +2376,18 @@ local function interactionSteps()
                 tostring(loot ~= nil and #core.pipboy.items(loot.holder) or -1), tostring(I.UI.getMode())))
             chestSlugs, chestRounds = have('Test Slugs'), have('Test Rounds')
         end },
+        -- A menu opened over the screen takes the buttons: Y does not take anything behind it
+        { run = function() I.UI.addMode('MainMenu') end },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.DPadDown) },
+        { settle = 10 },
+        { run = press(input.CONTROLLER_BUTTON.Y) },
+        { settle = 10 },
+        { run = function()
+            say('chestmenu', 'mode=' .. tostring(I.UI.getMode()) .. ' ' .. chestSummary())
+            I.UI.removeMode('MainMenu')
+        end, done = function() return I.UI.getMode() == 'Interface' end },
+        { settle = 10 },
         -- The pad: the first press of down picks out the first thing, the second the next, Y takes it, X takes the rest
         { run = press(input.CONTROLLER_BUTTON.DPadDown) },
         { settle = 10 },
@@ -4268,6 +4280,7 @@ def check_arena_interact(text):
            rf"lock=false mode=nil experience={plugin.ARENA_PICK_XP}")
     expect("chest", "no lock screen, the chest opens with its things in it", r"lock=false loot=2 mode=Interface")
     # The pad: down twice picks out the slugs (the things are listed by name), Y takes them, X takes the rest
+    expect("chestmenu", "a menu over the screen takes the buttons, nothing is taken", "mode=MainMenu items=2 slugs=0 rounds=0")
     expect("chestpad1", "the slugs are taken", rf"items=1 slugs={plugin.ARENA_CHEST_SLUGS} rounds=0")
     expect("chestpad2", "the rounds are taken", rf"items=0 slugs={plugin.ARENA_CHEST_SLUGS} rounds={plugin.ARENA_CHEST_ROUNDS}")
     expect("journal", "the trigger of the journal opens no window in Fallout", "mode=nil")

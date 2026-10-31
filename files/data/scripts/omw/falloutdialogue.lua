@@ -478,9 +478,10 @@ if conversation.available() then
     I.UI.registerWindow('Dialogue', show, hide)
 end
 
--- What a key (or a button of the pad that stands for one) does while the window is there
+-- What a key (or a button of the pad that stands for one) does while the window is there and the top one (a menu opened
+-- over it takes the keys and the buttons)
 local function press(code)
-    if not visible then
+    if not visible or I.UI.getMode() ~= 'Dialogue' then
         return
     end
     local view = conversation.get()
@@ -513,7 +514,7 @@ local function press(code)
     end
 end
 
-local onPad = pad.handler('dialogue', function() return visible end, press)
+local onPad = pad.handler('dialogue', function() return visible and I.UI.getMode() == 'Dialogue' end, press)
 
 return {
     engineHandlers = {

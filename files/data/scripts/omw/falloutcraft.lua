@@ -271,7 +271,8 @@ end
 -- What a key (or a button of the pad that stands for one) does while the menu is there: up and down pick a recipe,
 -- left and right a sub-category, Enter makes the recipe
 local function press(code)
-    if not element then
+    -- (a menu opened over the screen takes the keys and the buttons)
+    if not element or I.UI.getMode() ~= 'Interface' then
         return
     end
     if code == input.KEY.DownArrow then
@@ -294,7 +295,7 @@ local function press(code)
     end
 end
 
-local onPad = pad.handler('craft', function() return element ~= nil end, press)
+local onPad = pad.handler('craft', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press)
 
 local function sync()
     local menu = pipboy.recipes()

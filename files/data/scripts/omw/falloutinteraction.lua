@@ -341,6 +341,10 @@ end
 -- What a key (or a button of the pad that stands for one) does: on the screen of the hours left and right change them
 -- and Enter begins the wait; on the screen of a lock Enter puts a bobby pin in
 local function press(code)
+    -- (a menu opened over the screen takes the keys and the buttons)
+    if I.UI.getMode() ~= 'Interface' then
+        return
+    end
     if screen == 'rest' then
         if code == input.KEY.LeftArrow then
             hours = math.max(1, hours - 1)
@@ -359,7 +363,8 @@ local function press(code)
     end
 end
 
-local onPad = pad.handler('interaction', function() return screen == 'rest' or screen == 'lock' end, press)
+local onPad = pad.handler('interaction',
+    function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' end, press)
 
 return {
     engineHandlers = {
