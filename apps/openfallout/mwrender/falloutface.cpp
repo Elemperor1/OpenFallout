@@ -7,7 +7,9 @@
 #include <string>
 
 #include <osg/Geometry>
+#include <osg/StateSet>
 #include <osg/Texture2D>
+#include <osg/Uniform>
 #include <osg/observer_ptr>
 
 #ifndef GL_BGR
@@ -369,7 +371,18 @@ namespace OFRender
 
                 // The state set is that of every character with the same hair
                 osg::ref_ptr<osg::StateSet> copy = new osg::StateSet(*stateset, osg::CopyOp::SHALLOW_COPY);
-                copy->setAttributeAndModes(own, osg::StateAttribute::ON);
+                const osg::StateSet::RefAttributePair* pair = stateset->getAttributePair(osg::StateAttribute::MATERIAL);
+                const osg::StateAttribute::OverrideValue value
+                    = pair != nullptr ? pair->second : osg::StateAttribute::OverrideValue(osg::StateAttribute::ON);
+                copy->setAttributeAndModes(own, value);
+
+                // The shaders read the material from uniforms (the attribute itself draws nothing), which the setup of
+                // the model put in the state set, and the copy shares them with every character of this hair. Give
+                // this one uniforms of its own, of the new material.
+                osg::ref_ptr<osg::StateSet> uniforms = new osg::StateSet;
+                own->setStateSet(uniforms, value);
+                for (const auto& entry : uniforms->getUniformList())
+                    copy->addUniform(entry.second.first, value);
                 node.setStateSet(copy);
                 ++mChanged;
             }
@@ -394,8 +407,9 @@ namespace OFRender
                 traverse(group);
             }
 
-            std::vector<osg::Group*> mHat;
-            std::vector<osg::Group*> mNoHat;
+            // Held, as taking a shape out of its last parent would free it
+            std::vector<osg::ref_ptr<osg::Group>> mHat;
+            std::vector<osg::ref_ptr<osg::Group>> mNoHat;
         };
     }
 
@@ -413,7 +427,7 @@ namespace OFRender
         if (collect.mHat.empty() || collect.mNoHat.empty())
             return 0;
         std::size_t removed = 0;
-        for (osg::Group* shape : hat ? collect.mNoHat : collect.mHat)
+        for (const osg::ref_ptr<osg::Group>& shape : hat ? collect.mNoHat : collect.mHat)
             while (shape->getNumParents() > 0)
             {
                 shape->getParent(0)->removeChild(shape);

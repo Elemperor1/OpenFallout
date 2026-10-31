@@ -9,6 +9,7 @@
 #include <osg/Geometry>
 #include <osg/Group>
 #include <osg/Texture2D>
+#include <osg/Uniform>
 
 #include <cmath>
 #include <string>
@@ -391,6 +392,25 @@ namespace
         EXPECT_EQ(hatted->getChild(0)->getName(), "HAT");
     }
 
+    TEST(OpenFalloutRenderChooseHairShape, takesOutAShapeWhoseOnlyOwnerIsItsParentAndSharedOnesFromEveryParent)
+    {
+        // the group is freed with its last parent: it must not be asked anything after that
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        osg::ref_ptr<osg::Group> other = new osg::Group;
+        root->addChild(new osg::Group);
+        root->getChild(0)->setName("NoHat");
+        root->addChild(new osg::Group);
+        root->getChild(1)->setName("Hat");
+        osg::ref_ptr<osg::Group> shared = new osg::Group;
+        shared->setName("hat");
+        root->addChild(shared);
+        other->addChild(shared);
+        shared = nullptr;
+        EXPECT_EQ(chooseHairShape(*root, false), 3u);
+        EXPECT_EQ(root->getNumChildren(), 1u);
+        EXPECT_EQ(other->getNumChildren(), 0u);
+    }
+
     TEST(OpenFalloutRenderChooseHairShape, leavesAModelThatHasOnlyOneOfThemAlone)
     {
         osg::ref_ptr<osg::Group> beard = new osg::Group;
@@ -416,6 +436,10 @@ namespace
         osg::ref_ptr<osg::StateSet> shared = new osg::StateSet;
         shared->setTextureAttribute(0, new osg::Texture2D(makeImage(2)), osg::StateAttribute::ON);
         shared->setAttributeAndModes(material, osg::StateAttribute::ON);
+        // what the setup of the shaders made of the material
+        material->setStateSet(shared);
+        const osg::Uniform* sharedDiffuse = shared->getUniform("material.diffuse");
+        ASSERT_NE(sharedDiffuse, nullptr);
 
         osg::ref_ptr<osg::Group> mine = new osg::Group;
         mine->setStateSet(shared);
@@ -441,6 +465,23 @@ namespace
         EXPECT_FLOAT_EQ(own->getAmbient().b(), 0.2f);
         // and the picture stays
         EXPECT_NE(mine->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXTURE), nullptr);
+
+        // the shaders read uniforms: this shape has its own, of the colour, and those of the others do not change
+        const osg::Uniform* ownDiffuse = mine->getStateSet()->getUniform("material.diffuse");
+        ASSERT_NE(ownDiffuse, nullptr);
+        EXPECT_NE(ownDiffuse, sharedDiffuse);
+        osg::Vec4f value;
+        ASSERT_TRUE(ownDiffuse->get(value));
+        EXPECT_FLOAT_EQ(value.r(), 1.f);
+        EXPECT_FLOAT_EQ(value.g(), 0.5f);
+        int mode = -1;
+        ASSERT_TRUE(mine->getStateSet()->getUniform("material.vertexColorMode")->get(mode));
+        EXPECT_EQ(mode, static_cast<int>(SceneUtil::VertexColorModes::None));
+        ASSERT_TRUE(sharedDiffuse->get(value));
+        EXPECT_FLOAT_EQ(value.r(), 1.f);
+        EXPECT_FLOAT_EQ(value.g(), 1.f);
+        ASSERT_TRUE(shared->getUniform("material.vertexColorMode")->get(mode));
+        EXPECT_EQ(mode, static_cast<int>(SceneUtil::VertexColorModes::AmbientAndDiffuse));
     }
 
     TEST(OpenFalloutRenderTintHair, makesAMaterialForAShapeThatHasNoneAndSkipsNodesWithoutAPicture)
