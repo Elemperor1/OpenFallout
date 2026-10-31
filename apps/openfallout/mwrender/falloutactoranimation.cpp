@@ -486,7 +486,10 @@ namespace OFRender
         {
             // The part is out of the scene while the bone is looked for, so that the bone is one of the skeleton of
             // the character and never a node of the part itself (which the part would then be put under)
-            const std::vector<osg::ref_ptr<osg::Group>> parents(part->getParents().begin(), part->getParents().end());
+            // (getParents() of a node that is not const hands out a copy of the list, so it is taken once: the two ends
+            // of a range must come from the same list)
+            const osg::Node::ParentList parentList = part->getParents();
+            const std::vector<osg::ref_ptr<osg::Group>> parents(parentList.begin(), parentList.end());
             for (const osg::ref_ptr<osg::Group>& parent : parents)
                 parent->removeChild(part);
             SceneUtil::FindByNameVisitor find(attachTo);
