@@ -36,6 +36,28 @@ namespace
         EXPECT_EQ(chooseFalloutIdle(mFolder, files), "meshes/characters/_male/idle.kf");
     }
 
+    TEST_F(
+        OpenFalloutRenderChooseFalloutIdle, takesTheStandingPoseOfTheLocomotionFolderBeforeTheIdleThatMovesTheHandsOnly)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/h2hidle.kf",
+            "meshes/characters/_male/locomotion/hurt/mtidle.kf", "meshes/characters/_male/locomotion/mtidle.kf",
+            "meshes/characters/_male/locomotion/male/mtforward.kf", "meshes/characters/_male/1hmidle.kf" };
+        EXPECT_EQ(chooseFalloutIdle(mFolder, files), "meshes/characters/_male/locomotion/mtidle.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutIdle, takesTheMtidleOfTheFolderItselfBeforeThatOfTheLocomotionFolder)
+    {
+        const std::vector<std::string> files
+            = { "meshes/characters/_male/locomotion/mtidle.kf", "meshes/characters/_male/mtidle.kf" };
+        EXPECT_EQ(chooseFalloutIdle(mFolder, files), "meshes/characters/_male/mtidle.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutIdle, doesNotTakeTheMtidleOfAFolderOfTheLocomotionFolder)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/locomotion/hurt/mtidle.kf" };
+        EXPECT_EQ(chooseFalloutIdle(mFolder, files), "");
+    }
+
     TEST_F(OpenFalloutRenderChooseFalloutIdle, takesTheFirstIdleByNameWhenNoneIsPreferred)
     {
         const std::vector<std::string> files = { "meshes/characters/_male/2hridle.kf",

@@ -1,15 +1,26 @@
 #ifndef GAME_RENDER_ESM4NPCANIMATION_H
 #define GAME_RENDER_ESM4NPCANIMATION_H
 
+#include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 #include <vector>
+
+#include <osg/Image>
+#include <osg/Vec3f>
+#include <osg/ref_ptr>
 
 #include "falloutactoranimation.hpp"
 
 namespace ESM4
 {
     struct Npc;
+}
+
+namespace OFClass
+{
+    struct FalloutNpcPart;
 }
 
 namespace OFRender
@@ -22,11 +33,37 @@ namespace OFRender
         ~ESM4NpcAnimation() override;
 
     private:
-        /// Gives a part of a Fallout character its face: the shape of the morph file beside the model, moved by the
-        /// coefficients (FGGS and FGGA of the race and of the character together), and the texture of the face or of
-        /// the body that the editor wrote for the character, if there is one
-        void shapeFalloutPart(osg::Node& part, std::string_view model, const ESM4::Npc& traits,
-            const std::vector<float>& symmetric, const std::vector<float>& asymmetric, bool isHead, bool isBody);
+        /// The pictures that the look of a Fallout character is made of, which are the same for every part of it
+        struct FalloutLookImages
+        {
+            /// The texture of the face that the editor wrote for the character: mid grey, the colour of its skin on top
+            /// of the one of its race (empty when it has none)
+            osg::ref_ptr<osg::Image> mFaceTint;
+            /// The same for the body, which the hands take the average of
+            osg::ref_ptr<osg::Image> mBodyTint;
+            /// The picture of the eyes that the character has
+            osg::ref_ptr<osg::Image> mEyes;
+            /// Whether the hair is the one that fits under a hat
+            bool mHat = false;
+            /// The colour of the hair, each channel from 0 to 1; not set when the character has none
+            std::optional<osg::Vec3f> mHairColour;
+        };
+
+        /// Gives a part of a Fallout character its look: the shape of the morph file beside the model, moved by the
+        /// coefficients (FGGS and FGGA of the race and of the character together), and the picture of its skin, hair or
+        /// eyes
+        struct FalloutPartLook
+        {
+            /// The meshes of the part that the morph moved
+            std::size_t mMorphed = 0;
+            /// Where the picture of the part comes from, empty when it keeps that of its model
+            std::string mTexture;
+        };
+        FalloutPartLook shapeFalloutPart(osg::Node& part, const OFClass::FalloutNpcPart& npcPart,
+            const std::vector<float>& symmetric, const std::vector<float>& asymmetric, const FalloutLookImages& images);
+
+        /// The picture in the files of the game (a path under textures); null when there is none or it is not there
+        osg::ref_ptr<osg::Image> loadFalloutImage(const std::string& path);
 
         // Works for FO3/FONV/TES5
         void insertHeadParts(const std::vector<ESM::FormId>& partIds, std::set<uint32_t>& usedHeadPartTypes);

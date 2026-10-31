@@ -2,6 +2,8 @@
 #define GAME_MWCLASS_ESM4ACTOR_H
 
 #include <functional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include <components/esm4/loadcrea.hpp>
@@ -48,6 +50,43 @@ namespace OFClass
     /// hand, the head (which takes the face parts too), the hair. A piece is worn when no piece before it in the list
     /// covers a slot that it covers; one that covers no slot or has no model is not. Null pointers are left out.
     std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
+        const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor);
+
+    /// What a part of a character is, which tells what the pictures of the records do to it
+    enum class FalloutPartKind
+    {
+        Body, ///< the upper body of the race
+        Hand, ///< a hand of the race
+        Head, ///< the head of the race
+        Eye, ///< an eye of the race
+        Face, ///< the other parts of the head of the race (ears, mouth, teeth, tongue)
+        HeadPart, ///< a part that the character names: eyebrows, beards
+        Hair, ///< the hair that the character names
+        Worn, ///< a piece of armour or clothing
+    };
+
+    struct FalloutNpcPart
+    {
+        std::string mModel; ///< a path under meshes, as the record names it
+        std::string mTexture; ///< the picture that the record gives it, a path under textures; empty when it has none
+        FalloutPartKind mKind = FalloutPartKind::Worn;
+    };
+
+    struct FalloutNpcParts
+    {
+        std::vector<FalloutNpcPart> mParts;
+        bool mHatOn = false; ///< a worn piece takes the place of a hat or of a headband, so the hair is the short one
+    };
+
+    /// A picture that a record names (the ICON of a race, hair or eyes: "Characters\\Male\\HeadHuman.dds") as a path of
+    /// the files of the game, under textures. Empty when the record names none.
+    std::string falloutTexturePath(std::string_view icon);
+
+    /// The parts that make up a character, as falloutNpcModels lists the models, with what the records say of the
+    /// picture of each: the race gives the part of its body, head and eyes a picture (the ICON), the hair record gives
+    /// the hair its picture. The eyes of the character get theirs from the record of the eyes it names, which the
+    /// caller reads.
+    FalloutNpcParts falloutNpcParts(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
         const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor);
 
     /// The model of the head of the race for the sex (the first part of the head, as opposed to the ears, mouth, teeth,

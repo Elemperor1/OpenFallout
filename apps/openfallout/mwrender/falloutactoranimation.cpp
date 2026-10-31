@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <set>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -88,6 +90,16 @@ namespace OFRender
 
     namespace
     {
+        /// Says a thing about a skeleton folder or a file once, whatever number of characters share it: the characters
+        /// of a folder all have the same problem, and a log line for each of them hides the others
+        bool firstTimeFor(const std::string& key)
+        {
+            static std::mutex mutex;
+            static std::set<std::string> told;
+            const std::lock_guard lock(mutex);
+            return told.insert(key).second;
+        }
+
         /// The animation files (.kf, lower case paths) under a folder, listed once for all the characters that share it
         const std::vector<std::string>& animationFilesOf(const VFS::Manager& vfs, const std::string& folder)
         {
@@ -144,6 +156,40 @@ namespace OFRender
     {
         updateGait(duration);
         runAnimation(duration);
+        watchPose(duration);
+    }
+
+    void FalloutActorAnimation::watchPose(float duration)
+    {
+        // A part of the body that no animation moves is left in the pose of the skeleton file, which for the people of
+        // the games is the T. The idle plays on below everything else (nothing disables it), so a part with nothing
+        // on it means the idle was lost, and it is started again.
+        if (isDown() || mDefaultIdleGroup.empty())
+            return;
+        bool bare = false;
+        for (int group = 0; group < Num_BoneGroups; ++group)
+            bare = bare || getActiveGroup(static_cast<BoneGroup>(group)).empty();
+        if (!bare)
+        {
+            mBareTime = 0.f;
+            return;
+        }
+        mBareTime += duration;
+        constexpr float graceTime = 0.5f;
+        if (mBareTime < graceTime)
+            return;
+        mBareTime = 0.f;
+        if (!mBareReported)
+        {
+            mBareReported = true;
+            Log(Debug::Warning) << "T-pose watch: " << mPtr.getCellRef().getRefId() << " (" << mSkeletonPath
+                                << ") has a part of the body with no animation; its idle " << mDefaultIdleGroup
+                                << " starts again";
+        }
+        // The group may have been removed from the states by something else that played at its priority
+        disable(mDefaultIdleGroup);
+        play(mDefaultIdleGroup, OFRender::AnimPriority(OFMechanics::Priority_Default), OFRender::BlendMask_All, false,
+            1.f, "start", "stop", 0.f, ~0u, false);
     }
 
     std::string FalloutActorAnimation::addAnimation(const std::string& file, const std::string& skeleton)
@@ -155,7 +201,8 @@ namespace OFRender
         std::string group(VFS::Path::Normalized(file).stem());
         if (!hasAnimation(group))
         {
-            Log(Debug::Warning) << "The animation " << file << " has nothing to play on " << skeleton;
+            if (firstTimeFor("nothing\n" + file + "\n" + skeleton))
+                Log(Debug::Warning) << "The animation " << file << " has nothing to play on " << skeleton;
             return {};
         }
         return group;
@@ -169,7 +216,12 @@ namespace OFRender
         const std::string skeleton = mPtr.getClass().getCorrectedModel(mPtr);
         const std::string folder = falloutAnimationFolder(skeleton);
         if (folder.empty())
+        {
+            if (firstTimeFor("nofolder\n" + skeleton))
+                Log(Debug::Info) << "Animations: the skeleton \"" << skeleton << "\" of "
+                                 << mPtr.getCellRef().getRefId() << " has no folder; its character is not animated";
             return;
+        }
 
         mSkeletonPath = skeleton;
         const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), folder);
@@ -177,7 +229,12 @@ namespace OFRender
         bool playing = false;
         const std::string idle = chooseFalloutIdle(folder, files);
         if (idle.empty())
-            Log(Debug::Verbose) << "No idle animation among the " << files.size() << " files in " << folder;
+        {
+            if (firstTimeFor("noidle\n" + folder))
+                Log(Debug::Info) << "Animations: no idle animation among the " << files.size() << " files in " << folder
+                                 << " (" << mPtr.getCellRef().getRefId()
+                                 << " and the others of it stand in the pose of " << skeleton << ")";
+        }
         else
         {
             Log(Debug::Verbose) << "Idle animation of " << mPtr.getCellRef().getRefId() << ": " << idle;
@@ -213,7 +270,13 @@ namespace OFRender
         }
 
         if (!playing)
+        {
+            if (firstTimeFor("noanimation\n" + skeleton))
+                Log(Debug::Info) << "Animations: nothing plays on " << skeleton << " (" << mPtr.getCellRef().getRefId()
+                                 << " and the others of it stand in its pose): idle " << (idle.empty() ? "none" : idle)
+                                 << ", walk " << locomotion.mWalk << ", run " << locomotion.mRun;
             return;
+        }
         mAdvanceCallback = new AdvanceCallback(*this);
         mInsert->addUpdateCallback(mAdvanceCallback);
     }

@@ -1715,8 +1715,20 @@ namespace NifOsg
                 hasPartitions = partitions != nullptr;
                 if (hasPartitions)
                 {
+                    // The sections of a body of Fallout (BSDismemberSkinInstance) that are only seen when the part
+                    // has been cut off (the caps of meat and bone, in the shapes of the body and the head) are not
+                    // marked visible: the games draw only the sections that are
+                    const Nif::BSDismemberSkinInstance* dismember = skin->mRecordType == Nif::RC_BSDismemberSkinInstance
+                        ? static_cast<const Nif::BSDismemberSkinInstance*>(skin)
+                        : nullptr;
+                    constexpr std::uint16_t visibleSection = 1;
+                    std::size_t sectionIndex = 0;
                     for (const Nif::NiSkinPartition::Partition& partition : partitions->mPartitions)
                     {
+                        const std::size_t section = sectionIndex++;
+                        if (dismember != nullptr && section < dismember->mParts.size()
+                            && (dismember->mParts[section].mFlags & visibleSection) == 0)
+                            continue;
                         const std::vector<unsigned short>& trueTriangles = partition.mTrueTriangles;
                         if (!trueTriangles.empty())
                         {

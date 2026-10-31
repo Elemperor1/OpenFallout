@@ -185,6 +185,82 @@ namespace OFClass
             EXPECT_EQ(falloutNpcModels(race, true, nullptr, {}, { &suit }), (Models{ "suit\\jumpsuit.nif" }));
         }
 
+        TEST(OFClassNpcPartsTest, aPictureOfARecordIsAPathUnderTextures)
+        {
+            EXPECT_EQ(falloutTexturePath("Characters\\Male\\HeadHuman.dds"), "textures/Characters/Male/HeadHuman.dds");
+            EXPECT_EQ(falloutTexturePath("Characters/Hair/Bob.dds"), "textures/Characters/Hair/Bob.dds");
+            EXPECT_EQ(falloutTexturePath("textures\\characters\\bob.dds"), "textures/characters/bob.dds");
+            EXPECT_EQ(falloutTexturePath(""), "");
+        }
+
+        TEST(OFClassNpcPartsTest, thePartsKnowWhatTheyAreAndThePictureThatTheRecordsGiveThem)
+        {
+            ESM4::Race race = humanRace();
+            race.mBodyPartsMale[0].texture = "Characters\\Male\\UpperBodyMale.dds";
+            race.mBodyPartsMale[1].texture = "Characters\\Male\\HandMale.dds";
+            race.mHeadParts[0].texture = "Characters\\Male\\HeadHumanOld.dds";
+            race.mHeadParts[2].texture = "Characters\\Mouth\\MouthHuman.dds";
+            ESM4::Hair hair = hairOf("hair\\bob.nif");
+            hair.mIcon = "Characters\\Hair\\Bob.dds";
+            const ESM4::HeadPart beard = headPartOf("hair\\beard.nif");
+            const ESM4::Armor suit = armorOf(ESM4::Armor::FO3_UpperBody, "suit\\jumpsuit.nif");
+
+            const FalloutNpcParts parts = falloutNpcParts(race, false, &hair, { &beard }, { &suit });
+            ASSERT_EQ(parts.mParts.size(), 9u);
+            const auto expect = [&](std::size_t i, const char* model, const char* texture, FalloutPartKind kind) {
+                EXPECT_EQ(parts.mParts[i].mModel, model) << i;
+                EXPECT_EQ(parts.mParts[i].mTexture, texture) << i;
+                EXPECT_EQ(parts.mParts[i].mKind, kind) << i;
+            };
+            // the suit takes the place of the upper body of the race
+            expect(0, "male\\lefthand.nif", "textures/Characters/Male/HandMale.dds", FalloutPartKind::Hand);
+            expect(1, "male\\righthand.nif", "", FalloutPartKind::Hand);
+            expect(2, "male\\head.nif", "textures/Characters/Male/HeadHumanOld.dds", FalloutPartKind::Head);
+            expect(3, "male\\mouth.nif", "textures/Characters/Mouth/MouthHuman.dds", FalloutPartKind::Face);
+            expect(4, "eyes\\left.nif", "", FalloutPartKind::Eye);
+            expect(5, "eyes\\right.nif", "", FalloutPartKind::Eye);
+            expect(6, "hair\\beard.nif", "", FalloutPartKind::HeadPart);
+            expect(7, "hair\\bob.nif", "textures/Characters/Hair/Bob.dds", FalloutPartKind::Hair);
+            expect(8, "suit\\jumpsuit.nif", "", FalloutPartKind::Worn);
+        }
+
+        TEST(OFClassNpcPartsTest, theUpperBodyOfTheRaceIsTheBodyAndTheTextureOfTheBodyAloneIsNotAPart)
+        {
+            const ESM4::Race race = humanRace();
+            const FalloutNpcParts parts = falloutNpcParts(race, false, nullptr, {}, {});
+            ASSERT_FALSE(parts.mParts.empty());
+            EXPECT_EQ(parts.mParts.front().mKind, FalloutPartKind::Body);
+            EXPECT_EQ(std::count_if(parts.mParts.begin(), parts.mParts.end(),
+                          [](const FalloutNpcPart& part) { return part.mModel.empty(); }),
+                0);
+        }
+
+        TEST(OFClassNpcPartsTest, aHatOrAHeadbandPutsTheHairUnderIt)
+        {
+            const ESM4::Race race = humanRace();
+            const ESM4::Hair hair = hairOf("hair\\bob.nif");
+            const ESM4::Armor cap = armorOf(ESM4::Armor::FO3_Hat | ESM4::Armor::FO3_Headband, "suit\\cap.nif");
+            const ESM4::Armor band = armorOf(ESM4::Armor::FO3_Headband, "suit\\band.nif");
+            const ESM4::Armor glasses = armorOf(ESM4::Armor::FO3_EyeGlasses, "suit\\glasses.nif");
+            const ESM4::Armor helmet = armorOf(ESM4::Armor::FO3_Hat | ESM4::Armor::FO3_Hair, "suit\\helmet.nif");
+
+            EXPECT_FALSE(falloutNpcParts(race, false, &hair, {}, {}).mHatOn);
+            EXPECT_FALSE(falloutNpcParts(race, false, &hair, {}, { &glasses }).mHatOn);
+            // a cap that leaves the hair shows the hair that fits under it
+            const FalloutNpcParts underCap = falloutNpcParts(race, false, &hair, {}, { &cap });
+            EXPECT_TRUE(underCap.mHatOn);
+            EXPECT_EQ(std::count_if(underCap.mParts.begin(), underCap.mParts.end(),
+                          [](const FalloutNpcPart& part) { return part.mKind == FalloutPartKind::Hair; }),
+                1);
+            EXPECT_TRUE(falloutNpcParts(race, false, &hair, {}, { &band }).mHatOn);
+            // a helmet that covers the hair takes it away
+            const FalloutNpcParts underHelmet = falloutNpcParts(race, false, &hair, {}, { &helmet });
+            EXPECT_TRUE(underHelmet.mHatOn);
+            EXPECT_EQ(std::count_if(underHelmet.mParts.begin(), underHelmet.mParts.end(),
+                          [](const FalloutNpcPart& part) { return part.mKind == FalloutPartKind::Hair; }),
+                0);
+        }
+
         // The head parts of the test: the records by form ID, the way the store has them
         struct HeadPartStore
         {

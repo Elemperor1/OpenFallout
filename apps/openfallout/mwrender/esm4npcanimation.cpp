@@ -1,6 +1,7 @@
 #include "esm4npcanimation.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <mutex>
 #include <set>
@@ -8,6 +9,7 @@
 #include <components/esm4/loadarma.hpp>
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadclot.hpp>
+#include <components/esm4/loadeyes.hpp>
 #include <components/esm4/loadhair.hpp>
 #include <components/esm4/loadhdpt.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -60,49 +62,138 @@ namespace OFRender
             updatePartsTES5(*traits);
     }
 
-    void ESM4NpcAnimation::shapeFalloutPart(osg::Node& part, std::string_view model, const ESM4::Npc& traits,
-        const std::vector<float>& symmetric, const std::vector<float>& asymmetric, bool isHead, bool isBody)
+    osg::ref_ptr<osg::Image> ESM4NpcAnimation::loadFalloutImage(const std::string& path)
     {
-        // The shape: the morphs of the file beside the model, moved by the coefficients of the face
+        if (path.empty())
+            return nullptr;
+        const VFS::Path::Normalized normalized(path);
+        if (!mResourceSystem->getVFS()->exists(normalized))
+            return nullptr;
+        return mResourceSystem->getImageManager()->getImage(normalized);
+    }
+
+    namespace
+    {
+        // The skin of a character, as opposed to the underwear that the body model holds and the gore under it
+        bool isSkinPicture(const osg::Image* image)
+        {
+            return image != nullptr
+                && Misc::StringUtils::lowerCase(image->getFileName()).starts_with("textures/characters/");
+        }
+    }
+
+    ESM4NpcAnimation::FalloutPartLook ESM4NpcAnimation::shapeFalloutPart(osg::Node& part,
+        const OFClass::FalloutNpcPart& npcPart, const std::vector<float>& symmetric,
+        const std::vector<float>& asymmetric, const FalloutLookImages& images)
+    {
+        using Kind = OFClass::FalloutPartKind;
+        const Kind kind = npcPart.mKind;
+        const std::string& model = npcPart.mModel;
+        FalloutPartLook look;
+
+        // The hair has the shape for a bare head and the shape for a head with a hat; the character has one
+        std::string_view variant;
+        if (kind == Kind::Hair)
+        {
+            chooseHairShape(part, images.mHat);
+            variant = images.mHat ? "hat" : "nohat";
+        }
+
+        // The shape: the morphs of the file beside the model, moved by the coefficients of the face. The eyes are the
+        // first vertices of their file, as the head is
         if (!symmetric.empty() || !asymmetric.empty())
         {
-            const std::shared_ptr<const ESM4::FaceMorphs> morphs = getFaceMorphs(*mResourceSystem->getVFS(), model);
-            if (morphs != nullptr && morphFaceMeshes(part, *morphs, symmetric, asymmetric, isHead) == 0)
+            std::shared_ptr<const ESM4::FaceMorphs> morphs;
+            if (!variant.empty())
+                morphs = getFaceMorphs(*mResourceSystem->getVFS(), model, variant);
+            if (morphs == nullptr)
+                morphs = getFaceMorphs(*mResourceSystem->getVFS(), model);
+            if (morphs != nullptr)
             {
-                // Said once for each model, whatever number of characters wear it
-                static std::mutex sReportedMutex;
-                static std::set<std::string> sReported;
-                const std::lock_guard lock(sReportedMutex);
-                if (sReported.insert(Misc::StringUtils::lowerCase(model)).second)
-                    Log(Debug::Warning) << "FaceGen: the meshes of " << model << " do not have the "
-                                        << morphs->mVertexCount << " vertices of its morph file";
+                look.mMorphed
+                    = morphFaceMeshes(part, *morphs, symmetric, asymmetric, kind == Kind::Head || kind == Kind::Eye);
+                if (look.mMorphed == 0)
+                {
+                    // Said once for each model, whatever number of characters wear it
+                    static std::mutex sReportedMutex;
+                    static std::set<std::string> sReported;
+                    const std::lock_guard lock(sReportedMutex);
+                    if (sReported.insert(Misc::StringUtils::lowerCase(model)).second)
+                        Log(Debug::Warning) << "FaceGen: the meshes of " << model << " do not have the "
+                                            << morphs->mVertexCount << " vertices of its morph file";
+                }
             }
         }
 
-        // The skin: a texture that the editor wrote for the character. It writes it in the folder of the plugin that
-        // saved the character last, so a plugin that changes the character has its own, and for a character that no
-        // plugin changed it is the plugin that made it
-        if (!isHead && !isBody)
-            return;
-        const std::vector<std::string>& contentFiles = OFBase::Environment::get().getWorld()->getContentFiles();
-        const auto pluginOf = [&](std::int32_t contentFile) {
-            if (contentFile < 0 || static_cast<std::size_t>(contentFile) >= contentFiles.size())
-                return std::string();
-            return Misc::StringUtils::lowerCase(std::filesystem::path(contentFiles[contentFile]).stem().string());
-        };
-        const ESM4::FaceTextureIndex& textures = getFaceTextures(*mResourceSystem->getVFS());
-        const ESM4::FaceTextureIndex::Kind kind = isHead ? ESM4::FaceTextureIndex::Kind::Face
-            : OFClass::ESM4Npc::isFemale(mPtr)           ? ESM4::FaceTextureIndex::Kind::BodyFemale
-                                                         : ESM4::FaceTextureIndex::Kind::BodyMale;
-        const std::string* path = textures.findIn(kind, pluginOf(traits.mSourceFile), traits.mId.mIndex);
-        if (path == nullptr)
-            path = textures.find(kind, pluginOf(traits.mId.mContentFile), traits.mId.mIndex);
-        if (path == nullptr)
-            return;
-        const osg::ref_ptr<osg::Image> image
-            = mResourceSystem->getImageManager()->getImage(VFS::Path::Normalized(*path));
-        if (replaceDiffuseMap(part, image) == 0)
-            Log(Debug::Verbose) << "FaceGen: " << model << " has no diffuse map to give " << *path;
+        // The picture: what the record names (for the skin that of the race, for the hair that of the hair, for the
+        // eyes that of the eyes of the character), and for the skin the tint that the editor wrote for the character
+        osg::ref_ptr<osg::Image> named;
+        osg::ref_ptr<osg::Image> tint;
+        bool average = false;
+        bool skin = false;
+        std::string source = npcPart.mTexture;
+        switch (kind)
+        {
+            case Kind::Head:
+                skin = true;
+                tint = images.mFaceTint;
+                break;
+            case Kind::Body:
+                skin = true;
+                tint = images.mBodyTint;
+                break;
+            case Kind::Hand:
+                skin = true;
+                tint = images.mBodyTint;
+                average = true;
+                break;
+            case Kind::Eye:
+                named = images.mEyes;
+                source = images.mEyes != nullptr ? images.mEyes->getFileName() : std::string();
+                break;
+            case Kind::Hair:
+            case Kind::HeadPart:
+                break;
+            default:
+                return look;
+        }
+        if (kind != Kind::Eye)
+            named = loadFalloutImage(npcPart.mTexture);
+
+        // The hair, and the beard and eyebrows that go with it, have the colour of the character
+        if ((kind == Kind::Hair || kind == Kind::HeadPart) && images.mHairColour.has_value())
+            if (tintHair(part, *images.mHairColour) != 0)
+                look.mTexture = "colour";
+        if (kind == Kind::HeadPart)
+            return look;
+
+        if (named == nullptr && tint == nullptr)
+            return look;
+
+        const std::size_t replaced
+            = replaceDiffuseMap(part, [&](const osg::Image* original) -> osg::ref_ptr<osg::Image> {
+                  if (skin && !isSkinPicture(original))
+                      return nullptr;
+                  const osg::ref_ptr<osg::Image> base
+                      = named != nullptr ? named : osg::ref_ptr<osg::Image>(const_cast<osg::Image*>(original));
+                  if (base == nullptr)
+                      return nullptr;
+                  if (tint != nullptr)
+                  {
+                      const osg::ref_ptr<osg::Image> tinted
+                          = average ? tintSkinImageByAverage(*base, *tint) : tintSkinImage(*base, *tint);
+                      if (tinted != nullptr)
+                          return tinted;
+                  }
+                  return base.get() == original ? nullptr : base;
+              });
+        if (replaced != 0)
+        {
+            look.mTexture = source + (look.mTexture.empty() ? "" : " in colour");
+            if (tint != nullptr)
+                look.mTexture += (average ? " x average of " : " x ") + tint->getFileName();
+        }
+        return look;
     }
 
     void ESM4NpcAnimation::updatePartsFallout(const ESM4::Npc& traits)
@@ -120,6 +211,14 @@ namespace OFRender
                 Log(Debug::Error) << "Hair not found: " << ESM::RefId(traits.mHair);
         }
 
+        const ESM4::Eyes* eyes = nullptr;
+        if (!traits.mEyes.isZeroOrUnset())
+        {
+            eyes = store->get<ESM4::Eyes>().search(traits.mEyes);
+            if (eyes == nullptr)
+                Log(Debug::Error) << "Eyes not found: " << ESM::RefId(traits.mEyes);
+        }
+
         const std::vector<const ESM4::HeadPart*> headParts
             = OFClass::expandHeadParts(traits.mHeadParts, [store](ESM::FormId partId) -> const ESM4::HeadPart* {
                   const ESM4::HeadPart* part = store->get<ESM4::HeadPart>().search(partId);
@@ -130,8 +229,6 @@ namespace OFRender
 
         // The body parts are skinned to the bones of the skeleton and need no placing, unlike those of Oblivion
         const bool isFemale = OFClass::ESM4Npc::isFemale(mPtr);
-        const std::string headModel = OFClass::falloutHeadModel(*race, isFemale);
-        const std::string bodyModel = OFClass::falloutBodyModel(*race, isFemale);
 
         // The face of the character is that of its race for its sex, and the numbers of the record on top
         const std::vector<float> symmetric
@@ -141,15 +238,95 @@ namespace OFRender
             = ESM4::addFaceCoefficients(isFemale ? race->mAsymShapeModeCoeffFemale : race->mAsymShapeModeCoefficients,
                 traits.mAsymShapeModeCoefficients);
 
-        for (const std::string& model :
-            OFClass::falloutNpcModels(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr)))
+        // The skin: textures that the editor wrote for the character. It writes them in the folder of the plugin that
+        // saved the character last, so a plugin that changes the character has its own, and for a character that no
+        // plugin changed it is the plugin that made it
+        FalloutLookImages images;
         {
-            const osg::ref_ptr<osg::Node> part = insertPart(model);
-            if (part != nullptr)
-                shapeFalloutPart(*part, model, traits, symmetric, asymmetric,
-                    !headModel.empty() && Misc::StringUtils::ciEqual(model, headModel),
-                    !bodyModel.empty() && Misc::StringUtils::ciEqual(model, bodyModel));
+            const std::vector<std::string>& contentFiles = OFBase::Environment::get().getWorld()->getContentFiles();
+            const auto pluginOf = [&](std::int32_t contentFile) {
+                if (contentFile < 0 || static_cast<std::size_t>(contentFile) >= contentFiles.size())
+                    return std::string();
+                return Misc::StringUtils::lowerCase(std::filesystem::path(contentFiles[contentFile]).stem().string());
+            };
+            const ESM4::FaceTextureIndex& textures = getFaceTextures(*mResourceSystem->getVFS());
+            const auto find = [&](ESM4::FaceTextureIndex::Kind kind) -> osg::ref_ptr<osg::Image> {
+                const std::string* path = textures.findIn(kind, pluginOf(traits.mSourceFile), traits.mId.mIndex);
+                if (path == nullptr)
+                    path = textures.find(kind, pluginOf(traits.mId.mContentFile), traits.mId.mIndex);
+                if (path == nullptr)
+                    return nullptr;
+                return mResourceSystem->getImageManager()->getImage(VFS::Path::Normalized(*path));
+            };
+            images.mFaceTint = find(ESM4::FaceTextureIndex::Kind::Face);
+            images.mBodyTint
+                = find(isFemale ? ESM4::FaceTextureIndex::Kind::BodyFemale : ESM4::FaceTextureIndex::Kind::BodyMale);
         }
+        if (eyes != nullptr)
+            images.mEyes = loadFalloutImage(OFClass::falloutTexturePath(eyes->mIcon));
+
+        const OFClass::FalloutNpcParts parts
+            = OFClass::falloutNpcParts(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr));
+        images.mHat = parts.mHatOn;
+        // A colour of black is the colour of a record that has none, which then keeps the picture it has
+        if (traits.mHairColour.red != 0 || traits.mHairColour.green != 0 || traits.mHairColour.blue != 0)
+            images.mHairColour = osg::Vec3f(
+                traits.mHairColour.red / 255.f, traits.mHairColour.green / 255.f, traits.mHairColour.blue / 255.f);
+
+        std::size_t inserted = 0;
+        std::size_t missing = 0;
+        std::size_t morphed = 0;
+        std::string faceTexture;
+        std::string bodyTexture;
+        std::string hairTexture;
+        std::string eyeTexture;
+        for (const OFClass::FalloutNpcPart& npcPart : parts.mParts)
+        {
+            const osg::ref_ptr<osg::Node> part = insertPart(npcPart.mModel);
+            if (part == nullptr)
+            {
+                ++missing;
+                continue;
+            }
+            ++inserted;
+            const FalloutPartLook look = shapeFalloutPart(*part, npcPart, symmetric, asymmetric, images);
+            morphed += look.mMorphed;
+            switch (npcPart.mKind)
+            {
+                case OFClass::FalloutPartKind::Head:
+                    faceTexture = look.mTexture;
+                    break;
+                case OFClass::FalloutPartKind::Body:
+                    bodyTexture = look.mTexture;
+                    break;
+                case OFClass::FalloutPartKind::Hair:
+                    hairTexture = look.mTexture;
+                    break;
+                case OFClass::FalloutPartKind::Eye:
+                    eyeTexture = look.mTexture;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // One line for each of the first characters of a run: what the face and the body were made of, which is what
+        // to read when a character looks wrong
+        static std::atomic<int> sLooksTold{ 0 };
+        constexpr int maxLooksTold = 150;
+        const auto valueOr = [](const std::string& text, const char* otherwise) {
+            return text.empty() ? std::string(otherwise) : text;
+        };
+        if (sLooksTold.fetch_add(1) < maxLooksTold)
+            Log(Debug::Info) << "Look of " << mPtr.getCellRef().getRefId() << ": " << race->mEditorId
+                             << (isFemale ? " female" : " male") << ", " << inserted << " parts"
+                             << (missing != 0 ? " (" + std::to_string(missing) + " not found)" : std::string())
+                             << ", hair " << (hair != nullptr ? hair->mEditorId : std::string("none"))
+                             << (parts.mHatOn ? " (under a hat)" : "") << ", " << morphed << " meshes morphed, face "
+                             << valueOr(faceTexture, "of its model") << ", body "
+                             << valueOr(bodyTexture, "of its model") << ", hair texture "
+                             << valueOr(hairTexture, "of its model") << ", eyes "
+                             << valueOr(eyeTexture, "of its model");
     }
 
     template <class Record>

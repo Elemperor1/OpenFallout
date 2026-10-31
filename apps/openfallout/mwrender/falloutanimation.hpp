@@ -14,7 +14,8 @@ namespace OFRender
 
     /// The animation a character plays when it stands, chosen among the paths of the files in the folder of its
     /// skeleton (lower case, as the virtual file system lists them, files of folders below that one included): the file
-    /// `mtidle.kf`, else `idle.kf`, else `h2hidle.kf`, else the first of the files in the folder itself (in the order
+    /// `mtidle.kf`, else `locomotion/mtidle.kf` (the standing pose of the people of the games, whose folder has none
+    /// of its own), else `idle.kf`, else `h2hidle.kf`, else the first of the files in the folder itself (in the order
     /// of their names) that has `idle` in its name. Empty when there is none.
     std::string chooseFalloutIdle(std::string_view folder, const std::vector<std::string>& files);
 

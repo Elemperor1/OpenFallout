@@ -1,5 +1,6 @@
 #include <apps/openfallout/mwrender/falloutface.hpp>
 
+#include <components/sceneutil/material.hpp>
 #include <components/sceneutil/riggeometry.hpp>
 #include <components/sceneutil/texturetype.hpp>
 
@@ -10,6 +11,7 @@
 #include <osg/Texture2D>
 
 #include <cmath>
+#include <string>
 #include <vector>
 
 namespace
@@ -275,5 +277,185 @@ namespace
         EXPECT_EQ(replaceDiffuseMap(*part, makeImage(8)), 0u);
         EXPECT_EQ(part->getStateSet(), stateset.get());
         EXPECT_EQ(replaceDiffuseMap(*part, nullptr), 0u);
+    }
+    osg::ref_ptr<osg::Image> makeRgb(
+        int width, int height, unsigned char r, unsigned char g, unsigned char b, const std::string& name)
+    {
+        osg::ref_ptr<osg::Image> image = new osg::Image;
+        image->allocateImage(width, height, 1, GL_RGB, GL_UNSIGNED_BYTE);
+        for (int i = 0; i < width * height; ++i)
+        {
+            image->data()[i * 3] = r;
+            image->data()[i * 3 + 1] = g;
+            image->data()[i * 3 + 2] = b;
+        }
+        image->setFileName(name);
+        return image;
+    }
+
+    TEST(OpenFalloutRenderReplaceDiffuseMap, asksTheChooserForEachMapWithThePictureItHasAndLeavesItWhenTheAnswerIsNone)
+    {
+        const osg::ref_ptr<osg::Image> original = makeImage(2);
+        osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
+        stateset->setTextureAttribute(0, new osg::Texture2D(original), osg::StateAttribute::ON);
+        osg::ref_ptr<osg::Group> part = new osg::Group;
+        part->setStateSet(stateset);
+
+        const osg::Image* asked = nullptr;
+        EXPECT_EQ(replaceDiffuseMap(*part,
+                      [&](const osg::Image* image) {
+                          asked = image;
+                          return osg::ref_ptr<osg::Image>();
+                      }),
+            0u);
+        EXPECT_EQ(asked, original.get());
+        EXPECT_EQ(part->getStateSet(), stateset.get());
+
+        const osg::ref_ptr<osg::Image> other = makeImage(8);
+        EXPECT_EQ(replaceDiffuseMap(*part, [&](const osg::Image*) { return other; }), 1u);
+        const osg::Texture2D* own = static_cast<const osg::Texture2D*>(
+            part->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+        EXPECT_EQ(own->getImage(), other.get());
+        EXPECT_EQ(own->getInternalFormatMode(), osg::Texture::USE_IMAGE_DATA_FORMAT);
+        EXPECT_EQ(replaceDiffuseMap(*part, DiffuseChooser()), 0u);
+    }
+
+    TEST(OpenFalloutRenderTintSkinImage, multipliesTheSkinByTwiceTheTint)
+    {
+        const osg::ref_ptr<osg::Image> skin = makeRgb(4, 4, 100, 150, 200, "textures/characters/male/skin.dds");
+        const osg::ref_ptr<osg::Image> tint
+            = makeRgb(2, 2, 128, 160, 64, "textures/characters/facemods/a/00000001_0.dds");
+
+        const osg::ref_ptr<osg::Image> tinted = tintSkinImage(*skin, *tint);
+        ASSERT_NE(tinted, nullptr);
+        EXPECT_EQ(tinted->s(), 4);
+        EXPECT_EQ(tinted->t(), 4);
+        EXPECT_EQ(tinted->getPixelFormat(), static_cast<GLenum>(GL_RGB));
+        EXPECT_NEAR(tinted->data()[0], 100, 1);
+        EXPECT_NEAR(tinted->data()[1], 188, 1);
+        EXPECT_NEAR(tinted->data()[2], 100, 1);
+        // the skin of the race is not changed
+        EXPECT_EQ(skin->data()[0], 100);
+        // and the same two files give the same picture while it is in use
+        EXPECT_EQ(tintSkinImage(*skin, *tint), tinted);
+    }
+
+    TEST(OpenFalloutRenderTintSkinImage, byTheAverageOfATintThatIsNotLaidOutLikeTheSkin)
+    {
+        const osg::ref_ptr<osg::Image> skin = makeRgb(2, 2, 200, 200, 200, "textures/characters/male/hand.dds");
+        osg::ref_ptr<osg::Image> tint
+            = makeRgb(2, 1, 0, 0, 0, "textures/characters/bodymods/a/00000001modbodymale.dds");
+        tint->data()[3] = 255;
+        tint->data()[4] = 255;
+        tint->data()[5] = 255;
+
+        const osg::ref_ptr<osg::Image> tinted = tintSkinImageByAverage(*skin, *tint);
+        ASSERT_NE(tinted, nullptr);
+        // twice the average, 127.5 of 255, is one
+        EXPECT_NEAR(tinted->data()[0], 200, 1);
+        EXPECT_NEAR(tinted->data()[11], 200, 1);
+    }
+
+    TEST(OpenFalloutRenderTintSkinImage, isNothingForAPictureInAFormatThatCannotBeRead)
+    {
+        const osg::ref_ptr<osg::Image> skin = makeRgb(2, 2, 1, 2, 3, "a");
+        osg::ref_ptr<osg::Image> odd = new osg::Image;
+        odd->allocateImage(2, 2, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE);
+        EXPECT_EQ(tintSkinImage(*skin, *odd), nullptr);
+        EXPECT_EQ(tintSkinImage(*odd, *skin), nullptr);
+    }
+
+    osg::ref_ptr<osg::Group> makeHair()
+    {
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        root->setName("HairMessy01");
+        osg::ref_ptr<osg::Group> noHat = new osg::Group;
+        noHat->setName("Nohat");
+        osg::ref_ptr<osg::Group> hat = new osg::Group;
+        hat->setName("HAT");
+        root->addChild(noHat);
+        root->addChild(hat);
+        return root;
+    }
+
+    TEST(OpenFalloutRenderChooseHairShape, keepsTheShapeForABareHeadOrForAHat)
+    {
+        osg::ref_ptr<osg::Group> bare = makeHair();
+        EXPECT_EQ(chooseHairShape(*bare, false), 1u);
+        ASSERT_EQ(bare->getNumChildren(), 1u);
+        EXPECT_EQ(bare->getChild(0)->getName(), "Nohat");
+
+        osg::ref_ptr<osg::Group> hatted = makeHair();
+        EXPECT_EQ(chooseHairShape(*hatted, true), 1u);
+        ASSERT_EQ(hatted->getNumChildren(), 1u);
+        EXPECT_EQ(hatted->getChild(0)->getName(), "HAT");
+    }
+
+    TEST(OpenFalloutRenderChooseHairShape, leavesAModelThatHasOnlyOneOfThemAlone)
+    {
+        osg::ref_ptr<osg::Group> beard = new osg::Group;
+        osg::ref_ptr<osg::Group> shape = new osg::Group;
+        shape->setName("BeardThin:0");
+        beard->addChild(shape);
+        EXPECT_EQ(chooseHairShape(*beard, true), 0u);
+        EXPECT_EQ(chooseHairShape(*beard, false), 0u);
+        EXPECT_EQ(beard->getNumChildren(), 1u);
+
+        osg::ref_ptr<osg::Group> onlyHat = new osg::Group;
+        osg::ref_ptr<osg::Group> hat = new osg::Group;
+        hat->setName("Hat");
+        onlyHat->addChild(hat);
+        EXPECT_EQ(chooseHairShape(*onlyHat, false), 0u);
+        EXPECT_EQ(onlyHat->getNumChildren(), 1u);
+    }
+    TEST(OpenFalloutRenderTintHair, givesTheShapesTheirOwnMaterialOfTheColourWithoutTheColoursOfTheVertices)
+    {
+        SceneUtil::MaterialConfig config;
+        config.mVertexColorMode = SceneUtil::VertexColorModes::AmbientAndDiffuse;
+        osg::ref_ptr<SceneUtil::Material> material = new SceneUtil::Material(config);
+        osg::ref_ptr<osg::StateSet> shared = new osg::StateSet;
+        shared->setTextureAttribute(0, new osg::Texture2D(makeImage(2)), osg::StateAttribute::ON);
+        shared->setAttributeAndModes(material, osg::StateAttribute::ON);
+
+        osg::ref_ptr<osg::Group> mine = new osg::Group;
+        mine->setStateSet(shared);
+        osg::ref_ptr<osg::Group> theirs = new osg::Group;
+        theirs->setStateSet(shared);
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        root->addChild(mine);
+
+        EXPECT_EQ(tintHair(*root, osg::Vec3f(0.5f, 0.25f, 0.1f)), 1u);
+
+        EXPECT_EQ(theirs->getStateSet(), shared.get());
+        EXPECT_EQ(shared->getAttribute(osg::StateAttribute::MATERIAL), material.get());
+        EXPECT_EQ(material->getVertexColorMode(), SceneUtil::VertexColorModes::AmbientAndDiffuse);
+
+        ASSERT_NE(mine->getStateSet(), shared.get());
+        const SceneUtil::Material* own = dynamic_cast<const SceneUtil::Material*>(
+            mine->getStateSet()->getAttribute(osg::StateAttribute::MATERIAL));
+        ASSERT_NE(own, nullptr);
+        EXPECT_EQ(own->getVertexColorMode(), SceneUtil::VertexColorModes::None);
+        // twice the colour of the character
+        EXPECT_FLOAT_EQ(own->getDiffuse().r(), 1.f);
+        EXPECT_FLOAT_EQ(own->getDiffuse().g(), 0.5f);
+        EXPECT_FLOAT_EQ(own->getAmbient().b(), 0.2f);
+        // and the picture stays
+        EXPECT_NE(mine->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXTURE), nullptr);
+    }
+
+    TEST(OpenFalloutRenderTintHair, makesAMaterialForAShapeThatHasNoneAndSkipsNodesWithoutAPicture)
+    {
+        osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
+        stateset->setTextureAttribute(0, new osg::Texture2D(makeImage(2)), osg::StateAttribute::ON);
+        osg::ref_ptr<osg::Group> shape = new osg::Group;
+        shape->setStateSet(stateset);
+        osg::ref_ptr<osg::Group> plain = new osg::Group;
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        root->addChild(shape);
+        root->addChild(plain);
+
+        EXPECT_EQ(tintHair(*root, osg::Vec3f(1.f, 1.f, 1.f)), 1u);
+        EXPECT_NE(shape->getStateSet()->getAttribute(osg::StateAttribute::MATERIAL), nullptr);
+        EXPECT_EQ(plain->getStateSet(), nullptr);
     }
 }

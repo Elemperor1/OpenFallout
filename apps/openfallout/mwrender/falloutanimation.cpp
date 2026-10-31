@@ -38,7 +38,10 @@ namespace OFRender
 
     std::string chooseFalloutIdle(std::string_view folder, const std::vector<std::string>& files)
     {
-        static constexpr std::string_view preferred[] = { "mtidle", "idle", "h2hidle" };
+        // The people of the games have no idle in the folder of their skeleton that moves their body: `mtidle.kf` of
+        // the folder `locomotion` below it does (64 of the bones), while `h2hidle.kf` that sits in the folder moves
+        // only a node of the root and the face, which leaves the arms and legs in the T of the skeleton file
+        static constexpr std::string_view preferred[] = { "mtidle", "locomotion/mtidle", "idle", "h2hidle" };
         for (std::string_view stem : preferred)
         {
             const std::string path = std::string(folder) + std::string(stem) + std::string(sExtension);

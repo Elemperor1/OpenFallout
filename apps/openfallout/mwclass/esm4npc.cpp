@@ -19,6 +19,7 @@
 #include <components/esm4/wornarmor.hpp>
 
 #include <components/misc/resourcehelpers.hpp>
+#include <components/misc/strings/algorithm.hpp>
 
 #include "../mwphysics/physicssystem.hpp"
 #include "../mwworld/customdata.hpp"
@@ -59,14 +60,28 @@ namespace OFClass
         return parts;
     }
 
-    std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
+    std::string falloutTexturePath(std::string_view icon)
+    {
+        if (icon.empty())
+            return std::string();
+        std::string path(icon);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        if (path.size() >= 9 && Misc::StringUtils::ciEqual(std::string_view(path).substr(0, 9), "textures/"))
+            return path;
+        return "textures/" + path;
+    }
+
+    FalloutNpcParts falloutNpcParts(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
         const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor)
     {
         // Which of the pieces show, and the parts of the body they cover
         const ESM4::WornPieces worn = ESM4::wornPieces(armor, isFemale);
         const std::uint32_t covered = worn.mCovered;
 
-        std::vector<std::string> models;
+        FalloutNpcParts result;
+        // A hat, or a headband, that does not take the hair away shows the hair that fits under it
+        result.mHatOn = (covered & (ESM4::Armor::FO3_Hat | ESM4::Armor::FO3_Headband)) != 0;
+
         // The index of a part of the body in the race, and the biped slot that hides it: the upper body, left hand and
         // right hand (the fourth is only the texture of the upper body)
         constexpr std::array<std::uint32_t, 3> sBodySlots{ ESM4::Armor::FO3_UpperBody, ESM4::Armor::FO3_LeftHand,
@@ -74,23 +89,44 @@ namespace OFClass
         const std::vector<ESM4::Race::BodyPart>& body = isFemale ? race.mBodyPartsFemale : race.mBodyPartsMale;
         for (std::size_t i = 0; i < body.size() && i < sBodySlots.size(); ++i)
             if (!body[i].mesh.empty() && (covered & sBodySlots[i]) == 0)
-                models.push_back(body[i].mesh);
+                result.mParts.push_back({ body[i].mesh, falloutTexturePath(body[i].texture),
+                    i == 0 ? FalloutPartKind::Body : FalloutPartKind::Hand });
 
         // Everything of the face goes with the head: it is not there under a piece that covers the head
         if ((covered & ESM4::Armor::FO3_Head) == 0)
         {
-            for (const ESM4::Race::BodyPart& part : isFemale ? race.mHeadPartsFemale : race.mHeadParts)
-                if (!part.mesh.empty())
-                    models.push_back(part.mesh);
+            // The parts of the head of the race are, in order, the head, the ears (a picture only), the mouth, the
+            // upper and lower teeth, the tongue, and the left and right eye
+            const std::vector<ESM4::Race::BodyPart>& face = isFemale ? race.mHeadPartsFemale : race.mHeadParts;
+            constexpr std::size_t sFirstEye = 6;
+            for (std::size_t i = 0; i < face.size(); ++i)
+            {
+                if (face[i].mesh.empty())
+                    continue;
+                const FalloutPartKind kind = i == 0 ? FalloutPartKind::Head
+                    : i >= sFirstEye                ? FalloutPartKind::Eye
+                                                    : FalloutPartKind::Face;
+                result.mParts.push_back({ face[i].mesh, falloutTexturePath(face[i].texture), kind });
+            }
             for (const ESM4::HeadPart* part : headParts)
                 if (part != nullptr && !part->mModel.empty())
-                    models.push_back(part->mModel.getOriginal());
+                    result.mParts.push_back({ part->mModel.getOriginal(), std::string(), FalloutPartKind::HeadPart });
         }
         if (hair != nullptr && !hair->mModel.empty() && (covered & ESM4::Armor::FO3_Hair) == 0)
-            models.push_back(hair->mModel.getOriginal());
+            result.mParts.push_back(
+                { hair->mModel.getOriginal(), falloutTexturePath(hair->mIcon), FalloutPartKind::Hair });
 
         for (const ESM4::WornPiece& piece : worn.mPieces)
-            models.push_back(piece.mModel->getOriginal());
+            result.mParts.push_back({ piece.mModel->getOriginal(), std::string(), FalloutPartKind::Worn });
+        return result;
+    }
+
+    std::vector<std::string> falloutNpcModels(const ESM4::Race& race, bool isFemale, const ESM4::Hair* hair,
+        const std::vector<const ESM4::HeadPart*>& headParts, const std::vector<const ESM4::Armor*>& armor)
+    {
+        std::vector<std::string> models;
+        for (FalloutNpcPart& part : falloutNpcParts(race, isFemale, hair, headParts, armor).mParts)
+            models.push_back(std::move(part.mModel));
         return models;
     }
 
