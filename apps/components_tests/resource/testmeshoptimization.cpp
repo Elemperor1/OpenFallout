@@ -15,10 +15,36 @@ namespace
     constexpr VFS::Path::NormalizedView hairOne("meshes/characters/hair/hairone.nif");
     constexpr VFS::Path::NormalizedView hairOneMorphs("meshes/characters/hair/hairone.egm");
     constexpr VFS::Path::NormalizedView hairTwo("meshes/characters/hair/hairtwo.nif");
+    constexpr VFS::Path::NormalizedView hairShapes("meshes/characters/hair/hairshapes.nif");
+    constexpr VFS::Path::NormalizedView hairShapesHat("meshes/characters/hair/hairshapeshat.egm");
+    constexpr VFS::Path::NormalizedView hairShapesNoHat("meshes/characters/hair/hairshapesnohat.egm");
+    constexpr VFS::Path::NormalizedView hairHatOnly("meshes/characters/hair/hairhatonly.nif");
+    constexpr VFS::Path::NormalizedView hairHatOnlyHat("meshes/characters/hair/hairhatonlyhat.egm");
     constexpr VFS::Path::NormalizedView folderWithDot("meshes/characters/head.d/headhuman.nif");
     constexpr VFS::Path::NormalizedView folderWithDotMorphs("meshes/characters/head.egm");
     constexpr VFS::Path::NormalizedView noExtension("meshes/characters/noextension");
     constexpr VFS::Path::NormalizedView noExtensionMorphs("meshes/characters/noextension.egm");
+
+    TEST(ResourceMeshOptimization, leavesTheNodesAndVerticesOfAHairWithMorphFilesForItsShapesAsTheyAre)
+    {
+        VFSTestFile file("");
+        const std::unique_ptr<VFS::Manager> vfs = createTestVFS({
+            { hairShapes, &file },
+            { hairShapesHat, &file },
+            { hairShapesNoHat, &file },
+            { hairHatOnly, &file },
+            { hairHatOnlyHat, &file },
+            { hairTwo, &file },
+        });
+
+        const unsigned int plain = Resource::getMeshOptimizationOptions(*vfs, hairTwo);
+        EXPECT_EQ(plain & changing, changing);
+
+        // the shapes of a hair for a head with a hat and one without have a file each, named after the model
+        EXPECT_EQ(Resource::getMeshOptimizationOptions(*vfs, hairShapes) & changing, 0u);
+        EXPECT_EQ(Resource::getMeshOptimizationOptions(*vfs, hairHatOnly) & changing, 0u);
+        EXPECT_EQ(Resource::getMeshOptimizationOptions(*vfs, hairShapes), plain & ~changing);
+    }
 
     TEST(ResourceMeshOptimization, leavesTheNodesAndVerticesOfAMeshWithAFaceGenMorphFileAsTheyAre)
     {

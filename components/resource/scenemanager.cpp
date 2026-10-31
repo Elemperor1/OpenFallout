@@ -956,11 +956,15 @@ namespace Resource
         const std::size_t dot = name.find_last_of('.');
         if (dot == std::string_view::npos || name.find('/', dot) != std::string_view::npos)
             return options;
-        const VFS::Path::Normalized morphs(std::string(name.substr(0, dot)) + ".egm");
-        if (vfs.exists(morphs))
-            return options
-                & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
-                    | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
+        // The morphs of a model are in a file of its name, and those of a hair, that holds a shape for a head with a
+        // hat and one for a head without, in a file for each shape ("<name>hat.egm" and "<name>nohat.egm")
+        const std::string stem(name.substr(0, dot));
+        for (const char* variant : { "", "hat", "nohat" })
+            if (vfs.exists(VFS::Path::Normalized(stem + variant + ".egm")))
+                return options
+                    & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
+                        | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES
+                        | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
         return options;
     }
 
