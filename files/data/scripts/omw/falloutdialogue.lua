@@ -7,6 +7,7 @@ local async = require('openfallout.async')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+local pad = require('scripts.omw.falloutpad')
 
 local conversation = core.conversation
 local v2 = util.vector2
@@ -26,6 +27,8 @@ local visible = false
 -- The topics are listed from this one, and as many as fit the screen: there is no scrolling widget, so the list is
 -- moved by the wheel and the keys
 local optionOffset, optionCount = 1, 0
+-- The topic the keys and the pad have picked out (its place in the list of all the topics), nil while none has
+local optionSelected = nil
 -- The response that is said, the line of it that is being said, how long it has been (until the player has had the
 -- time to read it, or the voice is over) and how long since its voice ended
 local playedResponse = nil
@@ -47,6 +50,12 @@ local function closeWindow()
 end
 
 local advance, render
+
+-- No topic is left: the conversation is over
+local function goodbye()
+    conversation.close()
+    closeWindow()
+end
 -- The lines of the response do not all fit the screen
 local responseWindowed = false
 
@@ -72,6 +81,7 @@ local function pick(topic)
     local view = conversation.choose(topic)
     playedResponse = nil
     optionOffset = 1
+    optionSelected = nil
     render(view)
     startResponse(view)
 end
@@ -222,8 +232,9 @@ local function paragraph(text, color, width, events, maxLines, fromEnd)
     }
 end
 
-local function optionRow(text, onPick, width)
-    local row = paragraph(text, normalColor, width)
+local function optionRow(text, onPick, width, selected)
+    local color = selected and speakerColor or normalColor
+    local row = paragraph(text, color, width)
     local function paint(color)
         for _, line in ipairs(row.lines) do
             line.props.textColor = color
@@ -233,7 +244,7 @@ local function optionRow(text, onPick, width)
     row.events = {
         mouseClick = async:callback(onPick),
         focusGain = async:callback(function() paint(focusColor) end),
-        focusLoss = async:callback(function() paint(normalColor) end),
+        focusLoss = async:callback(function() paint(color) end),
     }
     return row
 end
@@ -323,7 +334,7 @@ function render(view)
             local shown, taken = {}, 0
             for index = optionOffset, #options do
                 local topic = options[index].topic
-                local row = optionRow(options[index].text, function() pick(topic) end, inner)
+                local row = optionRow(options[index].text, function() pick(topic) end, inner, index == optionSelected)
                 local height = #row.lines * lineHeight + gap.y
                 if #shown > 0 and taken + height > room then
                     break
@@ -356,10 +367,7 @@ function render(view)
             }, 1)
         end
         if #options == 0 then
-            add(optionRow('Goodbye', function()
-                conversation.close()
-                closeWindow()
-            end, inner))
+            add(optionRow('Goodbye', goodbye, inner))
         end
     end
 
@@ -402,8 +410,36 @@ local function scroll(by)
     else
         moved = math.max(1, optionOffset + by)
     end
+    optionSelected = nil
     if moved ~= optionOffset then
         optionOffset = moved
+        render(view)
+    end
+end
+
+-- Moves the pick to the next topic (down when `by` is positive), and the list with it when the topic is not shown
+local function moveSelection(by)
+    local view = conversation.get()
+    if not visible or view.speaking or not view.options or #view.options == 0 then
+        return
+    end
+    local count = #view.options
+    local moved
+    if optionSelected == nil then
+        -- the first pick is the first topic shown (the last one shown when it goes up)
+        moved = by > 0 and optionOffset or math.max(optionOffset, optionOffset + optionCount - 1)
+    else
+        moved = math.max(1, math.min(count, optionSelected + by))
+    end
+    moved = math.min(moved, count)
+    optionSelected = moved
+    if moved < optionOffset then
+        optionOffset = moved
+    end
+    render(view)
+    -- the topics that fit depend on where the list starts: it moves on until the topic is shown
+    while moved > optionOffset + optionCount - 1 and optionOffset < moved do
+        optionOffset = optionOffset + 1
         render(view)
     end
 end
@@ -414,6 +450,7 @@ function advance()
     local view = conversation.finish()
     playedResponse = nil
     optionOffset = 1
+    optionSelected = nil
     if view.ended then
         destroyElement()
         closeWindow()
@@ -425,6 +462,7 @@ end
 local function show()
     visible = true
     optionOffset = 1
+    optionSelected = nil
     local view = conversation.get()
     render(view)
     startResponse(view)
@@ -439,6 +477,43 @@ end
 if conversation.available() then
     I.UI.registerWindow('Dialogue', show, hide)
 end
+
+-- What a key (or a button of the pad that stands for one) does while the window is there
+local function press(code)
+    if not visible then
+        return
+    end
+    local view = conversation.get()
+    if view.speaking then
+        if code == input.KEY.Space or code == input.KEY.Enter then
+            advance()
+        end
+    elseif code >= input.KEY._1 and code <= input.KEY._9 then
+        -- the numbers are those of the topics that are shown
+        local number = code - input.KEY._1 + 1
+        local option = number <= optionCount and view.options[optionOffset + number - 1] or nil
+        if option then
+            pick(option.topic)
+        end
+    elseif code == input.KEY.DownArrow then
+        moveSelection(1)
+    elseif code == input.KEY.UpArrow then
+        moveSelection(-1)
+    elseif code == input.KEY.PageDown then
+        scroll(math.max(1, optionCount))
+    elseif code == input.KEY.PageUp then
+        scroll(-math.max(1, optionCount))
+    elseif code == input.KEY.Enter then
+        local option = optionSelected and view.options[optionSelected] or nil
+        if option then
+            pick(option.topic)
+        elseif view.options and #view.options == 0 then
+            goodbye()
+        end
+    end
+end
+
+local onPad = pad.handler('dialogue', function() return visible end, press)
 
 return {
     engineHandlers = {
@@ -487,31 +562,9 @@ return {
             end
         end,
         onKeyPress = function(key)
-            if not visible then
-                return
-            end
-            local view = conversation.get()
-            if view.speaking then
-                if key.code == input.KEY.Space or key.code == input.KEY.Enter then
-                    advance()
-                end
-            elseif key.code >= input.KEY._1 and key.code <= input.KEY._9 then
-                -- the numbers are those of the topics that are shown
-                local number = key.code - input.KEY._1 + 1
-                local option = number <= optionCount and view.options[optionOffset + number - 1] or nil
-                if option then
-                    pick(option.topic)
-                end
-            elseif key.code == input.KEY.DownArrow then
-                scroll(1)
-            elseif key.code == input.KEY.UpArrow then
-                scroll(-1)
-            elseif key.code == input.KEY.PageDown then
-                scroll(math.max(1, optionCount))
-            elseif key.code == input.KEY.PageUp then
-                scroll(-math.max(1, optionCount))
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
             if vertical > 0 then
                 scroll(-1)
@@ -521,6 +574,10 @@ return {
         end,
     },
     eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
+        end,
         -- However the window is left (Escape, the main menu, a script), the conversation is over. A screen that opens on
         -- top of it (the making of a character, from the end script of a response) leaves it where it is.
         UiModeChanged = function(data)

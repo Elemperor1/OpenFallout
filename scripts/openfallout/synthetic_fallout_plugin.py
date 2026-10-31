@@ -531,6 +531,9 @@ ARENA_OTHER_AMMO_COUNT = 3
 BOBBY_PIN_ID = 0x0A
 ARENA_PICK_DOOR_ID = 0x988
 ARENA_CHEST_ID = 0x989
+# What the chest holds: the rounds the rifle takes and the other kind
+ARENA_CHEST_ROUNDS = 4
+ARENA_CHEST_SLUGS = 2
 ARENA_KEYONLY_DOOR_ID = 0x98A
 ARENA_TERMINAL_ID = 0x98B
 ARENA_TERMINAL_MENU_ID = 0x98C
@@ -2650,10 +2653,11 @@ def arena_door(form_id, name):
 
 
 def arena_chest():
-    """A CONT record with the flags and the weight (5 bytes) and one thing in it, the rounds."""
+    """A CONT record with the flags and the weight (5 bytes) and two things in it, the rounds and the slugs."""
     return record(b"CONT", ARENA_CHEST_ID, [zstr(b"EDID", "OFTestArenaChest"), zstr(b"FULL", "Test Chest"),
                                             sub(b"DATA", struct.pack("<Bf", 0, 0.0)),
-                                            sub(b"CNTO", struct.pack("<Ii", ARENA_AMMO_ID, 4))])
+                                            sub(b"CNTO", struct.pack("<Ii", ARENA_AMMO_ID, ARENA_CHEST_ROUNDS)),
+                                            sub(b"CNTO", struct.pack("<Ii", ARENA_OTHER_AMMO_ID, ARENA_CHEST_SLUGS))])
 
 
 def arena_terminal(form_id, name, text, difficulty, flags, items):

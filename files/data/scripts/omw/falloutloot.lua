@@ -7,6 +7,7 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local pad = require('scripts.omw.falloutpad')
 
 local pipboy = core.pipboy
 
@@ -25,6 +26,8 @@ local shownSerial = nil
 local offset = 1
 local listLines = 12
 local listLength = 0
+-- The thing the keys and the pad have picked out (its place in the sorted list), drawn once a key has moved it
+local selected, selectFocus = 1, false
 
 local render
 local widgets
@@ -77,6 +80,19 @@ local function sortedItems(holder)
     return items
 end
 
+-- Everything in the container goes to the player
+local function takeAll()
+    local loot = pipboy.loot()
+    if not loot then
+        return
+    end
+    local player = pipboy.player()
+    for _, item in ipairs(sortedItems(loot.holder)) do
+        pipboy.transfer(loot.holder, player, item.id, item.count)
+    end
+    render()
+end
+
 function render()
     destroyElement()
     local loot = pipboy.loot()
@@ -93,6 +109,7 @@ function render()
     local player = pipboy.player()
     local items = sortedItems(loot.holder)
     listLength = #items
+    selected = math.max(1, math.min(selected, math.max(1, #items)))
     add(widgets.label(loot.name ~= '' and loot.name or 'Container', colors.titleColor, textSize + 4))
     if #items == 0 then
         add(widgets.label('Empty', colors.hintColor))
@@ -107,7 +124,7 @@ function render()
                 function()
                     pipboy.transfer(loot.holder, player, item.id, item.count)
                     render()
-                end), 340),
+                end, { color = selectFocus and index == selected and colors.pickedColor or colors.normalColor }), 340),
             widgets.cell(widgets.label(number(item.weight * item.count), colors.hintColor), 60),
             widgets.label(number(item.value * item.count), colors.hintColor)))
     end
@@ -116,12 +133,7 @@ function render()
             math.min(#items, offset + listLines - 1), #items), colors.hintColor, textSize - 4))
     end
     add(widgets.row(
-        widgets.cell(widgets.clickable('Take all', function()
-            for _, item in ipairs(items) do
-                pipboy.transfer(loot.holder, player, item.id, item.count)
-            end
-            render()
-        end, { enabled = #items > 0, color = colors.titleColor }), 140),
+        widgets.cell(widgets.clickable('Take all', takeAll, { enabled = #items > 0, color = colors.titleColor }), 140),
         widgets.clickable('Close', leave, { color = colors.titleColor })))
     element = ui.create(widgets.panel(rows))
 end
@@ -137,6 +149,74 @@ local function scroll(by)
     end
 end
 
+-- Moves the pick down (when `by` is positive) or up, and the list with it when the thing is not shown
+local function moveSelected(by)
+    local loot = element and pipboy.loot()
+    if not loot then
+        return
+    end
+    local count = #sortedItems(loot.holder)
+    if count == 0 then
+        return
+    end
+    if selectFocus then
+        selected = math.max(1, math.min(count, selected + by))
+    else
+        -- the first press picks the first thing shown (the last one shown when it goes up)
+        selectFocus = true
+        selected = math.min(count, by > 0 and offset or offset + listLines - 1)
+    end
+    if selected < offset then
+        offset = selected
+    elseif selected > offset + listLines - 1 then
+        offset = selected - listLines + 1
+    end
+    render()
+end
+
+-- Takes the thing that is picked out, as a click on it does; the first press only shows which one it is
+local function takeSelected()
+    local loot = element and pipboy.loot()
+    if not loot then
+        return
+    end
+    local item = sortedItems(loot.holder)[selected]
+    if not item then
+        return
+    end
+    if selectFocus then
+        pipboy.transfer(loot.holder, pipboy.player(), item.id, item.count)
+    else
+        selectFocus = true
+    end
+    render()
+end
+
+-- What a key (or a button of the pad that stands for one) does while the screen is there: the arrows and pages pick a
+-- thing, Enter takes it and R takes everything
+local function press(code)
+    if not element then
+        return
+    end
+    if code == input.KEY.DownArrow then
+        moveSelected(1)
+    elseif code == input.KEY.UpArrow then
+        moveSelected(-1)
+    elseif code == input.KEY.PageDown then
+        moveSelected(listLines)
+    elseif code == input.KEY.PageUp then
+        moveSelected(-listLines)
+    elseif code == input.KEY.Enter then
+        takeSelected()
+    elseif code == input.KEY.R then
+        takeAll()
+    end
+end
+
+-- On the pad Y takes the thing and X takes everything
+local onPad = pad.handler('loot', function() return element ~= nil end, press,
+    { [input.CONTROLLER_BUTTON.X] = input.KEY.R })
+
 local function sync()
     local loot = pipboy.loot()
     if not loot then
@@ -150,6 +230,7 @@ local function sync()
     if loot.serial ~= shownSerial then
         shownSerial = loot.serial
         offset = 1
+        selected, selectFocus = 1, false
         openMode()
         render()
     end
@@ -159,19 +240,9 @@ return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            if not element then
-                return
-            end
-            if key.code == input.KEY.DownArrow then
-                scroll(1)
-            elseif key.code == input.KEY.UpArrow then
-                scroll(-1)
-            elseif key.code == input.KEY.PageDown then
-                scroll(listLines)
-            elseif key.code == input.KEY.PageUp then
-                scroll(-listLines)
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
             if vertical > 0 then
                 scroll(-1)
@@ -181,6 +252,10 @@ return {
         end,
     },
     eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
+        end,
         -- However the screen is left (the button, Escape, a script), what was open is closed, and the scripts of the
         -- container hear of it
         UiModeChanged = function(data)

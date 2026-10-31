@@ -13,6 +13,7 @@ local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local Player = require('openfallout.types').Player
 local widgetModule = require('scripts.omw.falloutwidgets')
+local pad = require('scripts.omw.falloutpad')
 
 local vats = core.vats
 
@@ -38,6 +39,9 @@ local widgets
 local targets = {}
 local picked = 1
 local queue = {}
+-- The part of the picked one that the keys and the pad have picked out (its place in the list of parts), drawn once a
+-- key has moved it
+local partPicked, partFocus = 1, false
 -- The queue that is being carried out, and the seconds until its next attack
 local running = nil
 local wait = 0
@@ -121,6 +125,17 @@ local function go()
     closeMode(true)
 end
 
+local function partName(part)
+    return part.name ~= '' and part.name or part.target
+end
+
+-- Adds an attack on a part of the target to the queue
+local function queueAttack(target, part, name)
+    queue[#queue + 1] = { target = target, part = part.index, name = name, chance = part.chance }
+    print(string.format('V.A.T.S.: queued %s %d%%', name, math.floor(math.min(part.chance, 100) + 0.5)))
+    render()
+end
+
 function render()
     if element then
         element:destroy()
@@ -164,17 +179,20 @@ function render()
     if #parts == 0 then
         add(widgets.label('Nothing to aim at', colors.hintColor))
     end
-    for _, part in ipairs(parts) do
+    partPicked = math.max(1, math.min(partPicked, #parts))
+    for index, part in ipairs(parts) do
         local crippled = part.condition <= 0
         -- A perk can take the chance over 100 (it is capped before the perks): a hit is sure then, and 100 is what shows
         local shown = math.min(part.chance, 100)
         -- The name of the part, and the bone it is aimed at where the data gives it none
-        local partName = part.name ~= '' and part.name or part.target
-        local text = string.format('%s  %d%%%s', partName, math.floor(shown + 0.5), crippled and '  crippled' or '')
+        local name = partName(part)
+        local text = string.format('%s  %d%%%s', name, math.floor(shown + 0.5), crippled and '  crippled' or '')
         add(widgets.clickable(text, function()
-            queue[#queue + 1] = { target = target, part = part.index, name = partName, chance = part.chance }
-            render()
-        end, { enabled = left >= state.cost and part.chance > 0, color = colors.normalColor }))
+            queueAttack(target, part, name)
+        end, {
+            enabled = left >= state.cost and part.chance > 0,
+            color = partFocus and index == partPicked and colors.pickedColor or colors.normalColor,
+        }))
     end
 
     if #queue > 0 then
@@ -211,6 +229,7 @@ local function open(offered)
         return
     end
     picked, queue = 1, {}
+    partPicked, partFocus = 1, false
     modeOpen = true
     I.UI.addMode('Interface', { windows = {} })
     vats.setOpen(true)
@@ -220,7 +239,44 @@ end
 local function cycle(by)
     if element and #targets > 1 then
         picked = (picked - 1 + by) % #targets + 1
+        partPicked = 1
         render()
+    end
+end
+
+-- Moves the pick to the next part of the picked character (down when `by` is positive)
+local function movePart(by)
+    local target = targets[picked]
+    local parts = element and target and vats.parts(target) or {}
+    if #parts == 0 then
+        return
+    end
+    if partFocus then
+        partPicked = math.max(1, math.min(#parts, partPicked + by))
+    else
+        partFocus, partPicked = true, by > 0 and 1 or #parts
+    end
+    render()
+end
+
+-- Queues the attack on the part that is picked out, as a click on it does (not when the points or the chance do not allow);
+-- the first press only shows the part that is picked out
+local function queuePicked()
+    local target = targets[picked]
+    local parts = element and target and vats.parts(target) or {}
+    local part = parts[partPicked]
+    if not part then
+        return
+    end
+    if not partFocus then
+        -- nothing was picked out yet: the first press shows which part is
+        partFocus = true
+        render()
+        return
+    end
+    local state = vats.state()
+    if state.actionPoints - spent() >= state.cost and part.chance > 0 then
+        queueAttack(target, part, partName(part))
     end
 end
 
@@ -262,21 +318,51 @@ local function step()
     end
 end
 
+-- What a key (or a button of the pad that stands for one) does: V opens the screen; on the screen the arrows pick a
+-- character (left and right) and a part of it (up and down), Space queues the attack on the part and Enter carries the
+-- queue out
+local function press(code)
+    if code == input.KEY.V and not modeOpen and controlsAllowed() then
+        open()
+    elseif not element then
+        return
+    elseif code == input.KEY.Enter then
+        go()
+    elseif code == input.KEY.Space then
+        queuePicked()
+    elseif code == input.KEY.RightArrow or code == input.KEY.Tab or code == input.KEY.PageDown then
+        cycle(1)
+    elseif code == input.KEY.LeftArrow or code == input.KEY.PageUp then
+        cycle(-1)
+    elseif code == input.KEY.DownArrow then
+        movePart(1)
+    elseif code == input.KEY.UpArrow then
+        movePart(-1)
+    end
+end
+
+-- On the pad Y queues the attack on the part and X carries the queue out; the left bumper opens the screen (the bumpers
+-- pick the character while it is open)
+local handlePad = pad.handler('vats', function() return element ~= nil end, press,
+    { [input.CONTROLLER_BUTTON.Y] = input.KEY.Space, [input.CONTROLLER_BUTTON.X] = input.KEY.Enter })
+
+local function onPad(button)
+    if element == nil and not modeOpen and button == input.CONTROLLER_BUTTON.LeftShoulder then
+        if I.UI.getMode() == nil and not running and controlsAllowed() then
+            pad.log('vats', button, 'open')
+            open()
+        end
+        return
+    end
+    handlePad(button)
+end
+
 return {
     engineHandlers = {
         onKeyPress = function(key)
-            if key.code == input.KEY.V and not modeOpen and controlsAllowed() then
-                open()
-            elseif not element then
-                return
-            elseif key.code == input.KEY.Enter then
-                go()
-            elseif key.code == input.KEY.RightArrow or key.code == input.KEY.Tab then
-                cycle(1)
-            elseif key.code == input.KEY.LeftArrow then
-                cycle(-1)
-            end
+            press(key.code)
         end,
+        onControllerButtonPress = onPad,
         -- The attacks of a queue come a moment apart while the game runs
         onUpdate = function(dt)
             if not running then
@@ -290,6 +376,10 @@ return {
         end,
     },
     eventHandlers = {
+        -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
+        PadButton = function(data)
+            onPad(data.button)
+        end,
         OpenVats = function(data)
             open(data and data.targets)
         end,
