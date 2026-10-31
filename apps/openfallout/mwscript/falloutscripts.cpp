@@ -4030,11 +4030,17 @@ namespace OFScript
         if (!whereIs(user, userPlace) || !whereIs(furnitureRef, furniturePlace)
             || !inOneSpace(furniturePlace, userPlace))
             return;
-        // Where it stands, the way it faces
+        // The animation of getting up ends on the entry, turned half a way round from the way the character came to
+        // it (it faces away from the furniture). The player keeps the way it looks.
         Move move;
         move.mWhere = userPlace;
         move.mWhere.mPosition = osg::Vec3f(at.mPosition.x, at.mPosition.y, at.mPosition.z);
         move.mParts = Move::PositionX | Move::PositionY | Move::PositionZ;
+        if (user != mPlayer)
+        {
+            move.mWhere.mAngle.z() = at.mHeading + osg::PIf;
+            move.mParts |= Move::AngleZ;
+        }
         askForMove(user, move);
     }
 

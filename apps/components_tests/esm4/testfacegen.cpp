@@ -192,6 +192,38 @@ namespace
         EXPECT_EQ(index.find(ESM4::FaceTextureIndex::Kind::BodyMale, "falloutnv", 0x00aabbcc), nullptr);
     }
 
+    TEST(ESM4FaceTextureIndexTest, findsTheTextureOfACharacterInARaceWhenItHasNoneOfItsOwn)
+    {
+        using Kind = ESM4::FaceTextureIndex::Kind;
+        ESM4::FaceTextureIndex index;
+        // the names the editor wrote for characters that get their race when the game makes them: the sex, the race,
+        // the character
+        index.add("textures/characters/facemods/falloutnv.esm/m00000019_0013d6a2_0.dds");
+        index.add("textures/characters/facemods/falloutnv.esm/f000038e5_0013d6a2_0.dds");
+        index.add("textures/characters/facemods/falloutnv.esm/f00000019_0013d6a2_0.dds");
+        index.add("textures/characters/bodymods/falloutnv.esm/00000019_0013d6a2modbodymale.dds");
+        index.add("textures/characters/bodymods/falloutnv.esm/00000019_0013d6a2modbodyfemale.dds");
+        index.add("textures/characters/facemods/falloutnv.esm/x00000019_0013d6a2_0.dds");
+        EXPECT_EQ(index.size(), 5u);
+
+        ASSERT_NE(index.findForRace(Kind::Face, "falloutnv", 0x19, 0x0013d6a2, false), nullptr);
+        EXPECT_EQ(*index.findForRace(Kind::Face, "falloutnv", 0x19, 0x0013d6a2, false),
+            "textures/characters/facemods/falloutnv.esm/m00000019_0013d6a2_0.dds");
+        EXPECT_EQ(*index.findForRace(Kind::Face, "falloutnv", 0x19, 0x0113d6a2, true),
+            "textures/characters/facemods/falloutnv.esm/f00000019_0013d6a2_0.dds");
+        EXPECT_EQ(*index.findForRace(Kind::BodyMale, "falloutnv", 0x19, 0x0013d6a2, false),
+            "textures/characters/bodymods/falloutnv.esm/00000019_0013d6a2modbodymale.dds");
+        EXPECT_EQ(*index.findForRace(Kind::BodyFemale, "falloutnv", 0x19, 0x0013d6a2, true),
+            "textures/characters/bodymods/falloutnv.esm/00000019_0013d6a2modbodyfemale.dds");
+        // another race, another character, the other sex of a race that has one
+        EXPECT_EQ(index.findForRace(Kind::Face, "falloutnv", 0x38e5, 0x0013d6a2, false), nullptr);
+        EXPECT_NE(index.findForRace(Kind::Face, "falloutnv", 0x38e5, 0x0013d6a2, true), nullptr);
+        EXPECT_EQ(index.findForRace(Kind::Face, "falloutnv", 0x19, 0x0013d6a3, false), nullptr);
+        EXPECT_EQ(index.findForRace(Kind::BodyMale, "falloutnv", 0x38e5, 0x0013d6a2, false), nullptr);
+        // they are not the files of a character without a race
+        EXPECT_EQ(index.find(Kind::Face, "falloutnv", 0x0013d6a2), nullptr);
+    }
+
     TEST(ESM4FaceTextureIndexTest, takesTheFolderOfAPluginWithOrWithoutItsExtension)
     {
         // the editor names the folder of a plugin with the extension of its file
@@ -252,7 +284,10 @@ namespace
     TEST(ESM4FaceTextureIndexTest, leavesOutPathsThatAreNotTexturesOfCharacters)
     {
         ESM4::FaceTextureIndex index;
-        index.add("textures/characters/facemods/falloutnv/m000038e5_001300a5_0.dds");
+        index.add("textures/characters/facemods/falloutnv/x000038e5_001300a5_0.dds");
+        index.add("textures/characters/facemods/falloutnv/m000038e5_001300a5_1.dds");
+        index.add("textures/characters/facemods/falloutnv/m38e5_001300a5_0.dds");
+        index.add("textures/characters/bodymods/falloutnv/000038e5_001300a5modbodyother.dds");
         index.add("textures/characters/facemods/falloutnv/000038e5_1.dds");
         index.add("textures/characters/facemods/falloutnv/000038e5_0.png");
         index.add("textures/characters/facemods/000038e5_0.dds");

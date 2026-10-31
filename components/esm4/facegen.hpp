@@ -123,11 +123,21 @@ namespace ESM4
         // the plugin that last saved the character
         const std::string* findIn(Kind kind, std::string_view plugin, std::uint32_t formId) const;
 
+        // The texture that the editor wrote for a character in a race, for the characters that have no file under their
+        // own id because they get their race when the game makes them (facemods "m<race>_<character>_0.dds" for a man,
+        // "f..." for a woman, bodymods "<race>_<character>modbodymale.dds"). The ids are matched by their last six
+        // digits and the folder of the plugin is chosen as `find` chooses it.
+        const std::string* findForRace(
+            Kind kind, std::string_view plugin, std::uint32_t race, std::uint32_t formId, bool female) const;
+
         std::size_t size() const { return mCount; }
 
     private:
         // The files of each kind, by the name of the folder of the plugin and then by the last six digits of the id
         std::map<Kind, std::map<std::string, std::map<std::uint32_t, std::string>, std::less<>>> mFiles;
+        // The same for the files of a character in a race, by the race and then the character (last six digits of each,
+        // the race in the high bits), and for the face by the sex too in the top bit
+        std::map<Kind, std::map<std::string, std::map<std::uint64_t, std::string>, std::less<>>> mRaceFiles;
         std::size_t mCount = 0;
     };
 }

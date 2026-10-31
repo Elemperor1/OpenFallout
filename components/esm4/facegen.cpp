@@ -56,6 +56,40 @@ namespace ESM4
             return true;
         }
 
+        // The value of eight lower case hex digits, or false
+        bool readEightDigits(std::string_view text, std::uint32_t& value)
+        {
+            if (text.size() != 8)
+                return false;
+            value = 0;
+            for (const char c : text)
+            {
+                std::uint32_t digit;
+                if (c >= '0' && c <= '9')
+                    digit = static_cast<std::uint32_t>(c - '0');
+                else if (c >= 'a' && c <= 'f')
+                    digit = static_cast<std::uint32_t>(c - 'a' + 10);
+                else
+                    return false;
+                value = value << 4 | digit;
+            }
+            return true;
+        }
+
+        // Two ids of eight digits with an underscore between and `rest` after them: the race and the character
+        bool readRaceAndId(std::string_view name, std::string_view rest, std::uint32_t& race, std::uint32_t& id)
+        {
+            if (name.size() != 17 + rest.size() || name[8] != '_' || name.substr(17) != rest)
+                return false;
+            return readEightDigits(name.substr(0, 8), race) && readEightDigits(name.substr(9, 8), id);
+        }
+
+        std::uint64_t raceKey(std::uint32_t race, std::uint32_t id, bool female)
+        {
+            return (female ? std::uint64_t(1) << 63 : 0) | std::uint64_t(race & 0x00FFFFFFu) << 24
+                | std::uint64_t(id & 0x00FFFFFFu);
+        }
+
         // The six hex digits at the end of eight, or false if there are not eight lower case digits before the rest
         bool readId(std::string_view name, std::string_view rest, std::uint32_t& id)
         {
@@ -184,11 +218,24 @@ namespace ESM4
 
         Kind kind;
         std::uint32_t id = 0;
+        std::uint32_t race = 0;
+        bool raceFile = false;
+        bool female = false;
         if (directory == "facemods")
         {
             kind = Kind::Face;
             if (!readId(stem, "_0", id))
-                return;
+            {
+                // The files of a character in a race: the sex, the race and the character
+                if (stem.size() > 1 && (stem[0] == 'm' || stem[0] == 'f')
+                    && readRaceAndId(stem.substr(1), "_0", race, id))
+                {
+                    raceFile = true;
+                    female = stem[0] == 'f';
+                }
+                else
+                    return;
+            }
         }
         else if (directory == "bodymods")
         {
@@ -196,11 +243,32 @@ namespace ESM4
                 kind = Kind::BodyMale;
             else if (readId(stem, "modbodyfemale", id))
                 kind = Kind::BodyFemale;
+            else if (readRaceAndId(stem, "modbodymale", race, id))
+            {
+                kind = Kind::BodyMale;
+                raceFile = true;
+            }
+            else if (readRaceAndId(stem, "modbodyfemale", race, id))
+            {
+                kind = Kind::BodyFemale;
+                raceFile = true;
+                female = true;
+            }
             else
                 return;
         }
         else
             return;
+
+        if (raceFile)
+        {
+            auto& raceFiles = mRaceFiles[kind].try_emplace(std::string(withoutPluginExtension(plugin))).first->second;
+            std::string name(root);
+            name.append(directory).append("/").append(plugin).append("/").append(file);
+            if (raceFiles.try_emplace(raceKey(race, id, female), std::move(name)).second)
+                ++mCount;
+            return;
+        }
 
         // Of several files with the same last six digits, the first is kept
         auto& files = mFiles[kind].try_emplace(std::string(withoutPluginExtension(plugin))).first->second;
@@ -220,6 +288,33 @@ namespace ESM4
             return nullptr;
         const auto file = own->second.find(formId & 0x00FFFFFFu);
         return file != own->second.end() ? &file->second : nullptr;
+    }
+
+    const std::string* FaceTextureIndex::findForRace(
+        Kind kind, std::string_view plugin, std::uint32_t race, std::uint32_t formId, bool female) const
+    {
+        const auto kindFiles = mRaceFiles.find(kind);
+        if (kindFiles == mRaceFiles.end())
+            return nullptr;
+        const std::uint64_t key = raceKey(race, formId, female);
+        plugin = withoutPluginExtension(plugin);
+        if (const auto own = kindFiles->second.find(plugin); own != kindFiles->second.end())
+            if (const auto file = own->second.find(key); file != own->second.end())
+                return &file->second;
+        const std::string* only = nullptr;
+        std::size_t found = 0;
+        for (const auto& [name, files] : kindFiles->second)
+        {
+            if (name == plugin)
+                continue;
+            const auto file = files.find(key);
+            if (file != files.end())
+            {
+                only = &file->second;
+                ++found;
+            }
+        }
+        return found == 1 ? only : nullptr;
     }
 
     const std::string* FaceTextureIndex::find(Kind kind, std::string_view plugin, std::uint32_t formId) const

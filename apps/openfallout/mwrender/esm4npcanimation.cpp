@@ -254,6 +254,13 @@ namespace OFRender
                 const std::string* path = textures.findIn(kind, pluginOf(traits.mSourceFile), traits.mId.mIndex);
                 if (path == nullptr)
                     path = textures.find(kind, pluginOf(traits.mId.mContentFile), traits.mId.mIndex);
+                // A character that gets its race when the game makes it has the files of the race it got instead
+                if (path == nullptr)
+                    path = textures.findForRace(
+                        kind, pluginOf(traits.mSourceFile), race->mId.mIndex, traits.mId.mIndex, isFemale);
+                if (path == nullptr)
+                    path = textures.findForRace(
+                        kind, pluginOf(traits.mId.mContentFile), race->mId.mIndex, traits.mId.mIndex, isFemale);
                 if (path == nullptr)
                     return nullptr;
                 return mResourceSystem->getImageManager()->getImage(VFS::Path::Normalized(*path));
