@@ -72,8 +72,10 @@ namespace OFRender
         /// one.
         void startAnimations(bool female);
 
-        /// Adds a model to the actor and returns the node that it is, null when there is no model
-        osg::ref_ptr<osg::Node> insertPart(std::string_view model);
+        /// Adds a model to the actor and returns the node that it is, null when there is no model. A model that is not
+        /// skinned names the bone it is put on in its file; one that does not (a hat) and is for the head
+        /// (`forHead`), with its vertices around the origin of the head, is put on the head bone.
+        osg::ref_ptr<osg::Node> insertPart(std::string_view model, bool forHead = false);
 
     private:
         class AdvanceCallback;

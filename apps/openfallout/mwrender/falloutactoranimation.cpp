@@ -438,7 +438,7 @@ namespace OFRender
         mGait = gait;
     }
 
-    osg::ref_ptr<osg::Node> FalloutActorAnimation::insertPart(std::string_view model)
+    osg::ref_ptr<osg::Node> FalloutActorAnimation::insertPart(std::string_view model, bool forHead)
     {
         if (model.empty())
             return nullptr;
@@ -464,7 +464,24 @@ namespace OFRender
 
         // A part that is not skinned (the hair, eyes and mouth, a hat) is put on a bone of the skeleton by its file,
         // that is the head for all of these: at the root of the character it would stay at the feet
-        const std::string attachTo = attachmentName(*part);
+        std::string attachTo = attachmentName(*part);
+        osg::Quat partRoot = attachmentRotation(*part);
+        if (attachTo.empty() && forHead)
+        {
+            // Most hats name no bone. Their vertices are around the origin of the head (7 to 17 units above it for a
+            // hat), where a few are in the frame of the skeleton, at head height: those are right where they are
+            FindSkinnedMesh skin;
+            part->accept(skin);
+            osg::ComputeBoundsVisitor bounds;
+            part->accept(bounds);
+            constexpr double skeletonHeightFrom = 60.0;
+            if (!skin.mSkinned && bounds.getBoundingBox().valid()
+                && bounds.getBoundingBox().center().z() < skeletonHeightFrom)
+            {
+                attachTo = "Bip01 Head";
+                partRoot = osg::Quat();
+            }
+        }
         if (!attachTo.empty())
         {
             // The part is out of the scene while the bone is looked for, so that the bone is one of the skeleton of
@@ -483,7 +500,7 @@ namespace OFRender
                 const osg::NodePathList paths = bone->getParentalNodePaths(mObjectRoot.get());
                 if (!paths.empty())
                     boneRest = osg::computeLocalToWorld(paths.front()).getRotate();
-                const osg::Quat frame = attachmentFrame(boneRest, attachmentRotation(*part));
+                const osg::Quat frame = attachmentFrame(boneRest, partRoot);
                 if (std::abs(frame.w()) < 0.99999)
                 {
                     osg::ref_ptr<osg::MatrixTransform> turn = new osg::MatrixTransform(osg::Matrix::rotate(frame));

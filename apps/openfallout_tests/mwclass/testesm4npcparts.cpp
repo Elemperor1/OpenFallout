@@ -177,6 +177,28 @@ namespace OFClass
             EXPECT_EQ(models.back(), "suit\\hat.nif");
         }
 
+        TEST(OFClassNpcPartsTest, aPieceWornOnTheHeadIsMarkedForTheHead)
+        {
+            const ESM4::Race race = humanRace();
+            const ESM4::Armor hat = armorOf(ESM4::Armor::FO3_Hat | ESM4::Armor::FO3_Hair, "suit\\hat.nif");
+            const ESM4::Armor glasses = armorOf(ESM4::Armor::FO3_EyeGlasses, "suit\\glasses.nif");
+            const ESM4::Armor suit = armorOf(ESM4::Armor::FO3_UpperBody, "suit\\jumpsuit.nif");
+
+            const FalloutNpcParts parts = falloutNpcParts(race, false, nullptr, {}, { &hat, &glasses, &suit });
+            std::size_t worn = 0;
+            for (const FalloutNpcPart& part : parts.mParts)
+            {
+                if (part.mKind != FalloutPartKind::Worn)
+                {
+                    EXPECT_FALSE(part.mForHead) << part.mModel;
+                    continue;
+                }
+                ++worn;
+                EXPECT_EQ(part.mForHead, part.mModel != "suit\\jumpsuit.nif") << part.mModel;
+            }
+            EXPECT_EQ(worn, 3u);
+        }
+
         TEST(OFClassNpcPartsTest, aRaceWithNoPartsGivesOnlyWhatTheCharacterWears)
         {
             const ESM4::Race race{};

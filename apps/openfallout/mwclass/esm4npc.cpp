@@ -123,8 +123,13 @@ namespace OFClass
             result.mParts.push_back(
                 { hair->mModel.getOriginal(), falloutTexturePath(hair->mIcon), FalloutPartKind::Hair });
 
+        // The slots of the head: what is worn there hangs on the head bone when its file does not say where it goes
+        constexpr std::uint32_t headSlots = ESM4::Armor::FO3_Head | ESM4::Armor::FO3_Hair | ESM4::Armor::FO3_Headband
+            | ESM4::Armor::FO3_Hat | ESM4::Armor::FO3_EyeGlasses | ESM4::Armor::FO3_NoseRing | ESM4::Armor::FO3_Earrings
+            | ESM4::Armor::FO3_Mask | ESM4::Armor::FO3_MouthObject;
         for (const ESM4::WornPiece& piece : worn.mPieces)
-            result.mParts.push_back({ piece.mModel->getOriginal(), std::string(), FalloutPartKind::Worn });
+            result.mParts.push_back(
+                { piece.mModel->getOriginal(), std::string(), FalloutPartKind::Worn, (piece.mSlots & headSlots) != 0 });
         return result;
     }
 

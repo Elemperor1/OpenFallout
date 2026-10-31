@@ -303,7 +303,7 @@ namespace OFRender
         std::string eyeTexture;
         for (const OFClass::FalloutNpcPart& npcPart : parts.mParts)
         {
-            const osg::ref_ptr<osg::Node> part = insertPart(npcPart.mModel);
+            const osg::ref_ptr<osg::Node> part = insertPart(npcPart.mModel, npcPart.mForHead);
             if (part == nullptr)
             {
                 ++missing;
