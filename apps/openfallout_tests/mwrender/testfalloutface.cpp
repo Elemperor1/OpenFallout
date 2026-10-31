@@ -1,5 +1,6 @@
 #include <apps/openfallout/mwrender/falloutface.hpp>
 
+#include <components/misc/osguservalues.hpp>
 #include <components/sceneutil/material.hpp>
 #include <components/sceneutil/riggeometry.hpp>
 #include <components/sceneutil/texturetype.hpp>
@@ -498,5 +499,27 @@ namespace
         EXPECT_EQ(tintHair(*root, osg::Vec3f(1.f, 1.f, 1.f)), 1u);
         EXPECT_NE(shape->getStateSet()->getAttribute(osg::StateAttribute::MATERIAL), nullptr);
         EXPECT_EQ(plain->getStateSet(), nullptr);
+    }
+
+    TEST(OpenFalloutRenderAttachmentName, givesTheBoneThatTheModelNames)
+    {
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        osg::ref_ptr<osg::Group> inner = new osg::Group;
+        root->addChild(inner);
+        inner->setUserValue(Misc::OsgUserValues::sAttachTo, std::string("Bip01 Head"));
+
+        EXPECT_EQ(attachmentName(*root), "Bip01 Head");
+        EXPECT_EQ(attachmentName(*inner), "Bip01 Head");
+    }
+
+    TEST(OpenFalloutRenderAttachmentName, isEmptyForAModelThatNamesNone)
+    {
+        osg::ref_ptr<osg::Group> root = new osg::Group;
+        root->addChild(new osg::Group);
+        osg::ref_ptr<osg::Group> blank = new osg::Group;
+        blank->setUserValue(Misc::OsgUserValues::sAttachTo, std::string());
+
+        EXPECT_TRUE(attachmentName(*root).empty());
+        EXPECT_TRUE(attachmentName(*blank).empty());
     }
 }

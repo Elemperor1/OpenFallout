@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <mutex>
 #include <set>
+#include <sstream>
 
 #include <components/esm4/loadarma.hpp>
 #include <components/esm4/loadarmo.hpp>
@@ -151,6 +152,12 @@ namespace OFRender
                 named = images.mEyes;
                 source = images.mEyes != nullptr ? images.mEyes->getFileName() : std::string();
                 break;
+            case Kind::Worn:
+                // The skin that shows from clothes (the arms of an outfit, the neck) has the picture of the skin of the
+                // race, and gets the tint of the body like the body does; the rest of the outfit is left as it is
+                skin = true;
+                tint = images.mBodyTint;
+                break;
             case Kind::Hair:
             case Kind::HeadPart:
                 break;
@@ -159,6 +166,8 @@ namespace OFRender
         }
         if (kind != Kind::Eye)
             named = loadFalloutImage(npcPart.mTexture);
+        if (kind == Kind::Worn && tint == nullptr)
+            return look;
 
         // The hair, and the beard and eyebrows that go with it, have the colour of the character
         if ((kind == Kind::Hair || kind == Kind::HeadPart) && images.mHairColour.has_value())
@@ -285,6 +294,8 @@ namespace OFRender
         std::size_t morphed = 0;
         std::string faceTexture;
         std::string bodyTexture;
+        bool bodyShown = false;
+        std::size_t wornSkin = 0;
         std::string hairTexture;
         std::string eyeTexture;
         for (const OFClass::FalloutNpcPart& npcPart : parts.mParts)
@@ -304,7 +315,12 @@ namespace OFRender
                     faceTexture = look.mTexture;
                     break;
                 case OFClass::FalloutPartKind::Body:
+                    bodyShown = true;
                     bodyTexture = look.mTexture;
+                    break;
+                case OFClass::FalloutPartKind::Worn:
+                    if (!look.mTexture.empty())
+                        ++wornSkin;
                     break;
                 case OFClass::FalloutPartKind::Hair:
                     hairTexture = look.mTexture;
@@ -325,15 +341,21 @@ namespace OFRender
             return text.empty() ? std::string(otherwise) : text;
         };
         if (sLooksTold.fetch_add(1) < maxLooksTold)
-            Log(Debug::Info) << "Look of " << mPtr.getCellRef().getRefId() << ": " << race->mEditorId
-                             << (isFemale ? " female" : " male") << ", " << inserted << " parts"
+        {
+            // The form id is written in hexadecimal and leaves the stream in it; the numbers here are not
+            std::ostringstream ref;
+            ref << mPtr.getCellRef().getRefId();
+            Log(Debug::Info) << "Look of " << ref.str() << ": " << race->mEditorId << (isFemale ? " female" : " male")
+                             << ", " << inserted << " parts"
                              << (missing != 0 ? " (" + std::to_string(missing) + " not found)" : std::string())
                              << ", hair " << (hair != nullptr ? hair->mEditorId : std::string("none"))
                              << (parts.mHatOn ? " (under a hat)" : "") << ", " << morphed << " meshes morphed, face "
                              << valueOr(faceTexture, "of its model") << ", body "
-                             << valueOr(bodyTexture, "of its model") << ", hair texture "
+                             << (bodyShown ? valueOr(bodyTexture, "of its model") : std::string("under clothes"))
+                             << ", skin on clothes tinted " << wornSkin << ", hair texture "
                              << valueOr(hairTexture, "of its model") << ", eyes "
                              << valueOr(eyeTexture, "of its model");
+        }
     }
 
     template <class Record>

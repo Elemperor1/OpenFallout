@@ -9,6 +9,9 @@ namespace Misc
     {
         static const std::string sFileHash;
         static const std::string sXSoftEffect;
+        /// The name of the node of a skeleton that a model asks to be attached to (the extra data "Prn" of Fallout
+        /// files)
+        static const std::string sAttachTo;
     };
 }
 

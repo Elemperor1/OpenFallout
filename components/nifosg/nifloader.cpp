@@ -864,6 +864,11 @@ namespace NifOsg
 
                     constexpr std::string_view extraDataIdentifer = "omw:data";
 
+                    // The model of a part that is not skinned (the hair and eyes of a character, a hat) names the
+                    // node of the skeleton that the game attaches it to
+                    if (Misc::StringUtils::ciEqual(sd->mName, "Prn") && !sd->mData.empty())
+                        node->setUserValue(Misc::OsgUserValues::sAttachTo, sd->mData);
+
                     // String markers may contain important information
                     // affecting the entire subtree of this obj
                     if (sd->mData == "MRK")

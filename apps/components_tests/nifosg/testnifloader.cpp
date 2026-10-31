@@ -1,6 +1,8 @@
 #include "../nif/node.hpp"
 #include "../nif/sequence.hpp"
 
+#include <components/misc/osguservalues.hpp>
+#include <components/nif/extra.hpp>
 #include <components/nif/node.hpp>
 #include <components/nif/property.hpp>
 #include <components/nifosg/nifloader.hpp>
@@ -114,6 +116,52 @@ osg::Group {
   }
 }
 )");
+    }
+
+    // The hair, eyes and hats of the characters of the games are not skinned: the file names the bone they are put on
+    TEST_F(NifOsgLoaderTest, keepsTheNameOfTheNodeThatAModelAsksToBeAttachedTo)
+    {
+        Nif::NiStringExtraData extra;
+        init(extra);
+        extra.mName = "Prn";
+        extra.mData = "Bip01 Head";
+        extra.mRecordType = Nif::RC_NiStringExtraData;
+        Nif::NiNode node;
+        init(node);
+        node.mExtra = Nif::ExtraPtr(&extra);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&node);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::Group* root = result->asGroup();
+        ASSERT_NE(root, nullptr);
+        ASSERT_EQ(root->getNumChildren(), 1u);
+        std::string attachTo;
+        EXPECT_TRUE(root->getChild(0)->getUserValue(Misc::OsgUserValues::sAttachTo, attachTo));
+        EXPECT_EQ(attachTo, "Bip01 Head");
+    }
+
+    TEST_F(NifOsgLoaderTest, doesNotNameANodeToAttachToForOtherExtraData)
+    {
+        Nif::NiStringExtraData extra;
+        init(extra);
+        extra.mName = "UPB";
+        extra.mData = "BSBoneLOD#Bone#0#";
+        extra.mRecordType = Nif::RC_NiStringExtraData;
+        Nif::NiNode node;
+        init(node);
+        node.mExtra = Nif::ExtraPtr(&extra);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&node);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::Group* root = result->asGroup();
+        ASSERT_NE(root, nullptr);
+        ASSERT_EQ(root->getNumChildren(), 1u);
+        std::string attachTo;
+        EXPECT_FALSE(root->getChild(0)->getUserValue(Misc::OsgUserValues::sAttachTo, attachTo));
     }
 
     // The shape of the blocks of distant objects of the games: a triangle shape with a list of segments

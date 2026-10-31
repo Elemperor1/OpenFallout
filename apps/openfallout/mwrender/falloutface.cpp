@@ -20,6 +20,7 @@
 #endif
 
 #include <components/debug/debuglog.hpp>
+#include <components/misc/osguservalues.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/algorithm.hpp>
 #include <components/sceneutil/material.hpp>
@@ -204,6 +205,40 @@ namespace OFRender
             ++moved;
         }
         return moved;
+    }
+
+    namespace
+    {
+        class FindAttachment : public osg::NodeVisitor
+        {
+        public:
+            FindAttachment()
+                : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+            {
+            }
+
+            void apply(osg::Node& node) override
+            {
+                if (!mName.empty())
+                    return;
+                std::string name;
+                if (node.getUserValue(Misc::OsgUserValues::sAttachTo, name) && !name.empty())
+                {
+                    mName = std::move(name);
+                    return;
+                }
+                traverse(node);
+            }
+
+            std::string mName;
+        };
+    }
+
+    std::string attachmentName(osg::Node& part)
+    {
+        FindAttachment find;
+        part.accept(find);
+        return std::move(find.mName);
     }
 
     std::size_t replaceDiffuseMap(osg::Node& part, osg::Image* image)

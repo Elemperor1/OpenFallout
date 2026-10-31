@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <vector>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -23,6 +24,7 @@
 #include "../mwworld/refdata.hpp"
 
 #include "blendmask.hpp"
+#include "falloutface.hpp"
 
 namespace OFRender
 {
@@ -370,6 +372,34 @@ namespace OFRender
                 group->addChild(skeleton->getChild(i));
             mObjectRoot->replaceChild(skeleton, group);
             part = group;
+        }
+
+        // A part that is not skinned (the hair, eyes and mouth, a hat) is put on a bone of the skeleton by its file,
+        // that is the head for all of these: at the root of the character it would stay at the feet
+        const std::string attachTo = attachmentName(*part);
+        if (!attachTo.empty())
+        {
+            SceneUtil::FindByNameVisitor find(attachTo);
+            mObjectRoot->accept(find);
+            osg::Group* bone = find.mFoundNode;
+            // The bone is on the skeleton of the character, and never in the part itself (a part has none of its own
+            // that it names)
+            if (bone != nullptr && bone != part.get())
+            {
+                for (osg::Group* parent : std::vector<osg::Group*>(part->getParents()))
+                    parent->removeChild(part);
+                bone->addChild(part);
+            }
+            else
+            {
+                static std::mutex sReportedMutex;
+                static std::set<std::string> sReported;
+                const std::lock_guard lock(sReportedMutex);
+                if (sReported.insert(std::string(model) + "\n" + attachTo).second)
+                    Log(Debug::Warning) << "The part " << model << " asks to be on the bone " << attachTo
+                                        << ", which the skeleton of " << mPtr.getCellRef().getRefId()
+                                        << " does not have; it stays where the character is";
+            }
         }
         return part;
     }

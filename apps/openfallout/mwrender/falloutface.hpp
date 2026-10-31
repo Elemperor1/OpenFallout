@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -64,6 +65,11 @@ namespace OFRender
     /// for a bare one, and takes the other out of this part. A hair that has only one of them keeps it. Returns how
     /// many shapes it took out.
     std::size_t chooseHairShape(osg::Node& part, bool hat);
+
+    /// The name of the node of the skeleton that a model asks to be attached to: the games put the hair, eyes, mouth
+    /// and beard of a character, and the hats, on the bone "Bip01 Head" by the extra data "Prn" of the file, since
+    /// these parts are not skinned. Empty when the model names none.
+    std::string attachmentName(osg::Node& part);
 
     /// The morphs of the .egm file that goes with a model (a path as the race and the hair records name it). The file
     /// is read once. Null when there is none, or when it is not valid, which is said once in the log.
