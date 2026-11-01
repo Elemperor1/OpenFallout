@@ -72,8 +72,10 @@ namespace OFRender
         /// one.
         void startAnimations(bool female);
 
-        /// Adds a model to the actor and returns the node that it is, null when there is no model
-        osg::ref_ptr<osg::Node> insertPart(std::string_view model);
+        /// Adds a model to the actor and returns the node that it is, null when there is no model. A model that is not
+        /// skinned names the bone it is put on in its file; one that does not (a hat) and is for the head
+        /// (`forHead`), with its vertices around the origin of the head, is put on the head bone.
+        osg::ref_ptr<osg::Node> insertPart(std::string_view model, bool forHead = false);
 
     private:
         class AdvanceCallback;
@@ -86,6 +88,12 @@ namespace OFRender
         /// Adds the animation file of the weapon move, if there is one, and plays it once over the body above the waist
         /// at the priority. Empty when the files have none.
         std::string playWeaponMove(FalloutWeaponMove move, int priority, bool loop);
+
+        /// Starts the idle again when a part of the body has no animation (the T of the skeleton shows)
+        void watchPose(float duration);
+
+        /// Says in the log where the bones of the actor stand a second into its idle (the first few actors only)
+        void logPose(float duration);
 
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
@@ -113,6 +121,15 @@ namespace OFRender
         std::map<std::string, std::string> mIdleGroups;
         /// The group of the idle it stands in, which a script does not play over
         std::string mDefaultIdleGroup;
+
+        /// How long a part of the body has had no animation, and whether that has been said
+        float mBareTime = 0.f;
+        bool mBareReported = false;
+        /// Whether the idle was looked at for a part of the body that it has nothing for
+        bool mCoverageChecked = false;
+        /// How long the idle has played, and whether the bones were said
+        float mPoseTime = 0.f;
+        bool mPoseLogged = false;
 
         std::string mWalkGroup;
         std::string mRunGroup;

@@ -881,6 +881,16 @@ namespace Resource
                 return false;
             if (isReservedName(node->getName()))
                 return false;
+            // The hair of a character is two shapes in one model, for a head with a hat and for one without, and the
+            // one that the character does not need is taken out by its name
+            if (Misc::StringUtils::ciEqual(node->getName(), "hat")
+                || Misc::StringUtils::ciEqual(node->getName(), "nohat"))
+                return false;
+            // A model that names the node of a skeleton it is attached to (the hair of a character, a hat) holds
+            // that on its root, which would be gone with the root when the root is merged into its parent
+            std::string attachTo;
+            if (node->getUserValue(Misc::OsgUserValues::sAttachTo, attachTo))
+                return false;
 
             return (option & optimizer->getPermissibleOptimizationsForObject(node)) != 0;
         }
@@ -951,11 +961,15 @@ namespace Resource
         const std::size_t dot = name.find_last_of('.');
         if (dot == std::string_view::npos || name.find('/', dot) != std::string_view::npos)
             return options;
-        const VFS::Path::Normalized morphs(std::string(name.substr(0, dot)) + ".egm");
-        if (vfs.exists(morphs))
-            return options
-                & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
-                    | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
+        // The morphs of a model are in a file of its name, and those of a hair, that holds a shape for a head with a
+        // hat and one for a head without, in a file for each shape ("<name>hat.egm" and "<name>nohat.egm")
+        const std::string stem(name.substr(0, dot));
+        for (const char* variant : { "", "hat", "nohat" })
+            if (vfs.exists(VFS::Path::Normalized(stem + variant + ".egm")))
+                return options
+                    & ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
+                        | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES
+                        | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
         return options;
     }
 

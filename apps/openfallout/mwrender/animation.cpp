@@ -1289,6 +1289,14 @@ namespace OFRender
         return "";
     }
 
+    bool Animation::hasControllersFor(std::string_view groupname, BoneGroup boneGroup) const
+    {
+        const AnimStateMap::const_iterator state = mStates.find(groupname);
+        if (state == mStates.end() || state->second.mSource == nullptr)
+            return false;
+        return !state->second.mSource->mControllerMap[boneGroup].empty();
+    }
+
     float Animation::getCurrentTime(std::string_view groupname) const
     {
         AnimStateMap::const_iterator iter = mStates.find(groupname);

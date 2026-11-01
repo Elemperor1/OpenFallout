@@ -483,15 +483,9 @@ namespace OFRender
         mSky->listAssetsToPreload(workItem->mModels, workItem->mTextures);
         mWater->listAssetsToPreload(workItem->mTextures);
 
-        workItem->mModels.push_back(Settings::models().mXbaseanim);
-        workItem->mModels.push_back(Settings::models().mXbaseanim1st);
-        workItem->mModels.push_back(Settings::models().mXbaseanimfemale);
-        workItem->mModels.push_back(Settings::models().mXargonianswimkna);
-
-        workItem->mKeyframes.push_back(Settings::models().mXbaseanimkf);
-        workItem->mKeyframes.push_back(Settings::models().mXbaseanim1stkf);
-        workItem->mKeyframes.push_back(Settings::models().mXbaseanimfemalekf);
-        workItem->mKeyframes.push_back(Settings::models().mXargonianswimknakf);
+        // The base animation files of Morrowind (xbase_anim, xargonian_swimkna) are not preloaded: the games of the
+        // engine have none, and each one was logged as a missing file at every start. The animations of the characters
+        // of Fallout are the files of their skeleton folders (FalloutActorAnimation).
 
         workItem->mTextures.emplace_back("textures/_land_default.dds");
 

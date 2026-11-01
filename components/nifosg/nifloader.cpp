@@ -1,6 +1,7 @@
 #include "nifloader.hpp"
 
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -185,6 +186,26 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    // The turn that the vertices of the first shape under a node go through up to the parent of the node: the turn of
+    // each node on the way, the turn of the node itself and that of the shape included
+    std::optional<osg::Matrixf> turnOfFirstShape(const Nif::NiAVObject* node)
+    {
+        const osg::Matrixf own = osg::Matrixf::rotate(node->mTransform.toMatrix().getRotate());
+        if (isTypeNiGeometry(node->mRecordType) || isTypeBSGeometry(node->mRecordType))
+            return own;
+        if (const Nif::NiNode* ninode = dynamic_cast<const Nif::NiNode*>(node))
+        {
+            for (const auto& child : ninode->mChildren)
+            {
+                if (child.empty())
+                    continue;
+                if (const std::optional<osg::Matrixf> below = turnOfFirstShape(child.getPtr()))
+                    return *below * own;
+            }
+        }
+        return std::nullopt;
     }
 
     // Collect all properties affecting the given drawable that should be handled on drawable basis rather than on the
@@ -863,6 +884,19 @@ namespace NifOsg
                     const Nif::NiStringExtraData* sd = static_cast<const Nif::NiStringExtraData*>(e.getPtr());
 
                     constexpr std::string_view extraDataIdentifer = "omw:data";
+
+                    // The model of a part that is not skinned (the hair and eyes of a character, a hat) names the
+                    // node of the skeleton that the game attaches it to
+                    if (Misc::StringUtils::ciEqual(sd->mName, "Prn") && !sd->mData.empty())
+                    {
+                        node->setUserValue(Misc::OsgUserValues::sAttachTo, sd->mData);
+                        // The vertices of the part end up turned by this node and the shape under it (the female hair
+                        // files turn both, by the same half turn, and the two cancel), and that goes into the meshes
+                        // when the model is optimized: a part is put on its bone by what the file holds
+                        const std::optional<osg::Matrixf> turn = turnOfFirstShape(nifNode);
+                        node->setUserValue(Misc::OsgUserValues::sAttachRotation,
+                            turn ? turn->getRotate() : nifNode->mTransform.toMatrix().getRotate());
+                    }
 
                     // String markers may contain important information
                     // affecting the entire subtree of this obj
@@ -1715,8 +1749,20 @@ namespace NifOsg
                 hasPartitions = partitions != nullptr;
                 if (hasPartitions)
                 {
+                    // The sections of a body of Fallout (BSDismemberSkinInstance) that are only seen when the part
+                    // has been cut off (the caps of meat and bone, in the shapes of the body and the head) are not
+                    // marked visible: the games draw only the sections that are
+                    const Nif::BSDismemberSkinInstance* dismember = skin->mRecordType == Nif::RC_BSDismemberSkinInstance
+                        ? static_cast<const Nif::BSDismemberSkinInstance*>(skin)
+                        : nullptr;
+                    constexpr std::uint16_t visibleSection = 1;
+                    std::size_t sectionIndex = 0;
                     for (const Nif::NiSkinPartition::Partition& partition : partitions->mPartitions)
                     {
+                        const std::size_t section = sectionIndex++;
+                        if (dismember != nullptr && section < dismember->mParts.size()
+                            && (dismember->mParts[section].mFlags & visibleSection) == 0)
+                            continue;
                         const std::vector<unsigned short>& trueTriangles = partition.mTrueTriangles;
                         if (!trueTriangles.empty())
                         {

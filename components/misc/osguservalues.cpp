@@ -4,4 +4,6 @@ namespace Misc
 {
     const std::string OsgUserValues::sFileHash = "fileHash";
     const std::string OsgUserValues::sXSoftEffect = "xSoftEffect";
+    const std::string OsgUserValues::sAttachTo = "attachTo";
+    const std::string OsgUserValues::sAttachRotation = "attachRotation";
 }

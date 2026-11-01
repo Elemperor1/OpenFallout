@@ -638,7 +638,7 @@ LOD_LAND_ID = 0x987
 MAP_FIND_REF_ID = 0x9A3 # a map marker in the open world, hidden until the player walks up to it
 MAP_FIND_PLACE = (200.0, 300.0)
 MAP_FIND_NAME = "Test Find"
-LAST_ID = 0x9A3 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0x9A7 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -673,6 +673,12 @@ FURNITURE_OFFSET = (0.0, 60.0) # from the middle of the trigger, along the long 
 FURNITURE_MESH = "openfallout\\chair.nif"
 FURNITURE_ENTRY = ((40.0, 25.0, 0.0), 1500, 14) # the offset, the orientation in thousandths of a radian, the kind
 FURNITURE_FLAGS = 0x40000001
+# What the games move a character that has sat down from the entry to the seat: the settings fFurnitureMarker14DeltaX, DeltaY,
+# DeltaZ and HeadingDelta of the files (the kind of the entry is 14). In the space of the character at the entry, x to its
+# right and y to its front; it faces the entry's way turned by the heading. Here it goes back across the entry, toward the
+# middle of the chair.
+FURNITURE_DELTA = (3.0, -40.0, 0.0, 0.5)
+FURNITURE_GMST_ID = 0x9A4  # and the three next
 # A sitter: a character whose first package is to travel to a second chair (and so sits there), and whose second package, to
 # travel to a marker, is on and not done all the while: it stays in the chair. Its script sets the global `sitter` to what
 # IsCurrentFurnitureRef tells of it and the chair.
@@ -2426,7 +2432,7 @@ def plugin():
                                   arena_door(ARENA_KEYONLY_DOOR_ID, "OFTestArenaKeyDoor")])
             + top_group(b"CONT", [arena_chest()])
             + top_group(b"TERM", arena_terminals())
-            + top_group(b"GMST", arena_game_settings())
+            + top_group(b"GMST", [*arena_game_settings(), *furniture_game_settings()])
             + top_group(b"KEYM", [arena_key()])
             + top_group(b"RCCT", arena_categories())
             + top_group(b"RCPE", arena_recipes())
@@ -2688,6 +2694,16 @@ def arena_game_settings():
                                             sub(b"DATA", struct.pack("<i", ARENA_HACK_RETRY_MS))]),
             record(b"GMST", ARENA_GMST_ID + 1, [zstr(b"EDID", "iXPLevelPickLockEasy"),
                                                 sub(b"DATA", struct.pack("<i", ARENA_PICK_XP))])]
+
+
+def furniture_game_settings():
+    """The settings of how a character moves from the entry of a marker to the seat (a GMST of the float kind: the name starts
+    with f, and the value is 4 bytes)."""
+    kind = FURNITURE_ENTRY[2]
+    names = ("DeltaX", "DeltaY", "DeltaZ", "HeadingDelta")
+    return [record(b"GMST", FURNITURE_GMST_ID + index, [zstr(b"EDID", f"fFurnitureMarker{kind}{name}"),
+                                                        sub(b"DATA", struct.pack("<f", value))])
+            for index, (name, value) in enumerate(zip(names, FURNITURE_DELTA))]
 
 
 def arena_lock_refs():

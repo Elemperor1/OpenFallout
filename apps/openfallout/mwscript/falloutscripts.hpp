@@ -1161,6 +1161,15 @@ namespace OFScript
             FalloutScript::FormId actor, int value, const std::function<double(int)>& permanent) override;
         /// The settings of the files for the actor values that are worked out, read when the first is asked for
         const FalloutScript::DerivedStatSettings& derivedSettings();
+        /// How the games move a character from the entry of a marker to where it stays on the furniture, from the
+        /// settings of the files (read when first asked for)
+        const FalloutScript::FurnitureDeltas& furnitureDeltas();
+        /// Where a character that began to use a piece of furniture at the entry stays on it
+        FalloutScript::FurnitureSeat settledOn(
+            const FalloutScript::FurnitureSeat& entry, const OFWorld::Ptr& furniture);
+        /// A character that gets up from a piece of furniture stands where it began, at the entry of the marker
+        void standUpFrom(FalloutScript::FormId user, const OFWorld::Ptr& actor, int entry,
+            FalloutScript::FormId furniture, const osg::Vec3f& sat);
         bool initialLock(FalloutScript::FormId reference, bool& locked, int& level) override;
         bool formListEntries(FalloutScript::FormId list, std::vector<FalloutScript::FormId>& entries) override;
         bool perk(FalloutScript::FormId perk, FalloutScript::PerkInfo& info) override;
@@ -1555,6 +1564,7 @@ namespace OFScript
         std::mutex mDerivedSettingsMutex;
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
+        std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)
         const std::map<std::string, double>& gameSettingValues();
