@@ -385,6 +385,19 @@ namespace OFRender
                                  << ", walk " << locomotion.mWalk << ", run " << locomotion.mRun;
             return;
         }
+
+        // The idle and sitting animations of a person key the pelvis on "Bip01 NonAccum" and leave "Bip01" out, which
+        // the walking ones key at height 0: the skeleton file has "Bip01" at the standing height of the pelvis, so a
+        // person that has not walked yet had that height twice and stood 61 to 67 units above the floor (found on the
+        // Mac, round 11J)
+        if (mPtr.getType() == ESM4::Npc::sRecordId)
+        {
+            SceneUtil::FindByNameVisitor find("Bip01");
+            mObjectRoot->accept(find);
+            if (osg::MatrixTransform* pelvisRoot = dynamic_cast<osg::MatrixTransform*>(find.mFoundNode))
+                lowerToTheFloor(*pelvisRoot);
+        }
+
         mAdvanceCallback = new AdvanceCallback(*this);
         mInsert->addUpdateCallback(mAdvanceCallback);
     }

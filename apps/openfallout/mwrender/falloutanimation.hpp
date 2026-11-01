@@ -5,6 +5,8 @@
 #include <string_view>
 #include <vector>
 
+#include <osg/MatrixTransform>
+
 namespace OFRender
 {
     /// The folder with the animation files (.kf) of a character of Fallout 3 or New Vegas: the folder of its skeleton,
@@ -104,6 +106,13 @@ namespace OFRender
     /// `dynamicidle_sleep.kf`). The games also play a file to get in and one to get out, chosen among the idles by
     /// their conditions; those are not played. Empty when the kind has no pose or the files do not have it.
     std::string chooseFalloutPose(std::string_view folder, int entryKind, const std::vector<std::string>& files);
+
+    /// Takes the height out of the place of a node and keeps the rest of it (the place across the floor and the turn).
+    /// The skeleton file of a person has its node "Bip01" at the standing height of the pelvis (67.77), but the
+    /// animations of the games put that height on the child "Bip01 NonAccum" and key "Bip01" at 0 (the walking ones do;
+    /// the idle and sitting ones leave "Bip01" out), so that a person for whom nothing keys "Bip01" has both and stands
+    /// above the floor by the 67.77.
+    void lowerToTheFloor(osg::MatrixTransform& node);
 }
 
 #endif

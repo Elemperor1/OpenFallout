@@ -2,6 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <osg/Matrix>
+#include <osg/MatrixTransform>
+
 #include <string>
 #include <vector>
 
@@ -378,5 +381,26 @@ namespace
         EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 3, FalloutWeaponMove::Attack, {}), "");
         EXPECT_EQ(chooseFalloutWeaponAnimation("", 3, FalloutWeaponMove::Attack, files({ "1hpattack3" })), "");
         EXPECT_EQ(chooseFalloutWeaponAnimation(mFolder, 40, FalloutWeaponMove::Attack, files({ "1hpattack3" })), "");
+    }
+
+    TEST(OpenFalloutRenderLowerToTheFloor, takesTheHeightOutOfThePlaceAndKeepsTheRest)
+    {
+        const osg::ref_ptr<osg::MatrixTransform> node = new osg::MatrixTransform;
+        osg::Matrix matrix = osg::Matrix::rotate(osg::PI_2, osg::Vec3d(0, 1, 0));
+        matrix.setTrans(osg::Vec3d(0.0, 0.657, 67.771));
+        node->setMatrix(matrix);
+
+        lowerToTheFloor(*node);
+
+        const osg::Vec3d place = node->getMatrix().getTrans();
+        EXPECT_DOUBLE_EQ(place.x(), 0.0);
+        EXPECT_DOUBLE_EQ(place.y(), 0.657);
+        EXPECT_DOUBLE_EQ(place.z(), 0.0);
+        // The turn is the same one: x goes where it went
+        const osg::Vec3d moved = osg::Matrix::transform3x3(osg::Vec3d(1, 0, 0), node->getMatrix());
+        const osg::Vec3d before = osg::Matrix::transform3x3(osg::Vec3d(1, 0, 0), matrix);
+        EXPECT_NEAR(moved.x(), before.x(), 1e-9);
+        EXPECT_NEAR(moved.y(), before.y(), 1e-9);
+        EXPECT_NEAR(moved.z(), before.z(), 1e-9);
     }
 }

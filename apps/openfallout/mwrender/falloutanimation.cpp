@@ -299,4 +299,13 @@ namespace OFRender
                 return path;
         return {};
     }
+
+    void lowerToTheFloor(osg::MatrixTransform& node)
+    {
+        osg::Matrix matrix = node.getMatrix();
+        osg::Vec3d place = matrix.getTrans();
+        place.z() = 0.0;
+        matrix.setTrans(place);
+        node.setMatrix(matrix);
+    }
 }
