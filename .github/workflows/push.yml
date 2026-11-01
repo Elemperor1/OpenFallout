@@ -12,6 +12,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 # PR branches are tested by pull_request; avoid rebuilding each commit twice.
 # A newer commit cancels the run of a pull request, but never a run on master:
 # only master runs store the caches that pull requests start from, and a cancelled

@@ -5,6 +5,9 @@ on:
       tags:
         - openmw-**
 
+permissions:
+  contents: read
+
 jobs:
   Windows:
     uses: ./.github/workflows/windows.yml
