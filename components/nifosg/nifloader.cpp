@@ -1,6 +1,7 @@
 #include "nifloader.hpp"
 
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -185,6 +186,26 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    // The turn that the vertices of the first shape under a node go through up to the parent of the node: the turn of
+    // each node on the way, the turn of the node itself and that of the shape included
+    std::optional<osg::Matrixf> turnOfFirstShape(const Nif::NiAVObject* node)
+    {
+        const osg::Matrixf own = osg::Matrixf::rotate(node->mTransform.toMatrix().getRotate());
+        if (isTypeNiGeometry(node->mRecordType) || isTypeBSGeometry(node->mRecordType))
+            return own;
+        if (const Nif::NiNode* ninode = dynamic_cast<const Nif::NiNode*>(node))
+        {
+            for (const auto& child : ninode->mChildren)
+            {
+                if (child.empty())
+                    continue;
+                if (const std::optional<osg::Matrixf> below = turnOfFirstShape(child.getPtr()))
+                    return *below * own;
+            }
+        }
+        return std::nullopt;
     }
 
     // Collect all properties affecting the given drawable that should be handled on drawable basis rather than on the
@@ -869,10 +890,12 @@ namespace NifOsg
                     if (Misc::StringUtils::ciEqual(sd->mName, "Prn") && !sd->mData.empty())
                     {
                         node->setUserValue(Misc::OsgUserValues::sAttachTo, sd->mData);
-                        // The turn of this node goes into the meshes when the model is optimized, and a part is put
-                        // on its bone by what the file holds
-                        node->setUserValue(
-                            Misc::OsgUserValues::sAttachRotation, nifNode->mTransform.toMatrix().getRotate());
+                        // The vertices of the part end up turned by this node and the shape under it (the female hair
+                        // files turn both, by the same half turn, and the two cancel), and that goes into the meshes
+                        // when the model is optimized: a part is put on its bone by what the file holds
+                        const std::optional<osg::Matrixf> turn = turnOfFirstShape(nifNode);
+                        node->setUserValue(Misc::OsgUserValues::sAttachRotation,
+                            turn ? turn->getRotate() : nifNode->mTransform.toMatrix().getRotate());
                     }
 
                     // String markers may contain important information

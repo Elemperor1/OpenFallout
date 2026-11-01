@@ -174,6 +174,87 @@ osg::Group {
         EXPECT_NEAR(moved.z(), 0.0, 1e-5);
     }
 
+    // The female hair files turn their root and their shapes by the same half turn: the two cancel, and the part is
+    // put on its bone by what is left
+    struct AttachedShapeFile
+    {
+        AttachedShapeFile(float rootTurn, float shapeTurn)
+        {
+            mData.mRecordType = Nif::RC_NiTriShapeData;
+            mData.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(1, 1, 0) };
+            mData.mNumTriangles = 1;
+            mData.mTriangles = { 0, 1, 2 };
+            Nif::Testing::init(mShape);
+            mShape.mRecordType = Nif::RC_BSSegmentedTriShape;
+            mShape.mData = Nif::NiGeometryDataPtr(&mData);
+            mShape.mShaderProperty = Nif::BSShaderPropertyPtr(nullptr);
+            mShape.mAlphaProperty = Nif::NiAlphaPropertyPtr(nullptr);
+            turnAboutZ(mShape, shapeTurn);
+            Nif::Testing::init(mExtra);
+            mExtra.mName = "Prn";
+            mExtra.mData = "Bip01 Head";
+            mExtra.mRecordType = Nif::RC_NiStringExtraData;
+            Nif::Testing::init(mRoot);
+            mRoot.mExtra = Nif::ExtraPtr(&mExtra);
+            mRoot.mChildren = Nif::NiAVObjectList{ Nif::NiAVObjectPtr(&mShape) };
+            turnAboutZ(mRoot, rootTurn);
+        }
+
+        // By a number of quarter turns about z, as a file writes it (acting on column vectors): x goes to y for one
+        static void turnAboutZ(Nif::NiAVObject& object, float quarterTurns)
+        {
+            object.mTransform.mRotation.mValues[0][0] = 0.f;
+            object.mTransform.mRotation.mValues[0][1] = -quarterTurns;
+            object.mTransform.mRotation.mValues[1][0] = quarterTurns;
+            object.mTransform.mRotation.mValues[1][1] = 0.f;
+        }
+
+        Nif::NiTriShapeData mData;
+        Nif::BSSegmentedTriShape mShape;
+        Nif::NiStringExtraData mExtra;
+        Nif::NiNode mRoot;
+    };
+
+    TEST_F(NifOsgLoaderTest, keepsTheTurnOfTheShapeUnderTheNodeThatAModelAsksToBeAttachedToAsWell)
+    {
+        // A quarter turn of the root and the same one of the shape: a half turn, x goes to -x
+        AttachedShapeFile same(1.f, 1.f);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&same.mRoot);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::Group* root = result->asGroup();
+        ASSERT_NE(root, nullptr);
+        ASSERT_EQ(root->getNumChildren(), 1u);
+        osg::Quat turn;
+        ASSERT_TRUE(root->getChild(0)->getUserValue(Misc::OsgUserValues::sAttachRotation, turn));
+        const osg::Vec3d moved = turn * osg::Vec3d(1.0, 0.0, 0.0);
+        EXPECT_NEAR(moved.x(), -1.0, 1e-5);
+        EXPECT_NEAR(moved.y(), 0.0, 1e-5);
+        EXPECT_NEAR(moved.z(), 0.0, 1e-5);
+    }
+
+    TEST_F(NifOsgLoaderTest, keepsNoTurnWhenTheRootAndTheShapeOfAModelTurnOppositeWays)
+    {
+        // The two cancel: the vertices are used as they are stored
+        AttachedShapeFile opposite(1.f, -1.f);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&opposite.mRoot);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::Group* root = result->asGroup();
+        ASSERT_NE(root, nullptr);
+        ASSERT_EQ(root->getNumChildren(), 1u);
+        osg::Quat turn;
+        ASSERT_TRUE(root->getChild(0)->getUserValue(Misc::OsgUserValues::sAttachRotation, turn));
+        const osg::Vec3d moved = turn * osg::Vec3d(1.0, 0.0, 0.0);
+        EXPECT_NEAR(moved.x(), 1.0, 1e-5);
+        EXPECT_NEAR(moved.y(), 0.0, 1e-5);
+        EXPECT_NEAR(moved.z(), 0.0, 1e-5);
+    }
+
     TEST_F(NifOsgLoaderTest, doesNotNameANodeToAttachToForOtherExtraData)
     {
         Nif::NiStringExtraData extra;
