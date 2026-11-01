@@ -1,0 +1,18 @@
+# What the source does not say for itself about the commands that answer a fixed value or change nothing.
+# state: stand-in = the engine takes the command in and the effect is not there; exact = the fixed answer is what the
+# games give, so the command counts as done. The commands that scripts/openfallout/coverage_dashboard.py finds
+# answering a fixed value and that are not listed here are shown as stand-ins until somebody looks at them.
+name,state,reason
+IsXBox,exact,the answer of the PC executables is 0
+IsPS3,exact,the answer of the PC executables is 0
+GetVampire,exact,nothing here makes a vampire and the games keep the command for the vampires of Fallout 3
+ShowWarning,exact,the retail executables format the text and show it nowhere
+Cast,exact,the command does nothing in the executables (magic.cpp)
+GetDisposition,stand-in,answers 0: the disposition of a character towards another is not worked out
+IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
+GetCasinoWinningsLevel,stand-in,answers 0: the casino of New Vegas is not built
+SetCasinoWinningsLevel,stand-in,changes nothing: the casino of New Vegas is not built
+GetWeaponHealthPerc,stand-in,answers 100: nothing wears a weapon out yet
+GetCauseofDeath,stand-in,answers -1: the cause of a death is not kept
+GetDestructionStage,stand-in,answers -1: the stages of destruction are not kept
+HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character

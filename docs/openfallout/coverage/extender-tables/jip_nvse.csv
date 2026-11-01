@@ -1,0 +1,1151 @@
+code,name,short_name,needs_reference,parameters,parameter_labels,condition,returns
+0x2200,GetLNVersion,GetJIPLNVersion,no,,,no,
+0x2201,FileExists,,no,0 1?, | ,no,
+0x2202,GetTimeStamp,,no,,,no,string
+0x2203,GetController,,no,,,no,
+0x2204,IsButtonPressed,,no,1,,yes,
+0x2205,GetLeftStickX,GetLSX,no,,,yes,
+0x2206,GetLeftStickY,GetLSY,no,,,yes,
+0x2207,GetRightStickX,GetRSX,no,,,yes,
+0x2208,GetRightStickY,GetRSY,no,,,yes,
+0x2209,GetLeftTrigger,GetLTr,no,,,yes,
+0x220a,GetRightTrigger,GetRTr,no,,,yes,
+0x220b,GetDeadZoneLS,,no,,,no,
+0x220c,GetDeadZoneRS,,no,,,no,
+0x220d,SetDeadZoneLS,,no,44,,no,
+0x220e,SetDeadZoneRS,,no,44,,no,
+0x220f,GetPressedButtons,GetButtons,no,,,no,
+0x2210,GetNVSEVersionFull,,no,,,no,
+0x2211,GetLoadedType,GLT,no,37 1 1? 1?, |  |  | ,no,
+0x2212,ListToArray,,no,37,,no,array
+0x2213,NONE,,no,,,no,
+0x2214,GetCombatStyle,,no,25?,,no,form
+0x2215,NONE,,no,,,no,
+0x2216,SaveHotkeys,,no,,,no,array
+0x2217,RestoreHotkeys,,no,1?,,no,
+0x2218,GetBipedModelList,GetBMList,no,3?,,no,form
+0x2219,SetBipedModelList,SetBMList,no,61 61?, | ,no,
+0x221a,GetModName,,no,1 1?, | ,no,string
+0x221b,HasPerkRank,,yes,61 1?, | ,no,
+0x221c,SetGlobalValue,SGV,no,0 2, | ,no,
+0x221d,GetSelfModIndex,,no,,,no,
+0x221e,LeveledListAddForm,LListAddForm,no,61 61 1 1 2, |  |  |  | ,no,
+0x221f,LeveledListRemoveForm,LListRemoveForm,no,61 61, | ,no,
+0x2220,GetLevItemIndexByForm,LListGetFormIndex,no,61 61, | ,no,
+0x2221,GetLevItemIndexByLevel,LListGetLevelIndex,no,61 1, | ,no,
+0x2222,GetChanceNone,,no,61,,no,
+0x2223,SetChanceNone,,no,61 1, | ,no,
+0x2224,GetNumLevItems,LListGetCount,no,61,,no,
+0x2225,GetNthLevItem,LListGetNthForm,no,61 1, | ,no,form
+0x2226,GetNthLevItemLevel,LListGetNthLevel,no,61 1, | ,no,
+0x2227,GetNthLevItemCount,LListGetNthCount,no,61 1, | ,no,
+0x2228,RemoveNthLevItem,LListRemoveNthForm,no,61 1, | ,no,
+0x2229,LeveledListClear,LListClear,no,61,,no,
+0x222a,DumpLevList,LListDump,no,61,,no,
+0x222b,GetChanceNoneGlobal,,no,61,,no,
+0x222c,ClearAllHotkeys,,no,,,no,
+0x222d,GetMapMarkerRep,,yes,,,no,form
+0x222e,SetMapMarkerRep,,yes,61?,,no,
+0x222f,GetMapMarkerName,,yes,,,no,string
+0x2230,SetMapMarkerName,,yes,0,,no,
+0x2231,GetMapMarkerType,,yes,,,no,
+0x2232,SetMapMarkerType,,yes,1,,no,
+0x2233,NONE,,no,,,no,
+0x2234,SetMapMarkerVisible,,yes,1,,no,
+0x2235,GetMapMarkerHidden,,yes,,,no,
+0x2236,SetMapMarkerHidden,,yes,1,,no,
+0x2237,GetMapMarkerTravel,,yes,,,no,
+0x2238,SetMapMarkerTravel,,yes,1,,no,
+0x2239,GetFormMods,,no,61?,,no,array
+0x223a,IsFormOverridden,,no,61,,no,
+0x223b,SetPerkRank,,yes,61 1 1?, |  | ,no,
+0x223c,GetMerchantContainer,,yes,,,no,form
+0x223d,GetRadioBroadcastType,,yes,,,no,
+0x223e,SetRadioBroadcastType,,yes,1,,no,
+0x223f,GetRadioRadius,,yes,,,no,
+0x2240,SetRadioRadius,,yes,2,,no,
+0x2241,GetRadioStatic,,yes,,,no,
+0x2242,SetRadioStatic,,yes,2,,no,
+0x2243,GetRadioPosRef,,yes,,,no,
+0x2244,SetRadioPosRef,,yes,4,,no,
+0x2245,IsRadioRef,,yes,,,no,
+0x2246,Search,,no,0 0?, | ,no,
+0x2247,LNGetAggroRadius,,no,25?,,no,
+0x2248,LNSetAggroRadius,,no,1 25?, | ,no,
+0x2249,IsMapMarker,,yes,,,no,
+0x224a,GetCellCoords,,no,61?,,no,array
+0x224b,GetLockedOut,,no,4?,,no,
+0x224c,SetLockedOut,,no,1 4?, | ,no,
+0x224d,GetCreatureType,,no,25?,,no,
+0x224e,GetLoadedTypeArray,GLTA,no,1 1?, | ,no,array
+0x224f,GetPasswordNote,,no,61?,,no,form
+0x2250,SetPasswordNote,,no,61 61?, | ,no,
+0x2251,GetFormRefs,,no,61 1?, | ,no,array
+0x2252,GetCellLightingTemplate,,no,61,,no,form
+0x2253,SetCellLightingTemplate,,no,61 61?, | ,no,
+0x2254,GetRecipeInputForms,,no,61,,no,array
+0x2255,GetRecipeOutputForms,,no,61,,no,array
+0x2256,GetRecipeInputCount,,no,61 61, | ,no,
+0x2257,SetRecipeInputCount,,no,61 61 1, |  | ,no,
+0x2258,GetRecipeOutputCount,,no,61 61, | ,no,
+0x2259,SetRecipeOutputCount,,no,61 61 1, |  | ,no,
+0x225a,GetRecipeRequiredSkill,,no,61,,no,
+0x225b,SetRecipeRequiredSkill,,no,61 1, | ,no,
+0x225c,GetRecipeRequiredSkillLevel,,no,61,,no,
+0x225d,SetRecipeRequiredSkillLevel,,no,61 1, | ,no,
+0x225e,ReplaceRecipeInputForm,,no,61 61 61, |  | ,no,
+0x225f,ReplaceRecipeOutputForm,,no,61 61 61, |  | ,no,
+0x2260,GetFormRecipes,,no,61 61?, | ,no,array
+0x2261,GetFormRecipeOutputs,,no,61 61?, | ,no,array
+0x2262,GetWorldspaceParentWorldspace,GetWorldParentWorld,no,27,,no,form
+0x2263,GetTerminalLock,,no,61?,,no,
+0x2264,GetArmorClass,GetAC,no,3?,,yes,
+0x2265,IsRaceInList,,yes,37,,yes,
+0x2266,GetFormFromMod,GFFM,no,0 0, | ,no,form
+0x2267,GetPerkEntryCount,,no,39,,no,
+0x2268,GetNthPerkEntryType,,no,39 1, | ,no,
+0x2269,GetNthPerkEntryFunction,,no,39 1, | ,no,
+0x226a,SetNthPerkEntryFunction,,no,39 1 1, |  | ,no,
+0x226b,GetNthPerkEntryForm,,no,39 1, | ,no,form
+0x226c,SetNthPerkEntryForm,,no,61 1 61, |  | ,no,
+0x226d,GetNthPerkEntryValue1,,no,39 1, | ,no,
+0x226e,SetNthPerkEntryValue1,,no,61 1 2, |  | ,no,
+0x226f,GetNthPerkEntryValue2,,no,39 1, | ,no,
+0x2270,SetNthPerkEntryValue2,,no,61 1 2, |  | ,no,
+0x2271,GetNthPerkEntryString,,no,39 1, | ,no,string
+0x2272,SetNthPerkEntryString,,no,61 1 0, |  | ,no,
+0x2273,GetActivatorRadioStation,,no,61?,,no,form
+0x2274,SetActivatorRadioStation,,no,61 61?, | ,no,
+0x2275,GetActivatorPrompt,,no,61?,,no,string
+0x2276,SetActivatorPrompt,,no,0 61?, | ,no,
+0x2277,GetActivatorWaterType,,no,61?,,no,form
+0x2278,SetActivatorWaterType,,no,61 61?, | ,no,
+0x2279,GetActiveQuest,,no,,,no,form
+0x227a,GetINIFloat,,no,0 0?, | ,no,
+0x227b,GetINIString,,no,0 0?, | ,no,string
+0x227c,SetINIFloat,,no,0 44 0?, |  | ,no,
+0x227d,SetINIString,,no,0 0 0?, |  | ,no,
+0x227e,GetINISection,,no,0 0? 1?, |  | ,no,array
+0x227f,SetINISection,,no,0 1 0?, |  | ,no,
+0x2280,IsParentActivateOnly,,no,4?,,no,
+0x2281,SetLinkedReference,SetLinkedRef,yes,4?,,no,
+0x2282,SetBaseForm,,yes,21,,no,
+0x2283,GetStringSetting,,no,0,,no,string
+0x2284,SetStringSetting,,no,0 0, | ,no,
+0x2285,GetINISectionNames,,no,0?,,no,array
+0x2286,GetRaceVoice,,no,61 1, | ,no,
+0x2287,SetRaceVoice,,no,61 1 61, |  | ,no,
+0x2288,GetRaceAgeRace,,no,61 1, | ,no,
+0x2289,SetRaceAgeRace,,no,61 1 61, |  | ,no,
+0x228a,GetFilesInFolder,GetFiles,no,0 0?, | ,no,array
+0x228b,NONE,,no,,,no,
+0x228c,NONE,,no,,,no,
+0x228d,NONE,,no,,,no,
+0x228e,GetLeveledListFlags,LListGetFlags,no,61,,no,
+0x228f,SetLeveledListFlags,LListSetFlags,no,61 1, | ,no,
+0x2290,GetActivatorSoundLooping,,no,61?,,no,form
+0x2291,SetActivatorSoundLooping,,no,61 61?, | ,no,
+0x2292,GetActivatorSoundActivate,,no,61?,,no,form
+0x2293,SetActivatorSoundActivate,,no,61 61?, | ,no,
+0x2294,EnableButton,,no,1,,no,
+0x2295,DisableButton,,no,1,,no,
+0x2296,IsButtonDisabled,,no,1,,yes,
+0x2297,HoldButton,,no,1,,no,
+0x2298,ReleaseButton,,no,1,,no,
+0x2299,IsButtonHeld,,no,1,,yes,
+0x229a,IsTrait,,no,39,,no,
+0x229b,GetLoadScreenTexture,,no,61,,no,string
+0x229c,SetLoadScreenTexture,,no,61 0, | ,no,
+0x229d,GetLoadScreenType,,no,61,,no,form
+0x229e,SetLoadScreenType,,no,61 61, | ,no,
+0x229f,GetLoadScreenTypeTextRGB,,no,61,,no,array
+0x22a0,SetLoadScreenTypeTextRGB,,no,61 2 2 2, |  |  | ,no,
+0x22a1,CopyFaceGenFrom,,yes,25?,,no,
+0x22a2,SetRace,,no,61 61, | ,no,
+0x22a3,GetFoldersInFolder,GetFolders,no,0 0?, | ,no,array
+0x22a4,EnableTrigger,,no,1,,no,
+0x22a5,DisableTrigger,,no,1,,no,
+0x22a6,IsTriggerDisabled,,no,1,,yes,
+0x22a7,HoldTrigger,,no,1,,no,
+0x22a8,ReleaseTrigger,,no,1,,no,
+0x22a9,IsTriggerHeld,,no,1,,yes,
+0x22aa,GetPCCanUsePowerArmor,,no,,,no,
+0x22ab,GetIdleAnimPath,,no,61,,no,string
+0x22ac,SetIdleAnimPath,,no,61 0, | ,no,
+0x22ad,LNGetName,,no,61?,,no,string
+0x22ae,RemoveINIKey,,no,0 0?, | ,no,
+0x22af,RemoveINISection,,no,0 0?, | ,no,
+0x22b0,GetGlobalTimeMultiplier,ggtm,no,,,no,
+0x22b1,GetCasinoMaxWinnings,,no,63,,no,
+0x22b2,SetCasinoMaxWinnings,,no,63 1, | ,no,
+0x22b3,GetCasinoBJPayout,,no,63,,no,
+0x22b4,SetCasinoBJPayout,,no,63 2, | ,no,
+0x22b5,GetCasinoBJ17Stand,,no,63,,no,
+0x22b6,SetCasinoBJ17Stand,,no,63 1, | ,no,
+0x22b7,GetCasinoNumDecks,,no,63,,no,
+0x22b8,SetCasinoNumDecks,,no,63 1, | ,no,
+0x22b9,GetCasinoShufflePercent,,no,63,,no,
+0x22ba,SetCasinoShufflePercent,,no,63 2, | ,no,
+0x22bb,GetCasinoReelStops,,no,63 1, | ,no,
+0x22bc,SetCasinoReelStops,,no,61 1 1, |  | ,no,
+0x22bd,AddNoteNS,,no,40,,no,
+0x22be,GetCellWaterForm,,no,61?,,no,form
+0x22bf,GetWaterFormEffect,,no,61,,no,form
+0x22c0,ar_Cat,pinto_Cat,no,1 1 1?, |  | ,no,
+0x22c1,GetInventoryWeight,GetInvWeight,yes,1?,,no,
+0x22c2,GetChallengeType,,no,65,,no,
+0x22c3,GetChallengeThreshold,,no,65,,no,
+0x22c4,SetChallengeThreshold,,no,65 1, | ,no,
+0x22c5,GetChallengeInterval,,no,65,,no,
+0x22c6,SetChallengeInterval,,no,65 1, | ,no,
+0x22c7,GetChallengeValue1,,no,65,,no,
+0x22c8,SetChallengeValue1,,no,65 1, | ,no,
+0x22c9,GetChallengeValue2,,no,65,,no,
+0x22ca,SetChallengeValue2,,no,65 1, | ,no,
+0x22cb,GetChallengeValue3,,no,65,,no,
+0x22cc,SetChallengeValue3,,no,65 1, | ,no,
+0x22cd,GetChallengeForm1,,no,65,,no,form
+0x22ce,SetChallengeForm1,,no,65 61, | ,no,
+0x22cf,GetChallengeForm2,,no,65,,no,form
+0x22d0,SetChallengeForm2,,no,65 61, | ,no,
+0x22d1,GetRecipeCategory,,no,61,,no,form
+0x22d2,SetRecipeCategory,,no,61 61, | ,no,
+0x22d3,GetRecipeSubcategory,,no,61,,no,form
+0x22d4,SetRecipeSubcategory,,no,61 61, | ,no,
+0x22d5,NONE,,no,,,no,
+0x22d6,GetReferenceFlag,GetRefFlag,yes,1,,yes,
+0x22d7,SetReferenceFlag,SetRefFlag,yes,1 1, | ,no,
+0x22d8,AddRecipeInputForm,,no,61 61 1, |  | ,no,
+0x22d9,AddRecipeOutputForm,,no,61 61 1, |  | ,no,
+0x22da,RemoveRecipeInputForm,,no,61 61, | ,no,
+0x22db,RemoveRecipeOutputForm,,no,61 61, | ,no,
+0x22dc,AddRecipeCondition,,no,61 1 61 1 2, |  |  |  | ,no,
+0x22dd,NONE,,no,,,no,
+0x22de,GetFormFlag,,no,61 1, | ,no,
+0x22df,SetFormFlag,,no,61 1 1, |  | ,no,
+0x22e0,GetDistance2D,,yes,4,,yes,
+0x22e1,GetDistance3D,,yes,4,,yes,
+0x22e2,GetIngestibleFlag,,no,61 1, | ,no,
+0x22e3,SetIngestibleFlag,,no,61 1 1, |  | ,no,
+0x22e4,IsSkillMagazine,,no,61,,no,
+0x22e5,NONE,,no,,,no,
+0x22e6,GetServiceFlag,,no,25 1, | ,no,
+0x22e7,SetServiceFlag,,no,25 1 1, |  | ,no,
+0x22e8,LeveledListReplaceForm,LListReplaceForm,no,61 61 61, |  | ,no,
+0x22e9,NONE,,no,,,no,
+0x22ea,GetCellImageSpace,,no,61,,no,form
+0x22eb,PlayerHasKey,,yes,,,yes,
+0x22ec,GetCellFlag,,no,61 1, | ,no,
+0x22ed,SetCellFlag,,no,61 1 1, |  | ,no,
+0x22ee,NONE,,no,,,no,
+0x22ef,NONE,,no,,,no,
+0x22f0,fsqrt,,no,44,,no,
+0x22f1,GetCellWaterHeight,,no,61?,,no,
+0x22f2,SetCellWaterHeight,,no,2 61?, | ,no,
+0x22f3,GetAnimObjectIdle,GetANIOIdle,no,61,,no,form
+0x22f4,SetAnimObjectIdle,SetANIOIdle,no,61 61, | ,no,
+0x22f5,GetActorTemplateFlag,,no,1 25?, | ,no,
+0x22f6,SetActorTemplateFlag,,no,1 1 25?, |  | ,no,
+0x22f7,BaseGetItemCount,,no,61 61?, | ,no,
+0x22f8,BaseAddItem,,no,61 1 61?, |  | ,no,
+0x22f9,BaseRemoveItem,,no,61 1 61?, |  | ,no,
+0x22fa,LNSetActorTemplate,,no,61 25?, | ,no,
+0x22fb,BaseAddItemHealth,,no,61 1 2 61?, |  |  | ,no,
+0x22fc,LNSetName,,no,0 61?, | ,no,
+0x22fd,fSin,,no,2,,no,
+0x22fe,fCos,,no,2,,no,
+0x22ff,SortFormsByType,,no,1 1, | ,no,array
+0x2300,GetFormCountType,,no,1 1, | ,no,
+0x2301,GetPickupSound,,no,61,,no,form
+0x2302,SetPickupSound,,no,61 61, | ,no,
+0x2303,GetPutdownSound,,no,61,,no,form
+0x2304,SetPutdownSound,,no,61 61, | ,no,
+0x2305,GetContainerOpenSound,,no,61?,,no,form
+0x2306,SetContainerOpenSound,,no,61 61?, | ,no,
+0x2307,GetContainerCloseSound,,no,61?,,no,form
+0x2308,SetContainerCloseSound,,no,61 61?, | ,no,
+0x2309,NONE,,no,,,no,
+0x230a,GetPlayerRegions,,no,,,no,array
+0x230b,fAtan,,no,2,,no,
+0x230c,GetPerkLevel,,no,39,,no,
+0x230d,GetZoneFlag,,no,61 1, | ,no,
+0x230e,SetZoneFlag,,no,61 1 1, |  | ,no,
+0x230f,fAsin,,no,2,,no,
+0x2310,fAcos,,no,2,,no,
+0x2311,SetNthLevItem,LListsetNthForm,no,61 1 61, |  | ,no,
+0x2312,SetNthLevItemLevel,LListSetNthLevel,no,61 1 1, |  | ,no,
+0x2313,SetNthLevItemCount,LListSetNthCount,no,61 1 1, |  | ,no,
+0x2314,GetBaseFactionRank,,no,61 25?, | ,no,
+0x2315,SetBaseFactionRank,,no,17 1 25?, |  | ,no,
+0x2316,GetImpactDataSet,,no,3,,no,form
+0x2317,SetImpactDataSet,,no,61 61, | ,no,
+0x2318,HasActionRef,,yes,,,no,
+0x2319,SetHotkey,,no,1 61 2? 1?, |  |  | ,no,
+0x231a,GetChallengeFlags,,no,65,,no,
+0x231b,SetChallengeFlags,,no,65 1, | ,no,
+0x231c,LNIsPlayable,,no,61?,,no,
+0x231d,LNSetIsPlayable,,no,1 61?, | ,no,
+0x231e,GetZone,,yes,,,no,
+0x231f,GetBaseKarma,,no,25?,,no,
+0x2320,SetBaseKarma,,no,1 25?, | ,no,
+0x2321,ActorHasEffect,,yes,31,,yes,
+0x2322,NONE,,no,,,no,
+0x2323,GetEquippedData,GetEqData,yes,1,,no,array
+0x2324,SetEquippedData,SetEqData,yes,1 1? 1?, |  | ,no,
+0x2325,EquipItemData,,yes,3 2? 1? 1? 1?, |  |  |  | ,no,
+0x2326,Console,,no,0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2327,GetDefaultMessageTime,GetDMT,no,,,no,
+0x2328,SetDefaultMessageTime,SetDMT,no,2,,no,
+0x2329,NONE,,no,,,no,
+0x232a,NONE,,no,,,no,
+0x232b,GetWeaponKillImpulse,,no,3,,no,
+0x232c,SetWeaponKillImpulse,,no,61 2, | ,no,
+0x232d,GetWeaponImpulseDistance,,no,3,,no,
+0x232e,SetWeaponImpulseDistance,,no,61 2, | ,no,
+0x232f,GetWeaponVATSEffect,,no,3,,no,form
+0x2330,SetWeaponVATSEffect,,no,61 61, | ,no,
+0x2331,GetWeaponCritFlags,,no,3,,no,
+0x2332,SetWeaponCritFlags,,no,3 1, | ,no,
+0x2333,GetBodyPartData,,no,25,,no,form
+0x2334,GetRadius,,no,61?,,no,
+0x2335,SetRadius,,no,2 61?, | ,no,
+0x2336,CrosshairRefInList,,no,37,,no,
+0x2337,GetGameSettings,,no,1?,,no,array
+0x2338,GetShowQuestItems,,no,,,no,
+0x2339,GetWaterTrait,,no,61 1, | ,no,
+0x233a,SetWaterTrait,,no,61 1 44, |  | ,no,
+0x2600,SetPersistent,,yes,1,,no,
+0x2601,GetActorTemplate,,no,25?,,no,form
+0x2602,GetLeveledActorBase,,yes,,,no,form
+0x2603,GetCreatureDamage,,no,25?,,no,
+0x2604,SetCreatureDamage,,no,1 25?, | ,no,
+0x2605,GetIsPoisoned,,yes,,,yes,
+0x2606,AddItemAlt,,yes,50 1? 2? 1? 1?, |  |  |  | ,no,
+0x2607,GetValueAlt,,no,3?,,no,
+0x2608,IsComponentLoaded,,no,0,,no,
+0x2609,InjectUIXML,,no,0 0, | ,no,
+0x260a,InjectUIComponent,,no,0 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x260b,GetAmmoTraitNumeric,,no,3 1, | ,no,
+0x260c,SetAmmoTraitNumeric,,no,3 1 2, |  | ,no,
+0x260d,GetAmmoProjectile,,no,3,,no,form
+0x260e,SetAmmoProjectile,,no,61 61?, | ,no,
+0x260f,GetNumAmmoEffects,,no,61,,no,
+0x2610,GetNthAmmoEffect,,no,61 1, | ,no,form
+0x2611,AddAmmoEffect,,no,61 61, | ,no,
+0x2612,RemoveAmmoEffect,,no,61 61, | ,no,
+0x2613,GetAmmoEffectTraitNumeric,,no,61 1, | ,no,
+0x2614,SetAmmoEffectTraitNumeric,,no,61 1 2, |  | ,no,
+0x2615,GetProjectileTraitNumeric,,no,21 1, | ,no,
+0x2616,SetProjectileTraitNumeric,,no,61 1 2, |  | ,no,
+0x2617,GetProjectileFlag,,no,21 1, | ,no,
+0x2618,SetProjectileFlag,,no,61 1 1, |  | ,no,
+0x2619,GetProjectileExplosion,,no,21,,no,form
+0x261a,SetProjectileExplosion,,no,21 21?, | ,no,
+0x261b,GetExplosionTraitNumeric,,no,21 1, | ,no,
+0x261c,SetExplosionTraitNumeric,,no,61 1 2, |  | ,no,
+0x261d,GetExplosionTraitForm,,no,21 1, | ,no,form
+0x261e,SetExplosionTraitForm,,no,61 1 61?, |  | ,no,
+0x261f,GetExplosionFlag,,no,21 1, | ,no,
+0x2620,SetExplosionFlag,,no,61 1 1, |  | ,no,
+0x2621,AddScriptVariable,,no,0 14?, | ,no,
+0x2622,GetDelayElapsed,,no,14,,no,
+0x2623,SetDelayElapsed,,no,14 2, | ,no,
+0x2624,GetPackageFlag,,no,29 1, | ,no,
+0x2625,SetPackageFlag,,no,29 1 1, |  | ,no,
+0x2626,GetGlobalVariable,,no,19,,no,
+0x2627,SetGlobalVariable,,no,19 2, | ,no,
+0x2628,GetFactionReputationType,,no,17,,no,form
+0x2629,SetFactionReputationType,,no,17 62?, | ,no,
+0x262a,RefToString,,no,61?,,no,string
+0x262b,StringToRef,,no,0,,no,form
+0x262c,GetObjectDimensions,GetObjDim,no,8 21?, | ,no,
+0x262d,GetIsItem,,no,3?,,no,
+0x262e,GetMinOf,,no,44 44 44? 44? 44?, |  |  |  | ,no,
+0x262f,GetMaxOf,,no,44 44 44? 44? 44?, |  |  |  | ,no,
+0x2630,GetCombatStyleTraitNumeric,,no,30 1, | ,no,
+0x2631,SetCombatStyleTraitNumeric,,no,30 1 2, |  | ,no,
+0x2632,GetCombatStyleFlag,,no,30 1, | ,no,
+0x2633,SetCombatStyleFlag,,no,30 1 1, |  | ,no,
+0x2634,SetLinkedReference,SetLinkedRef,yes,4?,,no,
+0x2635,GetEnableChildren,,yes,,,no,array
+0x2636,GetLinkedChildren,,yes,,,no,array
+0x2637,GetFollowers,,yes,,,no,array
+0x2638,GetCursorPos,,no,8,,no,
+0x2639,GetUIString,,no,0,,no,string
+0x263a,ReadArrayFromFile,,no,0 1?, | ,no,array
+0x263b,ReadStringFromFile,,no,0 1? 1?, |  | ,no,string
+0x263c,WriteArrayToFile,,no,0 1 1 1?, |  |  | ,no,
+0x263d,WriteStringToFile,,no,0 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x263e,GetClassTraitNumeric,,no,16 1, | ,no,
+0x263f,SetClassTraitNumeric,,no,16 1 1, |  | ,no,
+0x2640,GetClassFlag,,no,16 1, | ,no,
+0x2641,SetClassFlag,,no,16 1 1, |  | ,no,
+0x2642,GetLightTraitNumeric,,no,21 1, | ,no,
+0x2643,SetLightTraitNumeric,,no,61 1 2, |  | ,no,
+0x2644,GetLightFlag,,no,21 1, | ,no,
+0x2645,SetLightFlag,,no,61 1 1, |  | ,no,
+0x2646,GetSoundTraitNumeric,,no,12 1, | ,no,
+0x2647,SetSoundTraitNumeric,,no,12 1 2, |  | ,no,
+0x2648,GetSoundFlag,,no,12 1, | ,no,
+0x2649,SetSoundFlag,,no,12 1 1, |  | ,no,
+0x264a,GetWeaponDetectionSoundLevel,,no,3,,no,
+0x264b,SetWeaponDetectionSoundLevel,,no,3 1, | ,no,
+0x264c,IsEquippedWeaponSilenced,,yes,,,yes,
+0x264d,IsEquippedWeaponScoped,,yes,,,yes,
+0x264e,GetWeaponSound,,no,3 1, | ,no,form
+0x264f,SetWeaponSound,,no,61 1 12?, |  | ,no,
+0x2650,SetWeaponItemMod,,no,61 1 3?, |  | ,no,
+0x2651,SetWeaponItemModEffect,,no,61 1 1, |  | ,no,
+0x2652,SetWeaponItemModValue,,no,61 1 2, |  | ,no,
+0x2653,GetWeatherImageSpaceMod,,no,33 1, | ,no,form
+0x2654,SetWeatherImageSpaceMod,,no,33 1 42?, |  | ,no,
+0x2655,GetWeatherTexture,,no,33 1, | ,no,string
+0x2656,SetWeatherTexture,,no,33 1 0, |  | ,no,
+0x2657,GetWeatherPrecipitationModel,,no,33,,no,string
+0x2658,SetWeatherPrecipitationModel,,no,33 0, | ,no,
+0x2659,GetWeatherTraitNumeric,,no,33 1, | ,no,
+0x265a,SetWeatherTraitNumeric,,no,33 1 44, |  | ,no,
+0x265b,GetWeatherRGBColor,,no,33 1 1 1?, |  |  | ,no,
+0x265c,SetWeatherRGBColor,,no,33 1 1 1 1?, |  |  |  | ,no,
+0x265d,GetLandTextureTextureSet,,no,61,,no,form
+0x265e,SetLandTextureTextureSet,,no,61 61, | ,no,
+0x265f,GetLandTextureTraitNumeric,,no,61 1, | ,no,
+0x2660,SetLandTextureTraitNumeric,,no,61 1 1, |  | ,no,
+0x2661,GetLandTextureNumGrasses,,no,61,,no,
+0x2662,GetLandTextureNthGrass,,no,61 1, | ,no,form
+0x2663,LandTextureAddGrass,,no,61 61, | ,no,
+0x2664,LandTextureRemoveGrass,,no,61 61, | ,no,
+0x2665,GetTextureSetTexture,,no,61 1, | ,no,string
+0x2666,SetTextureSetTexture,,no,61 1 0, |  | ,no,
+0x2667,GetTextureSetTraitNumeric,,no,61 1, | ,no,
+0x2668,SetTextureSetTraitNumeric,,no,61 1 44, |  | ,no,
+0x2669,GetTextureSetFlag,,no,61 1, | ,no,
+0x266a,SetTextureSetFlag,,no,61 1 1, |  | ,no,
+0x266b,GetClimateSunTexture,,no,61,,no,string
+0x266c,SetClimateSunTexture,,no,61 0, | ,no,
+0x266d,GetClimateSunGlareTexture,,no,61,,no,string
+0x266e,SetClimateSunGlareTexture,,no,61 0, | ,no,
+0x266f,GetClimateNightSkyModel,,no,61,,no,string
+0x2670,SetClimateNightSkyModel,,no,61 0, | ,no,
+0x2671,GetClimateTraitNumeric,,no,61 1, | ,no,
+0x2672,SetClimateTraitNumeric,,no,61 1 1, |  | ,no,
+0x2673,GetClimateNumWeatherTypes,,no,61,,no,
+0x2674,GetClimateNthWeatherType,,no,61 1, | ,no,form
+0x2675,GetClimateNthWeatherChance,,no,61 1, | ,no,
+0x2676,GetClimateNthWeatherGlobal,,no,61 1, | ,no,form
+0x2677,ClimateAddWeatherType,,no,61 33 1 19?, |  |  | ,no,
+0x2678,ClimateRemoveWeatherType,,no,61 33, | ,no,
+0x2679,GetPrimitiveBound,,yes,8,,no,
+0x267a,SetPrimitiveBound,,yes,8 2, | ,no,
+0x267b,GetNumEffects,,no,11,,no,
+0x267c,GetNthEffectBase,,no,11 1, | ,no,form
+0x267d,GetNthEffectTraitNumeric,,no,11 1 1, |  | ,no,
+0x267e,SetNthEffectTraitNumeric,,no,11 1 1 1, |  |  | ,no,
+0x267f,GetNumActorEffects,,no,25?,,no,
+0x2680,GetNthActorEffect,,no,1 25?, | ,no,
+0x2681,GetActiveMenuMode,,no,,,no,
+0x2682,GetActiveUIComponentName,,no,,,no,string
+0x2683,GetActiveUIComponentFullName,,no,,,no,string
+0x2684,GetActiveUIComponentID,,no,,,no,
+0x2685,GetMenuTargetRef,,no,1,,no,form
+0x2686,GetMenuItemFilter,,no,1 1?, | ,no,
+0x2687,ClickMenuButton,,no,0 1?, | ,no,
+0x2688,RemoveItemTarget,,yes,50 26 1? 1?, |  |  | ,no,
+0x2689,GetActorLevelingData,,no,1 25?, | ,no,
+0x268a,SetActorLevelingData,,no,1 2 25?, |  | ,no,
+0x268b,SetNthEffectBase,,no,11 1 31, |  | ,no,
+0x268c,HasVariableAdded,,no,0 14?, | ,no,
+0x268d,RemoveScriptVariable,,no,0 14?, | ,no,
+0x268e,GetLoadOrderChanged,,no,,,no,
+0x268f,ValidateModIndex,,no,1,,no,
+0x2690,RemoveAllAddedVariables,,no,14?,,no,
+0x2691,AuxiliaryVariableGetSize,AuxVarSize,no,0 61?, | ,no,
+0x2692,AuxiliaryVariableGetType,AuxVarType,no,0 1? 61?, |  | ,no,
+0x2693,AuxiliaryVariableGetFloat,AuxVarGetFlt,no,0 1? 61?, |  | ,no,
+0x2694,AuxiliaryVariableSetFloat,AuxVarSetFlt,no,0 44 1? 61?, |  |  | ,no,
+0x2695,AuxiliaryVariableGetRef,AuxVarGetRef,no,0 1? 61?, |  | ,no,form
+0x2696,AuxiliaryVariableSetRef,AuxVarSetRef,no,0 61 1? 61?, |  |  | ,no,
+0x2697,AuxiliaryVariableGetString,AuxVarGetStr,no,0 1? 61?, |  | ,no,string
+0x2698,AuxiliaryVariableSetString,AuxVarSetStr,no,0 0 1? 61?, |  |  | ,no,
+0x2699,AuxiliaryVariableGetAll,AuxVarGetAll,no,1 61?, | ,no,array
+0x269a,AuxiliaryVariableErase,AuxVarErase,no,0 1? 61?, |  | ,no,
+0x269b,AuxiliaryVariableEraseAll,AuxVarEraseAll,no,1 61?, | ,no,
+0x269c,RefMapArrayGetSize,RefMapSize,no,0,,no,
+0x269d,RefMapArrayGetType,RefMapGetType,no,0 61?, | ,no,
+0x269e,RefMapArrayGetFirst,RefMapFirst,no,0,,no,array
+0x269f,RefMapArrayGetNext,RefMapNext,no,0,,no,array
+0x26a0,RefMapArrayGetKeys,RefMapKeys,no,0,,no,array
+0x26a1,RefMapArrayGetAll,RefMapGetAll,no,1,,no,array
+0x26a2,RefMapArrayErase,RefMapErase,no,0 61?, | ,no,
+0x26a3,RefMapArrayDestroy,RefMapDestroy,no,0,,no,
+0x26a4,RefMapArrayGetFloat,RefMapGetFlt,no,0 61?, | ,no,
+0x26a5,RefMapArraySetFloat,RefMapSetFlt,no,0 44 61?, |  | ,no,
+0x26a6,RefMapArrayGetRef,RefMapGetRef,no,0 61?, | ,no,form
+0x26a7,RefMapArraySetRef,RefMapSetRef,no,0 61 61?, |  | ,no,
+0x26a8,RefMapArrayGetString,RefMapGetStr,no,0 61?, | ,no,string
+0x26a9,RefMapArraySetString,RefMapSetStr,no,0 0 61?, |  | ,no,
+0x26aa,ClearJIPSavedData,,no,1 1 1 1, |  |  | ,no,
+0x26ab,SetValueAlt,,no,3 1, | ,no,
+0x26ac,GetBodyPartDataSkeleton,,no,61,,no,string
+0x26ad,SetBodyPartDataSkeleton,,no,61 0, | ,no,
+0x26ae,GetBodyPartDataRagdoll,,no,61,,no,form
+0x26af,SetBodyPartDataRagdoll,,no,61 61?, | ,no,
+0x26b0,GetBodyPartDataHasPart,,no,61 1, | ,no,
+0x26b1,GetBodyPartTraitNumeric,,no,61 1 1, |  | ,no,
+0x26b2,SetBodyPartTraitNumeric,,no,61 1 1 2, |  |  | ,no,
+0x26b3,GetBodyPartTraitForm,,no,61 1 1, |  | ,no,form
+0x26b4,SetBodyPartTraitForm,,no,61 1 1 61?, |  |  | ,no,
+0x26b5,GetBodyPartName,,no,61 1, | ,no,string
+0x26b6,SetBodyPartName,,no,61 1 0, |  | ,no,
+0x26b7,GetBodyPartReplacementModel,,no,61 1, | ,no,string
+0x26b8,SetBodyPartReplacementModel,,no,61 1 0, |  | ,no,
+0x26b9,GetBodyPartFlag,,no,61 1 1, |  | ,no,
+0x26ba,SetBodyPartFlag,,no,61 1 1 1, |  |  | ,no,
+0x26bb,GetWeaponModReloadAnim,,no,3,,no,
+0x26bc,SetWeaponModReloadAnim,,no,3 1, | ,no,
+0x26bd,AuxiliaryVariableGetAsArray,AuxVarGetAsArr,no,0 61?, | ,no,array
+0x26be,AuxiliaryVariableSetFromArray,AuxVarSetFromArr,no,0 1 61?, |  | ,no,
+0x26bf,GetSoundSourceFile,,no,12,,no,string
+0x26c0,SetSoundSourceFile,,no,12 0, | ,no,
+0x26c1,GetDestructionDataHealth,,no,61,,no,
+0x26c2,SetDestructionDataHealth,,no,61 1, | ,no,
+0x26c3,GetDestructionDataTargetable,,no,61,,no,
+0x26c4,SetDestructionDataTargetable,,no,61 1, | ,no,
+0x26c5,GetDestructionDataNumStages,,no,61,,no,
+0x26c6,GetNthDestructionStageTrait,,no,61 1 1, |  | ,no,
+0x26c7,SetNthDestructionStageTrait,,no,61 1 1 1, |  |  | ,no,
+0x26c8,GetNthDestructionStageExplosion,,no,61 1, | ,no,form
+0x26c9,SetNthDestructionStageExplosion,,no,61 1 61?, |  | ,no,
+0x26ca,GetNthDestructionStageDebris,,no,61 1, | ,no,form
+0x26cb,SetNthDestructionStageDebris,,no,61 1 61?, |  | ,no,
+0x26cc,GetNthDestructionStageReplacement,,no,61 1, | ,no,string
+0x26cd,SetNthDestructionStageReplacement,,no,61 1 0, |  | ,no,
+0x26ce,GetTeammates,,no,,,no,array
+0x26cf,GetCurrentWeather,,no,,,no,form
+0x26d0,GetCurrentClimate,,no,,,no,form
+0x26d1,SetCurrentClimate,,no,61,,no,
+0x26d2,RefreshCurrentClimate,,no,,,no,
+0x26d3,GetWorldspaceClimate,,no,27,,no,form
+0x26d4,SetWorldspaceClimate,,no,27 61?, | ,no,
+0x26d5,GetActorVoiceType,,no,25?,,no,form
+0x26d6,SetActorVoiceType,,no,61 25?, | ,no,
+0x26d7,GetCreatureReach,,no,25?,,no,
+0x26d8,GetIsImmobile,,no,25?,,no,
+0x26d9,PickFromList,,yes,37 1? 1?, |  | ,no,
+0x26da,SetStageAlt,,no,14 1, | ,no,
+0x26db,ToggleNoZPosReset,,yes,1,,no,
+0x26dc,GetProjectileRefSource,,yes,,,no,form
+0x26dd,SetProjectileRefSource,,yes,4?,,no,
+0x26de,GetProjectileRefWeapon,,yes,,,no,form
+0x26df,SetProjectileRefWeapon,,yes,3,,no,
+0x26e0,GetProjectileRefLifeTime,,yes,,,no,
+0x26e1,GetProjectileRefDistanceTraveled,,yes,,,no,
+0x26e2,GetProjectileRefDamage,,yes,,,no,
+0x26e3,SetProjectileRefDamage,,yes,2,,no,
+0x26e4,GetProjectileRefSpeedMult,,yes,,,no,
+0x26e5,SetProjectileRefSpeedMult,,yes,2,,no,
+0x26e6,NONE,,no,,,no,
+0x26e7,GetWorldspaceFlag,,no,27 1, | ,no,
+0x26e8,SetWorldspaceFlag,,no,27 1 1, |  | ,no,
+0x26e9,GetIdleLoopTimes,,no,61 1, | ,no,
+0x26ea,ToggleCreatureModel,,no,0 1 25?, |  | ,no,
+0x26eb,CreatureHasModel,,no,0 25?, | ,no,
+0x26ec,GetCreatureModels,,no,25?,,no,array
+0x26ed,DisableNavMeshAlt,,no,61,,no,
+0x26ee,EnableNavMeshAlt,,no,61,,no,
+0x26ef,GetTerrainHeight,,no,2 2, | ,no,
+0x26f0,RefMapArrayValidate,RefMapValidate,no,0,,no,
+0x26f1,HasPrimitive,,yes,,,no,
+0x26f2,AddPrimitive,,yes,1 2 2 2, |  |  | ,no,
+0x26f3,AddDestructionStage,,no,61 1 1 1, |  |  | ,no,
+0x26f4,RemoveDestructionStage,,no,61 1, | ,no,
+0x26f5,GetWeaponShellCasingModel,,no,3,,no,string
+0x26f6,SetWeaponShellCasingModel,,no,61 0, | ,no,
+0x26f7,AddNewEffect,,no,11 31 1 1 1? 1? 1?, |  |  |  |  |  | ,no,
+0x26f8,RemoveNthEffect,,no,11 1, | ,no,
+0x26f9,SetObjectEffect,,no,61 61?, | ,no,
+0x26fa,GetActorUnarmedEffect,,no,25?,,no,form
+0x26fb,SetActorUnarmedEffect,,no,61 25?, | ,no,
+0x26fc,IsPCInCombat,,no,,,yes,
+0x26fd,CCCOnLoad,,no,,,no,
+0x26fe,CCCSetFloat,,no,1 2, | ,no,
+0x26ff,CCCSetString,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2700,CCCSetTrait,,no,1 1 1?, |  | ,no,
+0x2701,CCCGetDistance,,yes,4 1?, | ,no,
+0x2702,CCCTaskPackageFlags,,no,29 1 1 1, |  |  | ,no,
+0x2703,CCCSetEquipped,,no,,,no,
+0x2704,CCCInFaction,,yes,17 1?, | ,no,
+0x2705,CCCSetNCCS,,yes,1?,,no,
+0x2706,GetEncumbranceRate,,yes,,,yes,
+0x2707,CCCLoadNCCS,,no,,,no,
+0x2708,CCCSavedForm,,no,1,,no,form
+0x2709,CCCLocationName,,yes,,,no,string
+0x270a,CCCGetReputation,,yes,,,no,form
+0x270b,GetSelectedItemRef,,no,,,no,form
+0x270c,GetWeaponRefModFlags,,yes,,,no,
+0x270d,SetWeaponRefModFlags,,yes,1,,no,
+0x270e,GetBarterItems,,no,1,,no,array
+0x270f,GetItemRefCurrentHealth,,yes,1?,,no,
+0x2710,SetItemRefCurrentHealth,,yes,2 1?, | ,no,
+0x2711,GetBarterGoldAlt,,no,,,no,
+0x2712,GetRecipeMenuSelection,,no,,,no,form
+0x2713,GetRecipeMenuCategory,,no,,,no,form
+0x2714,UnlockRecipeMenuQuantity,,no,1?,,no,
+0x2715,GetRecipeMenuNumSubcategories,,no,,,no,
+0x2716,SetHotkeyItemRef,,yes,1,,no,
+0x2717,EquipItemAlt,,yes,3 1? 1?, |  | ,no,
+0x2718,UnequipItemAlt,,yes,3 1? 1?, |  | ,no,
+0x2719,DropAlt,,yes,50 1? 1?, |  | ,no,
+0x271a,DropMeAlt,,yes,1? 1?, | ,no,
+0x271b,GetFormDescription,,no,61,,no,string
+0x271c,GetAddictionEffect,,no,61,,no,form
+0x271d,SetAddictionEffect,,no,61 61?, | ,no,
+0x271e,GetAddictionChance,,no,61,,no,
+0x271f,SetAddictionChance,,no,61 2, | ,no,
+0x2720,GetIsPoison,,no,61,,no,
+0x2721,GetContainerRespawns,,no,61?,,no,
+0x2722,SetContainerRespawns,,no,1 61?, | ,no,
+0x2723,ModBaseActorValue,ModBaseAV,no,5 2 25?, |  | ,no,
+0x2724,GetGrassTraitNumeric,,no,61 1, | ,no,
+0x2725,SetGrassTraitNumeric,,no,61 1 2, |  | ,no,
+0x2726,GetGrassModel,,no,61,,no,string
+0x2727,SetGrassModel,,no,61 0, | ,no,
+0x2728,GetWheelDisabled,,yes,,,no,
+0x2729,SetWheelDisabled,,yes,1,,no,
+0x272a,GetInterruptPackage,,yes,,,no,form
+0x272b,EnableImprovedRecipeMenu,,no,,,no,
+0x272c,InitItemFilter,,no,,,no,
+0x272d,SetItemFilter,,no,0?,,no,
+0x272e,GetSessionTime,,no,,,no,
+0x272f,GetQuestTargetsChanged,,no,,,no,
+0x2730,GetWorldMapPosMults,,yes,45 45, | ,no,
+0x2731,NONE,,no,,,no,
+0x2732,NONE,,no,,,no,
+0x2733,GetActiveEffects,,yes,1?,,no,array
+0x2734,GetActorProcessingLevel,,yes,,,no,
+0x2735,GetActorsByProcessingLevel,,no,1,,no,array
+0x2736,GetExteriorCell,,no,27 1 1, |  | ,no,form
+0x2737,GetCellBuffered,,no,61?,,no,
+0x2738,MessageExAlt,,no,2 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2739,GetTempEffects,,yes,,,no,array
+0x273a,RemoveNthTempEffect,,yes,1,,no,
+0x273b,GetActorLightAmount,,yes,,,yes,
+0x273c,GetActorAlpha,,yes,,,no,
+0x273d,GetActorDiveBreath,,yes,,,no,
+0x273e,SetActorDiveBreath,,yes,2,,no,
+0x273f,GetGameDifficulty,,no,,,yes,
+0x2740,ToggleFirstPerson,,no,1,,no,
+0x2741,StopIdle,,yes,,,no,
+0x2742,GetCombatTargets,,yes,,,no,array
+0x2743,GetCombatAllies,,yes,,,no,array
+0x2744,GetDetectedActors,,yes,,,no,array
+0x2745,GetDetectingActors,,yes,,,no,array
+0x2746,ClearActiveQuest,,no,,,no,
+0x2747,SetFormDescription,,no,61 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2748,GetPCFastTravelled,,no,,,no,
+0x2749,GetPCMovedCell,,no,,,no,
+0x274a,GetPCDetectionState,,no,,,yes,
+0x274b,GetFontFile,,no,1,,no,string
+0x274c,SetFontFile,,no,1 0, | ,no,
+0x274d,ShowTextInputMenu,,no,61 2 2 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x274e,NONE,,no,,,no,
+0x274f,NONE,,no,,,no,
+0x2750,NONE,,no,,,no,
+0x2751,GetPipboyRadio,,no,,,yes,form
+0x2752,CCCSayTo,,yes,6 13 1? 1?, |  |  | ,no,
+0x2753,CCCRunResultScripts,,yes,13,,no,
+0x2754,GetCombatDisabled,,yes,,,no,
+0x2755,SetCombatDisabled,,yes,1 6?, | ,no,
+0x2756,ToggleNoHealthReset,,no,1 2, | ,no,
+0x2757,GetCurrentStablePackage,,yes,,,no,form
+0x2758,MoveToCell,,yes,61 2 2 2, |  |  | ,no,
+0x2759,MoveToEditorPosition,,yes,1?,,no,
+0x275a,GetTeammateUsingAmmo,,yes,,,no,
+0x275b,SetTeammateUsingAmmo,,yes,1,,no,
+0x275c,ToggleDetectionFix,,yes,1,,no,
+0x275d,NONE,,no,,,no,
+0x275e,NONE,,no,,,no,
+0x275f,ToggleIgnoreLockedDoors,,no,1,,no,
+0x2760,CCCSetFollowState,,yes,1?,,no,
+0x2761,IsInCombatWith,,yes,6,,no,
+0x2762,RefToPosStr,,yes,,,no,string
+0x2763,MoveToPosStr,,yes,0,,no,
+0x2764,RefMapArrayGetValue,RefMapGetVal,no,0 61?, | ,no,array
+0x2765,RefMapArraySetValue,RefMapSetVal,no,0 1 61?, |  | ,no,
+0x2766,GetAllItems,,yes,1? 1? 1? 1? 37?, |  |  |  | ,no,array
+0x2767,GetAllItemRefs,,yes,1? 1? 1? 1? 37?, |  |  |  | ,no,array
+0x2768,LockEquipment,,yes,1,,no,
+0x2769,IsAttacking,,yes,,,yes,
+0x276a,GetPCUsingScope,,no,,,yes,
+0x276b,HolsterWeapon,,yes,,,no,
+0x276c,GetFallTimeElapsed,,yes,,,no,
+0x276d,GetFallTimeRemaining,,yes,,,no,
+0x276e,ResetFallTime,,yes,,,no,
+0x276f,GetCenterPos,,yes,8,,no,
+0x2770,SetIdleLoopTimes,,no,61 1 1, |  | ,no,
+0x2771,CCCSMS,,no,4?,,no,
+0x2772,GetDetonationTimer,,yes,,,no,
+0x2773,SetDetonationTimer,,yes,2,,no,
+0x2774,GetMineArmed,,yes,,,no,
+0x2775,GetRefType,,no,4?,,no,
+0x2776,GetEffectFlag,,no,61 1, | ,no,
+0x2777,SetEffectFlag,,no,61 1 1, |  | ,no,
+0x2778,GetBaseEffectFlag,,no,61 1, | ,no,
+0x2779,SetBaseEffectFlag,,no,61 1 1, |  | ,no,
+0x277a,GetPCUsingIronSights,,no,,,yes,
+0x277b,GetPCLastExteriorDoor,,no,,,no,form
+0x277c,GetRadiationLevelAlt,,yes,,,yes,
+0x277d,IsInWater,,yes,,,yes,
+0x277e,SetEmbeddedWeaponNode,,no,61 0, | ,no,
+0x277f,SetEmbeddedWeaponAV,,no,3 5, | ,no,
+0x2780,GetDroppedRefs,,yes,,,no,array
+0x2781,MoveAwayFromPlayer,,yes,,,no,
+0x2782,FaceObject,,yes,4,,no,
+0x2783,Turn,,yes,2,,no,
+0x2784,SetMessageDisabled,,no,61 1, | ,no,
+0x2785,GetMessageDisabled,,no,49,,no,
+0x2786,GetAshPileSource,,yes,,,no,form
+0x2787,GetMessageFlags,,no,49,,no,
+0x2788,SetMessageFlags,,no,49 1, | ,no,
+0x2789,ToggleObjectCollision,TOC,yes,1,,no,
+0x278a,IsSoundPlaying,,no,12 4?, | ,no,
+0x278b,SwapTextureEx,,no,4 0 0 1?, |  |  | ,no,
+0x278c,GetMaterialPropertyValue,GetMatrPropVal,yes,0 1, | ,no,
+0x278d,SetMaterialPropertyValue,SetMatrPropVal,yes,0 1 2, |  | ,no,
+0x278e,GetSoundPlayers,,no,12,,no,array
+0x278f,SetMessageDisplayTime,,no,49 1, | ,no,
+0x2790,GetImpactDataModel,,no,61,,no,string
+0x2791,SetImpactDataModel,,no,61 0, | ,no,
+0x2792,GetImpactDataTrait,,no,61 1, | ,no,ambiguous
+0x2793,SetImpactDataTraitNumeric,,no,61 1 44, |  | ,no,
+0x2794,SetImpactDataTraitForm,,no,61 1 61?, |  | ,no,
+0x2795,sv_RegexMatch,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2796,sv_RegexSearch,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,array
+0x2797,sv_RegexReplace,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,string
+0x2798,SetOnMenuClickEventHandler,,no,61 1 0, |  | ,no,
+0x2799,SetOnFastTravelEventHandler,,no,61 1, | ,no,
+0x279a,SetOnMenuOpenEventHandler,,no,61 1 1?, |  | ,no,
+0x279b,SetOnMenuCloseEventHandler,,no,61 1 1?, |  | ,no,
+0x279c,SetOnAnimActionEventHandler,,no,61 1 61 1, |  |  | ,no,
+0x279d,SetOnPlayGroupEventHandler,,no,61 1 61 10, |  |  | ,no,
+0x279e,SetOnHealthDamageEventHandler,,no,61 1 61, |  | ,no,
+0x279f,SetOnCrippledLimbEventHandler,,no,61 1 61, |  | ,no,
+0x27a0,SetOnFireWeaponEventHandler,,no,61 1 61?, |  | ,no,
+0x27a1,GetCurrentAmmo,,yes,,,no,form
+0x27a2,GetCurrentAmmoRounds,,yes,,,no,
+0x27a3,GetMoonTexture,,no,1,,no,string
+0x27a4,SetMoonTexture,,no,1 0, | ,no,
+0x27a5,SetFullNameAlt,SetActorFullNameAlt,no,0 61?, | ,no,
+0x27a6,SetWeatherTransitionTimeOverride,,no,1?,,no,
+0x27a7,GetDetectionValue,,yes,6,,no,
+0x27a8,GetBaseActorValueAlt,GetBaseAVAlt,no,5 25?, | ,no,
+0x27a9,SetOnMouseoverChangeEventHandler,,no,61 1 1?, |  | ,no,
+0x27aa,GetAlwaysRun,,no,,,yes,
+0x27ab,GetAutoMove,,no,,,yes,
+0x27ac,SetSpeedMult,,yes,1?,,no,
+0x27ad,GetIsRagdolled,,yes,,,yes,
+0x27ae,ForceActorDetectionValue,,yes,1? 1?, | ,no,
+0x27af,SetOnPCTargetChangeEventHandler,,no,61 1, | ,no,
+0x27b0,FreePlayer,GoodbyeWorldspace,no,,,no,
+0x27b1,AuxVarGetFltCond,,yes,14 1, | ,yes,
+0x27b2,GetLocalGravity,,no,8,,no,
+0x27b3,SetLocalGravityVector,,no,2 2 2, |  | ,no,
+0x27b4,GetActorVelocity,,yes,8?,,no,
+0x27b5,IsInAir,,yes,,,yes,
+0x27b6,GetHasContact,,yes,61,,no,
+0x27b7,GetContactRefs,,yes,,,no,array
+0x27b8,GetHasContactBase,,yes,61,,no,
+0x27b9,GetHasContactType,,yes,1,,yes,
+0x27ba,GetObjectUnderFeet,,yes,,,no,form
+0x27bb,GetHasPhantom,,yes,,,no,
+0x27bc,GetArmorRCT,,no,3,,no,string
+0x27bd,SetArmorRCT,,no,61 0, | ,no,
+0x27be,GetPerkFlag,,no,39 1, | ,no,
+0x27bf,SetPerkFlag,,no,39 1 1, |  | ,no,
+0x27c0,ModLogPrint,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x27c1,GetBaseEffectScript,,no,61,,no,form
+0x27c2,SetBaseEffectScript,,no,61 61, | ,no,
+0x27c3,GetWaterNoiseTexture,,no,61,,no,string
+0x27c4,SetWaterNoiseTexture,,no,61 0, | ,no,
+0x27c5,SetWaterFormEffect,,no,61 61?, | ,no,form
+0x27c6,GetWaterSound,,no,61,,no,form
+0x27c7,SetWaterSound,,no,61 61?, | ,no,
+0x27c8,GetInteractionDisabled,,no,21?,,no,
+0x27c9,SetInteractionDisabled,,no,1 21?, | ,no,
+0x27ca,GetInteractionDisabledType,,no,1,,no,
+0x27cb,SetInteractionDisabledType,,no,1 1, | ,no,
+0x27cc,GetImageSpaceTrait,,no,43 1, | ,no,
+0x27cd,SetImageSpaceTrait,,no,43 1 2, |  | ,no,
+0x27ce,GetImageSpaceModTrait,,no,42 1, | ,no,
+0x27cf,SetImageSpaceModTrait,,no,42 1 2, |  | ,no,
+0x27d0,SetOnKeyDownEventHandler,,no,61 1 1?, |  | ,no,
+0x27d1,SetOnKeyUpEventHandler,,no,61 1 1?, |  | ,no,
+0x27d2,SetOnControlDownEventHandler,,no,61 1 1?, |  | ,no,
+0x27d3,SetOnControlUpEventHandler,,no,61 1 1?, |  | ,no,
+0x27d4,SetGameMainLoopCallback,SGMLC,no,61 1? 1? 1?, |  |  | ,no,
+0x27d5,GetGlobalRef,,no,19,,no,form
+0x27d6,SetGlobalRef,,no,19 61?, | ,no,
+0x27d7,GetWorldspaceNoiseTexture,,no,27,,no,string
+0x27d8,SetWorldspaceNoiseTexture,,no,61 0, | ,no,
+0x27d9,GetWorldspaceWaterType,,no,27,,no,form
+0x27da,SetWorldspaceWaterType,,no,27 61?, | ,no,
+0x27db,GetWorldspaceImagespace,,no,27,,no,form
+0x27dc,SetWorldspaceImagespace,,no,27 61?, | ,no,
+0x27dd,SetCellWaterForm,,no,61 61?, | ,no,
+0x27de,GetCellClimate,,no,61,,no,form
+0x27df,SetCellClimate,,no,61 61?, | ,no,
+0x27e0,GetCellNoiseTexture,,no,61,,no,string
+0x27e1,SetCellNoiseTexture,,no,61 0, | ,no,
+0x27e2,RemoveMeIRAlt,,yes,1? 1? 26?, |  | ,no,
+0x27e3,GetScriptDisabled,,no,61,,no,
+0x27e4,SetScriptDisabled,,no,61 1, | ,no,
+0x27e5,GetScriptEventDisabled,,no,61 0, | ,no,
+0x27e6,SetScriptEventDisabled,,no,61 0 1, |  | ,no,
+0x27e7,FakeScriptEvent,,yes,0 61?, | ,no,
+0x27e8,RefreshItemsList,,no,,,no,
+0x27e9,AddRefMapMarker,,yes,,,no,
+0x27ea,RemoveRefMapMarker,,yes,,,no,
+0x27eb,RefHasMapMarker,,yes,,,no,
+0x27ec,IsSpellTargetAlt,,yes,11,,yes,
+0x27ed,GetCalculatedWeaponDamage,,no,3?,,no,
+0x27ee,GetOptionalPatch,,no,0,,no,
+0x27ef,SetOptionalPatch,,no,0 1, | ,no,
+0x27f0,SetPosEx,,yes,2 2 2 1?, |  |  | ,no,
+0x27f1,GetReticlePos,,no,1? 2?, | ,no,array
+0x27f2,GetReticleRange,,no,1? 2? 1?, |  | ,no,
+0x27f3,MoveToReticle,,yes,2? 2? 2? 2? 1?, |  |  |  | ,no,
+0x27f4,SetRefName,,yes,0?,,no,
+0x27f5,GetActorValueModifier,GetAVMod,yes,5 1?, | ,no,
+0x27f6,GetPerkModifier,,yes,1 2 61? 61?, |  |  | ,no,
+0x27f7,SetOnQuestStageEventHandler,,no,61 1 14 1 1?, |  |  |  | ,no,
+0x27f8,SetAngleEx,,yes,2 2 2 1?, |  |  | ,no,
+0x27f9,GetTeleportDoor,,yes,,,no,form
+0x27fa,GetBarterPriceMult,,no,1,,no,
+0x27fb,SetBarterPriceMult,,no,1 2, | ,no,
+0x27fc,SetOnDialogTopicEventHandler,,no,61 1 61, |  | ,no,
+0x27fd,TapButton,,no,1,,no,
+0x27fe,TapTrigger,,no,1,,no,
+0x27ff,SetOnTriggerDownEventHandler,,no,61 1 1, |  | ,no,
+0x2800,SetOnTriggerUpEventHandler,,no,61 1 1, |  | ,no,
+0x2801,SetOnCriticalHitEventHandler,,no,61 1 61? 61? 61?, |  |  |  | ,no,
+0x2802,GetHitHealthDamage,,yes,,,no,
+0x2803,GetHitLimbDamage,,yes,,,no,
+0x2804,CrippleLimb,,yes,1 4?, | ,no,
+0x2805,HoldControl,,no,1,,no,
+0x2806,ReleaseControl,,no,1,,no,
+0x2807,PlayIdleEx,,yes,48?,,no,
+0x2808,SetBipedModelPathAlt,,no,3 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2809,GetKillXP,,yes,,,no,
+0x280a,NONE,,no,,,no,
+0x280b,GetKiller,,yes,,,no,form
+0x280c,KillActorAlt,,yes,4? 1? 1?, |  | ,no,
+0x280d,ReloadEquippedModels,ReloadModels,yes,1?,,no,
+0x280e,MoveToFadeDelay,,yes,4 2, | ,no,
+0x280f,RunScriptSnippet,,no,1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2810,ScriptWait,,no,1,,no,
+0x2811,IsScriptWaiting,,no,14?,,no,
+0x2812,StopScriptWaiting,,no,14?,,no,
+0x2813,GetCrosshairWater,,no,,,no,form
+0x2814,GetScriptBlockDisabled,,no,61 1, | ,no,
+0x2815,SetScriptBlockDisabled,,no,61 1 1?, |  | ,no,
+0x2816,GetPlayedIdle,,yes,,,no,form
+0x2817,IsIdlePlayingEx,,yes,48,,yes,
+0x2818,GetObjectiveTargets,,no,14 1, | ,no,array
+0x2819,SetObjectiveNthTarget,,no,14 1 1 4, |  |  | ,no,
+0x281a,GetObjectiveHasTarget,,no,14 1 4, |  | ,no,
+0x281b,AddObjectiveTarget,,no,14 1 4, |  | ,no,
+0x281c,RemoveObjectiveTarget,,no,14 1 4, |  | ,no,
+0x281d,GetObjectiveText,,no,14 1, | ,no,string
+0x281e,SetObjectiveText,,no,14 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x281f,GetArmorAudioTemplate,,no,3,,no,form
+0x2820,SetArmorAudioTemplate,,no,3 3?, | ,no,
+0x2821,SetWeaponOut,,yes,1,,no,
+0x2822,SetTerminalUIModel,,no,61 0?, | ,no,
+0x2823,AddBaseEffectListEffect,,no,7 25?, | ,no,
+0x2824,RemoveBaseEffectListEffect,,no,7 25?, | ,no,
+0x2825,ShowQuantityMenu,,no,61 1 1?, |  | ,no,
+0x2826,MessageBoxExAlt,,no,61 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2827,GetVATSTargets,,no,,,no,array
+0x2828,HasScriptBlock,,no,1 61?, | ,no,
+0x2829,CastImmediate,,yes,11 6?, | ,no,
+0x282a,IsInCharGen,,no,,,yes,
+0x282b,DisableScriptedActivate,,yes,1,,no,
+0x282c,GetHitAttacker,,yes,,,no,form
+0x282d,GetHitProjectile,,yes,,,no,form
+0x282e,GetHitWeapon,,yes,,,no,form
+0x282f,GetGameDaysPassed,,no,1? 1? 1?, |  | ,no,
+0x2830,GetWaterImmersionPerc,,yes,,,yes,
+0x2831,GetProjectileMuzzleFlash,,no,21,,no,string
+0x2832,SetProjectileMuzzleFlash,,no,61 0, | ,no,
+0x2833,DismemberLimb,,yes,1 1?, | ,no,
+0x2834,RunBatchScript,,no,0,,no,
+0x2835,IsArmorAddon,,no,3,,no,
+0x2836,ToggleCraftingMessages,,no,1?,,no,
+0x2837,ToggleHardcoreTracking,,no,1,,no,
+0x2838,SetGameDifficulty,,no,1,,no,
+0x2839,GetEquippedItemRef,,yes,1,,no,form
+0x283a,ExecuteScript,,yes,,,no,
+0x283b,NONE,,no,,,no,
+0x283c,IsFleeing,,yes,,,yes,
+0x283d,GetEnemyHealthTarget,,no,,,no,form
+0x283e,SetCurrentAmmoRounds,,yes,1,,no,
+0x283f,IsAnimPlayingEx,,yes,1 1? 1? 1?, |  |  | ,no,
+0x2840,AttachAshPileEx,,yes,61,,no,
+0x2841,MarkActivatorAshPile,,no,61,,no,
+0x2842,SetActorVelocity,,yes,8 2, | ,no,
+0x2843,GetRigidBodyMass,,yes,,,no,
+0x2844,PushObject,,yes,2 2 2 2 4?, |  |  |  | ,no,
+0x2845,GetSkeletonModel,,no,25,,no,string
+0x2846,SetNPCSkeletonModel,,no,25 0?, | ,no,
+0x2847,SetCRESkeletonModel,,no,25 0, | ,no,
+0x2848,SetBodyPartData,,no,25 61, | ,no,
+0x2849,GetTargetUnreachable,,yes,,,yes,
+0x284a,MoveToContainer,,yes,4 1?, | ,no,
+0x284b,GetNifBlockTranslation,GetNifTrans,yes,0 1? 1?, |  | ,no,array
+0x284c,SetNifBlockTranslation,SetNifTrans,yes,0 2 2 2 1? 1?, |  |  |  |  | ,no,
+0x284d,GetNifBlockRotation,GetNifRot,yes,0 1? 1?, |  | ,no,array
+0x284e,SetNifBlockRotation,SetNifRot,yes,0 2 2 2 1? 1?, |  |  |  |  | ,no,
+0x284f,GetNifBlockScale,GetNifScale,yes,0 1?, | ,no,
+0x2850,SetNifBlockScale,SetNifScale,yes,0 2 1?, |  | ,no,
+0x2851,GetNifBlockFlag,GetNifFlag,yes,0 1 1?, |  | ,no,
+0x2852,SetNifBlockFlag,SetNifFlag,yes,0 1 1 1?, |  |  | ,no,
+0x2853,GetBufferedCells,,no,1,,no,array
+0x2854,SetVATSTargetable,,yes,1,,no,
+0x2855,GetWindDirection,,no,,,no,
+0x2856,SetWindDirection,,no,2,,no,
+0x2857,GetCreatureWeaponList,,no,25?,,no,form
+0x2858,SetWindSpeedMult,,no,2,,no,
+0x2859,TriggerLightningFX,,no,,,no,
+0x285a,GetObjectVelocity,,yes,8?,,no,
+0x285b,GetAngularVelocity,GetAngVel,yes,0 8?, | ,no,
+0x285c,SetAngularVelocity,SetAngVel,yes,0 8 2, |  | ,no,
+0x285d,PlaceAtCell,,no,61 1 61 2 2 2, |  |  |  |  | ,no,
+0x285e,GetRayCastPos,,yes,19 19 19 2? 1? 0? 2?, |  |  |  |  |  | ,no,
+0x285f,GetAnimSequenceFrequency,GetAnimSeqFreq,yes,0,,no,
+0x2860,SetAnimSequenceFrequency,SetAnimSeqFreq,yes,0 2, | ,no,
+0x2861,StopSound,,no,12 4?, | ,no,
+0x2862,IsMusicPlaying,,no,61?,,no,
+0x2863,SetMusicState,,no,1,,no,
+0x2864,GetNoUnequip,,yes,,,no,
+0x2865,SetNoUnequip,,yes,1,,no,
+0x2866,SetCursorPos,,no,2 2, | ,no,
+0x2867,MoveToNode,,yes,4 0 2? 2? 2?, |  |  |  | ,no,
+0x2868,GetDeathItem,,no,25?,,no,form
+0x2869,SetDeathItem,,no,3 25?, | ,no,
+0x286a,GetActorLeveledList,,yes,,,no,form
+0x286b,GetPlayerPerks,,no,,,no,array
+0x286c,UnloadUIComponent,,no,0,,no,
+0x286d,GetQuests,,no,1?,,no,array
+0x286e,GetQuestObjectives,,no,14 1, | ,no,array
+0x286f,GetActiveObjectives,,no,,,no,array
+0x2870,GetObjectiveTeleportLinks,,no,14 1, | ,no,array
+0x2871,GetNifBlockParentNodes,GetNifParents,yes,0 1?, | ,no,array
+0x2872,ClearMessageQueue,,no,,,no,
+0x2873,InitMiniMap,,no,,,no,
+0x2874,UpdateMiniMap,,no,1 1?, | ,no,
+0x2875,GetCrosshairRefEx,,no,,,no,form
+0x2876,IsMobile,,yes,,,no,
+0x2877,IsGrabbable,,yes,,,no,
+0x2878,SetOnLocationDiscoverEventHandler,,no,61 1, | ,no,
+0x2879,AttachLight,,yes,0 61 2? 2? 2?, |  |  |  | ,no,
+0x287a,RemoveLight,,yes,0,,no,
+0x287b,SetOnCraftingEventHandler,,no,61 1, | ,no,
+0x287c,IsInKillCam,,no,,,yes,
+0x287d,SwapObjectLOD,,no,61 1 1, |  | ,no,
+0x287e,ResetClouds,,no,,,no,
+0x287f,GetPluginHeaderVersion,,no,0,,no,
+0x2880,SetOnHitEventHandler,,no,61 1 61?, |  | ,no,
+0x2881,SetSystemColor,,no,1 1 1 1, |  |  | ,no,
+0x2882,NONE,,no,,,no,
+0x2883,GetArmourPenetrated,,yes,,,no,
+0x2884,GetImpactMaterialType,,no,25?,,no,
+0x2885,SetImpactMaterialType,,no,1 25?, | ,no,
+0x2886,GetImpactDataSetForm,,no,61 1, | ,no,form
+0x2887,SetImpactDataSetForm,,no,61 1 61?, |  | ,no,
+0x2888,SetQuestFlag,,no,14 1 1, |  | ,no,
+0x2889,GetQuestFlag,,no,14 1, | ,no,
+0x288a,PushActorAwayAlt,,yes,2 2? 2? 2? 1?, |  |  |  | ,no,
+0x288b,SetGameHour,,no,2,,no,
+0x288c,GetGameVolume,,no,1,,no,
+0x288d,SetGameVolume,,no,1 1?, | ,no,
+0x288e,MoveAwayFrom,,yes,4 2 1?, |  | ,no,
+0x288f,GetEquippedWeaponPoison,,yes,,,no,form
+0x2890,SuppressQuestMessages,,no,,,no,
+0x2891,TravelToRef,,yes,4 1?, | ,no,
+0x2892,GetIsLAA,,no,,,no,
+0x2893,fTan,,no,2,,no,
+0x2894,fAtan2,,no,2 2, | ,no,
+0x2895,DonnerReedKuruParty,TheOtherOtherWhiteMeat,yes,1,,no,
+0x2896,SetArmorClass,,no,3 1, | ,no,
+0x2897,GetEquippedEx,,yes,37,,no,form
+0x2898,TestEquippedSlots,,yes,3,,no,
+0x2899,GetWeaponOnHitSetting,,no,3,,no,
+0x289a,SetWeaponOnHitSetting,,no,3 1, | ,no,
+0x289b,GetWeaponSemiAutoFireDelay,,no,3 1, | ,no,
+0x289c,SetWeaponSemiAutoFireDelay,,no,3 1 2, |  | ,no,
+0x289d,IsStickDisabled,,no,1,,yes,
+0x289e,SetStickDisabled,,no,1 1, | ,no,
+0x289f,NONE,,no,,,no,
+0x28a0,GetActiveIMODs,,no,,,no,array
+0x28a1,ToggleItemUnique,,no,61 1, | ,no,
+0x28a2,SetTextInputExtendedProps,,no,2 2 1? 1? 1?, |  |  |  | ,no,
+0x28a3,SetTextInputString,,no,0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x28a4,ClickMenuTile,,no,0,,no,
+0x28a5,StringToActorValue,,no,0,,no,
+0x28a6,GetFactions,,no,25?,,no,array
+0x28a7,GetBaseItems,,no,61?,,no,array
+0x28a8,GetHit3DData,,yes,1,,no,array
+0x28a9,GetWeaponModel,,no,3 1, | ,no,string
+0x28aa,SetWeaponModel,,no,61 1 0, |  | ,no,
+0x28ab,GetOwnerOfCell,,no,61,,no,form
+0x28ac,TogglePipBoyLight,,no,1?,,no,
+0x28ad,GetHardcoreTracking,,no,,,yes,
+0x28ae,SetPerkLevel,,no,39 1, | ,no,
+0x28af,GetProjectileRefImpactRef,,yes,,,no,form
+0x28b0,SetOnProjectileImpactEventHandler,,no,61 1 61, |  | ,no,
+0x28b1,GetNoteRead,,no,40,,yes,
+0x28b2,SetOnNoteAddedEventHandler,,no,61 1, | ,no,
+0x28b3,SetOnUseAidItemEventHandler,,no,61 1 61, |  | ,no,
+0x28b4,ToggleVanityWheel,,no,1?,,no,
+0x28b5,ToggleHUDCursor,,no,1?,,no,
+0x28b6,GetHardcoreStageThreshold,,no,61,,no,
+0x28b7,SetHardcoreStageThreshold,,no,61 1, | ,no,
+0x28b8,GetHardcoreStageEffect,,no,61,,no,form
+0x28b9,SetHardcoreStageEffect,,no,61 7?, | ,no,
+0x28ba,ClearModelAltTextures,,no,3,,no,
+0x28bb,GetCreatureSoundsTemplate,,no,25,,no,form
+0x28bc,SetCreatureSoundsTemplate,,no,61 25?, | ,no,
+0x28bd,GetDebugModeState,,no,1,,no,
+0x28be,GetProjectileRefImpactMaterial,,yes,,,no,
+0x28bf,FreezeTime,,no,1?,,no,
+0x28c0,GetConditionDamagePenalty,,no,,,no,
+0x28c1,SetConditionDamagePenalty,,no,2,,no,
+0x28c2,NONE,,no,,,no,
+0x28c3,NONE,,no,,,no,
+0x28c4,ToggleBipedSlotVisibility,,no,1 1?, | ,no,
+0x28c5,SetOnReloadWeaponEventHandler,,no,61 1, | ,no,
+0x28c6,AddTileFromTemplate,,no,0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x28c7,UpdatePlayer3D,,no,,,no,
+0x28c8,GetArrayValue,,no,1 1, | ,no,ambiguous
+0x28c9,SetOnRagdollEventHandler,,no,61 1, | ,no,
+0x28ca,PushActorNoRagdoll,,yes,2 2 4? 1?, |  |  | ,no,
+0x28cb,SetUIFloatGradual,,no,0 2? 2? 2? 1?, |  |  |  | ,no,
+0x28cc,CloseActiveMenu,,no,1?,,no,
+0x28cd,ReloadCloudTextures,,no,,,no,
+0x28ce,ToggleImmortalMode,TIMM,no,1?,,no,
+0x28cf,GetBodyPartVATSTarget,,no,1 25?, | ,no,string
+0x28d0,SetLinearVelocity,,yes,0 2 2 2 1?, |  |  |  | ,no,
+0x28d1,GetEquippedArmorRefs,,yes,,,no,array
+0x28d2,GetHitNode,,yes,,,no,string
+0x28d3,InsertNode,,no,61 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x28d4,AttachModel,,no,61 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x28d5,SynchronizePosition,SyncPos,no,4? 1? 2? 0?, |  |  | ,no,
+0x28d6,ToggleCameraCollision,,no,1?,,no,
+0x28d7,InitRockItLauncher,,no,3,,no,
+0x28d8,ForceClimate,,no,61?,,no,
+0x28d9,GetInFactionList,,yes,37,,yes,
+0x28da,LeveledListHasFormDeep,LListHasFormDeep,no,61 61, | ,no,
+0x28db,GetActorTiltAngle,,yes,8,,no,
+0x28dc,SetActorTiltAngle,,yes,8 2, | ,no,
+0x28dd,ReloadCharController,,yes,,,no,
+0x28de,GetRandomInRange,,no,1 1, | ,no,
+0x28df,ModelHasBlock,,no,61 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x28e0,GetGroundMaterial,,yes,,,yes,
+0x28e1,ShowLevelUpMenuEx,,no,1,,no,
+0x28e2,GetRayCastRef,,yes,1? 0?, | ,no,form
+0x28e3,GetRayCastMaterial,,yes,1? 0?, | ,no,
+0x28e4,FireWeaponEx,,yes,3 0?, | ,no,
+0x28e5,GetArmorEffectiveDT,,yes,,,no,
+0x28e6,GetArmorEffectiveDR,,yes,,,no,
+0x28e7,GetActorGravityMult,,yes,,,no,
+0x28e8,SetActorGravityMult,,yes,2,,no,
+0x28e9,ToggleHitEffects,,no,1?,,no,
+0x28ea,ToggleNoMovementCombat,,no,1?,,no,
+0x28eb,ToggleTeammateKillable,SetTeammateKillable,yes,1?,,no,
+0x28ec,ToggleNoGunWobble,SetNoGunWobble,yes,1?,,no,
+0x28ed,RewardXPExact,,no,1,,no,
+0x28ee,GetHitExtendedFlag,,yes,1,,no,
+0x28ef,ClearDeadActors,,no,,,no,
+0x28f0,GetCameraMovement,,no,45 45, | ,no,
+0x28f1,GetHotkeyItemRef,,no,1,,no,form
+0x28f2,GetCollisionNodes,,yes,,,no,array
+0x28f3,GetChildBlocks,,yes,0? 1? 1?, |  | ,no,array
+0x28f4,GetBlockTextureSet,,yes,0,,no,array
+0x28f5,GetReticleNode,,no,2? 1?, | ,no,string
+0x28f6,NONE,,no,,,no,
+0x28f7,EquippedWeaponHasModType,,yes,1,,yes,
+0x28f8,GetPosEx,,yes,45 45 45, |  | ,no,
+0x28f9,GetAngleEx,,yes,45 45 45 1?, |  |  | ,no,
+0x28fa,ToggleMouseMovement,,no,1?,,no,
+0x28fb,SetTextureTransformKey,SetTexTransKey,yes,0 1 1 2, |  |  | ,no,
+0x28fc,AttachExtraCamera,AttachCam,yes,0 1 0? 1?, |  |  | ,no,
+0x28fd,ProjectExtraCamera,ProjCam,no,0 0 2 1? 1? 1?, |  |  |  |  | ,no,
+0x28fe,AttachUIXML,,yes,0 0, | ,no,
+0x28ff,AttachUIComponent,,yes,0 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?, |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | ,no,
+0x2900,RenameNifBlock,,yes,0 0 1?, |  | ,no,
+0x2901,RemoveNifBlock,,yes,0 1?, | ,no,
+0x2902,SetInternalMarker,,no,61 1?, | ,no,
+0x2903,FailQuest,,no,14,,no,
+0x2904,PlayAnimSequence,,yes,0 0?, | ,no,
+0x2905,RemoveAllPerks,,yes,1?,,no,
+0x2906,GetPointRayCastPos,,no,2 2 2 2 2 45 45 45 1? 2?, |  |  |  |  |  |  |  |  | ,no,
+0x2907,TogglePlayerSneaking,,no,1,,no,
+0x2908,GetActorMovementFlags,,yes,,,no,
+0x2909,GetTranslatedPos,,yes,2 2 2 45 45 45, |  |  |  |  | ,no,
+0x290a,GetHitBaseWeaponDamage,,yes,,,no,
+0x290b,GetHitFatigueDamage,,yes,,,no,
+0x290c,RefreshAnimData,,yes,,,no,
+0x290d,GetNifBlockTranslationAlt,GetNifTransAlt,yes,0 45 45 45 1? 1?, |  |  |  |  | ,no,
+0x290e,GetNifBlockRotationAlt,GetNifRotAlt,yes,0 45 45 45 1? 1?, |  |  |  |  | ,no,
+0x290f,GetLinearVelocityAlt,GetLinVelAlt,yes,0 45 45 45 1?, |  |  |  | ,no,
+0x2910,GetAngularVelocityAlt,GetAngVelAlt,yes,0 45 45 45 1?, |  |  |  | ,no,
+0x2911,SetAngularVelocityEx,SetAngVelEx,yes,0 2 2 2 1?, |  |  |  | ,no,
+0x2912,GetActorVelocityAlt,,yes,45 45 45 1?, |  |  | ,no,
+0x2913,GetCollisionObjProperty,GetCollProp,yes,0 1, | ,no,
+0x2914,SetCollisionObjProperty,SetCollProp,yes,0 1 2, |  | ,no,
+0x2915,GetCollisionObjLayerType,GetCollLayer,yes,0,,no,
+0x2916,SetCollisionObjLayerType,SetCollLayer,yes,0 1, | ,no,
+0x2917,SetRefrModelPath,SetRefModel,yes,0?,,no,
+0x2918,NONE,,no,,,no,
+0x2919,AttachLine,,yes,0 0 2 2 2 2 2, |  |  |  |  |  | ,no,
+0x291a,IsSpellTargetList,,yes,37,,yes,
+0x291b,GetExcludedCombatActions,,yes,,,no,
+0x291c,SetExcludedCombatActions,,yes,1,,no,
+0x291d,SetArmorConditionPenalty,,no,2?,,no,
+0x291e,PlaySound3DNode,,yes,12 0, | ,no,
+0x291f,GetReticlePosAlt,,no,45 45 45 1? 2?, |  |  |  | ,no,
+0x2920,GetLightAmountAtPoint,,no,2 2 2, |  | ,no,
+0x2921,TransformWorldToLocal,,no,2 2 2 2 2 2 2 2 2 45 45, |  |  |  |  |  |  |  |  |  | ,no,
+0x2922,GetAnglesBetweenPoints,,no,2 2 2 2 2 2 45 45, |  |  |  |  |  |  | ,no,
+0x2923,GetP2PRayCastRange,,no,2 2 2 2 2 2 1?, |  |  |  |  |  | ,no,
+0x2924,WeaponHasModType,,no,61 1, | ,no,
+0x2925,ProjectUITile,,yes,0 0 2 2 2 2, |  |  |  |  | ,no,
+0x2926,RotateAroundPoint,,yes,2 2 2 2 2 2 1?, |  |  |  |  |  | ,no,
+0x2927,GetStringUIDimensions,,no,0 1 2 45 45 45, |  |  |  |  | ,no,
+0x2928,ToggleNodeCollision,,yes,0 1, | ,no,
+0x2929,GetAllPerks,,yes,1? 1?, | ,no,array
+0x292a,GetEditorPosition,,yes,45 45 45 45? 45? 45?, |  |  |  |  | ,no,form
+0x292b,GetWorldspacePersistentCell,,no,27,,no,form
+0x292c,ScrollMouseWheel,,no,1?,,no,
+0x292d,GetCellNorthRotation,,no,61,,no,
+0x292e,RefHasExtraData,,yes,1?,,no,
+0x292f,GetRefExtraData,,yes,32769 32769?, | ,no,ambiguous
+0x2930,SetRefExtraData,,yes,32769? 32845?, | ,no,
+0x2931,TogglePurgeOnUnload,TPOU,yes,1?,,no,
+0x2932,GetProjectileLight,,no,21,,no,form
+0x2933,SetProjectileLight,,no,21 21?, | ,no,
+0x2934,IsItemUnique,,no,3,,no,
+0x2935,GetMenuItemListRefs,,no,1? 1?, | ,no,array
+0x2936,GetSelfAsInventoryRef,,yes,,,no,form
+0x2937,SetDamageToArmorMaxPercent,DTAMP,no,2?,,no,
+0x2938,RegisterSRScript,,no,0,,no,
+0x2939,SetAmmoCasing,,no,3 3?, | ,no,
+0x293a,AssignKeyword,,no,61 0, | ,no,
+0x293b,HasKeyword,,no,61 0, | ,no,
+0x293c,GetKeywordForms,,no,0,,no,array
+0x293d,ToggleDepthClear,,no,1,,no,
+0x293e,HasKeywordCond,,yes,1,,yes,
+0x293f,GetStringHash,GetHash,no,0 1? 1?, |  | ,no,
+0x2940,CalculateShotsPerSec,,yes,61,,no,
+0x2941,IsAttackQueued,,no,,,yes,
+0x2942,GetReticleTargetLimb,,no,2?,,no,

@@ -1,0 +1,10 @@
+code,name,short_name,needs_reference,parameters,parameter_labels,condition,returns
+0x3920,ForcePlayIdle,,yes,61 1?,form | int,no,
+0x3921,SetWeaponAnimationPath,,no,61 1 1 0,weapon | first person | enable | animation path,no,
+0x3922,SetActorAnimationPath,,no,1 1 0 1? 61? 1?,first person | enable | animation path | poll condition | condition | match base anim group id,no,
+0x3923,PlayAnimationPath,,yes,0 1?,path | first person,no,
+0x3924,ForceStopIdle,,yes,1?,int,no,
+0x3925,kNVSEReset,,no,,,no,
+0x3926,PlayGroupAlt,,yes,10 1?,anim group | play immediately,no,
+0x3927,CreateIdleAnimForm,,no,0 1?,path | type,no,
+0x3928,EjectWeapon,,yes,,,no,

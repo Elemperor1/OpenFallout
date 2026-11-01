@@ -1,0 +1,9 @@
+code,name,short_name,needs_reference,parameters,parameter_labels,condition,returns
+0x2132,GetMoveFlags,,yes,,,no,
+0x2133,SetSneaking,,yes,1?,int,no,
+0x2134,OverridePlayerMovementAnimMult,,no,2,float,no,
+0x2135,SetControllerRunThreshold,,no,2,float,no,
+0x2136,GetSmoothIronsightsValue,GSIV,no,1 2?,mode | tolerp,no,
+0x2137,SetSmoothIronsightsValue,,no,1 2,mode | value,no,
+0x2138,SetAlwaysForward,,no,1?,int,no,
+0x2139,StewieGetValue,StewVal,no,32772,string,no,ambiguous

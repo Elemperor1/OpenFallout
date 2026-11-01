@@ -1,0 +1,526 @@
+<title>OpenFallout Coverage Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a headline number, then one treemap. The three families (script commands, extender functions, record types)
+   are the big boxes; each library is a box inside one, and each unit is a square inside the library. */
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --ink: #12151c;
+  --ink-2: #454c5e;
+  --muted: #6a7184;
+  --rule: #dcdfe7;
+  --wash: #eceef3;
+  --done: #0b8f0b;
+  --stand: #2a78d6;
+  --todo: #c6cad4;
+  --focus: #12151c;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218;
+    --surface: #181c25;
+    --ink: #e9ebf1;
+    --ink-2: #b1b7c6;
+    --muted: #868da1;
+    --rule: #2a3040;
+    --wash: #202534;
+    --done: #0ca30c;
+    --stand: #3987e5;
+    --todo: #3b4254;
+    --focus: #e9ebf1;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218;
+  --surface: #181c25;
+  --ink: #e9ebf1;
+  --ink-2: #b1b7c6;
+  --muted: #868da1;
+  --rule: #2a3040;
+  --wash: #202534;
+  --done: #0ca30c;
+  --stand: #3987e5;
+  --todo: #3b4254;
+  --focus: #e9ebf1;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.page { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; }
+.head-text { min-width: 0; }
+.eyebrow { margin: 0; color: var(--ink-2); font-size: 15px; }
+.hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 2px 0 0; }
+.hero-pct { font-size: clamp(48px, 9vw, 72px); font-weight: 650; line-height: 1.05; letter-spacing: -0.02em; }
+.hero-frac { font-size: clamp(20px, 3.4vw, 28px); color: var(--ink-2); }
+.sub { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; min-width: 0; max-width: 100%; }
+.seg { display: flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 2px; }
+.seg button {
+  font: inherit; color: var(--ink-2); background: transparent; border: 0; border-radius: 6px;
+  padding: 6px 12px; cursor: pointer; white-space: nowrap;
+}
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg .n { font-variant-numeric: tabular-nums; opacity: 0.7; margin-left: 4px; }
+.search {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 7px 12px; width: 230px; max-width: 100%;
+}
+.search::placeholder { color: var(--muted); }
+@media (max-width: 560px) { .tools, .search { width: 100%; } }
+button:focus-visible, .search:focus-visible, .lib:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.chart {
+  position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--ink-2); font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend svg { flex: none; }
+.legend .mid { color: var(--muted); }
+.map { position: relative; }
+.map svg { display: block; width: 100%; touch-action: manipulation; }
+.map svg text { font-family: var(--font); }
+.fam-box { fill: var(--wash); }
+.fam-head { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.fam-head .dim { fill: var(--ink-2); font-weight: 400; }
+.lib-box { fill: var(--surface); }
+.lib-name { fill: var(--ink-2); font-size: 11px; }
+.u-done { fill: var(--done); }
+.u-stand { fill: var(--stand); fill-rule: evenodd; }
+.u-todo { fill: var(--todo); }
+.searching .u-done, .searching .u-stand, .searching .u-todo { opacity: 0.28; }
+.u-hit { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.u-hover { fill: none; stroke: var(--focus); stroke-width: 2; pointer-events: none; }
+.lib-ring { fill: none; stroke: var(--focus); stroke-width: 2; pointer-events: none; }
+.tip {
+  position: absolute; z-index: 5; pointer-events: none; max-width: 300px; padding: 9px 11px;
+  background: var(--ink); color: var(--bg); border-radius: 8px; font-size: 12.5px; line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.tip[hidden] { display: none; }
+.tip b { display: block; font-size: 14px; font-weight: 650; }
+.tip .st { display: block; margin-top: 2px; }
+.tip .mono { font-family: var(--mono); font-size: 12px; opacity: 0.85; }
+.tip .note { display: block; margin-top: 4px; opacity: 0.85; }
+
+.matches { color: var(--ink-2); font-size: 13px; }
+.matches:empty { display: none; }
+.matches code { font-family: var(--mono); font-size: 12px; background: var(--wash); border-radius: 4px; padding: 1px 5px; }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px; min-width: 0; }
+.panel h2 { margin: 0 0 10px; font-size: 16px; font-weight: 650; }
+.panel p, .panel li { color: var(--ink-2); margin: 0 0 8px; max-width: 68ch; }
+.panel ul { margin: 0; padding-left: 18px; }
+.panel dt { color: var(--ink); font-weight: 600; margin-top: 10px; }
+.panel dd { margin: 2px 0 0; color: var(--ink-2); max-width: 68ch; }
+.swatch { display: inline-block; vertical-align: -2px; margin-right: 4px; }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+tr.fam td { background: var(--wash); font-weight: 650; color: var(--ink); }
+td .bar { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--todo); vertical-align: middle; margin-left: 8px; overflow: hidden; }
+td .bar i { display: block; height: 100%; background: var(--done); }
+
+.foot { color: var(--muted); font-size: 12.5px; }
+.foot code { font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { .seg button { transition: background 0.12s; } }
+</style>
+
+<div class="page">
+  <header class="head">
+    <div class="head-text">
+      <p class="eyebrow" id="eyebrow">OpenFallout engine coverage*</p>
+      <h1 class="hero"><span class="hero-pct" id="heroPct">0%</span><span class="hero-frac" id="heroFrac"></span></h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="tools">
+      <div class="seg" role="group" aria-label="What to count" id="scopes"></div>
+      <input class="search" id="search" type="search" placeholder="Find a command or record" aria-label="Find a command, function or record type" autocomplete="off">
+    </div>
+  </header>
+
+  <section class="chart" aria-label="Coverage map">
+    <div class="legend" id="legend"></div>
+    <div class="map" id="map"><div class="tip" id="tip" role="tooltip" hidden></div></div>
+    <div class="matches" id="matches" aria-live="polite"></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel">
+      <h2>By library</h2>
+      <div class="tablewrap"><table id="table"></table></div>
+    </section>
+    <section class="panel">
+      <h2>*What is counted</h2>
+      <dl id="defs">
+        <dt>The unit</dt>
+        <dd>One script command of the two games (615, from the tables read out of the Fallout 3 and New Vegas executables), one function of a script extender plugin (from the plugin's own DLL), or one record type of the two base plugins (from the plugin census). Every unit shown is already read: its name, code and arguments are known.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--done)"/></svg>Done</dt>
+        <dd>The engine has it: a handler is registered for the command or function, or the record is loaded and kept in the record store. Done means built, not checked against the games; the audit in docs/openfallout lists what nobody has verified.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><path fill="var(--stand)" fill-rule="evenodd" d="M0 0h12v12H0z M3 3v6h6V3z"/></svg>Stand-in</dt>
+        <dd>The engine takes it in and does nothing with it, or gives a fixed answer. A record is a stand-in when it is loaded and then dropped.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--todo)"/></svg>Not done</dt>
+        <dd>No handler (the engine reports it once and carries on), or no record store.</dd>
+        <dt>Not counted yet</dt>
+        <dd>The games' own menu layouts and interface textures, perk entry points, animation groups and the functions of the executables themselves. The repository has no per-item table for them yet, so they have no squares. Add a table and a rule to the script to bring one in.</dd>
+        <dt>Scopes</dt>
+        <dd><b>The games</b> leaves out the extender functions, which only mods use. <b>Tale of Two Wastelands</b> adds back the 139 extender codes its scripts call.</dd>
+      </dl>
+    </section>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var DATA = /*COVERAGE_DATA*/null;
+  if (!DATA) { document.getElementById("sub").textContent = "No data was put in this page. Run scripts/openfallout/coverage_dashboard.py."; return; }
+
+  var FAMILIES = [
+    { id: "extender", name: "Script extender functions", short: "Extenders", about: "from the plugin DLLs (xNVSE and others)" },
+    { id: "command", name: "Script commands", short: "Commands", about: "from the two executables" },
+    { id: "record", name: "Record types", short: "Records", about: "from the census of the base plugins" }
+  ];
+  var STATES = { done: "Done", "stand-in": "Stand-in", todo: "Not done" };
+  var STATE_CLASS = { done: "u-done", "stand-in": "u-stand", todo: "u-todo" };
+  var SCOPES = [
+    { id: "all", name: "All libraries" },
+    { id: "games", name: "The games" },
+    { id: "ttw", name: "Tale of Two Wastelands" }
+  ];
+  var NS = "http://www.w3.org/2000/svg";
+  var scope = "all";
+  try { var saved = localStorage.getItem("ofCoverageScope"); if (saved && SCOPES.some(function (s) { return s.id === saved; })) scope = saved; } catch (e) {}
+  var query = "";
+
+  function inScope(unit, lib) {
+    if (scope === "all" || lib.family !== "extender") return true;
+    return scope === "ttw" && unit.ttw !== undefined;
+  }
+  function fmt(n) { return n.toLocaleString("en-US"); }
+  function pct(done, total) { return total ? (100 * done / total).toFixed(2) + "%" : "0%"; }
+
+  // The libraries as the current scope sees them
+  function view() {
+    var libs = [];
+    DATA.libraries.forEach(function (lib) {
+      var units = lib.units.filter(function (u) { return inScope(u, lib); });
+      if (!units.length) return;
+      var c = { done: 0, "stand-in": 0, todo: 0 };
+      units.forEach(function (u) { c[u.s]++; });
+      libs.push({ name: lib.name, family: lib.family, about: lib.about, units: units, count: c, total: units.length });
+    });
+    return libs;
+  }
+  function sum(libs) {
+    var c = { done: 0, "stand-in": 0, todo: 0, total: 0 };
+    libs.forEach(function (l) { c.done += l.count.done; c["stand-in"] += l.count["stand-in"]; c.todo += l.count.todo; c.total += l.total; });
+    return c;
+  }
+
+  // ---- squarified treemap (Bruls, Huizing, van Wijk) ----
+  function worst(row, side) {
+    var s = 0, mx = 0, mn = Infinity;
+    row.forEach(function (a) { s += a; if (a > mx) mx = a; if (a < mn) mn = a; });
+    return Math.max(side * side * mx / (s * s), s * s / (side * side * mn));
+  }
+  function squarify(values, x, y, w, h) {
+    var total = values.reduce(function (a, b) { return a + b; }, 0);
+    var areas = values.map(function (v) { return v * w * h / total; });
+    var out = [], i = 0;
+    while (i < areas.length) {
+      var side = Math.min(w, h), row = [areas[i]], j = i + 1, cur = worst(row, side);
+      while (j < areas.length) {
+        var next = row.concat(areas[j]), wn = worst(next, side);
+        if (wn <= cur) { row = next; cur = wn; j++; } else break;
+      }
+      var s = row.reduce(function (a, b) { return a + b; }, 0), thick = s / side, off = 0;
+      row.forEach(function (a) {
+        if (w >= h) { var hh = a / thick; out.push({ x: x, y: y + off, w: thick, h: hh }); off += hh; }
+        else { var ww = a / thick; out.push({ x: x + off, y: y, w: ww, h: thick }); off += ww; }
+      });
+      if (w >= h) { x += thick; w -= thick; } else { y += thick; h -= thick; }
+      i = j;
+    }
+    return out;
+  }
+  // The largest squares that fit n of them in a box
+  function grid(n, w, h) {
+    var best = { cols: 1, pitch: 0 };
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols), pitch = Math.min(w / cols, h / rows);
+      if (pitch > best.pitch) best = { cols: cols, pitch: pitch };
+    }
+    return best;
+  }
+  function textFit(label, width, size) { return label.length * size * 0.56 <= width; }
+
+  // ---- drawing ----
+  var mapEl = document.getElementById("map"), tip = document.getElementById("tip");
+  var layout = null, svg = null, hoverRect = null, ringRect = null;
+
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function sq(x, y, s) { return "M" + x.toFixed(1) + " " + y.toFixed(1) + "h" + s.toFixed(1) + "v" + s.toFixed(1) + "h-" + s.toFixed(1) + "z"; }
+  function ring(x, y, s, t) {
+    var i = s - 2 * t;
+    return sq(x, y, s) + "M" + (x + t).toFixed(1) + " " + (y + t).toFixed(1) + "h" + i.toFixed(1) + "v" + i.toFixed(1) + "h-" + i.toFixed(1) + "z";
+  }
+
+  function render() {
+    var libs = view(), total = sum(libs);
+    var W = Math.max(280, Math.floor(mapEl.clientWidth));
+    var H = Math.max(420, Math.min(1500, Math.round(total.total * 150 / W * 1.35)));
+    var famTotals = FAMILIES.map(function (f) {
+      var ls = libs.filter(function (l) { return l.family === f.id; });
+      return { fam: f, libs: ls, sum: sum(ls) };
+    }).filter(function (f) { return f.libs.length; });
+    famTotals.sort(function (a, b) { return b.sum.total - a.sum.total; });
+
+    if (svg) svg.remove();
+    svg = el("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "group", "aria-label": "Treemap of the libraries" });
+    if (query) svg.setAttribute("class", "searching");
+    mapEl.insertBefore(svg, tip);
+    layout = { libs: [], W: W, H: H };
+
+    var famRects = squarify(famTotals.map(function (f) { return f.sum.total; }), 0, 0, W, H);
+    famTotals.forEach(function (f, fi) {
+      var r = famRects[fi], gap = 3;
+      var fx = r.x + gap / 2, fy = r.y + gap / 2, fw = r.w - gap, fh = r.h - gap;
+      el("rect", { x: fx, y: fy, width: fw, height: fh, rx: 6, class: "fam-box" }, svg);
+      // header: the longest wording that fits
+      var head = 22;
+      var variants = [
+        f.fam.name + "  " + fmt(f.sum.done) + " / " + fmt(f.sum.total) + "  " + pct(f.sum.done, f.sum.total),
+        f.fam.name + "  " + pct(f.sum.done, f.sum.total),
+        f.fam.short + "  " + pct(f.sum.done, f.sum.total),
+        pct(f.sum.done, f.sum.total)
+      ];
+      var label = variants.find(function (v) { return textFit(v, fw - 16, 13); }) || variants[3];
+      var t = el("text", { x: fx + 8, y: fy + 15, class: "fam-head" }, svg);
+      var cut = label.lastIndexOf("  ");
+      var tn = el("tspan", {}, t); tn.textContent = cut > 0 && label.indexOf("/") < 0 ? label.slice(0, cut) : label.split("  ")[0];
+      if (label.indexOf("  ") > 0) { var td = el("tspan", { class: "dim", dx: 8 }, t); td.textContent = label.split("  ").slice(1).join("   "); }
+      var inner = { x: fx + 4, y: fy + head, w: fw - 8, h: fh - head - 4 };
+      if (inner.w < 8 || inner.h < 8) return;
+      var sorted = f.libs.slice().sort(function (a, b) { return b.total - a.total; });
+      var rects = squarify(sorted.map(function (l) { return l.total; }), inner.x, inner.y, inner.w, inner.h);
+      sorted.forEach(function (lib, li) {
+        var q = rects[li], g = 2;
+        var bx = q.x + g / 2, by = q.y + g / 2, bw = q.w - g, bh = q.h - g;
+        el("rect", { x: bx, y: by, width: bw, height: bh, rx: 3, class: "lib-box" }, svg);
+        var strip = (bw >= 70 && bh >= 46) ? 16 : 0, pad = 3;
+        if (strip) {
+          var nm = lib.name;
+          while (nm.length > 3 && !textFit(nm, bw - 8, 11)) nm = nm.slice(0, -1);
+          if (nm !== lib.name) nm = nm.replace(/\s+$/, "") + "…";
+          var lt = el("text", { x: bx + 5, y: by + 12, class: "lib-name" }, svg); lt.textContent = nm;
+        }
+        var gx = bx + pad, gy = by + strip + pad, gw = bw - 2 * pad, gh = bh - strip - 2 * pad;
+        var g2 = grid(lib.total, gw, gh), p = g2.pitch, s = p > 7 ? p - 2 : Math.max(1, p - 1);
+        var info = { lib: lib, x: bx, y: by, w: bw, h: bh, gx: gx, gy: gy, cols: g2.cols, pitch: p, size: s };
+        layout.libs.push(info);
+        var dd = "", ds = "", dt = "", dh = "";
+        lib.units.forEach(function (u, k) {
+          var x = gx + (k % g2.cols) * p, y = gy + Math.floor(k / g2.cols) * p;
+          if (u.s === "done") dd += sq(x, y, s);
+          else if (u.s === "stand-in") ds += ring(x, y, s, Math.max(1, s * 0.24));
+          else dt += sq(x, y, s);
+          if (query && matches(u, lib)) dh += sq(x - 0.5, y - 0.5, s + 1);
+        });
+        var grp = el("g", { class: "lib", tabindex: 0, role: "img", "aria-label": lib.name + ": " + fmt(lib.count.done) + " of " + fmt(lib.total) + " done, " + fmt(lib.count["stand-in"]) + " stand-ins" }, svg);
+        info.group = grp;
+        if (dt) el("path", { d: dt, class: "u-todo" }, grp);
+        if (ds) el("path", { d: ds, class: "u-stand" }, grp);
+        if (dd) el("path", { d: dd, class: "u-done" }, grp);
+        if (dh) el("path", { d: dh, class: "u-hit" }, grp);
+        grp.addEventListener("focus", function () { showLib(info, true); });
+        grp.addEventListener("blur", hideTip);
+      });
+    });
+    ringRect = el("rect", { class: "lib-ring", rx: 3, visibility: "hidden" }, svg);
+    hoverRect = el("rect", { class: "u-hover", visibility: "hidden" }, svg);
+    updateHead(total);
+    updateTable(libs);
+  }
+
+  // ---- hover ----
+  function pointIn(info, px, py) { return px >= info.x && px <= info.x + info.w && py >= info.y && py <= info.y + info.h; }
+  function unitAt(info, px, py) {
+    var col = Math.floor((px - info.gx) / info.pitch), row = Math.floor((py - info.gy) / info.pitch);
+    if (col < 0 || row < 0 || col >= info.cols || px < info.gx || py < info.gy) return null;
+    var idx = row * info.cols + col;
+    return idx < info.lib.units.length ? { unit: info.lib.units[idx], col: col, row: row } : null;
+  }
+  function lines(parent, items) { items.forEach(function (it) { var e = document.createElement(it.tag || "span"); if (it.cls) e.className = it.cls; e.textContent = it.text; parent.appendChild(e); }); }
+  function place(clientX, clientY) {
+    var box = mapEl.getBoundingClientRect(), x = clientX - box.left + 14, y = clientY - box.top + 14;
+    tip.hidden = false;
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    if (x + w > box.width) x = Math.max(0, clientX - box.left - w - 14);
+    if (y + h > box.height) y = Math.max(0, clientY - box.top - h - 14);
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  }
+  function showUnit(info, hit, cx, cy) {
+    var u = hit.unit;
+    tip.textContent = "";
+    lines(tip, [{ tag: "b", text: u.n }, { cls: "st", text: STATES[u.s] + (u.w ? " · " + u.w : "") }]);
+    if (u.c) lines(tip, [{ cls: "mono", text: u.c + " · " + info.lib.name }]); else lines(tip, [{ cls: "mono", text: info.lib.name }]);
+    if (u.ttw !== undefined) lines(tip, [{ cls: "note", text: "Tale of Two Wastelands calls it" + (u.ttw ? " " + fmt(u.ttw) + (u.ttw === 1 ? " time" : " times") : "") + "." }]);
+    if (u.t) lines(tip, [{ cls: "note", text: u.s === "done" && u.t.indexOf(" ") < 0 ? "Handled in " + u.t : u.t }]);
+    hoverRect.setAttribute("x", info.gx + hit.col * info.pitch - 1); hoverRect.setAttribute("y", info.gy + hit.row * info.pitch - 1);
+    hoverRect.setAttribute("width", info.size + 2); hoverRect.setAttribute("height", info.size + 2);
+    hoverRect.setAttribute("visibility", "visible"); ringRect.setAttribute("visibility", "hidden");
+    place(cx, cy);
+  }
+  function showLib(info, focus, cx, cy) {
+    var c = info.lib.count;
+    tip.textContent = "";
+    lines(tip, [{ tag: "b", text: info.lib.name }, { cls: "st", text: fmt(c.done) + " of " + fmt(info.lib.total) + " done (" + pct(c.done, info.lib.total) + ")" },
+      { cls: "note", text: fmt(c["stand-in"]) + " stand-ins, " + fmt(c.todo) + " not done" }, { cls: "mono", text: info.lib.about }]);
+    hoverRect.setAttribute("visibility", "hidden");
+    ringRect.setAttribute("x", info.x); ringRect.setAttribute("y", info.y); ringRect.setAttribute("width", info.w); ringRect.setAttribute("height", info.h);
+    ringRect.setAttribute("visibility", focus ? "visible" : "hidden");
+    if (focus) { var b = svg.getBoundingClientRect(); place(b.left + info.x + info.w / 2, b.top + info.y + 8); } else place(cx, cy);
+  }
+  function hideTip() { tip.hidden = true; if (hoverRect) hoverRect.setAttribute("visibility", "hidden"); if (ringRect) ringRect.setAttribute("visibility", "hidden"); }
+  mapEl.addEventListener("pointermove", function (ev) {
+    if (!svg || !layout) return;
+    var b = svg.getBoundingClientRect(), sc = layout.W / b.width, px = (ev.clientX - b.left) * sc, py = (ev.clientY - b.top) * sc;
+    for (var i = 0; i < layout.libs.length; i++) {
+      var info = layout.libs[i];
+      if (!pointIn(info, px, py)) continue;
+      var hit = unitAt(info, px, py);
+      if (hit) showUnit(info, hit, ev.clientX, ev.clientY); else showLib(info, false, ev.clientX, ev.clientY);
+      return;
+    }
+    hideTip();
+  });
+  mapEl.addEventListener("pointerleave", hideTip);
+
+  // ---- the rest of the page ----
+  function updateHead(total) {
+    var scopeName = SCOPES.filter(function (s) { return s.id === scope; })[0].name;
+    document.getElementById("heroPct").textContent = pct(total.done, total.total);
+    document.getElementById("heroFrac").textContent = "(" + fmt(total.done) + "/" + fmt(total.total) + ")";
+    document.getElementById("eyebrow").textContent = "OpenFallout engine coverage*: " + scopeName.toLowerCase();
+    var s = fmt(total["stand-in"]) + " more are stand-ins that take the call and do nothing. ";
+    if (scope === "ttw") s += "That is the two games plus the 139 extender codes that the scripts of Tale of Two Wastelands call. ";
+    else if (scope === "games") s += "The extender functions, which only mods use, are left out. ";
+    s += "Every unit counted is already read from the executables, plugin files and censuses; the percentage is how many the engine implements.";
+    document.getElementById("sub").textContent = s;
+  }
+  function updateTable(libs) {
+    var table = document.getElementById("table");
+    table.textContent = "";
+    var thead = document.createElement("thead"), hr = document.createElement("tr");
+    ["Library", "Units", "Done", "Stand-in", "Not done", "% done"].forEach(function (h) { var th = document.createElement("th"); th.scope = "col"; th.textContent = h; hr.appendChild(th); });
+    thead.appendChild(hr); table.appendChild(thead);
+    var tb = document.createElement("tbody");
+    FAMILIES.forEach(function (f) {
+      var ls = libs.filter(function (l) { return l.family === f.id; });
+      if (!ls.length) return;
+      function row(name, c, total, cls) {
+        var tr = document.createElement("tr"); if (cls) tr.className = cls;
+        var cells = [name, fmt(total), fmt(c.done), fmt(c["stand-in"]), fmt(c.todo)];
+        cells.forEach(function (t, i) { var td = document.createElement(i === 0 && cls ? "th" : "td"); if (i === 0 && cls) td.scope = "row"; td.textContent = t; tr.appendChild(td); });
+        var last = document.createElement("td");
+        last.textContent = pct(c.done, total);
+        var bar = document.createElement("span"); bar.className = "bar"; var fill = document.createElement("i"); fill.style.width = (total ? 100 * c.done / total : 0) + "%"; bar.appendChild(fill); last.appendChild(bar);
+        tr.appendChild(last); tb.appendChild(tr);
+      }
+      var fs = sum(ls);
+      row(f.name, fs, fs.total, "fam");
+      ls.slice().sort(function (a, b) { return b.total - a.total; }).forEach(function (l) { row(l.name, l.count, l.total, ""); });
+    });
+    table.appendChild(tb);
+  }
+  function matches(u, lib) { return u.n.toLowerCase().indexOf(query) >= 0 || (u.c && u.c.toLowerCase() === query); }
+  function updateMatches() {
+    var box = document.getElementById("matches");
+    box.textContent = "";
+    if (!query) return;
+    var found = [], more = 0;
+    view().forEach(function (lib) { lib.units.forEach(function (u) { if (matches(u, lib)) { if (found.length < 12) found.push({ u: u, lib: lib }); else more++; } }); });
+    if (!found.length) { box.textContent = "Nothing in this view is called that."; return; }
+    found.forEach(function (f, i) {
+      if (i) box.appendChild(document.createTextNode("  "));
+      var c = document.createElement("code"); c.textContent = f.u.n + " · " + STATES[f.u.s].toLowerCase(); box.appendChild(c);
+    });
+    if (more) box.appendChild(document.createTextNode("  and " + fmt(more) + " more"));
+  }
+
+  // legend
+  (function () {
+    var lg = document.getElementById("legend");
+    function item(cls, path, text) {
+      var s = document.createElement("span");
+      var v = document.createElementNS(NS, "svg"); v.setAttribute("width", 12); v.setAttribute("height", 12); v.setAttribute("aria-hidden", "true");
+      var p = document.createElementNS(NS, "path"); p.setAttribute("d", path); p.setAttribute("class", cls); v.appendChild(p); s.appendChild(v);
+      s.appendChild(document.createTextNode(text)); lg.appendChild(s);
+    }
+    item("u-done", "M0 0h12v12H0z", "Done: the engine has it");
+    item("u-stand", "M0 0h12v12H0zM3 3v6h6V3z", "Stand-in: taken in, nothing done with it");
+    item("u-todo", "M0 0h12v12H0z", "Not done");
+    var m = document.createElement("span"); m.className = "mid"; m.textContent = "One square is one command, function or record type. Hover for its name."; lg.appendChild(m);
+  })();
+
+  // scope buttons
+  var scopesEl = document.getElementById("scopes");
+  function drawScopes() {
+    scopesEl.textContent = "";
+    SCOPES.forEach(function (s) {
+      var save = scope; scope = s.id; var tot = sum(view()); scope = save;
+      var b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", s.id === scope ? "true" : "false");
+      b.appendChild(document.createTextNode(s.name));
+      var n = document.createElement("span"); n.className = "n"; n.textContent = fmt(tot.total); b.appendChild(n);
+      b.addEventListener("click", function () {
+        scope = s.id; try { localStorage.setItem("ofCoverageScope", scope); } catch (e) {}
+        drawScopes(); render(); updateMatches();
+      });
+      scopesEl.appendChild(b);
+    });
+  }
+
+  var searchEl = document.getElementById("search"), timer = 0;
+  searchEl.addEventListener("input", function () {
+    query = searchEl.value.trim().toLowerCase();
+    clearTimeout(timer); timer = setTimeout(function () { render(); updateMatches(); }, 120);
+  });
+
+  document.getElementById("foot").textContent = "Made from commit " + DATA.commit + " on " + DATA.generated + ". To refresh it, run scripts/openfallout/coverage_dashboard.py; the rules are in docs/openfallout/coverage-dashboard.md.";
+  drawScopes(); render();
+  var lastW = mapEl.clientWidth;
+  if (window.ResizeObserver) new ResizeObserver(function () { if (Math.abs(mapEl.clientWidth - lastW) > 2) { lastW = mapEl.clientWidth; render(); } }).observe(mapEl);
+  else window.addEventListener("resize", render);
+})();
+</script>

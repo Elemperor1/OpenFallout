@@ -1,0 +1,10 @@
+code,name,short_name,needs_reference,parameters,parameter_labels,condition,returns
+0x3800,TTW_ShowGeneProjector,,no,,,no,
+0x3801,EmptyCommand,,no,,,no,
+0x3802,EmptyCommand,,no,,,no,
+0x3803,EmptyCommand,,no,,,no,
+0x3804,EmptyCommand,,no,,,no,
+0x3805,TTW_CRC32,,no,0,string,no,
+0x3806,TTW_GetPlugins,,no,,,no,array
+0x3807,TTW_GetEquippedWeaponSkill,,yes,,,yes,
+0x3808,TTW_EnableRadioFix,,no,1,int,no,

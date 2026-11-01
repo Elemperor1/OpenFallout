@@ -1,0 +1,216 @@
+code,name,short_name,needs_reference,parameters,parameter_labels,condition,returns
+0x3c93,ModNumericGameSetting,,no,0 2,string | float,no,
+0x3c94,ModNumericINISetting,,no,0 2,string | float,no,
+0x3c95,SetPlayerCanPickpocketEquippedItems,SetPCCanStealEqItems,no,1,int,no,
+0x3c96,GetPlayerCanPickpocketEquippedItems,GetPCCanStealEqItems,no,,,yes,
+0x3c97,GetPCHasSleepWaitOverride,,no,,,yes,
+0x3c98,SetPCHasSleepWaitOverride,,no,1,int,no,
+0x3c99,ShowingOffDisable,DisableIFYouDidntNotice,yes,1?,int,no,
+0x3c9a,ShowingOffEnable,EnableIFYouDidntNotice,yes,1?,int,no,
+0x3c9b,GetNumActorsInRangeFromRef,,yes,2 1?,float | int,yes,
+0x3c9c,GetNumCombatActorsFromActor,,yes,2? 1?,float | int,yes,
+0x3c9d,IsWeaponMelee,,no,3?,item,yes,
+0x3c9e,IsEquippedWeaponMelee,,yes,,,yes,
+0x3c9f,IsWeaponRanged,,no,3?,item,yes,
+0x3ca0,IsEquippedWeaponRanged,,yes,,,yes,
+0x3ca1,GetChallengeProgress,,no,65,challenge,yes,
+0x3ca2,ConditionPrint,,no,,,yes,
+0x3ca3,MessageExAltShowoff,,no,2 1 0 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2? 2?,Float | Int | format string | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable | variable,no,
+0x3ca4,GetNumQueuedCornerMessages,,no,,,yes,
+0x3ca5,GetCreatureTurningSpeed,,no,25?,base actor,yes,
+0x3ca6,SetCreatureTurningSpeed,,no,2 25?,float | base actor,no,
+0x3ca7,GetCreatureFootWeight,,no,25?,base actor,yes,
+0x3ca8,SetCreatureFootWeight,,no,2 25?,float | base actor,no,
+0x3ca9,SetCreatureReach,,no,1 25?,int | base actor,no,
+0x3caa,SetCreatureBaseScale,,no,2 25?,float | base actor,no,
+0x3cab,DumpFormList,FListDump,no,37 0? 1?,form list | string | int,no,
+0x3cac,ListAddArray_OLD,AddArrayToFormList_OLD,no,37 1 1?,form list | array | index,no,
+0x3cad,ListAddList,AddFormListToFormList,no,37 37 1?,form list | form list | index,no,
+0x3cae,IsAnimPlayingExCond,,yes,1 1?,Integer | Integer,yes,
+0x3caf,GetNumCompassHostiles,,no,2? 1?,float | int,yes,
+0x3cb0,AuxStringMapArrayGetSize,AuxStringMapSize,no,0,string,no,
+0x3cb1,AuxStringMapArrayGetValueType,AuxStringMapGetValueType,no,0 0,string | string,no,
+0x3cb2,AuxStringMapArrayGetFloat,AuxStringMapGetFlt,no,0 0,string | string,no,
+0x3cb3,AuxStringMapArrayGetRef,AuxStringMapGetRef,no,0 0,string | string,no,form
+0x3cb4,AuxStringMapArrayGetString,AuxStringMapGetStr,no,0 0,string | string,no,string
+0x3cb5,AuxStringMapArrayGetFirst,AuxStringMapFirst,no,0,string,no,array
+0x3cb6,AuxStringMapArrayGetNext,AuxStringMapNext,no,0,string,no,array
+0x3cb7,AuxStringMapArrayGetKeys,AuxStringMapKeys,no,0,string,no,array
+0x3cb8,AuxStringMapArrayGetAll,AuxStringMapGetAll,no,1,int,no,array
+0x3cb9,AuxStringMapArrayGetAsArray,AuxStringMapGetAsArr,no,0,string,no,array
+0x3cba,AuxStringMapArraySetFromArray,AuxStringMapSetFromArr,no,0 1 1?,string | array | int,no,
+0x3cbb,AuxStringMapArraySetFloat,AuxStringMapSetFlt,no,0 0 44,string | string | double,no,
+0x3cbc,AuxStringMapArraySetRef,AuxStringMapSetRef,no,0 0 61,string | string | form,no,
+0x3cbd,AuxStringMapArraySetString,AuxStringMapSetStr,no,0 0 0,string | string | string,no,
+0x3cbe,AuxStringMapArrayEraseKey,AuxStringMapEraseKey,no,0 0,string | string,no,
+0x3cbf,AuxStringMapArrayValidateValues,AuxStringMapValidateVals,no,0,string,no,
+0x3cc0,AuxStringMapArrayDestroy,AuxStringMapDestroy,no,0,string,no,
+0x3cc1,GetRadiationExtraData,,yes,,,no,
+0x3cc2,SetRadiationExtraData,,yes,2,float,no,
+0x3cc3,PlayerHasNightVisionActive,,no,,,yes,
+0x3cc4,PlayerIsDrinkingPlacedWater,,no,,,yes,
+0x3cc5,SetIsPCAMurderer,YoureAMurderer,no,1,int,no,
+0x3cc6,IsNight,BloodyTears,no,61?,form,yes,
+0x3cc7,IsLimbCrippled,,yes,1? 1?,int | int,yes,
+0x3cc8,GetNumCrippledLimbs,,yes,1?,int,yes,
+0x3cc9,GetCrippledLimbsAsBitMask,,yes,1?,int,yes,
+0x3cca,GetNumBrokenEquippedItems,GetNumBrokenEq,yes,2? 1?,float | int,yes,
+0x3ccb,GetEquippedItemsAsBitMask,GetOccupiedEquipSlots,yes,,,yes,
+0x3ccc,GetEquippedWeaponType,,yes,,,yes,
+0x3ccd,GetBaseEquippedWeight,,yes,2? 1?,float | int,yes,
+0x3cce,GetCalculatedEquippedWeight,,yes,2? 1?,float | int,yes,
+0x3ccf,GetCalculatedMaxCarryWeight,GetMaxCarryWeightPerkModified,yes,,,yes,
+0x3cd0,GetShowOffDebugMode,,no,,,no,
+0x3cd1,SetShowOffDebugMode,,no,1,int,no,
+0x3cd2,UnequipItems,,yes,1? 1? 1? 1?,int | int | int | int,no,
+0x3cd3,GetEquippedItems,,yes,1?,int,no,array
+0x3cd4,IsBaseForm,IsBasedForm,no,61,form,no,
+0x3cd5,SetRandomizerSeed,SetSeed,no,1?,int,no,
+0x3cd6,SetSeedUsingForm,SetFormSeed,no,61?,form,no,
+0x3cd7,GetRandomizerSeed,GetSeed,no,,,no,
+0x3cd8,RandSeeded,GenerateSeededRandomNumber,no,1 1,int | int,no,
+0x3cd9,GetRandomPercentSeeded,,no,,,no,
+0x3cda,IsReferenceCloned,IsRefrCloned,yes,,,yes,
+0x3cdb,AdvanceSeed,,no,1,int,no,
+0x3cdc,IsTemporaryReference,IsTempRefr,no,,,yes,
+0x3cdd,GetPCHasScriptedFastTravelOverride,,no,,,yes,
+0x3cde,GetPCCanFastTravel,,no,,,yes,
+0x3cdf,GetWeaponHasFlag,WeaponHasFlag,no,1 3?,int | object,yes,
+0x3ce0,GetActorHasBaseFlag,ActorHasBaseFlag,no,1 25?,int | base actor,yes,
+0x3ce1,RemoveAllItemsShowOff,,yes,1? 1? 26? 37?,int | int | container reference | form list,no,
+0x3ce2,ForceWeaponJamAnim,ForceJamAnim,yes,,,no,
+0x3ce3,DisableAlt,SnigOff,yes,1?,int,no,
+0x3ce4,EnableAlt,SnigOn,yes,1?,int,no,
+0x3ce5,GetCalculatedSkillPoints,GetCalculatedSkillPointsEarnedPerLevel,no,1?,int,yes,
+0x3ce6,GetLevelUpMenuPoints,,no,1? 1?,int | int,no,
+0x3ce7,ToggleQuestMessages,,no,1?,int,no,
+0x3ce8,GetCalculatedPerkPoints,GetCalculatedPerkPointsEarnedPerLevel,no,1?,int,yes,
+0x3ce9,GetLevelUpMenuCurrentPage,GetLevelUpMenuPage,no,,,no,
+0x3cea,SetLevelUpMenuCurrentPage,SetLevelUpMenuPage,no,1,int,no,
+0x3ceb,ShowPerkMenu,IfIDecideToGoWithYourFunctionWhatAreThePerks,no,1? 0?,Integer | String,no,
+0x3cec,ShowSkillMenu,ShowSkillsMenu,no,1? 1? 0?,Integer | Integer | String,no,
+0x3ced,GetLevelUpMenuUnspentPoints,,no,1,int,no,
+0x3cee,SetLevelUpMenuCanExitEarly,,no,1,int,no,
+0x3cef,SetLevelUpMenuPoints,,no,1 1,int | int,no,
+0x3cf0,CreateFolder,CreateDirectoryA,no,0,string,no,
+0x3cf1,GetExplosionRefSource,,yes,,,no,form
+0x3cf2,GetExplosionRefRadius,,yes,,,no,
+0x3cf3,SetExplosionRefRadius,,yes,2,float,no,
+0x3cf4,SetExplosionRefSource,,yes,6,actor reference,no,
+0x3cf5,GetActorValueDamage,GetAVDamage,yes,5,actor value,yes,
+0x3cf6,GetPipboyRadioVoiceEntryData,,no,1 1?,int | int,no,array
+0x3cf7,GetEquippedItemRefs,,yes,1?,int,no,array
+0x3cf8,SetNoEquipShowOff,SetNoEquipSO,no,61 1 61?,form | int | script,no,
+0x3cf9,GetNoEquipShowOff,GetNoEquipSO,no,61 1,form | int,no,ambiguous
+0x3cfa,SetShowOffOnCornerMessageEventHandler,SetOnCornerMessageEventHandler,no,1 61 1?,setOrRemove | Script | flags,no,
+0x3cfb,GetIngestibleConsumeSound,,no,61?,form,no,form
+0x3cfc,SetIngestibleConsumeSound,,no,61 61?,form | form,no,
+0x3cfd,SetFactionCombatReactionTemp,,no,17 17 1 1? 1?,faction1 | faction2 | setAllyOrEnemy (int) | F1toF2Flag (int) | F2toF1Flag (int),no,
+0x3cfe,GetEquippedItemRefForItem,,yes,61,form,no,form
+0x3cff,SetAllyTemp,SetAllyShowOff,no,17 17 1? 1?,faction1 | faction2 | F1toF2Flag (int) | F2toF1Flag (int),no,
+0x3d00,SetEnemyTemp,SetEnemyShowOff,no,17 17 1? 1?,faction1 | faction2 | F1toF2Flag (int) | F2toF1Flag (int),no,
+0x3d01,TopicInfoGetResponseStrings,,no,61,form,no,array
+0x3d02,TopicInfoSetResponseStrings_OLD,,no,61 1,form | array,no,
+0x3d03,TopicInfoSetNthResponseString,,no,61 1 0,form | int | string,no,
+0x3d04,GetItemCanHaveHealth,,no,61?,form,yes,
+0x3d05,SayTo_GetSpeakingActor,,yes,,,no,form
+0x3d06,SayTo_GetTopic,,yes,,,no,form
+0x3d07,SayTo_GetTopicInfo,,yes,,,no,form
+0x3d08,SayTo_GetQuest,,yes,,,no,form
+0x3d09,FormListRemoveForm,RemoveFormFromFormList,no,37 61,form list | form,no,
+0x3d0a,GetZoneRespawns,,no,61,form,no,
+0x3d0b,ClearCinematicTextQueue,ClearQuestMessageQueue,no,,,no,
+0x3d0c,GetCellEncounterZone,GetCellZone,no,61,form,no,form
+0x3d0d,ShowPauseMenu,,no,1?,int,no,
+0x3d0e,RemoveFormFromLeveledList,SorryYoureNotOnTheListAnymore,no,61 61,form | form,no,
+0x3d0f,SetWeaponFlag,SetWeaponHasFlag,no,1 1 3?,int | int | object,no,
+0x3d10,SetOwnershipTemp,ImGoingToBorrowThis,no,61? 61?,form | form,no,
+0x3d11,IsActorAlt,,no,25?,base actor,no,
+0x3d12,ApplyEasing,Ease,no,44 0 1,double | string | int,no,
+0x3d13,Matrix_IsMatrix_OLD,Mat_IsMat_OLD,no,1,array,no,
+0x3d14,Matrix3x3_GetQuaternion_OLD,Mat_GetQuat_OLD,no,1,array,no,array
+0x3d15,Quaternion_GetMatrix_OLD,Quat_GetMat_OLD,no,1,array,no,array
+0x3d16,Matrix_Transpose_OLD,Mat_T_OLD,no,1,array,no,array
+0x3d17,Matrix_Dump_OLD,Mat_Dump_OLD,no,1,array,no,
+0x3d18,Matrix_ApplyOperationWithScalar_OLD,Mat_ApplyOpWithScal_OLD,no,1 0 44,array | string | double,no,array
+0x3d19,Matrix_ApplyOperationWithMatrix_OLD,Mat_ApplyOpWithMat_OLD,no,1 0 1,array | string | array,no,array
+0x3d1a,ReadFromJSONFile,ReadFromJSON,no,32772 32772? 32769? 32770?,string | string | int | bool,no,ambiguous
+0x3d1b,WriteToJSONFile,WriteToJSON,no,32845 32772 32772? 32769? 32770? 32770? 32770?,elem | string | string | int | bool | bool | bool,no,
+0x3d1c,ListAddArray,AddArrayToFormList,no,32776 32832 32769?,form | array | index,no,
+0x3d1d,Matrix_IsMatrix,Mat_IsMat,no,32832,array,no,
+0x3d1e,Matrix3x3_GetQuaternion,Mat_GetQuat,no,32832,array,no,array
+0x3d1f,Quaternion_GetMatrix,Quat_GetMat,no,32832,array,no,array
+0x3d20,Matrix_Transpose,Mat_T,no,32832,array,no,array
+0x3d21,Matrix_Dump,Mat_Dump,no,32832,array,no,
+0x3d22,Matrix_ApplyOperationWithScalar,Mat_ApplyOpWithScal,no,32832 32772 32769,array | string | float,no,array
+0x3d23,Matrix_ApplyOperationWithMatrix,Mat_ApplyOpWithMat,no,32832 32772 32832,array | string | array,no,array
+0x3d24,TopicInfoSetResponseStrings,,no,32776 32832,form | array,no,
+0x3d25,GetCalculatedItemValue,,no,1? 21?,int | target item,yes,
+0x3d26,SetINIValue_Cached,SetINIValC,no,32772 32773 32772? 32772?,string | float or string | string | string,no,
+0x3d27,GetINIFloatOrCreate_Cached,GetINIFltOrCreateC,no,32772 32772? 32769? 32772?,string | string | float | string,no,
+0x3d28,GetINIStringOrCreate_Cached,GetINIStrOrCreateC,no,32772 32772? 32772? 32772?,string | string | string | string,no,string
+0x3d29,GetINIFloatOrDefault_Cached,GetINIFloat_Cached,no,32772 32772? 32769?,string | string | float,no,
+0x3d2a,GetINIStringOrDefault_Cached,GetINIString_Cached,no,32772 32772? 32772?,string | string | string,no,string
+0x3d2b,HasINISetting_Cached,HasINISettingC,no,32772 32772?,string | string,no,
+0x3d2c,ClearFileCacheShowOff,CloseFileSO,no,32772 32769,string | num,no,
+0x3d2d,SaveCachedIniFile,SaveCachedIni,no,32772?,string,no,
+0x3d2e,ReloadIniCache,,no,32772?,string,no,
+0x3d2f,ResetInteriorAlt,IWantThisRoomCleanRightNow,no,9,cell,no,
+0x3d30,SetEnableParent,SetParentRef,yes,61?,form,no,
+0x3d31,GetEquippedWeapon,,yes,,,no,form
+0x3d32,GetEquippedWeaponRef,,yes,,,no,form
+0x3d33,GetCalculatedAPCost,GetCalculatedWeaponAttackAPCost,no,1 61?,int | form,no,
+0x3d34,GetPosArray,,yes,,,no,array
+0x3d35,GetCompassTargets,,no,1?,int,no,array
+0x3d36,SetLiveEffectMagnitudeModifier,,no,2 0,float | string,no,
+0x3d37,IsOutsideMainThread,,no,,,no,
+0x3d38,GetLiveEffectBaseTrait,,no,1,int,no,
+0x3d39,GetActorValueName,GetAVName,no,5 1?,actor value | int,no,string
+0x3d3a,SetINIInteger_Cached,SetINIIntC,no,32772 32769 32772? 32772?,string | int | string | string,no,
+0x3d3b,GetAddedItemRefShowOff,GetAddedItemRefSO,no,,,no,form
+0x3d3c,GetIsPlayerOverencumbered,IsPCOverencumbered,no,1?,int,yes,
+0x3d3d,RefillPlayerAmmo,,no,1,int,no,
+0x3d3e,AuxTimerStart,,no,0 44? 1? 61?,string | double | int | form,no,
+0x3d3f,AuxTimerStop,AuxTimerErase,no,0 1? 61?,string | int | form,no,
+0x3d40,AuxTimerPaused,,no,0 1? 61?,string | int | form,no,
+0x3d41,AuxTimerTimeElapsed,,no,0 1? 61?,string | int | form,no,
+0x3d42,AuxTimerTimeToCountdown,,no,0 61?,string | form,no,
+0x3d43,AuxTimerTimeLeft,,no,0 61?,string | form,no,
+0x3d44,SetOnAuxTimerStartHandler,SetOnTimerStartHandler,no,1 61 0 61?,setOrRemove | script | string | form,no,
+0x3d45,SetOnAuxTimerStopHandler,SetOnTimerStopHandler,no,1 61 0 61?,setOrRemove | script | string | form,no,
+0x3d46,ClearShowoffSavedData,,no,1 1,int | int,no,
+0x3d47,SetAmmoName,,no,0 1? 61?,string | int | form,no,
+0x3d48,GetAmmoName,,no,1? 61?,int | form,no,string
+0x3d49,KillAllHostiles,,no,6?,actor reference,no,
+0x3d4a,IsAiming,,yes,,,no,
+0x3d4b,IsBlockingOrAiming,,yes,,,no,
+0x3d4c,SetOnAuxTimerUpdateHandler,SetOnTimerUpdateHandler,no,1 61 0 61?,setOrRemove | script | string | form,no,
+0x3d4d,SetItemHotkeyIconPath,,no,32776 32772,form | string,no,
+0x3d4e,GetItemHotkeyIconPath,,no,61 1?,form | int,no,string
+0x3d4f,GetExplosionHitDamage,,no,,,no,
+0x3d50,SetExplosionHitDamage,,no,2,float,no,
+0x3d51,IsJumping_BROKEN,,yes,,,no,
+0x3d52,FreezeAmmoRegen,,no,1?,int,no,
+0x3d53,GetCalculatedActorSpread,,yes,1?,int,no,
+0x3d54,GetIsActivationPromptShown,,no,,,yes,
+0x3d55,GetHitLocationLingering,,yes,,,yes,
+0x3d56,HighlightAdditionalReferenceAlt,,yes,2? 2? 2? 2?,float | float | float | float,no,
+0x3d57,GetVATSMaxEngageDistance,,no,,,no,
+0x3d58,SetForceDrawHitscanProjectiles,,no,1?,int,no,
+0x3d59,SetProjectileTracerChanceOverride,,no,1?,int,no,
+0x3d5a,SpawnTracingProjectile,,yes,61 1? 1?,form | int | int,no,form
+0x3d5b,GetVATSTargetable,,yes,,,yes,
+0x3d5c,GetProjectileRefIsStuck,,yes,,,no,
+0x3d5d,ForceRecoilAnim,,yes,,,no,
+0x3d5e,ForceHitStaggerReaction,ForceHitReaction,yes,1?,int,no,
+0x3d5f,IsPlayerLookingAround,,no,,,yes,
+0x3d60,GetActorFadeState,,yes,,,no,
+0x3d61,IsActorInvisibleToPlayer,,yes,,,yes,
+0x3d62,IsFormLoading,,no,61,form,no,
+0x3d63,ApplyEasingAlt,EaseAlt,no,44 1 1,double | int | int,no,
+0x3d64,PatchFreezeTime,,no,,,no,
+0x3d65,PlaceAtReticleAlt,,yes,61 1? 2? 2? 2?,formToPlace | count | minDistance | maxDistance | healthPercent,no,form
+0x3d66,ToANSIChar,,no,1 1?,int | int,no,string
+0x3d67,GetWorldOffsetPosArray,,yes,,,no,array
+0x3d68,BaseCopyFaceGenFrom,,no,25 25,base actor | base actor,no,
+0x3d69,GetSpellUsageNumEx,,yes,11,Magic Item,yes,
