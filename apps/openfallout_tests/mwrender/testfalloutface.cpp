@@ -565,6 +565,26 @@ namespace
         expectNear(bone * (frame * (root * eye)), eye, 0.01);
     }
 
+    TEST(OpenFalloutRenderAttachmentFrame, putsAPartBackThatTurnsAboutAnAxisOtherThanThatOfTheBone)
+    {
+        // The female hair of the games: a half turn about (0, 1, 1) in the file (root and shape together), on a bone
+        // that has a quarter turn about y. The vertices of the file are upright as they are stored; the file turns them
+        // onto their side, as it is the meshes of the part that hold the turn once loaded
+        const osg::Quat bone = turnOfFile(sHeadAtRest);
+        const osg::Quat file(osg::PI, osg::Vec3d(0.0, 1.0, 1.0));
+        const osg::Quat frame = attachmentFrame(bone, file);
+
+        const osg::Vec3d stored(3.0, 5.0, 7.0);
+        const osg::Vec3d inTheMesh = file * stored;
+        // The mesh is on its side (y and z are exchanged, x mirrored) ...
+        expectNear(inTheMesh, osg::Vec3d(-3.0, 7.0, 5.0), 0.01);
+        // ... and the frame and the bone bring it back, whichever of the two is meant to come first in the file
+        expectNear(bone * (frame * inTheMesh), stored, 0.01);
+        // The turn that the part ends up with in the character is the inverse of the one of the file (a half turn, so
+        // the same one): what is up in the mesh is up in the character
+        expectNear(bone * (frame * osg::Vec3d(0.0, 1.0, 0.0)), osg::Vec3d(0.0, 0.0, 1.0), 0.01);
+    }
+
     TEST(OpenFalloutRenderAttachmentFrame, turnsAPartThatHasNoTurnInItsRootBackIntoTheHeadModel)
     {
         const osg::Quat bone = turnOfFile(sHeadAtRest);

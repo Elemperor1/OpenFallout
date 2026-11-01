@@ -84,9 +84,10 @@ namespace OFRender
     /// model (the axes of the world, the origin on the bone) when the bone is at rest. The files of these parts
     /// hold their vertices in that frame, and the eyes and mouth have the turn of the bone undone in their own root
     /// while the hair, eyebrows and beards have none, and the female hair files turn their root and their shapes by
-    /// the same half turn, which cancel; the result is the same for all of them: the turn that sits on the bone, then
-    /// the one of the file (root and shape), then the vertices give the identity. `boneRest` is the turn of the bone
-    /// in the character at rest, `partRoot` the one of `attachmentRotation`.
+    /// the same half turn, which cancel; the result is the same for all of them: the vertices of the file, then the
+    /// turn of the file (root and shape), then the turn that this returns, then the turn that sits on the bone give
+    /// the vertices as they are stored. `boneRest` is the turn of the bone in the character at rest, `partRoot` the
+    /// one of `attachmentRotation`. The order of the two matters when they do not share an axis.
     osg::Quat attachmentFrame(const osg::Quat& boneRest, const osg::Quat& partRoot);
 
     /// The morphs of the .egm file that goes with a model (a path as the race and the hair records name it). The file

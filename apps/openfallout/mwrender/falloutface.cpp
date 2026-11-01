@@ -252,7 +252,10 @@ namespace OFRender
 
     osg::Quat attachmentFrame(const osg::Quat& boneRest, const osg::Quat& partRoot)
     {
-        return boneRest.inverse() * partRoot.inverse();
+        // (osg::Quat multiplies the way that matrices of OSG do, the left one first: this puts the turn of the file
+        // right first, and the turn of the bone right after it. The two do not commute for the female hair, whose
+        // turn is a half turn about a slanted axis, and a quarter turn of the bone about another.)
+        return partRoot.inverse() * boneRest.inverse();
     }
 
     std::size_t replaceDiffuseMap(osg::Node& part, osg::Image* image)
