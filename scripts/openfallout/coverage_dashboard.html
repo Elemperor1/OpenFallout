@@ -1,8 +1,9 @@
 <title>OpenFallout Coverage Map</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: a headline number, then one treemap. The three families (script commands, extender functions, record types)
-   are the big boxes; each library is a box inside one, and each unit is a square inside the library. */
+/* Layout: two headline measures (read, implemented), then one treemap. The families (script commands, extender
+   functions, record types, menus, perk entry points, animation groups) are the big boxes; each library is a box inside
+   one, and each unit is a square inside the library. The two measures are buttons: the one pressed colours the map. */
 :root {
   --bg: #f3f4f7;
   --surface: #ffffff;
@@ -63,12 +64,28 @@ body {
 .page { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
 .head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; }
-.head-text { min-width: 0; }
-.eyebrow { margin: 0; color: var(--ink-2); font-size: 15px; }
-.hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 2px 0 0; }
-.hero-pct { font-size: clamp(48px, 9vw, 72px); font-weight: 650; line-height: 1.05; letter-spacing: -0.02em; }
-.hero-frac { font-size: clamp(20px, 3.4vw, 28px); color: var(--ink-2); }
-.sub { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+.head-text { min-width: 0; flex: 1 1 560px; }
+.eyebrow { margin: 0; color: var(--ink-2); font-size: 15px; font-weight: 400; }
+.measures { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 0; }
+.measure {
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer; flex: 1 1 250px; max-width: 420px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 16px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.measure:hover { border-color: var(--ink-2); }
+.measure[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.m-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; color: var(--ink-2); font-size: 14px; font-weight: 600; }
+.m-tag { font-weight: 400; font-size: 12px; color: var(--muted); }
+.measure[aria-pressed="true"] .m-tag { color: var(--ink-2); }
+.m-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; }
+.m-pct { font-size: clamp(36px, 7.5vw, 56px); font-weight: 650; line-height: 1.08; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.m-frac { font-size: 17px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.m-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--todo); margin-top: 2px; }
+.m-bar i { display: block; height: 100%; }
+.m-bar .b-done { background: var(--done); }
+.m-bar .b-stand { background: var(--stand); }
+.m-note { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.sub { margin: 10px 0 0; color: var(--muted); max-width: 72ch; }
 
 .tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; min-width: 0; max-width: 100%; }
 .seg { display: flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 2px; }
@@ -85,7 +102,7 @@ body {
 }
 .search::placeholder { color: var(--muted); }
 @media (max-width: 560px) { .tools, .search { width: 100%; } }
-button:focus-visible, .search:focus-visible, .lib:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button:focus-visible, .measure:focus-visible, .search:focus-visible, .lib:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .chart {
   position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px;
@@ -141,7 +158,7 @@ th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--ru
 th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 150px; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
 tr.fam td { background: var(--wash); font-weight: 650; color: var(--ink); }
-td .bar { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--todo); vertical-align: middle; margin-left: 8px; overflow: hidden; }
+td .bar { display: inline-block; width: 48px; height: 6px; border-radius: 3px; background: var(--todo); vertical-align: middle; margin-left: 8px; overflow: hidden; }
 td .bar i { display: block; height: 100%; background: var(--done); }
 
 .foot { color: var(--muted); font-size: 12.5px; }
@@ -152,8 +169,21 @@ td .bar i { display: block; height: 100%; background: var(--done); }
 <div class="page">
   <header class="head">
     <div class="head-text">
-      <p class="eyebrow" id="eyebrow">OpenFallout engine coverage*</p>
-      <h1 class="hero"><span class="hero-pct" id="heroPct">0%</span><span class="hero-frac" id="heroFrac"></span></h1>
+      <h1 class="eyebrow" id="eyebrow">OpenFallout engine coverage*</h1>
+      <div class="measures" role="group" aria-label="Colour the map by">
+        <button class="measure" type="button" id="mRead" aria-pressed="false">
+          <span class="m-label">Read<span class="m-tag" data-tag>colours the map</span></span>
+          <span class="m-main"><span class="m-pct" data-pct>0%</span><span class="m-frac" data-frac></span></span>
+          <span class="m-bar" aria-hidden="true"><i class="b-done" data-done></i></span>
+          <span class="m-note" data-note></span>
+        </button>
+        <button class="measure" type="button" id="mImpl" aria-pressed="true">
+          <span class="m-label">Implemented<span class="m-tag" data-tag>colours the map</span></span>
+          <span class="m-main"><span class="m-pct" data-pct>0%</span><span class="m-frac" data-frac></span></span>
+          <span class="m-bar" aria-hidden="true"><i class="b-done" data-done></i><i class="b-stand" data-stand></i></span>
+          <span class="m-note" data-note></span>
+        </button>
+      </div>
       <p class="sub" id="sub"></p>
     </div>
     <div class="tools">
@@ -177,17 +207,21 @@ td .bar i { display: block; height: 100%; background: var(--done); }
       <h2>*What is counted</h2>
       <dl id="defs">
         <dt>The unit</dt>
-        <dd>One script command of the two games (615, from the tables read out of the Fallout 3 and New Vegas executables), one function of a script extender plugin (from the plugin's own DLL), or one record type of the two base plugins (from the plugin census). Every unit shown is already read: its name, code and arguments are known.</dd>
-        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--done)"/></svg>Done</dt>
-        <dd>The engine has it: a handler is registered for the command or function, or the record is loaded and kept in the record store. Done means built, not checked against the games; the audit in docs/openfallout lists what nobody has verified.</dd>
-        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><path fill="var(--stand)" fill-rule="evenodd" d="M0 0h12v12H0z M3 3v6h6V3z"/></svg>Stand-in</dt>
-        <dd>The engine takes it in and does nothing with it, or gives a fixed answer. A record is a stand-in when it is loaded and then dropped.</dd>
-        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--todo)"/></svg>Not done</dt>
-        <dd>No handler (the engine reports it once and carries on), or no record store.</dd>
-        <dt>Not counted yet</dt>
-        <dd>The games' own menu layouts and interface textures, perk entry points, animation groups and the functions of the executables themselves. The repository has no per-item table for them yet, so they have no squares. Add a table and a rule to the script to bring one in.</dd>
+        <dd>One thing the games define and the engine has to answer to: a script command (615, from the tables read out of the two executables), a function of a script extender plugin (from the plugin's DLL), a record type of the two base plugins, a menu file of the games (menus/*.xml), a perk entry point (from the editor) or an animation group (from the tables of the executables). Every unit has at least its name from one of those tables.</dd>
+        <dt>Read</dt>
+        <dd>What the unit does, or for a menu how it is laid out, has been read from the executables or the games' data files, and the read is on record: a line in the tracker (<code>reads.csv</code>, or the read column of the menu and perk tables) with where it was found, or for a record type a loader that parses it. The name and code alone do not count. A unit the engine implements but nobody wrote down a read of is not counted here; that gap is what the tracker is for.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--done)"/></svg>Implemented: done</dt>
+        <dd>The engine has it: a handler is registered for the command or function, the record is loaded and kept in the record store, a perk entry point is applied by some code, the engine picks animation files by the group's name. Done means built, not checked against the games; the audit in docs/openfallout lists what nobody has verified.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><path fill="var(--stand)" fill-rule="evenodd" d="M0 0h12v12H0z M3 3v6h6V3z"/></svg>Implemented: stand-in</dt>
+        <dd>The engine takes it in and does nothing with it, or gives a fixed answer. A record is a stand-in when it is loaded and then dropped. A menu is a stand-in when one of the engine's own screens (Lua, on Morrowind's widgets) does its job; it is done only when the game's own menu file is drawn.</dd>
+        <dt><svg class="swatch" width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="1.5" fill="var(--todo)"/></svg>Not done, not read</dt>
+        <dd>No handler (the engine reports it once and carries on), no record store, no code that applies the entry point, no screen; or, in the Read colouring, no read on record.</dd>
+        <dt>Left out</dt>
+        <dd>Ten perk entry points of the editor's table that no code of the executable calls and no perk uses. The games' interface textures, NIF block types and the functions of the executables themselves are not counted yet.</dd>
         <dt>Scopes</dt>
         <dd><b>The games</b> leaves out the extender functions, which only mods use. <b>Tale of Two Wastelands</b> adds back the 139 extender codes its scripts call.</dd>
+        <dt>Keeping it right</dt>
+        <dd>The tracker lives in <code>docs/openfallout/coverage/tracker</code>. When a round reads something, add a line to <code>reads.csv</code> (or flip the read column) with its evidence; when a screen or a rule lands, the page follows from the source or the menu table.</dd>
       </dl>
     </section>
   </div>
@@ -204,9 +238,14 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   var FAMILIES = [
     { id: "extender", name: "Script extender functions", short: "Extenders", about: "from the plugin DLLs (xNVSE and others)" },
     { id: "command", name: "Script commands", short: "Commands", about: "from the two executables" },
-    { id: "record", name: "Record types", short: "Records", about: "from the census of the base plugins" }
+    { id: "record", name: "Record types", short: "Records", about: "from the census of the base plugins" },
+    { id: "menu", name: "Game menus", short: "Menus", about: "the menu files of the games" },
+    { id: "perk", name: "Perk entry points", short: "Perks", about: "from the editor's table" },
+    { id: "animation", name: "Animation groups", short: "Animations", about: "from the tables of the executables" }
   ];
   var STATES = { done: "Done", "stand-in": "Stand-in", todo: "Not done" };
+  var MEASURES = { read: "Read", impl: "Implemented" };
+  var ORDER = { done: 0, "stand-in": 1, todo: 2 };
   var STATE_CLASS = { done: "u-done", "stand-in": "u-stand", todo: "u-todo" };
   var SCOPES = [
     { id: "all", name: "All libraries" },
@@ -216,7 +255,14 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   var NS = "http://www.w3.org/2000/svg";
   var scope = "all";
   try { var saved = localStorage.getItem("ofCoverageScope"); if (saved && SCOPES.some(function (s) { return s.id === saved; })) scope = saved; } catch (e) {}
+  var measure = "impl";
+  try { var savedMeasure = localStorage.getItem("ofCoverageMeasure"); if (savedMeasure && MEASURES[savedMeasure]) measure = savedMeasure; } catch (e) {}
   var query = "";
+
+  // What the map shows of a unit: its implemented state, or read / not read in the colours of done / not done
+  function stateOf(u) { return measure === "read" ? (u.r ? "done" : "todo") : u.s; }
+  // The counts of the measure shown, from the implemented counts and the number read
+  function measured(c, read, total) { return measure === "read" ? { done: read, "stand-in": 0, todo: total - read } : { done: c.done, "stand-in": c["stand-in"], todo: c.todo }; }
 
   function inScope(unit, lib) {
     if (scope === "all" || lib.family !== "extender") return true;
@@ -231,15 +277,19 @@ td .bar i { display: block; height: 100%; background: var(--done); }
     DATA.libraries.forEach(function (lib) {
       var units = lib.units.filter(function (u) { return inScope(u, lib); });
       if (!units.length) return;
-      var c = { done: 0, "stand-in": 0, todo: 0 };
-      units.forEach(function (u) { c[u.s]++; });
-      libs.push({ name: lib.name, family: lib.family, about: lib.about, units: units, count: c, total: units.length });
+      var c = { done: 0, "stand-in": 0, todo: 0 }, read = 0;
+      units.forEach(function (u) { c[u.s]++; read += u.r ? 1 : 0; });
+      units = units.slice().sort(function (a, b) {
+        var d = ORDER[stateOf(a)] - ORDER[stateOf(b)];
+        return d || (a.n.toLowerCase() < b.n.toLowerCase() ? -1 : a.n.toLowerCase() > b.n.toLowerCase() ? 1 : 0);
+      });
+      libs.push({ name: lib.name, family: lib.family, about: lib.about, units: units, count: c, read: read, total: units.length });
     });
     return libs;
   }
   function sum(libs) {
-    var c = { done: 0, "stand-in": 0, todo: 0, total: 0 };
-    libs.forEach(function (l) { c.done += l.count.done; c["stand-in"] += l.count["stand-in"]; c.todo += l.count.todo; c.total += l.total; });
+    var c = { done: 0, "stand-in": 0, todo: 0, total: 0, read: 0 };
+    libs.forEach(function (l) { c.done += l.count.done; c["stand-in"] += l.count["stand-in"]; c.todo += l.count.todo; c.total += l.total; c.read += l.read; });
     return c;
   }
 
@@ -304,6 +354,7 @@ td .bar i { display: block; height: 100%; background: var(--done); }
       var ls = libs.filter(function (l) { return l.family === f.id; });
       return { fam: f, libs: ls, sum: sum(ls) };
     }).filter(function (f) { return f.libs.length; });
+    famTotals.forEach(function (f) { f.m = measured(f.sum, f.sum.read, f.sum.total); });
     famTotals.sort(function (a, b) { return b.sum.total - a.sum.total; });
 
     if (svg) svg.remove();
@@ -320,10 +371,10 @@ td .bar i { display: block; height: 100%; background: var(--done); }
       // header: the longest wording that fits
       var head = 22;
       var variants = [
-        f.fam.name + "  " + fmt(f.sum.done) + " / " + fmt(f.sum.total) + "  " + pct(f.sum.done, f.sum.total),
-        f.fam.name + "  " + pct(f.sum.done, f.sum.total),
-        f.fam.short + "  " + pct(f.sum.done, f.sum.total),
-        pct(f.sum.done, f.sum.total)
+        f.fam.name + "  " + fmt(f.m.done) + " / " + fmt(f.sum.total) + "  " + pct(f.m.done, f.sum.total),
+        f.fam.name + "  " + pct(f.m.done, f.sum.total),
+        f.fam.short + "  " + pct(f.m.done, f.sum.total),
+        pct(f.m.done, f.sum.total)
       ];
       var label = variants.find(function (v) { return textFit(v, fw - 16, 13); }) || variants[3];
       var t = el("text", { x: fx + 8, y: fy + 15, class: "fam-head" }, svg);
@@ -352,12 +403,13 @@ td .bar i { display: block; height: 100%; background: var(--done); }
         var dd = "", ds = "", dt = "", dh = "";
         lib.units.forEach(function (u, k) {
           var x = gx + (k % g2.cols) * p, y = gy + Math.floor(k / g2.cols) * p;
-          if (u.s === "done") dd += sq(x, y, s);
-          else if (u.s === "stand-in") ds += ring(x, y, s, Math.max(1, s * 0.24));
+          var us = stateOf(u);
+          if (us === "done") dd += sq(x, y, s);
+          else if (us === "stand-in") ds += ring(x, y, s, Math.max(1, s * 0.24));
           else dt += sq(x, y, s);
           if (query && matches(u, lib)) dh += sq(x - 0.5, y - 0.5, s + 1);
         });
-        var grp = el("g", { class: "lib", tabindex: 0, role: "img", "aria-label": lib.name + ": " + fmt(lib.count.done) + " of " + fmt(lib.total) + " done, " + fmt(lib.count["stand-in"]) + " stand-ins" }, svg);
+        var grp = el("g", { class: "lib", tabindex: 0, role: "img", "aria-label": lib.name + ": " + fmt(lib.read) + " of " + fmt(lib.total) + " read, " + fmt(lib.count.done) + " done, " + fmt(lib.count["stand-in"]) + " stand-ins" }, svg);
         info.group = grp;
         if (dt) el("path", { d: dt, class: "u-todo" }, grp);
         if (ds) el("path", { d: ds, class: "u-stand" }, grp);
@@ -393,8 +445,9 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   function showUnit(info, hit, cx, cy) {
     var u = hit.unit;
     tip.textContent = "";
-    lines(tip, [{ tag: "b", text: u.n }, { cls: "st", text: STATES[u.s] + (u.w ? " · " + u.w : "") }]);
+    lines(tip, [{ tag: "b", text: u.n }, { cls: "st", text: "Implemented: " + STATES[u.s].toLowerCase() + (u.w ? " · " + u.w : "") }, { cls: "st", text: "Read: " + (u.r ? "yes" : "not on record yet") }]);
     if (u.c) lines(tip, [{ cls: "mono", text: u.c + " · " + info.lib.name }]); else lines(tip, [{ cls: "mono", text: info.lib.name }]);
+    if (u.r && u.e) lines(tip, [{ cls: "note", text: "Read: " + u.e }]);
     if (u.ttw !== undefined) lines(tip, [{ cls: "note", text: "Tale of Two Wastelands calls it" + (u.ttw ? " " + fmt(u.ttw) + (u.ttw === 1 ? " time" : " times") : "") + "." }]);
     if (u.t) lines(tip, [{ cls: "note", text: u.s === "done" && u.t.indexOf(" ") < 0 ? "Handled in " + u.t : u.t }]);
     hoverRect.setAttribute("x", info.gx + hit.col * info.pitch - 1); hoverRect.setAttribute("y", info.gy + hit.row * info.pitch - 1);
@@ -405,7 +458,8 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   function showLib(info, focus, cx, cy) {
     var c = info.lib.count;
     tip.textContent = "";
-    lines(tip, [{ tag: "b", text: info.lib.name }, { cls: "st", text: fmt(c.done) + " of " + fmt(info.lib.total) + " done (" + pct(c.done, info.lib.total) + ")" },
+    lines(tip, [{ tag: "b", text: info.lib.name }, { cls: "st", text: "Read: " + fmt(info.lib.read) + " of " + fmt(info.lib.total) + " (" + pct(info.lib.read, info.lib.total) + ")" },
+      { cls: "st", text: "Implemented: " + fmt(c.done) + " of " + fmt(info.lib.total) + " (" + pct(c.done, info.lib.total) + ")" },
       { cls: "note", text: fmt(c["stand-in"]) + " stand-ins, " + fmt(c.todo) + " not done" }, { cls: "mono", text: info.lib.about }]);
     hoverRect.setAttribute("visibility", "hidden");
     ringRect.setAttribute("x", info.x); ringRect.setAttribute("y", info.y); ringRect.setAttribute("width", info.w); ringRect.setAttribute("height", info.h);
@@ -430,37 +484,54 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   // ---- the rest of the page ----
   function updateHead(total) {
     var scopeName = SCOPES.filter(function (s) { return s.id === scope; })[0].name;
-    document.getElementById("heroPct").textContent = pct(total.done, total.total);
-    document.getElementById("heroFrac").textContent = "(" + fmt(total.done) + "/" + fmt(total.total) + ")";
     document.getElementById("eyebrow").textContent = "OpenFallout engine coverage*: " + scopeName.toLowerCase();
-    var s = fmt(total["stand-in"]) + " more are stand-ins that take the call and do nothing. ";
+    function card(id, key, done, stand, note) {
+      var b = document.getElementById(id);
+      b.setAttribute("aria-pressed", measure === key ? "true" : "false");
+      b.querySelector("[data-tag]").textContent = measure === key ? "colours the map" : "show on the map";
+      b.querySelector("[data-pct]").textContent = pct(done, total.total);
+      b.querySelector("[data-frac]").textContent = "(" + fmt(done) + "/" + fmt(total.total) + ")";
+      b.querySelector("[data-done]").style.width = (total.total ? 100 * done / total.total : 0) + "%";
+      var sb = b.querySelector("[data-stand]"); if (sb) sb.style.width = (total.total ? 100 * stand / total.total : 0) + "%";
+      b.querySelector("[data-note]").textContent = note;
+    }
+    card("mRead", "read", total.read, 0, "what the unit does has been read from the executables or game files, and written down with where");
+    card("mImpl", "impl", total.done, total["stand-in"], fmt(total["stand-in"]) + " more are stand-ins that take the call and do nothing; done means built, not checked");
+    var s = "";
     if (scope === "ttw") s += "That is the two games plus the 139 extender codes that the scripts of Tale of Two Wastelands call. ";
     else if (scope === "games") s += "The extender functions, which only mods use, are left out. ";
-    s += "Every unit counted is already read from the executables, plugin files and censuses; the percentage is how many the engine implements.";
+    s += "Every unit has at least its name and code from a table of the executables or plugins; that is not counted as read. The tracker in docs/openfallout/coverage/tracker is where reads are written down.";
     document.getElementById("sub").textContent = s;
   }
   function updateTable(libs) {
     var table = document.getElementById("table");
     table.textContent = "";
     var thead = document.createElement("thead"), hr = document.createElement("tr");
-    ["Library", "Units", "Done", "Stand-in", "Not done", "% done"].forEach(function (h) { var th = document.createElement("th"); th.scope = "col"; th.textContent = h; hr.appendChild(th); });
+    ["Library", "Units", "Read", "% read", "Done", "Stand-in", "% done"].forEach(function (h) { var th = document.createElement("th"); th.scope = "col"; th.textContent = h; hr.appendChild(th); });
     thead.appendChild(hr); table.appendChild(thead);
     var tb = document.createElement("tbody");
+    function pctCell(tr, part, total) {
+      var td = document.createElement("td");
+      td.textContent = pct(part, total);
+      var bar = document.createElement("span"); bar.className = "bar"; var fill = document.createElement("i"); fill.style.width = (total ? 100 * part / total : 0) + "%"; bar.appendChild(fill); td.appendChild(bar);
+      tr.appendChild(td);
+    }
     FAMILIES.forEach(function (f) {
       var ls = libs.filter(function (l) { return l.family === f.id; });
       if (!ls.length) return;
-      function row(name, c, total, cls) {
+      function row(name, c, read, total, cls) {
         var tr = document.createElement("tr"); if (cls) tr.className = cls;
-        var cells = [name, fmt(total), fmt(c.done), fmt(c["stand-in"]), fmt(c.todo)];
-        cells.forEach(function (t, i) { var td = document.createElement(i === 0 && cls ? "th" : "td"); if (i === 0 && cls) td.scope = "row"; td.textContent = t; tr.appendChild(td); });
-        var last = document.createElement("td");
-        last.textContent = pct(c.done, total);
-        var bar = document.createElement("span"); bar.className = "bar"; var fill = document.createElement("i"); fill.style.width = (total ? 100 * c.done / total : 0) + "%"; bar.appendChild(fill); last.appendChild(bar);
-        tr.appendChild(last); tb.appendChild(tr);
+        var first = document.createElement(cls ? "th" : "td"); if (cls) first.scope = "row"; first.textContent = name; tr.appendChild(first);
+        [fmt(total), fmt(read)].forEach(function (t) { var td = document.createElement("td"); td.textContent = t; tr.appendChild(td); });
+        pctCell(tr, read, total);
+        [fmt(c.done), fmt(c["stand-in"])].forEach(function (t) { var td = document.createElement("td"); td.textContent = t; tr.appendChild(td); });
+        pctCell(tr, c.done, total);
+        tb.appendChild(tr);
       }
       var fs = sum(ls);
-      row(f.name, fs, fs.total, "fam");
-      ls.slice().sort(function (a, b) { return b.total - a.total; }).forEach(function (l) { row(l.name, l.count, l.total, ""); });
+      row(f.name, fs, fs.read, fs.total, "fam");
+      if (ls.length === 1 && ls[0].name === f.name) return;
+      ls.slice().sort(function (a, b) { return b.total - a.total; }).forEach(function (l) { row(l.name, l.count, l.read, l.total, ""); });
     });
     table.appendChild(tb);
   }
@@ -474,25 +545,40 @@ td .bar i { display: block; height: 100%; background: var(--done); }
     if (!found.length) { box.textContent = "Nothing in this view is called that."; return; }
     found.forEach(function (f, i) {
       if (i) box.appendChild(document.createTextNode("  "));
-      var c = document.createElement("code"); c.textContent = f.u.n + " · " + STATES[f.u.s].toLowerCase(); box.appendChild(c);
+      var c = document.createElement("code"); c.textContent = f.u.n + " · " + (f.u.r ? "read" : "not read") + " · " + STATES[f.u.s].toLowerCase(); box.appendChild(c);
     });
     if (more) box.appendChild(document.createTextNode("  and " + fmt(more) + " more"));
   }
 
   // legend
-  (function () {
+  function drawLegend() {
     var lg = document.getElementById("legend");
+    lg.textContent = "";
     function item(cls, path, text) {
       var s = document.createElement("span");
       var v = document.createElementNS(NS, "svg"); v.setAttribute("width", 12); v.setAttribute("height", 12); v.setAttribute("aria-hidden", "true");
       var p = document.createElementNS(NS, "path"); p.setAttribute("d", path); p.setAttribute("class", cls); v.appendChild(p); s.appendChild(v);
       s.appendChild(document.createTextNode(text)); lg.appendChild(s);
     }
-    item("u-done", "M0 0h12v12H0z", "Done: the engine has it");
-    item("u-stand", "M0 0h12v12H0zM3 3v6h6V3z", "Stand-in: taken in, nothing done with it");
-    item("u-todo", "M0 0h12v12H0z", "Not done");
-    var m = document.createElement("span"); m.className = "mid"; m.textContent = "One square is one command, function or record type. Hover for its name."; lg.appendChild(m);
-  })();
+    if (measure === "read") {
+      item("u-done", "M0 0h12v12H0z", "Read: what it does is on record");
+      item("u-todo", "M0 0h12v12H0z", "Not read yet (the name and code are known)");
+    } else {
+      item("u-done", "M0 0h12v12H0z", "Done: the engine has it");
+      item("u-stand", "M0 0h12v12H0zM3 3v6h6V3z", "Stand-in: taken in, nothing done with it");
+      item("u-todo", "M0 0h12v12H0z", "Not done");
+    }
+    var m = document.createElement("span"); m.className = "mid"; m.textContent = "One square is one command, function, record type, menu, entry point or animation group. Hover for its name.";
+    lg.appendChild(m);
+  }
+
+  // the two measures colour the map
+  [["mRead", "read"], ["mImpl", "impl"]].forEach(function (pair) {
+    document.getElementById(pair[0]).addEventListener("click", function () {
+      measure = pair[1]; try { localStorage.setItem("ofCoverageMeasure", measure); } catch (e) {}
+      drawLegend(); render(); updateMatches();
+    });
+  });
 
   // scope buttons
   var scopesEl = document.getElementById("scopes");
@@ -518,7 +604,7 @@ td .bar i { display: block; height: 100%; background: var(--done); }
   });
 
   document.getElementById("foot").textContent = "Made from commit " + DATA.commit + " on " + DATA.generated + ". To refresh it, run scripts/openfallout/coverage_dashboard.py; the rules are in docs/openfallout/coverage-dashboard.md.";
-  drawScopes(); render();
+  drawLegend(); drawScopes(); render();
   var lastW = mapEl.clientWidth;
   if (window.ResizeObserver) new ResizeObserver(function () { if (Math.abs(mapEl.clientWidth - lastW) > 2) { lastW = mapEl.clientWidth; render(); } }).observe(mapEl);
   else window.addEventListener("resize", render);

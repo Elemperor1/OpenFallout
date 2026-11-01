@@ -15,9 +15,16 @@ counts as done. The numbers come from the source tree, so run the script again a
   * Record types: every record type of the two base plugins (the census table in docs/openfallout/census-results.md). A
     type is done when its loader's record is kept in the engine's record store (apps/openfallout/mwworld/esmstore.hpp).
 
-A unit is in one of three states: done, a stand-in (the engine takes it in and does nothing with it, or answers a
-fixed value) or not done. The reasons for the stand-ins are in the source, or in
-docs/openfallout/coverage/stand-ins.csv for the ones the source does not say.
+  * Menus, perk entry points and animation groups, which the tree has no loader or handler table for: their lists are
+    the tracker in docs/openfallout/coverage/tracker (menus.csv, perk-entry-points.csv), and the animation groups are
+    read from the table in components/falloutscript/animgroups.cpp.
+
+A unit has two measures. **Implemented** is one of three states: done, a stand-in (the engine takes it in and does
+nothing with it, or answers a fixed value) or not done. The reasons for the stand-ins are in the source, or in
+docs/openfallout/coverage/stand-ins.csv for the ones the source does not say. **Read** is whether what the unit does
+has been read from the executables or the game's data files and the read is on record: a line of the tracker
+(docs/openfallout/coverage/tracker/reads.csv, or the read column of the menu and perk tables), or a loader for the
+record type. Having its name and code from a table does not count: every unit has that.
 
 Needs Python 3 only (and git, for the commit it prints on the page).
 """
@@ -50,6 +57,16 @@ STAND_INS = "docs/openfallout/coverage/stand-ins.csv"
 CENSUS = "docs/openfallout/census-results.md"
 LOADERS = "components/esm4"
 STORE = "apps/openfallout/mwworld/esmstore.hpp"
+TRACKER = "docs/openfallout/coverage/tracker"
+TRACKER_MENUS = TRACKER + "/menus.csv"
+TRACKER_PERKS = TRACKER + "/perk-entry-points.csv"
+TRACKER_READS = TRACKER + "/reads.csv"
+PERKS_HEADER = "components/falloutscript/perks.hpp"
+ANIMATION_TABLE = "components/falloutscript/animgroups.cpp"
+ANIMATION_PICKER = "apps/openfallout/mwrender/falloutanimation.cpp"
+# Where the engine uses a perk entry point (tests are left out)
+PERK_SOURCES = ["apps/openfallout", "components"]
+READ_LEVELS = ("listed", "read")
 
 # The extender plugins, in the order of the page: file, name on the page, who makes it
 EXTENDER_PLUGINS = [
@@ -95,6 +112,15 @@ COMMAND_TOPICS = [
 ]
 TOPIC_FALLBACK = "Other commands"
 
+# The topics the animation groups are sorted into for the page (first rule that matches a name takes it)
+ANIMATION_TOPICS = [
+    ("Reloading and jams", r"^(?:Reload|Jam)"),
+    ("Attacks and mines", r"^(?:Attack|PlaceMine|Counter)"),
+    ("Holding a weapon", r"^(?:Aim|Holster|Equip|Unequip|HandGrip|BlockIdle)"),
+    ("Hits and death", r"^(?:BlockHit|Recoil|Stagger|Death)"),
+]
+ANIMATION_FALLBACK = "Idling, moving and talking"
+
 # The groups the record types are sorted into for the page
 RECORD_GROUPS = [
     ("World and cells", "CELL WRLD LAND LTEX REFR ACHR ACRE PGRE PWAT NAVM NAVI REGN GRAS ECZN LGTM LSCR LSCT"),
@@ -127,11 +153,11 @@ def strip_comments(text):
     return re.sub(r"//[^\n]*", "", text)
 
 
-def source_files(directories):
+def source_files(directories, extensions=(".cpp",)):
     for directory in directories:
         for root, _, names in os.walk(path(directory)):
             for name in sorted(names):
-                if name.endswith(".cpp"):
+                if name.endswith(extensions):
                     yield os.path.join(root, name)
 
 
@@ -270,6 +296,61 @@ def read_stored_records():
     return set(re.findall(r"Store<ESM4::(\w+)>", read_text(STORE)))
 
 
+def read_tracker(relative):
+    """The rows of a csv of the tracker as dictionaries; lines that start with # are notes."""
+    with open(path(relative), encoding="utf-8", newline="") as stream:
+        lines = [line for line in stream if not line.lstrip().startswith("#")]
+    return list(csv.DictReader(lines))
+
+
+def read_reads(rows):
+    """The read evidence of reads.csv: {(family, lower case name): evidence}."""
+    reads = {}
+    for row in rows:
+        family, name, evidence = row["family"].strip(), row["name"].strip(), row["evidence"].strip()
+        if not (family and name and evidence):
+            raise SystemExit("A row of %s lacks its family, its name or its evidence: %r" % (TRACKER_READS, row))
+        reads[(family, name.lower())] = evidence
+    return reads
+
+
+def read_animation_groups():
+    """The animation groups of the two tables of the executables in animgroups.cpp: [(name, New Vegas number, Fallout 3
+    number or None)]. Every group of Fallout 3 is in the table of New Vegas."""
+    text = strip_comments(read_text(ANIMATION_TABLE))
+    tables = {}
+    for match in re.finditer(r"constexpr std::string_view (\w+)\[\]\s*=\s*\{(.*?)\};", text, re.S):
+        tables[match.group(1)] = re.findall(r'"([^"]+)"', match.group(2))
+    fallout3, new_vegas = tables["sFallout3"], tables["sNewVegas"]
+    number3 = {name: index for index, name in enumerate(fallout3)}
+    return [(name, index, number3.get(name)) for index, name in enumerate(new_vegas)]
+
+
+def read_animation_picks():
+    """The lower case words that falloutanimation.cpp picks animation files by (the quoted strings of the source)."""
+    return {word.lower() for word in re.findall(r'"([A-Za-z0-9_]+)"', strip_comments(read_text(ANIMATION_PICKER)))}
+
+
+def read_entry_point_constants():
+    """The entry points that perks.hpp names: {constant: number}."""
+    text = strip_comments(read_text(PERKS_HEADER))
+    section = text.split("namespace EntryPoint", 1)[1].split("}", 1)[0]
+    return {name: int(number) for name, number in re.findall(r"constexpr int (\w+)\s*=\s*(\d+)\s*;", section)}
+
+
+def read_entry_point_calls(constants):
+    """The entry-point constants that some code of the engine uses (EntryPoint::name or Entry::name outside the header
+    and the tests)."""
+    used = set()
+    for file in source_files(PERK_SOURCES, (".cpp", ".hpp")):
+        if file.endswith(os.path.join("falloutscript", "perks.hpp")) or "components_tests" in file:
+            continue
+        with open(file, encoding="utf-8", errors="replace") as stream:
+            text = strip_comments(stream.read())
+        used.update(name for name in re.findall(r"\b(?:EntryPoint|Entry)::(\w+)\b", text) if name in constants)
+    return used
+
+
 # --------------------------------------------------------------------------------------------------------------------
 # Sorting into libraries
 
@@ -282,7 +363,7 @@ def command_topic(name):
 
 
 def unit(name, state, note="", extra=None):
-    result = {"n": name, "s": state}
+    result = {"n": name, "s": state, "r": 0}
     if note:
         result["t"] = note
     if extra:
@@ -372,8 +453,95 @@ def record_libraries(census, structs, stored):
         group = group_of.get(code)
         if group is None:
             raise SystemExit("The record type %s is in no group of RECORD_GROUPS" % code)
-        libraries[group].append(unit(code, state, note + "; " + counts))
+        item = unit(code, state, note + "; " + counts)
+        if struct is not None:
+            item["r"] = 1
+            item["e"] = "the loader of ESM4::%s parses the record from the plugins" % struct
+        libraries[group].append(item)
     return libraries
+
+
+def menu_libraries(rows):
+    """The libraries of the menu files of the games, from the tracker table menus.csv."""
+    libraries = {}
+    for row in rows:
+        name, library = row["name"].strip(), row["library"].strip()
+        read, state = row["read"].strip(), row["implemented"].strip()
+        if read not in READ_LEVELS or state not in (DONE, STAND_IN, TODO) or row["games"].strip() not in ("both", "nv"):
+            raise SystemExit("A row of %s has a value that is not allowed: %r" % (TRACKER_MENUS, row))
+        if read == "read" and not row["evidence"].strip():
+            raise SystemExit("The menu %s is marked read with no evidence" % name)
+        where = "Fallout 3 and New Vegas" if row["games"].strip() == "both" else "New Vegas only"
+        item = unit(name, state, row["note"].strip(), {"c": row["kind"].strip() + ".xml", "w": where})
+        if read == "read":
+            item["r"] = 1
+            item["e"] = row["evidence"].strip()
+        libraries.setdefault(library, []).append(item)
+    return libraries
+
+
+def perk_libraries(rows, constants, called):
+    """The library of perk entry points. The numbers are those of the executables; the table of names is the tracker
+    perk-entry-points.csv. An entry point that no code of the executable calls and no perk uses is left out (dead)."""
+    by_number = {number: name for name, number in constants.items()}
+    units, dead = [], 0
+    for row in rows:
+        number = int(row["number"])
+        read = row["read"].strip()
+        if read not in READ_LEVELS or row["games"].strip() not in ("both", "nv"):
+            raise SystemExit("A row of %s has a value that is not allowed: %r" % (TRACKER_PERKS, row))
+        if read == "read" and not row["evidence"].strip():
+            raise SystemExit("The entry point %d is marked read with no evidence" % number)
+        if row["dead"].strip():
+            dead += 1
+            continue
+        if number in by_number and by_number[number] in called:
+            state, note = DONE, "applied by the engine (EntryPoint::%s)" % by_number[number]
+        elif number in by_number:
+            state, note = TODO, "named in perks.hpp (EntryPoint::%s), no code applies it yet" % by_number[number]
+        else:
+            state, note = TODO, "not named in perks.hpp; no code applies it"
+        if row["note"].strip():
+            note += "; " + row["note"].strip()
+        where = "Fallout 3 and New Vegas" if row["games"].strip() == "both" else "New Vegas only"
+        item = unit(row["name"].strip(), state, note, {"c": "entry point %d" % number, "w": where})
+        if read == "read":
+            item["r"] = 1
+            item["e"] = row["evidence"].strip()
+        units.append(item)
+    about = "perk entry points" + ("; %d more are in the table but nothing calls them" % dead if dead else "")
+    return [{"name": "Perk entry points", "family": "perk", "about": about, "units": units}]
+
+
+def animation_libraries(groups, picks):
+    """The libraries of animation groups. A group is done when falloutanimation.cpp picks files by its name (the word
+    itself, or the word before an underscore: dynamicidle_sit)."""
+    libraries = {}
+    for name, new_vegas, fallout3 in groups:
+        low = name.lower()
+        chosen = low in picks or any(word.startswith(low + "_") for word in picks)
+        topic = next((title for title, pattern in ANIMATION_TOPICS if re.search(pattern, name)), ANIMATION_FALLBACK)
+        where = "Fallout 3 and New Vegas" if fallout3 is not None else "New Vegas only"
+        number = "number %d in New Vegas" % new_vegas + (", %d in Fallout 3" % fallout3 if fallout3 is not None else "")
+        if chosen:
+            state, note = DONE, "the engine picks animation files by this name (falloutanimation.cpp)"
+        else:
+            state, note = TODO, "nothing in the engine picks it; a script can still play it by name"
+        libraries.setdefault(topic, []).append(unit(name, state, note, {"c": number, "w": where}))
+    return libraries
+
+
+def attach_reads(libraries, reads):
+    """Puts the evidence of reads.csv into the units; returns the entries of reads.csv that match no unit."""
+    used = set()
+    for library in libraries:
+        for item in library["units"]:
+            key = (library["family"], item["n"].lower())
+            if key in reads:
+                item["r"] = 1
+                item["e"] = reads[key]
+                used.add(key)
+    return sorted("%s %s" % key for key in reads if key not in used)
 
 
 def count(units):
@@ -381,6 +549,10 @@ def count(units):
     for item in units:
         totals[item["s"]] += 1
     return totals
+
+
+def count_read(units):
+    return sum(item["r"] for item in units)
 
 
 def build():
@@ -406,14 +578,28 @@ def build():
     for group, _ in RECORD_GROUPS:
         libraries.append({"name": group, "family": "record", "about": "record types", "units": records[group]})
 
+    menus = menu_libraries(read_tracker(TRACKER_MENUS))
+    for title in sorted(menus, key=lambda title: (title == "Building blocks", -len(menus[title]), title)):
+        about = "the menu files of the games (menus/*.xml)" if title != "Building blocks" else "pieces the menu files share"
+        libraries.append({"name": title, "family": "menu", "about": about, "units": menus[title]})
+    constants = read_entry_point_constants()
+    libraries.extend(perk_libraries(read_tracker(TRACKER_PERKS), constants, read_entry_point_calls(constants)))
+    animations = animation_libraries(read_animation_groups(), read_animation_picks())
+    for title in [t for t, _ in ANIMATION_TOPICS] + [ANIMATION_FALLBACK]:
+        if title in animations:
+            libraries.append({"name": title, "family": "animation", "about": "animation groups", "units": animations[title]})
+
+    unknown_reads = attach_reads(libraries, read_reads(read_tracker(TRACKER_READS)))
     for library in libraries:
         library["units"].sort(key=lambda item: ({DONE: 0, STAND_IN: 1, TODO: 2}[item["s"]], item["n"].lower()))
         library["count"] = count(library["units"])
+        library["read"] = count_read(library["units"])
     return {
         "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "commit": git_commit(),
         "libraries": libraries,
         "unknownHandlers": unknown,
+        "unknownReads": unknown_reads,
         "ttwTotal": len(ttw),
     }
 
@@ -432,28 +618,48 @@ def git_commit():
 
 
 def summary(data):
-    lines = []
+    lines = ["%-36s %5s  %5s %6s  %5s %8s  %7s" % ("", "units", "read", "% read", "done", "stand-in", "% done")]
     families = {}
     for library in data["libraries"]:
         total = sum(library["count"].values())
         done = library["count"][DONE]
         lines.append(
-            "%-36s %5d units  %5d done  %4d stand-in  %5.1f%%"
-            % (library["name"], total, done, library["count"][STAND_IN], 100.0 * done / total if total else 0)
+            "%-36s %5d  %5d %5.1f%%  %5d %8d  %6.1f%%"
+            % (
+                library["name"],
+                total,
+                library["read"],
+                100.0 * library["read"] / total if total else 0,
+                done,
+                library["count"][STAND_IN],
+                100.0 * done / total if total else 0,
+            )
         )
-        family = families.setdefault(library["family"], {DONE: 0, STAND_IN: 0, TODO: 0})
+        family = families.setdefault(library["family"], {DONE: 0, STAND_IN: 0, TODO: 0, "read": 0})
         for key, value in library["count"].items():
             family[key] += value
+        family["read"] += library["read"]
     lines.append("")
     for family, totals in families.items():
-        total = sum(totals.values())
+        total = totals[DONE] + totals[STAND_IN] + totals[TODO]
         lines.append(
-            "%-36s %5d units  %5d done  %4d stand-in  %5.1f%%"
-            % (family, total, totals[DONE], totals[STAND_IN], 100.0 * totals[DONE] / total)
+            "%-36s %5d  %5d %5.1f%%  %5d %8d  %6.1f%%"
+            % (
+                family,
+                total,
+                totals["read"],
+                100.0 * totals["read"] / total,
+                totals[DONE],
+                totals[STAND_IN],
+                100.0 * totals[DONE] / total,
+            )
         )
     if data["unknownHandlers"]:
         lines.append("")
         lines.append("Handlers for names that are in no command table: " + ", ".join(data["unknownHandlers"]))
+    if data["unknownReads"]:
+        lines.append("")
+        lines.append("Entries of reads.csv that match no unit: " + ", ".join(data["unknownReads"]))
     return "\n".join(lines)
 
 
