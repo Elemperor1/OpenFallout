@@ -331,12 +331,18 @@ namespace OFRender
             return image;
         }
 
-        // The skin of the editor's textures: twice the tint on the skin
+        // The skin shaders of the games add twice what the base mod (the facemods or bodymods file of a character) has
+        // above a half grey to the skin, and multiply the sum by four times the detail mod, which is
+        // (62, 65, 62) of 255 for a character that has no file of it (the default of the game: nearly one)
+        constexpr float sModScale = 2.f;
+        constexpr std::array<float, 3> sDetailGain{ 4.f * 62.f / 255.f, 4.f * 65.f / 255.f, 4.f * 62.f / 255.f };
+
+        // The colour of the hair, the beards and the eyebrows is twice the colour of the character
         constexpr float sTintScale = 2.f;
 
         osg::ref_ptr<osg::Image> tintedSkin(const osg::Image& skin, const osg::Image& tint, bool average)
         {
-            const std::string name = skin.getFileName() + (average ? " * average of " : " * ") + tint.getFileName();
+            const std::string name = skin.getFileName() + (average ? " + average of " : " + ") + tint.getFileName();
             const bool named = !skin.getFileName().empty() && !tint.getFileName().empty();
             if (named)
             {
@@ -355,8 +361,8 @@ namespace OFRender
             if (!decodeImage(skin, skinPixels) || !decodeImage(tint, tintPixels))
                 return nullptr;
             const ESM4::SkinImage tinted = average
-                ? ESM4::tintSkin(skinPixels, ESM4::averageColour(tintPixels), sTintScale)
-                : ESM4::tintSkin(skinPixels, tintPixels, sTintScale);
+                ? ESM4::addSkinMod(skinPixels, ESM4::averageColour(tintPixels), sModScale, sDetailGain)
+                : ESM4::addSkinMod(skinPixels, tintPixels, sModScale, sDetailGain);
             osg::ref_ptr<osg::Image> result = makeImage(tinted, name);
             if (result != nullptr && named)
             {

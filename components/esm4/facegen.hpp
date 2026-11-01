@@ -83,16 +83,19 @@ namespace ESM4
     bool decodeSkinImage(
         SkinPixelFormat format, const std::uint8_t* data, std::size_t size, int width, int height, SkinImage& image);
 
-    // The skin multiplied by the tint and by `scale` (two for the textures of the editor), at the size of the skin:
-    // the tint is read at the same place of its own picture, between its pixels as a stretched picture is. A channel
-    // is held at 255.
-    SkinImage tintSkin(const SkinImage& skin, const SkinImage& tint, float scale);
+    // The skin as the skin shaders of the games draw it with the base mod of a character (its facemods or bodymods
+    // file): the shader adds `scale` times (mod - 127.5) to each channel of the skin (the shaders: skin + 2 * (mod -
+    // 0.5)) and multiplies the sum by `gain` for each channel (the detail mod, which no character here has a file for).
+    // The mod is read at the same place of its own picture, between its pixels as a stretched picture is. A channel is
+    // held between 0 and 255.
+    SkinImage addSkinMod(const SkinImage& skin, const SkinImage& mod, float scale, const std::array<float, 3>& gain);
 
     // The average colour of a picture, each channel from 0 to 255; black for an empty one
     std::array<float, 3> averageColour(const SkinImage& image);
 
-    // The skin multiplied by a colour (each channel from 0 to 255) and by `scale`
-    SkinImage tintSkin(const SkinImage& skin, const std::array<float, 3>& colour, float scale);
+    // The same with one colour (each channel from 0 to 255) in the place of the mod
+    SkinImage addSkinMod(
+        const SkinImage& skin, const std::array<float, 3>& mod, float scale, const std::array<float, 3>& gain);
 
     // The textures that the editor wrote for single characters, under textures/characters/facemods/<plugin>/ (the skin
     // of the face: <8 hex digits>_0.dds) and textures/characters/bodymods/<plugin>/ (the skin of the body:

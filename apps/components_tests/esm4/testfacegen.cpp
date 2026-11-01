@@ -400,37 +400,64 @@ namespace
         EXPECT_EQ(image.mPixels.size(), 18u);
     }
 
-    TEST(ESM4SkinImageTest, tintMultipliesTheSkinByTwiceTheTintSoThatMidGreyChangesNothing)
+    constexpr std::array<float, 3> noGain{ 1.f, 1.f, 1.f };
+
+    TEST(ESM4SkinImageTest, aModAddsTwiceWhatItHasAboveHalfGreySoThatMidGreyChangesNothing)
     {
         const ESM4::SkinImage skin = flatImage(2, 2, 100, 150, 200);
-        const ESM4::SkinImage grey = ESM4::tintSkin(skin, flatImage(1, 1, 128, 128, 128), 2.f);
+        const ESM4::SkinImage grey = ESM4::addSkinMod(skin, flatImage(1, 1, 128, 128, 128), 2.f, noGain);
         ASSERT_EQ(grey.mPixels.size(), 12u);
         EXPECT_NEAR(grey.mPixels[0], 100, 1);
         EXPECT_NEAR(grey.mPixels[1], 150, 1);
         EXPECT_NEAR(grey.mPixels[2], 200, 1);
 
-        const ESM4::SkinImage warm = ESM4::tintSkin(skin, flatImage(1, 1, 160, 64, 255), 2.f);
-        EXPECT_NEAR(warm.mPixels[0], 125, 1);
-        EXPECT_NEAR(warm.mPixels[1], 75, 1);
+        const ESM4::SkinImage warm = ESM4::addSkinMod(skin, flatImage(1, 1, 160, 64, 255), 2.f, noGain);
+        EXPECT_NEAR(warm.mPixels[0], 165, 1);
+        EXPECT_NEAR(warm.mPixels[1], 23, 1);
         // held at 255
         EXPECT_EQ(warm.mPixels[2], 255);
+
+        // and at 0
+        EXPECT_EQ(ESM4::addSkinMod(skin, flatImage(1, 1, 0, 0, 0), 2.f, noGain).mPixels[0], 0);
     }
 
-    TEST(ESM4SkinImageTest, tintStretchesASmallerPictureOverTheSkin)
+    TEST(ESM4SkinImageTest, aModOfADarkSkinMakesTheSkinDark)
     {
-        ESM4::SkinImage tint;
-        tint.mWidth = 2;
-        tint.mHeight = 1;
-        tint.mPixels = { 0, 0, 0, 255, 255, 255 };
-        const ESM4::SkinImage result = ESM4::tintSkin(flatImage(4, 1, 200, 200, 200), tint, 1.f);
+        // the numbers of a head: the picture of the head and the mod of a dark character
+        const ESM4::SkinImage dark
+            = ESM4::addSkinMod(flatImage(1, 1, 132, 103, 86), flatImage(1, 1, 103, 97, 93), 2.f, noGain);
+        EXPECT_NEAR(dark.mPixels[0], 83, 1);
+        EXPECT_NEAR(dark.mPixels[1], 42, 1);
+        EXPECT_NEAR(dark.mPixels[2], 17, 1);
+    }
+
+    TEST(ESM4SkinImageTest, theGainMultipliesTheSumOfEachChannel)
+    {
+        const ESM4::SkinImage skin = flatImage(1, 1, 100, 100, 100);
+        const std::array<float, 3> gain{ 0.5f, 1.f, 2.f };
+        const ESM4::SkinImage result = ESM4::addSkinMod(skin, flatImage(1, 1, 128, 128, 128), 2.f, gain);
+        // 101 (the mod of 128 adds one) times the gain
+        EXPECT_NEAR(result.mPixels[0], 51, 1);
+        EXPECT_NEAR(result.mPixels[1], 101, 1);
+        EXPECT_NEAR(result.mPixels[2], 202, 1);
+    }
+
+    TEST(ESM4SkinImageTest, aModIsStretchedOverASmallerOrBiggerSkin)
+    {
+        ESM4::SkinImage mod;
+        mod.mWidth = 2;
+        mod.mHeight = 1;
+        mod.mPixels = { 0, 0, 0, 255, 255, 255 };
+        const ESM4::SkinImage result = ESM4::addSkinMod(flatImage(4, 1, 100, 100, 100), mod, 1.f, noGain);
         ASSERT_EQ(result.mWidth, 4);
         EXPECT_EQ(result.mPixels[0], 0);
+        EXPECT_LT(result.mPixels[0], result.mPixels[3]);
         EXPECT_LT(result.mPixels[3], result.mPixels[6]);
         EXPECT_LT(result.mPixels[6], result.mPixels[9]);
-        EXPECT_EQ(result.mPixels[9], 200);
+        EXPECT_NEAR(result.mPixels[9], 228, 1);
     }
 
-    TEST(ESM4SkinImageTest, tintByAColourAndTheAverageOfAPicture)
+    TEST(ESM4SkinImageTest, aModByAColourAndTheAverageOfAPicture)
     {
         ESM4::SkinImage mixed;
         mixed.mWidth = 2;
@@ -441,12 +468,13 @@ namespace
         EXPECT_FLOAT_EQ(mean[1], 150.f);
         EXPECT_FLOAT_EQ(mean[2], 150.f);
 
-        const ESM4::SkinImage result = ESM4::tintSkin(flatImage(1, 1, 200, 200, 200), mean, 1.f);
-        EXPECT_NEAR(result.mPixels[0], 39, 1);
-        EXPECT_NEAR(result.mPixels[1], 118, 1);
+        const ESM4::SkinImage result = ESM4::addSkinMod(flatImage(1, 1, 200, 200, 200), mean, 1.f, noGain);
+        EXPECT_NEAR(result.mPixels[0], 123, 1);
+        EXPECT_NEAR(result.mPixels[1], 222, 1);
+        EXPECT_NEAR(result.mPixels[2], 222, 1);
 
         EXPECT_EQ(ESM4::averageColour({}), (std::array<float, 3>{ 0.f, 0.f, 0.f }));
-        EXPECT_TRUE(ESM4::tintSkin({}, mean, 2.f).mPixels.empty());
-        EXPECT_TRUE(ESM4::tintSkin(flatImage(1, 1, 1, 1, 1), ESM4::SkinImage{}, 2.f).mPixels.empty());
+        EXPECT_TRUE(ESM4::addSkinMod({}, mean, 2.f, noGain).mPixels.empty());
+        EXPECT_TRUE(ESM4::addSkinMod(flatImage(1, 1, 1, 1, 1), ESM4::SkinImage{}, 2.f, noGain).mPixels.empty());
     }
 }

@@ -324,7 +324,7 @@ namespace
         EXPECT_EQ(replaceDiffuseMap(*part, DiffuseChooser()), 0u);
     }
 
-    TEST(OpenFalloutRenderTintSkinImage, multipliesTheSkinByTwiceTheTint)
+    TEST(OpenFalloutRenderTintSkinImage, addsTwiceWhatTheTextureHasAboveHalfGreyToTheSkin)
     {
         const osg::ref_ptr<osg::Image> skin = makeRgb(4, 4, 100, 150, 200, "textures/characters/male/skin.dds");
         const osg::ref_ptr<osg::Image> tint
@@ -335,9 +335,10 @@ namespace
         EXPECT_EQ(tinted->s(), 4);
         EXPECT_EQ(tinted->t(), 4);
         EXPECT_EQ(tinted->getPixelFormat(), static_cast<GLenum>(GL_RGB));
-        EXPECT_NEAR(tinted->data()[0], 100, 1);
-        EXPECT_NEAR(tinted->data()[1], 188, 1);
-        EXPECT_NEAR(tinted->data()[2], 100, 1);
+        // (the skin + 2 * (texture - 127.5)) times the default of the detail mod, (0.9725, 1.0196, 0.9725)
+        EXPECT_NEAR(tinted->data()[0], 98, 1);
+        EXPECT_NEAR(tinted->data()[1], 219, 1);
+        EXPECT_NEAR(tinted->data()[2], 71, 1);
         // the skin of the race is not changed
         EXPECT_EQ(skin->data()[0], 100);
         // and the same two files give the same picture while it is in use
@@ -355,9 +356,9 @@ namespace
 
         const osg::ref_ptr<osg::Image> tinted = tintSkinImageByAverage(*skin, *tint);
         ASSERT_NE(tinted, nullptr);
-        // twice the average, 127.5 of 255, is one
-        EXPECT_NEAR(tinted->data()[0], 200, 1);
-        EXPECT_NEAR(tinted->data()[11], 200, 1);
+        // the average, 127.5 of 255, changes nothing but the default of the detail mod, 0.9725 for red and blue
+        EXPECT_NEAR(tinted->data()[0], 195, 1);
+        EXPECT_NEAR(tinted->data()[11], 195, 1);
     }
 
     TEST(OpenFalloutRenderTintSkinImage, isNothingForAPictureInAFormatThatCannotBeRead)

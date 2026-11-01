@@ -203,7 +203,7 @@ namespace OFRender
         {
             look.mTexture = source + (look.mTexture.empty() ? "" : " in colour");
             if (tint != nullptr)
-                look.mTexture += (average ? " x average of " : " x ") + tint->getFileName();
+                look.mTexture += (average ? " + average of " : " + ") + tint->getFileName();
         }
         return look;
     }

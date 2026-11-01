@@ -349,6 +349,9 @@ namespace ESM4
             return static_cast<std::uint8_t>(std::clamp(value + 0.5f, 0.f, 255.f));
         }
 
+        // The value of a mod that changes nothing: the shaders take the half of 1 off it
+        constexpr float sModNeutral = 127.5f;
+
         // The four colours of a block of S3TC: two of 5:6:5 bits and, between them, two more (when the first is the
         // greater, or always in the blocks of DXT3 and DXT5, which have their alpha before the colours)
         void blockColours(const std::uint8_t* block, bool fourColours, std::uint8_t colours[4][3])
@@ -500,27 +503,28 @@ namespace ESM4
         return false;
     }
 
-    SkinImage tintSkin(const SkinImage& skin, const SkinImage& tint, float scale)
+    SkinImage addSkinMod(const SkinImage& skin, const SkinImage& mod, float scale, const std::array<float, 3>& gain)
     {
-        if (!fits(skin) || !fits(tint))
+        if (!fits(skin) || !fits(mod))
             return {};
         SkinImage result;
         result.mWidth = skin.mWidth;
         result.mHeight = skin.mHeight;
         result.mPixels.resize(skin.mPixels.size());
-        // The tint is read at the place of each pixel of the skin, in the units of its own pixels
-        const float toTintX = static_cast<float>(tint.mWidth) / static_cast<float>(skin.mWidth);
-        const float toTintY = static_cast<float>(tint.mHeight) / static_cast<float>(skin.mHeight);
+        // The mod is read at the place of each pixel of the skin, in the units of its own pixels
+        const float toModX = static_cast<float>(mod.mWidth) / static_cast<float>(skin.mWidth);
+        const float toModY = static_cast<float>(mod.mHeight) / static_cast<float>(skin.mHeight);
         for (int y = 0; y < skin.mHeight; ++y)
             for (int x = 0; x < skin.mWidth; ++x)
             {
-                const float tx = (static_cast<float>(x) + 0.5f) * toTintX;
-                const float ty = (static_cast<float>(y) + 0.5f) * toTintY;
+                const float tx = (static_cast<float>(x) + 0.5f) * toModX;
+                const float ty = (static_cast<float>(y) + 0.5f) * toModY;
                 const std::size_t at = (static_cast<std::size_t>(y) * skin.mWidth + x) * 3;
                 for (int channel = 0; channel < 3; ++channel)
                 {
-                    const float factor = sampleChannel(tint, tx, ty, channel) / 255.f * scale;
-                    result.mPixels[at + channel] = clampByte(static_cast<float>(skin.mPixels[at + channel]) * factor);
+                    const float offset = (sampleChannel(mod, tx, ty, channel) - sModNeutral) * scale;
+                    result.mPixels[at + channel]
+                        = clampByte((static_cast<float>(skin.mPixels[at + channel]) + offset) * gain[channel]);
                 }
             }
         return result;
@@ -541,7 +545,8 @@ namespace ESM4
         return mean;
     }
 
-    SkinImage tintSkin(const SkinImage& skin, const std::array<float, 3>& colour, float scale)
+    SkinImage addSkinMod(
+        const SkinImage& skin, const std::array<float, 3>& mod, float scale, const std::array<float, 3>& gain)
     {
         if (!fits(skin))
             return {};
@@ -550,7 +555,11 @@ namespace ESM4
         result.mHeight = skin.mHeight;
         result.mPixels.resize(skin.mPixels.size());
         for (std::size_t i = 0; i < skin.mPixels.size(); ++i)
-            result.mPixels[i] = clampByte(static_cast<float>(skin.mPixels[i]) * colour[i % 3] / 255.f * scale);
+        {
+            const std::size_t channel = i % 3;
+            result.mPixels[i] = clampByte(
+                (static_cast<float>(skin.mPixels[i]) + (mod[channel] - sModNeutral) * scale) * gain[channel]);
+        }
         return result;
     }
 }

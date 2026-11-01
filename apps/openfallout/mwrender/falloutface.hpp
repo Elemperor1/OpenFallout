@@ -46,14 +46,17 @@ namespace OFRender
     /// part only. Returns how many nodes it changed.
     std::size_t replaceDiffuseMap(osg::Node& part, const DiffuseChooser& choose);
 
-    /// The skin with the texture that the editor wrote for a character on it: each colour of the skin times twice the
-    /// colour of the tint at the same place. The tint is stretched over the skin, so a tint of 8 by 8 pixels is a few
-    /// colours spread over the body. The result is a new picture, shared by whoever asks for the same two files while
-    /// one has it. Null when either is in a format that cannot be read (it is not the one of the other characters).
+    /// The skin with the texture that the editor wrote for a character (its facemods or bodymods file, the base mod)
+    /// on it, as the skin shaders of the games do it: twice what the texture has above a half grey is added to each
+    /// colour of the skin, and the sum is multiplied by the default of the detail mod, nearly one. The texture is
+    /// stretched over the skin, so a texture of 8 by 8 pixels is a few colours spread over the body. The result is a
+    /// new picture, shared by whoever asks for the same two files while one has it. Null when either is in a format
+    /// that cannot be read (it is not the one of the other characters).
     osg::ref_ptr<osg::Image> tintSkinImage(const osg::Image& skin, const osg::Image& tint);
 
-    /// The same with the average colour of the tint in the place of the tint: for a part of the body whose picture is
-    /// laid out otherwise than the tint's (the hands have a picture of their own, the tint is that of the body).
+    /// The same with the average colour of the texture in the place of the texture: for a part of the body whose
+    /// picture is laid out otherwise than the texture's (the hands have a picture of their own, the texture is that of
+    /// the body).
     osg::ref_ptr<osg::Image> tintSkinImageByAverage(const osg::Image& skin, const osg::Image& tint);
 
     /// Gives the shapes of a hair, beard or eyebrow its colour. The pictures of the hair of the games are greys that
