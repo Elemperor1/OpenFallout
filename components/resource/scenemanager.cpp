@@ -881,6 +881,11 @@ namespace Resource
                 return false;
             if (isReservedName(node->getName()))
                 return false;
+            // The hair of a character is two shapes in one model, for a head with a hat and for one without, and the
+            // one that the character does not need is taken out by its name
+            if (Misc::StringUtils::ciEqual(node->getName(), "hat")
+                || Misc::StringUtils::ciEqual(node->getName(), "nohat"))
+                return false;
             // A model that names the node of a skeleton it is attached to (the hair of a character, a hat) holds
             // that on its root, which would be gone with the root when the root is merged into its parent
             std::string attachTo;
