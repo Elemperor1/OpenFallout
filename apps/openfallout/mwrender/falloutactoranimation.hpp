@@ -92,6 +92,9 @@ namespace OFRender
         /// Starts the idle again when a part of the body has no animation (the T of the skeleton shows)
         void watchPose(float duration);
 
+        /// Says in the log where the bones of the actor stand a second into its idle (the first few actors only)
+        void logPose(float duration);
+
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
         void setGait(FalloutGait gait);
@@ -124,6 +127,9 @@ namespace OFRender
         bool mBareReported = false;
         /// Whether the idle was looked at for a part of the body that it has nothing for
         bool mCoverageChecked = false;
+        /// How long the idle has played, and whether the bones were said
+        float mPoseTime = 0.f;
+        bool mPoseLogged = false;
 
         std::string mWalkGroup;
         std::string mRunGroup;

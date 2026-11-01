@@ -1,6 +1,7 @@
 #include "falloutactoranimation.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <iomanip>
 #include <map>
@@ -206,6 +207,32 @@ namespace OFRender
         }
     }
 
+    namespace
+    {
+        // Keeps the node "Bip01" of a person on the floor. The skeleton file has it at the standing height of the
+        // pelvis (67.77) and the animations of the games put that height on its child "Bip01 NonAccum", so the node is
+        // lowered after everything that could have put it back (a controller of the skeleton file itself) on every
+        // frame. A node that an animation keys at another height is left as that animation has it.
+        class LowerRootCallback : public SceneUtil::NodeCallback<LowerRootCallback, osg::MatrixTransform*>
+        {
+        public:
+            explicit LowerRootCallback(float restHeight)
+                : mRestHeight(restHeight)
+            {
+            }
+
+            void operator()(osg::MatrixTransform* node, osg::NodeVisitor* nv)
+            {
+                if (std::abs(node->getMatrix().getTrans().z() - mRestHeight) < 0.01f)
+                    lowerToTheFloor(*node);
+                traverse(node, nv);
+            }
+
+        private:
+            float mRestHeight;
+        };
+    }
+
     FalloutActorAnimation::FalloutActorAnimation(
         const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
         : Animation(ptr, std::move(parentNode), resourceSystem)
@@ -247,6 +274,40 @@ namespace OFRender
         updateGait(duration);
         runAnimation(duration);
         watchPose(duration);
+        logPose(duration);
+    }
+
+    void FalloutActorAnimation::logPose(float duration)
+    {
+        // Where the bones of a person stand a second into the idle, for the first few of them: what to read when one
+        // stands above the floor or sinks into it. The character has its feet at height 0.
+        if (mPoseLogged || mObjectRoot == nullptr || mPtr.getType() != ESM4::Npc::sRecordId)
+            return;
+        mPoseTime += duration;
+        if (mPoseTime < 1.f)
+            return;
+        mPoseLogged = true;
+        static std::atomic<int> sLogged{ 0 };
+        if (sLogged.fetch_add(1) >= 6)
+            return;
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(2);
+        bool first = true;
+        for (const char* name :
+            { "Bip01", "Bip01 NonAccum", "Bip01 Pelvis", "Bip01 Head", "Bip01 L Foot", "Bip01 R Foot" })
+        {
+            SceneUtil::FindByNameVisitor find(name);
+            mObjectRoot->accept(find);
+            if (find.mFoundNode == nullptr)
+                continue;
+            const osg::NodePathList paths = find.mFoundNode->getParentalNodePaths(mObjectRoot.get());
+            if (paths.empty())
+                continue;
+            out << (first ? "" : ", ") << name << " z " << osg::computeLocalToWorld(paths.front()).getTrans().z();
+            first = false;
+        }
+        Log(Debug::Info) << "Pose of " << mPtr.getCellRef().getRefId()
+                         << " after a second (heights in the character, feet at 0): " << out.str();
     }
 
     void FalloutActorAnimation::watchPose(float duration)
@@ -395,7 +456,11 @@ namespace OFRender
             SceneUtil::FindByNameVisitor find("Bip01");
             mObjectRoot->accept(find);
             if (osg::MatrixTransform* pelvisRoot = dynamic_cast<osg::MatrixTransform*>(find.mFoundNode))
+            {
+                const float restHeight = pelvisRoot->getMatrix().getTrans().z();
                 lowerToTheFloor(*pelvisRoot);
+                pelvisRoot->addUpdateCallback(new LowerRootCallback(restHeight));
+            }
         }
 
         mAdvanceCallback = new AdvanceCallback(*this);
