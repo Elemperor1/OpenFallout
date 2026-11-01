@@ -1,0 +1,155 @@
+#include <components/falloutmenu/atlas.hpp>
+#include <components/falloutmenu/font.hpp>
+
+#include <gtest/gtest.h>
+
+#include <cstring>
+#include <string>
+
+namespace
+{
+    using FalloutMenu::Atlas;
+    using FalloutMenu::Font;
+    using FalloutMenu::FontSet;
+
+    constexpr std::size_t headerBytes = 296;
+    constexpr std::size_t glyphBytes = 56;
+
+    void putFloat(std::string& bytes, std::size_t at, float value)
+    {
+        std::memcpy(bytes.data() + at, &value, sizeof(value));
+    }
+
+    void putGlyph(
+        std::string& bytes, unsigned char c, float width, float height, float before, float after, float ascent)
+    {
+        const std::size_t at = bytes.size() - 256 * glyphBytes + c * glyphBytes;
+        putFloat(bytes, at + 4, 0.25f);
+        putFloat(bytes, at + 8, 0.5f);
+        putFloat(bytes, at + 12, 0.5f);
+        putFloat(bytes, at + 24, 0.75f);
+        putFloat(bytes, at + 36, width);
+        putFloat(bytes, at + 40, height);
+        putFloat(bytes, at + 44, before);
+        putFloat(bytes, at + 48, after);
+        putFloat(bytes, at + 52, ascent);
+    }
+
+    // A font of 30 high lines whose characters are 10 wide with 1 before and 1 after, and a narrow space
+    std::string testFont()
+    {
+        std::string bytes(headerBytes + 256 * glyphBytes, '\0');
+        putFloat(bytes, 0, 30.f);
+        const unsigned int one = 1;
+        std::memcpy(bytes.data() + 4, &one, sizeof(one));
+        std::memcpy(bytes.data() + 12, "test_font_0", 11);
+        for (unsigned char c = 33; c < 127; ++c)
+            putGlyph(bytes, c, 10.f, 20.f, 1.f, 1.f, 20.f);
+        putGlyph(bytes, ' ', 0.f, 0.f, 0.f, 6.f, 0.f);
+        return bytes;
+    }
+
+    TEST(FalloutMenuFontTest, a_file_that_is_too_short_or_has_no_size_is_not_a_font)
+    {
+        EXPECT_FALSE(Font::parse("short"));
+        EXPECT_FALSE(Font::parse(std::string(headerBytes + 256 * glyphBytes, '\0')));
+    }
+
+    TEST(FalloutMenuFontTest, the_header_gives_the_line_height_and_the_texture_name)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        EXPECT_FLOAT_EQ(font->lineHeight(), 30.f);
+        EXPECT_EQ(font->textureName(), "test_font_0");
+        EXPECT_FLOAT_EQ(font->baseline(), 20.f);
+        EXPECT_FLOAT_EQ(font->glyph('A').mWidth, 10.f);
+        EXPECT_FLOAT_EQ(font->glyph('A').mU0, 0.25f);
+        EXPECT_FLOAT_EQ(font->glyph('A').mV1, 0.75f);
+    }
+
+    TEST(FalloutMenuFontTest, a_character_is_as_wide_as_its_picture_and_the_room_around_it)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        EXPECT_FLOAT_EQ(font->advance('A'), 12.f);
+        EXPECT_FLOAT_EQ(font->advance(' '), 6.f);
+        EXPECT_FLOAT_EQ(font->lineWidth("AB A"), 12.f + 12.f + 6.f + 12.f);
+    }
+
+    TEST(FalloutMenuFontTest, a_line_is_laid_out_character_by_character_from_the_top_left)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        const Font::Layout layout = font->layout("A A");
+        ASSERT_EQ(layout.mQuads.size(), 2u);
+        EXPECT_EQ(layout.mLines, 1);
+        EXPECT_FLOAT_EQ(layout.mWidth, 30.f);
+        EXPECT_FLOAT_EQ(layout.mHeight, 30.f);
+        // The picture starts after the room before it, and its top is as far above the baseline as it reaches
+        EXPECT_FLOAT_EQ(layout.mQuads[0].mX, 1.f);
+        EXPECT_FLOAT_EQ(layout.mQuads[0].mY, 0.f);
+        EXPECT_FLOAT_EQ(layout.mQuads[1].mX, 12.f + 6.f + 1.f);
+    }
+
+    TEST(FalloutMenuFontTest, text_breaks_at_new_lines_and_at_the_space_before_a_word_that_does_not_fit)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        EXPECT_EQ(font->layout("A\nA").mLines, 2);
+        EXPECT_FLOAT_EQ(font->layout("A\nA").mHeight, 60.f);
+        // Three words of two characters (24 wide) in a space for 40: one word on each line
+        const Font::Layout wrapped = font->layout("AA AA AA", 40.f);
+        EXPECT_EQ(wrapped.mLines, 3);
+        EXPECT_LE(wrapped.mWidth, 40.f);
+        // Without a limit it is one line
+        EXPECT_EQ(font->layout("AA AA AA").mLines, 1);
+    }
+
+    TEST(FalloutMenuFontTest, lines_are_justified_inside_the_width_of_the_block)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        // "A" is 12 wide and "AAAA" 48: the short line of a centred block starts 18 in, of a right one 36 in
+        const Font::Layout centre = font->layout("AAAA\nA", 0.f, 2);
+        ASSERT_EQ(centre.mQuads.size(), 5u);
+        EXPECT_FLOAT_EQ(centre.mQuads[4].mX, 18.f + 1.f);
+        const Font::Layout right = font->layout("AAAA\nA", 0.f, 4);
+        EXPECT_FLOAT_EQ(right.mQuads[4].mX, 36.f + 1.f);
+        EXPECT_FLOAT_EQ(right.mQuads[4].mY, 30.f);
+    }
+
+    TEST(FalloutMenuFontTest, the_font_set_gives_a_font_that_is_there_for_a_number_that_is_not)
+    {
+        FontSet set;
+        EXPECT_TRUE(set.empty());
+        EXPECT_EQ(set.get(1), nullptr);
+        set.set(3, *Font::parse(testFont()));
+        EXPECT_FALSE(set.empty());
+        EXPECT_NE(set.get(3), nullptr);
+        EXPECT_EQ(set.get(5), set.get(3));
+        EXPECT_EQ(set.get(0), set.get(3));
+        // A number outside the nine is ignored when it is set
+        set.set(10, *Font::parse(testFont()));
+        EXPECT_EQ(set.get(10), set.get(3));
+    }
+
+    TEST(FalloutMenuAtlasTest, each_line_names_a_part_of_the_big_texture)
+    {
+        const Atlas atlas = Atlas::parse(
+            "# comment\n"
+            "\n"
+            "Solid.dds\t\tBig0.dds, 0, 2D, 0.250000, 0.500000, 0.000000, 0.125000, 0.062500\n"
+            "line.dds\t\tBig0.dds, 0, 2D, 0.0, 0.0, 0.0, 1.0, 1.0\r\n"
+            "bad line\n");
+        EXPECT_EQ(atlas.size(), 2u);
+        const Atlas::Entry* solid = atlas.find("Interface\\Shared\\SOLID.dds");
+        ASSERT_NE(solid, nullptr);
+        EXPECT_EQ(solid->mTexture, "Big0.dds");
+        EXPECT_FLOAT_EQ(solid->mU, 0.25f);
+        EXPECT_FLOAT_EQ(solid->mV, 0.5f);
+        EXPECT_FLOAT_EQ(solid->mWidth, 0.125f);
+        EXPECT_FLOAT_EQ(solid->mHeight, 0.0625f);
+        EXPECT_NE(atlas.find("line.dds"), nullptr);
+        EXPECT_EQ(atlas.find("nothing.dds"), nullptr);
+    }
+}
