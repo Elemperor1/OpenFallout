@@ -1412,6 +1412,13 @@ namespace OFScript
                     if (!mMessagesDrawnByLua || waited > 5000)
                     {
                         mOpenByLua = false;
+                        {
+                            // The window is the manager's from now on: a script that draws the boxes lets go of this
+                            // one
+                            const std::lock_guard lock(mOpenMessageMutex);
+                            if (mOpenMessage)
+                                mOpenMessage->mLua = false;
+                        }
                         windows->interactiveMessageBox(mOpenBox.mText, mOpenBox.mButtons, false, 0);
                         mOpenBoxId = windows->interactiveMessageBoxId();
                     }
@@ -1455,6 +1462,12 @@ namespace OFScript
         }
         mOpenNumbers = box.mNumbers;
         mOpenOwner = box.mOwner;
+        const std::int64_t now
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count();
+        // A script that says it draws the boxes (and said it a moment ago) has this one; otherwise the window
+        // manager's window is made for it, and a script that draws is told so (OpenMessage::mLua)
+        const bool byLua = mMessagesDrawnByLua && now - mMessagesClaimedAt.load() < 1000;
         {
             OpenMessage open;
             open.mSerial = ++mMessageSerial;
@@ -1465,14 +1478,12 @@ namespace OFScript
             open.mBody = box.mBody;
             open.mTimed = box.mTimed;
             open.mTime = box.mTime;
+            open.mLua = byLua;
             const std::lock_guard lock(mOpenMessageMutex);
             mOpenMessage = std::move(open);
         }
         mMessageOpen = true;
-        const std::int64_t now
-            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                  .count();
-        if (mMessagesDrawnByLua && now - mMessagesClaimedAt.load() < 1000)
+        if (byLua)
         {
             // The box is Lua's: the window manager makes none, and the button is what Lua presses
             mOpenByLua = true;

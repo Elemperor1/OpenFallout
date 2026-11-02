@@ -970,6 +970,9 @@ namespace OFScript
             /// seconds (the record's display time); `mButtons` then has the one that closes it
             bool mTimed = false;
             double mTime = 0;
+            /// A script of Lua draws this box (the button it picks is the answer); false when the window manager's own
+            /// window is open for it, which a script must not draw a second time
+            bool mLua = false;
         };
         /// The box that is open, if any (any thread)
         std::optional<OpenMessage> openMessage() const;

@@ -14,6 +14,11 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
+
 local menuModule = require('scripts.omw.falloutmenu')
 
 local chargen = core.chargen
@@ -800,7 +805,7 @@ return {
         -- The game stands still while a screen is open, and the screens of the engine open between frames
         onFrame = sync,
         onKeyPress = function(key)
-            if not shownPage or not (element or shown) then
+            if messageOpen() or not shownPage or not (element or shown) then
                 return
             end
             if shown and controls and shownPage ~= 'name' and key.code ~= input.KEY.Enter then

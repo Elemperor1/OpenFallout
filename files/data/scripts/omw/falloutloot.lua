@@ -6,6 +6,11 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local menuModule = require('scripts.omw.falloutmenu')
@@ -479,7 +484,7 @@ end
 -- thing, Enter takes it and R takes everything
 local function press(code)
     -- (a menu opened over the screen takes the keys and the buttons)
-    if not isOpen() or I.UI.getMode() ~= 'Interface' then
+    if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     if shown then
@@ -502,7 +507,7 @@ local function press(code)
 end
 
 -- On the pad Y takes the thing and X takes everything
-local onPad = pad.handler('loot', function() return isOpen() and I.UI.getMode() == 'Interface' end, press,
+local onPad = pad.handler('loot', function() return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.R })
 
 local function sync()
@@ -539,6 +544,9 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            if messageOpen() then
+                return
+            end
             -- the lists of the file's menu take the wheel themselves
             if shown then
                 return

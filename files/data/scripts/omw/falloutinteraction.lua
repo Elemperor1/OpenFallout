@@ -7,6 +7,11 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
 local pad = require('scripts.omw.falloutpad')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local menuModule = require('scripts.omw.falloutmenu')
@@ -392,7 +397,7 @@ end
 -- and Enter begins the wait; on the screen of a lock Enter puts a bobby pin in
 local function press(code)
     -- (a menu opened over the screen takes the keys and the buttons)
-    if I.UI.getMode() ~= 'Interface' then
+    if I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     if screen == 'rest' then
@@ -416,7 +421,8 @@ local function press(code)
 end
 
 local onPad = pad.handler('interaction',
-    function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' end, press)
+    function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' and not messageOpen() end,
+    press)
 
 return {
     engineHandlers = {

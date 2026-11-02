@@ -251,6 +251,11 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - Keys: Escape picks the last button; a letter picks the first button whose words start with it. Arrows, Enter and Space
   (the lit button, or the first) are the port's own; the executable leaves them to the list.
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
+- The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
+  pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
+  keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`).
+- A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
+  after its claim ran out, has the window manager's own window and is left to it.
 
 Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the sound the box makes
 when it opens (`UIPopUpMessageWindow`) and the click sound (`UIMenuOK`), the message's own sound, and everything in this

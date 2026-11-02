@@ -19,7 +19,9 @@ namespace OFLua
         // apart as `title` and `body`), the buttons the player can pick from (in the order they are listed), the form
         // of its message (as core.getFormId writes one) and a number that is another for each box that opens. A box
         // with no button of its own has `timed` and the `time` in seconds after which the game's box closes itself (a
-        // script that draws it presses its button then). Nothing when no box is open.
+        // script that draws it presses its button then). `lua` is true when the script that claimed the boxes draws
+        // this one: a box that opened before the claim, or after its lease ran out, has the window manager's own
+        // window, and a script must not draw it a second time. Nothing when no box is open.
         api["current"] = [lua]() -> sol::object {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             if (scripts == nullptr)
@@ -35,6 +37,7 @@ namespace OFLua
             result["body"] = open->mBody;
             result["timed"] = open->mTimed;
             result["time"] = open->mTime;
+            result["lua"] = open->mLua;
             sol::table buttons(lua, sol::create);
             int index = 1;
             for (const std::string& button : open->mButtons)

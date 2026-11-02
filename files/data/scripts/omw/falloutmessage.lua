@@ -7,8 +7,11 @@
 -- is open and which button was picked is the engine's (core.messagebox); this script shows the box and presses the
 -- button. A game whose data lacks the file keeps the window of the engine's own: the script gives the boxes back to it.
 local core = require('openfallout.core')
+local async = require('openfallout.async')
 local I = require('openfallout.interfaces')
 local input = require('openfallout.input')
+local ui = require('openfallout.ui')
+local util = require('openfallout.util')
 
 local menuModule = require('scripts.omw.falloutmenu')
 
@@ -34,6 +37,9 @@ local shown = nil
 -- whether its answer has been given
 local serial, openFor, current, answered = nil, 0, nil, false
 local list = nil
+-- A widget the size of the screen under the box: the box has the pointer, as a window that stops the game has it (the
+-- file's stackingtype is no_click_past), and the screens under it are not clicked
+local blocker = nil
 local ownsMode = false
 -- The game's own window is back in charge of the boxes (the file is not there, or does not have what the box needs)
 local given = false
@@ -46,6 +52,10 @@ local function closeMode()
 end
 
 local function close()
+    if blocker then
+        blocker:destroy()
+        blocker = nil
+    end
     if shown then
         shown:close()
         shown = nil
@@ -138,6 +148,12 @@ end
 -- The box that the engine has open is drawn, on top of whatever is open
 local function show(box)
     close()
+    -- (made first, so that the box is above it)
+    blocker = ui.create {
+        layer = 'Modal',
+        props = { relativeSize = util.vector2(1, 1) },
+        events = { mousePress = async:callback(function() end), mouseRelease = async:callback(function() end) },
+    }
     local opened = menuModule.open(FILE, { layer = 'Modal' })
     if not opened then
         giveBack()
@@ -200,13 +216,21 @@ local function onKey(key)
 end
 
 return {
+    interfaceName = 'FalloutMessage',
+    interface = {
+        version = 1,
+        -- Whether a box is drawn: the screens under it leave the keys, the pad and the wheel to it
+        isOpen = function() return shown ~= nil end,
+    },
     engineHandlers = {
         onFrame = function()
             if given then return end
             -- The script says every frame that it draws the boxes: a script that is gone stops being asked
             messagebox.claim(true)
             local box = messagebox.current()
-            if not box then
+            -- A box that the window manager has made its own window for (it opened before the claim, or the claim ran
+            -- out) is that window's: it is not drawn a second time
+            if not box or not box.lua then
                 if shown then close() end
                 return
             end
