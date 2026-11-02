@@ -129,6 +129,13 @@ namespace FalloutMenu::Xml
                     ++p;
                     continue;
                 }
+                if (text.compare(p, 4, "<!--") == 0)
+                {
+                    // A comment between the attributes of a tag is skipped and the tag goes on
+                    const std::size_t end = text.find("-->", p + 4);
+                    p = end == std::string_view::npos ? n : end + 3;
+                    continue;
+                }
                 if (text[p] == '<')
                     break;
                 const std::size_t keyStart = p;

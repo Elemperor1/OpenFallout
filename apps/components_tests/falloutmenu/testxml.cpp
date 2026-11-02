@@ -35,6 +35,21 @@ namespace
         EXPECT_EQ(nodes[0].mChildren[0].mName, "b");
     }
 
+    TEST(FalloutMenuXmlTest, a_comment_between_the_attributes_of_a_tag_is_skipped)
+    {
+        const std::vector<Xml::Node> nodes
+            = Xml::parse("<rect <!-- why --> name=\"Button\" <!-- and --> id='3'><x>1</x></rect>");
+        ASSERT_EQ(nodes.size(), 1u);
+        ASSERT_NE(nodes[0].attribute("name"), nullptr);
+        EXPECT_EQ(*nodes[0].attribute("name"), "Button");
+        ASSERT_NE(nodes[0].attribute("id"), nullptr);
+        EXPECT_EQ(*nodes[0].attribute("id"), "3");
+        ASSERT_EQ(nodes[0].mChildren.size(), 1u);
+        EXPECT_EQ(nodes[0].mChildren[0].mName, "x");
+        // A comment that is never closed ends the file, not the program
+        EXPECT_NO_THROW(Xml::parse("<rect <!-- never ended name=\"a\">"));
+    }
+
     TEST(FalloutMenuXmlTest, a_closing_tag_closes_what_was_left_open_inside_it)
     {
         const std::vector<Xml::Node> nodes = Xml::parse("<a><b><c></a><d/>");
