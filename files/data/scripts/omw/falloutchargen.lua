@@ -46,6 +46,8 @@ local shown = nil
 local updateShown = nil
 -- What the keys do on it: `move(delta)` to another row, `change(delta)` to adjust or to tag the row that is picked
 local controls = nil
+-- What is done every frame while a screen from a file is up (the pointer lights rows without the script being asked)
+local follow = nil
 
 local function update()
     if element then element:update() end
@@ -58,6 +60,7 @@ local function closeShown()
     end
     updateShown = nil
     controls = nil
+    follow = nil
 end
 
 local function destroyElement()
@@ -386,16 +389,25 @@ local function specialMenu()
     shown = opened
     local state = chargen.state()
     -- What the screen started with: Reset goes back to it
-    local baseline, numbers = {}, {}
+    local baseline, numbers, texts = {}, {}, {}
     for index, attribute in ipairs(state.attributes) do
         baseline[attribute.number] = attribute.value
         numbers[index] = attribute.number
+        texts[index] = attribute.description or ''
     end
-    local selected = 1
-    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit
+    local selected, described = 1, nil
+    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit, and the
+    -- description is of that row
     local function pick()
         local row = made.selected()
         if row >= 1 and row <= #numbers then selected = row end
+    end
+    follow = function()
+        local row = made.selected()
+        if row ~= described and row >= 1 and row <= #numbers then
+            described = row
+            opened:set('CGM_SelectionText', 'string', texts[row])
+        end
     end
     function updateShown()
         local now = chargen.state()
@@ -418,7 +430,8 @@ local function specialMenu()
             opened:io('_CurrPoints', total)
             opened:io('_MaxPoints', total + now.pointsLeft)
             opened:set('CGM_PointCounter', 'string', 'Points Left: ' .. now.pointsLeft)
-            opened:set('CGM_SelectionText', 'string', now.attributes[selected].description or '')
+            opened:set('CGM_SelectionText', 'string', texts[selected])
+            described = selected
         end)
     end
     local function adjust(row, delta)
@@ -467,16 +480,25 @@ local function skillsMenu()
     if not opened then return false end
     shown = opened
     -- What the screen started with (skills may arrive already tagged): Reset goes back to it
-    local numbers, tagged = {}, {}
+    local numbers, tagged, texts = {}, {}, {}
     for index, skill in ipairs(chargen.state().skills) do
         numbers[index] = skill.number
         tagged[skill.number] = skill.tagged == true
+        texts[index] = skill.description or ''
     end
-    local selected = 1
-    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit
+    local selected, described = 1, nil
+    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit, and the
+    -- description is of that row
     local function pick()
         local row = made.selected()
         if row >= 1 and row <= #numbers then selected = row end
+    end
+    follow = function()
+        local row = made.selected()
+        if row ~= described and row >= 1 and row <= #numbers then
+            described = row
+            opened:set('CGM_SelectionText', 'string', texts[row])
+        end
     end
     function updateShown()
         local now = chargen.state()
@@ -496,7 +518,8 @@ local function skillsMenu()
             opened:io('_CurrPoints', now.tagLimit - now.tagsLeft)
             opened:io('_MaxPoints', now.tagLimit)
             opened:set('CGM_PointCounter', 'string', 'Tags Left: ' .. now.tagsLeft)
-            opened:set('CGM_SelectionText', 'string', now.skills[selected].description or '')
+            opened:set('CGM_SelectionText', 'string', texts[selected])
+            described = selected
         end)
     end
     local function toggle(row)
@@ -611,7 +634,10 @@ end
 
 local function sync()
     -- A menu drawn from a file keeps the window size it was opened with until it is told the window changed
-    if shown then shown:checkSize() end
+    if shown then
+        shown:checkSize()
+        if follow then follow() end
+    end
     local page = chargen.page()
     if not page then
         if element or modeOpen then
