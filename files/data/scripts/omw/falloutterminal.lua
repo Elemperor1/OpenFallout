@@ -189,7 +189,8 @@ end
 
 local function menuKeyOf(terminal)
     local parts = { terminal.body or '', tostring(terminal.canGoBack == true) }
-    for _, line in ipairs(terminal.lines or {}) do parts[#parts + 1] = line.text end
+    -- The index is part of the key: a line with the same words but another item behind it is another line
+    for _, line in ipairs(terminal.lines or {}) do parts[#parts + 1] = tostring(line.index) .. ' ' .. line.text end
     return table.concat(parts, '\n')
 end
 
