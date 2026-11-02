@@ -171,7 +171,10 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
     const std::size_t segmentCount = static_cast<std::size_t>(divisor) * divisor;
     for (std::size_t i = 0; i < segmentCount; ++i)
     {
-        reader.get(count); // NOTE: count may be zero
+        // NOTE: count may be zero. A failed read ends the loop, so a divisor that promises more
+        // segments than the record holds cannot make it run on without data.
+        if (!reader.getExact(count))
+            throw std::runtime_error("Triangle segments end before the square of divisor");
 
         std::vector<std::uint16_t> indices;
         indices.resize(count);
