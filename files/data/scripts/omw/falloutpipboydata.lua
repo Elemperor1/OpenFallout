@@ -59,9 +59,15 @@ local DATA_RECT_Y = 149
 -- The size of one cell of the worlds, the units of the positions of the markers and of the cells of the map rectangle
 local CELL = 4096
 
--- The picture of a marker by the kind of place its record says it is; any other kind has the dot the games draw
--- for a waypoint (the picture of each kind is chosen by the games' code and is read from the executable)
-local MARKER_ICONS = {}
+-- The picture of a marker: the games' code has one table of fourteen pictures, by the kind of place the marker's record
+-- says it is (1 to 14, the same order in both games' executables), and a picture for a place the player has seen on the
+-- map but cannot travel to yet. A kind outside the table (the code would read past it) has the dot of a waypoint.
+local MARKER_FOLDER = 'Interface\\Icons\\World Map\\icon_map_'
+local MARKER_KINDS = {
+    'city', 'settlement', 'encampment', 'natural_landmark', 'cave', 'factory', 'monument', 'military', 'office',
+    'ruins_town', 'ruins_urban', 'ruins_sewer', 'metro', 'vault',
+}
+local MARKER_UNDISCOVERED = MARKER_FOLDER .. 'undiscovered.dds'
 local MARKER_DEFAULT = 'Interface\\Worldmap\\waypoint_node.dds'
 
 local shown, lists, tabs = nil, nil, nil
@@ -94,8 +100,9 @@ function module.dateText(now)
 end
 
 -- Where a place of the world is on the picture, as the part of its width and height from the north-west corner (0 to 1),
--- by the rectangle of cells the worldspace gives the picture; nil when the worldspace gives none. The cell of a position
--- is the position over the size of a cell, and the rows go up to the north.
+-- by the rectangle of cells the worldspace gives the picture, as both executables do: left = north-west cell x * 4096, right
+-- = (south-east cell x + 1) * 4096, top = (north-west cell y + 1) * 4096, bottom = south-east cell y * 4096, and the rows go
+-- up to the north. nil when the worldspace gives none.
 function module.mapPoint(world, x, y)
     if not world or (world.width or 0) <= 0 or (world.height or 0) <= 0 then return nil end
     local across = world.southEastX - world.northWestX + 1
@@ -201,8 +208,10 @@ local function zoomBy(notches)
     placeMap()
 end
 
-local function markerIcon(marker)
-    return MARKER_ICONS[marker.type or -1] or MARKER_DEFAULT
+function module.markerIcon(marker)
+    if not marker.travel then return MARKER_UNDISCOVERED end
+    local kind = MARKER_KINDS[marker.type or 0]
+    return kind and (MARKER_FOLDER .. kind .. '.dds') or MARKER_DEFAULT
 end
 
 -- The picture, the arrow and the markers of the places the player has found
@@ -236,7 +245,7 @@ local function fillWorld()
             shown:set(tile, '_y', marker.v)
             shown:set(tile, '_LocationName', marker.name or '')
             shown:set(tile, '_MarkerIndex', index)
-            shown:set(tile, 'filename', markerIcon(marker))
+            shown:set(tile, 'filename', module.markerIcon(marker))
             shown:set(tile, 'user0', marker.travel and true or false)
         end
         if info and info.outside then
