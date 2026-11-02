@@ -186,8 +186,14 @@ end
 
 local uiControlsOverridden = false
 
+-- A message box (drawn by a script or in the engine's window) is modal: the menus are not opened or closed under it
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
+
 local function uiAllowed()
     return Player.getControlSwitch(self, Player.CONTROL_SWITCH.Controls) and not uiControlsOverridden
+        and not messageOpen()
 end
 
 input.registerTriggerHandler('Inventory', async:callback(function()

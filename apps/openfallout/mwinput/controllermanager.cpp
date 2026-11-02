@@ -17,6 +17,7 @@
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwgui/windowbase.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "actions.hpp"
 #include "bindingsmanager.hpp"
@@ -255,6 +256,12 @@ namespace OFInput
     bool ControllerManager::gamepadToGuiControl(const SDL_ControllerButtonEvent& arg)
     {
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
+
+        // A message box that a script draws is modal: the buttons do not reach the screens beneath it (the script has
+        // had the button already), as the keys do not (ActionManager::executeAction)
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->luaMessageOpen())
+            return true;
 
         if (Settings::gui().mControllerMenus)
         {
