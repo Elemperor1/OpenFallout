@@ -2,11 +2,11 @@ name,library,kind,games,read,implemented,evidence,note
 generic/test_menu,Building blocks,piece,both,listed,todo,,
 globals,Building blocks,piece,both,listed,todo,,
 prefabs/book_line,Building blocks,piece,both,listed,todo,,
-prefabs/bottom_bracket,Building blocks,piece,both,listed,todo,,
+prefabs/bottom_bracket,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/bottom_tab_bar,Building blocks,piece,both,listed,todo,,
-prefabs/box,Building blocks,piece,both,listed,todo,,
+prefabs/box,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/bracket_vert,Building blocks,piece,both,listed,todo,,
-prefabs/brightness,Building blocks,piece,both,listed,todo,,
+prefabs/brightness,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/button_basic,Building blocks,piece,both,listed,todo,,
 prefabs/button_box,Building blocks,piece,both,listed,todo,,
 prefabs/button_companion_wheel,Building blocks,piece,nv,listed,todo,,
@@ -23,7 +23,7 @@ prefabs/caravan_bet_menu,Building blocks,piece,nv,listed,todo,,
 prefabs/caravan_builddeck_menu,Building blocks,piece,nv,listed,todo,,
 prefabs/caravan_game_menu,Building blocks,piece,nv,listed,todo,,
 prefabs/caravan_results_menu,Building blocks,piece,nv,listed,todo,,
-prefabs/card_info,Building blocks,piece,both,listed,todo,,
+prefabs/card_info,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/color,Building blocks,piece,both,listed,todo,,
 prefabs/compassicon,Building blocks,piece,both,listed,todo,,
 prefabs/fade_line,Building blocks,piece,both,listed,todo,,
@@ -34,38 +34,38 @@ prefabs/focus_box,Building blocks,piece,both,listed,todo,,
 prefabs/generic_background,Building blocks,piece,both,listed,todo,,
 prefabs/horiz_floating_scroll,Building blocks,piece,both,listed,todo,,
 prefabs/horizontal_scroll,Building blocks,piece,both,listed,todo,,
-prefabs/hotkey,Building blocks,piece,both,listed,todo,,
-prefabs/hotkeys,Building blocks,piece,both,listed,todo,,
+prefabs/hotkey,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/hotkeys,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/hudtemplates,Building blocks,piece,both,listed,todo,,
 prefabs/icon_companion_wheel,Building blocks,piece,nv,listed,todo,,
 prefabs/infopiece,Building blocks,piece,both,listed,todo,,
 prefabs/item_listing,Building blocks,piece,both,listed,todo,,
-prefabs/item_stats_display,Building blocks,piece,both,listed,todo,,
-prefabs/line,Building blocks,piece,both,listed,todo,,
-prefabs/list_box,Building blocks,piece,both,listed,todo,,
-prefabs/list_box_template,Building blocks,piece,both,listed,todo,,
+prefabs/item_stats_display,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/line,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/list_box,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/list_box_template,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/load_and_save_menus,Building blocks,piece,both,listed,todo,,
-prefabs/meter,Building blocks,piece,both,listed,todo,,
+prefabs/meter,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/meter_framed,Building blocks,piece,both,listed,todo,,
 prefabs/scroll_line,Building blocks,piece,both,listed,todo,,
-prefabs/scrollbar_horiz,Building blocks,piece,both,listed,todo,,
-prefabs/scrollbar_vert,Building blocks,piece,both,listed,todo,,
+prefabs/scrollbar_horiz,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/scrollbar_vert,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/selection_box,Building blocks,piece,both,listed,todo,,
 prefabs/skill_item,Building blocks,piece,both,listed,todo,,
-prefabs/super_text_box,Building blocks,piece,both,listed,todo,,
+prefabs/super_text_box,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/tab_box,Building blocks,piece,both,listed,todo,,
-prefabs/tabline,Building blocks,piece,both,listed,todo,,
-prefabs/tabline_template,Building blocks,piece,both,listed,todo,,
+prefabs/tabline,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
+prefabs/tabline_template,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/text,Building blocks,piece,both,listed,todo,,
-prefabs/text_box,Building blocks,piece,both,listed,todo,,
+prefabs/text_box,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/tile_button,Building blocks,piece,both,listed,todo,,
 prefabs/tile_button_over,Building blocks,piece,both,listed,todo,,
-prefabs/top_bracket,Building blocks,piece,both,listed,todo,,
+prefabs/top_bracket,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/top_corner_text,Building blocks,piece,both,listed,todo,,
 prefabs/top_corner_title,Building blocks,piece,both,listed,todo,,
 prefabs/trait_select_checkbox,Building blocks,piece,nv,listed,todo,,
 prefabs/vert_floating_scroll,Building blocks,piece,both,listed,todo,,
-prefabs/vertical_fade_line,Building blocks,piece,both,listed,todo,,
+prefabs/vertical_fade_line,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/vertical_scroll,Building blocks,piece,both,listed,todo,,
 prefabs/xbox_floating_hint,Building blocks,piece,both,listed,todo,,
 black_jack_menu,Casino and caravan menus,screen,nv,listed,todo,,
@@ -80,23 +80,23 @@ chargen/char_gen_menu,Characters and dialogue,screen,both,listed,stand-in,,"fall
 chargen/love_tester_menu,Characters and dialogue,screen,nv,listed,todo,,
 chargen/race_sex_menu,Characters and dialogue,screen,both,listed,stand-in,,"falloutchargen.lua: sex and race; the face is not made (no sliders, no head to turn)"
 chargen/specialbookmenu,Characters and dialogue,screen,both,listed,todo,,
-dialog/dialog_menu,Characters and dialogue,screen,both,listed,stand-in,,falloutdialogue.lua takes over the Morrowind dialogue window
+dialog/dialog_menu,Characters and dialogue,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutdialogue.lua fills the topics and the reply; the layout is the file's
 dialog/texteditmenu,Characters and dialogue,screen,both,listed,todo,,
 surgerymenu,Characters and dialogue,screen,both,listed,todo,,
 trait_menu,Characters and dialogue,screen,nv,listed,todo,,
 trait_select_menu,Characters and dialogue,screen,nv,listed,stand-in,,falloutchargen.lua: the traits
 barter_menu,Items and trading,screen,both,listed,todo,,
 book_menu,Items and trading,screen,both,listed,todo,,
-container_menu,Items and trading,screen,both,listed,stand-in,,"falloutloot.lua: things can be taken, not put back yet"
+container_menu,Items and trading,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutloot.lua fills the two lists and the item cards; things move both ways
 item_mod_menu,Items and trading,screen,nv,listed,todo,,
-quantity_menu,Items and trading,screen,both,listed,todo,,
-recipe_menu,Items and trading,screen,nv,listed,stand-in,,falloutcraft.lua lists the recipes of a bench or campfire
+quantity_menu,Items and trading,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutquantity.lua keeps the amount for the container and the Pip-Boy drop
+recipe_menu,Items and trading,screen,nv,read,done,M12 (PR 100): laid out and drawn from its own file; run offline against the real menu code and the extracted New Vegas data; not yet seen in the running game (no bench was reached in Mac round 12A),falloutcraft.lua lists the recipes of a bench or campfire in the file's lists
 repair_menu,Items and trading,screen,both,listed,todo,,no repair yet (falloutpipboy.lua says so)
 repair_services_menu,Items and trading,screen,both,listed,todo,,
 computers_menu,"Locks, terminals and rest",screen,both,listed,stand-in,,falloutinteraction.lua: the menu of a terminal
 hacking_menu,"Locks, terminals and rest",screen,both,listed,stand-in,,falloutinteraction.lua: the game of hacking
 lockpick_menu,"Locks, terminals and rest",screen,both,listed,stand-in,,falloutinteraction.lua: the lock with bobby pins
-sleep_wait_menu,"Locks, terminals and rest",screen,both,listed,stand-in,,falloutinteraction.lua: the hours to wait or sleep
+sleep_wait_menu,"Locks, terminals and rest",screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)","falloutinteraction.lua opens it for the hours to wait or sleep; the hours, the buttons and the meter are the file's"
 loading_menu,Options and saving,screen,both,listed,todo,,
 options/credits_menu,Options and saving,screen,both,listed,todo,,
 options/load_menu,Options and saving,screen,both,listed,todo,,
@@ -110,11 +110,11 @@ generic/quest_added,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
 generic/skill_perk,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
 levelup_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,the level-up screen of falloutpipboy.lua
 main/hud_main_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,"the head-up display is drawn by falloutstatus.lua on its own widgets; its sizes follow the menu file, the layout is not evaluated"
-main/inventory_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,the INV tab of falloutpipboy.lua
+main/inventory_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)","falloutpipboyitems.lua: the ITEMS page of the Pip-Boy (list, tabs, cards, drop)"
 main/map_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,"the DATA tab of falloutpipboy.lua: a list of the places found, no map"
 main/quickkeys_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,no hot keys yet (falloutpipboy.lua says so)
 main/safe_zone,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
-main/stats_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,"the STAT tab (status, S.P.E.C.I.A.L., skills, perks) of falloutpipboy.lua"
+main/stats_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, rounds 12C to 12H, New Vegas and Fallout 3 (General tab lines, perks and the per-limb bars not shown yet; mouse path and pad focus not seen)","falloutpipboystats.lua: the STAT page (status, S.P.E.C.I.A.L., skills, perks) with the descriptions from the plugins"
 message_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
 reputation_menu,"Pip-Boy, HUD and pop-ups",screen,nv,listed,todo,,
 select_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
