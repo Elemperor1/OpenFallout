@@ -849,13 +849,7 @@ namespace OFGui
 
     void SettingsWindow::apply()
     {
-        const Settings::CategorySettingVector changed = Settings::Manager::getPendingChanges();
-        OFBase::Environment::get().getWorld()->processChangedSettings(changed);
-        OFBase::Environment::get().getSoundManager()->processChangedSettings(changed);
-        OFBase::Environment::get().getWindowManager()->processChangedSettings(changed);
-        OFBase::Environment::get().getInputManager()->processChangedSettings(changed);
-        OFBase::Environment::get().getMechanicsManager()->processChangedSettings(changed);
-        Settings::Manager::resetPendingChanges();
+        OFBase::Environment::get().getWindowManager()->applyChangedSettings();
 
         updateLightSettings();
     }

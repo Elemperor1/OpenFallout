@@ -84,6 +84,24 @@ namespace OFLua
             return sol::make_object<int>(lua, tile->uid());
         }
 
+        // The traits of a row of a list, from a table of Lua (texts, numbers and booleans; the rest is left out)
+        std::map<std::string, FalloutMenu::Value> traitsOf(const sol::table& table)
+        {
+            std::map<std::string, FalloutMenu::Value> traits;
+            for (const auto& [key, value] : table)
+            {
+                if (!key.is<std::string>())
+                    continue;
+                if (value.is<std::string>())
+                    traits[key.as<std::string>()] = FalloutMenu::Value::fromText(value.as<std::string>());
+                else if (value.is<bool>())
+                    traits[key.as<std::string>()] = FalloutMenu::Value(value.as<bool>() ? 1.f : 0.f);
+                else if (value.is<double>())
+                    traits[key.as<std::string>()] = FalloutMenu::Value(static_cast<float>(value.as<double>()));
+            }
+            return traits;
+        }
+
         sol::object valueObject(sol::this_state lua, const FalloutMenu::Value& value)
         {
             if (value.isText())
@@ -268,25 +286,18 @@ namespace OFLua
             std::vector<std::map<std::string, FalloutMenu::Value>> made;
             for (std::size_t index = 1; index <= rows.size(); ++index)
             {
-                std::map<std::string, FalloutMenu::Value> row;
                 const sol::object entry = rows[index];
-                if (entry.is<sol::table>())
-                {
-                    for (const auto& [key, value] : entry.as<sol::table>())
-                    {
-                        if (!key.is<std::string>())
-                            continue;
-                        if (value.is<std::string>())
-                            row[key.as<std::string>()] = FalloutMenu::Value::fromText(value.as<std::string>());
-                        else if (value.is<bool>())
-                            row[key.as<std::string>()] = FalloutMenu::Value(value.as<bool>() ? 1.f : 0.f);
-                        else if (value.is<double>())
-                            row[key.as<std::string>()] = FalloutMenu::Value(static_cast<float>(value.as<double>()));
-                    }
-                }
-                made.push_back(std::move(row));
+                made.push_back(entry.is<sol::table>() ? traitsOf(entry.as<sol::table>())
+                                                      : std::map<std::string, FalloutMenu::Value>());
             }
             list->setRows(made);
+        };
+        // Set traits on a row that is there (the row from 1), without making the rows again
+        menuT["updateRow"] = [](LuaMenu& self, int number, int row, const sol::table& traits) {
+            FalloutMenu::ListBox* list = self.mMenu->list(number - 1);
+            if (list == nullptr)
+                throw std::runtime_error("The menu has no list " + std::to_string(number));
+            list->updateRow(row - 1, traitsOf(traits));
         };
         menuT["selectRow"] = [](LuaMenu& self, int number, int row, sol::optional<bool> reveal) {
             if (FalloutMenu::ListBox* list = self.mMenu->list(number - 1))

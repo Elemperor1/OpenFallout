@@ -122,4 +122,27 @@
 -- @function [parent=#menu] settingsOpen
 -- @return #boolean
 
+---
+-- What a setting that the game's own settings screens write is now: a number, or a boolean for a switch. The names are:
+-- `masterVolume`, `musicVolume`, `footstepsVolume`, `voiceVolume`, `effectsVolume` (0 to 1), `gamma` (the video's
+-- gamma), `mouseSensitivity` (the camera's), `invertYAxis`, `crosshair` and `subtitles` (booleans). Any other name is an error.
+-- @function [parent=#menu] getOption
+-- @param #string name
+-- @return #any
+
+---
+-- Change one of those settings (a number, or a boolean for a switch); the engine takes the change at once
+-- @function [parent=#menu] setOption
+-- @param #string name
+-- @param #any value
+
+---
+-- Whether a game controller is plugged in
+-- @function [parent=#menu] controllerConnected
+-- @return #boolean
+
+---
+-- Write the settings to the user's file (the screens of the settings do it when they are left)
+-- @function [parent=#menu] saveOptions
+
 return nil

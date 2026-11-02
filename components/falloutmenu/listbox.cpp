@@ -53,22 +53,34 @@ namespace FalloutMenu
             // What the screen does not say, the row has lit: the files leave the alpha of a row's text for the code to
             // set
             menu.set(*item, "_line_alpha", 255.f);
-            // A trait written `Tile.trait` is set on the tile of that name inside the row (the file's template names
-            // the text of a row, and the marker that shows an equipped item)
-            for (const auto& [trait, value] : row)
-            {
-                if (trait == "_template")
-                    continue;
-                const std::size_t dot = trait.find('.');
-                if (dot == std::string::npos)
-                    menu.set(*item, trait, value);
-                else if (Tile* inside = menu.find(*item, std::string_view(trait).substr(0, dot)))
-                    menu.set(*inside, std::string_view(trait).substr(dot + 1), value);
-            }
+            setTraits(*item, row);
             menu.set(*item, "listindex", static_cast<float>(index++));
             mItems.push_back(item->uid());
         }
         layout();
+    }
+
+    void ListBox::setTraits(Tile& item, const std::map<std::string, Value>& traits)
+    {
+        Menu& menu = mOpen.menu();
+        // A trait written `Tile.trait` is set on the tile of that name inside the row (the file's template names the
+        // text of a row, and the marker that shows an equipped item)
+        for (const auto& [trait, value] : traits)
+        {
+            if (trait == "_template")
+                continue;
+            const std::size_t dot = trait.find('.');
+            if (dot == std::string::npos)
+                menu.set(item, trait, value);
+            else if (Tile* inside = menu.find(item, std::string_view(trait).substr(0, dot)))
+                menu.set(*inside, std::string_view(trait).substr(dot + 1), value);
+        }
+    }
+
+    void ListBox::updateRow(int row, const std::map<std::string, Value>& traits)
+    {
+        if (Tile* target = item(row))
+            setTraits(*target, traits);
     }
 
     Tile* ListBox::item(int row)

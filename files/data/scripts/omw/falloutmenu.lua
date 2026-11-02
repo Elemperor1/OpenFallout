@@ -244,7 +244,8 @@ function Shown:io(trait, value)
 end
 
 -- Make a list of the menu: `listTile` is the list (a tile of `list_box.xml`) and `template` the tile that each row is.
--- Returns an object with `rows(tables of traits)`, `select(row)`, `selected()`, `count()` and `onClick(function(row))`;
+-- Returns an object with `rows(tables of traits)`, `update(row, traits)`, `select(row)`, `selected()`, `count()` and
+-- `onClick(function(row, tile))`;
 -- the rows are from 1.
 function Shown:list(listTile, template)
     local number = self.menu:addList(listTile, template)
@@ -253,6 +254,11 @@ function Shown:list(listTile, template)
     local list = {}
     function list.rows(rows)
         shown.menu:setRows(number, rows)
+        shown:refresh()
+    end
+    -- Set traits on a row that is there (a value that changed), and leave the scrolling of the list as it is
+    function list.update(row, traits)
+        shown.menu:updateRow(number, row, traits)
         shown:refresh()
     end
     function list.select(row, reveal)

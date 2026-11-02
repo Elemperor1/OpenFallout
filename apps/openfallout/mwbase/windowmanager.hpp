@@ -365,6 +365,14 @@ namespace OFBase
         virtual void togglePostProcessorHud() = 0;
         virtual void toggleSettingsWindow() = 0;
 
+        /// What was changed in the settings (the pending changes) is told to the parts of the engine that read them
+        /// (the sound, the video, the input, the mechanics, the world), as the window for the settings does after each
+        /// change, and is not pending any more. A script of Lua that sets a setting calls it.
+        virtual void applyChangedSettings() = 0;
+        /// The settings and the permanent storage of the scripts are written to the user's files, as the window for the
+        /// settings does when it closes
+        virtual void saveSettings() = 0;
+
         /// A script of Lua draws the pause menu (start_menu.xml) when `drawn` is true: the buttons of the window
         /// manager's own menu are not shown while it does. With `escape` the key that leaves the menu (Escape, the B
         /// button) is the script's: it goes back a step in a screen of the menu instead of closing the menu. The script

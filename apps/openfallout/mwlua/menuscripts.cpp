@@ -2,8 +2,16 @@
 
 #include <MyGUI_InputManager.h>
 
+#include <SDL_gamecontroller.h>
+#include <SDL_joystick.h>
+
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
 #include <components/lua/util.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
@@ -36,6 +44,38 @@ namespace OFLua
                 if (slot.mPath.filename() == slotName)
                     return &slot;
             return nullptr;
+        }
+
+        // The settings that the game's own settings screens (the file start_menu.xml) write, by the name that a script
+        // gives them: the screens only reach these, and a setting that the engine has no counterpart of is not here
+        // (the script keeps what the player picked for it)
+        struct Option
+        {
+            std::string_view mName;
+            std::string_view mCategory;
+            std::string_view mSetting;
+            bool mIsBool;
+        };
+
+        constexpr Option screenOptions[] = {
+            { "masterVolume", "Sound", "master volume", false },
+            { "musicVolume", "Sound", "music volume", false },
+            { "footstepsVolume", "Sound", "footsteps volume", false },
+            { "voiceVolume", "Sound", "voice volume", false },
+            { "effectsVolume", "Sound", "sfx volume", false },
+            { "gamma", "Video", "gamma", false },
+            { "mouseSensitivity", "Input", "camera sensitivity", false },
+            { "invertYAxis", "Input", "invert y axis", true },
+            { "crosshair", "HUD", "crosshair", true },
+            { "subtitles", "GUI", "subtitles", true },
+        };
+
+        const Option& findOption(std::string_view name)
+        {
+            for (const Option& option : screenOptions)
+                if (option.mName == name)
+                    return option;
+            throw std::runtime_error("Not a setting of the menu: " + std::string(name));
         }
 
         bool shouldBypass(const sol::optional<sol::table>& options)
@@ -180,6 +220,42 @@ namespace OFLua
                 windows->toggleSettingsWindow();
         };
         api["settingsOpen"] = []() { return OFBase::Environment::get().getWindowManager()->isSettingsWindowVisible(); };
+
+        // The settings that the screens of the game's settings write (the names are in `screenOptions` above): what a
+        // setting is now (a number, or a boolean for those that are switches), and a change of it, which the engine
+        // takes at once
+        api["getOption"] = [](sol::this_state thisState, std::string_view name) -> sol::object {
+            const Option& option = findOption(name);
+            if (option.mIsBool)
+                return sol::make_object(thisState, Settings::get<bool>(option.mCategory, option.mSetting).get());
+            return sol::make_object(thisState, Settings::get<float>(option.mCategory, option.mSetting).get());
+        };
+        api["setOption"] = [](std::string_view name, sol::object value) {
+            const Option& option = findOption(name);
+            if (option.mIsBool)
+            {
+                if (!value.is<bool>())
+                    throw std::runtime_error("The setting is a switch (true or false): " + std::string(name));
+                Settings::get<bool>(option.mCategory, option.mSetting).set(value.as<bool>());
+            }
+            else
+            {
+                if (!value.is<float>())
+                    throw std::runtime_error("The setting is a number: " + std::string(name));
+                Settings::get<float>(option.mCategory, option.mSetting).set(value.as<float>());
+            }
+            OFBase::Environment::get().getWindowManager()->applyChangedSettings();
+        };
+        // Whether a game controller is plugged in (the game's settings leave out the items of the pad when there is
+        // none)
+        api["controllerConnected"] = []() {
+            for (int index = 0; index < SDL_NumJoysticks(); ++index)
+                if (SDL_IsGameController(index) == SDL_TRUE)
+                    return true;
+            return false;
+        };
+        // The settings are written to the user's file (when the screens of the settings are left)
+        api["saveOptions"] = []() { OFBase::Environment::get().getWindowManager()->saveSettings(); };
 
         return LuaUtil::makeReadOnly(api);
     }

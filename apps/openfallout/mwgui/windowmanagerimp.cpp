@@ -59,6 +59,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
+#include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/soundmanager.hpp"
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/world.hpp"
@@ -2475,6 +2476,23 @@ namespace OFGui
                 std::chrono::steady_clock::now().time_since_epoch())
                 .count();
         }
+    }
+
+    void WindowManager::applyChangedSettings()
+    {
+        const Settings::CategorySettingVector changed = Settings::Manager::getPendingChanges();
+        OFBase::Environment::get().getWorld()->processChangedSettings(changed);
+        OFBase::Environment::get().getSoundManager()->processChangedSettings(changed);
+        processChangedSettings(changed);
+        OFBase::Environment::get().getInputManager()->processChangedSettings(changed);
+        OFBase::Environment::get().getMechanicsManager()->processChangedSettings(changed);
+        Settings::Manager::resetPendingChanges();
+    }
+
+    void WindowManager::saveSettings()
+    {
+        Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+        OFBase::Environment::get().getLuaManager()->savePermanentStorage(mCfgMgr.getUserConfigPath());
     }
 
     void WindowManager::setMainMenuDrawnByLua(bool drawn, bool escape)
