@@ -47,15 +47,22 @@ local MAP = {
     centerX = 427.5,
     centerY = 250,
     half = 80,
-    -- How far the picture can be zoomed (the factor of its size in the file) and by how much each turn of the wheel
-    leastZoom = 0.25,
-    mostZoom = 1.0,
-    step = 1.25,
-    -- The widths the file leaves to the code: places, quest markers and the arrow of the player
-    markerWidth = 34,
-    questWidth = 24,
-    arrowWidth = 28,
+    -- How the picture is zoomed (read from both executables): the factor of its size in the file starts at the file's 1.0,
+    -- stays between two settings, and each turn of the wheel multiplies or divides it by 1.1 once, however many notches
+    -- the turn is
+    leastZoom = { 'fWorldMapMinZoom', 0.75 },
+    mostZoom = { 'fWorldMapMaxZoom', 5.0 },
+    startZoom = 1.0,
+    step = 1.1,
+    -- The widths the file leaves to the code (`user0` to `user2`: the places, the quest markers and the arrow of the
+    -- player) are each a setting for the least zoom and one for the most, with the width in between by the zoom's place
+    -- between its two limits
+    markerWidth = { { 'fWorldMapMarkerMinSize', 20 }, { 'fWorldMapMarkerMaxSize', 50 } },
+    questWidth = { { 'fWorldQuestMarkerMinSize', 30 }, { 'fWorldQuestMarkerMaxSize', 60 } },
+    arrowWidth = { { 'fWorldfPlayerCursorMinSize', 40 }, { 'fWorldPlayerCursorMaxSize', 70 } },
 }
+-- The picture of the world map has a margin on each side (13/128 of its width), so a place is at u * 51/64 + 13/128
+local MARGIN, SCALE = 0.1015625, 0.796875
 -- Where the file puts the objectives of a quest (the rectangle under the button of the quest page) with its button shown
 local DATA_RECT_Y = 149
 -- The size of one cell of the worlds, the units of the positions of the markers and of the cells of the map rectangle
@@ -82,13 +89,13 @@ local marked = {}
 local named = nil
 local quests = {}
 -- The place and the size of the picture of the world: the units of the file (the picture may be moved and zoomed)
-local zoom, moveX, moveY = 0.5, 0, 0
+local zoom, moveX, moveY = MAP.startZoom, 0, 0
 local objectivesFor = nil
 -- Where the picture was when the pointer took hold of it, while it is dragged
 local dragFrom = nil
 
--- The words of a tab: the setting's text (the games' own files, then the port's table of the defaults), in capitals as the
--- other tabs of the Pip-Boy are drawn (whether the games capitalise the tab words on the screen is not read)
+-- The words of a tab: the setting's text (the games' own files, then the port's table of the defaults), as the setting
+-- holds it: the executables put the text of a tab on the screen as it is, with no change of case
 local function word(setting, fallback)
     local text = pipboy.text(setting)
     return text ~= '' and text or fallback
@@ -99,8 +106,8 @@ function module.tabLabel(tab, newVegas)
         local ok, stats = pcall(pipboy.stats)
         newVegas = ok and stats ~= nil and stats.newVegas == true
     end
-    if newVegas and tab.vegas then return word(tab.vegas, tab.vegasFallback):upper() end
-    return word(tab.setting, tab.fallback):upper()
+    if newVegas and tab.vegas then return word(tab.vegas, tab.vegasFallback) end
+    return word(tab.setting, tab.fallback)
 end
 
 local function number(value)
@@ -128,6 +135,32 @@ function module.mapPoint(world, x, y)
     local down = world.northWestY - world.southEastY + 1
     if across <= 0 or down <= 0 then return nil end
     return (x / CELL - world.northWestX) / across, (world.northWestY + 1 - y / CELL) / down
+end
+
+-- Where a point given as the part of the cell rectangle (0 to 1) is on the picture of the world map, which has a margin on
+-- each side: the executables remap it on the world map tab (the local map's picture has none)
+function module.pictureSpot(u, v)
+    return u * SCALE + MARGIN, v * SCALE + MARGIN
+end
+
+-- A setting's number (the games' own files, then the default read from the executables)
+local function setting(entry)
+    return pipboy.setting(entry[1]) or entry[2]
+end
+
+-- The least and the most of a size by the zoom, and the size between them at this zoom: the zoom's place between its
+-- two limits (0 to 1) takes the same place between the two sizes
+function module.zoomLimits()
+    local least, most = setting(MAP.leastZoom), setting(MAP.mostZoom)
+    if most < least then least, most = most, least end
+    return least, most
+end
+
+function module.sizeAt(sizes, magnification)
+    local least, most = module.zoomLimits()
+    local low, high = setting(sizes[1]), setting(sizes[2])
+    local t = most > least and (magnification - least) / (most - least) or 0
+    return low + (high - low) * math.max(0, math.min(1, t))
 end
 
 local function interact()
@@ -199,6 +232,9 @@ end
 local function placeMap()
     shown:batch(function()
         shown:set(MAP.image, '_Magnification', zoom)
+        shown:set(MAP.image, 'user0', module.sizeAt(MAP.markerWidth, zoom))
+        shown:set(MAP.image, 'user1', module.sizeAt(MAP.questWidth, zoom))
+        shown:set(MAP.image, 'user2', module.sizeAt(MAP.arrowWidth, zoom))
         clampMove()
         shown:set(MAP.image, 'x', moveX)
         shown:set(MAP.image, 'y', moveY)
@@ -214,13 +250,15 @@ local function centreOn(u, v)
     placeMap()
 end
 
--- Change the zoom, keeping the point under the middle of the window where it is
+-- Change the zoom, keeping the point under the middle of the window where it is: the wheel turned up (the notches of the
+-- script are minus) zooms in, once by the step whatever the number of notches, as the executables do
 local function zoomBy(notches)
     local width, height = imageSize()
-    if width <= 0 or height <= 0 then return end
+    if width <= 0 or height <= 0 or notches == 0 then return end
     local u, v = (MAP.centerX - moveX) / width, (MAP.centerY - moveY) / height
-    local wanted = zoom * (MAP.step ^ (-notches))
-    zoom = math.max(MAP.leastZoom, math.min(MAP.mostZoom, wanted))
+    local least, most = module.zoomLimits()
+    local wanted = notches < 0 and zoom * MAP.step or zoom / MAP.step
+    zoom = math.max(least, math.min(most, wanted))
     shown:set(MAP.image, '_Magnification', zoom)
     width, height = imageSize()
     moveX, moveY = MAP.centerX - u * width, MAP.centerY - v * height
@@ -244,15 +282,22 @@ local function fillWorld()
         if info and info.file and info.file ~= '' then
             shown:set(MAP.image, 'filename', info.file)
         end
+        -- The size of the picture in its file's units: the worldspace's own (the file's 2048 when it gives none)
+        if info and (info.width or 0) > 0 and (info.height or 0) > 0 then
+            shown:set(MAP.image, 'filewidth', info.width)
+            shown:set(MAP.image, 'fileheight', info.height)
+        end
+        local least, most = module.zoomLimits()
+        zoom = math.max(least, math.min(most, zoom))
         shown:set(MAP.image, '_Magnification', zoom)
-        shown:set(MAP.image, 'user0', MAP.markerWidth)
-        shown:set(MAP.image, 'user1', MAP.questWidth)
-        shown:set(MAP.image, 'user2', MAP.arrowWidth)
+        shown:set(MAP.image, 'user0', module.sizeAt(MAP.markerWidth, zoom))
+        shown:set(MAP.image, 'user1', module.sizeAt(MAP.questWidth, zoom))
+        shown:set(MAP.image, 'user2', module.sizeAt(MAP.arrowWidth, zoom))
         local kept = {}
         for _, marker in ipairs(markers) do
             local u, v = module.mapPoint(info, marker.x, marker.y)
             if u and u >= 0 and u <= 1 and v >= 0 and v <= 1 then
-                marker.u, marker.v = u, v
+                marker.u, marker.v = module.pictureSpot(u, v)
                 kept[#kept + 1] = marker
             end
         end
@@ -269,7 +314,10 @@ local function fillWorld()
         end
         if info and info.outside then
             local u, v = module.mapPoint(info, info.x, info.y)
-            if u then points.player = { u = u, v = v } end
+            if u then
+                u, v = module.pictureSpot(u, v)
+                points.player = { u = u, v = v }
+            end
         end
         if shown:find(MAP.arrow) then
             shown:set(MAP.arrow, 'visible', points.player ~= nil)
@@ -425,6 +473,8 @@ local function open()
         return false
     end
     shown, lists, tabs = opened, made, result
+    -- The picture is shown at the file's own size each time the page is opened (the executables keep no zoom between opens)
+    zoom = MAP.startZoom
     opened:batch(function()
         -- The lists that can be picked from take the pointer (the objectives are only read)
         for _, name in ipairs({ 'MM_QuestsList', 'MM_NotesList' }) do

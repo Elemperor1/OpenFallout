@@ -93,9 +93,10 @@ the lines of the general page.
 
 `falloutpipboydata.lua` fills `main/map_menu.xml`. The headline has the place the player is in (the name the engine gives the
 cell, or the worldspace's) and the date and time of the world written as the executables do (`10.22.81, 21:41`: month, day, two digits of the year, then
-the 24-hour clock; no AM or PM); the tabs are WORLD MAP, QUESTS, MISC (NOTES in Fallout 3) and RADIO with the
+the 24-hour clock; no AM or PM); the tabs are World Map, Quests, Misc (Notes in Fallout 3) and Radio with the
 numbers 1 to 4 the file gives them, their words from the settings the executables name (`sWorldMapTabText`, `sQuestsTabText`,
-`sMiscTabText` or `sNotesTabText`, `sCommsTabText`) (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
+`sMiscTabText` or `sNotesTabText`, `sCommsTabText`), written as the setting holds them (the executables' code for the tab bar
+changes no case) (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
 and nothing here can).
 
 *World map.* The picture is the file's `MM_WorldMap_ParentImage` (the file names the Fallout 3 picture; the picture of the
@@ -106,12 +107,20 @@ a picture (the hacking and character menus have such tiles too). The places the 
 file's `MapMarkerTemplate` as children of the picture, with their position in `_x` and `_y` as a part of the picture (0 to 1);
 a place is put on the picture by the rectangle of cells the worldspace's `MNAM` gives it, as both executables do (the left edge
 is the north-west cell times 4096, the right edge is the cell after the south-east one, the top is the cell after the
-north-west one, the bottom is the south-east cell times 4096; the usable width and height of `MNAM` only stretch the picture,
-and the rows go up to the north), and the player's arrow is put the same way. The picture is
+north-west one, the bottom is the south-east cell times 4096, and the rows go up to the north; the usable width and height
+of `MNAM` are the size of the picture in the file's units, `filewidth` and `fileheight`, 2048 for the wasteland), and the
+player's arrow is put the same way. On the world map tab the picture has a margin of 13/128 of its width on each side, so a point
+is at `u * 0.796875 + 0.1015625` of the picture (the executables remap it for that tab only). The picture is
 placed with the file's own numbers (the window of the map is 855 by 500 units, its middle 427.5 by 250 is where the picture
-can be moved to at most, the box in the middle names the place under it) and starts centred on the player at half size.
+can be moved to at most, the box in the middle names the place under it) and starts centred on the player at the file's own
+size (a magnification of 1.0, the file's default; the executables keep none between two openings).
 The pointer drags the picture and the wheel zooms it (the file's `draggable` and `wheelable` tiles; the page does the
-arithmetic, since the file leaves it to code); a click on a place travels there, a place that cannot be travelled to (found,
+arithmetic, since the file leaves it to code): a turn of the wheel multiplies the magnification by 1.1 (up) or divides it
+by 1.1 (down) once, however many notches the turn is, between `fWorldMapMinZoom` and `fWorldMapMaxZoom` (0.75 and 5.0 in
+both executables, and no plugin of either game changes them). The widths the file leaves to the code (`user0` of the picture for the places, `user1`
+for the quest markers, `user2` for the arrow) are each a pair of settings read from the executables: the width runs from the least to the
+most as the magnification runs from its least to its most limit (places `fWorldMapMarkerMinSize` and `fWorldMapMarkerMaxSize`, 20 and 50;
+quest markers 30 and 60; the arrow 40 and 70); a click on a place travels there, a place that cannot be travelled to (found,
 not visited) only says its name. Enter travels to the place the box names. The picture of a place is the games' own table of fourteen
 (`Interface\Icons\World Map\icon_map_*`: city, settlement, encampment, natural landmark, cave, factory, monument, military,
 office, ruins town, ruins urban, ruins sewer, metro, vault, by the marker's type 1 to 14, in that order in both executables)
@@ -177,11 +186,12 @@ table; a game in another language gets its words from its plugin). The card, car
   word stays whole (the port's rule, matched to that).
 - The meaning of the byte `&widescreen;` reads, and of the traits `wraplimit`, `wraplines`, `ishtml`, `cropx`, `cropy`,
   `repeat*`, `explorefade` and `menufade`.
-- Whether the tab words of the data page are
-  drawn in capitals (the page does, as the other tabs of the Pip-Boy; the executables' own code for it was not read),
-  the zoom limits and the size of the places on the map (the executables keep them in settings whose default values are not
-  read yet), and the remap of the position (`u * 0.796875 + 0.1015625`) that the executables apply for one mode of the map
-  object, which is not the world map as far as is known.
+- Whether the font or the file draws the tab words of the data page in capitals (the executables' code for the tab bar does
+  not change their case; New Vegas was read, Fallout 3 was not), what turns the arrow of the player on the map (the code sets
+  its angle to minus the player's heading, minus 0.3, minus the cell's north offset inside; the page has no turning picture
+  yet), the local map tab (zoom 0.1 to 0.9, places 20 to 75, a render of the cell), and which form the cell's extra data of kind
+  1 is that the headline's place text reads outside (the page writes the worldspace's name, or the cell's, where the games
+  write the region's or the cell's map name).
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in
   the executable's table. The loader leaves them as text.
 
