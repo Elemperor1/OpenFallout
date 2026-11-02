@@ -421,6 +421,20 @@ namespace FalloutMenu
         return { designX - originX, designY - originY };
     }
 
+    namespace
+    {
+        // The hotrects around a tile that take the pointer: what is over a tile is over them too (the box of a button
+        // made by `super_text_box` is a tile in the hotrect, and the code reads the hotrect)
+        std::vector<Tile*> hotrectsAround(Menu& menu, Tile& tile)
+        {
+            std::vector<Tile*> around;
+            for (Tile* up = tile.parent(); up != nullptr; up = up->parent())
+                if (up->type() == TileType::HotRect && menu.number(*up, "target") != 0)
+                    around.push_back(up);
+            return around;
+        }
+    }
+
     Tile* OpenMenu::pointerMoved(float x, float y)
     {
         const float scale = this->scale();
@@ -428,18 +442,33 @@ namespace FalloutMenu
         const float designY = y / scale;
         Tile* over = mMenu->tileAt(designX, designY);
         const int overId = over != nullptr ? over->uid() : 0;
-        if (overId != mHover)
+        std::vector<int> chain;
+        if (over != nullptr)
+            for (Tile* hot : hotrectsAround(*mMenu, *over))
+                chain.push_back(hot->uid());
+        if (overId != mHover || chain != mHoverChain)
         {
-            if (Tile* old = mMenu->byId(mHover))
-                mMenu->set(*old, "mouseover", 0.f);
-            if (over != nullptr)
+            if (overId != mHover)
             {
-                mMenu->set(*over, "mouseover", 1.f);
-                // The highlight of a list goes to the row the pointer comes to
-                if (const std::optional<std::pair<int, int>> row = rowOf(*over))
-                    mLists[row->first]->select(row->second);
+                if (Tile* old = mMenu->byId(mHover))
+                    mMenu->set(*old, "mouseover", 0.f);
+                if (over != nullptr)
+                {
+                    mMenu->set(*over, "mouseover", 1.f);
+                    // The highlight of a list goes to the row the pointer comes to
+                    if (const std::optional<std::pair<int, int>> row = rowOf(*over))
+                        mLists[row->first]->select(row->second);
+                }
+                mHover = overId;
             }
-            mHover = overId;
+            for (const int id : mHoverChain)
+                if (std::find(chain.begin(), chain.end(), id) == chain.end())
+                    if (Tile* old = mMenu->byId(id))
+                        mMenu->set(*old, "mouseover", 0.f);
+            for (const int id : chain)
+                if (Tile* now = mMenu->byId(id))
+                    mMenu->set(*now, "mouseover", 1.f);
+            mHoverChain = std::move(chain);
         }
         if (Tile* dragged = mMenu->byId(mDragged))
         {
@@ -490,6 +519,8 @@ namespace FalloutMenu
         if (tile != nullptr && tile == pressed)
         {
             click(*tile);
+            for (Tile* hot : hotrectsAround(*mMenu, *tile))
+                click(*hot);
             return tile;
         }
         return nullptr;

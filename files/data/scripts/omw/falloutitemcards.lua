@@ -88,6 +88,8 @@ function module.show(shown, item)
                 if card then
                     shown:set(name, '_Value', card.value)
                     if card.title then shown:set(name, '_Title', card.title) end
+                    -- The file hides some cards by their alpha (the damage, the strength needed) until the code shows them
+                    shown:set(name, 'alpha', 255)
                 end
                 shown:set(name, 'visible', card ~= nil)
             end

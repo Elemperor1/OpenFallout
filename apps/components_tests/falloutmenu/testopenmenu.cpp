@@ -291,6 +291,42 @@ namespace
         EXPECT_FLOAT_EQ(menu.number(*a, "clicked"), 3.f);
     }
 
+    TEST(FalloutOpenMenuTest, a_hotrect_around_the_tile_under_the_pointer_is_over_and_clicked_as_well)
+    {
+        // As a button made by super_text_box: a hotrect with a box in it that takes the pointer too
+        Fixture f;
+        OpenMenu& open = f.open(
+            "<menu name=\"M\"><hotrect name=\"Outer\"><x>10</x><y>10</y><width>100</width>"
+            "<height>40</height><target>1</target><rect name=\"Box\"><width>100</width>"
+            "<height>40</height><target>1</target></rect></hotrect>"
+            "<hotrect name=\"Off\"><x>200</x><y>10</y><width>100</width><height>40</height>"
+            "<target>0</target><rect name=\"InOff\"><width>100</width><height>40</height>"
+            "<target>1</target></rect></hotrect></menu>",
+            640.f, 480.f);
+        Menu& menu = open.menu();
+        Tile* outer = menu.find("Outer");
+        Tile* box = menu.find("Box");
+        EXPECT_EQ(open.pointerMoved(20, 20), box);
+        EXPECT_FLOAT_EQ(menu.number(*box, "mouseover"), 1.f);
+        EXPECT_FLOAT_EQ(menu.number(*outer, "mouseover"), 1.f);
+        open.pointerPressed(20, 20);
+        EXPECT_EQ(open.pointerReleased(20, 20), box);
+        EXPECT_FLOAT_EQ(menu.number(*box, "clicked"), 1.f);
+        EXPECT_FLOAT_EQ(menu.number(*outer, "clicked"), 1.f);
+        // Out of it, the hotrect is not over any more
+        open.pointerMoved(400, 400);
+        EXPECT_FLOAT_EQ(menu.number(*box, "mouseover"), 0.f);
+        EXPECT_FLOAT_EQ(menu.number(*outer, "mouseover"), 0.f);
+        // A hotrect that is not a target (disabled) is not over and not clicked, the tile in it still is
+        Tile* off = menu.find("Off");
+        Tile* inOff = menu.find("InOff");
+        EXPECT_EQ(open.pointerMoved(110, 20), inOff);
+        EXPECT_FLOAT_EQ(menu.number(*off, "mouseover"), 0.f);
+        open.pointerPressed(110, 20);
+        open.pointerReleased(110, 20);
+        EXPECT_FLOAT_EQ(menu.number(*off, "clicked"), 0.f);
+    }
+
     TEST(FalloutOpenMenuTest, the_wheel_counts_on_the_tile_that_takes_it)
     {
         Fixture f;

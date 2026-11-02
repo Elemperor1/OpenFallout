@@ -171,6 +171,8 @@ namespace FalloutMenu
         float mPixelHeight = 0;
         /// The ids of the tiles the pointer is on, went down on and drags (0 for none)
         int mHover = 0;
+        /// The hotrects around the tile the pointer is on, which are over as well
+        std::vector<int> mHoverChain;
         int mPressed = 0;
         int mDragged = 0;
         std::vector<int> mScrollbars;

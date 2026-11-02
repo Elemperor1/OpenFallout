@@ -124,8 +124,16 @@ end
 
 -- Run what a script has asked for when a tile is clicked (by name, and by the name of the menu file's tile)
 function Shown:dispatch(tile)
-    local handler = self.clicks[self.menu:name(tile)]
-    if handler then handler(tile) end
+    -- The tile that was hit may be a box inside the button (the hotrect round it is what the script asked about)
+    local target = tile
+    while target do
+        local handler = self.clicks[self.menu:name(target)]
+        if handler then
+            handler(target)
+            break
+        end
+        target = self.menu:parent(target)
+    end
     -- A tile in a row of a list is the row's click
     local list, row = self.menu:rowOf(tile)
     if list and self.rowClicks[list] then self.rowClicks[list](row, tile) end
