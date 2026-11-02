@@ -55,7 +55,7 @@ ESM::LandData::LandData(const ESM4::Land& land, int /*loadFlags*/)
         rowOffset += land.mHeightMap.gradientData[y * mLandSize];
 
         const float heightY = rowOffset * ESM4::Land::sHeightScale;
-        mHeightsData[y * mLandSize] = heightY;
+        mHeightsData[static_cast<std::size_t>(y) * mLandSize] = heightY;
         mMinHeight = std::min(mMinHeight, heightY);
         mMaxHeight = std::max(mMaxHeight, heightY);
 

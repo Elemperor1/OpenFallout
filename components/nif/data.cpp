@@ -301,7 +301,7 @@ namespace Nif
         const uint32_t numPixels = nif->get<uint32_t>();
         if (nif->getVersion() >= NIFStream::generateVersion(10, 4, 0, 2))
             nif->read(mNumFaces);
-        nif->readVector(mData, numPixels * mNumFaces);
+        nif->readVector(mData, static_cast<size_t>(numPixels) * mNumFaces);
     }
 
     void NiPixelData::post(Reader& nif)
