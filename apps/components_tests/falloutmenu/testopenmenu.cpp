@@ -490,6 +490,20 @@ namespace
         EXPECT_EQ(menu.find("List")->children().size(), 4u);
     }
 
+    TEST(FalloutOpenMenuListTest, the_list_is_the_tile_of_the_name_that_has_a_scrollbar)
+    {
+        Fixture f;
+        // A heading with the name of the list, before it
+        std::string menuText = listMenu;
+        menuText.insert(
+            menuText.find("<hotrect name=\"List\">"), "<text name=\"List\"><string> Heading </string></text>");
+        OpenMenu& open = f.open(menuText, 1280.f, 960.f);
+        const int number = open.addList("List", "Row");
+        ASSERT_GE(number, 0);
+        EXPECT_EQ(open.list(number)->listTile(), open.menu().byId(open.list(number)->listTile())->uid());
+        EXPECT_NE(open.menu().find(*open.menu().byId(open.list(number)->listTile()), "lb_scrollbar"), nullptr);
+    }
+
     TEST(FalloutOpenMenuListTest, a_row_can_set_a_trait_of_a_tile_inside_it)
     {
         Fixture f;

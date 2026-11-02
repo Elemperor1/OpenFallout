@@ -346,7 +346,22 @@ namespace FalloutMenu
 
     int OpenMenu::addList(std::string_view listTile, std::string_view templateName)
     {
-        Tile* tile = mMenu->find(listTile);
+        // The list is the tile of that name that has a scrollbar in it: a menu may name a heading the same
+        Tile* tile = nullptr;
+        const std::string wanted = Xml::lower(listTile);
+        for (const Tile* candidate : mMenu->tiles())
+        {
+            if (Xml::lower(candidate->name()) != wanted)
+                continue;
+            Tile* found = mMenu->byId(candidate->uid());
+            if (found != nullptr && mMenu->find(*found, "lb_scrollbar") != nullptr)
+            {
+                tile = found;
+                break;
+            }
+        }
+        if (tile == nullptr)
+            tile = mMenu->find(listTile);
         if (tile == nullptr || !mMenu->hasTemplate(templateName))
             return -1;
         mLists.push_back(std::make_unique<ListBox>(*this, tile->uid(), std::string(templateName)));
