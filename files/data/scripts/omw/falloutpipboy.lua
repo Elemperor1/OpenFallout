@@ -946,5 +946,9 @@ return {
         PadButton = function(data)
             onPad(data.button)
         end,
+        -- A key of the keyboard (its code in `code`), sent by a script, for the keys no button of the pad stands for
+        PipboyKey = function(data)
+            press(data.code)
+        end,
     },
 }
