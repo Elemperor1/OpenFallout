@@ -17,7 +17,10 @@ namespace FalloutScript::SettingText
         };
 
         // The labels the menu files of both games ask for (`&-sName;`), as they are on the screens that were drawn
-        // from the files. The caravan, card and roulette games are not here: their words are not needed yet.
+        // from the files. The caravan, card and roulette games are not here: their words are not needed yet. The length
+        // and the case of the defaults of the buttons and the tabs of the data page were read from both executables
+        // (sMakeActiveQuest 17, sPlayAudio 10, sStopAudio 10, sShowAllNotes 14, sShowActiveNotes 23, sNextChallenge 19,
+        // the tab texts 9, 9, 6, 4 (Misc, New Vegas), 5 (Notes, Fallout 3), 5); the words are the ones that fit.
         constexpr std::array entries = {
             Entry{ "sAccept", "Accept" },
             Entry{ "sBack", "Back" },
@@ -26,6 +29,7 @@ namespace FalloutScript::SettingText
             Entry{ "sCauterize", "Cauterize" },
             Entry{ "sChallengeToggle", "Challenges" },
             Entry{ "sCloseButton", "Close" },
+            Entry{ "sCommsTabText", "Radio" },
             Entry{ "sContinue", "Continue" },
             Entry{ "sCrew", "Credits" },
             Entry{ "sCurrentObjective", "Current Objective" },
@@ -59,18 +63,22 @@ namespace FalloutScript::SettingText
             Entry{ "sLevelUp", "LEVEL UP" },
             Entry{ "sLoad", "Load" },
             Entry{ "sLoadSavedGame", "Load Saved Game" },
+            Entry{ "sLocalMapTabText", "Local Map" },
             Entry{ "sLockLevelText", "Lock Level" },
             Entry{ "sLockpickSkillText", "Lockpick Skill" },
             Entry{ "sMadeAt", "Made at" },
-            Entry{ "sMakeActiveQuest", "Make Active" },
+            Entry{ "sMakeActiveQuest", "Make Active Quest" },
             Entry{ "sMedicineSkill", "Medicine" },
+            Entry{ "sMiscTabText", "Misc" },
             Entry{ "sModffects", "Mod Effects" },
             Entry{ "sMorphine", "Morphine" },
             Entry{ "sNavigate", "Navigate" },
             Entry{ "sNew", "New" },
             Entry{ "sNext", "Next" },
-            Entry{ "sNextChallenge", "Next Challenge" },
+            Entry{ "sNextChallenge", "Show Next Challenge" },
             Entry{ "sNoItemsToRepair", "No items to repair" },
+            Entry{ "sNotesTabText", "Notes" },
+            Entry{ "sNotesToggle", "Notes" },
             Entry{ "sOK", "OK" },
             Entry{ "sPCMenuHintA", "(A)" },
             Entry{ "sPCMenuHintE", "(E)" },
@@ -83,9 +91,10 @@ namespace FalloutScript::SettingText
             Entry{ "sPCMenuHintX", "(X)" },
             Entry{ "sPicksRemainingText", "Picks Remaining" },
             Entry{ "sPlaceMarker", "Place Marker" },
-            Entry{ "sPlayAudio", "Play" },
+            Entry{ "sPlayAudio", "Play Audio" },
             Entry{ "sPressStart", "Press Start" },
             Entry{ "sPrevious", "Previous" },
+            Entry{ "sQuestsTabText", "Quests" },
             Entry{ "sQuit", "Quit" },
             Entry{ "sRecipes", "Recipes" },
             Entry{ "sRedeemCode", "Redeem Code" },
@@ -100,8 +109,8 @@ namespace FalloutScript::SettingText
             Entry{ "sSaveGame", "Save Game" },
             Entry{ "sSelect", "Select" },
             Entry{ "sSettings", "Settings" },
-            Entry{ "sShowActiveNotes", "Active Notes" },
-            Entry{ "sShowAllNotes", "All Notes" },
+            Entry{ "sShowActiveNotes", "Show Active Quest Notes" },
+            Entry{ "sShowAllNotes", "Show All Notes" },
             Entry{ "sShowLocation", "Show Location" },
             Entry{ "sSkillRequirement", "Skill Requirement" },
             Entry{ "sSpace", "Space" },
@@ -126,7 +135,7 @@ namespace FalloutScript::SettingText
             Entry{ "sStatsStatus", "Status" },
             Entry{ "sStatsXP", "XP" },
             Entry{ "sStimpak", "Stimpak" },
-            Entry{ "sStopAudio", "Stop" },
+            Entry{ "sStopAudio", "Stop Audio" },
             Entry{ "sSwitchLimbs", "Switch Limbs" },
             Entry{ "sTakeAll", "Take All" },
             Entry{ "sTravel", "Travel" },
@@ -135,6 +144,7 @@ namespace FalloutScript::SettingText
             Entry{ "sVatsBodyPart", "Body Part" },
             Entry{ "sVatsSelect", "Select" },
             Entry{ "sVatsTarget", "Target" },
+            Entry{ "sWorldMapTabText", "World Map" },
             Entry{ "sXPProgressMarker", "XP" },
         };
 

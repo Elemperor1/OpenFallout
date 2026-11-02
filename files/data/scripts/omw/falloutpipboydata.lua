@@ -27,12 +27,14 @@ local module = {}
 
 local MENU_FILE = 'main/map_menu.xml'
 
--- The tabs, with the number the file gives each (`_CurrentTab`; 0 is the local map, which is not there)
+-- The tabs, with the number the file gives each (`_CurrentTab`; 0 is the local map, which is not there) and the setting
+-- that holds the words of each (read from both executables; the third tab is Misc in New Vegas, which keeps the notes with
+-- the challenges, and Notes in Fallout 3)
 local TABS = {
-    { key = 'world', value = 1, label = 'WORLD MAP' },
-    { key = 'quests', value = 2, label = 'QUESTS' },
-    { key = 'notes', value = 3, label = 'NOTES' },
-    { key = 'radio', value = 4, label = 'RADIO' },
+    { key = 'world', value = 1, setting = 'sWorldMapTabText', fallback = 'World Map' },
+    { key = 'quests', value = 2, setting = 'sQuestsTabText', fallback = 'Quests' },
+    { key = 'notes', value = 3, setting = 'sNotesTabText', fallback = 'Notes', vegas = 'sMiscTabText', vegasFallback = 'Misc' },
+    { key = 'radio', value = 4, setting = 'sCommsTabText', fallback = 'Radio' },
 }
 
 local MAP = {
@@ -59,9 +61,15 @@ local DATA_RECT_Y = 149
 -- The size of one cell of the worlds, the units of the positions of the markers and of the cells of the map rectangle
 local CELL = 4096
 
--- The picture of a marker by the kind of place its record says it is; any other kind has the dot the games draw
--- for a waypoint (the picture of each kind is chosen by the games' code and is read from the executable)
-local MARKER_ICONS = {}
+-- The picture of a marker: the games' code has one table of fourteen pictures, by the kind of place the marker's record
+-- says it is (1 to 14, the same order in both games' executables), and a picture for a place the player has seen on the
+-- map but cannot travel to yet. A kind outside the table (the code would read past it) has the dot of a waypoint.
+local MARKER_FOLDER = 'Interface\\Icons\\World Map\\icon_map_'
+local MARKER_KINDS = {
+    'city', 'settlement', 'encampment', 'natural_landmark', 'cave', 'factory', 'monument', 'military', 'office',
+    'ruins_town', 'ruins_urban', 'ruins_sewer', 'metro', 'vault',
+}
+local MARKER_UNDISCOVERED = MARKER_FOLDER .. 'undiscovered.dds'
 local MARKER_DEFAULT = 'Interface\\Worldmap\\waypoint_node.dds'
 
 local shown, lists, tabs = nil, nil, nil
@@ -79,23 +87,41 @@ local objectivesFor = nil
 -- Where the picture was when the pointer took hold of it, while it is dragged
 local dragFrom = nil
 
+-- The words of a tab: the setting's text (the games' own files, then the port's table of the defaults), in capitals as the
+-- other tabs of the Pip-Boy are drawn (whether the games capitalise the tab words on the screen is not read)
+local function word(setting, fallback)
+    local text = pipboy.text(setting)
+    return text ~= '' and text or fallback
+end
+
+function module.tabLabel(tab, newVegas)
+    if newVegas == nil then
+        local ok, stats = pcall(pipboy.stats)
+        newVegas = ok and stats ~= nil and stats.newVegas == true
+    end
+    if newVegas and tab.vegas then return word(tab.vegas, tab.vegasFallback):upper() end
+    return word(tab.setting, tab.fallback):upper()
+end
+
 local function number(value)
     return string.format('%d', math.floor(value + 0.5))
 end
 
--- The time and the date for the headline: "9:41 PM 10.23.2281" (the order and the look of the games' own are not known)
+-- The time and the date for the headline, as both executables write them ("%s, %d:%02d" over the date "%02d.%02d.%02d"):
+-- "10.22.81, 21:41" is the month (1 to 12), the day and the last two digits of the year, then the hour (24 hour clock, not
+-- padded) and the minutes. There is no AM or PM.
 function module.dateText(now)
     if not now or not now.year then return '' end
     local hours = math.floor(now.hour or 0)
     local minutes = math.floor(((now.hour or 0) - hours) * 60)
-    local clock = (hours % 12 == 0) and 12 or (hours % 12)
-    return string.format('%d:%02d %s %02d.%02d.%d', clock, minutes, hours < 12 and 'AM' or 'PM', (now.month or 0) + 1,
-        now.day or 1, now.year)
+    return string.format('%02d.%02d.%02d, %d:%02d', (now.month or 0) + 1, now.day or 1, math.floor(now.year) % 100, hours,
+        minutes)
 end
 
 -- Where a place of the world is on the picture, as the part of its width and height from the north-west corner (0 to 1),
--- by the rectangle of cells the worldspace gives the picture; nil when the worldspace gives none. The cell of a position
--- is the position over the size of a cell, and the rows go up to the north.
+-- by the rectangle of cells the worldspace gives the picture, as both executables do: left = north-west cell x * 4096, right
+-- = (south-east cell x + 1) * 4096, top = (north-west cell y + 1) * 4096, bottom = south-east cell y * 4096, and the rows go
+-- up to the north. nil when the worldspace gives none.
 function module.mapPoint(world, x, y)
     if not world or (world.width or 0) <= 0 or (world.height or 0) <= 0 then return nil end
     local across = world.southEastX - world.northWestX + 1
@@ -201,8 +227,10 @@ local function zoomBy(notches)
     placeMap()
 end
 
-local function markerIcon(marker)
-    return MARKER_ICONS[marker.type or -1] or MARKER_DEFAULT
+function module.markerIcon(marker)
+    if not marker.travel then return MARKER_UNDISCOVERED end
+    local kind = MARKER_KINDS[marker.type or 0]
+    return kind and (MARKER_FOLDER .. kind .. '.dds') or MARKER_DEFAULT
 end
 
 -- The picture, the arrow and the markers of the places the player has found
@@ -236,7 +264,7 @@ local function fillWorld()
             shown:set(tile, '_y', marker.v)
             shown:set(tile, '_LocationName', marker.name or '')
             shown:set(tile, '_MarkerIndex', index)
-            shown:set(tile, 'filename', markerIcon(marker))
+            shown:set(tile, 'filename', module.markerIcon(marker))
             shown:set(tile, 'user0', marker.travel and true or false)
         end
         if info and info.outside then
@@ -342,7 +370,10 @@ end
 
 local function fillHeadline()
     shown:batch(function()
-        shown:set('MM_Headline_LocationInfo', 'string', info and info.location or '')
+        -- The engine names the place the player is in (a cell without a name has its worldspace's); the worldspace of the
+        -- map stands in when it gives none
+        local place = info and ((info.location ~= '' and info.location) or info.world) or ''
+        shown:set('MM_Headline_LocationInfo', 'string', place or '')
         shown:set('MM_Headline_TimeDateInfo', 'string', module.dateText(info))
     end)
 end
@@ -382,7 +413,7 @@ local function open()
     end
     local labels, values = {}, {}
     for index, tab in ipairs(TABS) do
-        labels[index], values[index] = tab.label, tab.value
+        labels[index], values[index] = module.tabLabel(tab), tab.value
     end
     local ok, result = pcall(function()
         return opened:tabs('MM_Tabline', 'TabButtonTemplate', labels, tabIndex, function(index) pickTab(index) end,

@@ -92,22 +92,31 @@ the lines of the general page.
 ### The data page of the Pip-Boy
 
 `falloutpipboydata.lua` fills `main/map_menu.xml`. The headline has the place the player is in (the name the engine gives the
-cell, or the worldspace's) and the time and date of the world; the tabs are WORLD MAP, QUESTS, NOTES and RADIO with the numbers
-1 to 4 the file gives them (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
+cell, or the worldspace's) and the date and time of the world written as the executables do (`10.22.81, 21:41`: month, day, two digits of the year, then
+the 24 hour clock; no AM or PM); the tabs are WORLD MAP, QUESTS, MISC (NOTES in Fallout 3) and RADIO with the
+numbers 1 to 4 the file gives them, their words from the settings the executables name (`sWorldMapTabText`, `sQuestsTabText`,
+`sMiscTabText` or `sNotesTabText`, `sCommsTabText`) (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
 and nothing here can).
 
 *World map.* The picture is the file's `MM_WorldMap_ParentImage` (the file names the Fallout 3 picture; the picture of the
-worldspace record, `ICON`, is used when it has one). It is a hot rectangle that names a file, which the renderer now draws as
+worldspace record, `ICON`, is the picture: both executables take it from the record and from nothing else, so New Vegas
+shows its own `wasteland_nv_1024_no_map` and each expansion its own; the file's name stands in only for a record without
+one). It is a hot rectangle that names a file, which the renderer now draws as
 a picture (the hacking and character menus have such tiles too). The places the player has found are tiles made from the
 file's `MapMarkerTemplate` as children of the picture, with their position in `_x` and `_y` as a part of the picture (0 to 1);
-a place is put on the picture by the rectangle of cells the worldspace's `MNAM` gives it (the north-west and the south-east
-corner cell, 4096 units to a cell, the rows going up to the north), and the player's arrow is put the same way. The picture is
+a place is put on the picture by the rectangle of cells the worldspace's `MNAM` gives it, as both executables do (the left edge
+is the north-west cell times 4096, the right edge is the cell after the south-east one, the top is the cell after the
+north-west one, the bottom is the south-east cell times 4096; the usable width and height of `MNAM` only stretch the picture,
+and the rows go up to the north), and the player's arrow is put the same way. The picture is
 placed with the file's own numbers (the window of the map is 855 by 500 units, its middle 427.5 by 250 is where the picture
 can be moved to at most, the box in the middle names the place under it) and starts centred on the player at half size.
 The pointer drags the picture and the wheel zooms it (the file's `draggable` and `wheelable` tiles; the page does the
 arithmetic, since the file leaves it to code); a click on a place travels there, a place that cannot be travelled to (found,
-not visited) only says its name. Enter travels to the place the box names. The picture of each kind of place and the arrow
-that turns to where the player faces are not read yet: every place has the dot of a waypoint and the arrow does not turn.
+not visited) only says its name. Enter travels to the place the box names. The picture of a place is the games' own table of fourteen
+(`Interface\Icons\World Map\icon_map_*`: city, settlement, encampment, natural landmark, cave, factory, monument, military,
+office, ruins town, ruins urban, ruins sewer, metro, vault, by the marker's type 1 to 14, in that order in both executables)
+and the picture for a place that is not yet travelled to is `icon_map_undiscovered`; a type outside the table has the dot of a
+waypoint. The arrow that turns to where the player faces is not done: the arrow does not turn.
 
 *Quests.* The list of the file with its empty squares, the objectives of the quest that is picked in the list beside it (the
 square of an objective that is done is filled and its text dim), as the engine's `core.pipboy.quests()` has them; a quest that
@@ -151,9 +160,11 @@ table; a game in another language gets its words from its plugin). The card, car
   word stays whole (the port's rule, matched to that).
 - The meaning of the byte `&widescreen;` reads, and of the traits `wraplimit`, `wraplines`, `ishtml`, `cropx`, `cropy`,
   `repeat*`, `explorefade` and `menufade`.
-- The look of the headline of the data page (the order of the time and the date, the 12 hour clock), the labels of its tabs,
-  the picture of each kind of place and how a position becomes a place on the picture: the page uses the usable cell rectangle
-  of the worldspace and the games' own numbers are to be read from the executable.
+- Whether the tab words of the data page are
+  drawn in capitals (the page does, as the other tabs of the Pip-Boy; the executables' own code for it was not read),
+  the zoom limits and the size of the places on the map (the executables keep them in settings whose default values are not
+  read yet), and the remap of the position (`u * 0.796875 + 0.1015625`) that the executables apply for one mode of the map
+  object, which is not the world map as far as is known.
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in
   the executable's table. The loader leaves them as text.
 
