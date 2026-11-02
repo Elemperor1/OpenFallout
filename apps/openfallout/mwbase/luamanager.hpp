@@ -147,6 +147,9 @@ namespace OFBase
                 MouseWheel,
             } mType;
             std::variant<SDL_Keysym, int, SDLUtil::TouchEvent, WheelChange> mValue;
+            // The console or a dialog of the engine's own windows had the input when it came, before the engine acted
+            // on it (the key that closes either is theirs too). Only the keys and the buttons of the pad say it
+            bool mTaken = false;
         };
         virtual void inputEvent(const InputEvent& event) = 0;
 

@@ -187,6 +187,8 @@ namespace OFLua
         LuaUi::ResourceManager* uiResourceManager() { return &mUiResourceManager; }
 
         bool isProcessingInputEvents() const { return mProcessingInputEvents; }
+        // Whether the key or the button that the menu scripts are being given had been taken by the console or a dialog
+        bool isMenuInputTaken() const { return mMenuInputTaken; }
 
         void reportStats(unsigned int frameNumber, osg::Stats& stats) const;
         std::string formatResourceUsageStats() const override;
@@ -209,6 +211,7 @@ namespace OFLua
         bool mInitialized = false;
         bool mGlobalScriptsStarted = false;
         bool mProcessingInputEvents = false;
+        bool mMenuInputTaken = false;
         bool mApplyingDelayedActions = false;
         bool mNewGameStarted = false;
         bool mReloadAllScriptsRequested = false;

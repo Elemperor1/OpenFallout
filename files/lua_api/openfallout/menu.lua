@@ -101,16 +101,11 @@
 -- @return #boolean
 
 ---
--- Whether the console is open. It takes the keys that are typed, and menu scripts are given those keys too, so a script
--- that acts on keys leaves them alone while it is open
--- @function [parent=#menu] consoleOpen
--- @return #boolean
-
----
--- Whether a dialog of the engine's own windows is open over the menu, such as the one that tells that a save or a load
--- failed. It takes the keys and the buttons of the pad, and menu scripts are given those too, so a script that acts on
--- them leaves them alone while it is open
--- @function [parent=#menu] dialogOpen
+-- Whether the console, or a dialog of the engine's own windows such as the one that tells that a save or a load failed,
+-- had the key or the button of the pad that the handler is being given: they take those, and menu scripts are given
+-- them too (the key that closes the console or the dialog as well), so a script that acts on keys leaves them alone
+-- when this is true. Ask it in the handler of the key or of the button; outside one it is false
+-- @function [parent=#menu] inputTaken
 -- @return #boolean
 
 ---

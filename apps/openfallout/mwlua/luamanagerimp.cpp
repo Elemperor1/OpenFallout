@@ -376,7 +376,11 @@ namespace OFLua
             BoolScopeGuard processingGuard(mProcessingInputEvents);
 
             for (const auto& event : mMenuInputEvents)
+            {
+                mMenuInputTaken = event.mTaken;
                 mMenuScripts.processInputEvent(event);
+            }
+            mMenuInputTaken = false;
             mMenuInputEvents.clear();
             if (playerScripts && !windowManager->containsMode(OFGui::GM_MainMenu))
             {

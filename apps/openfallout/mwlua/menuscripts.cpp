@@ -1,7 +1,5 @@
 #include "menuscripts.hpp"
 
-#include <MyGUI_InputManager.h>
-
 #include <SDL_gamecontroller.h>
 #include <SDL_joystick.h>
 
@@ -207,11 +205,10 @@ namespace OFLua
                 && OFBase::Environment::get().getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) == -1
                 && OFBase::Environment::get().getWindowManager()->isSavingAllowed();
         };
-        // Whether the console is open: it takes the keys that are typed, and menu scripts are given them as well
-        api["consoleOpen"] = []() { return OFBase::Environment::get().getWindowManager()->isConsoleMode(); };
-        // Whether a dialog of the engine's own windows is open over the menu (the one that tells a save or a load
-        // failed): it has the keys and the buttons of the pad, and menu scripts are given those as well
-        api["dialogOpen"] = []() { return MyGUI::InputManager::getInstance().isModalAny(); };
+        // Whether the console or a dialog of the engine's own windows (the one that tells a save or a load failed) had
+        // the key or the button that the script is being given: they take the keys and the buttons of the pad, and menu
+        // scripts are given those as well. Asked in a handler of a key or of a button of the pad
+        api["inputTaken"] = [context]() { return context.mLuaManager->isMenuInputTaken(); };
         // The window manager's window for the settings (the game's own settings screens are not drawn from its menu
         // file yet), and whether it is open
         api["openSettings"] = []() {

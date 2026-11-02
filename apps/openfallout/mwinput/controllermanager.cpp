@@ -131,8 +131,11 @@ namespace OFInput
         if (!Settings::input().mEnableController || mBindingsManager->isDetectingBindingState())
             return;
 
+        // (who has the button is taken before the button is acted on, as for a key)
         OFBase::Environment::get().getLuaManager()->inputEvent(
-            { OFBase::LuaManager::InputEvent::ControllerPressed, arg.button });
+            { OFBase::LuaManager::InputEvent::ControllerPressed, arg.button,
+                OFBase::Environment::get().getWindowManager()->isConsoleMode()
+                    || MyGUI::InputManager::getInstance().isModalAny() });
 
         mJoystickLastUsed = true;
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())

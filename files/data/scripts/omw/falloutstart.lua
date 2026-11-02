@@ -521,9 +521,9 @@ end
 
 -- A message box that is open (one that opened before the menu did) has the keys and the buttons of the pad, and so has the
 -- console and a dialog of the engine's own windows (a failed save or load): the keys that are typed in them reach the
--- menu's script as well
+-- menu's script as well, and so does the key that closes one (the engine says who had the key or the button when it came)
 local function inputTaken()
-    if engine.consoleOpen() or engine.dialogOpen() then return true end
+    if engine.inputTaken() then return true end
     local box = core.messageBox
     if box == nil then return false end
     local ok, current = pcall(box.current)

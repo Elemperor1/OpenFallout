@@ -348,11 +348,12 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   shows the name, the level and the time played of the save that is lit. Writing over a save and loading one ask first.
   The save's picture, its version line, deleting a save, and the sorting the game uses (not read) are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
-  `menu.openSettings`, `menu.settingsOpen`, `menu.consoleOpen`, `menu.dialogOpen` (`openfallout.menu`). While the console, a
+  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
-  buttons of the pad first) is open the script leaves the keys and the buttons of the pad alone (the keys typed in the
-  console reach the menu's scripts as well). The script says every frame that it draws the menu; while
-  it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
+  buttons of the pad first) has the input, the script leaves the keys and the buttons of the pad alone: the keys typed in
+  the console reach the menu's scripts as well, and so does the key that closes it, so the engine takes who had the key or
+  the button when it came, before it acts on it (`inputTaken` in the handler). The script says every frame that it draws
+  the menu; while it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
   back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
   list the engine closes the menu with them. Settings opens the game's own settings screens (below).
 - Not read yet, so estimated: where the question's container is (the file leaves its place to the code: it is put at the
