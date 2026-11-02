@@ -22,8 +22,9 @@ local menuModule = require('scripts.omw.falloutmenu')
 
 local FILE = 'options/start_menu.xml'
 -- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
--- over all of that, as the message boxes are
-local LAYER = 'Modal'
+-- in the layer above it (the one the engine's settings window is in). The console's layer is above that one, so the
+-- console is still seen over the menu (the layer of the message boxes is above the console's)
+local LAYER = 'Settings'
 local MAX_SAVES = 1000
 -- The room that the file gives the question and its choices: three rows of the height of an item, at the list's side
 local CONFIRM_ROWS = 3
