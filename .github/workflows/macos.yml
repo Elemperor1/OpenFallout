@@ -11,9 +11,6 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-
 jobs:
   MacOS:
     name: ${{ inputs.image }}

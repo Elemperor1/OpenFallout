@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   Windows:
+    permissions:
+      contents: write
     uses: ./.github/workflows/windows.yml
     with:
       image: "2022"
@@ -18,6 +20,8 @@ jobs:
       release: true
     secrets: inherit
   MacOS:
+    permissions:
+      contents: write
     strategy:
       fail-fast: true
       matrix:
