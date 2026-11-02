@@ -489,13 +489,13 @@ namespace
         EXPECT_FALSE(guess.mCorrect);
         EXPECT_FALSE(guess.mIgnored);
         EXPECT_EQ(guess.mLikeness, FalloutScript::Hacking::likeness(puzzle.words()[wrong], puzzle.password()));
-        EXPECT_EQ(guess.mAttemptsLeft, FalloutScript::Hacking::attempts - 1);
+        EXPECT_EQ(guess.mAttemptsLeft, puzzle.maxAttempts() - 1);
         EXPECT_TRUE(puzzle.guessed(wrong));
         // The same word again is a guess again, and costs the same
         const Puzzle::Guess again = puzzle.guess(wrong);
         EXPECT_FALSE(again.mIgnored);
         EXPECT_EQ(again.mLikeness, guess.mLikeness);
-        EXPECT_EQ(puzzle.attemptsLeft(), FalloutScript::Hacking::attempts - 2);
+        EXPECT_EQ(puzzle.attemptsLeft(), puzzle.maxAttempts() - 2);
         EXPECT_TRUE(puzzle.guess(10000).mIgnored);
     }
 
@@ -533,24 +533,24 @@ namespace
         const Puzzle::Guess guess = puzzle.guess(right);
         EXPECT_TRUE(guess.mCorrect);
         EXPECT_EQ(guess.mLikeness, static_cast<int>(puzzle.password().size()));
-        EXPECT_EQ(guess.mAttemptsLeft, FalloutScript::Hacking::attempts);
+        EXPECT_EQ(guess.mAttemptsLeft, puzzle.maxAttempts());
         EXPECT_TRUE(puzzle.solved());
         EXPECT_FALSE(puzzle.lockedOut());
         EXPECT_TRUE(puzzle.guess(0).mIgnored);
     }
 
-    TEST(FalloutScriptHackingTest, four_wrong_guesses_lock_the_terminal)
+    TEST(FalloutScriptHackingTest, as_many_wrong_guesses_as_the_board_gives_lock_the_terminal)
     {
         Puzzle puzzle(5, 2, defaults);
         int made = 0;
-        for (std::size_t word = 0; word < puzzle.words().size() && made < FalloutScript::Hacking::attempts; ++word)
+        for (std::size_t word = 0; word < puzzle.words().size() && made < puzzle.maxAttempts(); ++word)
         {
             if (puzzle.words()[word] == puzzle.password())
                 continue;
             EXPECT_FALSE(puzzle.guess(word).mIgnored);
             ++made;
         }
-        EXPECT_EQ(made, FalloutScript::Hacking::attempts);
+        EXPECT_EQ(made, puzzle.maxAttempts());
         EXPECT_TRUE(puzzle.lockedOut());
         EXPECT_EQ(puzzle.attemptsLeft(), 0);
         std::size_t right = 0;
