@@ -93,7 +93,7 @@ the lines of the general page.
 
 `falloutpipboydata.lua` fills `main/map_menu.xml`. The headline has the place the player is in (the name the engine gives the
 cell, or the worldspace's) and the date and time of the world written as the executables do (`10.22.81, 21:41`: month, day, two digits of the year, then
-the 24 hour clock; no AM or PM); the tabs are WORLD MAP, QUESTS, MISC (NOTES in Fallout 3) and RADIO with the
+the 24-hour clock; no AM or PM); the tabs are WORLD MAP, QUESTS, MISC (NOTES in Fallout 3) and RADIO with the
 numbers 1 to 4 the file gives them, their words from the settings the executables name (`sWorldMapTabText`, `sQuestsTabText`,
 `sMiscTabText` or `sNotesTabText`, `sCommsTabText`) (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
 and nothing here can).
