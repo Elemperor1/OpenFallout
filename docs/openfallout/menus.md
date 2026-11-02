@@ -15,6 +15,33 @@ does is still code; what a screen looks like, where its parts are and what it sa
 | `font.*` | Reads a `.fnt` and lays a text out with its glyph widths, justification and wrapping. |
 | `atlas.*` | Reads the `.tai` list of pieces of `InterfaceShared*.dds`. |
 
+## Showing a menu
+
+| Part | What it does |
+| --- | --- |
+| `components/falloutmenu/openmenu.*` | Opens a menu from the data (menu file, fonts from the INI, the atlas, texture sizes) for a window of some size, turns the draw list into pictures in window pixels (a character cut from the font texture, an atlas piece, a repeated strip, a picture cut to a window), and plays the pointer into it. |
+| `components/falloutmenu/listbox.*` | What the games' code does for `list_box.xml`: a row is a tile made from the menu's template, given its traits, its height and place; the scrollbar is told how many items there are; the highlight follows the pointer. |
+| `apps/openfallout/mwlua/menubindings.cpp` | `core.menus.open(file, width, height, pad)` gives a menu object to Lua: its pictures, traits, clicks, lists, scrollbars. |
+| `files/data/scripts/omw/falloutmenu.lua` | Draws the pictures as widgets, hands the pointer to the menu, and calls the script's handler for the tile that was clicked. `onClick(name, f)`, `set(tile, trait, value)`, `io(trait, value)`, `list(listTile, template)`, `onDrag`, `batch`. |
+| `falloutquantity.lua`, `falloutitemcards.lua` | The "how many?" menu and the item cards, used by the screens that move or list items. |
+
+What the host (the script) must do for a menu is what the games' code did: write the values the file leaves empty ("set
+in code": a text's `string`, the `_Value` of a card, whether a tile is `visible`), the traits of the menu root that the file
+reads through `io()` (`_DialogVisible`, `_ShowingText`, ...), and the cumulative counters the pointer drives. The file reads
+these from the pointer, and the renderer sets them:
+
+- `mouseover` is 1 on the tile under the pointer. `clicked` and `wheelmoved` only go up (`wheelmoved` goes down for a turn
+  of the wheel away from the player); scrollbars and arrows subtract the counters. `dragstartx/y` is -1 while nothing is
+  dragged; `dragx/dragy` are the pointer's place in the parent while dragging.
+- A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
+  and so are its children.
+- A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).
+
+Screens drawn from their file so far: the hours to wait or sleep (`sleep_wait_menu.xml`), the dialogue
+(`dialog/dialog_menu.xml`), taking things from a container and putting them back (`container_menu.xml`), "how many?"
+(`quantity_menu.xml`). The older hand-built widgets of each stay as a fallback for when the file cannot be opened, and are
+removed once the screen has been played.
+
 ## What was read from the executable
 
 - The design space is 960 high and `960 * width / height` wide; it is drawn scaled by `height / 960`.
