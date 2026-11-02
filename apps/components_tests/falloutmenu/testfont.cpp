@@ -141,6 +141,21 @@ namespace
         EXPECT_EQ(font->layout("AA AA AA").mLines, 1);
     }
 
+    TEST(FalloutMenuFontTest, a_word_wider_than_the_room_stays_whole)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        // Three characters (36 wide) in a space for 20 are one line, as the label of a narrow button is
+        const Font::Layout alone = font->layout("AAA", 20.f);
+        EXPECT_EQ(alone.mLines, 1);
+        EXPECT_EQ(alone.mQuads.size(), 3u);
+        EXPECT_FLOAT_EQ(alone.mWidth, 36.f);
+        // With more words the long one is a line of its own and the others follow
+        const Font::Layout more = font->layout("AAA A A", 20.f);
+        EXPECT_EQ(more.mLines, 3);
+        EXPECT_FLOAT_EQ(more.mWidth, 36.f);
+    }
+
     TEST(FalloutMenuFontTest, lines_are_justified_inside_the_width_of_the_block)
     {
         const std::optional<Font> font = Font::parse(testFont());

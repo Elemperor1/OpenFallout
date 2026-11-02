@@ -88,8 +88,8 @@ end
 
 -- The box the pages of the Pip-Boy are laid out in (1024 by 768 design units; the games draw them on the screen of the
 -- 3D device), for the `box` option of `open`; the row of the pages (STAT, INV, DATA) is over the top of the window, so
--- the pages leave this many pixels free there
-module.PIPBOY_BOX = { width = 1024, height = 768, top = 64 }
+-- the pages leave this many units of the window (the units of ui.screenSize()) free there
+module.PIPBOY_BOX = { width = 1024, height = 768, top = 40 }
 
 -- Where a menu is drawn in a window of this size. Most menus are laid out for the whole window. A menu laid out in a box
 -- of its own is drawn with the box as large as the window lets it be (below the `top` pixels the box asks to be kept

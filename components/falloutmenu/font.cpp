@@ -209,11 +209,12 @@ namespace FalloutMenu
                     if (c == ' ')
                         lastSpace = i;
                     width += advance(c);
-                    if (width > wrapWidth && i > lineStart)
+                    // A line breaks at a space only: a word that is wider than the room stays whole on a line of its
+                    // own (the three letters of a short button label are wider than the room its fixed width leaves)
+                    if (width > wrapWidth && lastSpace != std::string_view::npos && lastSpace > lineStart)
                     {
-                        std::size_t cut = lastSpace != std::string_view::npos && lastSpace > lineStart ? lastSpace : i;
-                        lines.push_back(paragraph.substr(lineStart, cut - lineStart));
-                        lineStart = lastSpace != std::string_view::npos && lastSpace > lineStart ? cut + 1 : cut;
+                        lines.push_back(paragraph.substr(lineStart, lastSpace - lineStart));
+                        lineStart = lastSpace + 1;
                         lastSpace = std::string_view::npos;
                         width = 0;
                         for (std::size_t k = lineStart; k <= i; ++k)

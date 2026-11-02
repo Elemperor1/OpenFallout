@@ -274,6 +274,7 @@ end
 function module.update()
     if not shown then return end
     shown:checkSize()
+    quantity.update()
     updateCards()
 end
 

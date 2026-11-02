@@ -3,7 +3,7 @@
 -- what was chosen. It is a module of the screens that ask (the container, the barter, the Pip-Boy), not a script.
 --
 --   quantity.ask(12, function(count) ... end)
---   quantity.isOpen(); quantity.press(keyCode); quantity.close()
+--   quantity.isOpen(); quantity.press(keyCode); quantity.update(); quantity.close()
 local input = require('openfallout.input')
 
 local menuModule = require('scripts.omw.falloutmenu')
@@ -22,6 +22,13 @@ function module.close()
     if shown then
         shown:close()
         shown = nil
+    end
+end
+
+-- Each frame the prompt is open: the window size (the screen under the prompt follows the window in its own update)
+function module.update()
+    if shown then
+        shown:checkSize()
     end
 end
 

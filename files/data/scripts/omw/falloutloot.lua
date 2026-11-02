@@ -519,6 +519,7 @@ local function sync()
     end
     if shown then
         shown:checkSize()
+        quantity.update()
         updateCards()
     end
 end
