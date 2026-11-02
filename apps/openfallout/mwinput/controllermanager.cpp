@@ -265,8 +265,10 @@ namespace OFInput
 
         // The pause menu that a script draws takes the buttons: they do not reach the window manager's own menu, which
         // is not shown then. B leaves a screen of it as Escape does, and closes the menu when the script has no screen
-        // to go back from.
+        // to go back from. A dialog of the window manager that is open over it (the one that tells a save failed) is
+        // modal and has the buttons first.
         if (winMgr->getMode() == OFGui::GM_MainMenu && winMgr->isMainMenuDrawnByLua()
+            && !MyGUI::InputManager::getInstance().isModalAny()
             && (arg.button != SDL_CONTROLLER_BUTTON_B || winMgr->isMainMenuEscapeLua()))
             return true;
 

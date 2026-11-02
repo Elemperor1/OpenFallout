@@ -1,5 +1,7 @@
 #include "menuscripts.hpp"
 
+#include <MyGUI_InputManager.h>
+
 #include <components/lua/util.hpp>
 #include <components/misc/strings/lower.hpp>
 
@@ -167,6 +169,9 @@ namespace OFLua
         };
         // Whether the console is open: it takes the keys that are typed, and menu scripts are given them as well
         api["consoleOpen"] = []() { return OFBase::Environment::get().getWindowManager()->isConsoleMode(); };
+        // Whether a dialog of the engine's own windows is open over the menu (the one that tells a save or a load
+        // failed): it has the keys and the buttons of the pad, and menu scripts are given those as well
+        api["dialogOpen"] = []() { return MyGUI::InputManager::getInstance().isModalAny(); };
         // The window manager's window for the settings (the game's own settings screens are not drawn from its menu
         // file yet), and whether it is open
         api["openSettings"] = []() {

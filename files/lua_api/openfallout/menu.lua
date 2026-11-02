@@ -107,6 +107,13 @@
 -- @return #boolean
 
 ---
+-- Whether a dialog of the engine's own windows is open over the menu, such as the one that tells that a save or a load
+-- failed. It takes the keys and the buttons of the pad, and menu scripts are given those too, so a script that acts on
+-- them leaves them alone while it is open
+-- @function [parent=#menu] dialogOpen
+-- @return #boolean
+
+---
 -- Open the engine's window for the settings (nothing when it is already open)
 -- @function [parent=#menu] openSettings
 
