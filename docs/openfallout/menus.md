@@ -328,6 +328,36 @@ arrows, a word is one step), the position of the whole screen (the file centres 
 the window here), the pause after a right guess (half a second here, the game waits 250 ms and then fades), and everything is
 checked in the offline harness only, not in the running game.
 
+### The pause menu
+
+`falloutstart.lua` (a script of the menu context, so it runs while the engine's menu is open, which the scripts of the
+player do not) draws the menu that opens with Escape in a running game on `options/start_menu.xml`. The game's code
+(class `StartMenu`, menu id 0x3F5, `FalloutNV.exe` round 12V) does not use a file for each of the title screen, the pause
+menu and the lists of saves: they are one file, and the code shows a part of it by fading its containers in and out (it
+sets their `_alpha`, and the file shows a tile when that is more than 0), so the script sets `_alpha` and `_enabled` of
+`main_container` (the list), `saveload_container` (the saves, with the panel of the one that is lit above it),
+`confirm_container` (a question and its choices) and `main_back_button`.
+
+- The list: Continue (there is no Resume item: Continue and Escape do the same), Save (only when the game can be saved:
+  `menu.canSave()`), Load (only when there is a save), Settings, Quit (which asks). The game has a Help item and, in the
+  pause menu, an item for the title screen that are not here, and the title screen itself is still the engine's: no content
+  is loaded there, so the words of the game (game settings) are not there either.
+- The list of saves: the newest first; the row for a new save when saving (`sNewSave n/1000 sSavesRemaining`, from the
+  template `lb_newsave_template`, so a row of a list can name its template: `_template`), the rows of the saves
+  (`lb_saveload_template`: `#0003` and the place, or the abbreviation of the quick or the automatic save). The panel
+  shows the name, the level and the time played of the save that is lit. Writing over a save and loading one ask first.
+  The save's picture, its version line, deleting a save, and the sorting the game uses (not read) are not here.
+- The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
+  `menu.openSettings`, `menu.settingsOpen` (`openfallout.menu`). The script says every frame that it draws the menu; while
+  it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
+  back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
+  list the engine closes the menu with them. Settings opens the engine's own window until the settings screens are drawn
+  from the file (that needs the four submenus read: ranges, defaults and grouping were not found in round 12V).
+- Not read yet, so estimated: where the question's container is (the file leaves its place to the code: it is put at the
+  list's side, in the middle of the window's height), which tile is lit first (the first row), and the format of the time
+  played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
+  picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

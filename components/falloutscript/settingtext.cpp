@@ -20,7 +20,9 @@ namespace FalloutScript::SettingText
         // from the files; sAttributesCount and sSkillsCount are formats of the character making screens (read from the
         // executables: the number of points left, then an 's' unless it is one), sAttributesTitle and sSkillsTitle the
         // formats of their titles (the points given and all that can be given; the capitals are in the text), and the
-        // trait menu's title and counter have a plural and a singular format (upper case, as read). The caravan, card
+        // trait menu's title and counter have a plural and a singular format (upper case, as read). The words of the
+        // pause menu's questions and save list (sConfirm*, sNewSave, sSavesRemaining, sNoSaves, the abbreviations of
+        // the quick and automatic saves, sLevelAbbrev, sPlayTime) are the port's own. The caravan, card
         // and roulette games are not here: their words are not needed yet. The length and the case of the defaults of
         // the buttons and the tabs of the data page were read from both executables (sMakeActiveQuest 17, sPlayAudio
         // 10, sStopAudio 10, sShowAllNotes 14, sShowActiveNotes 23, sNextChallenge 19, the tab texts 9, 9, 6, 4 (Misc,
@@ -31,6 +33,7 @@ namespace FalloutScript::SettingText
             Entry{ "sAccept", "Accept" },
             Entry{ "sAttributesCount", "Distribute %d Point" },
             Entry{ "sAttributesTitle", "ATTRIBUTES: %d/%d Points Assigned" },
+            Entry{ "sAutosaveAbbrev", "Auto" },
             Entry{ "sBack", "Back" },
             Entry{ "sCWheelTitle", "Companion Wheel" },
             Entry{ "sCancel", "Cancel" },
@@ -38,6 +41,9 @@ namespace FalloutScript::SettingText
             Entry{ "sChallengeToggle", "Challenges" },
             Entry{ "sCloseButton", "Close" },
             Entry{ "sCommsTabText", "Radio" },
+            Entry{ "sConfirmLoad", "Load this saved game? Any progress since your last save will be lost." },
+            Entry{ "sConfirmQuit", "Are you sure you want to quit?" },
+            Entry{ "sConfirmSave", "Overwrite this saved game?" },
             Entry{ "sContinue", "Continue" },
             Entry{ "sCrew", "Credits" },
             Entry{ "sCurrentObjective", "Current Objective" },
@@ -46,6 +52,7 @@ namespace FalloutScript::SettingText
             Entry{ "sDone", "Done" },
             Entry{ "sEnterName", "Enter Name" },
             Entry{ "sExit", "Exit" },
+            Entry{ "sExitGameAffirm", "Exit Game" },
             Entry{ "sExplosive", "Explosive" },
             Entry{ "sHitPointsShort", "HP" },
             Entry{ "sHowMany", "How many?" },
@@ -67,6 +74,7 @@ namespace FalloutScript::SettingText
             Entry{ "sInventoryValue", "VAL" },
             Entry{ "sInventoryWeight", "Wg" },
             Entry{ "sInventoryWeightUpper", "WG" },
+            Entry{ "sLevelAbbrev", "Lvl" },
             Entry{ "sLevelProgress", "Level Progress" },
             Entry{ "sLevelUp", "LEVEL UP" },
             Entry{ "sLoad", "Load" },
@@ -82,9 +90,12 @@ namespace FalloutScript::SettingText
             Entry{ "sMorphine", "Morphine" },
             Entry{ "sNavigate", "Navigate" },
             Entry{ "sNew", "New" },
+            Entry{ "sNewSave", "New Save" },
             Entry{ "sNext", "Next" },
             Entry{ "sNextChallenge", "Next Challenge Type" },
+            Entry{ "sNo", "No" },
             Entry{ "sNoItemsToRepair", "No items to repair" },
+            Entry{ "sNoSaves", "No Saved Games" },
             Entry{ "sNotesTabText", "Notes" },
             Entry{ "sNotesToggle", "Notes" },
             Entry{ "sOK", "OK" },
@@ -100,9 +111,11 @@ namespace FalloutScript::SettingText
             Entry{ "sPicksRemainingText", "Picks Remaining" },
             Entry{ "sPlaceMarker", "Place Marker" },
             Entry{ "sPlayAudio", "Play Audio" },
+            Entry{ "sPlayTime", "Play Time" },
             Entry{ "sPressStart", "Press Start" },
             Entry{ "sPrevious", "Previous" },
             Entry{ "sQuestsTabText", "Quests" },
+            Entry{ "sQuicksaveAbbrev", "Quick" },
             Entry{ "sQuit", "Quit" },
             Entry{ "sRecipes", "Recipes" },
             Entry{ "sRedeemCode", "Redeem Code" },
@@ -115,6 +128,7 @@ namespace FalloutScript::SettingText
             Entry{ "sReturn", "Return" },
             Entry{ "sSave", "Save" },
             Entry{ "sSaveGame", "Save Game" },
+            Entry{ "sSavesRemaining", "Saves Remaining" },
             Entry{ "sSelect", "Select" },
             Entry{ "sSettings", "Settings" },
             Entry{ "sShowActiveNotes", "Show Active Quest Notes" },
@@ -160,6 +174,7 @@ namespace FalloutScript::SettingText
             Entry{ "sVatsTarget", "Target" },
             Entry{ "sWorldMapTabText", "World Map" },
             Entry{ "sXPProgressMarker", "XP" },
+            Entry{ "sYes", "Yes" },
         };
 
         char lower(char c)
