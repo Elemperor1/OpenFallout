@@ -59,6 +59,13 @@ namespace FalloutMenu
             glyph.mBefore = readFloat(bytes, at + 44);
             glyph.mAfter = readFloat(bytes, at + 48);
             glyph.mAscent = readFloat(bytes, at + 52);
+            // A file with a number that is not a number would put that into every line that uses the character
+            for (const float number : { glyph.mU0, glyph.mV0, glyph.mU1, glyph.mV1, glyph.mWidth, glyph.mHeight,
+                     glyph.mBefore, glyph.mAfter, glyph.mAscent })
+            {
+                if (!std::isfinite(number))
+                    return std::nullopt;
+            }
         }
         // The baseline is as far below the top of a line as the tallest character reaches above it
         float tallest = 0;

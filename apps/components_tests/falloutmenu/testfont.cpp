@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <limits>
 #include <string>
 
 namespace
@@ -53,6 +54,23 @@ namespace
     {
         EXPECT_FALSE(Font::parse("short"));
         EXPECT_FALSE(Font::parse(std::string(headerBytes + 256 * glyphBytes, '\0')));
+    }
+
+    TEST(FalloutMenuFontTest, a_character_with_a_number_that_is_not_a_number_makes_the_file_not_a_font)
+    {
+        const float notFinite[] = { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() };
+        // The corners, then the width, height, room before and after, and how far it reaches above the line
+        const std::size_t fields[] = { 4, 8, 12, 24, 36, 40, 44, 48, 52 };
+        for (const float bad : notFinite)
+        {
+            for (const std::size_t field : fields)
+            {
+                std::string bytes = testFont();
+                putFloat(bytes, bytes.size() - 256 * glyphBytes + 'A' * glyphBytes + field, bad);
+                EXPECT_FALSE(Font::parse(bytes)) << "field " << field << " value " << bad;
+            }
+        }
+        EXPECT_TRUE(Font::parse(testFont()));
     }
 
     TEST(FalloutMenuFontTest, the_header_gives_the_line_height_and_the_texture_name)
