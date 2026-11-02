@@ -128,6 +128,23 @@ rows: the engine does not have the notes or the stations of the player.
 The page needs `core.interact.mapInfo()` (the worldspace, its picture and the rectangle of cells, where the player stands and
 faces, the name of the place, the date) and the `space` and `type` of each place of `core.interact.map()`.
 
+### Making the character
+
+`falloutchargen.lua` draws the screens that the engine's character making (`core.chargen`) opens, one after the other. The
+name is entered on `dialog/texteditmenu.xml` (the prompt, the name with a cursor, OK); the points of S.P.E.C.I.A.L. and the
+tags of the skills are on `chargen/char_gen_menu.xml`, whose list takes the file's two row templates: `CGM_AttributeTemplate`
+(the name, the value and the two arrows, which show by the file's own rules: the left one while the value is above its least,
+the right one while points are left and the value is below its most) and `CGM_SelectItemTemplate` (the name, the value and
+the square of a skill that is tagged). The file asks the code for the title, the text of the selection, the counter and the
+numbers `_CurrPoints` and `_MaxPoints` (the points given so far and all that can be given), and Done is shown dim until they
+are equal, as the file says. A click on a row picks it and shows its description; the arrows give and take a point; Reset
+goes back to what the screen started with. The keys: up and down pick a row, left and right give and take a point (space
+tags), Enter is Done. The top of the list is where the file leaves it to the code, 60 units down; the words of the counter
+and the picture of the selection (the file hides it) are not read from the executables yet. The sex and race screen
+(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and which of the two trait
+menus (`trait_menu.xml`, `trait_select_menu.xml`) the games open for the traits is not read yet; both keep the stand-in
+widgets, as does any screen whose file the install lacks.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
