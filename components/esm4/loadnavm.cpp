@@ -34,16 +34,69 @@
 #include "reader.hpp"
 //#include "writer.hpp"
 
+namespace
+{
+    // The data of an NVNM sub-record is fields and counted arrays, and the counts come straight from the file. Every
+    // read goes through the bytes the sub-record has left (at most 65535, the size in a sub-record header has 16
+    // bits), so a count that promises more than the sub-record holds ends the load with an error before anything is
+    // allocated, and so does a record that ends inside a field.
+    class NvnmBytes
+    {
+    public:
+        explicit NvnmBytes(ESM4::Reader& reader)
+            : mReader(reader)
+            , mRemaining(reader.subRecordHeader().dataSize)
+        {
+        }
+
+        std::size_t remaining() const { return mRemaining; }
+
+        template <class T>
+        void get(T& value)
+        {
+            if (mRemaining < sizeof(T) || !mReader.getExact(value))
+                throw std::runtime_error("NVNM ends inside a field");
+            mRemaining -= sizeof(T);
+        }
+
+        void getFormId(ESM::FormId& id)
+        {
+            if (mRemaining < sizeof(std::uint32_t) || !mReader.getFormId(id))
+                throw std::runtime_error("NVNM ends inside a field");
+            mRemaining -= sizeof(std::uint32_t);
+        }
+
+        // A 32-bit count and then that many elements.
+        template <class T>
+        void getArray(std::vector<T>& out)
+        {
+            std::uint32_t count;
+            get(count);
+            if (count > mRemaining / sizeof(T))
+                throw std::runtime_error("NVNM array is longer than the rest of the sub-record");
+
+            out.resize(count);
+            if (count != 0 && !mReader.get(out.data(), static_cast<std::size_t>(count) * sizeof(T)))
+                throw std::runtime_error("NVNM ends inside an array");
+            mRemaining -= static_cast<std::size_t>(count) * sizeof(T);
+        }
+
+    private:
+        ESM4::Reader& mReader;
+        std::size_t mRemaining;
+    };
+}
+
 void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
 {
     // std::cout << "start: divisor " << std::dec << divisor << ", segments " << triSegments.size() << //std::endl;
     //"this 0x" << this << std::endl; // FIXME
 
-    std::uint32_t count;
+    NvnmBytes bytes(reader);
 
-    reader.get(unknownNVER);
-    reader.get(unknownLCTN);
-    reader.getFormId(worldSpaceId);
+    bytes.get(unknownNVER);
+    bytes.get(unknownLCTN);
+    bytes.getFormId(worldSpaceId);
     // FLG_Tamriel    = 0x0000003c, // grid info follows, possibly Tamriel?
     // FLG_Morrowind  = 0x01380000, // grid info follows, probably Skywind
     // FIXME: this check doesn't work because `getFormId` adjusts content file index
@@ -66,8 +119,8 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
         // Formula seems to be floor(Skywind coord / 2) <cmath>
         //
         Grid grid;
-        reader.get(grid.y); // NOTE: reverse order
-        reader.get(grid.x);
+        bytes.get(grid.y); // NOTE: reverse order
+        bytes.get(grid.x);
         cellGrid = grid;
 // FIXME: debugging only
 #if 0
@@ -82,7 +135,7 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
     else
     {
         ESM::FormId cellId;
-        reader.getFormId(cellId);
+        bytes.getFormId(cellId);
         cellGrid = cellId;
 
 #if 0
@@ -95,97 +148,41 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
 #endif
     }
 
-    reader.get(count); // numVerticies
-    if (count)
-    {
-        verticies.resize(count);
-        for (std::vector<Vertex>::iterator it = verticies.begin(); it != verticies.end(); ++it)
-        {
-            reader.get(*it);
-// FIXME: debugging only
-#if 0
-            //if (reader.hdr().record.id == 0x2004ecc) // FIXME
-            std::cout << "nvnm vert " << (*it).x << ", " << (*it).y << ", " << (*it).z << std::endl;
-#endif
-        }
-    }
-
-    reader.get(count); // numTriangles;
-    if (count)
-    {
-        triangles.resize(count);
-        for (std::vector<Triangle>::iterator it = triangles.begin(); it != triangles.end(); ++it)
-        {
-            reader.get(*it);
-        }
-    }
-
-    reader.get(count); // numExtConn;
-    if (count)
-    {
-        extConns.resize(count);
-        for (std::vector<ExtConnection>::iterator it = extConns.begin(); it != extConns.end(); ++it)
-        {
-            reader.get(*it);
-// FIXME: debugging only
-#if 0
-            std::cout << "nvnm ext 0x" << std::hex << (*it).navMesh << std::endl;
-#endif
-        }
-    }
-
-    reader.get(count); // numDoorTriangles;
-    if (count)
-    {
-        doorTriangles.resize(count);
-        for (std::vector<DoorTriangle>::iterator it = doorTriangles.begin(); it != doorTriangles.end(); ++it)
-        {
-            reader.get(*it);
-        }
-    }
-
-    reader.get(count); // numCoverTriangles;
-    if (count)
-    {
-        coverTriangles.resize(count);
-        for (std::vector<std::uint16_t>::iterator it = coverTriangles.begin(); it != coverTriangles.end(); ++it)
-        {
-            reader.get(*it);
-        }
-    }
+    bytes.getArray(verticies); // numVerticies
+    bytes.getArray(triangles); // numTriangles
+    bytes.getArray(extConns); // numExtConn
+    bytes.getArray(doorTriangles); // numDoorTriangles
+    bytes.getArray(coverTriangles); // numCoverTriangles
 
     // abs((maxX - minX) / divisor) = Max X Distance
-    reader.get(divisor); // FIXME: latest over-writes old
+    bytes.get(divisor); // FIXME: latest over-writes old
 
-    reader.get(maxXDist); // FIXME: update with formula
-    reader.get(maxYDist);
-    reader.get(minX); // FIXME: use std::min
-    reader.get(minY);
-    reader.get(minZ);
-    reader.get(maxX);
-    reader.get(maxY);
-    reader.get(maxZ);
+    bytes.get(maxXDist); // FIXME: update with formula
+    bytes.get(maxYDist);
+    bytes.get(minX); // FIXME: use std::min
+    bytes.get(minY);
+    bytes.get(minZ);
+    bytes.get(maxX);
+    bytes.get(maxY);
+    bytes.get(maxZ);
 
-    // FIXME: should check remaining size here
     // there are divisor^2 segments, each segment is a vector of triangle indices
     const std::size_t segmentCount = static_cast<std::size_t>(divisor) * divisor;
+    // NOTE: a segment may be empty, but its count of indices is there
+    if (segmentCount > bytes.remaining() / sizeof(std::uint32_t))
+        throw std::runtime_error("Triangle segments end before the square of divisor");
     for (std::size_t i = 0; i < segmentCount; ++i)
     {
-        // NOTE: count may be zero. A failed read ends the loop, so a divisor that promises more
-        // segments than the record holds cannot make it run on without data.
-        if (!reader.getExact(count))
-            throw std::runtime_error("Triangle segments end before the square of divisor");
-
         std::vector<std::uint16_t> indices;
-        indices.resize(count);
-        for (std::vector<std::uint16_t>::iterator it = indices.begin(); it != indices.end(); ++it)
-        {
-            reader.get(*it);
-        }
+        bytes.getArray(indices);
         triSegments.push_back(std::move(indices));
     }
     if (triSegments.size() != segmentCount)
         throw std::runtime_error("Triangle segments size is not the square of divisor");
+
+    // The reader goes on from the end of the sub-record, whatever follows the segments in it
+    if (bytes.remaining() != 0)
+        reader.skipSubRecordData(static_cast<std::uint32_t>(bytes.remaining()));
 #if 0
     if (triSegments.size() != divisor*divisor)
         std::cout << "divisor " << std::dec << divisor << ", segments " << triSegments.size() << //std::endl;
