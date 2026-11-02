@@ -45,7 +45,7 @@ On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock
 
 | Screen | D-pad | LB / RB | Y | X |
 |---|---|---|---|---|
-| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA) | a page up or down | use the thing picked (equip, eat, read) | drop it |
+| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA); on the INV page `[` and `]` on the keyboard change the tab | a page up or down | use the thing picked (equip, eat, read) | drop it |
 | Conversation | up and down pick a topic | a page of topics | say the topic picked; carry on while a character speaks | |
 | V.A.T.S. | left and right pick the character, up and down the part | the character before or after | queue an attack on the part picked (the first press shows which part is picked) | attack: carry out the queue |
 | Container | up and down pick a thing | a page | take it (the first press shows which is picked) | take everything |

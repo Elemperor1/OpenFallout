@@ -39,8 +39,31 @@ these from the pointer, and the renderer sets them:
 
 Screens drawn from their file so far: the hours to wait or sleep (`sleep_wait_menu.xml`), the dialogue
 (`dialog/dialog_menu.xml`), taking things from a container and putting them back (`container_menu.xml`), "how many?"
-(`quantity_menu.xml`). The older hand-built widgets of each stay as a fallback for when the file cannot be opened, and are
-removed once the screen has been played.
+(`quantity_menu.xml`), the bench (`recipe_menu.xml`) and the items page of the Pip-Boy (`main/inventory_menu.xml`). The
+older hand-built widgets of each stay as a fallback for when the file cannot be opened, and are removed once the screen
+has been played.
+
+### The tabline
+
+A menu file that has a tabline (`tabline.xml`) leaves the buttons to the game's code: it keeps the template
+(`TabButtonTemplate`) and the code makes one button for each tab, gives it its text and a `listindex`, and says which one
+is current in the line's `_CurrentTab`. `Shown:tabs(line, template, labels, picked, onPick)` of `falloutmenu.lua` does that.
+A button is as wide as its text and the room the template leaves around it; the buttons are spread over the width of the
+line with the same gap between them, which is also `_LeftLineLength`, the length of the lines the file draws from one
+button to the next and to the brackets at the ends (the lines meet the brackets exactly with this gap, which is the
+reason to think the game spreads them so). The Pip-Boy page row (STAT, INV, DATA) is not in any menu file: the games have
+it in the Pip-Boy device, which is a model, and `falloutpipboy.lua` keeps a plain row of its own at the top of the screen
+for it.
+
+### The items page of the Pip-Boy
+
+`falloutpipboyitems.lua` lists what the player carries in the list of `inventory_menu.xml` (the marker of what is worn is
+the file's), puts the weight, health, resistance (Fallout 3) or threshold (New Vegas) and caps in the cards of the
+headline, and the cards of the thing the pointer is on in the file's `item_stats_display`. A click on a thing uses it
+(puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
+keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
+than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
+yet: the picture of the thing (the games show its model), the hot keys, repair and mods (their buttons are hidden).
 
 ## What was read from the executable
 

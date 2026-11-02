@@ -102,9 +102,10 @@ end
 
 -- Change a number of things and draw the menu once, after the last of them
 function Shown:batch(change)
+    local outer = self.batching
     self.batching = true
     local ok, problem = pcall(change)
-    self.batching = false
+    self.batching = outer
     self:refresh()
     if not ok then error(problem, 0) end
 end
@@ -187,6 +188,56 @@ function Shown:list(listTile, template)
     function list.count() return shown.menu:rowCount(number) end
     function list.onClick(handler) shown.rowClicks[number] = handler end
     return list
+end
+
+-- Fill a tabline (a tile that includes tabline.xml) with a button for each label, as the game's code does with the
+-- template the menu file keeps for the buttons. The buttons are spread over the line with the same gap between them, as
+-- long as the lines the file draws between them (`_LeftLineLength`); a button is as wide as its text and the room the
+-- template leaves around it. `options`: prefix (the names of the buttons are prefix .. number, default 'Tab').
+-- Returns an object with `pick(index)` (the tab that is shown as the current one), `current()` and `count()`;
+-- `onPick(index)` is called when a button is clicked.
+function Shown:tabs(line, template, labels, picked, onPick, options)
+    local menu = self.menu
+    local prefix = options and options.prefix or 'Tab'
+    local tabs = { buttons = {}, index = picked }
+    local shown = self
+    self:batch(function()
+        for i, label in ipairs(labels) do
+            local tile = menu:instantiate(line, template, prefix .. i)
+            if not tile then
+                error('the menu ' .. self.file .. ' has no template ' .. template, 0)
+            end
+            menu:set(tile, 'string', label)
+            menu:set(tile, 'listindex', i - 1)
+            tabs.buttons[i] = tile
+        end
+        local total = 0
+        for _, tile in ipairs(tabs.buttons) do
+            total = total + menu:getNumber(tile, 'width')
+        end
+        local gap = math.max(0, (menu:getNumber(line, 'width') - total) / (#labels + 1))
+        local x = gap
+        for _, tile in ipairs(tabs.buttons) do
+            menu:set(tile, '_x', x)
+            x = x + menu:getNumber(tile, 'width') + gap
+        end
+        menu:set(line, '_LeftLineLength', gap)
+        menu:set(line, '_ButtonCount', #labels)
+        menu:set(line, '_CurrentTab', picked - 1)
+    end)
+    function tabs.pick(index)
+        tabs.index = index
+        shown.menu:set(line, '_CurrentTab', index - 1)
+        shown:refresh()
+    end
+    function tabs.current() return tabs.index end
+    function tabs.count() return #tabs.buttons end
+    for i = 1, #labels do
+        self.clicks[prefix .. i] = function()
+            if onPick then onPick(i) end
+        end
+    end
+    return tabs
 end
 
 -- Put a scrollbar of the menu at a value
