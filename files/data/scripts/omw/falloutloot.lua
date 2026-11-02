@@ -270,6 +270,8 @@ local function fillSide(side)
     if picked > 0 and #rows > 0 then
         side.list.select(math.min(picked, #rows), true)
     end
+    -- The thing on the same row may be another one now (a filter changed): the cards are made again
+    cardSide, cardRow = nil, nil
 end
 
 local function setTitles(loot)
@@ -413,7 +415,15 @@ local function updateCards()
         side = sides[name]
         row = side and side.list.selected() or 0
     end
-    if row > 0 and (cardSide ~= name or cardRow ~= row) then
+    if row <= 0 then
+        -- neither list has a row to pick: no card
+        if cardRow ~= 0 then
+            cardSide, cardRow = nil, 0
+            cards.show(shown, nil)
+        end
+        return
+    end
+    if cardSide ~= name or cardRow ~= row then
         cardSide, cardRow = name, row
         cards.show(shown, side.listed and side.listed[row] or nil)
     end

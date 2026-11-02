@@ -140,6 +140,7 @@ function Shown:checkSize()
     if size.x ~= self.size.x or size.y ~= self.size.y then
         self.size = size
         local place = placement(size, self.box)
+        self.origin = place.position
         self.menu:resize(place.pixels.x, place.pixels.y)
         self.element.layout.props.position = place.position
         self.element.layout.props.size = place.size
@@ -310,7 +311,8 @@ function module.open(file, options)
         return nil
     end
     local shown = setmetatable({
-        menu = menu, file = file, size = size, box = options.box, clicks = {}, rowClicks = {}, dragHooks = {},
+        menu = menu, file = file, size = size, box = options.box, origin = place.position, clicks = {}, rowClicks = {},
+        dragHooks = {},
     }, Shown)
     shown.version = menu:version()
     shown.element = ui.create {
@@ -341,7 +343,8 @@ function module.open(file, options)
                 -- The files count the wheel the other way round: up is -1 (the scrollbars add `wheelmoved` to the place)
                 local notches = e.delta.y > 0 and -1 or (e.delta.y < 0 and 1 or 0)
                 if notches ~= 0 then
-                    shown.menu:wheel(e.position.x, e.position.y, notches)
+                    -- the wheel event has the cursor in the window, the menu is in the pixels of the element
+                    shown.menu:wheel(e.position.x - shown.origin.x, e.position.y - shown.origin.y, notches)
                     shown:refresh()
                 end
             end),
