@@ -2467,6 +2467,34 @@ namespace OFGui
         updateVisible();
     }
 
+    namespace
+    {
+        std::int64_t steadyMilliseconds()
+        {
+            return std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+        }
+    }
+
+    void WindowManager::setMainMenuDrawnByLua(bool drawn, bool escape)
+    {
+        if (drawn)
+            mMainMenuClaimedAt = steadyMilliseconds();
+        mMainMenuEscape = drawn && escape;
+        mMainMenuDrawn = drawn;
+    }
+
+    bool WindowManager::isMainMenuDrawnByLua() const
+    {
+        return mMainMenuDrawn.load() && steadyMilliseconds() - mMainMenuClaimedAt.load() < 1000;
+    }
+
+    bool WindowManager::isMainMenuEscapeLua() const
+    {
+        return isMainMenuDrawnByLua() && mMainMenuEscape.load();
+    }
+
     void WindowManager::cycleSpell(bool next)
     {
         if (!isGuiMode())

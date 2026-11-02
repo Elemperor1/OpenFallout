@@ -76,4 +76,34 @@
 -- Exit the game
 -- @function [parent=#menu] quit
 
+---
+-- Whether the menu that opens with Escape is open (the screen on top is the menu)
+-- @function [parent=#menu] mainMenuOpen
+-- @return #boolean
+
+---
+-- A script draws the menu that opens with Escape (`drawn` true), as the game's own menu file `start_menu.xml` does, or
+-- the engine does (false, as before): the engine's own buttons are not shown while a script draws it. The script says it
+-- every frame: a claim that is a second old is no longer one, so a script that fails gives the menu back. With `escape`
+-- the key that leaves the menu (Escape, the B button) is the script's, which goes back a step in a screen of its own;
+-- the engine does not close the menu with it then.
+-- @function [parent=#menu] claimMainMenu
+-- @param #boolean drawn
+-- @param #boolean escape optional
+
+---
+-- Close the menu and go on with the game (nothing when no game is running)
+-- @function [parent=#menu] resume
+
+---
+-- Whether the game can be saved now: a game is running, the character is made and the place can be saved in
+-- @function [parent=#menu] canSave
+-- @return #boolean
+
+---
+-- Open the engine's window for the settings, and whether it is open
+-- @function [parent=#menu] openSettings
+-- @function [parent=#menu] settingsOpen
+-- @return #boolean
+
 return nil

@@ -5,7 +5,10 @@
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
+#include "../mwbase/windowmanager.hpp"
+#include "../mwbase/world.hpp"
 #include "../mwstate/character.hpp"
+#include "../mwworld/globals.hpp"
 
 #include "context.hpp"
 #include "luamanagerimp.hpp"
@@ -138,6 +141,38 @@ namespace OFLua
         };
 
         api["quit"] = []() { OFBase::Environment::get().getStateManager()->requestQuit(); };
+
+        // The menu that opens with Escape, which a script can draw from the game's own menu file (start_menu.xml)
+        // instead of the window manager's buttons. Whether it is open (the screen on top is the menu):
+        api["mainMenuOpen"]
+            = []() { return OFBase::Environment::get().getWindowManager()->getMode() == OFGui::GM_MainMenu; };
+        // The script draws the menu (true), or the window manager does (false, as before). The script says it every
+        // frame: a claim that is a second old is no longer one, so that a script that fails gives the menu back. With
+        // `escape` the key that leaves the menu (Escape, the B button) is the script's, which goes back a step in a
+        // screen of its own, and the window manager does not close the menu with it.
+        api["claimMainMenu"] = [](bool drawn, sol::optional<bool> escape) {
+            OFBase::Environment::get().getWindowManager()->setMainMenuDrawnByLua(drawn, escape.value_or(false));
+        };
+        // Close the menu and go on with the game (nothing when no game is running)
+        api["resume"] = []() {
+            if (OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_Running)
+                OFBase::Environment::get().getWindowManager()->removeGuiMode(OFGui::GM_MainMenu);
+        };
+        // Whether the game can be saved now, as the window manager's menu decides it to show its button for saving: a
+        // game that runs, whose character is made and which is not in a place that cannot be saved in
+        api["canSave"] = []() {
+            return OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_Running
+                && OFBase::Environment::get().getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) == -1
+                && OFBase::Environment::get().getWindowManager()->isSavingAllowed();
+        };
+        // The window manager's window for the settings (the game's own settings screens are not drawn from its menu
+        // file yet), and whether it is open
+        api["openSettings"] = []() {
+            OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+            if (!windows->isSettingsWindowVisible())
+                windows->toggleSettingsWindow();
+        };
+        api["settingsOpen"] = []() { return OFBase::Environment::get().getWindowManager()->isSettingsWindowVisible(); };
 
         return LuaUtil::makeReadOnly(api);
     }

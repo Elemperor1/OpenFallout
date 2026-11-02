@@ -365,6 +365,17 @@ namespace OFBase
         virtual void togglePostProcessorHud() = 0;
         virtual void toggleSettingsWindow() = 0;
 
+        /// A script of Lua draws the pause menu (start_menu.xml) when `drawn` is true: the buttons of the window
+        /// manager's own menu are not shown while it does. With `escape` the key that leaves the menu (Escape, the B
+        /// button) is the script's: it goes back a step in a screen of the menu instead of closing the menu. The script
+        /// says it every frame and a claim that is a second old is no longer one, so a script that fails gives the menu
+        /// back. Any thread.
+        virtual void setMainMenuDrawnByLua(bool drawn, bool escape) = 0;
+        /// A script of Lua draws the pause menu now (it said so within the last second)
+        virtual bool isMainMenuDrawnByLua() const = 0;
+        /// ... and the key that leaves the menu is the script's
+        virtual bool isMainMenuEscapeLua() const = 0;
+
         /// Cycle to next or previous spell
         virtual void cycleSpell(bool next) = 0;
         /// Cycle to next or previous weapon

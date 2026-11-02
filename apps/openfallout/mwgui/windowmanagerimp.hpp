@@ -7,6 +7,8 @@
    and retrieving information from the Gui.
 **/
 
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -377,6 +379,9 @@ namespace OFGui
         void toggleDebugWindow() override;
         void togglePostProcessorHud() override;
         void toggleSettingsWindow() override;
+        void setMainMenuDrawnByLua(bool drawn, bool escape) override;
+        bool isMainMenuDrawnByLua() const override;
+        bool isMainMenuEscapeLua() const override;
 
         /// Cycle to next or previous spell
         void cycleSpell(bool next) override;
@@ -496,6 +501,12 @@ namespace OFGui
         MyGUI::Widget* mInputBlocker;
 
         bool mHudEnabled;
+
+        /// When a script of Lua last said that it draws the pause menu (milliseconds of the steady clock), and whether
+        /// it keeps the key that leaves the menu
+        std::atomic<std::int64_t> mMainMenuClaimedAt{ 0 };
+        std::atomic<bool> mMainMenuDrawn{ false };
+        std::atomic<bool> mMainMenuEscape{ false };
         bool mCursorVisible;
         bool mCursorActive;
         bool mCursorInteractionEnabled;
