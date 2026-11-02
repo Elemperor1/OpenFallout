@@ -203,6 +203,14 @@ local function finishPage()
     chargen.finish()
 end
 
+-- Whether the Done button of a screen drawn from the file is lit: nothing is left to spend or to tag
+local function doneReady()
+    local state = chargen.state()
+    if shownPage == 'special' then return state.pointsLeft <= 0 end
+    if shownPage == 'skills' then return state.tagsLeft <= 0 end
+    return true
+end
+
 -- The pages
 
 local nameLabel = nil
@@ -371,9 +379,11 @@ end
 local function pointsMenu(template, title)
     local opened = menuModule.open(MENU_POINTS)
     if not opened then return nil end
+    -- Kept from here on, so that a failure below is cleaned up by closeShown() where the page is made
+    shown = opened
     local made = opened:list('CGM_ItemList', template)
     if not made then
-        opened:close()
+        closeShown()
         return nil
     end
     opened:batch(function()
@@ -386,7 +396,6 @@ end
 local function specialMenu()
     local opened, made = pointsMenu('CGM_AttributeTemplate', word('sStatsSpecial', 'S.P.E.C.I.A.L.'))
     if not opened then return false end
-    shown = opened
     local state = chargen.state()
     -- What the screen started with: Reset goes back to it
     local baseline, numbers, texts = {}, {}, {}
@@ -478,7 +487,6 @@ end
 local function skillsMenu()
     local opened, made = pointsMenu('CGM_SelectItemTemplate', word('sStatsSkills', 'Skills'))
     if not opened then return false end
-    shown = opened
     -- What the screen started with (skills may arrive already tagged): Reset goes back to it
     local numbers, tagged, texts = {}, {}, {}
     for index, skill in ipairs(chargen.state().skills) do
@@ -680,6 +688,9 @@ return {
             if key.code == input.KEY.Enter then
                 if shownPage == 'name' then
                     if chargen.setName(typed or '') ~= '' then finishPage() end
+                elseif shown and not doneReady() then
+                    -- The Done button of the file is dim until the points are spent or the tags are put: so is Enter
+                    return
                 else
                     finishPage()
                 end
