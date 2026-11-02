@@ -526,10 +526,11 @@ namespace FalloutMenu
             // A tile that mirrors its child does not move the child's frame, so the child stands where it says
             if (t != &tile && t->mParent != nullptr && mirrorsChild(*t))
                 continue;
-            x += number(*t, "x");
+            // A text puts its x at the point it is justified to, so what is in it moves with it
+            x += number(*t, "x") - anchorShift(*t);
             y += number(*t, "y");
         }
-        return std::array<float, 4>{ x - anchorShift(tile), y, number(tile, "width"), number(tile, "height") };
+        return std::array<float, 4>{ x, y, number(tile, "width"), number(tile, "height") };
     }
 
     std::array<float, 4> Menu::colorOf(const Tile& tile)

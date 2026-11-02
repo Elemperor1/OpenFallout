@@ -27,7 +27,12 @@ namespace FalloutMenu
         {
             Value value;
             value.mString = std::string(text);
-            if (!text.empty())
+            if (text.empty())
+            {
+                // A trait written with nothing in it is a text of no characters, not the number 0
+                value.mIsText = true;
+            }
+            else
             {
                 const std::string copy(text);
                 char* end = nullptr;

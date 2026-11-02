@@ -137,6 +137,17 @@ namespace
         EXPECT_NE(f.mLoader->problems()[0].find("too deep"), std::string::npos);
     }
 
+    TEST(FalloutMenuLoaderTest, a_trait_written_with_nothing_in_it_is_an_empty_text_not_zero)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><text name=\"T\"><string></string></text><image name=\"I\"><filename/></image></menu>");
+        Tile* text = menu.find("T");
+        ASSERT_NE(text, nullptr);
+        EXPECT_EQ(menu.text(*text, "string"), "");
+        EXPECT_EQ(menu.text(*menu.find("I"), "filename"), "");
+    }
+
     TEST(FalloutMenuEvaluationTest, a_number_that_is_not_finite_is_not_a_number)
     {
         Fixture f;
@@ -394,6 +405,23 @@ namespace
         EXPECT_FLOAT_EQ(items[2].mX, 60.f);
         EXPECT_EQ(items[2].mText, "abcd");
         EXPECT_EQ(items[2].mJustify, 4);
+    }
+
+    TEST(FalloutMenuDrawTest, the_rectangle_of_a_tile_in_a_text_follows_the_text_it_is_justified_to)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><text name=\"R\"><string> abcd </string><x> 100 </x><justify> &right; </justify>"
+            "<image name=\"I\"><filename> a.dds </filename><x> 5 </x></image></text></menu>");
+        // The text is 40 wide, so it starts at 60 and its image 5 further; the rectangle is where the image is drawn
+        const auto rect = menu.rectangle(*menu.find("I"));
+        ASSERT_TRUE(rect.has_value());
+        EXPECT_FLOAT_EQ((*rect)[0], 65.f);
+        float drawn = -1.f;
+        for (const DrawItem& item : menu.draw())
+            if (item.mType == TileType::Image)
+                drawn = item.mX;
+        EXPECT_FLOAT_EQ(drawn, (*rect)[0]);
     }
 
     TEST(FalloutMenuDrawTest, a_clip_window_cuts_what_is_in_it_that_asks_for_it)
