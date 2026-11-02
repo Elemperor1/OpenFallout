@@ -52,7 +52,8 @@ local function accept()
 end
 
 -- Asks for 1 to `max` and calls `onChosen(count)` when the player says OK; nothing happens when it is cancelled.
--- Returns false when the menu file is not there (the caller takes what it was asked about as it is).
+-- Returns false when the menu file is not there, or has no meter to set (the caller takes what it was asked about as it
+-- is).
 function module.ask(max, onChosen)
     module.close()
     most = math.max(1, math.floor(max))
@@ -61,10 +62,15 @@ function module.ask(max, onChosen)
         return false
     end
     shown, amount, accepted = opened, 1, onChosen
-    opened:batch(function()
+    -- Setting a tile the file does not have is an error; a menu that cannot show the amount is closed, not left open
+    local ready = pcall(opened.batch, opened, function()
         opened:set('QM_AmountMeter', 'user0', most)
         show()
     end)
+    if not ready then
+        module.close()
+        return false
+    end
     -- A drag of the meter sets the amount, which stays when the meter is let go
     opened:onDrag('QM_AmountMeter', function()
         local value = tonumber(opened:get('QM_AmountMeter', '_Value')) or 0
