@@ -101,8 +101,11 @@
 -- @return #boolean
 
 ---
--- Open the engine's window for the settings, and whether it is open
+-- Open the engine's window for the settings (nothing when it is already open)
 -- @function [parent=#menu] openSettings
+
+---
+-- Whether the engine's window for the settings is open
 -- @function [parent=#menu] settingsOpen
 -- @return #boolean
 

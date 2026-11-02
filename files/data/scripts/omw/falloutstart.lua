@@ -63,6 +63,7 @@ local function fade(name, on)
 end
 
 local function closeShown()
+    pending = nil
     if shown then
         shown:close()
         shown = nil
@@ -243,6 +244,8 @@ end
 
 -- Go back one step: from a question to the screen it came from, from a list of saves to the main list
 local function back()
+    -- what was picked and not carried out yet (it is, in the next frame) is given up
+    pending = nil
     if screen == 'confirm' then
         if confirmFrom == 'list' then showList() else showSaves(confirmFrom, lastSaveRow) end
     elseif screen == 'save' or screen == 'load' then
@@ -354,8 +357,16 @@ local function open()
     return true
 end
 
+-- A message box that is open (one that opened before the menu did) has the keys and the buttons of the pad
+local function messageOpen()
+    local box = core.messageBox
+    if box == nil then return false end
+    local ok, current = pcall(box.current)
+    return ok and current ~= nil
+end
+
 local function onKey(key)
-    if not shown then return end
+    if not shown or messageOpen() then return end
     local code = key.code
     local KEY = input.KEY
     local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm or lists.saves
@@ -382,7 +393,7 @@ end
 -- The buttons of the pad: the engine does not give them to its own menu while the script draws this one, and takes B only
 -- in the list (to close the menu), so the pad moves the lit row, picks it, goes back and closes the menu here
 local function onPad(button)
-    if not shown then return end
+    if not shown or messageOpen() then return end
     local PAD = input.CONTROLLER_BUTTON
     if button == PAD.DPadUp then
         onKey({ code = input.KEY.UpArrow })
@@ -400,15 +411,17 @@ end
 return {
     engineHandlers = {
         onFrame = function()
+            -- The engine's own window for the settings is the menu while it is open
+            local function drawnNow()
+                return engine.getState() == engine.STATE.Running and not failed and not engine.settingsOpen()
+            end
             if pending then
+                -- carried out in this frame while the menu is still the one that picked it, given up when it is not
                 local action = pending
                 pending = nil
-                action()
+                if drawnNow() and engine.mainMenuOpen() then action() end
             end
-            local state = engine.getState()
-            local running = state == engine.STATE.Running
-            -- The engine's own window for the settings is the menu while it is open
-            local drawn = running and not failed and not engine.settingsOpen()
+            local drawn = drawnNow()
             if not drawn then
                 closeShown()
                 release()
