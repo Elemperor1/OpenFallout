@@ -176,6 +176,41 @@ counter is never hidden. The executable's own limit is `iTraitMenuMaxNumTraits` 
 two) and its list is every perk with the trait flag in the order the data handler has them (the engine lists them by name),
 with the conditions of the perk checked for the player (the engine does not check them).
 
+### The level-up screen
+
+`falloutlevelup.lua` fills `levelup_menu.xml` (a module of `falloutpipboy.lua`, which opens it when the engine hands out a
+level and shows the stand-in widgets only when the file is not in the install). Read from both executables (the creator,
+the click handler and the list fill of `LevelUpMenu`):
+
+- The title is `sLevelUpTitleText` ("WELCOME TO LEVEL %d") with the player's level, set once when the menu is made; the perk
+  page keeps it.
+- The counter is `sLevelUpSkillCounter` (one point left, no number in it) or `sLevelUpSkillCounterPl` (one `%d`) on the skills
+  page and `sLevelUpPerkCounter` / `sLevelUpPerkCounterPl` on the perk page, hidden when nothing is left. The file's own
+  `_CurrPoints` and `_MaxPoints` (the points given and all that can be given) decide when Continue is lit.
+- The skills are the actor values 32 to 45 in that order (Barter to Unarmed), without any whose record has the flag 0x2000
+  (the executable's own test; the games list 13 skills, Big Guns and Survival each being in one game only). A row has its
+  base value, `_ExtraValue` (what perks, chems and the like add), `_AddedValue` (the points given on this screen) and the
+  value as a whole number between 0 and 100 in `_DisplayString`. The points are `trunc(0.5 * Intelligence + 10)` changed by
+  the perk entry point 10 (`iLevelUpSkillPointsBase`, `iLevelUp01Mult` and the others have no reader in New Vegas), and are
+  limited to what the skills have room for under 100. The right arrow gives a point at once to the skill (the executable
+  writes the actor value on the click), the left one takes back a point given on this screen; the arrows show by the file's
+  expressions. Reset takes back every point given on the page.
+- The selection is the actor value's own `ICON` and `DESC`; on the weapon skills (Big Guns, Energy Weapons, Explosives,
+  Melee, Small Guns, Unarmed) the corner badge `stats_icon_badge` shows `weap_skill_icon_*.dds` (New Vegas's file only).
+- The perk page comes when the level gives a perk (`iLevelsPerPerk`, 2 in New Vegas; the engine decides). It lists the
+  perks that are playable, not traits, below their last rank and whose conditions the player meets (a perk the level does
+  not reach yet is dim and cannot be picked); a multi-rank perk the player already has shows its rank in brackets. One perk
+  is picked: a click on the picked row puts it back. The text under it is "Requirements: Level N" (`sRequirementsText` and
+  `sLevelAbbrev`) when the perk asks for more than level 1, then the description; the picture is the perk's `ICON`.
+- Continue goes to the page after, Back to the page before (shown from the second page on), Done on the last page adds the
+  perk (at its next rank) and closes the screen. With nothing left to open the Pip-Boy over, the window closes with it, as
+  the menu of the games does.
+- The keys: up and down light a row, left and right (or space) give or take back a point or pick the perk, Enter is Continue
+  or Done, Backspace is Back, R is Reset.
+
+Not done: the sounds, the requirement lines of a perk other than its level, and everything on this page is checked in the
+offline harness only (not in the running game).
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

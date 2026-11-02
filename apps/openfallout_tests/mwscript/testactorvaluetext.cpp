@@ -17,11 +17,12 @@ namespace
     using namespace ESM4Test;
 
     std::string avif(std::uint32_t id, const std::string& editorId, const std::string& name, const std::string& text,
-        const std::string& icon = std::string())
+        const std::string& icon = std::string(), std::uint32_t flags = 0)
     {
         return record("AVIF", id,
             zString("EDID", editorId) + zString("FULL", name) + zString("DESC", text)
-                + (icon.empty() ? std::string() : zString("ICON", icon)) + zString("ANAM", "Short"));
+                + (icon.empty() ? std::string() : zString("ICON", icon)) + zString("ANAM", "Short"),
+            flags);
     }
 
     // The words the games' Pip-Boy shows for a skill or an attribute are in the plugins' AVIF records. This reads a
@@ -33,7 +34,8 @@ namespace
             + topGroup("AVIF",
                 avif(0x100, "AVStrength", "Strength", "Strength is a measure of your raw physical power.",
                     "Interface\\Icons\\PipboyImages\\S.P.E.C.I.A.L\\SPECIAL_Strength.dds")
-                    + avif(0x101, "AVSmallGuns", "Guns", "Skill with pistols and rifles."));
+                    + avif(0x101, "AVSmallGuns", "Guns", "Skill with pistols and rifles.")
+                    + avif(0x102, "AVSurvival", "Survival", "Skill with the wild.", "", 0x2000));
 
         OFWorld::ESMStore store;
         Loading::Listener listener;
@@ -52,6 +54,16 @@ namespace
         EXPECT_EQ(guns.mName, "Guns");
         EXPECT_EQ(guns.mDescription, "Skill with pistols and rifles.");
         EXPECT_EQ(guns.mIcon, "");
+        // The level-up screen skips the actor value whose record has the flag 0x2000, and no other
+        EXPECT_FALSE(strength.mLevelUpSkip);
+        EXPECT_FALSE(guns.mLevelUpSkip);
+        EXPECT_TRUE(scripts.actorValueText("AVSurvival", "Fallback").mLevelUpSkip);
+
+        // The perks' conditions name an actor value by its number: the attributes are 5 to 11 and the skills 32 to 45,
+        // and the others (Karma is 23) have no name here
+        EXPECT_EQ(scripts.actorValueName(5), "Strength");
+        EXPECT_EQ(scripts.actorValueName(41), "Guns");
+        EXPECT_EQ(scripts.actorValueName(23), "");
 
         const OFScript::FalloutScripts::ActorValueText none = scripts.actorValueText("Nothing", "Fallback");
         EXPECT_EQ(none.mName, "Fallback");

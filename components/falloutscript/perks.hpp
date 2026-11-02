@@ -89,6 +89,8 @@ namespace FalloutScript
         FormId mId = 0;
         std::string mName;
         std::string mDescription;
+        /// The picture of the record (`ICON`) that the level-up screen shows beside the description
+        std::string mIcon;
         int mMinimumLevel = 0;
         int mRanks = 1;
         bool mPlayable = false;

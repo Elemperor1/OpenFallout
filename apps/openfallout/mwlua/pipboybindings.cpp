@@ -80,9 +80,36 @@ namespace OFLua
                 row["id"] = idText(perk.mId);
                 row["name"] = perk.mName;
                 row["description"] = perk.mDescription;
+                row["icon"] = perk.mIcon;
+                row["minLevel"] = perk.mMinimumLevel;
                 row["rank"] = perk.mRank;
                 row["ranks"] = perk.mRanks;
                 row["available"] = perk.mAvailable;
+                sol::table requirements(lua, sol::create);
+                int requirement = 1;
+                for (const OFScript::FalloutScripts::PipboyRequirement& entry : perk.mRequirements)
+                {
+                    sol::table line(lua, sol::create);
+                    switch (entry.mKind)
+                    {
+                        case OFScript::FalloutScripts::PipboyRequirement::Kind::ActorValue:
+                            line["kind"] = "value";
+                            break;
+                        case OFScript::FalloutScripts::PipboyRequirement::Kind::Perk:
+                            line["kind"] = "perk";
+                            break;
+                        default:
+                            line["kind"] = "other";
+                            break;
+                    }
+                    line["actorValue"] = entry.mActorValue;
+                    line["name"] = entry.mName;
+                    line["comparison"] = entry.mComparison;
+                    line["number"] = entry.mNumber;
+                    line["or"] = entry.mOr;
+                    requirements[requirement++] = line;
+                }
+                row["requirements"] = requirements;
                 rows[index++] = row;
             }
             return rows;
@@ -164,6 +191,8 @@ namespace OFLua
                 row["number"] = skill.mNumber;
                 row["name"] = text.mName;
                 row["description"] = text.mDescription;
+                row["icon"] = text.mIcon;
+                row["levelUpSkip"] = text.mLevelUpSkip;
                 row["value"] = value;
                 row["base"] = host.actorValues().base(player, skill.mNumber);
                 row["tagged"] = host.chargen().tagged(skill.mNumber);

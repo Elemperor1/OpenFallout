@@ -477,7 +477,7 @@ local function specialMenu()
         end
         opened:batch(function()
             made.rows(rows)
-            made.select(selected)
+            made.select(selected, true)
             -- The points given are what the values are above their least (1), as the executables count them
             local current = total - #now.attributes
             opened:io('_CurrPoints', current)
@@ -568,7 +568,7 @@ local function skillsMenu()
         end
         opened:batch(function()
             made.rows(rows)
-            made.select(selected)
+            made.select(selected, true)
             opened:io('_CurrPoints', now.tagLimit - now.tagsLeft)
             opened:io('_MaxPoints', now.tagLimit)
             showTitle(opened, 'sSkillsTitle', 'SKILLS:  %d/%d Selected', now.tagLimit - now.tagsLeft, now.tagLimit)
@@ -654,7 +654,7 @@ local function traitsMenu()
         end
         opened:batch(function()
             made.rows(rows)
-            made.select(selected)
+            made.select(selected, true)
             opened:io('_CurrPoints', now.traitLimit - now.traitsLeft)
             opened:io('_MaxPoints', now.traitLimit)
             opened:set('LUM_Headline_Title', 'string',

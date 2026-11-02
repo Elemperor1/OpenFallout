@@ -84,6 +84,7 @@ namespace OFScript
         info.mId = id;
         info.mName = record->mFullName;
         info.mDescription = record->mDescription;
+        info.mIcon = record->mIcon;
         info.mMinimumLevel = record->mData.mMinimumLevel;
         info.mRanks = std::max<int>(record->mData.mRanks, 1);
         info.mPlayable = record->mData.mPlayable != 0;

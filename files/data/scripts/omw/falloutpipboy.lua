@@ -2,9 +2,9 @@
 -- inventory by kind of item) and DATA (the quests and the map), and the screen of a level up. What a character is and
 -- carries is the engine's (core.pipboy); this script shows it in the window "Inventory", which it takes over from the
 -- one of Morrowind for content that has a Pip-Boy, and gives the choices of the player back. The windows that Morrowind
--- shows beside the inventory are left empty. The map is a list of the places found, to travel to (core.interact); there
--- is no radio, no repair and no hot keys yet. The INV page is drawn from the game's own menu file
--- (falloutpipboyitems.lua); the other pages are still drawn with plain widgets, as is INV when that file is not there.
+-- shows beside the inventory are left empty. There is no radio, no repair and no hot keys yet. The pages are drawn from the
+-- game's own menu files (INV falloutpipboyitems.lua, STAT falloutpipboystats.lua, DATA falloutpipboydata.lua) and the
+-- screen of a level up too (falloutlevelup.lua); the plain widgets below are for an install that lacks a file.
 -- The row of the three pages is the script's: the games have the buttons of the Pip-Boy itself (a model) for it.
 local core = require('openfallout.core')
 local input = require('openfallout.input')
@@ -16,6 +16,7 @@ local pad = require('scripts.omw.falloutpad')
 local itemsPage = require('scripts.omw.falloutpipboyitems')
 local statsPage = require('scripts.omw.falloutpipboystats')
 local dataMenu = require('scripts.omw.falloutpipboydata')
+local levelUpMenu = require('scripts.omw.falloutlevelup')
 
 local pipboy = core.pipboy
 
@@ -42,6 +43,9 @@ local selected = 1
 local listLines = 12
 -- A level up that has not been shown
 local levelUpPending = false
+-- The screen of the level up was opened by the level itself (not from the Pip-Boy): the game's menu ends with the screen
+-- and nothing of the Pip-Boy is left to look at
+local levelUpClosesWindow = false
 -- The level that the screen of the level up is for (the games show one screen for each level)
 local levelUpLevel = nil
 -- Seconds since the engine was asked for level ups
@@ -82,6 +86,7 @@ local function openLevelUp()
     levelPage = 1
     levelAdded = {}
     levelPerk = nil
+    levelUpMenu.begin(levelUpLevel)
 end
 
 -- A word of the game, from the settings of the files
@@ -561,10 +566,11 @@ local function counterText(single, plural, count)
     return count == 1 and single or (plural:gsub('%%d', tostring(count)))
 end
 
-local function finishLevelUp()
-    if levelPerk then
-        pipboy.choosePerk(levelPerk)
+local function finishLevelUp(perk)
+    if perk then
+        pipboy.choosePerk(perk)
     end
+    levelUpMenu.hide()
     -- A perk point that is left gets a screen of its own; when there is none the level is done, and the next level that
     -- the experience reached (there is a screen for each) is handed out
     if pipboy.stats().perkPoints > 0 and #pipboy.offeredPerks() > 0 then
@@ -573,6 +579,11 @@ local function finishLevelUp()
         view = 'pipboy'
         levelUpLevel = nil
         pipboy.levelUpDone()
+        if levelUpClosesWindow then
+            levelUpClosesWindow = false
+            closeWindow()
+            return
+        end
     end
     render()
 end
@@ -668,7 +679,7 @@ local function levelUpPage(add)
         widgets.cell(widgets.clickable(word('sReset', 'Reset'), resetLevelUp, {}), 120),
         widgets.cell(widgets.clickable(lastPage and word('sDone', 'Done') or word('sContinue', 'Continue'), function()
             if lastPage then
-                finishLevelUp()
+                finishLevelUp(levelPerk)
             else
                 levelPage = 2
                 render()
@@ -708,7 +719,20 @@ function render()
         itemsPage.hide()
         statsPage.hide()
         dataMenu.hide()
+        levelUpMenu.hide()
         return
+    end
+    -- The screen of a level up is the game's own menu, with no row of pages over it (the stand-in below is for an install
+    -- that has no file for it)
+    if view == 'levelup' then
+        itemsPage.hide()
+        statsPage.hide()
+        dataMenu.hide()
+        if levelUpMenu.show({ finish = finishLevelUp }) then
+            return
+        end
+    else
+        levelUpMenu.hide()
     end
     -- The pages of the items, the stats and the data are the game's own menus: only the row of the pages is put over them
     if view == 'pipboy' and tab == 'inv' then
@@ -736,6 +760,7 @@ function render()
     itemsPage.hide()
     statsPage.hide()
     dataMenu.hide()
+    levelUpMenu.hide()
     widgets = widgetModule.new(update)
     local width = math.max(520, math.floor(ui.screenSize().x * 0.5))
     local rows = { { props = { size = v2(width, 0) } } }
@@ -771,6 +796,7 @@ local function hide()
     itemsPage.hide()
     statsPage.hide()
     dataMenu.hide()
+    levelUpMenu.hide()
     -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
@@ -821,7 +847,15 @@ end
 -- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
 -- over it takes the keys and the buttons)
 local function press(code)
-    if not visible or view ~= 'pipboy' or I.UI.getMode() ~= 'Interface' then
+    if not visible or I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    -- The screen of a level up takes the keys it uses (the stand-in widgets, when it is not the game's menu, take none)
+    if view == 'levelup' then
+        if levelUpMenu.isOpen() then levelUpMenu.press(code) end
+        return
+    end
+    if view ~= 'pipboy' then
         return
     end
     -- The page of the game's menu takes the keys it uses (not Left and Right, which change the page)
@@ -886,7 +920,7 @@ local function press(code)
 end
 
 -- X drops the item; the other buttons stand for the keys of every screen
-local onPad = pad.handler('pipboy', function() return visible and view == 'pipboy' and I.UI.getMode() == 'Interface' end, press,
+local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
 
 return {
@@ -917,6 +951,9 @@ return {
             if dataMenu.isOpen() then
                 dataMenu.update()
             end
+            if levelUpMenu.isOpen() then
+                levelUpMenu.update()
+            end
             if not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
                 if view == 'levelup' then
                     -- The screen was left (Escape, another window) before the points were given: it comes back as it
@@ -931,10 +968,12 @@ return {
                     else
                         view = 'pipboy'
                         levelUpLevel = nil
+                        levelUpClosesWindow = false
                         pipboy.levelUpDone()
                     end
                 elseif levelUpPending then
                     levelUpPending = false
+                    levelUpClosesWindow = true
                     openLevelUp()
                     openWindow()
                 end
