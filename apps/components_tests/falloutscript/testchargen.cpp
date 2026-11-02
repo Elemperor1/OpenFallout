@@ -135,9 +135,13 @@ namespace
         const Chargen vegas(Game::NewVegas);
         EXPECT_TRUE(vegas.isSkill(survival));
         EXPECT_FALSE(vegas.isSkill(bigGuns));
-        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[8].mEditorId, std::string("SmallGuns"));
-        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[11].mEditorId, std::string("Throwing"));
-        EXPECT_EQ(Chargen::skillsOf(Game::Fallout3)[9].mEditorId, std::string("SmallGuns"));
+        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[8].mEditorId, std::string("AVSmallGuns"));
+        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[11].mEditorId, std::string("AVThrowing"));
+        EXPECT_EQ(Chargen::skillsOf(Game::Fallout3)[9].mEditorId, std::string("AVSmallGuns"));
+        // The files name every actor value record with AV in front, and the text of a skill is found by that name
+        for (const Game game : { Game::Fallout3, Game::NewVegas })
+            for (const FalloutScript::ChargenSkill& skill : Chargen::skillsOf(game))
+                EXPECT_EQ(std::string(skill.mEditorId).rfind("AV", 0), 0u) << skill.mEditorId;
     }
 
     TEST(FalloutScriptChargenTest, three_skills_are_tagged_and_a_tag_can_be_taken_off)

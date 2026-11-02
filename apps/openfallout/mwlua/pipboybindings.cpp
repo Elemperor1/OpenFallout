@@ -61,13 +61,13 @@ namespace OFLua
             const char* mName;
         };
         constexpr Attribute attributes[Chargen::attributeCount] = {
-            { "Strength", "Strength" },
-            { "Perception", "Perception" },
-            { "Endurance", "Endurance" },
-            { "Charisma", "Charisma" },
-            { "Intelligence", "Intelligence" },
-            { "Agility", "Agility" },
-            { "Luck", "Luck" },
+            { "AVStrength", "Strength" },
+            { "AVPerception", "Perception" },
+            { "AVEndurance", "Endurance" },
+            { "AVCharisma", "Charisma" },
+            { "AVIntelligence", "Intelligence" },
+            { "AVAgility", "Agility" },
+            { "AVLuck", "Luck" },
         };
 
         sol::table perkRows(const sol::state_view& lua, const std::vector<OFScript::FalloutScripts::PipboyPerk>& perks)

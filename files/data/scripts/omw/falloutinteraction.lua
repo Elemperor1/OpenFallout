@@ -238,6 +238,13 @@ end
 local function renderRestMenu(request)
     local menu = menuModule.open('sleep_wait_menu.xml')
     if not menu then return false end
+    -- a file that lacks one of the tiles this screen fills is not the game's: the widgets take over
+    for _, name in ipairs({ 'SWM_HowManyText', 'SWM_WaitButton', 'SWM_HoursChosen', 'SWM_Scrollbar' }) do
+        if not menu:find(name) then
+            menu:close()
+            return false
+        end
+    end
     restMenu = menu
     local title = request.sleeping and word('sSleep', 'Sleep') or word('sWait', 'Wait')
     -- (sHowMany is the "how many?" of the quantity screen, not of the hours)

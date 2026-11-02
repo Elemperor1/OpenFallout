@@ -72,14 +72,14 @@ namespace
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
         const std::string description
             = "Skill in all small weapons, from pistols to rifles. A character\x92s aim.\r\nSecond line.";
-        const std::string data = zString("EDID", "SmallGuns") + zString("FULL", "Small Guns")
+        const std::string data = zString("EDID", "AVSmallGuns") + zString("FULL", "Small Guns")
             + zString("DESC", description) + zString("ICON", "interface\\icons\\guns.dds") + zString("ANAM", "Guns");
 
         const std::vector<ESM4::ActorValueInfo> records
             = loadRecords<ESM4::ActorValueInfo>("AVIF", record("AVIF", 7, data), 0, &encoder);
 
         ASSERT_EQ(records.size(), 1u);
-        EXPECT_EQ(records[0].mEditorId, "SmallGuns");
+        EXPECT_EQ(records[0].mEditorId, "AVSmallGuns");
         EXPECT_EQ(records[0].mFullName, "Small Guns");
         EXPECT_EQ(records[0].mDescription,
             "Skill in all small weapons, from pistols to rifles. A character\xE2\x80\x99s aim.\r\nSecond line.");

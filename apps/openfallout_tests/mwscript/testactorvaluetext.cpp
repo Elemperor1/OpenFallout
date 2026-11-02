@@ -29,8 +29,8 @@ namespace
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
         const std::string plugin = header()
             + topGroup("AVIF",
-                avif(0x100, "Strength", "Strength", "Strength is a measure of your raw physical power.")
-                    + avif(0x101, "SmallGuns", "Guns", "Skill with pistols and rifles."));
+                avif(0x100, "AVStrength", "Strength", "Strength is a measure of your raw physical power.")
+                    + avif(0x101, "AVSmallGuns", "Guns", "Skill with pistols and rifles."));
 
         OFWorld::ESMStore store;
         Loading::Listener listener;
@@ -40,11 +40,11 @@ namespace
         store.setUp();
 
         OFScript::FalloutScripts scripts(store, FalloutScript::Game::NewVegas, 0x14);
-        const OFScript::FalloutScripts::ActorValueText strength = scripts.actorValueText("Strength", "Fallback");
+        const OFScript::FalloutScripts::ActorValueText strength = scripts.actorValueText("AVStrength", "Fallback");
         EXPECT_EQ(strength.mName, "Strength");
         EXPECT_EQ(strength.mDescription, "Strength is a measure of your raw physical power.");
 
-        const OFScript::FalloutScripts::ActorValueText guns = scripts.actorValueText("smallguns", "Fallback");
+        const OFScript::FalloutScripts::ActorValueText guns = scripts.actorValueText("avsmallguns", "Fallback");
         EXPECT_EQ(guns.mName, "Guns");
         EXPECT_EQ(guns.mDescription, "Skill with pistols and rifles.");
 

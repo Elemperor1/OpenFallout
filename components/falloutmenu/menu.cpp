@@ -527,7 +527,9 @@ namespace FalloutMenu
             return 0;
         // A text is placed by the point it is justified to: its left end, its middle or its right end
         const int justify = static_cast<int>(std::lround(number(tile, "justify")));
-        const float width = number(tile, "width");
+        // The lines are justified in a block that is never narrower than the text (Font::layout), so a text with a
+        // width of its own that is less than the text takes stands by the point of the block it is drawn in
+        const float width = std::max(number(tile, "width"), defaultOf(tile, "width").number());
         return justify == 2 ? width / 2 : justify == 4 ? width : 0.f;
     }
 

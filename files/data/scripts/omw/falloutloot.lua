@@ -416,6 +416,11 @@ local function updateCards()
         name = name == 'items' and 'container' or 'items'
         side = sides[name]
         row = side and side.list.selected() or 0
+        if row > 0 then
+            -- the keys act on the list whose pick is shown
+            focusSide = name
+            activeSide = name
+        end
     end
     if row <= 0 then
         -- neither list has a row to pick: no card

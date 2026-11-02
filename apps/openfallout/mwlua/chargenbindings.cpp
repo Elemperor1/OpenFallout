@@ -66,13 +66,13 @@ namespace OFLua
 
         // In the order of the numbers 5 to 11
         constexpr Attribute attributes[Chargen::attributeCount] = {
-            { "Strength", "Strength" },
-            { "Perception", "Perception" },
-            { "Endurance", "Endurance" },
-            { "Charisma", "Charisma" },
-            { "Intelligence", "Intelligence" },
-            { "Agility", "Agility" },
-            { "Luck", "Luck" },
+            { "AVStrength", "Strength" },
+            { "AVPerception", "Perception" },
+            { "AVEndurance", "Endurance" },
+            { "AVCharisma", "Charisma" },
+            { "AVIntelligence", "Intelligence" },
+            { "AVAgility", "Agility" },
+            { "AVLuck", "Luck" },
         };
 
         sol::table state(const sol::state_view& lua)

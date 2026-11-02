@@ -415,6 +415,19 @@ namespace
         EXPECT_EQ(items[2].mJustify, 4);
     }
 
+    TEST(FalloutMenuDrawTest, a_text_wider_than_its_own_width_stands_by_the_block_it_is_drawn_in)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><text name=\"C\"><string> abcd </string><x> 100 </x><width> 20 </width>"
+            "<justify> &center; </justify></text></menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        // The text is 40 wide and the lines are justified in a block that is never narrower than that, so the block
+        // is centred on the point (a width of 20 would put it 10 further right than the lines are)
+        EXPECT_FLOAT_EQ(items[0].mX, 80.f);
+    }
+
     TEST(FalloutMenuDrawTest, the_rectangle_of_a_tile_in_a_text_follows_the_text_it_is_justified_to)
     {
         Fixture f;

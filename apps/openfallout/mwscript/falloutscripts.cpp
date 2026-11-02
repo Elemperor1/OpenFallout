@@ -878,7 +878,7 @@ namespace OFScript
                   if (blockType != FalloutScript::BlockType::OnTrigger)
                       Log(Debug::Info) << (blockType == FalloutScript::BlockType::OnTriggerEnter ? "Trigger enter: "
                                                                                                  : "Trigger leave: ")
-                                       << std::hex << trigger << " by " << actor;
+                                       << std::hex << trigger << " by " << actor << std::dec;
                   mObjects.trigger(trigger, blockType, actor, filter);
               };
         mTriggers.update(bodies, active, raise);
