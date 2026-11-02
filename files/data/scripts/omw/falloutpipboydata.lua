@@ -107,14 +107,15 @@ local function number(value)
     return string.format('%d', math.floor(value + 0.5))
 end
 
--- The time and the date for the headline: "9:41 PM 10.23.2281" (the order and the look of the games' own are not known)
+-- The time and the date for the headline, as both executables write them ("%s, %d:%02d" over the date "%02d.%02d.%02d"):
+-- "10.22.81, 21:41" is the month (1 to 12), the day and the last two digits of the year, then the hour (24 hour clock, not
+-- padded) and the minutes. There is no AM or PM.
 function module.dateText(now)
     if not now or not now.year then return '' end
     local hours = math.floor(now.hour or 0)
     local minutes = math.floor(((now.hour or 0) - hours) * 60)
-    local clock = (hours % 12 == 0) and 12 or (hours % 12)
-    return string.format('%d:%02d %s %02d.%02d.%d', clock, minutes, hours < 12 and 'AM' or 'PM', (now.month or 0) + 1,
-        now.day or 1, now.year)
+    return string.format('%02d.%02d.%02d, %d:%02d', (now.month or 0) + 1, now.day or 1, math.floor(now.year) % 100, hours,
+        minutes)
 end
 
 -- Where a place of the world is on the picture, as the part of its width and height from the north-west corner (0 to 1),
