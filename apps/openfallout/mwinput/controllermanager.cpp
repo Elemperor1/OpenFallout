@@ -365,6 +365,19 @@ namespace OFInput
             }
         };
 
+        // A message box that a script draws is modal: the triggers do not cycle the windows beneath it and the sticks
+        // do not scroll them, as the buttons do not. A trigger is still followed, so one let go under the box can cycle
+        // the windows again when it is gone
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->luaMessageOpen())
+        {
+            if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
+                handleTriggerPress(arg.value, mRightTriggerGuiPressed, [] {});
+            else if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+                handleTriggerPress(arg.value, mLeftTriggerGuiPressed, [] {});
+            return true;
+        }
+
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
 
         if (Settings::gui().mControllerMenus)
