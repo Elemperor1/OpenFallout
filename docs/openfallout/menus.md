@@ -60,8 +60,8 @@ The pages of the Pip-Boy (`main/inventory_menu.xml`, `main/stats_menu.xml`, `mai
 reputation menus have the same id) are laid out in a box of 1024 by 768 design units, which is the background picture
 `Interface\Shared\Background\pipboy.dds` stretched over it. A script opens them with the box
 (`menu.open(file, { box = menu.PIPBOY_BOX })`) and the renderer draws the box as large as the window lets it be (the window
-height at 16:9) in the middle of the window, with the pointer in the box's own pixels. Every other menu is laid out for the
-whole window.
+height at 16:9) in the middle of the window, below the 64 pixels at the top that the row of the pages keeps, with the pointer in
+the box's own pixels. Every other menu is laid out for the whole window.
 
 ### The items page of the Pip-Boy
 
@@ -86,6 +86,16 @@ gives each part's meter 1, or 0 when it is crippled. Keys: up and down and the p
 and after. Not there yet: the pictures of the skills, perks and attributes (the games choose models and textures in code), how
 hurt each part is (the engine does not tell), the effects, the hardcore needs (their buttons are hidden), the healing buttons, and
 the lines of the general page.
+
+## The words of the labels
+
+The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
+those words in their executables, and the plugins only hold the settings that were changed from them, so reading the plugins
+gives nothing for OK, Cancel, Take All, the titles and the names of the cards: the first run on the real data showed those
+labels blank (the number of pieces of each menu with no words matched the count the engine gave exactly). `gameSettingText`
+now answers from the plugins when a record has the text, and otherwise from `components/falloutscript/settingtext.cpp`, a
+table of the port's own wording for the 120-odd labels the screens drawn from the files use (not a copy of the executables'
+table; a game in another language gets its words from its plugin). The card, caravan and roulette games' words are not in it.
 
 ## What was read from the executable
 

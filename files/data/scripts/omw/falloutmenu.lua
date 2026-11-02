@@ -87,22 +87,25 @@ local function contentOf(pieces)
 end
 
 -- The box the pages of the Pip-Boy are laid out in (1024 by 768 design units; the games draw them on the screen of the
--- 3D device), for the `box` option of `open`
-module.PIPBOY_BOX = { width = 1024, height = 768 }
+-- 3D device), for the `box` option of `open`; the row of the pages (STAT, INV, DATA) is over the top of the window, so
+-- the pages leave this many pixels free there
+module.PIPBOY_BOX = { width = 1024, height = 768, top = 64 }
 
 -- Where a menu is drawn in a window of this size. Most menus are laid out for the whole window. A menu laid out in a box
--- of its own is drawn with the box as large as the window lets it be, in the middle; `pixels` is the size the menu is
--- told (960 design units are as many pixels as the box is scaled by) and the element is as large as the box, so the
--- pointer is already in its pixels.
+-- of its own is drawn with the box as large as the window lets it be (below the `top` pixels the box asks to be kept
+-- free), in the middle; `pixels` is the size the menu is told (960 design units are as many pixels as the box is scaled
+-- by) and the element is as large as the box, so the pointer is already in its pixels.
 local function placement(size, box)
     if not box then
         return { pixels = size, position = v2(0, 0), size = size }
     end
-    local scale = math.min(size.x / box.width, size.y / box.height)
+    local top = box.top or 0
+    local room = math.max(size.y - top, 1)
+    local scale = math.min(size.x / box.width, room / box.height)
     local width, height = box.width * scale, box.height * scale
     return {
         pixels = v2(960 * scale * size.x / size.y, 960 * scale),
-        position = v2(math.floor((size.x - width) / 2), math.floor((size.y - height) / 2)),
+        position = v2(math.floor((size.x - width) / 2), top + math.floor((room - height) / 2)),
         size = v2(width, height),
     }
 end

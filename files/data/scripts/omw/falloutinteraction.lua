@@ -240,8 +240,8 @@ local function renderRestMenu(request)
     if not menu then return false end
     restMenu = menu
     local title = request.sleeping and word('sSleep', 'Sleep') or word('sWait', 'Wait')
-    menu:set('SWM_HowManyText', 'string',
-        request.sleeping and word('sHowMany', 'How many hours?') or word('sHowManyWait', 'How many hours?'))
+    -- (sHowMany is the "how many?" of the quantity screen, not of the hours)
+    menu:set('SWM_HowManyText', 'string', word('sHowManyHours', 'How many hours?'))
     menu:set('SWM_WaitButton', 'string', title)
     menu:set('SWM_HoursChosen', 'string', hoursText(hours))
     menu:setScrollbar('SWM_Scrollbar', hours - 1)
