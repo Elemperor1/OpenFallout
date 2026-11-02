@@ -127,6 +127,33 @@ namespace
         EXPECT_NE(f.mLoader->problems()[0].find("nothing.xml"), std::string::npos);
     }
 
+    TEST(FalloutMenuLoaderTest, a_prefab_that_includes_itself_through_a_tile_is_stopped)
+    {
+        Fixture f;
+        f.mFiles["menus/prefabs/loop.xml"] = "<rect name=\"Inner\"><include src=\"loop.xml\"/></rect>";
+        Menu& menu = f.open("<menu name=\"M\"><rect name=\"A\"><include src=\"loop.xml\"/></rect></menu>");
+        EXPECT_NE(menu.find("A"), nullptr);
+        ASSERT_FALSE(f.mLoader->problems().empty());
+        EXPECT_NE(f.mLoader->problems()[0].find("too deep"), std::string::npos);
+    }
+
+    TEST(FalloutMenuEvaluationTest, a_number_that_is_not_finite_is_not_a_number)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"A\">"
+            "<x><copy> 3e38 </copy><mult> 1000 </mult></x>"
+            "<width><copy> inf </copy></width>"
+            "<height><copy> 1e999 </copy></height>"
+            "</rect></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "x"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "width"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "height"), 0.f);
+        EXPECT_TRUE(Value::fromText("nan").isText());
+        EXPECT_TRUE(Value::fromText("1e999").isText());
+        EXPECT_EQ(Value(3.0e38f).text(), "3e+38");
+    }
+
     TEST(FalloutMenuEvaluationTest, steps_work_on_one_running_value_with_no_precedence)
     {
         Fixture f;

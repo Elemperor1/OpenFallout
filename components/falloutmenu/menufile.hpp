@@ -162,7 +162,7 @@ namespace FalloutMenu
     private:
         const std::vector<Xml::Node>* file(const std::string& path);
         std::string resolveInclude(const std::string& from, const std::string& source);
-        std::shared_ptr<TileDef> buildTile(const Xml::Node& node, const std::string& path);
+        std::shared_ptr<TileDef> buildTile(const Xml::Node& node, const std::string& path, int depth);
         void fill(TileDef& tile, const std::vector<Xml::Node>& nodes, const std::string& path, int depth);
         TraitDef buildTrait(const Xml::Node& node);
         Operand buildOperand(const Xml::Node& node);

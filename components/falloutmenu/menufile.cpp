@@ -410,7 +410,7 @@ namespace FalloutMenu
             }
             if (typeOf(node.mName))
             {
-                std::shared_ptr<TileDef> child = buildTile(node, path);
+                std::shared_ptr<TileDef> child = buildTile(node, path, depth);
                 if (child->mType == TileType::Template)
                     mTemplates[Xml::lower(child->mName)] = child;
                 tile.mChildren.push_back(std::move(child));
@@ -420,7 +420,7 @@ namespace FalloutMenu
         }
     }
 
-    std::shared_ptr<TileDef> Loader::buildTile(const Xml::Node& node, const std::string& path)
+    std::shared_ptr<TileDef> Loader::buildTile(const Xml::Node& node, const std::string& path, int depth)
     {
         auto tile = std::make_shared<TileDef>();
         tile->mType = *typeOf(node.mName);
@@ -429,7 +429,7 @@ namespace FalloutMenu
         tile->mFile = path;
         // The children of the tile are built in one go, because an include may carry traits and tiles at once and a
         // trait written after the include has to win over the one in it.
-        fill(*tile, node.mChildren, path, 0);
+        fill(*tile, node.mChildren, path, depth);
         return tile;
     }
 
@@ -440,7 +440,7 @@ namespace FalloutMenu
             return nullptr;
         for (const Xml::Node& node : *nodes)
             if (typeOf(node.mName) && node.mName != "template")
-                return buildTile(node, path);
+                return buildTile(node, path, 0);
         return nullptr;
     }
 
@@ -453,7 +453,7 @@ namespace FalloutMenu
         {
             if (typeOf(node.mName))
             {
-                std::shared_ptr<TileDef> tile = buildTile(node, path);
+                std::shared_ptr<TileDef> tile = buildTile(node, path, 0);
                 tile->mType = TileType::Plain;
                 return tile;
             }

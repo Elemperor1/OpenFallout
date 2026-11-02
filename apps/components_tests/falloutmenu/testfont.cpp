@@ -118,6 +118,25 @@ namespace
         EXPECT_FLOAT_EQ(right.mQuads[4].mY, 30.f);
     }
 
+    TEST(FalloutMenuFontTest, a_block_wider_than_its_longest_line_is_the_width_the_lines_are_justified_in)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        // One "A" (12 wide) wrapped to 100: the block is 100 wide, so a right-justified A ends at 100, a centred one
+        // is in the middle, and the width the text reports is the block's, which is where the tile puts its x
+        const Font::Layout right = font->layout("A", 100.f, 4);
+        EXPECT_FLOAT_EQ(right.mWidth, 100.f);
+        EXPECT_FLOAT_EQ(right.mQuads[0].mX, 88.f + 1.f);
+        const Font::Layout centre = font->layout("A", 100.f, 2);
+        EXPECT_FLOAT_EQ(centre.mQuads[0].mX, 44.f + 1.f);
+        // A tile wider than its text justifies in its own width
+        const Font::Layout wide = font->layout("A", 0.f, 4, 60.f);
+        EXPECT_FLOAT_EQ(wide.mWidth, 60.f);
+        EXPECT_FLOAT_EQ(wide.mQuads[0].mX, 48.f + 1.f);
+        // and never in less than the text takes
+        EXPECT_FLOAT_EQ(font->layout("AAAA", 0.f, 4, 10.f).mWidth, 48.f);
+    }
+
     TEST(FalloutMenuFontTest, the_font_set_gives_a_font_that_is_there_for_a_number_that_is_not)
     {
         FontSet set;

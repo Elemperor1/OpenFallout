@@ -1,8 +1,10 @@
 #ifndef OPENFALLOUT_COMPONENTS_FALLOUTMENU_VALUE_H
 #define OPENFALLOUT_COMPONENTS_FALLOUTMENU_VALUE_H
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -14,8 +16,9 @@ namespace FalloutMenu
     {
     public:
         Value() = default;
+        /// A number that is not finite (an overflow in a step of a trait) is 0
         Value(float number)
-            : mNumber(number)
+            : mNumber(std::isfinite(number) ? number : 0.f)
         {
         }
 
@@ -29,7 +32,9 @@ namespace FalloutMenu
                 const std::string copy(text);
                 char* end = nullptr;
                 const double parsed = std::strtod(copy.c_str(), &end);
-                if (end != copy.c_str() && *end == '\0')
+                // `inf`, `nan` and numbers too large for a float are texts, not numbers
+                if (end != copy.c_str() && *end == '\0' && std::isfinite(parsed)
+                    && std::fabs(parsed) <= static_cast<double>(std::numeric_limits<float>::max()))
                     value.mNumber = static_cast<float>(parsed);
                 else
                     value.mIsText = true;
@@ -55,7 +60,7 @@ namespace FalloutMenu
         {
             if (mIsText || !mString.empty())
                 return mString;
-            if (mNumber == static_cast<float>(static_cast<long long>(mNumber)))
+            if (std::fabs(mNumber) < 9.0e18f && mNumber == std::trunc(mNumber))
                 return std::to_string(static_cast<long long>(mNumber));
             char buffer[32];
             std::snprintf(buffer, sizeof(buffer), "%g", static_cast<double>(mNumber));

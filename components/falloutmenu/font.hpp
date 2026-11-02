@@ -50,6 +50,8 @@ namespace FalloutMenu
         struct Layout
         {
             std::vector<Quad> mQuads;
+            /// The width of the block the lines are justified in: the longest line, or the room the text was
+            /// wrapped to or asked to be justified in, if that is more
             float mWidth = 0;
             float mHeight = 0;
             /// How many lines the text took
@@ -73,8 +75,9 @@ namespace FalloutMenu
 
         /// Lay a text out: broken into lines at the new lines and, when `wrapWidth` is more than zero, at the spaces
         /// before a word that would not fit. `justify` is 1 for left, 2 for centre and 4 for right, and says where each
-        /// line is in the width of the whole text.
-        Layout layout(std::string_view text, float wrapWidth = 0, int justify = 1) const;
+        /// line is in the width of the whole text. That width is the longest line; it is also at least `wrapWidth` and
+        /// at least `blockWidth` (the width of the tile the text is in, when that is more than the text).
+        Layout layout(std::string_view text, float wrapWidth = 0, int justify = 1, float blockWidth = 0) const;
 
     private:
         float mSize = 0;

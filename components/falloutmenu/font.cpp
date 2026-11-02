@@ -82,7 +82,7 @@ namespace FalloutMenu
         return width;
     }
 
-    Font::Layout Font::layout(std::string_view text, float wrapWidth, int justify) const
+    Font::Layout Font::layout(std::string_view text, float wrapWidth, int justify, float blockWidth) const
     {
         // Break the text into the lines it is shown in
         std::vector<std::string_view> lines;
@@ -130,12 +130,12 @@ namespace FalloutMenu
 
         Layout layout;
         layout.mLines = static_cast<int>(lines.size());
-        float blockWidth = wrapWidth > 0 ? wrapWidth : 0;
+        // The block the lines are justified in, which is also the width the text reports, so that a tile that is put
+        // by its justification point (a text's x) and the lines in it agree where the block starts
+        blockWidth = std::max({ blockWidth, wrapWidth, 0.f });
         for (const std::string_view line : lines)
             blockWidth = std::max(blockWidth, lineWidth(line));
-        layout.mWidth = 0;
-        for (const std::string_view line : lines)
-            layout.mWidth = std::max(layout.mWidth, lineWidth(line));
+        layout.mWidth = blockWidth;
         layout.mHeight = static_cast<float>(lines.size()) * mSize;
         for (std::size_t row = 0; row < lines.size(); ++row)
         {
