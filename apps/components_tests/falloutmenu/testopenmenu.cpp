@@ -490,6 +490,21 @@ namespace
         EXPECT_EQ(menu.find("List")->children().size(), 4u);
     }
 
+    TEST(FalloutOpenMenuListTest, a_row_can_set_a_trait_of_a_tile_inside_it)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        std::vector<std::map<std::string, Value>> rows;
+        rows.push_back({ { "T.string", Value::fromText("Stimpak (3)") }, { "T.alpha", Value(100.f) } });
+        list.setRows(rows);
+        Tile* text = menu.find(*list.item(0), "T");
+        ASSERT_NE(text, nullptr);
+        EXPECT_EQ(menu.text(*text, "string"), "Stimpak (3)");
+        EXPECT_FLOAT_EQ(menu.number(*text, "alpha"), 100.f);
+    }
+
     TEST(FalloutOpenMenuListTest, the_highlight_goes_to_the_row_the_pointer_is_on_and_follows_the_scrolling)
     {
         Fixture f;

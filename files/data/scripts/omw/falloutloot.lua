@@ -8,6 +8,9 @@ local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
+local menuModule = require('scripts.omw.falloutmenu')
+local quantity = require('scripts.omw.falloutquantity')
+local cards = require('scripts.omw.falloutitemcards')
 
 local pipboy = core.pipboy
 
@@ -32,6 +35,23 @@ local selected, selectFocus = 1, false
 local render
 local widgets
 
+-- The screen is drawn from the game's own menu file (container_menu.xml): the player's things on the left, the
+-- container's on the right. `shown` is that menu while it is there; `sides` the two lists with what each lists.
+local MENU_FILE = 'container_menu.xml'
+local shown, sides, activeSide = nil, nil, 'container'
+-- The thing whose cards are shown: the side and the row
+local cardSide, cardRow = nil, nil
+
+-- The tabs the arrows over a list go through: everything, then one kind of thing at a time
+local FILTERS = {
+    { setting = 'sInventoryItems', fallback = 'Items' },
+    { key = 'weapons', setting = 'sInventoryWeapons', fallback = 'Weapons' },
+    { key = 'apparel', setting = 'sInventoryApparel', fallback = 'Apparel' },
+    { key = 'aid', setting = 'sInventoryAid', fallback = 'Aid' },
+    { key = 'misc', setting = 'sInventoryMisc', fallback = 'Misc' },
+    { key = 'ammo', setting = 'sInventoryAmmo', fallback = 'Ammo' },
+}
+
 local function update()
     if element then element:update() end
 end
@@ -41,6 +61,15 @@ local function destroyElement()
         element:destroy()
         element = nil
     end
+    quantity.close()
+    if shown then
+        shown:close()
+        shown, sides, cardSide, cardRow = nil, nil, nil, nil
+    end
+end
+
+local function isOpen()
+    return element ~= nil or shown ~= nil
 end
 
 local function openMode()
@@ -93,7 +122,7 @@ local function takeAll()
     render()
 end
 
-function render()
+local function renderLegacy()
     destroyElement()
     local loot = pipboy.loot()
     if not loot then
@@ -197,11 +226,230 @@ local function takeSelected()
     render()
 end
 
+
+local function word(setting, fallback)
+    local text = pipboy.text(setting)
+    return text ~= '' and text or fallback
+end
+
+-- What a row of a list says: the name, and how many there are of it
+local function rowText(item)
+    return item.name .. (item.count > 1 and (' (' .. item.count .. ')') or '')
+end
+
+-- The things one side lists, in the order of the name: the player's side leaves out the keys (they are on the keyring)
+-- and the armor the files keep from the player, and both leave out what the tab above does not list
+local function listedItems(side)
+    local listed = {}
+    local filter = FILTERS[side.filter]
+    for _, item in ipairs(sortedItems(side.holder())) do
+        local hide = side.player and (item.key or item.hidden)
+        if not hide and (filter.key == nil or item.category == filter.key) then
+            listed[#listed + 1] = item
+        end
+    end
+    return listed
+end
+
+local function otherSide(side)
+    return side == sides.items and sides.container or sides.items
+end
+
+-- Make the rows of a side again, with the pick kept where it was
+local function fillSide(side)
+    side.listed = listedItems(side)
+    local rows = {}
+    for index, item in ipairs(side.listed) do
+        rows[index] = {
+            ['ListItemText.string'] = rowText(item),
+            ['CM_list_template_ItemMarker.visible'] = item.equipped == true,
+        }
+    end
+    local picked = side.list.selected()
+    side.list.rows(rows)
+    if picked > 0 and #rows > 0 then
+        side.list.select(math.min(picked, #rows), true)
+    end
+end
+
+local function setTitles(loot)
+    local items, container = sides.items, sides.container
+    local itemsFilter, containerFilter = FILTERS[items.filter], FILTERS[container.filter]
+    shown:batch(function()
+        shown:set('CM_ItemsTitle', 'string', word(itemsFilter.setting, itemsFilter.fallback))
+        shown:set('CM_ContainerTitle', 'string',
+            container.filter == 1 and (loot.name ~= '' and loot.name or 'Container')
+                or word(containerFilter.setting, containerFilter.fallback))
+        shown:set('CM_Items_CapsLabel', 'string',
+            word('sInventoryCaps', 'Caps') .. ' ' .. number(pipboy.stats().caps))
+    end)
+end
+
+local function fillAll()
+    local loot = pipboy.loot()
+    if not (shown and loot) then
+        return
+    end
+    shown:batch(function()
+        fillSide(sides.items)
+        fillSide(sides.container)
+        setTitles(loot)
+    end)
+    cardSide, cardRow = nil, nil
+end
+
+-- Moves some of a thing from one side to the other
+local function moveItem(from, item, count)
+    local to = otherSide(from)
+    if from.player and item.equipped then
+        ui.showMessage('Unequip it first.')
+        return
+    end
+    pipboy.transfer(from.holder(), to.holder(), item.id, count)
+    fillAll()
+end
+
+-- A thing is picked: a stack of several asks how many, else it moves
+local function activateRow(side, row)
+    local item = side.listed and side.listed[row]
+    if not item then
+        return
+    end
+    if item.count > 1 then
+        if quantity.ask(item.count, function(count) moveItem(side, item, count) end) then
+            return
+        end
+    end
+    moveItem(side, item, item.count)
+end
+
+-- The tab of a side goes to the next one (or the one before)
+local function cycleFilter(side, by)
+    side.filter = (side.filter - 1 + by) % #FILTERS + 1
+    local loot = pipboy.loot()
+    shown:batch(function()
+        fillSide(side)
+        if loot then setTitles(loot) end
+    end)
+end
+
+local function openMenu()
+    if shown then
+        return true
+    end
+    local opened = menuModule.open(MENU_FILE)
+    if not opened then
+        return false
+    end
+    local made = {
+        items = { name = 'CM_Items_InventoryList', filter = 1, player = true,
+            holder = function() return pipboy.player() end },
+        container = { name = 'CM_Container_InventoryList', filter = 1,
+            holder = function() local loot = pipboy.loot() return loot and loot.holder or '' end },
+    }
+    for _, side in pairs(made) do
+        side.list = opened:list(side.name, 'CM_list_template')
+        if not side.list then
+            opened:close()
+            return false
+        end
+    end
+    shown, sides = opened, made
+    for _, side in pairs(made) do
+        side.list.onClick(function(row) activateRow(side, row) end)
+    end
+    opened:onClick('CM_Items_LeftFilterArrow', function() cycleFilter(made.items, -1) end)
+    opened:onClick('CM_Items_RightFilterArrow', function() cycleFilter(made.items, 1) end)
+    opened:onClick('CM_Container_LeftFilterArrow', function() cycleFilter(made.container, -1) end)
+    opened:onClick('CM_Container_RightFilterArrow', function() cycleFilter(made.container, 1) end)
+    opened:onClick('CM_TakeAllButton', function() takeAll() end)
+    opened:onClick('CM_ExitButton', function() leave() end)
+    return true
+end
+
+local function renderMenu()
+    if not openMenu() then
+        return false
+    end
+    fillAll()
+    return true
+end
+
+function render()
+    if not pipboy.loot() then
+        destroyElement()
+        return
+    end
+    if element then
+        destroyElement()
+    end
+    if not renderMenu() then
+        renderLegacy()
+    end
+end
+
+-- The cards of the thing the pointer (or the pick) is on
+local function updateCards()
+    if not shown then
+        return
+    end
+    for name, side in pairs(sides) do
+        local row = side.list.selected()
+        if row > 0 and (cardSide ~= name or cardRow ~= row) then
+            cardSide, cardRow = name, row
+            cards.show(shown, side.listed and side.listed[row] or nil)
+            return
+        end
+    end
+end
+
+-- The keys while the menu of the file is there: Left and Right go to the other list, the arrows and pages pick a
+-- thing, Enter moves it and R takes everything
+local function pressMenu(code)
+    if quantity.isOpen() then
+        quantity.press(code)
+        return
+    end
+    local side = sides[activeSide]
+    local count = side.list.count()
+    local picked = side.list.selected()
+    if code == input.KEY.LeftArrow or code == input.KEY.RightArrow then
+        activeSide = activeSide == 'container' and 'items' or 'container'
+        local now = sides[activeSide]
+        if now.list.count() > 0 and now.list.selected() <= 0 then
+            now.list.select(1, true)
+        end
+        updateCards()
+    elseif code == input.KEY.DownArrow or code == input.KEY.PageDown then
+        local by = code == input.KEY.DownArrow and 1 or 8
+        if count > 0 then
+            side.list.select(picked <= 0 and 1 or math.min(count, picked + by), true)
+        end
+        updateCards()
+    elseif code == input.KEY.UpArrow or code == input.KEY.PageUp then
+        local by = code == input.KEY.UpArrow and 1 or 8
+        if count > 0 then
+            side.list.select(picked <= 0 and count or math.max(1, picked - by), true)
+        end
+        updateCards()
+    elseif code == input.KEY.Enter then
+        if picked > 0 then
+            activateRow(side, picked)
+        end
+    elseif code == input.KEY.R then
+        takeAll()
+    end
+end
+
 -- What a key (or a button of the pad that stands for one) does while the screen is there: the arrows and pages pick a
 -- thing, Enter takes it and R takes everything
 local function press(code)
     -- (a menu opened over the screen takes the keys and the buttons)
-    if not element or I.UI.getMode() ~= 'Interface' then
+    if not isOpen() or I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    if shown then
+        pressMenu(code)
         return
     end
     if code == input.KEY.DownArrow then
@@ -220,7 +468,7 @@ local function press(code)
 end
 
 -- On the pad Y takes the thing and X takes everything
-local onPad = pad.handler('loot', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press,
+local onPad = pad.handler('loot', function() return isOpen() and I.UI.getMode() == 'Interface' end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.R })
 
 local function sync()
@@ -237,8 +485,13 @@ local function sync()
         shownSerial = loot.serial
         offset = 1
         selected, selectFocus = 1, false
+        activeSide = 'container'
         openMode()
         render()
+    end
+    if shown then
+        shown:checkSize()
+        updateCards()
     end
 end
 
@@ -250,6 +503,10 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            -- the lists of the file's menu take the wheel themselves
+            if shown then
+                return
+            end
             if vertical > 0 then
                 scroll(-1)
             elseif vertical < 0 then

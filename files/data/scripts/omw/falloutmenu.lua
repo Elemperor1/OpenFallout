@@ -130,6 +130,23 @@ function Shown:dispatch(tile)
     if list and self.rowClicks[list] then self.rowClicks[list](row, tile) end
 end
 
+-- The hook of the tile that is being dragged, or of one it is in
+function Shown:dragHook()
+    local tile = self.menu:dragged()
+    while tile do
+        local hook = self.dragHooks[self.menu:name(tile)]
+        if hook then return hook end
+        tile = self.menu:parent(tile)
+    end
+    return nil
+end
+
+-- A tile that is dragged (a meter) shows its value from the drag until it is let go, and from what the code says then:
+-- `read()` gives the value at the moment it is let go and `apply(value)` puts it where the code keeps it
+function Shown:onDrag(name, read, apply)
+    self.dragHooks[name] = { read = read, apply = apply }
+end
+
 -- Call `handler(tile)` when the tile of this name is clicked
 function Shown:onClick(name, handler)
     self.clicks[name] = handler
@@ -205,7 +222,7 @@ function module.open(file, options)
         print('menu ' .. file .. ' is not shown: ' .. tostring(reason))
         return nil
     end
-    local shown = setmetatable({ menu = menu, file = file, size = size, clicks = {}, rowClicks = {} }, Shown)
+    local shown = setmetatable({ menu = menu, file = file, size = size, clicks = {}, rowClicks = {}, dragHooks = {} }, Shown)
     shown.version = menu:version()
     shown.element = ui.create {
         layer = options.layer or 'Windows',
@@ -223,7 +240,11 @@ function module.open(file, options)
             end),
             mouseRelease = async:callback(function(e)
                 if e.button ~= 1 then return end
+                -- What a tile that was dragged shows is read before it is let go, as the file takes the drag away then
+                local hook = shown:dragHook()
+                local kept = hook and hook.read()
                 local tile = shown.menu:pointerReleased(e.offset.x, e.offset.y)
+                if hook then hook.apply(kept) end
                 if tile then shown:dispatch(tile) end
                 shown:refresh()
             end),

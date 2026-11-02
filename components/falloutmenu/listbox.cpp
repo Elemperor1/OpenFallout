@@ -48,8 +48,16 @@ namespace FalloutMenu
             // What the screen does not say, the row has lit: the files leave the alpha of a row's text for the code to
             // set
             menu.set(*item, "_line_alpha", 255.f);
+            // A trait written `Tile.trait` is set on the tile of that name inside the row (the file's template names
+            // the text of a row, and the marker that shows an equipped item)
             for (const auto& [trait, value] : row)
-                menu.set(*item, trait, value);
+            {
+                const std::size_t dot = trait.find('.');
+                if (dot == std::string::npos)
+                    menu.set(*item, trait, value);
+                else if (Tile* inside = menu.find(*item, std::string_view(trait).substr(0, dot)))
+                    menu.set(*inside, std::string_view(trait).substr(dot + 1), value);
+            }
             menu.set(*item, "listindex", static_cast<float>(index++));
             mItems.push_back(item->uid());
         }
