@@ -357,6 +357,23 @@ namespace
         EXPECT_EQ(items[0].mFile, "a.dds");
     }
 
+    TEST(FalloutMenuDrawTest, a_hot_rectangle_that_names_a_file_is_a_picture_and_one_that_does_not_is_not)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\">"
+            "<hotrect name=\"Picture\"><filename> map.dds </filename><width> 200 </width><height> 100 "
+            "</height></hotrect>"
+            "<hotrect name=\"Button\"><width> 50 </width><height> 20 </height></hotrect>"
+            "</menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        EXPECT_EQ(items[0].mTile->name(), "Picture");
+        EXPECT_EQ(items[0].mType, TileType::Image);
+        EXPECT_EQ(items[0].mFile, "map.dds");
+        EXPECT_FLOAT_EQ(items[0].mWidth, 200.f);
+    }
+
     TEST(FalloutMenuDrawTest, positions_add_up_through_the_tiles_a_tile_is_in)
     {
         Fixture f;

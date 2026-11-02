@@ -45,7 +45,7 @@ On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock
 
 | Screen | D-pad | LB / RB | Y | X |
 |---|---|---|---|---|
-| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA); on the STAT and INV pages `[` and `]` on the keyboard change the tab | a page up or down | use the thing picked (equip, eat, read) | drop it |
+| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA); on the STAT, INV and DATA pages `[` and `]` on the keyboard change the tab (DATA: the world map, quests, notes and radio; Enter on the world map travels to the place named in the box in the middle) | a page up or down | use the thing picked (equip, eat, read) | drop it |
 | Conversation | up and down pick a topic | a page of topics | say the topic picked; carry on while a character speaks | |
 | V.A.T.S. | left and right pick the character, up and down the part | the character before or after | queue an attack on the part picked (the first press shows which part is picked) | attack: carry out the queue |
 | Container | up and down pick a thing | a page | take it (the first press shows which is picked) | take everything |
@@ -53,7 +53,7 @@ On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock
 | Lock | | | put in a bobby pin | |
 | Waiting | left and right change the hours | | begin | |
 
-The terminal (menus and the hacking game), the making of the character (the name still needs a keyboard) and the screen of a level up are used with the pointer and A only. The quests are on the DATA page of the Pip-Boy: the journal of Morrowind (the J key, and LB by the old default) opens nothing in Fallout now.
+The terminal (menus and the hacking game), the making of the character (the name still needs a keyboard) and the screen of a level up are used with the pointer and A only. The quests are on the DATA page of the Pip-Boy (QUESTS tab; the world map is on its first tab, where the mouse drags the map and the wheel zooms it): the journal of Morrowind (the J key, and LB by the old default) opens nothing in Fallout now.
 
 ## Frame rate and picture
 

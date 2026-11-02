@@ -593,13 +593,16 @@ namespace FalloutMenu
         const float frameX = mirrorsChild(tile) ? originX : x;
         const float frameY = mirrorsChild(tile) ? originY : y;
 
-        const bool isImage = tile.mType == TileType::Image;
+        // A hot rectangle that names a file is a picture that takes the pointer (the picture of the world map of the
+        // Pip-Boy, the cursor of the hacking menu)
+        const bool isImage
+            = tile.mType == TileType::Image || (tile.mType == TileType::HotRect && !text(tile, "filename").empty());
         const bool isText = tile.mType == TileType::Text;
         if (isImage || isText)
         {
             DrawItem item;
             item.mTile = &tile;
-            item.mType = tile.mType;
+            item.mType = isImage ? TileType::Image : tile.mType;
             item.mX = x;
             item.mY = y;
             item.mWidth = width;

@@ -859,6 +859,10 @@ QUEST_OBJECTIVE_TEXT = "Do the thing"
 QUEST_FLAG_START_GAME = 0x01
 STAGE_FLAG_COMPLETE_QUEST = 0x01
 WORLD_NAME = "OFTestWorld"
+# The picture of the world map of the Pip-Boy and its rectangle (the usable width and height, the cells at the north-west
+# and the south-east corners)
+WORLD_MAP_FILE = "Interface\\Worldmap\\OFTestMap.dds"
+WORLD_MAP_RECT = (1000, 900, -4, 5, 3, -6)
 WEATHER_NAME = "OFTestWeather"
 CONDITIONAL_WEATHER_NAME = "OFTestConditionalWeather"
 # The size of an exterior cell of Fallout 3 and New Vegas, in game units. The exterior cell 0,0 covers x and y from 0 to
@@ -2249,6 +2253,8 @@ def world_record():
     """The WRLD record of OFTestWorld."""
     land_level, water_level = -2700.0, -14000.0
     return record(b"WRLD", WORLD_ID, [zstr(b"EDID", WORLD_NAME), zstr(b"FULL", "OpenFallout Test World"),
+                                      zstr(b"ICON", WORLD_MAP_FILE),
+                                      sub(b"MNAM", struct.pack("<IIhhhh", *WORLD_MAP_RECT)),
                                       sub(b"NAM0", struct.pack("<ff", -4096.0, -4096.0)),
                                       sub(b"NAM9", struct.pack("<ff", 8192.0, 8192.0)),
                                       sub(b"CNAM", struct.pack("<I", CLIMATE_ID)),

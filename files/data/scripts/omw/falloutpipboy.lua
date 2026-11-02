@@ -15,6 +15,7 @@ local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local itemsPage = require('scripts.omw.falloutpipboyitems')
 local statsPage = require('scripts.omw.falloutpipboystats')
+local dataMenu = require('scripts.omw.falloutpipboydata')
 
 local pipboy = core.pipboy
 
@@ -706,24 +707,35 @@ function render()
     if not visible then
         itemsPage.hide()
         statsPage.hide()
+        dataMenu.hide()
         return
     end
-    -- The pages of the items and the stats are the game's own menus: only the row of the pages is put over them
+    -- The pages of the items, the stats and the data are the game's own menus: only the row of the pages is put over them
     if view == 'pipboy' and tab == 'inv' then
         statsPage.hide()
+        dataMenu.hide()
         if itemsPage.show() then
             element = ui.create(pageStrip())
             return
         end
     elseif view == 'pipboy' and tab == 'stat' then
         itemsPage.hide()
+        dataMenu.hide()
         if statsPage.show() then
+            element = ui.create(pageStrip())
+            return
+        end
+    elseif view == 'pipboy' and tab == 'data' then
+        itemsPage.hide()
+        statsPage.hide()
+        if dataMenu.show({ close = closeWindow }) then
             element = ui.create(pageStrip())
             return
         end
     end
     itemsPage.hide()
     statsPage.hide()
+    dataMenu.hide()
     widgets = widgetModule.new(update)
     local width = math.max(520, math.floor(ui.screenSize().x * 0.5))
     local rows = { { props = { size = v2(width, 0) } } }
@@ -758,6 +770,7 @@ local function hide()
     dropPrompt = nil
     itemsPage.hide()
     statsPage.hide()
+    dataMenu.hide()
     -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
@@ -769,7 +782,7 @@ for _, name in ipairs({ 'Stats', 'Magic', 'Map' }) do
 end
 
 local function scroll(by)
-    if not visible or view ~= 'pipboy' or itemsPage.isOpen() or statsPage.isOpen() then
+    if not visible or view ~= 'pipboy' or itemsPage.isOpen() or statsPage.isOpen() or dataMenu.isOpen() then
         return
     end
     if dropPrompt then
@@ -816,6 +829,9 @@ local function press(code)
         return
     end
     if statsPage.isOpen() and statsPage.press(code) then
+        return
+    end
+    if dataMenu.isOpen() and dataMenu.press(code) then
         return
     end
     if dropPrompt then
@@ -897,6 +913,9 @@ return {
             end
             if statsPage.isOpen() then
                 statsPage.update()
+            end
+            if dataMenu.isOpen() then
+                dataMenu.update()
             end
             if not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
                 if view == 'levelup' then

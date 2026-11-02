@@ -171,6 +171,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutpad.lua
     scripts/omw/falloutinteraction.lua
     scripts/omw/falloutpipboy.lua
+    scripts/omw/falloutpipboydata.lua
     scripts/omw/falloutpipboyitems.lua
     scripts/omw/falloutpipboystats.lua
     scripts/omw/falloutquantity.lua

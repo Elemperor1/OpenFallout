@@ -39,8 +39,8 @@ these from the pointer, and the renderer sets them:
 
 Screens drawn from their file so far: the hours to wait or sleep (`sleep_wait_menu.xml`), the dialogue
 (`dialog/dialog_menu.xml`), taking things from a container and putting them back (`container_menu.xml`), "how many?"
-(`quantity_menu.xml`), the bench (`recipe_menu.xml`) and the items and stats pages of the Pip-Boy
-(`main/inventory_menu.xml`, `main/stats_menu.xml`). The
+(`quantity_menu.xml`), the bench (`recipe_menu.xml`) and the items, stats and data pages of the Pip-Boy
+(`main/inventory_menu.xml`, `main/stats_menu.xml`, `main/map_menu.xml`). The
 older hand-built widgets of each stay as a fallback for when the file cannot be opened, and are removed once the screen
 has been played.
 
@@ -48,7 +48,9 @@ has been played.
 
 A menu file that has a tabline (`tabline.xml`) leaves the buttons to the game's code: it keeps the template
 (`TabButtonTemplate`) and the code makes one button for each tab, gives it its text and a `listindex`, and says which one
-is current in the line's `_CurrentTab`. `Shown:tabs(line, template, labels, picked, onPick)` of `falloutmenu.lua` does that.
+is current in the line's `_CurrentTab`. `Shown:tabs(line, template, labels, picked, onPick, options)` of `falloutmenu.lua` does
+that; `options.values` gives the `_CurrentTab` of each tab when the code leaves a number out (the data page has no local
+map, so its tabs are 1 to 4 and the file's expressions for the lists still say which one shows).
 A button is as wide as its text and the room the template leaves around it; the buttons are spread over the width of the
 line with the same gap between them, which is also `_LeftLineLength`, the length of the lines the file draws from one
 button to the next and to the brackets at the ends (the lines meet the brackets exactly with this gap, which is the
@@ -87,6 +89,36 @@ and after. Not there yet: the pictures of the skills, perks and attributes (the 
 hurt each part is (the engine does not tell), the effects, the hardcore needs (their buttons are hidden), the healing buttons, and
 the lines of the general page.
 
+### The data page of the Pip-Boy
+
+`falloutpipboydata.lua` fills `main/map_menu.xml`. The headline has the place the player is in (the name the engine gives the
+cell, or the worldspace's) and the time and date of the world; the tabs are WORLD MAP, QUESTS, NOTES and RADIO with the numbers
+1 to 4 the file gives them (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
+and nothing here can).
+
+*World map.* The picture is the file's `MM_WorldMap_ParentImage` (the file names the Fallout 3 picture; the picture of the
+worldspace record, `ICON`, is used when it has one). It is a hot rectangle that names a file, which the renderer now draws as
+a picture (the hacking and character menus have such tiles too). The places the player has found are tiles made from the
+file's `MapMarkerTemplate` as children of the picture, with their position in `_x` and `_y` as a part of the picture (0 to 1);
+a place is put on the picture by the rectangle of cells the worldspace's `MNAM` gives it (the north-west and the south-east
+corner cell, 4096 units to a cell, the rows going up to the north), and the player's arrow is put the same way. The picture is
+placed with the file's own numbers (the window of the map is 855 by 500 units, its middle 427.5 by 250 is where the picture
+can be moved to at most, the box in the middle names the place under it) and starts centred on the player at half size.
+The pointer drags the picture and the wheel zooms it (the file's `draggable` and `wheelable` tiles; the page does the
+arithmetic, since the file leaves it to code); a click on a place travels there, a place that cannot be travelled to (found,
+not visited) only says its name. Enter travels to the place the box names. The picture of each kind of place and the arrow
+that turns to where the player faces are not read yet: every place has the dot of a waypoint and the arrow does not turn.
+
+*Quests.* The list of the file with its empty squares, the objectives of the quest that is picked in the list beside it (the
+square of an objective that is done is filled and its text dim), as the engine's `core.pipboy.quests()` has them; a quest that
+is done is not listed. The file's buttons (Show Location, Place Marker, Make Active) are hidden: nothing here knows where the
+objectives of a quest are on the map, or which quest is the active one. The place the file puts the objectives in depends on
+those buttons, so the page sets it to where the file has it with a button shown. *Notes and radio* are the file's lists with no
+rows: the engine does not have the notes or the stations of the player.
+
+The page needs `core.interact.mapInfo()` (the worldspace, its picture and the rectangle of cells, where the player stands and
+faces, the name of the place, the date) and the `space` and `type` of each place of `core.interact.map()`.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
@@ -105,6 +137,8 @@ table; a game in another language gets its words from its plugin). The card, car
   own colour is -1); their red, green and blue come from the `iSystemColor` settings in the INI.
 - A tile's position is the sum of its ancestors' positions. A text tile's `x` is the point it is justified to (left end,
   centre or right end).
+- A hot rectangle that names a file (`filename`) is a picture that takes the pointer: the picture of the world map, the
+  cursor of the hacking menu (seen in the files, not yet in the running game).
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
 
@@ -117,6 +151,9 @@ table; a game in another language gets its words from its plugin). The card, car
   word stays whole (the port's rule, matched to that).
 - The meaning of the byte `&widescreen;` reads, and of the traits `wraplimit`, `wraplines`, `ishtml`, `cropx`, `cropy`,
   `repeat*`, `explorefade` and `menufade`.
+- The look of the headline of the data page (the order of the time and the date, the 12 hour clock), the labels of its tabs,
+  the picture of each kind of place and how a position becomes a place on the picture: the page uses the usable cell rectangle
+  of the worldspace and the games' own numbers are to be read from the executable.
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in
   the executable's table. The loader leaves them as text.
 

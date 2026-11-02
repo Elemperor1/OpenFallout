@@ -493,8 +493,42 @@ namespace OFScript
             osg::Vec3f mPosition;
             bool mTravel = false;
             double mDistance = 0;
+            /// The worldspace the marker is in (0 for a place inside a building)
+            FalloutScript::FormId mWorldspace = 0;
+            /// What kind of place the record says it is (the first byte of its `TNAM`), which the icon follows
+            unsigned mType = 0;
         };
         std::vector<MapEntry> mapEntries();
+
+        /// What the map of the Pip-Boy needs to draw the world and the player on it: the worldspace whose picture it
+        /// shows (the one the player is in, or the one of the first marker found when the player is inside a building),
+        /// the picture and the rectangle of cells that the plugin gives it, where the player stands and faces, the name
+        /// of the place, and the date and time of the world
+        struct MapInfo
+        {
+            FalloutScript::FormId mWorldspace = 0;
+            /// Whether the player is in the open world (the position and heading are on the map then)
+            bool mOutside = false;
+            std::string mLocation;
+            std::string mWorldName;
+            /// The picture of the worldspace record (`ICON`), empty when it has none
+            std::string mMapFile;
+            /// The record's `MNAM`: the usable size of the picture and the cells at its north-west and south-east
+            /// corners (all 0 when the record has none)
+            unsigned mWidth = 0;
+            unsigned mHeight = 0;
+            int mNorthWestX = 0;
+            int mNorthWestY = 0;
+            int mSouthEastX = 0;
+            int mSouthEastY = 0;
+            osg::Vec3f mPosition;
+            /// Degrees clockwise from north
+            double mHeading = 0;
+            bool mHasDate = false;
+            FalloutScript::GameDate mDate;
+            double mHour = 0;
+        };
+        MapInfo mapInfo();
         /// The player goes to a marker at once: the text of why not, empty when it did
         std::string travelTo(FalloutScript::FormId marker);
 
@@ -1702,6 +1736,7 @@ namespace OFScript
             FalloutScript::FormId mWorldspace = 0;
             osg::Vec3f mPosition;
             std::string mName;
+            unsigned mType = 0;
         };
         const std::vector<PlacedMarker>& placedMarkers();
         std::optional<std::vector<PlacedMarker>> mPlacedMarkers;

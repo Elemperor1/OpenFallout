@@ -178,9 +178,42 @@ function Shown:dragHook()
 end
 
 -- A tile that is dragged (a meter) shows its value from the drag until it is let go, and from what the code says then:
--- `read()` gives the value at the moment it is let go and `apply(value)` puts it where the code keeps it
-function Shown:onDrag(name, read, apply)
-    self.dragHooks[name] = { read = read, apply = apply }
+-- `read()` gives the value at the moment it is let go and `apply(value)` puts it where the code keeps it. A tile that the
+-- code moves with the drag (a map) has `move()` too, called each time the pointer moves while the tile is held; the file
+-- gives it `dragx` and `dragy` (where in the tile the pointer is) and `dragstartx` and `dragstarty` (where it took hold).
+function Shown:onDrag(name, read, apply, move)
+    self.dragHooks[name] = { read = read, apply = apply, move = move }
+end
+
+-- Call `handler(notches, tile)` when the wheel turns over the window: notches are the file's way (up is -1), tile is the
+-- tile of the file that takes the wheel (nil for none)
+function Shown:onWheel(handler)
+    self.wheelHandler = handler
+end
+
+-- Where the pointer last was in the window, in pixels (what `rect` gives positions in), and where the button went down
+function Shown:pointerAt()
+    return self.pointer
+end
+
+-- A tile made from a template of the menu under a tile, as the game's code does for the markers of a map; its number
+function Shown:instantiate(parent, template, name)
+    local tile = self.menu:instantiate(parent, template, name)
+    if not tile then
+        error('the menu ' .. self.file .. ' has no template ' .. template, 0)
+    end
+    return tile
+end
+
+-- Take every tile made with `instantiate` out from under a tile
+function Shown:removeChildren(parent)
+    self.menu:removeChildren(parent)
+    self:refresh()
+end
+
+-- The rectangle of a tile in pixels of the window: x, y, width, height (nil when it is not drawn)
+function Shown:rect(tile)
+    return self.menu:rect(tile)
 end
 
 -- Call `handler(tile)` when the tile of this name is clicked
@@ -228,12 +261,19 @@ end
 -- Fill a tabline (a tile that includes tabline.xml) with a button for each label, as the game's code does with the
 -- template the menu file keeps for the buttons. The buttons are spread over the line with the same gap between them, as
 -- long as the lines the file draws between them (`_LeftLineLength`); a button is as wide as its text and the room the
--- template leaves around it. `options`: prefix (the names of the buttons are prefix .. number, default 'Tab').
+-- template leaves around it. `options`: prefix (the names of the buttons are prefix .. number, default 'Tab'), values
+-- (the `_CurrentTab` of each tab, default 0, 1, 2 ...).
 -- Returns an object with `pick(index)` (the tab that is shown as the current one), `current()` and `count()`;
 -- `onPick(index)` is called when a button is clicked.
 function Shown:tabs(line, template, labels, picked, onPick, options)
     local menu = self.menu
     local prefix = options and options.prefix or 'Tab'
+    -- The value of the line's `_CurrentTab` that stands for each tab: the numbers from 0 unless the code skips some
+    -- (a Pip-Boy page without its local map keeps the numbers of the file for the others)
+    local values = options and options.values
+    local function valueOf(index)
+        return values and values[index] or (index - 1)
+    end
     local tabs = { buttons = {}, index = picked }
     local shown = self
     self:batch(function()
@@ -243,7 +283,7 @@ function Shown:tabs(line, template, labels, picked, onPick, options)
                 error('the menu ' .. self.file .. ' has no template ' .. template, 0)
             end
             menu:set(tile, 'string', label)
-            menu:set(tile, 'listindex', i - 1)
+            menu:set(tile, 'listindex', valueOf(i))
             tabs.buttons[i] = tile
         end
         local total = 0
@@ -258,11 +298,11 @@ function Shown:tabs(line, template, labels, picked, onPick, options)
         end
         menu:set(line, '_LeftLineLength', gap)
         menu:set(line, '_ButtonCount', #labels)
-        menu:set(line, '_CurrentTab', picked - 1)
+        menu:set(line, '_CurrentTab', valueOf(picked))
     end)
     function tabs.pick(index)
         tabs.index = index
-        shown.menu:set(line, '_CurrentTab', index - 1)
+        shown.menu:set(line, '_CurrentTab', valueOf(index))
         shown:refresh()
     end
     function tabs.current() return tabs.index end
@@ -321,16 +361,24 @@ function module.open(file, options)
         content = contentOf(menu:pieces()),
         events = {
             mouseMove = async:callback(function(e)
+                shown.pointer = { x = e.offset.x, y = e.offset.y, startX = shown.pointer and shown.pointer.startX,
+                    startY = shown.pointer and shown.pointer.startY }
                 shown.menu:pointerMoved(e.offset.x, e.offset.y)
+                -- A tile the code moves with the drag follows the pointer
+                local hook = shown:dragHook()
+                if hook and hook.move then hook.move() end
                 shown:refresh()
             end),
             mousePress = async:callback(function(e)
                 if e.button ~= 1 then return end
+                shown.pointer = { x = e.offset.x, y = e.offset.y, startX = e.offset.x, startY = e.offset.y }
                 shown.menu:pointerPressed(e.offset.x, e.offset.y)
                 shown:refresh()
             end),
             mouseRelease = async:callback(function(e)
                 if e.button ~= 1 then return end
+                shown.pointer = { x = e.offset.x, y = e.offset.y, startX = shown.pointer and shown.pointer.startX,
+                    startY = shown.pointer and shown.pointer.startY }
                 -- What a tile that was dragged shows is read before it is let go, as the file takes the drag away then
                 local hook = shown:dragHook()
                 local kept = hook and hook.read()
@@ -344,7 +392,8 @@ function module.open(file, options)
                 local notches = e.delta.y > 0 and -1 or (e.delta.y < 0 and 1 or 0)
                 if notches ~= 0 then
                     -- the wheel event has the cursor in the window, the menu is in the pixels of the element
-                    shown.menu:wheel(e.position.x - shown.origin.x, e.position.y - shown.origin.y, notches)
+                    local tile = shown.menu:wheel(e.position.x - shown.origin.x, e.position.y - shown.origin.y, notches)
+                    if shown.wheelHandler then shown.wheelHandler(notches, tile) end
                     shown:refresh()
                 end
             end),

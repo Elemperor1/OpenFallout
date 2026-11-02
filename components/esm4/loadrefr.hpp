@@ -115,7 +115,7 @@ namespace ESM4
         std::int32_t mFactionRank = -1;
 
         bool mIsMapMarker = false;
-        std::uint16_t mMapMarker;
+        std::uint16_t mMapMarker{ 0 };
         // FNAM of a map marker (Fallout 3 and New Vegas): 0x01 visible, 0x02 can be travelled to
         std::uint8_t mMapMarkerFlags = 0;
 
