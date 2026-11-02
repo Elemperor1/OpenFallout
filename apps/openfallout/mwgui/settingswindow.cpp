@@ -1119,6 +1119,9 @@ namespace OFGui
 
     void SettingsWindow::onOpen()
     {
+        // The settings can have been changed while the window was closed (the game's own settings screens write the
+        // volumes, the brightness and some switches), and a toggle takes its next value from its caption
+        configureWidgets(mMainWidget, false);
         highlightCurrentResolution();
         updateControlsBox();
         updateLightSettings();
