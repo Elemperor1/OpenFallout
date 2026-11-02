@@ -976,6 +976,9 @@ namespace OFScript
         };
         /// The box that is open, if any (any thread)
         std::optional<OpenMessage> openMessage() const;
+        /// A message box that a script of Lua draws is open: it is modal, and the actions of the keys and buttons of
+        /// the game (Escape, which would close the screen under it) are not carried out while it is (any thread)
+        bool luaMessageOpen() const;
         /// A script of Lua draws the message boxes (message_menu.xml) when `drawn` is true: the box of the window
         /// manager is not made then, and the button that Lua picks (pressMessageButton) is the answer. When it is
         /// false again (the file is not there, or the script cannot show a box) a box that is open is made as the

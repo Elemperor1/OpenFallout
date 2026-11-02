@@ -60,6 +60,12 @@ namespace OFInput
     void ActionManager::executeAction(int action)
     {
         OFBase::Environment::get().getLuaManager()->inputEvent({ OFBase::LuaManager::InputEvent::Action, action });
+        // A message box that a script draws is modal (as the window of the engine's own was): the actions of the keys
+        // and buttons are not carried out under it, so that Escape does not close the screen the box is over; the
+        // script gets the keys itself
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->luaMessageOpen())
+            return;
         const auto inputManager = OFBase::Environment::get().getInputManager();
         const auto windowManager = OFBase::Environment::get().getWindowManager();
         // trigger action activated

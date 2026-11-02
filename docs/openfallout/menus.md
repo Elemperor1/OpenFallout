@@ -253,7 +253,9 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
-  keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`).
+  keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`). The engine's own actions for the keys
+  and buttons (Escape, which would close the screen under the box, the inventory key) are not carried out either while a
+  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys.
 - A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
   after its claim ran out, has the window manager's own window and is left to it.
 

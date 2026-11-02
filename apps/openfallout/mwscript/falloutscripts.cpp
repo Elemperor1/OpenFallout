@@ -1518,6 +1518,12 @@ namespace OFScript
         return mOpenMessage;
     }
 
+    bool FalloutScripts::luaMessageOpen() const
+    {
+        const std::lock_guard lock(mOpenMessageMutex);
+        return mOpenMessage && mOpenMessage->mLua;
+    }
+
     bool FalloutScripts::pressMessageButton(std::size_t button)
     {
         std::uint32_t serial = 0;
