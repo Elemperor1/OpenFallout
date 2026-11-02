@@ -77,7 +77,7 @@ namespace FalloutScript::SettingText
             Entry{ "sNavigate", "Navigate" },
             Entry{ "sNew", "New" },
             Entry{ "sNext", "Next" },
-            Entry{ "sNextChallenge", "Next Challenge Info" },
+            Entry{ "sNextChallenge", "Next Challenge Type" },
             Entry{ "sNoItemsToRepair", "No items to repair" },
             Entry{ "sNotesTabText", "Notes" },
             Entry{ "sNotesToggle", "Notes" },
