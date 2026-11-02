@@ -146,10 +146,11 @@ local function fill()
     cardRow = nil
 end
 
--- The cards, and the mark beside a thing that can be used, for the row that is picked or under the pointer
+-- The cards, and the mark beside a thing that can be used, for the row that is picked or under the pointer; a list with
+-- no row to pick (an empty category) shows no card and nothing to use
 local function updateCards()
-    local row = list.selected()
-    if row <= 0 or row == cardRow then return end
+    local row = math.max(list.selected(), 0)
+    if row == cardRow then return end
     cardRow = row
     local item = listed[row]
     shown:batch(function()
