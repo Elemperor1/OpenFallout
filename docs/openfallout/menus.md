@@ -92,8 +92,9 @@ the lines of the general page.
 ### The data page of the Pip-Boy
 
 `falloutpipboydata.lua` fills `main/map_menu.xml`. The headline has the place the player is in (the name the engine gives the
-cell, or the worldspace's) and the time and date of the world; the tabs are WORLD MAP, QUESTS, NOTES and RADIO with the numbers
-1 to 4 the file gives them (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
+cell, or the worldspace's) and the time and date of the world; the tabs are WORLD MAP, QUESTS, MISC (NOTES in Fallout 3) and RADIO with the
+numbers 1 to 4 the file gives them, their words from the settings the executables name (`sWorldMapTabText`, `sQuestsTabText`,
+`sMiscTabText` or `sNotesTabText`, `sCommsTabText`) (tab 0, the local map, is not there: the games draw it from a render of the cell the player is in,
 and nothing here can).
 
 *World map.* The picture is the file's `MM_WorldMap_ParentImage` (the file names the Fallout 3 picture; the picture of the
@@ -158,7 +159,8 @@ table; a game in another language gets its words from its plugin). The card, car
   word stays whole (the port's rule, matched to that).
 - The meaning of the byte `&widescreen;` reads, and of the traits `wraplimit`, `wraplines`, `ishtml`, `cropx`, `cropy`,
   `repeat*`, `explorefade` and `menufade`.
-- The look of the headline of the data page (the order of the time and the date, the 12 hour clock), the labels of its tabs,
+- The look of the headline of the data page (the order of the time and the date, the 12 hour clock), whether the tab words are
+  drawn in capitals (the page does, as the other tabs of the Pip-Boy; the executables' own code for it was not read),
   the zoom limits and the size of the places on the map (the executables keep them in settings whose default values are not
   read yet), and the remap of the position (`u * 0.796875 + 0.1015625`) that the executables apply for one mode of the map
   object, which is not the world map as far as is known.

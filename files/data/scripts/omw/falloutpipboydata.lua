@@ -27,12 +27,14 @@ local module = {}
 
 local MENU_FILE = 'main/map_menu.xml'
 
--- The tabs, with the number the file gives each (`_CurrentTab`; 0 is the local map, which is not there)
+-- The tabs, with the number the file gives each (`_CurrentTab`; 0 is the local map, which is not there) and the setting
+-- that holds the words of each (read from both executables; the third tab is Misc in New Vegas, which keeps the notes with
+-- the challenges, and Notes in Fallout 3)
 local TABS = {
-    { key = 'world', value = 1, label = 'WORLD MAP' },
-    { key = 'quests', value = 2, label = 'QUESTS' },
-    { key = 'notes', value = 3, label = 'NOTES' },
-    { key = 'radio', value = 4, label = 'RADIO' },
+    { key = 'world', value = 1, setting = 'sWorldMapTabText', fallback = 'World Map' },
+    { key = 'quests', value = 2, setting = 'sQuestsTabText', fallback = 'Quests' },
+    { key = 'notes', value = 3, setting = 'sNotesTabText', fallback = 'Notes', vegas = 'sMiscTabText', vegasFallback = 'Misc' },
+    { key = 'radio', value = 4, setting = 'sCommsTabText', fallback = 'Radio' },
 }
 
 local MAP = {
@@ -84,6 +86,22 @@ local zoom, moveX, moveY = 0.5, 0, 0
 local objectivesFor = nil
 -- Where the picture was when the pointer took hold of it, while it is dragged
 local dragFrom = nil
+
+-- The words of a tab: the setting's text (the games' own files, then the port's table of the defaults), in capitals as the
+-- other tabs of the Pip-Boy are drawn (whether the games capitalise the tab words on the screen is not read)
+local function word(setting, fallback)
+    local text = pipboy.text(setting)
+    return text ~= '' and text or fallback
+end
+
+function module.tabLabel(tab, newVegas)
+    if newVegas == nil then
+        local ok, stats = pcall(pipboy.stats)
+        newVegas = ok and stats ~= nil and stats.newVegas == true
+    end
+    if newVegas and tab.vegas then return word(tab.vegas, tab.vegasFallback):upper() end
+    return word(tab.setting, tab.fallback):upper()
+end
 
 local function number(value)
     return string.format('%d', math.floor(value + 0.5))
@@ -394,7 +412,7 @@ local function open()
     end
     local labels, values = {}, {}
     for index, tab in ipairs(TABS) do
-        labels[index], values[index] = tab.label, tab.value
+        labels[index], values[index] = module.tabLabel(tab), tab.value
     end
     local ok, result = pcall(function()
         return opened:tabs('MM_Tabline', 'TabButtonTemplate', labels, tabIndex, function(index) pickTab(index) end,

@@ -2,6 +2,9 @@
 
 #include <components/falloutscript/settingtext.hpp>
 
+#include <cstddef>
+#include <utility>
+
 namespace
 {
     using namespace FalloutScript;
@@ -11,6 +14,34 @@ namespace
         EXPECT_EQ(SettingText::standIn("sCancel"), "Cancel");
         EXPECT_EQ(SettingText::standIn("sOK"), "OK");
         EXPECT_EQ(SettingText::standIn("sInventoryWeightUpper"), "WG");
+    }
+
+    TEST(FalloutSettingText, the_words_of_the_data_page_have_the_lengths_the_executables_give_them)
+    {
+        // Read from the default texts of FalloutNV.exe and Fallout3.exe (the same in both): the length of each, and
+        // that only sData is upper case
+        const std::pair<const char*, size_t> lengths[] = {
+            { "sTravel", 6 },
+            { "sMakeActiveQuest", 17 },
+            { "sPlayAudio", 10 },
+            { "sTune", 4 },
+            { "sStopAudio", 10 },
+            { "sPlaceMarker", 12 },
+            { "sShowLocation", 13 },
+            { "sShowAllNotes", 14 },
+            { "sShowActiveNotes", 23 },
+            { "sNextChallenge", 19 },
+            { "sData", 4 },
+            { "sLocalMapTabText", 9 },
+            { "sWorldMapTabText", 9 },
+            { "sQuestsTabText", 6 },
+            { "sMiscTabText", 4 },
+            { "sNotesTabText", 5 },
+            { "sCommsTabText", 5 },
+        };
+        for (const auto& [name, length] : lengths)
+            EXPECT_EQ(SettingText::standIn(name).size(), length) << name;
+        EXPECT_EQ(SettingText::standIn("sData"), "DATA");
     }
 
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)
