@@ -356,8 +356,13 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   the menu; while it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
   back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
   list the engine closes the menu with them. Settings opens the game's own settings screens (below).
-- Not read yet, so estimated: where the question's container is (the file leaves its place to the code: it is put at the
-  list's side, in the middle of the window's height), which tile is lit first (the first row), and the format of the time
+- Where the question's container is: the file says its `x`, `y` and `width` are "set in code", but round 12AC found no code
+  in `StartMenu` that sets a position or a size for the container or for the panel of the lit save (only the strings, the
+  fades, the user traits, and one `y` shift of a tile on a wide screen), so the port puts the container at the list's side, in
+  the middle of the window's height (an estimate, as the question's own tile sits 20 units to the left of it, right-aligned).
+  The panel of the lit save goes with the list of saves (it is hidden while the question is shown: the first run in the
+  game, round 12AB, drew the question over its play-time line). Not read yet, so estimated: which tile is lit first (the
+  first row), and the format of the time
   played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
   picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
 
