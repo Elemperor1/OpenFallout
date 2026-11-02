@@ -14,6 +14,7 @@ local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local itemsPage = require('scripts.omw.falloutpipboyitems')
+local statsPage = require('scripts.omw.falloutpipboystats')
 
 local pipboy = core.pipboy
 
@@ -704,13 +705,25 @@ function render()
     destroyElement()
     if not visible then
         itemsPage.hide()
+        statsPage.hide()
         return
     end
-    if view == 'pipboy' and tab == 'inv' and itemsPage.show() then
-        element = ui.create(pageStrip())
-        return
+    -- The pages of the items and the stats are the game's own menus: only the row of the pages is put over them
+    if view == 'pipboy' and tab == 'inv' then
+        statsPage.hide()
+        if itemsPage.show() then
+            element = ui.create(pageStrip())
+            return
+        end
+    elseif view == 'pipboy' and tab == 'stat' then
+        itemsPage.hide()
+        if statsPage.show() then
+            element = ui.create(pageStrip())
+            return
+        end
     end
     itemsPage.hide()
+    statsPage.hide()
     widgets = widgetModule.new(update)
     local width = math.max(520, math.floor(ui.screenSize().x * 0.5))
     local rows = { { props = { size = v2(width, 0) } } }
@@ -744,6 +757,7 @@ local function hide()
     keyring = false
     dropPrompt = nil
     itemsPage.hide()
+    statsPage.hide()
     -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
@@ -755,7 +769,7 @@ for _, name in ipairs({ 'Stats', 'Magic', 'Map' }) do
 end
 
 local function scroll(by)
-    if not visible or view ~= 'pipboy' or itemsPage.isOpen() then
+    if not visible or view ~= 'pipboy' or itemsPage.isOpen() or statsPage.isOpen() then
         return
     end
     if dropPrompt then
@@ -799,6 +813,9 @@ local function press(code)
     end
     -- The page of the game's menu takes the keys it uses (not Left and Right, which change the page)
     if itemsPage.isOpen() and itemsPage.press(code) then
+        return
+    end
+    if statsPage.isOpen() and statsPage.press(code) then
         return
     end
     if dropPrompt then
@@ -877,6 +894,9 @@ return {
             reopenWait = math.max(0, reopenWait - core.getRealFrameDuration())
             if itemsPage.isOpen() then
                 itemsPage.update()
+            end
+            if statsPage.isOpen() then
+                statsPage.update()
             end
             if not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
                 if view == 'levelup' then

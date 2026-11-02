@@ -39,7 +39,8 @@ these from the pointer, and the renderer sets them:
 
 Screens drawn from their file so far: the hours to wait or sleep (`sleep_wait_menu.xml`), the dialogue
 (`dialog/dialog_menu.xml`), taking things from a container and putting them back (`container_menu.xml`), "how many?"
-(`quantity_menu.xml`), the bench (`recipe_menu.xml`) and the items page of the Pip-Boy (`main/inventory_menu.xml`). The
+(`quantity_menu.xml`), the bench (`recipe_menu.xml`) and the items and stats pages of the Pip-Boy
+(`main/inventory_menu.xml`, `main/stats_menu.xml`). The
 older hand-built widgets of each stay as a fallback for when the file cannot be opened, and are removed once the screen
 has been played.
 
@@ -64,6 +65,20 @@ headline, and the cards of the thing the pointer is on in the file's `item_stats
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
 yet: the picture of the thing (the games show its model), the hot keys, repair and mods (their buttons are hidden).
+
+### The stats page of the Pip-Boy
+
+`falloutpipboystats.lua` fills `main/stats_menu.xml`: the headline (level, health, action points, experience; the menu reads
+them from `user5` to `user8` of its root), the five tabs along the bottom (the file draws them; the page is the root's
+`user0`, 0 to 4, which a click on a tab sets), the lists of S.P.E.C.I.A.L., skills and perks (the template is
+`stats_list_template`; the number on the right is `user1` of the row), and the description of the row that is picked or under
+the pointer, which the file shows under the picture of the thing (`stats_icon`, made visible while there is a description).
+The status page puts the pictures of the parts of the body in the Vault Boy (the games choose them in code: `head`, `torso`,
+`left_arm` ... under `Interface\Stats`, with `_broken` for a crippled part, which the engine reports in `core.hud.status()`) and
+gives each part's meter 1, or 0 when it is crippled. Keys: up and down and the pages pick a row, `[` and `]` go to the tab before
+and after. Not there yet: the pictures of the skills, perks and attributes (the games choose models and textures in code), how
+hurt each part is (the engine does not tell), the effects, the hardcore needs (their buttons are hidden), the healing buttons, and
+the lines of the general page.
 
 ## What was read from the executable
 
