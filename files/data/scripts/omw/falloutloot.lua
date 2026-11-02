@@ -392,6 +392,7 @@ end
 
 -- The cards of the thing the pointer (or the pick) is on. Both lists keep their pick, so the cards follow the list
 -- that was moved last (the pointer over a row, a key, or Left and Right to the other list), and stay while none moves.
+-- The keys act on that list too (`activeSide`), so Enter moves the thing whose cards are shown.
 local focusSide = nil
 local function updateCards()
     if not shown then
@@ -403,6 +404,7 @@ local function updateCards()
             side.lastRow = row
             if row > 0 then
                 focusSide = name
+                activeSide = name
             end
         end
     end
