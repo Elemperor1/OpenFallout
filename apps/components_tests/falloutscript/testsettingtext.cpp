@@ -26,6 +26,24 @@ namespace
             EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
     }
 
+    TEST(FalloutSettingText, the_settings_screens_have_the_words_of_their_labels_and_values)
+    {
+        // The four submenus, the items of each, and the words a toggle goes through (the names are the ones rounds 12W
+        // and 12Y read from the executable). The offline harness answers every name with a word of its own, so a name
+        // that is missing here shows as the name itself in the running game (round 12AB)
+        for (const char* name :
+            { "sGameplay", "sDisplay", "sAudio", "sControls", "sKillCamMode", "sKillCamModeNone", "sKillCamModePlayer",
+                "sKillCamModeCinematic", "sHardcore", "sDifficulty", "sLockLevelNameVeryEasy", "sLockLevelNameEasy",
+                "sNormal", "sLockLevelNameHard", "sLockLevelNameVeryHard", "sSaveOnRest", "sSaveOnWait",
+                "sSaveOnTravel", "sTrueIronSights", "sOn", "sOff", "sBrightness", "sHUDOpacity", "sHUDColor",
+                "sPipboyColor", "sGreen", "sBlue", "sAmber", "sWhite", "sTextureSize", "sLarge", "sMedium", "sSmall",
+                "sActorFade", "sItemFade", "sObjectFade", "sGrassFade", "sShadowFade", "sLightFade", "sSpecularityFade",
+                "sObjectLODFade", "sTreeLODFade", "sCrosshair", "sDialogSubtitles", "sGeneralSubtitles",
+                "sMasterVolume", "sMusicVolume", "sFootstepsVolume", "sVoiceVolume", "sEffectsVolume", "sRadioVolume",
+                "sCameraPitch", "sMouseSensitivity", "sDisableXBoxController", "sRumble" })
+            EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
+    }
+
     TEST(FalloutSettingText, the_words_of_the_data_page_have_the_lengths_the_executables_give_them)
     {
         // Read from the default texts of FalloutNV.exe and Fallout3.exe (the same in both): the length of each, and
