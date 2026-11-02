@@ -588,6 +588,52 @@ namespace
         EXPECT_FLOAT_EQ(menu.number(*text, "alpha"), 100.f);
     }
 
+    TEST(FalloutOpenMenuListTest, a_row_that_is_there_takes_new_traits_and_the_list_stays_scrolled)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(5));
+        Tile* bar = menu.find("lb_scrollbar");
+        list.select(4, true);
+        const float scrolled = menu.number(*bar, "_current_value");
+        ASSERT_GT(scrolled, 0.f);
+
+        list.updateRow(2, { { "T.string", Value::fromText("Changed") }, { "listindex", Value(7.f) } });
+        EXPECT_EQ(menu.text(*menu.find(*list.item(2), "T"), "string"), "Changed");
+        EXPECT_FLOAT_EQ(menu.number(*list.item(2), "listindex"), 7.f);
+        // the other rows are as they were and the rows are not made again
+        EXPECT_EQ(list.rowCount(), 5);
+        EXPECT_EQ(menu.text(*menu.find(*list.item(1), "T"), "string"), "Row 2");
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), scrolled);
+        EXPECT_EQ(list.selected(), 4);
+        // a row that is not there is left alone
+        list.updateRow(9, { { "T.string", Value::fromText("Nowhere") } });
+        EXPECT_EQ(list.rowCount(), 5);
+    }
+
+    TEST(FalloutOpenMenuListTest, a_row_whose_text_changes_height_is_measured_again_and_the_rows_below_it_move)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(4));
+        ASSERT_FLOAT_EQ(menu.number(*list.item(1), "height"), 40.f);
+        ASSERT_FLOAT_EQ(menu.number(*list.item(2), "_y"), 80.f);
+
+        list.updateRow(1, { { "string", Value::fromText("Two\nlines") } });
+        // 30 for each line of the test font and 10 of room
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "height"), 70.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(2), "_y"), 110.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(3), "_y"), 150.f);
+        // and the other way
+        list.updateRow(1, { { "string", Value::fromText("One") } });
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "height"), 40.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(3), "_y"), 120.f);
+    }
+
     TEST(FalloutOpenMenuListTest, the_highlight_goes_to_the_row_the_pointer_is_on_and_follows_the_scrolling)
     {
         Fixture f;

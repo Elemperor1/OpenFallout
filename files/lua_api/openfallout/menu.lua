@@ -101,16 +101,11 @@
 -- @return #boolean
 
 ---
--- Whether the console is open. It takes the keys that are typed, and menu scripts are given those keys too, so a script
--- that acts on keys leaves them alone while it is open
--- @function [parent=#menu] consoleOpen
--- @return #boolean
-
----
--- Whether a dialog of the engine's own windows is open over the menu, such as the one that tells that a save or a load
--- failed. It takes the keys and the buttons of the pad, and menu scripts are given those too, so a script that acts on
--- them leaves them alone while it is open
--- @function [parent=#menu] dialogOpen
+-- Whether the console, or a dialog of the engine's own windows such as the one that tells that a save or a load failed,
+-- had the key or the button of the pad that the handler is being given: they take those, and menu scripts are given
+-- them too (the key that closes the console or the dialog as well), so a script that acts on keys leaves them alone
+-- when this is true. Ask it in the handler of the key or of the button; outside one it is false
+-- @function [parent=#menu] inputTaken
 -- @return #boolean
 
 ---
@@ -121,5 +116,28 @@
 -- Whether the engine's window for the settings is open
 -- @function [parent=#menu] settingsOpen
 -- @return #boolean
+
+---
+-- What a setting that the game's own settings screens write is now: a number, or a boolean for a switch. The names are:
+-- `masterVolume`, `musicVolume`, `footstepsVolume`, `voiceVolume`, `effectsVolume` (0 to 1), `gamma` (the video's
+-- gamma), `mouseSensitivity` (the camera's), `invertYAxis`, `crosshair` and `subtitles` (booleans). Any other name is an error.
+-- @function [parent=#menu] getOption
+-- @param #string name
+-- @return #any
+
+---
+-- Change one of those settings (a number, or a boolean for a switch); the engine takes the change at once
+-- @function [parent=#menu] setOption
+-- @param #string name
+-- @param #any value
+
+---
+-- Whether a game controller is plugged in
+-- @function [parent=#menu] controllerConnected
+-- @return #boolean
+
+---
+-- Write the settings to the user's file (the screens of the settings do it when they are left)
+-- @function [parent=#menu] saveOptions
 
 return nil

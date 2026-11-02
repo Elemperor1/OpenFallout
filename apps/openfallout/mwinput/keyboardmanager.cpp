@@ -35,6 +35,10 @@ namespace OFInput
         // This assumes that SDL_TextInput events always come *after* the key event
         // (which is somewhat reasonable, and hopefully true for all SDL platforms)
         auto kc = SDLUtil::sdlKeyToMyGUI(arg.keysym.sym);
+        // Who has the key is taken now: what the key does (Escape closes the console or a dialog) comes before the
+        // scripts are given it
+        const bool taken = OFBase::Environment::get().getWindowManager()->isConsoleMode()
+            || MyGUI::InputManager::getInstance().isModalAny();
         if (mBindingsManager->getKeyBinding(A_Console) == arg.keysym.scancode
             // HACK: allow upper case variant of console keybinding.
             && (arg.keysym.mod & KMOD_SHIFT) == 0 && OFBase::Environment::get().getWindowManager()->isConsoleMode())
@@ -64,7 +68,7 @@ namespace OFInput
         if (!consumed || kc == MyGUI::KeyCode::Tab)
         {
             OFBase::Environment::get().getLuaManager()->inputEvent(
-                { OFBase::LuaManager::InputEvent::KeyPressed, arg.keysym });
+                { OFBase::LuaManager::InputEvent::KeyPressed, arg.keysym, taken });
         }
 
         input->setJoystickLastUsed(false);

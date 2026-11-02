@@ -6,9 +6,13 @@
 --
 -- The list, as the code of the game builds it (with the conditions of the pause menu): Continue (the same as Escape: there
 -- is no item for resuming), Save (when the game can be saved), Load (when there is a save), Settings, Quit (which asks).
--- Settings opens the engine's own window until the game's settings screens are drawn from the file; the Help item of the
--- game, and the item that goes to the title screen, are not here (the title screen is the engine's too, because no
--- content, and so no words of the game, is loaded there).
+-- Settings opens the game's own settings screens: the list of the four submenus (Gameplay, Display, Audio, Controls) and
+-- the options of the one that is picked, toggles and meters (falloutsettingsitems.lua has the items). A change is made
+-- at once, as in the game, and written to the user's file when the screens are left. The list of the submenus ends with a
+-- row of the port's own that opens the engine's window of settings, which has what the game's screens do not (the size
+-- and the mode of the window, the shaders, the mods). The Help item of the game, and the item that goes to the title
+-- screen, are not here (the title screen is the engine's too, because no content, and so no words of the game, is loaded
+-- there).
 --
 -- The script says every frame that it draws the menu (claimMainMenu), so that a script that fails gives it back to the
 -- engine, and keeps Escape and the B button for itself in a screen of the menu below the list (they go back one step);
@@ -18,7 +22,9 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local engine = require('openfallout.menu')
+local storage = require('openfallout.storage')
 local menuModule = require('scripts.omw.falloutmenu')
+local settingsItems = require('scripts.omw.falloutsettingsitems')
 
 local FILE = 'options/start_menu.xml'
 -- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
@@ -26,19 +32,30 @@ local FILE = 'options/start_menu.xml'
 -- console is still seen over the menu (the layer of the message boxes is above the console's)
 local LAYER = 'Settings'
 local MAX_SAVES = 1000
+-- The row of the port that opens the engine's own window of settings (the game has no such row)
+local ENGINE_WINDOW = 'Engine'
 -- The room that the file gives the question and its choices: three rows of the height of an item, at the list's side
 local CONFIRM_ROWS = 3
 
 local shown = nil
 local backdrop = nil
 local lists = {}
--- What is on show: 'list' (the main menu), 'save', 'load' or 'confirm'
+-- What is on show: 'list' (the main menu), 'save', 'load', 'confirm', 'settings' (the submenus) or 'options' (the items of
+-- one submenu)
 local screen = 'list'
 -- The screen the question was asked from, and what it asks
 local confirmFrom = 'list'
 local items = {}
 local saveRows = {}
 local lastSaveRow = 1
+-- The submenu that is shown, the items of its rows (the rows are in the order of the items) and whether one was changed
+-- since the settings were written
+local optionGroup = nil
+local optionItems = {}
+local optionsChanged = false
+local lastGroupRow = 1
+-- What the player picked for the items that the engine has no setting for (the permanent storage keeps it)
+local optionStore = nil
 -- A click is carried out in the next frame, where the engine's calls for saving and loading are allowed
 local pending = nil
 -- The script cannot draw the menu (the file is not there): the engine's own menu is used and nothing is claimed
@@ -62,8 +79,17 @@ local function fade(name, on)
     if name ~= 'main_back_button' then shown:set(name, '_enabled', on and 1 or 0) end
 end
 
+-- The settings are written to the user's file once, when the screens of the settings are left
+local function saveOptions()
+    if optionsChanged then
+        -- kept for the next time the screens are left when the engine could not write them
+        optionsChanged = not pcall(engine.saveOptions)
+    end
+end
+
 local function closeShown()
     pending = nil
+    saveOptions()
     if shown then
         shown:close()
         shown = nil
@@ -74,6 +100,7 @@ local function closeShown()
     end
     lists = {}
     screen, items, saveRows, panelFor = 'list', {}, {}, nil
+    optionGroup, optionItems = nil, {}
 end
 
 local function release()
@@ -135,8 +162,10 @@ local function showScreen(name)
         fade('main_container', name == 'list')
         fade('saveload_container', name == 'save' or name == 'load')
         fade('confirm_container', name == 'confirm')
-        -- the question has its own way out (its last choice), so Back is only in the lists of saves
-        fade('main_back_button', name == 'save' or name == 'load')
+        fade('settings_container', name == 'settings')
+        fade('options_container', name == 'options')
+        -- the question has its own way out (its last choice), so Back is only in the lists of saves and of the settings
+        fade('main_back_button', name == 'save' or name == 'load' or name == 'settings' or name == 'options')
     end)
 end
 
@@ -151,7 +180,7 @@ local function hidePanel()
     end)
 end
 
-local showList, showSaves, ask
+local showList, showSaves, ask, showSettings, showOptions
 
 -- The main list, with the items that the state of the game allows
 showList = function()
@@ -163,7 +192,7 @@ showList = function()
     if #collectSaves(true) > 0 then
         items[#items + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
     end
-    items[#items + 1] = { label = word('sSettings'), action = function() engine.openSettings() end }
+    items[#items + 1] = { label = word('sSettings'), action = function() showSettings() end }
     items[#items + 1] = {
         label = word('sQuit'),
         action = function()
@@ -242,13 +271,133 @@ ask = function(question, from, choices)
     end)
 end
 
--- Go back one step: from a question to the screen it came from, from a list of saves to the main list
+-- The storage of the items that have no setting in the engine
+local function store()
+    if optionStore == nil then
+        local ok, section = pcall(storage.playerSection, 'FalloutOptions')
+        optionStore = ok and section or false
+    end
+    return optionStore or nil
+end
+
+-- The traits of a row that change with its value: the word of a toggle (the number of the position of a meter) and which
+-- arrows can be used
+local function optionTraits(item, index)
+    local traits = { user2 = settingsItems.arrows(item, index) }
+    if item.values then
+        traits.user0 = word(item.values[index + 1])
+    else
+        traits.user0 = index
+    end
+    return traits
+end
+
+-- The submenus: Gameplay, Display, Audio and Controls, and the row of the port that opens the engine's own window of
+-- settings
+showSettings = function()
+    saveOptions()
+    optionGroup, optionItems = nil, {}
+    items = {}
+    local rows = {}
+    for _, group in ipairs(settingsItems.groups) do
+        items[#items + 1] = { label = word(group.word), group = group }
+        rows[#rows + 1] = { string = word(group.word), user0 = 0 }
+    end
+    items[#items + 1] = { label = ENGINE_WINDOW, action = function() engine.openSettings() end }
+    rows[#rows + 1] = { string = ENGINE_WINDOW, user0 = 0 }
+    shown:batch(function()
+        shown:set('settings_container', '_number_of_visible_items', #rows)
+        lists.settings.rows(rows)
+        showScreen('settings')
+        lists.settings.select(math.max(1, math.min(lastGroupRow, #rows)), true)
+    end)
+end
+
+-- The items of a submenu, as toggles and meters in the container of the options; `keepRow` is the row to light
+showOptions = function(group, keepRow)
+    optionGroup = group
+    optionItems = settingsItems.visible(group, engine.controllerConnected())
+    local rows = {}
+    for index, item in ipairs(optionItems) do
+        local position = settingsItems.read(item, engine, store())
+        local row = optionTraits(item, position)
+        row.string = word(item.word)
+        if item.values then
+            row._template = 'lb_toggle_template'
+        else
+            row._template = 'lb_meter_template'
+            row.user3 = item.count - 1
+        end
+        rows[index] = row
+    end
+    shown:batch(function()
+        -- the file keeps where the centre of the values is for each submenu (the code of the game copies it to `_center_x`)
+        shown:io('_center_x', shown.menu:getNumber(shown.menu:root(), group.center) or 360)
+        lists.options.rows(rows)
+        showScreen('options')
+        lists.options.select(math.max(1, math.min(keepRow or 1, #rows)), true)
+    end)
+end
+
+-- Put the item of a row at a position, as the game's code does when the row changes (the engine takes it at once)
+local function setOption(row, position)
+    local item = optionItems[row]
+    if not item then return end
+    position = settingsItems.write(item, position, engine, store())
+    optionsChanged = true
+    lists.options.update(row, optionTraits(item, position))
+end
+
+-- A step to the left or the right of the row that is lit (the arrows do not go past the first and the last position),
+-- or for `wrap` from the last back to the first (a toggle that is clicked on its value)
+local function stepOption(row, step, wrap)
+    local item = optionItems[row]
+    if not item then return end
+    local position = settingsItems.read(item, engine, store()) + step
+    if wrap and position >= item.count then position = 0 end
+    setOption(row, position)
+end
+
+-- What was clicked in a row of the options: an arrow, the value of a toggle, or the bar of a meter (which is set to the
+-- position the pointer is at)
+local function optionClick(row, tile)
+    local item = optionItems[row]
+    if not item then return end
+    local menu = shown.menu
+    local target = tile
+    while target do
+        local name = menu:name(target)
+        if name == 'lb_toggle_left' or name == 'lb_meter_left' then
+            return stepOption(row, -1)
+        elseif name == 'lb_toggle_right' or name == 'lb_meter_right' then
+            return stepOption(row, 1)
+        elseif name == 'lb_toggle_value' then
+            return stepOption(row, 1, true)
+        elseif name == 'lb_meter_hotrect' then
+            local rect, pointer = shown:rect(target), shown:pointerAt()
+            if rect and pointer and rect.width > 0 then
+                local fraction = math.max(0, math.min(1, (pointer.x - rect.x) / rect.width))
+                return setOption(row, math.floor(fraction * (item.count - 1) + 0.5))
+            end
+            return
+        end
+        target = menu:parent(target)
+    end
+end
+
+-- Go back one step: from a question to the screen it came from, from a list of saves to the main list, from the options
+-- to the submenus and from those to the main list
 local function back()
     -- what was picked and not carried out yet (it is, in the next frame) is given up
     pending = nil
     if screen == 'confirm' then
         if confirmFrom == 'list' then showList() else showSaves(confirmFrom, lastSaveRow) end
     elseif screen == 'save' or screen == 'load' then
+        showList()
+    elseif screen == 'options' then
+        showSettings()
+    elseif screen == 'settings' then
+        saveOptions()
         showList()
     end
 end
@@ -290,7 +439,13 @@ end
 local function pickItem(row)
     local item = items[row]
     if not item then return end
-    -- carried out in the next frame: the engine's calls that save and load are only allowed there
+    -- a submenu is shown at once; the rest is carried out in the next frame: the engine's calls that save and load are
+    -- only allowed there
+    if item.group then
+        lastGroupRow = row
+        showOptions(item.group)
+        return
+    end
     pending = item.action
 end
 
@@ -335,8 +490,10 @@ local function open()
         main = opened:list('main_container', 'lb_item_template'),
         saves = opened:list('saveload_container', 'lb_saveload_template'),
         confirm = opened:list('confirm_container', 'lb_item_template'),
+        settings = opened:list('settings_container', 'lb_item_template'),
+        options = opened:list('options_container', 'lb_toggle_template'),
     }
-    if not (made and made.main and made.saves and made.confirm) then
+    if not (made and made.main and made.saves and made.confirm and made.settings and made.options) then
         if opened then
             opened:close()
             print('start menu: the file ' .. FILE .. ' does not have what the menu needs; the engine\'s own menu is used')
@@ -348,10 +505,15 @@ local function open()
     shown, backdrop, lists = opened, dark, made
     lists.main.onClick(pickItem)
     lists.confirm.onClick(pickItem)
+    lists.settings.onClick(pickItem)
+    lists.options.onClick(optionClick)
     lists.saves.onClick(pickSave)
     shown:onClick('main_back_button', back)
     shown:batch(function()
         shown:set('main_back_button', 'string', word('sBack'))
+        -- The Defaults button of the settings (the file shows it with the options) resets the bindings of the controls,
+        -- which are not drawn yet, so it is left out: the file's own "additional visibility check" is what says it
+        shown:set('main_defaults_button', 'user0', 0)
     end)
     showList()
     return true
@@ -359,9 +521,9 @@ end
 
 -- A message box that is open (one that opened before the menu did) has the keys and the buttons of the pad, and so has the
 -- console and a dialog of the engine's own windows (a failed save or load): the keys that are typed in them reach the
--- menu's script as well
+-- menu's script as well, and so does the key that closes one (the engine says who had the key or the button when it came)
 local function inputTaken()
-    if engine.consoleOpen() or engine.dialogOpen() then return true end
+    if engine.inputTaken() then return true end
     local box = core.messageBox
     if box == nil then return false end
     local ok, current = pcall(box.current)
@@ -372,7 +534,8 @@ local function onKey(key)
     if not shown or inputTaken() then return end
     local code = key.code
     local KEY = input.KEY
-    local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm or lists.saves
+    local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm
+        or screen == 'settings' and lists.settings or screen == 'options' and lists.options or lists.saves
     if code == KEY.Escape then
         -- Escape closes the menu from the list (the engine does that); in a screen below it goes back
         if screen ~= 'list' then back() end
@@ -384,6 +547,16 @@ local function onKey(key)
         local step = code == KEY.UpArrow and -1 or 1
         if at == 0 then at = step > 0 and 0 or count + 1 end
         list.select(math.max(1, math.min(count, at + step)), true)
+        return
+    end
+    if screen == 'options' then
+        -- the lit row changes with the arrows to the sides (a toggle goes round with Enter)
+        local at = list.selected()
+        if code == KEY.LeftArrow or code == KEY.RightArrow then
+            if at > 0 then stepOption(at, code == KEY.LeftArrow and -1 or 1) end
+        elseif code == KEY.Enter or code == KEY.Space then
+            if at > 0 and optionItems[at] and optionItems[at].values then stepOption(at, 1, true) end
+        end
         return
     end
     if code == KEY.Enter or code == KEY.Space then
@@ -402,6 +575,18 @@ local function onPad(button)
         onKey({ code = input.KEY.UpArrow })
     elseif button == PAD.DPadDown then
         onKey({ code = input.KEY.DownArrow })
+    elseif button == PAD.DPadLeft then
+        onKey({ code = input.KEY.LeftArrow })
+    elseif button == PAD.DPadRight then
+        onKey({ code = input.KEY.RightArrow })
+    elseif button == PAD.LeftShoulder or button == PAD.RightShoulder then
+        -- a meter jumps a fifth of its length (the file's jump value; a toggle has none)
+        local at = screen == 'options' and lists.options.selected() or 0
+        local item = at > 0 and optionItems[at] or nil
+        if item and not item.values then
+            local jump = math.max(1, math.floor((item.count - 1) / 5 + 0.5))
+            stepOption(at, button == PAD.LeftShoulder and -jump or jump)
+        end
     elseif button == PAD.A then
         onKey({ code = input.KEY.Enter })
     elseif button == PAD.B then

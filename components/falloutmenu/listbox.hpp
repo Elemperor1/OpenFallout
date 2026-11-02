@@ -24,6 +24,9 @@ namespace FalloutMenu
         /// trait named `Tile.trait` is set on the tile of that name inside the row, and `_template` (a text) names
         /// another template for that row
         void setRows(const std::vector<std::map<std::string, Value>>& rows);
+        /// Set traits on a row that is there (a value that changed: a toggle, a meter), without making the rows again:
+        /// the scrolling of the list stays where it is. The traits are named as for `setRows`.
+        void updateRow(int row, const std::map<std::string, Value>& traits);
         int rowCount() const { return static_cast<int>(mItems.size()); }
         /// The row that is picked out (the one the pointer was last on, or the screen picked), -1 for none
         int selected() const { return mSelected; }
@@ -40,6 +43,7 @@ namespace FalloutMenu
     private:
         Tile* list();
         void reveal(int row);
+        void setTraits(Tile& item, const std::map<std::string, Value>& traits);
 
         OpenMenu& mOpen;
         int mList;

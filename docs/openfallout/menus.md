@@ -348,18 +348,58 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   shows the name, the level and the time played of the save that is lit. Writing over a save and loading one ask first.
   The save's picture, its version line, deleting a save, and the sorting the game uses (not read) are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
-  `menu.openSettings`, `menu.settingsOpen`, `menu.consoleOpen`, `menu.dialogOpen` (`openfallout.menu`). While the console, a
+  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
-  buttons of the pad first) is open the script leaves the keys and the buttons of the pad alone (the keys typed in the
-  console reach the menu's scripts as well). The script says every frame that it draws the menu; while
-  it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
+  buttons of the pad first) has the input, the script leaves the keys and the buttons of the pad alone: the keys typed in
+  the console reach the menu's scripts as well, and so does the key that closes it, so the engine takes who had the key or
+  the button when it came, before it acts on it (`inputTaken` in the handler). The script says every frame that it draws
+  the menu; while it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
   back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
-  list the engine closes the menu with them. Settings opens the engine's own window until the settings screens are drawn
-  from the file (that needs the four submenus read: ranges, defaults and grouping were not found in round 12V).
+  list the engine closes the menu with them. Settings opens the game's own settings screens (below).
 - Not read yet, so estimated: where the question's container is (the file leaves its place to the code: it is put at the
   list's side, in the middle of the window's height), which tile is lit first (the first row), and the format of the time
   played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
   picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
+
+### The settings screens
+
+Settings in the pause menu shows `settings_container` (the four submenus, as the game's list does) and, for the one that is
+picked, `options_container` (nine rows at a time, scrolled) with a toggle or a meter for each item, from the templates
+`lb_toggle_template` and `lb_meter_template` of the file (a row names its template with `_template`; the code of the game
+gives them their value: `user0` is the word of a toggle or the position of a meter, `user3` the number of positions, and
+`user2` which of the two arrows can be used; the centre of the values is `user1` to `user4` of the menu, one for each
+submenu). `falloutsettingsitems.lua` holds the items. What the code of the game builds, read in rounds 12W, 12Y and 12Z
+(`FalloutNV.exe`): the items of each submenu in order, the kind (a toggle with 2 to 5 words, a meter of 16 positions, 26 for
+the volumes), the words of a toggle (built from the last to the first, so index 0 is the last word built), what each index
+stores, and the start of each item (the compiled default of its INI setting). A change is made the moment a row changes
+(the game's handlers apply when their flag is set, which they are when a row changes), so the engine takes it at once
+(`menu.setOption`, which tells the parts of the engine that read settings) and the settings are written to the user's file
+once, when the screens are left (`menu.saveOptions`).
+
+- Gameplay: Kill Cam (None, Player, Cinematic), Hardcore, Difficulty (Very Easy to Very Hard, normal is the third),
+  Save on Rest, Save on Wait, Save on Travel, True Iron Sights. Display: Brightness, HUD Opacity, HUD Color and Pip-Boy
+  Color (Green, Blue, Amber, White), Texture Size (Large, Medium, Small), the nine fades (actor, item, object, grass,
+  shadow, light, specularity, object LOD, tree LOD), Crosshair, Dialog and General Subtitles. Audio: master, music,
+  footsteps, voice, effects and radio volume. Controls: Camera Pitch, Mouse Sensitivity, and the two items of the pad
+  (Controller, Rumble) only while a pad is plugged in (`menu.controllerConnected()`, as the game leaves them out).
+- Which of them the engine takes: the five volumes (the sound settings), Brightness (the video's gamma: the game's meter
+  is a straight line from `fGammaMin` 1.4 at the first position to `fGammaMax` 0.6 at the last, and the engine's gamma is
+  the inverse of the game's), Mouse Sensitivity (the camera's sensitivity: the game's meter goes from 0.0005 to 0.0100 and
+  starts at 0.002, the engine's value is the game's over what the game starts from, so 1 is where the game starts),
+  Camera Pitch (the invert-Y setting), Crosshair, and Dialog Subtitles (the subtitles setting; the engine has one setting
+  for both kinds). The other items are kept (in the permanent storage, `FalloutOptions`, so the screens show what was
+  picked) and nothing in the engine reads them yet: Kill Cam, Hardcore, Difficulty, the three saves, True Iron Sights, HUD
+  Opacity, the two colours, Texture Size, the nine fades, General Subtitles, Radio Volume, and the two items of the pad.
+- The list of submenus ends with a row of the port's own, "Engine", that opens the engine's window of settings (the size
+  and the mode of the window, the shaders, the mods): the game's screens do not have those. The Defaults button (it resets
+  the bindings of the controls and does nothing in the other submenus, round 12W) is not shown, because the rows of the
+  controls (rebinding) are not drawn yet. The rows that the game fills with the key or the button bound to a control, and
+  the rebinding itself, are not here.
+- Not read, so estimated: which row is lit first (the first), what a click on the value of a toggle does (it goes to the
+  next word and, after the last, to the first; the arrows stop at the ends), where on a meter a click sets it (the
+  position under the pointer), the pad's LB and RB (a fifth of a meter), whether the Hardcore row can be changed in a
+  running game (the game disables it under conditions that were not decoded), and what the Fallout 3 screens differ in
+  (not checked; the same file is drawn). Nothing was seen in the running game.
 
 ## The words of the labels
 

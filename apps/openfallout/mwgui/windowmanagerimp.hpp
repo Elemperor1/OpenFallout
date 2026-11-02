@@ -379,6 +379,8 @@ namespace OFGui
         void toggleDebugWindow() override;
         void togglePostProcessorHud() override;
         void toggleSettingsWindow() override;
+        void applyChangedSettings() override;
+        void saveSettings() override;
         void setMainMenuDrawnByLua(bool drawn, bool escape) override;
         bool isMainMenuDrawnByLua() const override;
         bool isMainMenuEscapeLua() const override;
