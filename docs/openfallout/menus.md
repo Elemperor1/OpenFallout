@@ -130,7 +130,7 @@ faces, the name of the place, the date) and the `space` and `type` of each place
 
 ### Making the character
 
-`falloutchargen.lua` draws the screens that the engine's character making (`core.chargen`) opens, one after the other. The
+`falloutchargen.lua` draws the screens that the engine's character-making (`core.chargen`) opens, one after the other. The
 name is entered on `dialog/texteditmenu.xml` (the prompt, the name with a cursor, OK); the points of S.P.E.C.I.A.L. and the
 tags of the skills are on `chargen/char_gen_menu.xml`, whose list takes the file's two row templates: `CGM_AttributeTemplate`
 (the name, the value and the two arrows, which show by the file's own rules: the left one while the value is above its least,
