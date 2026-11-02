@@ -21,6 +21,9 @@ local engine = require('openfallout.menu')
 local menuModule = require('scripts.omw.falloutmenu')
 
 local FILE = 'options/start_menu.xml'
+-- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
+-- over all of that, as the message boxes are
+local LAYER = 'Modal'
 local MAX_SAVES = 1000
 -- The room that the file gives the question and its choices: three rows of the height of an item, at the list's side
 local CONFIRM_ROWS = 3
@@ -309,7 +312,7 @@ local function open()
     -- The paused game shows through the menu, darkened a little: the game draws the pause menu over a picture of its own.
     -- It is made first, so that the element of the menu is above it
     local dark = ui.create {
-        layer = 'Windows',
+        layer = LAYER,
         type = ui.TYPE.Image,
         props = {
             relativeSize = util.vector2(1, 1),
@@ -319,7 +322,7 @@ local function open()
             ignorePointerEvents = true,
         },
     }
-    local opened = menuModule.open(FILE, { layer = 'Windows' })
+    local opened = menuModule.open(FILE, { layer = LAYER })
     local made = opened and {
         main = opened:list('main_container', 'lb_item_template'),
         saves = opened:list('saveload_container', 'lb_saveload_template'),
@@ -371,6 +374,24 @@ local function onKey(key)
     end
 end
 
+-- The buttons of the pad: the engine does not give them to its own menu while the script draws this one, and takes B only
+-- in the list (to close the menu), so the pad moves the lit row, picks it, goes back and closes the menu here
+local function onPad(button)
+    if not shown then return end
+    local PAD = input.CONTROLLER_BUTTON
+    if button == PAD.DPadUp then
+        onKey({ code = input.KEY.UpArrow })
+    elseif button == PAD.DPadDown then
+        onKey({ code = input.KEY.DownArrow })
+    elseif button == PAD.A then
+        onKey({ code = input.KEY.Enter })
+    elseif button == PAD.B then
+        if screen ~= 'list' then back() end
+    elseif button == PAD.Start then
+        pending = function() engine.resume() end
+    end
+end
+
 return {
     engineHandlers = {
         onFrame = function()
@@ -405,6 +426,7 @@ return {
             end
         end,
         onKeyPress = onKey,
+        onControllerButtonPress = onPad,
         onStateChanged = function()
             closeShown()
             release()

@@ -292,6 +292,20 @@ namespace OFGui
             const bool drawnByLua = OFBase::Environment::get().getWindowManager()->isMainMenuDrawnByLua()
                 && OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_Running;
             mButtonBox->setVisible(!drawnByLua);
+            // A button that was lit when the script took over would still answer Enter and Space: the keys are the
+            // script's now
+            if (drawnByLua)
+            {
+                MyGUI::Widget* focus = MyGUI::InputManager::getInstance().getKeyFocusWidget();
+                for (MyGUI::Widget* widget = focus; widget != nullptr; widget = widget->getParent())
+                {
+                    if (widget == mButtonBox)
+                    {
+                        MyGUI::InputManager::getInstance().resetKeyFocusWidget();
+                        break;
+                    }
+                }
+            }
         }
     }
 
