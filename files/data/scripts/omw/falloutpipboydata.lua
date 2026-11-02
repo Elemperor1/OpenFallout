@@ -342,7 +342,10 @@ end
 
 local function fillHeadline()
     shown:batch(function()
-        shown:set('MM_Headline_LocationInfo', 'string', info and info.location or '')
+        -- The engine names the place the player is in (a cell without a name has its worldspace's); the worldspace of the
+        -- map stands in when it gives none
+        local place = info and ((info.location ~= '' and info.location) or info.world) or ''
+        shown:set('MM_Headline_LocationInfo', 'string', place or '')
         shown:set('MM_Headline_TimeDateInfo', 'string', module.dateText(info))
     end)
 end
