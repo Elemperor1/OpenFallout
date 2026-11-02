@@ -66,6 +66,9 @@ jobs:
         install: 'no'
         key: ${{ inputs.image }}-${{ inputs.build-type }}
         max-size: 1000M
+        # Only master and release builds store caches, so that pull request runs
+        # do not push the caches pull requests start from out of the 10 GB budget.
+        save: ${{ inputs.build-type == 'Release' || github.ref == 'refs/heads/master' }}
 
     - name: Fingerprint build environment
       id: build-env
@@ -95,7 +98,7 @@ jobs:
       run: python3 CI/build_cache.py snapshot
 
     - name: Save incremental build
-      if: steps.build-cache.outputs.cache-hit != 'true'
+      if: steps.build-cache.outputs.cache-hit != 'true' && (inputs.build-type == 'Release' || github.ref == 'refs/heads/master')
       uses: actions/cache/save@v5
       with:
         path: |

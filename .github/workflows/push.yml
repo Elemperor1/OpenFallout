@@ -12,17 +12,44 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 # PR branches are tested by pull_request; avoid rebuilding each commit twice.
+# A newer commit cancels the run of a pull request, but never a run on master:
+# only master runs store the caches that pull requests start from, and a cancelled
+# run stores nothing.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   BUILD_TYPE: RelWithDebInfo
 
 jobs:
+  # Documentation-only changes skip the platform builds.  The job fails open to a full
+  # build: a problem in it leaves "code" empty, which the jobs below read as "build".
+  Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Test the rule for skipping builds
+      run: python3 -m unittest discover -s CI -p test_changed_paths.py -v
+
+    - name: Decide whether the platform builds are needed
+      id: classify
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: python3 CI/changed_paths.py --event "$EVENT" --base "$BASE" --github-output "$GITHUB_OUTPUT"
+
   Ubuntu:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
+    needs: Changes
+    if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -50,6 +77,9 @@ jobs:
       with:
         key: ubuntu-${{ runner.arch }}-${{ env.BUILD_TYPE }}
         max-size: 1000M
+        # Only master builds store caches, so that pull request runs do not push
+        # the caches pull requests start from out of the 10 GB budget.
+        save: ${{ github.ref == 'refs/heads/master' }}
 
     - name: Fingerprint build environment
       id: build-env
@@ -97,7 +127,7 @@ jobs:
       run: python3 CI/build_cache.py snapshot
 
     - name: Save incremental build
-      if: steps.build-cache.outputs.cache-hit != 'true'
+      if: steps.build-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       uses: actions/cache/save@v5
       with:
         path: build
@@ -127,7 +157,8 @@ jobs:
     #     name: build_artifact.7z
 
   MacOS:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
+    needs: Changes
+    if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     strategy:
       fail-fast: true
       matrix:
@@ -139,7 +170,8 @@ jobs:
       image: ${{ matrix.args.image }}
 
   Windows:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.validate-release }}
+    needs: Changes
+    if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     strategy:
       fail-fast: true
       matrix:
