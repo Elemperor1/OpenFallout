@@ -70,7 +70,10 @@ namespace FalloutMenu
         /// How far the pen moves over for a character
         float advance(unsigned char c) const;
 
-        /// The width a line of text takes
+        /// The width a line of text takes. The text is UTF-8 (what the engine gives for the strings of the games); the
+        /// font is indexed by the byte of the code page the games were made for (Windows-1252), so a character is the
+        /// byte it has there, one that the code page lacks is a question mark, and bytes that are not UTF-8 are taken
+        /// as they are.
         float lineWidth(std::string_view text) const;
 
         /// Lay a text out: broken into lines at the new lines and, when `wrapWidth` is more than zero, at the spaces
@@ -80,6 +83,8 @@ namespace FalloutMenu
         Layout layout(std::string_view text, float wrapWidth = 0, int justify = 1, float blockWidth = 0) const;
 
     private:
+        float bytesWidth(std::string_view bytes) const;
+
         float mSize = 0;
         float mBaseline = 0;
         std::string mTextureName;

@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <utility>
 
 namespace FalloutMenu
 {
@@ -12,6 +14,93 @@ namespace FalloutMenu
         constexpr std::size_t glyphBytes = 56;
         constexpr std::size_t glyphCount = 256;
         constexpr std::size_t headerBytes = 296;
+
+        // The byte of Windows-1252 for a character of Unicode, or '?'
+        unsigned char codePageByte(std::uint32_t code)
+        {
+            if (code < 0x100)
+                return static_cast<unsigned char>(code);
+            static constexpr std::pair<std::uint32_t, unsigned char> special[] = {
+                { 0x20AC, 0x80 },
+                { 0x201A, 0x82 },
+                { 0x0192, 0x83 },
+                { 0x201E, 0x84 },
+                { 0x2026, 0x85 },
+                { 0x2020, 0x86 },
+                { 0x2021, 0x87 },
+                { 0x02C6, 0x88 },
+                { 0x2030, 0x89 },
+                { 0x0160, 0x8A },
+                { 0x2039, 0x8B },
+                { 0x0152, 0x8C },
+                { 0x017D, 0x8E },
+                { 0x2018, 0x91 },
+                { 0x2019, 0x92 },
+                { 0x201C, 0x93 },
+                { 0x201D, 0x94 },
+                { 0x2022, 0x95 },
+                { 0x2013, 0x96 },
+                { 0x2014, 0x97 },
+                { 0x02DC, 0x98 },
+                { 0x2122, 0x99 },
+                { 0x0161, 0x9A },
+                { 0x203A, 0x9B },
+                { 0x0153, 0x9C },
+                { 0x017E, 0x9E },
+                { 0x0178, 0x9F },
+            };
+            for (const auto& [unicode, byte] : special)
+                if (unicode == code)
+                    return byte;
+            return '?';
+        }
+
+        // The text as the bytes the font is indexed by: the UTF-8 characters of the text become their bytes of the code
+        // page, and a byte that does not start a UTF-8 character is kept
+        std::string fontBytes(std::string_view text)
+        {
+            std::string out;
+            out.reserve(text.size());
+            for (std::size_t i = 0; i < text.size();)
+            {
+                const unsigned char lead = static_cast<unsigned char>(text[i]);
+                std::size_t length = 1;
+                std::uint32_t code = lead;
+                if (lead >= 0xC2 && lead <= 0xDF)
+                {
+                    length = 2;
+                    code = lead & 0x1Fu;
+                }
+                else if (lead >= 0xE0 && lead <= 0xEF)
+                {
+                    length = 3;
+                    code = lead & 0x0Fu;
+                }
+                else if (lead >= 0xF0 && lead <= 0xF4)
+                {
+                    length = 4;
+                    code = lead & 0x07u;
+                }
+                bool valid = length > 1 && i + length <= text.size();
+                for (std::size_t k = 1; valid && k < length; ++k)
+                {
+                    const unsigned char next = static_cast<unsigned char>(text[i + k]);
+                    valid = (next & 0xC0) == 0x80;
+                    code = (code << 6) | (next & 0x3Fu);
+                }
+                if (valid)
+                {
+                    out.push_back(static_cast<char>(codePageByte(code)));
+                    i += length;
+                }
+                else
+                {
+                    out.push_back(text[i]);
+                    ++i;
+                }
+            }
+            return out;
+        }
 
         float readFloat(std::string_view bytes, std::size_t offset)
         {
@@ -81,16 +170,23 @@ namespace FalloutMenu
         return std::max(0.f, g.mBefore + g.mWidth + g.mAfter);
     }
 
-    float Font::lineWidth(std::string_view text) const
+    float Font::bytesWidth(std::string_view bytes) const
     {
         float width = 0;
-        for (const char c : text)
+        for (const char c : bytes)
             width += advance(static_cast<unsigned char>(c));
         return width;
     }
 
-    Font::Layout Font::layout(std::string_view text, float wrapWidth, int justify, float blockWidth) const
+    float Font::lineWidth(std::string_view text) const
     {
+        return bytesWidth(fontBytes(text));
+    }
+
+    Font::Layout Font::layout(std::string_view utf8, float wrapWidth, int justify, float blockWidth) const
+    {
+        const std::string converted = fontBytes(utf8);
+        const std::string_view text = converted;
         // Break the text into the lines it is shown in
         std::vector<std::string_view> lines;
         std::size_t start = 0;
@@ -141,12 +237,12 @@ namespace FalloutMenu
         // by its justification point (a text's x) and the lines in it agree where the block starts
         blockWidth = std::max({ blockWidth, wrapWidth, 0.f });
         for (const std::string_view line : lines)
-            blockWidth = std::max(blockWidth, lineWidth(line));
+            blockWidth = std::max(blockWidth, bytesWidth(line));
         layout.mWidth = blockWidth;
         layout.mHeight = static_cast<float>(lines.size()) * mSize;
         for (std::size_t row = 0; row < lines.size(); ++row)
         {
-            const float width = lineWidth(lines[row]);
+            const float width = bytesWidth(lines[row]);
             float pen = 0;
             if (justify == 2)
                 pen = (blockWidth - width) / 2;

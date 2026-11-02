@@ -265,6 +265,14 @@ namespace
         EXPECT_FLOAT_EQ(square.designHeight(), 960.f);
     }
 
+    TEST(FalloutMenuEvaluationTest, a_window_taller_than_it_is_wide_is_still_960_high)
+    {
+        Fixture f;
+        Menu& tall = f.open("<menu name=\"M\"/>", 600.f, 1000.f);
+        EXPECT_FLOAT_EQ(tall.designHeight(), 960.f);
+        EXPECT_NEAR(tall.designWidth(), 576.f, 0.01f);
+    }
+
     TEST(FalloutMenuEvaluationTest, the_size_of_a_text_and_of_an_image_follow_from_what_they_show)
     {
         Fixture f;

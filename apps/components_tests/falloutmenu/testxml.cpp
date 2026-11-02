@@ -35,6 +35,16 @@ namespace
         EXPECT_EQ(nodes[0].mChildren[0].mName, "b");
     }
 
+    TEST(FalloutMenuXmlTest, a_slash_inside_an_attribute_without_quotes_is_part_of_the_value)
+    {
+        const std::vector<Xml::Node> nodes = Xml::parse("<include src=prefabs/box.xml/><rect name=a/b>");
+        ASSERT_EQ(nodes.size(), 2u);
+        ASSERT_NE(nodes[0].attribute("src"), nullptr);
+        EXPECT_EQ(*nodes[0].attribute("src"), "prefabs/box.xml");
+        ASSERT_NE(nodes[1].attribute("name"), nullptr);
+        EXPECT_EQ(*nodes[1].attribute("name"), "a/b");
+    }
+
     TEST(FalloutMenuXmlTest, a_comment_between_the_attributes_of_a_tag_is_skipped)
     {
         const std::vector<Xml::Node> nodes

@@ -388,18 +388,34 @@ function render()
     end
 end
 
--- The cards of the thing the pointer (or the pick) is on
+-- The cards of the thing the pointer (or the pick) is on. Both lists keep their pick, so the cards follow the list
+-- that was moved last (the pointer over a row, a key, or Left and Right to the other list), and stay while none moves.
+local focusSide = nil
 local function updateCards()
     if not shown then
         return
     end
     for name, side in pairs(sides) do
         local row = side.list.selected()
-        if row > 0 and (cardSide ~= name or cardRow ~= row) then
-            cardSide, cardRow = name, row
-            cards.show(shown, side.listed and side.listed[row] or nil)
-            return
+        if row ~= side.lastRow then
+            side.lastRow = row
+            if row > 0 then
+                focusSide = name
+            end
         end
+    end
+    local name = focusSide or activeSide
+    local side = sides[name]
+    local row = side and side.list.selected() or 0
+    if row <= 0 then
+        -- the list that was moved last has no pick (it was emptied): the other one's pick is shown
+        name = name == 'items' and 'container' or 'items'
+        side = sides[name]
+        row = side and side.list.selected() or 0
+    end
+    if row > 0 and (cardSide ~= name or cardRow ~= row) then
+        cardSide, cardRow = name, row
+        cards.show(shown, side.listed and side.listed[row] or nil)
     end
 end
 
@@ -415,6 +431,7 @@ local function pressMenu(code)
     local picked = side.list.selected()
     if code == input.KEY.LeftArrow or code == input.KEY.RightArrow then
         activeSide = activeSide == 'container' and 'items' or 'container'
+        focusSide = activeSide
         local now = sides[activeSide]
         if now.list.count() > 0 and now.list.selected() <= 0 then
             now.list.select(1, true)
@@ -486,6 +503,7 @@ local function sync()
         offset = 1
         selected, selectFocus = 1, false
         activeSide = 'container'
+        focusSide = nil
         openMode()
         render()
     end

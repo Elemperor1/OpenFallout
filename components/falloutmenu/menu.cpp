@@ -43,16 +43,10 @@ namespace FalloutMenu
     {
         if (pixelWidth <= 0 || pixelHeight <= 0)
             return;
-        if (pixelWidth >= pixelHeight)
-        {
-            mDesignHeight = 960;
-            mDesignWidth = 960 * pixelWidth / pixelHeight;
-        }
-        else
-        {
-            mDesignWidth = 1280;
-            mDesignHeight = 1280 * pixelHeight / pixelWidth;
-        }
+        // The design space is 960 high whatever the window is (a window that is taller than it is wide has a design
+        // space that is narrower than 960 wide, as the converter below says)
+        mDesignHeight = 960;
+        mDesignWidth = 960 * pixelWidth / pixelHeight;
         set(*mScreen, "width", mDesignWidth);
         set(*mScreen, "height", mDesignHeight);
         set(*mScreen, "resolutionconverter", 960.f / pixelHeight);

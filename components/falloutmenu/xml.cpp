@@ -162,9 +162,12 @@ namespace FalloutMenu::Xml
                     }
                     else
                     {
-                        // `name=value"`: no opening quote. The value ends at the closing quote or at white space.
+                        // `name=value"`: no opening quote. The value ends at the closing quote, at white space or at
+                        // the
+                        // `/>` that ends the tag (a `/` inside it, as in a path, is part of the value).
                         const std::size_t valueStart = p;
-                        while (p < n && text[p] != '"' && !isSpace(text[p]) && text[p] != '>' && text[p] != '/')
+                        while (p < n && text[p] != '"' && !isSpace(text[p]) && text[p] != '>'
+                            && !(text[p] == '/' && p + 1 < n && text[p + 1] == '>'))
                             ++p;
                         value = std::string(text.substr(valueStart, p - valueStart));
                         if (p < n && text[p] == '"')

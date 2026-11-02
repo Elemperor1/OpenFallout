@@ -94,6 +94,24 @@ namespace
         EXPECT_FLOAT_EQ(font->lineWidth("AB A"), 12.f + 12.f + 6.f + 12.f);
     }
 
+    TEST(FalloutMenuFontTest, a_character_of_utf8_is_one_character_of_the_font_not_one_for_each_of_its_bytes)
+    {
+        std::string bytes = testFont();
+        // The letters of the Windows-1252 code page the games use: e with an acute accent (0xE9), a right single quote
+        // (0x92)
+        putGlyph(bytes, 0xE9, 10.f, 20.f, 1.f, 1.f, 20.f);
+        putGlyph(bytes, 0x92, 4.f, 20.f, 1.f, 1.f, 20.f);
+        const std::optional<Font> font = Font::parse(bytes);
+        ASSERT_TRUE(font);
+        // "e acute" in UTF-8 is 0xC3 0xA9; the quote U+2019 is 0xE2 0x80 0x99
+        EXPECT_FLOAT_EQ(font->lineWidth("A\xC3\xA9"), 12.f + 12.f);
+        EXPECT_FLOAT_EQ(font->lineWidth("\xE2\x80\x99"), 6.f);
+        EXPECT_EQ(font->layout("A\xC3\xA9\xE2\x80\x99").mQuads.size(), 3u);
+        // A character the code page lacks is a question mark, and a byte that is not UTF-8 is kept as it is
+        EXPECT_FLOAT_EQ(font->lineWidth("\xE4\xB8\xAD"), font->advance('?'));
+        EXPECT_FLOAT_EQ(font->lineWidth("\xE9"), 12.f);
+    }
+
     TEST(FalloutMenuFontTest, a_line_is_laid_out_character_by_character_from_the_top_left)
     {
         const std::optional<Font> font = Font::parse(testFont());
