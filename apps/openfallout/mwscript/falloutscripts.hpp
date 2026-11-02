@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -170,6 +171,13 @@ namespace OFScript
 
         /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
         void setContentFiles(std::vector<std::string> files);
+
+        /// Read the default texts of the game's string settings from its executable, which is next to the `Data`
+        /// directory of one of these directories (the plugins hold only the settings that were changed from their
+        /// defaults, and the labels of the screens, the texts of the terminals and the counters of the level-up screen
+        /// are defaults). The executable of the game that is played is read first, then the other one. A game without
+        /// its executable next to the data is left with the port's own words for the labels.
+        void loadExecutableTexts(const std::vector<std::filesystem::path>& dataDirs);
 
         /// A saved game holds what the games keep (the stages of the quests, the variables of scripts, what characters
         /// carry, who is dead ...) as sections, one record each (REC_FOSV), after those of the world. A save that has
@@ -1730,6 +1738,9 @@ namespace OFScript
         std::optional<std::map<std::string, double>> mGameSettingValues;
         /// The settings that are texts, by name (under mDerivedSettingsMutex as well)
         std::optional<std::map<std::string, std::string>> mGameSettingTexts;
+        /// The default texts of the settings that the executables of the games build, by name in lower case (under
+        /// mDerivedSettingsMutex as well)
+        std::map<std::string, std::string> mExecutableTexts;
         /// What the player has open to take things from, under mLootMutex
         std::mutex mLootMutex;
         std::optional<Loot> mLoot;

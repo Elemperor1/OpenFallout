@@ -407,9 +407,23 @@ The menu files take the words of their labels from game settings (`<string> &-sC
 those words in their executables, and the plugins only hold the settings that were changed from them, so reading the plugins
 gives nothing for OK, Cancel, Take All, the titles and the names of the cards: the first run on the real data showed those
 labels blank (the number of pieces of each menu with no words matched the count the engine gave exactly). `gameSettingText`
-now answers from the plugins when a record has the text, and otherwise from `components/falloutscript/settingtext.cpp`, a
-table of the port's own wording for the 120-odd labels the screens drawn from the files use (not a copy of the executables'
-table; a game in another language gets its words from its plugin). The card, caravan and roulette games' words are not in it.
+now answers in this order: a plugin that has a record with the text (a game in another language); the default text that
+the player's own executable holds; the port's own wording in `components/falloutscript/settingtext.cpp`, a table of about
+175 labels that the screens drawn from the files use (not a copy of the executables' table; it is only the answer for an
+install whose executable is not found, and for the offline tests).
+
+The executable is read once at start-up (`FalloutScripts::loadExecutableTexts`, `components/falloutscript/exesettings.*`): the
+file `FalloutNV.exe` or `Fallout3.exe` next to the `Data` directory (or in it), the one of the game that is played first.
+Every string setting is built by a static initialiser, and a plain scan of the image finds them without a disassembler,
+by two layouts that were read in round 12AC: the code `68 <text> 68 <name> B9 <object> E8` (or `... 8B C8+n E8`: push the
+address of the default text, push the address of the name, load `ecx`, call the constructor), and, in Fallout3.exe for most
+of the settings, a table in the data of records of three addresses (text, name, table of functions). Round 12AC counted
+1319 string settings in FalloutNV.exe and 1371 in Fallout3.exe this way, and every one of the 55 names the settings
+screens use was found in New Vegas (49 in Fallout 3). The texts are converted from Windows-1252 to UTF-8; nothing of them
+is kept in the repository or the user's files, and the line `Settings texts: N read from <path>` in the log says that it
+worked. Before that (round 12AB, first run of the settings screens) every label of them was drawn as the name of its
+setting, since the table had none of them and the plugins hold none. The card, caravan and roulette games' words are
+found the same way.
 
 ## What was read from the executable
 

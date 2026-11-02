@@ -942,6 +942,9 @@ void OF::Engine::prepareEngine()
     mFalloutScripts = std::make_unique<OFScript::FalloutScripts>(
         mWorld->getStore(), OFScript::chooseGame(mContentFiles), OFScript::playerReferenceOf(mContentFiles));
     mFalloutScripts->setContentFiles(mContentFiles);
+    // the executable of the game is next to its Data directory (the first directory is the port's own resources)
+    mFalloutScripts->loadExecutableTexts(
+        mDataDirs.empty() ? Files::PathContainer() : Files::PathContainer(mDataDirs.begin() + 1, mDataDirs.end()));
     mEnvironment.setFalloutScripts(*mFalloutScripts);
 
     mWorld->init(mMaxRecastLogLevel, mViewer, std::move(rootNode), mWorkQueue, *mUnrefQueue);
