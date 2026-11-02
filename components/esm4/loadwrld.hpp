@@ -107,7 +107,7 @@ namespace ESM4
         float mLandLevel;
         float mWaterLevel;
 
-        Map mMap;
+        Map mMap{}; // all 0 when the record has no MNAM
 
         std::int32_t mMinX;
         std::int32_t mMinY;

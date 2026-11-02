@@ -159,6 +159,7 @@ namespace OFScript
                 marker.mId = reference.mId.toUint32();
                 marker.mPosition = osg::Vec3f(reference.mPos.pos[0], reference.mPos.pos[1], reference.mPos.pos[2]);
                 marker.mName = reference.mFullName;
+                marker.mType = reference.mMapMarker & 0xFF;
                 markers.push_back(std::move(marker));
             });
             for (PlacedMarker& marker : markers)

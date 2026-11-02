@@ -1842,6 +1842,13 @@ return {
                 end
                 print('OFTEST', 'object map', mapped and string.format('found=%s travel=%s', tostring(found ~= nil),
                     tostring(found and found.travel)) or tostring(markers))
+                -- What the map of the Pip-Boy needs: the picture and the rectangle of cells of the worldspace the player
+                -- is in (nothing of a world inside a building), and which way the player faces
+                local informed, info = pcall(core.interact.mapInfo)
+                print('OFTEST', 'object mapinfo', informed and string.format(
+                    'outside=%s world=%s file=%s size=%dx%d nw=%d,%d se=%d,%d facing=%s', tostring(info.outside), info.world,
+                    info.file, info.width, info.height, info.northWestX, info.northWestY, info.southEastX, info.southEastY,
+                    tostring(info.heading >= 0 and info.heading < 360)) or tostring(info))
                 -- The locks the script saw and changed, the cube it destroyed and deleted, and the list it added to
                 print('OFTEST', 'object locks', tostring(g.@LOCKED@), tostring(g.@LOCK_LEVEL@), tostring(g.@UNLOCKED@),
                     tostring(g.@RELOCKED@), tostring(g.@RELOCK_LEVEL@))
@@ -4618,6 +4625,12 @@ def check_objects(text, scenario):
     if found is not None and found != expected:
         problems.append("the place on the map in the open world should have been found by walking up to it (and none "
                         f"inside, where there is none): {expected}: " + str(found))
+    found = one("mapinfo")
+    expected = [("outside=true world=OpenFallout Test World file=" + plugin.WORLD_MAP_FILE + " size=1000x900 nw=-4,5 se=3,-6"
+                 " facing=true") if scenario.exterior else "outside=false world= file= size=0x0 nw=0,0 se=0,0 facing=true"]
+    if found is not None and found != expected:
+        problems.append("the map should know the picture and the rectangle of cells of the worldspace the player is in "
+                        f"(and none inside a building): {expected}: " + str(found))
     found = one("listed")
     if found is not None and found != [str(plugin.CREATURE_ITEMS)]:
         problems.append("the script should see the creature that is placed as a levelled list with the suits of the "

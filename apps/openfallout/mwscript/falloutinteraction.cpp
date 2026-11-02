@@ -567,6 +567,8 @@ namespace OFScript
             entry.mId = marker.mId;
             entry.mName = marker.mName;
             entry.mPosition = marker.mPosition;
+            entry.mWorldspace = marker.mWorldspace;
+            entry.mType = marker.mType;
             entry.mTravel = state == 2;
             entry.mDistance = -1;
             if (outside && marker.mWorldspace == space)
@@ -582,6 +584,53 @@ namespace OFScript
             return a.mId < b.mId;
         });
         return entries;
+    }
+
+    FalloutScripts::MapInfo FalloutScripts::mapInfo()
+    {
+        MapInfo info;
+        OFBase::World& world = *OFBase::Environment::get().getWorld();
+        const OFWorld::Ptr player = world.getPlayerPtr();
+        if (!player.isEmpty() && player.isInCell())
+        {
+            info.mPosition = player.getRefData().getPosition().asVec3();
+            constexpr double degreesPerRadian = 180.0 / 3.14159265358979323846;
+            info.mHeading = std::fmod(
+                std::fmod(player.getRefData().getPosition().rot[2] * degreesPerRadian, 360.0) + 360.0, 360.0);
+            info.mOutside = inOpenWorld(mPlayer);
+            info.mLocation = std::string(world.getCellName(player.getCell()));
+            if (info.mOutside)
+                info.mWorldspace = worldspaceOf(mPlayer);
+        }
+        // Inside a building the map is the one of the first place the player has found
+        if (info.mWorldspace == 0)
+        {
+            for (const PlacedMarker& marker : placedMarkers())
+            {
+                if (marker.mWorldspace != 0 && mMapMarkers.state(marker.mId) != 0)
+                {
+                    info.mWorldspace = marker.mWorldspace;
+                    break;
+                }
+            }
+        }
+        if (info.mWorldspace != 0)
+        {
+            if (const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(info.mWorldspace)))
+            {
+                info.mWorldName = space->mFullName;
+                info.mMapFile = space->mMapFile;
+                info.mWidth = space->mMap.width;
+                info.mHeight = space->mMap.height;
+                info.mNorthWestX = space->mMap.NWcellX;
+                info.mNorthWestY = space->mMap.NWcellY;
+                info.mSouthEastX = space->mMap.SEcellX;
+                info.mSouthEastY = space->mMap.SEcellY;
+            }
+        }
+        info.mHasDate = currentDate(info.mDate);
+        info.mHour = gameHour();
+        return info;
     }
 
     std::string FalloutScripts::travelTo(FalloutScript::FormId marker)

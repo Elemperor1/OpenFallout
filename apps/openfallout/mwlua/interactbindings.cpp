@@ -155,7 +155,8 @@ namespace OFLua
         api["cancelRest"] = []() { scripts().cancelRest(); };
 
         // The markers of the map the player has found: the form id, the name, where it is, whether the player can
-        // travel to it, and how far away it is along the floor (-1 when the player is not in the same world outside)
+        // travel to it, and how far away it is along the floor (-1 when the player is not in the same world outside),
+        // the worldspace it is in (`space`) and the kind of place it is (`type`, the number the record gives)
         api["map"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
@@ -168,9 +169,42 @@ namespace OFLua
                 row["y"] = entry.mPosition.y();
                 row["travel"] = entry.mTravel;
                 row["distance"] = entry.mDistance;
+                row["space"] = idText(entry.mWorldspace);
+                row["type"] = entry.mType;
                 rows[index++] = row;
             }
             return rows;
+        };
+        // What the map needs to draw the world and the player on it: the worldspace whose picture it is (`space`), the
+        // name of the place the player is in and of that world, the picture of the record (`file`, "" when it has
+        // none), the usable size of it and the cells at its corners (`width` and `height` are 0 when the record has no
+        // such data), where the player is (`x`, `y`, only when `outside`) and which way they face (degrees clockwise
+        // from north), and the date of the world (`year`, `month` from 0, `day` from 1, `hour`)
+        api["mapInfo"] = [lua]() {
+            const OFScript::FalloutScripts::MapInfo info = scripts().mapInfo();
+            sol::table row(lua, sol::create);
+            row["space"] = idText(info.mWorldspace);
+            row["outside"] = info.mOutside;
+            row["location"] = info.mLocation;
+            row["world"] = info.mWorldName;
+            row["file"] = info.mMapFile;
+            row["width"] = info.mWidth;
+            row["height"] = info.mHeight;
+            row["northWestX"] = info.mNorthWestX;
+            row["northWestY"] = info.mNorthWestY;
+            row["southEastX"] = info.mSouthEastX;
+            row["southEastY"] = info.mSouthEastY;
+            row["x"] = info.mPosition.x();
+            row["y"] = info.mPosition.y();
+            row["heading"] = info.mHeading;
+            if (info.mHasDate)
+            {
+                row["year"] = info.mDate.mYear;
+                row["month"] = info.mDate.mMonth;
+                row["day"] = info.mDate.mDay;
+            }
+            row["hour"] = info.mHour;
+            return row;
         };
         // The player travels to a marker: the text of why not, "" when it did
         api["travel"] = [](std::string_view marker) { return scripts().travelTo(parseId(marker)); };
