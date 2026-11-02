@@ -121,6 +121,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testmenuicon.cpp
     esm4/testmessage.cpp
     esm4/testmodeldata.cpp
+    esm4/testnavmesh.cpp
     esm4/testnote.cpp
     esm4/testnpc.cpp
     esm4/testoptionalsubrecords.cpp
