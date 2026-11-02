@@ -196,9 +196,12 @@ table; a game in another language gets its words from its plugin). The card, car
 - Whether the font or the file draws the tab words of the data page in capitals (the executables' code for the tab bar does
   not change their case; New Vegas was read, Fallout 3 was not), what turns the arrow of the player on the map (the code sets
   its angle to minus the player's heading, minus 0.3, minus the cell's north offset inside; the page has no turning picture
-  yet), the local map tab (zoom 0.1 to 0.9, places 20 to 75, a render of the cell), and which form the cell's extra data of kind
-  1 is that the headline's place text reads outside (the page writes the worldspace's name, or the cell's, where the games
-  write the region's or the cell's map name).
+  yet), the local map tab (zoom 0.1 to 0.9, places 20 to 75, a render of the cell), and the headline's place text outside: the
+  games ask the exterior cell at the player's place for a form by its extra data (a positional lookup; which subrecord of the
+  cell that is, and whether the name written is the form's map name, its editor id or its full name, was not read), and when
+  there is none they write the cell's own name; the regions are scanned (the highest priority wins, an override beats one that
+  is not) only when no cell is there, and the worldspace's name comes last. The page writes the cell's name, else the
+  worldspace's.
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in
   the executable's table. The loader leaves them as text.
 
