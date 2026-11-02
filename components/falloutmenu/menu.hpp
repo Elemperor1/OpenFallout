@@ -40,7 +40,7 @@ namespace FalloutMenu
     public:
         TileType type() const { return mType; }
         const std::string& name() const { return mName; }
-        int id() const { return mId; }
+        int uid() const { return mId; }
         Tile* parent() { return mParent; }
         const Tile* parent() const { return mParent; }
         const std::vector<std::unique_ptr<Tile>>& children() const { return mChildren; }
@@ -116,6 +116,9 @@ namespace FalloutMenu
         /// The size of the screen in pixels, from which the size of the design space follows: a tile 960 high, and as
         /// wide as the screen is for its height
         void setScreen(float pixelWidth, float pixelHeight);
+        /// Counts up whenever something that a trait depends on may have changed: a screen that draws again only when
+        /// this has moved on
+        unsigned generation() const { return mGeneration; }
         float designWidth() const { return mDesignWidth; }
         float designHeight() const { return mDesignHeight; }
 
@@ -148,8 +151,7 @@ namespace FalloutMenu
         /// Everything to draw, back to front
         std::vector<DrawItem> draw();
 
-        /// The tile the pointer is on at a point of the design space: the topmost visible tile that can be moused over
-        /// (`locus`) and clicked (`target`)
+        /// The tile the pointer is on at a point of the design space: the topmost visible tile that is a `target`
         Tile* tileAt(float x, float y);
         /// The tile under a point that takes the wheel (`wheelable`)
         Tile* wheelTileAt(float x, float y);
@@ -178,6 +180,7 @@ namespace FalloutMenu
         /// How far left of its `x` a text starts, for the point it is justified to
         float anchorShift(Tile& tile);
         void assignIds(Tile& tile);
+        void unindex(Tile& tile);
         void hitTest(Tile& tile, float originX, float originY, float x, float y, bool wheel, Tile*& best,
             std::optional<std::array<float, 4>> clip);
 
@@ -188,6 +191,7 @@ namespace FalloutMenu
         std::unique_ptr<Tile> mGlobals;
         unsigned mGeneration = 1;
         int mNextId = 1;
+        std::unordered_map<int, Tile*> mById;
         float mDesignWidth = 1280;
         float mDesignHeight = 960;
         std::vector<std::string> mProblems;

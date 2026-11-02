@@ -442,7 +442,7 @@ namespace
         EXPECT_FALSE(items[1].mClipped);
     }
 
-    TEST(FalloutMenuHitTest, the_pointer_is_on_the_topmost_tile_that_can_be_moused_over_and_clicked)
+    TEST(FalloutMenuHitTest, the_pointer_is_on_the_topmost_visible_tile_that_is_a_target)
     {
         Fixture f;
         Menu& menu = f.open(

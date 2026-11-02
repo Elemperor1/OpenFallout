@@ -1,0 +1,431 @@
+#include <components/falloutmenu/openmenu.hpp>
+
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <cstring>
+#include <map>
+#include <string>
+
+namespace
+{
+    using namespace FalloutMenu;
+
+    constexpr std::size_t headerBytes = 296;
+    constexpr std::size_t glyphBytes = 56;
+
+    void putFloat(std::string& bytes, std::size_t at, float value)
+    {
+        std::memcpy(bytes.data() + at, &value, sizeof(value));
+    }
+
+    // A font of 30 high lines whose characters are 10 wide with 1 before and 1 after, cut from a 100 by 100 texture
+    std::string testFont()
+    {
+        std::string bytes(headerBytes + 256 * glyphBytes, '\0');
+        putFloat(bytes, 0, 30.f);
+        const unsigned int one = 1;
+        std::memcpy(bytes.data() + 4, &one, sizeof(one));
+        std::memcpy(bytes.data() + 12, "Test_Font_0", 11);
+        for (unsigned char c = 33; c < 127; ++c)
+        {
+            const std::size_t at = bytes.size() - 256 * glyphBytes + c * glyphBytes;
+            putFloat(bytes, at + 4, 0.1f);
+            putFloat(bytes, at + 8, 0.2f);
+            putFloat(bytes, at + 12, 0.2f);
+            putFloat(bytes, at + 24, 0.4f);
+            putFloat(bytes, at + 36, 10.f);
+            putFloat(bytes, at + 40, 20.f);
+            putFloat(bytes, at + 44, 1.f);
+            putFloat(bytes, at + 48, 1.f);
+            putFloat(bytes, at + 52, 20.f);
+        }
+        return bytes;
+    }
+
+    // The first bytes of a DDS picture of a size
+    std::string dds(std::uint32_t width, std::uint32_t height)
+    {
+        std::string bytes(128, '\0');
+        std::memcpy(bytes.data(), "DDS ", 4);
+        const std::uint32_t header = 124;
+        std::memcpy(bytes.data() + 4, &header, 4);
+        std::memcpy(bytes.data() + 12, &height, 4);
+        std::memcpy(bytes.data() + 16, &width, 4);
+        return bytes;
+    }
+
+    struct Fixture
+    {
+        std::map<std::string, std::string> mFiles;
+        std::shared_ptr<Resources> mResources;
+        std::unique_ptr<OpenMenu> mMenu;
+
+        Fixture()
+        {
+            mFiles["textures/fonts/glow_monofonto_large.fnt"] = testFont();
+            mFiles["textures/fonts/test_font_0.dds"] = dds(100, 100);
+            mFiles["textures/interface/interfaceshared.tai"]
+                = "small.dds InterfaceShared0.dds, 0, 0, 0.5, 0.25, 0, 0.25, 0.5\n";
+            mFiles["textures/interface/interfaceshared0.dds"] = dds(1024, 1024);
+            mFiles["textures/interface/main/panel.dds"] = dds(64, 32);
+            mFiles["textures/interface/main/strip.dds"] = dds(20, 8);
+            mFiles["menus/globals.xml"] = "<globals/>";
+        }
+
+        OpenMenu& open(const std::string& menu, float width = 1280.f, float height = 960.f, bool pad = false)
+        {
+            mFiles["menus/test_menu.xml"] = menu;
+            Data data;
+            data.mRead = [this](const std::string& path) -> std::optional<std::string> {
+                const auto found = mFiles.find(path);
+                if (found == mFiles.end())
+                    return std::nullopt;
+                return found->second;
+            };
+            data.mReadStart = [this](const std::string& path, std::size_t count) -> std::optional<std::string> {
+                const auto found = mFiles.find(path);
+                if (found == mFiles.end())
+                    return std::nullopt;
+                return found->second.substr(0, count);
+            };
+            data.mSetting = [](std::string_view name) -> std::optional<std::string> {
+                if (name == "sHello")
+                    return "Hi";
+                return std::nullopt;
+            };
+            mResources = std::make_shared<Resources>(data);
+            std::string error;
+            mMenu = OpenMenu::open(mResources, "test_menu.xml", width, height, pad, &error);
+            EXPECT_TRUE(mMenu) << error;
+            return *mMenu;
+        }
+    };
+
+    TEST(FalloutOpenMenuTest, a_dds_gives_its_size_and_other_bytes_do_not)
+    {
+        const std::optional<TextSize> size = ddsSize(dds(512, 256));
+        ASSERT_TRUE(size);
+        EXPECT_FLOAT_EQ(size->mWidth, 512.f);
+        EXPECT_FLOAT_EQ(size->mHeight, 256.f);
+        EXPECT_FALSE(ddsSize("not a picture at all"));
+        EXPECT_FALSE(ddsSize(dds(0, 0)));
+    }
+
+    TEST(FalloutOpenMenuTest, a_texture_is_named_as_the_data_names_it)
+    {
+        EXPECT_EQ(texturePath("Interface\\Main\\Arrow.dds"), "textures/interface/main/arrow.dds");
+        EXPECT_EQ(texturePath("  Interface\\Main\\Arrow.dds "), "textures/interface/main/arrow.dds");
+        EXPECT_EQ(texturePath("Textures\\Fonts\\a.dds"), "textures/fonts/a.dds");
+        EXPECT_EQ(texturePath("Data\\Textures\\a.dds"), "textures/a.dds");
+    }
+
+    TEST(FalloutOpenMenuTest, the_fonts_atlas_and_system_colours_come_with_the_resources)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"/>");
+        EXPECT_NE(f.mResources->fonts().get(1), nullptr);
+        EXPECT_EQ(f.mResources->atlas().size(), 1u);
+        const std::optional<std::array<float, 3>> color = f.mResources->systemColor(2);
+        ASSERT_TRUE(color);
+        EXPECT_FLOAT_EQ((*color)[0], 255.f);
+        EXPECT_FLOAT_EQ((*color)[1], 67.f);
+        EXPECT_FALSE(f.mResources->systemColor(7));
+    }
+
+    TEST(FalloutOpenMenuTest, a_picture_goes_where_the_menu_puts_it_scaled_to_the_window)
+    {
+        Fixture f;
+        // The window is half the design height, so every unit is half a pixel
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><image name=\"I\"><x> 100 </x><y> 40 </y><width> 64 </width>"
+            "<height> 32 </height><filename> Interface\\Main\\Panel.dds </filename>"
+            "<zoom> &scale; </zoom></image></menu>",
+            640.f, 480.f);
+        const std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 1u);
+        EXPECT_EQ(pieces[0].mTexture, "textures/interface/main/panel.dds");
+        EXPECT_EQ(pieces[0].mX, 50);
+        EXPECT_EQ(pieces[0].mY, 20);
+        EXPECT_EQ(pieces[0].mWidth, 32);
+        EXPECT_EQ(pieces[0].mHeight, 16);
+        EXPECT_EQ(pieces[0].mSourceWidth, 64);
+        EXPECT_EQ(pieces[0].mSourceHeight, 32);
+        EXPECT_FALSE(pieces[0].mGlyph);
+        EXPECT_EQ(pieces[0].mTile->name(), "I");
+    }
+
+    TEST(FalloutOpenMenuTest, a_picture_the_data_lacks_is_left_out_and_told)
+    {
+        Fixture f;
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><image name=\"I\"><width> 64 </width><height> 32 </height>"
+            "<filename> Interface\\Main\\Gone.dds </filename></image></menu>");
+        EXPECT_TRUE(menu.pieces().empty());
+        EXPECT_EQ(f.mResources->missingTextures().count("textures/interface/main/gone.dds"), 1u);
+    }
+
+    TEST(FalloutOpenMenuTest, a_picture_from_the_atlas_takes_its_part_of_the_big_texture)
+    {
+        Fixture f;
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><image name=\"I\"><x> 10 </x><y> 10 </y><zoom> &scale; </zoom>"
+            "<width> 40 </width><height> 20 </height><filename> Interface\\Main\\small.dds"
+            "</filename><texatlas> Interface\\InterfaceShared.tai </texatlas></image></menu>");
+        const std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 1u);
+        EXPECT_EQ(pieces[0].mTexture, "textures/interface/interfaceshared0.dds");
+        EXPECT_EQ(pieces[0].mSourceX, 512);
+        EXPECT_EQ(pieces[0].mSourceY, 256);
+        EXPECT_EQ(pieces[0].mSourceWidth, 256);
+        EXPECT_EQ(pieces[0].mSourceHeight, 512);
+    }
+
+    TEST(FalloutOpenMenuTest, a_picture_that_repeats_is_cut_into_pieces_at_its_natural_size)
+    {
+        Fixture f;
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><image name=\"I\"><width> 50 </width><height> 8 </height>"
+            "<filename> Interface\\Main\\Strip.dds </filename><repeathorizontal> 1 "
+            "</repeathorizontal></image></menu>");
+        const std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 3u);
+        EXPECT_EQ(pieces[0].mX, 0);
+        EXPECT_EQ(pieces[0].mWidth, 20);
+        EXPECT_EQ(pieces[1].mX, 20);
+        EXPECT_EQ(pieces[2].mX, 40);
+        // The last one is cut short, and so is the part of the texture it shows
+        EXPECT_EQ(pieces[2].mWidth, 10);
+        EXPECT_EQ(pieces[2].mSourceWidth, 10);
+        EXPECT_EQ(pieces[0].mSourceWidth, 20);
+    }
+
+    TEST(FalloutOpenMenuTest, a_text_is_one_piece_for_each_character_cut_from_the_font_texture)
+    {
+        Fixture f;
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><text name=\"T\"><x> 20 </x><y> 10 </y><font> 1 </font>"
+            "<string> &-sHello; </string></text></menu>");
+        const std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 2u);
+        EXPECT_TRUE(pieces[0].mGlyph);
+        EXPECT_EQ(pieces[0].mTexture, "textures/fonts/test_font_0.dds");
+        // Each character is 10 wide and 20 high, the pen moves 12 for it; the baseline is 20 below the top
+        EXPECT_EQ(pieces[0].mWidth, 10);
+        EXPECT_EQ(pieces[0].mHeight, 20);
+        EXPECT_EQ(pieces[1].mX - pieces[0].mX, 12);
+        EXPECT_EQ(pieces[0].mSourceX, 10);
+        EXPECT_EQ(pieces[0].mSourceY, 20);
+        EXPECT_EQ(pieces[0].mSourceWidth, 10);
+        EXPECT_EQ(pieces[0].mSourceHeight, 20);
+    }
+
+    TEST(FalloutOpenMenuTest, a_piece_in_a_clip_window_carries_the_window_in_pixels)
+    {
+        Fixture f;
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"W\"><x> 10 </x><y> 10 </y><width> 100 </width>"
+            "<height> 60 </height><clipwindow> 1 </clipwindow><image name=\"I\"><clips> 1 </clips>"
+            "<width> 64 </width><height> 32 </height><filename> Interface\\Main\\Panel.dds"
+            "</filename><zoom> &scale; </zoom></image></rect></menu>");
+        const std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 1u);
+        EXPECT_TRUE(pieces[0].mClipped);
+        EXPECT_EQ(pieces[0].mClipX, 10);
+        EXPECT_EQ(pieces[0].mClipWidth, 100);
+        EXPECT_EQ(pieces[0].mClipHeight, 60);
+    }
+
+    TEST(FalloutOpenMenuTest, a_menu_that_is_not_there_is_told_and_the_pad_sets_xbox)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"><rect name=\"R\"><x> &xbox; </x></rect></menu>");
+        std::string error;
+        EXPECT_FALSE(OpenMenu::open(f.mResources, "nothing.xml", 1280.f, 960.f, false, &error));
+        EXPECT_NE(error.find("menus/nothing.xml"), std::string::npos);
+        EXPECT_FLOAT_EQ(f.mMenu->menu().number(*f.mMenu->menu().find("R"), "x"), 0.f);
+        f.open("<menu name=\"M\"><rect name=\"R\"><x> &xbox; </x></rect></menu>", 1280.f, 960.f, true);
+        EXPECT_FLOAT_EQ(f.mMenu->menu().number(*f.mMenu->menu().find("R"), "x"), 1.f);
+    }
+
+    const char* const buttons
+        = "<menu name=\"M\">"
+          "<hotrect name=\"A\"><x> 0 </x><y> 0 </y><width> 100 </width><height> 50 </height>"
+          "<locus> 1 </locus><target> 1 </target><wheelable> 1 </wheelable></hotrect>"
+          "<hotrect name=\"B\"><x> 200 </x><y> 0 </y><width> 100 </width><height> 50 </height>"
+          "<locus> 1 </locus><target> 1 </target></hotrect></menu>";
+
+    TEST(FalloutOpenMenuTest, the_tile_under_the_pointer_has_mouseover_and_the_one_it_left_does_not)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(buttons, 640.f, 480.f);
+        Menu& menu = open.menu();
+        Tile* a = menu.find("A");
+        Tile* b = menu.find("B");
+        EXPECT_EQ(open.pointerMoved(10, 10), a);
+        EXPECT_FLOAT_EQ(menu.number(*a, "mouseover"), 1.f);
+        EXPECT_EQ(open.pointerMoved(110, 10), b);
+        EXPECT_FLOAT_EQ(menu.number(*a, "mouseover"), 0.f);
+        EXPECT_FLOAT_EQ(menu.number(*b, "mouseover"), 1.f);
+        EXPECT_EQ(open.pointerMoved(5, 400), nullptr);
+        EXPECT_FLOAT_EQ(menu.number(*b, "mouseover"), 0.f);
+    }
+
+    TEST(FalloutOpenMenuTest, a_click_counts_up_on_the_tile_the_button_went_down_and_up_on)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(buttons, 640.f, 480.f);
+        Menu& menu = open.menu();
+        Tile* a = menu.find("A");
+        open.pointerPressed(10, 10);
+        EXPECT_EQ(open.pointerReleased(10, 10), a);
+        open.pointerPressed(10, 10);
+        EXPECT_EQ(open.pointerReleased(10, 10), a);
+        EXPECT_FLOAT_EQ(menu.number(*a, "clicked"), 2.f);
+        // Down on one and up on another is no click
+        open.pointerPressed(10, 10);
+        EXPECT_EQ(open.pointerReleased(110, 10), nullptr);
+        EXPECT_FLOAT_EQ(menu.number(*a, "clicked"), 2.f);
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("B"), "clicked"), 0.f);
+        open.click(*a);
+        EXPECT_FLOAT_EQ(menu.number(*a, "clicked"), 3.f);
+    }
+
+    TEST(FalloutOpenMenuTest, the_wheel_counts_on_the_tile_that_takes_it)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(buttons, 640.f, 480.f);
+        Menu& menu = open.menu();
+        Tile* a = menu.find("A");
+        EXPECT_EQ(open.wheelMoved(10, 10, 1), a);
+        EXPECT_EQ(open.wheelMoved(10, 10, 1), a);
+        EXPECT_EQ(open.wheelMoved(10, 10, -1), a);
+        EXPECT_FLOAT_EQ(menu.number(*a, "wheelmoved"), 1.f);
+        EXPECT_EQ(open.wheelMoved(110, 10, 1), nullptr);
+    }
+
+    TEST(FalloutOpenMenuTest, a_tile_that_can_be_dragged_follows_the_pointer_in_the_coordinates_of_its_parent)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(
+            "<menu name=\"M\"><rect name=\"P\"><x> 100 </x><y> 100 </y><width> 400 </width>"
+            "<height> 200 </height><hotrect name=\"D\"><x> 20 </x><y> 10 </y><width> 40 </width>"
+            "<height> 20 </height><locus> 1 </locus><target> 1 </target><draggable> 1 </draggable>"
+            "<dragstartx> -1 </dragstartx></hotrect></rect></menu>",
+            1280.f, 960.f);
+        Menu& menu = open.menu();
+        Tile* d = menu.find("D");
+        EXPECT_EQ(open.pointerPressed(130, 115), d);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragstartx"), 30.f);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragx"), 30.f);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragy"), 15.f);
+        // The pointer was 10 and 5 inside the tile
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragoffsetx"), 10.f);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragoffsety"), 5.f);
+        open.pointerMoved(300, 160);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragx"), 200.f);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragy"), 60.f);
+        open.pointerReleased(300, 160);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragstartx"), -1.f);
+        // It does not follow any more
+        open.pointerMoved(400, 200);
+        EXPECT_FLOAT_EQ(menu.number(*d, "dragx"), 200.f);
+    }
+
+    TEST(FalloutOpenMenuTest, a_tile_that_is_taken_out_is_let_go_of_by_the_pointer_and_drawn_no_more)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(
+            "<menu name=\"M\"><rect name=\"List\"/>"
+            "<template name=\"Row\"><width> 100 </width><height> 20 </height>"
+            "<locus> 1 </locus><target> 1 </target></template></menu>");
+        Menu& menu = open.menu();
+        Tile* list = menu.find("List");
+        Tile* row = menu.instantiate(*list, "Row", "Row1");
+        ASSERT_NE(row, nullptr);
+        EXPECT_EQ(open.pointerMoved(10, 10), row);
+        const int id = row->uid();
+        EXPECT_EQ(menu.byId(id), row);
+        open.remove(*row);
+        EXPECT_EQ(open.hovered(), nullptr);
+        EXPECT_EQ(menu.byId(id), nullptr);
+        EXPECT_EQ(open.pointerMoved(10, 10), nullptr);
+    }
+
+    // A scrollbar made as the files make them: arrows that count clicks, a marker that is dragged, a wheel
+    const char* const scrollbar
+        = "<menu name=\"M\"><hotrect name=\"Main\"><x> 0 </x><y> 0 </y><width> 300 </width><height> 100 </height>"
+          "<target> 1 </target><wheelable> 1 </wheelable><wheelmoved> 0 </wheelmoved>"
+          "<hotrect name=\"Bar\"><_step_size> 1 </_step_size><_number_of_items> 11 </_number_of_items>"
+          "<_number_of_visible_items> 1 </_number_of_visible_items><_SetInCode></_SetInCode>"
+          "<_wheelmoved><copy src=\"parent()\" trait=\"wheelmoved\"/></_wheelmoved>"
+          "<width> 200 </width><height> 20 </height>"
+          "<_current_value>"
+          "<add><copy src=\"child(Bar_right)\" trait=\"clicked\"/><sub src=\"child(Bar_left)\" trait=\"clicked\"/>"
+          "</add>"
+          "<add><copy src=\"me()\" trait=\"_wheelmoved\"/></add>"
+          "<onlyif><copy src=\"child(Bar_marker)\" trait=\"dragstartx\"/><lt> 0 </lt></onlyif>"
+          "<add><copy src=\"child(Bar_marker)\" trait=\"_drag_value\"/><onlyifnot>"
+          "<copy src=\"child(Bar_marker)\" trait=\"dragstartx\"/><lt> 0 </lt></onlyifnot></add>"
+          "<min><copy src=\"me()\" trait=\"_number_of_items\"/><sub src=\"me()\" trait=\"_number_of_visible_items\"/>"
+          "</min><max> 0 </max></_current_value>"
+          "<image name=\"Bar_left\"><width> 10 </width></image><image name=\"Bar_right\"><width> 10 </width></image>"
+          "<image name=\"Bar_marker\"><target> 1 </target><draggable> 1 </draggable><dragstartx> -1 </dragstartx>"
+          "<width> 20 </width><height> 20 </height>"
+          "<_drag_value><copy src=\"me()\" trait=\"dragx\"/><div> 20 </div><floor> 0 </floor></_drag_value>"
+          "</image></hotrect></hotrect></menu>";
+
+    TEST(FalloutOpenMenuTest, a_scrollbar_keeps_its_value_when_the_marker_is_let_go)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(scrollbar, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ASSERT_EQ(open.scrollbars().size(), 1u);
+        Tile* bar = menu.find("Bar");
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 0.f);
+        // Take hold of the marker at its left end and pull it 100 to the right: five steps of 20
+        open.pointerPressed(5, 5);
+        open.pointerMoved(105, 5);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 5.f);
+        open.pointerReleased(105, 5);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 5.f);
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("Bar_right"), "clicked"), 5.f);
+    }
+
+    TEST(FalloutOpenMenuTest, the_wheel_moves_a_scrollbar_and_is_not_counted_twice)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(scrollbar, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        Tile* bar = menu.find("Bar");
+        open.wheelMoved(250, 50, 1);
+        open.wheelMoved(250, 50, 1);
+        open.wheelMoved(250, 50, 1);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 3.f);
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("Main"), "wheelmoved"), 0.f);
+        // Turned the other way, the value goes down by one for each turn, and stops at 0
+        open.wheelMoved(250, 50, -1);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 2.f);
+        open.wheelMoved(250, 50, -1);
+        open.wheelMoved(250, 50, -1);
+        open.wheelMoved(250, 50, -1);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 0.f);
+        open.wheelMoved(250, 50, 1);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 1.f);
+    }
+
+    TEST(FalloutOpenMenuTest, a_scrollbar_is_put_at_a_value_by_the_screen)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(scrollbar, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        Tile* bar = menu.find("Bar");
+        open.setScrollbar(*bar, 7.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 7.f);
+        // The arrows still count from there
+        open.click(*menu.find("Bar_left"));
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 6.f);
+        open.setScrollbar(*bar, 100.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 10.f);
+    }
+}

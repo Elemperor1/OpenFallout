@@ -32,6 +32,7 @@
 #include "landbindings.hpp"
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
+#include "menubindings.hpp"
 #include "messagebindings.hpp"
 #include "pipboybindings.hpp"
 #include "regionbindings.hpp"
@@ -136,6 +137,8 @@ namespace OFLua
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
             api["hud"]
                 = context.cachePackage("openfallout_core_hud", [context]() { return initCoreHudBindings(context); });
+            api["menus"]
+                = context.cachePackage("openfallout_core_menus", [context]() { return initCoreMenuBindings(context); });
             api["interact"] = context.cachePackage(
                 "openfallout_core_interact", [context]() { return initCoreInteractBindings(context); });
             api["pipboy"] = context.cachePackage(

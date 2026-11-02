@@ -67,6 +67,7 @@ namespace FalloutMenu
         tile->mName = definition->mName;
         tile->mNameLower = Xml::lower(definition->mName);
         tile->mId = mNextId++;
+        mById[tile->mId] = tile.get();
         tile->mDefinition = definition.get();
         if (owned)
             tile->mOwnedDefinition = definition;
@@ -102,7 +103,12 @@ namespace FalloutMenu
 
     void Menu::set(Tile& tile, std::string_view trait, Value value)
     {
-        tile.mSet[Xml::lower(trait)] = std::move(value);
+        const std::string key = Xml::lower(trait);
+        const auto found = tile.mSet.find(key);
+        // Setting what is already set changes nothing, so a screen that draws when the generation moves does not
+        if (found != tile.mSet.end() && found->second == value)
+            return;
+        tile.mSet[key] = std::move(value);
         ++mGeneration;
     }
 
@@ -398,17 +404,15 @@ namespace FalloutMenu
 
     Tile* Menu::byId(int id)
     {
-        std::vector<Tile*> stack{ mRoot.get() };
-        while (!stack.empty())
-        {
-            Tile* tile = stack.back();
-            stack.pop_back();
-            if (tile->mId == id)
-                return tile;
-            for (const std::unique_ptr<Tile>& child : tile->mChildren)
-                stack.push_back(child.get());
-        }
-        return nullptr;
+        const auto found = mById.find(id);
+        return found == mById.end() ? nullptr : found->second;
+    }
+
+    void Menu::unindex(Tile& tile)
+    {
+        mById.erase(tile.mId);
+        for (const std::unique_ptr<Tile>& child : tile.mChildren)
+            unindex(*child);
     }
 
     std::vector<Tile*> Menu::tiles()
@@ -450,6 +454,7 @@ namespace FalloutMenu
     {
         if (tile.mParent == nullptr)
             return;
+        unindex(tile);
         auto& siblings = tile.mParent->mChildren;
         siblings.erase(std::remove_if(siblings.begin(), siblings.end(),
                            [&tile](const std::unique_ptr<Tile>& other) { return other.get() == &tile; }),
@@ -459,6 +464,8 @@ namespace FalloutMenu
 
     void Menu::removeChildren(Tile& tile)
     {
+        for (const std::unique_ptr<Tile>& child : tile.mChildren)
+            unindex(*child);
         tile.mChildren.clear();
         ++mGeneration;
     }
@@ -650,8 +657,9 @@ namespace FalloutMenu
         const float height = number(tile, "height");
         const float frameX = mirrorsChild(tile) ? originX : x;
         const float frameY = mirrorsChild(tile) ? originY : y;
-        const bool wanted
-            = wheel ? number(tile, "wheelable") != 0 : (number(tile, "locus") != 0 && number(tile, "target") != 0);
+        // A tile that is a `target` takes the pointer (a marker that is dragged has only that; `locus` is on tiles that
+        // are no buttons at all)
+        const bool wanted = wheel ? number(tile, "wheelable") != 0 : number(tile, "target") != 0;
         if (wanted && width > 0 && height > 0)
         {
             const std::array<float, 4> rect{ x, y, width, height };

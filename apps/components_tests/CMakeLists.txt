@@ -160,6 +160,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     falloutmenu/testfont.cpp
     falloutmenu/testmenu.cpp
+    falloutmenu/testopenmenu.cpp
     falloutmenu/testxml.cpp
 
     falloutscript/testactors.cpp

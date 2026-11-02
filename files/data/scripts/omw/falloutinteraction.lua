@@ -9,6 +9,7 @@ local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local pad = require('scripts.omw.falloutpad')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local menuModule = require('scripts.omw.falloutmenu')
 
 local interact = core.interact
 local pipboy = core.pipboy
@@ -26,6 +27,8 @@ local screen = nil
 local element = nil
 local modeOpen = false
 local widgets
+-- The screen of the hours to wait or sleep when it is drawn from the game's own menu file (sleep_wait_menu.xml)
+local restMenu = nil
 
 -- What the screen was drawn for, so that it is drawn again when that changes
 local shownSerial = nil
@@ -49,6 +52,10 @@ local function destroyElement()
     if element then
         element:destroy()
         element = nil
+    end
+    if restMenu then
+        restMenu:close()
+        restMenu = nil
     end
 end
 
@@ -208,6 +215,11 @@ local function startRest()
     local why = interact.startRest(hours)
     if why ~= '' then
         notice = why
+        if restMenu then
+            -- (the menu of the game has no line for it: the words go to the messages)
+            ui.showMessage(why)
+            return
+        end
     else
         notice = ''
         endedBefore = interact.restProgress().ended
@@ -217,8 +229,30 @@ local function startRest()
     render()
 end
 
+local function hoursText(count)
+    return string.format('%d %s', count, count == 1 and word('sHour', 'hour') or word('sHours', 'hours'))
+end
+
+-- The hours are chosen on the screen of the game's own file: the prompt, the word of the button and the hours are
+-- what the game says there, the rest is the file's
+local function renderRestMenu(request)
+    local menu = menuModule.open('sleep_wait_menu.xml')
+    if not menu then return false end
+    restMenu = menu
+    local title = request.sleeping and word('sSleep', 'Sleep') or word('sWait', 'Wait')
+    menu:set('SWM_HowManyText', 'string',
+        request.sleeping and word('sHowMany', 'How many hours?') or word('sHowManyWait', 'How many hours?'))
+    menu:set('SWM_WaitButton', 'string', title)
+    menu:set('SWM_HoursChosen', 'string', hoursText(hours))
+    menu:setScrollbar('SWM_Scrollbar', hours - 1)
+    menu:onClick('SWM_WaitButton', function() startRest() end)
+    menu:onClick('SWM_CancelButton', function() leave() end)
+    return true
+end
+
 -- The hours to wait or sleep
 local function renderRest(request)
+    if renderRestMenu(request) then return end
     widgets = widgetModule.new(update)
     local rows, add = newRows(widthOf(0.3, 420))
     local title = request.sleeping and word('sSleep', 'Sleep') or word('sWait', 'Wait')
@@ -322,6 +356,15 @@ local function sync()
     elseif screen == 'rest' then
         if not interact.rest() then
             leave()
+        elseif restMenu then
+            -- The hours follow the marker, which the pointer, the wheel and the keys move
+            local chosen = math.max(1, math.min(24, math.floor(restMenu:get('SWM_Scrollbar', '_current_value') + 1.5)))
+            if chosen ~= hours then
+                hours = chosen
+                restMenu:set('SWM_HoursChosen', 'string', hoursText(hours))
+            end
+            restMenu:checkSize()
+            restMenu:refresh()
         end
     elseif screen == 'resting' then
         local progress = interact.restProgress()
@@ -346,12 +389,14 @@ local function press(code)
         return
     end
     if screen == 'rest' then
-        if code == input.KEY.LeftArrow then
-            hours = math.max(1, hours - 1)
-            render()
-        elseif code == input.KEY.RightArrow then
-            hours = math.min(24, hours + 1)
-            render()
+        if code == input.KEY.LeftArrow or code == input.KEY.RightArrow then
+            hours = math.max(1, math.min(24, hours + (code == input.KEY.LeftArrow and -1 or 1)))
+            if restMenu then
+                restMenu:setScrollbar('SWM_Scrollbar', hours - 1)
+                restMenu:set('SWM_HoursChosen', 'string', hoursText(hours))
+            else
+                render()
+            end
         elseif code == input.KEY.Enter then
             startRest()
         end

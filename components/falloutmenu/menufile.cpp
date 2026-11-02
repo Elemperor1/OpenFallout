@@ -303,9 +303,12 @@ namespace FalloutMenu
             }
             else if (terminated)
             {
-                std::optional<float> value = builtinEntity(name);
-                if (!value && mEnvironment.mEntity)
+                // The program that shows the menu has the first word on the names that depend on the machine
+                std::optional<float> value;
+                if (mEnvironment.mEntity)
                     value = mEnvironment.mEntity(name);
+                if (!value)
+                    value = builtinEntity(name);
                 if (value)
                     replacement = Value(*value).text();
             }
