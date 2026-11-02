@@ -249,7 +249,7 @@ namespace FalloutMenu
                 pen = (blockWidth - width) / 2;
             else if (justify == 4)
                 pen = blockWidth - width;
-            const float baseline = static_cast<float>(row) * mSize + mBaseline;
+            const float baseline = static_cast<float>(row) * mSize + mBaseline - textRise;
             for (const char ch : lines[row])
             {
                 const unsigned char c = static_cast<unsigned char>(ch);

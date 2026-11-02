@@ -121,9 +121,10 @@ namespace
         EXPECT_EQ(layout.mLines, 1);
         EXPECT_FLOAT_EQ(layout.mWidth, 30.f);
         EXPECT_FLOAT_EQ(layout.mHeight, 30.f);
-        // The picture starts after the room before it, and its top is as far above the baseline as it reaches
+        // The picture starts after the room before it, and its top is as far above the baseline as it reaches (the line
+        // is drawn textRise higher than a baseline as far down as the tallest character reaches)
         EXPECT_FLOAT_EQ(layout.mQuads[0].mX, 1.f);
-        EXPECT_FLOAT_EQ(layout.mQuads[0].mY, 0.f);
+        EXPECT_FLOAT_EQ(layout.mQuads[0].mY, -Font::textRise);
         EXPECT_FLOAT_EQ(layout.mQuads[1].mX, 12.f + 6.f + 1.f);
     }
 
@@ -166,7 +167,7 @@ namespace
         EXPECT_FLOAT_EQ(centre.mQuads[4].mX, 18.f + 1.f);
         const Font::Layout right = font->layout("AAAA\nA", 0.f, 4);
         EXPECT_FLOAT_EQ(right.mQuads[4].mX, 36.f + 1.f);
-        EXPECT_FLOAT_EQ(right.mQuads[4].mY, 30.f);
+        EXPECT_FLOAT_EQ(right.mQuads[4].mY, 30.f - Font::textRise);
     }
 
     TEST(FalloutMenuFontTest, a_block_wider_than_its_longest_line_is_the_width_the_lines_are_justified_in)

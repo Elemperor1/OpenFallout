@@ -66,6 +66,14 @@ namespace FalloutMenu
         /// The distance from one line to the next
         float lineHeight() const { return mSize; }
         float baseline() const { return mBaseline; }
+        /// How far above the top of its line a text is drawn, in design units, compared with a baseline as far below
+        /// the top as the tallest character reaches. Not read from the executable (the text of the files was placed
+        /// against it): every list row of the games puts its text at y 20 in a row that is 20 taller than the text, and
+        /// the prefab text_box.xml adds 10 ("glow font's position is f'ed up") to the text it centres in a box that is
+        /// 20 taller than the text, so the games' text sits about 10 higher than this model puts it; with the rise the
+        /// words are in the middle of the boxes and rows the files draw round them (a glow dialogue font wants 7, the
+        /// large fonts 10 to 11).
+        static constexpr float textRise = 10.f;
         const Glyph& glyph(unsigned char c) const { return mGlyphs[c]; }
         /// How far the pen moves over for a character
         float advance(unsigned char c) const;
