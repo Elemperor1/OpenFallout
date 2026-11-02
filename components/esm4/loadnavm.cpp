@@ -168,7 +168,8 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
 
     // FIXME: should check remaining size here
     // there are divisor^2 segments, each segment is a vector of triangle indices
-    for (unsigned int i = 0; i < divisor * divisor; ++i)
+    const std::size_t segmentCount = static_cast<std::size_t>(divisor) * divisor;
+    for (std::size_t i = 0; i < segmentCount; ++i)
     {
         reader.get(count); // NOTE: count may be zero
 
@@ -180,7 +181,7 @@ void ESM4::NavMesh::NVNMstruct::load(ESM4::Reader& reader)
         }
         triSegments.push_back(std::move(indices));
     }
-    if (triSegments.size() != static_cast<std::size_t>(divisor) * divisor)
+    if (triSegments.size() != segmentCount)
         throw std::runtime_error("Triangle segments size is not the square of divisor");
 #if 0
     if (triSegments.size() != divisor*divisor)
