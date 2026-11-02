@@ -83,6 +83,14 @@ namespace
         EXPECT_EQ(hackLevel(-3, false, 1, defaults), 0);
     }
 
+    TEST(FalloutScriptInteractionTest, the_experience_of_hacking_is_a_setting_for_each_level)
+    {
+        EXPECT_STREQ(hackClassExperience(0), "iXPRewardHackComputerVeryEasy");
+        EXPECT_STREQ(hackClassExperience(2), "iXPRewardHackComputerAverage");
+        EXPECT_STREQ(hackClassExperience(4), "iXPRewardHackComputerVeryHard");
+        EXPECT_STREQ(hackClassExperience(9), "iXPRewardHackComputerVeryHard");
+    }
+
     TEST(FalloutScriptInteractionTest, nothing_stops_a_character_that_may_rest)
     {
         EXPECT_FALSE(restRefusal({}));

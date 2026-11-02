@@ -3,16 +3,21 @@
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <sstream>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loaddoor.hpp>
+#include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/messagetext.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/vfs/manager.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/luamanager.hpp"
@@ -30,6 +35,8 @@ namespace OFScript
 
         /// The actor value of the Lockpick skill
         constexpr int skillLockpick = 36;
+        /// The actor value of the Science skill, which hacking goes by
+        constexpr int skillScience = 40;
 
         /// The seconds after a lock opened before the object it belongs to is activated again: the screen of the lock
         /// is gone by then, and the screen of what opens (a container) does not meet it
@@ -191,9 +198,14 @@ namespace OFScript
 
         // A terminal is closed until it is hacked or its password is carried, unless its record says it is not
         const bool closed = mReferenceState.isLocked(reference);
+        const Interaction::Setting setting
+            = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
         TerminalState state;
         state.mReference = reference;
         state.mPath.push_back(base.toUint32());
+        state.mHackLevel = Interaction::hackLevel(
+            record->mDifficulty, (record->mTerminalFlags & 0x01) != 0, mProgress.level(), setting);
+        state.mHackParity = static_cast<int>(base.toUint32() & 1);
         if (closed && !record->mPasswordNote.isZeroOrUnset()
             && mActors.itemCount(mPlayer, record->mPasswordNote.toUint32()) > 0)
         {
@@ -202,33 +214,49 @@ namespace OFScript
         }
         else if (closed)
         {
-            const Interaction::Setting setting
-                = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
-            state.mHackLevel = Interaction::hackLevel(
-                record->mDifficulty, (record->mTerminalFlags & 0x01) != 0, mProgress.level(), setting);
-            std::uint32_t seed = 0;
+            int lockouts = 0;
             {
-                const std::lock_guard lock(mCombatRandomMutex);
-                seed = static_cast<std::uint32_t>(mCombatRandom());
+                const std::lock_guard lock(mInteractionMutex);
+                const auto found = mTerminalLockouts.find(reference);
+                if (found != mTerminalLockouts.end())
+                    lockouts = found->second;
             }
-            state.mPuzzle = std::make_unique<FalloutScript::Hacking::Puzzle>(seed, state.mHackLevel, setting);
+            // A terminal that locked the player out stays shut; once it is a second try for a perk that lets one
+            // (FalloutNV.exe 0x501990: the byte of the terminal, and the entry point 20 of the perks). A terminal of
+            // difficulty 5 asks for a key, and has no game of hacking (0x966c60 answers 2 for it too)
+            const bool again = mPerks.apply(FalloutScript::EntryPoint::ignoreLockedTerminal, mPlayer, 0.0) != 0.0;
+            if (record->mDifficulty > 4 || lockouts >= 2 || (lockouts == 1 && !again))
+                state.mLockedOut = true;
+            else
+            {
+                // The Science that the level asks for (FalloutNV.exe 0x501760); a player with less does not see the
+                // game at all. Fallout3.exe has no such setting (round 12T: the five are not in it), so only New Vegas
+                // asks
+                const double skill = mActorValues.current(mPlayer, skillScience);
+                const double needed = FalloutScript::Hacking::minimumScience(state.mHackLevel, setting);
+                if (mGame == FalloutScript::Game::NewVegas && skill < needed)
+                {
+                    tellPlayer(FalloutScript::formatMessage(
+                        gameSettingText("sHackIneligible"), { std::floor(needed), std::floor(skill) }));
+                    return true;
+                }
+                state.mPuzzle = newPuzzle(state.mHackLevel, state.mHackParity);
+            }
         }
         {
             const std::lock_guard lock(mInteractionMutex);
-            // The time to wait does not end by leaving the screen and coming back
-            const auto cooling = mTerminalCooldowns.find(reference);
-            if (cooling != mTerminalCooldowns.end())
-            {
-                if (state.mPuzzle)
-                    state.mLockout = cooling->second;
-                mTerminalCooldowns.erase(cooling);
-            }
             if (mTerminal)
                 leaveTerminal();
             state.mSerial = ++mTerminalSerial;
             mTerminal = std::move(state);
         }
         return true;
+    }
+
+    double FalloutScripts::hackGate()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        return mHackGate;
     }
 
     int FalloutScripts::terminalSerial()
@@ -241,7 +269,7 @@ namespace OFScript
     {
         TerminalScreen screen;
         FalloutScript::FormId menu = 0;
-        bool showingResult = false;
+        FalloutScript::FormId base = 0;
         {
             const std::lock_guard lock(mInteractionMutex);
             if (!mTerminal)
@@ -249,27 +277,42 @@ namespace OFScript
             const TerminalState& state = *mTerminal;
             screen.mTerminal = state.mReference;
             screen.mSerial = state.mSerial;
-            screen.mCanGoBack = state.mShowingResult || state.mPath.size() > 1;
+            // The Back line is in the menus below the first
+            screen.mCanGoBack = state.mPath.size() > 1;
             menu = state.mPath.back();
-            showingResult = state.mShowingResult;
-            screen.mBody = state.mResult;
+            base = state.mPath.front();
+            screen.mResult = state.mResult;
+            screen.mResultSerial = state.mResultSerial;
+            screen.mNote = state.mNote;
+            screen.mLockedOut = state.mLockedOut;
+            screen.mHackLevel = state.mHackLevel;
+            screen.mIntroStars
+                = static_cast<int>(FalloutScript::Hacking::wordLength(state.mHackLevel, state.mHackParity));
+            screen.mGate = mHackGate;
+            if (state.mLockedOut)
+                screen.mHacking = true;
             if (state.mPuzzle)
             {
                 screen.mHacking = true;
-                screen.mHackLevel = state.mHackLevel;
+                screen.mSolved = state.mPuzzle->solved();
                 screen.mWords = state.mPuzzle->words();
                 screen.mGuesses = state.mGuesses;
                 screen.mAttempts = state.mPuzzle->attemptsLeft();
-                screen.mLockout = state.mLockout;
+                screen.mMaxAttempts = state.mPuzzle->maxAttempts();
+                screen.mDump = state.mPuzzle->dump();
+                screen.mAddress = static_cast<int>(state.mPuzzle->address());
+                screen.mWordsLeft = static_cast<int>(state.mPuzzle->wordsLeft());
             }
         }
+        // A terminal whose record is not marked as unlocked tells the player that a password is asked for (the
+        // introduction of the screen is typed at every visit, also after the terminal was hacked: 0x501ae0)
+        if (const ESM4::Terminal* root = mStore.get<ESM4::Terminal>().search(ESM::FormId::fromUint32(base)))
+            screen.mIntro = (root->mTerminalFlags & 0x02) == 0;
         const ESM4::Terminal* record = mStore.get<ESM4::Terminal>().search(ESM::FormId::fromUint32(menu));
         if (record == nullptr)
             return screen;
         screen.mName = record->mFullName;
         if (screen.mHacking)
-            return screen;
-        if (showingResult)
             return screen;
         screen.mBody = terminalFormat(record->mText);
         FalloutScript::ConditionContext context;
@@ -292,7 +335,7 @@ namespace OFScript
         FalloutScript::FormId terminal = 0;
         {
             const std::lock_guard lock(mInteractionMutex);
-            if (!mTerminal || mTerminal->mPuzzle || mTerminal->mShowingResult)
+            if (!mTerminal || mTerminal->mPuzzle || mTerminal->mLockedOut || !mTerminal->mNote.empty())
                 return;
             menu = mTerminal->mPath.back();
             terminal = mTerminal->mReference;
@@ -309,24 +352,44 @@ namespace OFScript
             || !mConditions.holds(item.mConditions, context))
             return;
 
-        // The result script of the line runs first, then the note, then what the line shows
+        // The result script of the line runs first, then what the line shows: its result goes in the line under the
+        // menu, the note in the zone of the screen (0x757f70)
         mObjects.runResult(item.mScript, terminal);
-        if (!item.mDisplayNote.isZeroOrUnset() && (item.mFlags & 0x01) != 0)
+        std::string note;
+        if (!item.mDisplayNote.isZeroOrUnset())
         {
-            mActors.addItem(mPlayer, item.mDisplayNote.toUint32(), 1);
-            tellPlayer("Note added.");
+            const ESM4::Note* noteRecord = mStore.get<ESM4::Note>().search(item.mDisplayNote);
+            // A line adds its note when its flag says so, and not twice
+            if ((item.mFlags & 0x01) != 0 && mActors.itemCount(mPlayer, item.mDisplayNote.toUint32()) == 0)
+            {
+                mActors.addItem(mPlayer, item.mDisplayNote.toUint32(), 1);
+                std::string told = gameSettingText("sComputersAddedNote");
+                if (told.empty())
+                    told = "Note added: %s";
+                const std::size_t place = told.find("%s");
+                if (place != std::string::npos)
+                    told.replace(place, 2, noteRecord != nullptr ? noteRecord->mFullName : std::string());
+                tellPlayer(told);
+            }
+            // Only a note of text is shown by the terminal; a sound, an image and a voice have other screens
+            if (noteRecord != nullptr && noteRecord->mType == 1)
+                note = terminalFormat(noteRecord->mText);
         }
 
         const std::lock_guard lock(mInteractionMutex);
         if (!mTerminal || mTerminal->mReference != terminal)
             return;
         if (!item.mSubMenu.isZeroOrUnset() && mStore.get<ESM4::Terminal>().search(item.mSubMenu) != nullptr)
+        {
             mTerminal->mPath.push_back(item.mSubMenu.toUint32());
+            mTerminal->mResult.clear();
+        }
         else if (!item.mResultText.empty())
         {
             mTerminal->mResult = terminalFormat(item.mResultText);
-            mTerminal->mShowingResult = true;
+            ++mTerminal->mResultSerial;
         }
+        mTerminal->mNote = std::move(note);
         mTerminal->mSerial = ++mTerminalSerial;
     }
 
@@ -338,15 +401,16 @@ namespace OFScript
         TerminalState& state = *mTerminal;
         if (state.mPuzzle)
             leaveTerminal();
-        else if (state.mShowingResult)
+        else if (!state.mNote.empty())
         {
-            state.mShowingResult = false;
-            state.mResult.clear();
+            // The note was read: the menu comes back
+            state.mNote.clear();
             state.mSerial = ++mTerminalSerial;
         }
         else if (state.mPath.size() > 1)
         {
             state.mPath.pop_back();
+            state.mResult.clear();
             state.mSerial = ++mTerminalSerial;
         }
         else
@@ -355,15 +419,88 @@ namespace OFScript
 
     void FalloutScripts::leaveTerminal()
     {
-        if (mTerminal && mTerminal->mPuzzle && mTerminal->mLockout > 0)
-            mTerminalCooldowns[mTerminal->mReference] = mTerminal->mLockout;
+        // The next board waits for a time from the closing of the screen of the last one
+        if (mTerminal && (mTerminal->mPuzzle || mTerminal->mLockedOut))
+            mHackGate = gameSetting("iHackingRetryMilliseconds", 10000) / 1000.0;
         mTerminal.reset();
+    }
+
+    std::unique_ptr<FalloutScript::Hacking::Puzzle> FalloutScripts::newPuzzle(int level, int parity)
+    {
+        const Interaction::Setting setting
+            = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
+        std::uint32_t seed = 0;
+        {
+            const std::lock_guard lock(mCombatRandomMutex);
+            seed = static_cast<std::uint32_t>(mCombatRandom());
+        }
+        // The Science of the player and what the perks add to it for hacking
+        const double science = mActorValues.current(mPlayer, skillScience)
+            + mPerks.apply(FalloutScript::EntryPoint::hackingModifier, mPlayer, 0.0);
+        return std::make_unique<FalloutScript::Hacking::Puzzle>(
+            seed, level, parity, science, setting, hackingDictionary());
+    }
+
+    const FalloutScript::Hacking::Dictionary& FalloutScripts::hackingDictionary()
+    {
+        const std::lock_guard lock(mHackingDictionaryMutex);
+        if (!mHackingDictionary)
+        {
+            std::string text;
+            if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+            {
+                Files::IStreamPtr stream = resources->getVFS()->find(VFS::Path::Normalized("menus/falloutdict.txt"));
+                if (stream && stream->peek() != std::istream::traits_type::eof())
+                {
+                    std::ostringstream bytes;
+                    bytes << stream->rdbuf();
+                    text = bytes.str();
+                }
+            }
+            mHackingDictionary = FalloutScript::Hacking::Dictionary::parse(text);
+            // An install without the file plays with the project's own words
+            Log(Debug::Info) << "Hacking dictionary: "
+                             << (mHackingDictionary->empty() ? "built in" : "the game's file");
+        }
+        return *mHackingDictionary;
+    }
+
+    void FalloutScripts::hackGuessed(TerminalState& state, bool correct)
+    {
+        state.mSerial = ++mTerminalSerial;
+        if (correct)
+        {
+            mReferenceState.unlock(state.mReference);
+            const int level = state.mHackLevel;
+            if (const char* experience = Interaction::hackClassExperience(level))
+            {
+                const int reward = static_cast<int>(gameSetting(experience, 0));
+                if (reward > 0)
+                    rewardExperience(reward);
+            }
+        }
+        else if (state.mPuzzle->lockedOut())
+        {
+            // The terminal is shut: the next visit finds it so (a second try only for a perk), and the screen closes
+            ++mTerminalLockouts[state.mReference];
+            state.mLockedOut = true;
+        }
+    }
+
+    void FalloutScripts::hackFinish()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mTerminal || !mTerminal->mPuzzle || !mTerminal->mPuzzle->solved())
+            return;
+        mTerminal->mPuzzle.reset();
+        mTerminal->mGuesses.clear();
+        mTerminal->mSerial = ++mTerminalSerial;
     }
 
     int FalloutScripts::hackGuess(int word)
     {
         const std::lock_guard lock(mInteractionMutex);
-        if (!mTerminal || !mTerminal->mPuzzle || mTerminal->mLockout > 0 || word < 0)
+        if (!mTerminal || !mTerminal->mPuzzle || mTerminal->mLockedOut || word < 0)
             return -1;
         TerminalState& state = *mTerminal;
         FalloutScript::Hacking::Puzzle& puzzle = *state.mPuzzle;
@@ -371,20 +508,86 @@ namespace OFScript
         if (guess.mIgnored)
             return -1;
         state.mGuesses.push_back({ puzzle.words()[static_cast<std::size_t>(word)], guess.mLikeness });
-        state.mSerial = ++mTerminalSerial;
+        hackGuessed(state, guess.mCorrect);
         if (guess.mCorrect)
         {
-            mReferenceState.unlock(state.mReference);
+            // The screen of widgets has nothing to show for it
             state.mPuzzle.reset();
             state.mGuesses.clear();
-            tellPlayer("Password accepted.");
-        }
-        else if (puzzle.lockedOut())
-        {
-            state.mLockout = gameSetting("iHackingRetryMilliseconds", 10000) / 1000.0;
-            tellPlayer("The terminal is locked.");
         }
         return guess.mLikeness;
+    }
+
+    namespace
+    {
+        const char* unitKind(FalloutScript::Hacking::Puzzle::Unit::Kind kind)
+        {
+            switch (kind)
+            {
+                case FalloutScript::Hacking::Puzzle::Unit::Kind::Word:
+                    return "word";
+                case FalloutScript::Hacking::Puzzle::Unit::Kind::Brackets:
+                    return "brackets";
+                default:
+                    return "character";
+            }
+        }
+    }
+
+    std::optional<FalloutScripts::HackUnit> FalloutScripts::hackUnit(int position)
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mTerminal || !mTerminal->mPuzzle || position < 0
+            || static_cast<std::size_t>(position) >= mTerminal->mPuzzle->dump().size())
+            return std::nullopt;
+        const FalloutScript::Hacking::Puzzle::Unit unit
+            = mTerminal->mPuzzle->unitAt(static_cast<std::size_t>(position));
+        return HackUnit{ unitKind(unit.mKind), static_cast<int>(unit.mFirst), static_cast<int>(unit.mLength) };
+    }
+
+    FalloutScripts::HackPick FalloutScripts::hackPick(int position)
+    {
+        HackPick result;
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mTerminal || !mTerminal->mPuzzle || mTerminal->mLockedOut || position < 0)
+            return result;
+        TerminalState& state = *mTerminal;
+        FalloutScript::Hacking::Puzzle& puzzle = *state.mPuzzle;
+        using Effect = FalloutScript::Hacking::Puzzle::Pick::Effect;
+        const FalloutScript::Hacking::Puzzle::Pick pick = puzzle.pick(static_cast<std::size_t>(position));
+        if (pick.mIgnored)
+            return result;
+        result.mUnit
+            = { unitKind(pick.mUnit.mKind), static_cast<int>(pick.mUnit.mFirst), static_cast<int>(pick.mUnit.mLength) };
+        result.mText = pick.mText;
+        result.mIgnored = false;
+        result.mCorrect = pick.mCorrect;
+        result.mLikeness = pick.mLikeness;
+        result.mAttemptsLeft = pick.mAttemptsLeft;
+        switch (pick.mEffect)
+        {
+            case Effect::Denied:
+                result.mEffect = "denied";
+                break;
+            case Effect::Removed:
+                result.mEffect = "removed";
+                break;
+            case Effect::Replenished:
+                result.mEffect = "replenished";
+                break;
+            default:
+                break;
+        }
+        // A word is a guess, and so is a character that is no part of a word or a pair of brackets (0x767060)
+        if (pick.mUnit.mKind != FalloutScript::Hacking::Puzzle::Unit::Kind::Brackets)
+        {
+            state.mGuesses.push_back({ pick.mText, pick.mLikeness });
+            result.mLockedOut = !pick.mCorrect && puzzle.lockedOut();
+            hackGuessed(state, pick.mCorrect);
+        }
+        else if (pick.mEffect != Effect::None && pick.mEffect != Effect::Denied)
+            state.mSerial = ++mTerminalSerial;
+        return result;
     }
 
     void FalloutScripts::closeTerminal()
@@ -719,43 +922,11 @@ namespace OFScript
                 OFBase::Environment::get().getLuaManager()->defaultActivation(object, player);
         }
 
-        // A terminal that was locked up tries again once the time is over, with other words
+        // The wait before another board is laid out
         {
             const std::lock_guard lock(mInteractionMutex);
-            if (mTerminal && mTerminal->mPuzzle && mTerminal->mLockout > 0)
-            {
-                const int before = static_cast<int>(std::ceil(mTerminal->mLockout));
-                mTerminal->mLockout -= frametime;
-                if (mTerminal->mLockout <= 0)
-                {
-                    mTerminal->mLockout = 0;
-                    const Interaction::Setting setting
-                        = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
-                    std::uint32_t seed = 0;
-                    {
-                        const std::lock_guard randomLock(mCombatRandomMutex);
-                        seed = static_cast<std::uint32_t>(mCombatRandom());
-                    }
-                    mTerminal->mPuzzle
-                        = std::make_unique<FalloutScript::Hacking::Puzzle>(seed, mTerminal->mHackLevel, setting);
-                    mTerminal->mGuesses.clear();
-                    mTerminal->mSerial = ++mTerminalSerial;
-                }
-                else if (static_cast<int>(std::ceil(mTerminal->mLockout)) != before)
-                    mTerminal->mSerial = ++mTerminalSerial;
-            }
-        }
-
-        {
-            const std::lock_guard lock(mInteractionMutex);
-            for (auto cooling = mTerminalCooldowns.begin(); cooling != mTerminalCooldowns.end();)
-            {
-                cooling->second -= frametime;
-                if (cooling->second <= 0)
-                    cooling = mTerminalCooldowns.erase(cooling);
-                else
-                    ++cooling;
-            }
+            if (mHackGate > 0)
+                mHackGate = std::max(0.0, mHackGate - frametime);
         }
 
         updateRest(frametime);

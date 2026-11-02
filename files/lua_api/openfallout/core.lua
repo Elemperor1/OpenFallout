@@ -1730,15 +1730,27 @@
 ---
 -- @type InteractTerminal
 -- @field #string name
--- @field #string body The text it shows: its own, or the result of the line that was chosen.
+-- @field #number reference The form id of the terminal's reference (the same for every menu of one visit).
+-- @field #string body The words of the menu that is shown.
 -- @field #list<#InteractTerminalLine> lines The lines of the menu whose conditions hold.
--- @field #boolean canGoBack Whether Back goes to a menu above (else it leaves the terminal).
--- @field #boolean hacking Whether the terminal is closed and the game of hacking is on.
+-- @field #boolean canGoBack Whether the menu is below the first (it has a Back line; the first is left by `back`).
+-- @field #string result What the line that was chosen last says, shown under the menu until another comes or the menu changes.
+-- @field #number resultSerial Another for each result.
+-- @field #string note The text of a note that a line showed; `back` closes it.
+-- @field #boolean intro Whether the screen types the introduction first (the terminal's record is not marked unlocked).
+-- @field #number introStars How many stars the last line of the introduction has (the letters of a word of the game).
+-- @field #boolean hacking Whether the terminal is closed and the game of hacking is on, or it locked the player out.
 -- @field #number hackLevel From 0 to 4.
 -- @field #list<#string> words The words of the game of hacking.
 -- @field #list<#InteractGuess> guesses
 -- @field #number attempts The guesses that are left.
--- @field #number lockout The seconds before the terminal can be tried again, 0 when it can.
+-- @field #number maxAttempts The guesses a board gives.
+-- @field #string dump The 408 characters of memory of the game of hacking as they stand (a word that was taken out is dots).
+-- @field #number address The 16 bits that the first row of the dump has as its address; each row is 12 more.
+-- @field #number wordsLeft How many words are still in the dump.
+-- @field #boolean lockedOut The attempts are spent, or the terminal locked the player out on an earlier visit.
+-- @field #boolean solved The password was found; the screen asks `hackFinish` when it has shown it.
+-- @field #number gate The seconds that are left before a board of the game of hacking can be laid out (see `hackGate`).
 -- @field #number serial
 
 ---
@@ -1765,6 +1777,31 @@
 -- @function [parent=#Interact] guess
 -- @param #number word Its place in `words`, from 1.
 -- @return #number The likeness of the word, -1 when no guess was made.
+
+---
+-- The place of the dump (from 1) is a word, a pair of brackets or a character.
+-- @function [parent=#Interact] hackUnit
+-- @param #number position
+-- @return #table Nothing when the place is not in the dump; else `kind` ("word", "brackets" or "character"), `first` (from 1)
+-- and `length`.
+
+---
+-- The place of the dump (from 1) is chosen: a word is a guess, a pair of brackets takes a word out or gives the attempts back,
+-- and a character that is part of neither is a wrong guess too.
+-- @function [parent=#Interact] hackPick
+-- @param #number position
+-- @return #table Nothing when nothing was done; else `kind`, `first`, `length`, `text`, `correct`, `likeness`, `effect`
+-- ("none", "denied", "removed" or "replenished"), `attempts` (left) and `lockedOut`.
+
+---
+-- The screen of the game of hacking has shown that the password was found: the terminal goes on to its menu.
+-- @function [parent=#Interact] hackFinish
+
+---
+-- The seconds that are left before a board of the game of hacking can be laid out (the game waits `iHackingRetryMilliseconds`
+-- from the closing of the screen of the last one).
+-- @function [parent=#Interact] hackGate
+-- @return #number
 
 ---
 -- @function [parent=#Interact] closeTerminal

@@ -34,11 +34,15 @@ namespace FalloutScript
         constexpr int bookSkillPoints = 11;
         constexpr int recoveredHealth = 12;
         constexpr int buyPrice = 17;
+        /// More than 0 lets a character try a terminal that locked it out once more
+        constexpr int ignoreLockedTerminal = 20;
         constexpr int addictionChance = 23;
         constexpr int chemDuration = 25;
         constexpr int drinkingRadiation = 26;
         constexpr int calculateGunSpread = 34;
         constexpr int enemyCriticalChance = 36;
+        /// What a perk adds to the Science that hacking a terminal goes by
+        constexpr int hackingModifier = 30;
         constexpr int actionPointRegen = 39;
         constexpr int actionPointCost = 40;
         constexpr int runSpeed = 42;
