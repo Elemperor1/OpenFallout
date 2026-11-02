@@ -1,6 +1,7 @@
 #include "falloutscripts.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -584,6 +585,8 @@ namespace OFScript
         mQuests.reset();
         mMessageQueue.clear();
         mMessageOpen = false;
+        mOpenByLua = false;
+        mLuaPressed = -1;
         mOpenNumbers.clear();
         mOpenOwner = 0;
         mMessageBoxCount = 0;
@@ -1328,6 +1331,14 @@ namespace OFScript
         Log(Debug::Info) << "Message buttons: " << box.mButtons.size();
         box.mPlainText = record->mFullName.empty() ? text : record->mFullName + "\n\n" + text;
         box.mText = escapeTags(box.mPlainText);
+        box.mTitle = record->mFullName;
+        box.mBody = text;
+        // The game's box has no button for a message that has none, and closes itself when its display time is over
+        if (box.mButtons.empty() && record->mDisplayTime > 0)
+        {
+            box.mTimed = true;
+            box.mTime = static_cast<double>(record->mDisplayTime);
+        }
         // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
         // is queued in the next frame
         ++mMessageBoxCount;
@@ -1362,6 +1373,8 @@ namespace OFScript
         MessageBox box;
         box.mPlainText = title.empty() ? description : description.empty() ? title : title + "\n\n" + description;
         box.mText = escapeTags(box.mPlainText);
+        box.mTitle = title;
+        box.mBody = description;
         Log(Debug::Info) << "Reputation level: " << key;
         ++mMessageBoxCount;
         runOnMainThread([this, box = std::move(box)]() mutable {
@@ -1382,10 +1395,37 @@ namespace OFScript
             // A box that another part of the game opened in its place (a message of Lua, a question of the menu) was
             // not answered by the player, and the answer that box gets is not ours to take
             const std::uint64_t current = windows->interactiveMessageBoxId();
-            const bool replaced = current != 0 && current != mOpenBoxId;
-            const int pressed = replaced ? -1 : windows->readPressedButton();
-            if (!replaced && pressed < 0 && current != 0)
-                return;
+            bool replaced = false;
+            int pressed = -1;
+            if (mOpenByLua)
+            {
+                // Lua draws this box: the button it picks is the answer, and nothing else closes the box
+                pressed = mLuaPressed.exchange(-1);
+                if (pressed < 0)
+                {
+                    // A script that gave the boxes back, or that has not said for five seconds that it draws them
+                    // (it stopped), leaves the player with no window: the window manager makes one now
+                    const std::int64_t waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                    std::chrono::steady_clock::now().time_since_epoch())
+                                                    .count()
+                        - mMessagesClaimedAt.load();
+                    if (!mMessagesDrawnByLua || waited > 5000)
+                    {
+                        mOpenByLua = false;
+                        windows->interactiveMessageBox(mOpenBox.mText, mOpenBox.mButtons, false, 0);
+                        mOpenBoxId = windows->interactiveMessageBoxId();
+                    }
+                    return;
+                }
+            }
+            else
+            {
+                replaced = current != 0 && current != mOpenBoxId;
+                pressed = replaced ? -1 : windows->readPressedButton();
+                if (!replaced && pressed < 0 && current != 0)
+                    return;
+            }
+            mOpenByLua = false;
             mMessageOpen = false;
             --mMessageBoxCount;
             {
@@ -1416,13 +1456,44 @@ namespace OFScript
         mOpenNumbers = box.mNumbers;
         mOpenOwner = box.mOwner;
         {
+            OpenMessage open;
+            open.mSerial = ++mMessageSerial;
+            open.mText = box.mPlainText;
+            open.mButtons = box.mPlainButtons;
+            open.mForm = box.mForm;
+            open.mTitle = box.mTitle;
+            open.mBody = box.mBody;
+            open.mTimed = box.mTimed;
+            open.mTime = box.mTime;
             const std::lock_guard lock(mOpenMessageMutex);
-            mOpenMessage = OpenMessage{ ++mMessageSerial, box.mPlainText, box.mPlainButtons, box.mForm };
+            mOpenMessage = std::move(open);
+        }
+        mMessageOpen = true;
+        const std::int64_t now
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count();
+        if (mMessagesDrawnByLua && now - mMessagesClaimedAt.load() < 1000)
+        {
+            // The box is Lua's: the window manager makes none, and the button is what Lua presses
+            mOpenByLua = true;
+            mLuaPressed = -1;
+            mOpenBox = std::move(box);
+            mOpenBoxId = 0;
+            return;
         }
         // The first button has the focus, so that Enter picks it
         windows->interactiveMessageBox(box.mText, box.mButtons, false, 0);
         mOpenBoxId = windows->interactiveMessageBoxId();
-        mMessageOpen = true;
+    }
+
+    void FalloutScripts::setMessagesDrawnByLua(bool drawn)
+    {
+        if (drawn)
+            mMessagesClaimedAt = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                                     .count();
+        // A box that Lua had open and gave back is made by the window manager in the next frame (updateMessageBoxes)
+        mMessagesDrawnByLua = drawn;
     }
 
     int FalloutScripts::takeButtonPressed(FalloutScript::FormId owner)
@@ -1452,6 +1523,12 @@ namespace OFScript
                 const std::lock_guard lock(mOpenMessageMutex);
                 if (!mOpenMessage || mOpenMessage->mSerial != serial)
                     return;
+            }
+            if (mOpenByLua)
+            {
+                // The answer of a box that Lua draws; the frame takes it (updateMessageBoxes)
+                mLuaPressed = static_cast<int>(button);
+                return;
             }
             // The box that is open must be the one that was asked for: another one can have taken its place
             OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();

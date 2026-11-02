@@ -238,7 +238,11 @@ namespace FalloutMenu
         // by its justification point (a text's x) and the lines in it agree where the block starts
         blockWidth = std::max({ blockWidth, wrapWidth, 0.f });
         for (const std::string_view line : lines)
-            blockWidth = std::max(blockWidth, bytesWidth(line));
+        {
+            const float lineWidth = bytesWidth(line);
+            layout.mLongest = std::max(layout.mLongest, lineWidth);
+            blockWidth = std::max(blockWidth, lineWidth);
+        }
         layout.mWidth = blockWidth;
         layout.mHeight = static_cast<float>(lines.size()) * mSize;
         for (std::size_t row = 0; row < lines.size(); ++row)

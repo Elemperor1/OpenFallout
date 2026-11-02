@@ -216,6 +216,25 @@ namespace
         EXPECT_FLOAT_EQ(numberOf(menu, "A", "_div0"), 0.f);
     }
 
+    TEST(FalloutMenuEvaluationTest, onlyif_holds_for_a_text_that_has_characters)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"P\">"
+            "<text name=\"Full\"><string> some words </string></text>"
+            "<text name=\"Empty\"><string></string></text>"
+            "<rect name=\"A\">"
+            "<_withText><copy> 7 </copy><onlyif src=\"sibling(Full)\" trait=\"string\"/></_withText>"
+            "<_withNone><copy> 7 </copy><onlyif src=\"sibling(Empty)\" trait=\"string\"/></_withNone>"
+            "<_notText><copy> 7 </copy><onlyifnot src=\"sibling(Full)\" trait=\"string\"/></_notText>"
+            "<_notNone><copy> 7 </copy><onlyifnot src=\"sibling(Empty)\" trait=\"string\"/></_notNone>"
+            "</rect></rect></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_withText"), 7.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_withNone"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_notText"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_notNone"), 7.f);
+    }
+
     TEST(FalloutMenuEvaluationTest, a_trait_can_come_from_the_tiles_around)
     {
         Fixture f;

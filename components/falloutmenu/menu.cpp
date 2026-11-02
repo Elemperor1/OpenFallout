@@ -20,6 +20,13 @@ namespace FalloutMenu
         {
             return x >= rect[0] && y >= rect[1] && x < rect[0] + rect[2] && y < rect[1] + rect[3];
         }
+
+        /// What `onlyif` and `onlyifnot` ask of a value: a number that is not 0, or a text that has characters (the
+        /// message menu keeps the room under its words only `onlyif` the tile of the words has a string)
+        bool conditionHolds(const Value& value)
+        {
+            return value.truth() || (value.isText() && !value.text().empty());
+        }
     }
 
     Menu::Menu(std::shared_ptr<const TileDef> root, std::shared_ptr<const TileDef> globals,
@@ -308,11 +315,11 @@ namespace FalloutMenu
                     acc = (step.mOperand.mKind == Operand::Kind::None ? !acc.truth() : !operand.truth()) ? 1.f : 0.f;
                     break;
                 case Op::OnlyIf:
-                    if (!operand.truth())
+                    if (!conditionHolds(operand))
                         acc = Value(0.f);
                     break;
                 case Op::OnlyIfNot:
-                    if (operand.truth())
+                    if (conditionHolds(operand))
                         acc = Value(0.f);
                     break;
             }
