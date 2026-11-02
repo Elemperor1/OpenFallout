@@ -44,6 +44,13 @@ namespace
         EXPECT_EQ(SettingText::standIn("sData"), "DATA");
     }
 
+    TEST(FalloutSettingText, the_counters_of_the_character_making_screens_are_formats_with_the_points_left)
+    {
+        // Read from the executables as format strings (19 and 12 characters, the same in both games)
+        EXPECT_EQ(SettingText::standIn("sAttributesCount"), "Distribute %d Point");
+        EXPECT_EQ(SettingText::standIn("sSkillsCount"), "Tag %d Skill");
+    }
+
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)
     {
         // The menu files spell some of the names two ways (sOK and sOk, sQuit and squit)

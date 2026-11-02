@@ -5295,8 +5295,8 @@ namespace OFScript
             {
                 if (!info.mDescription.empty())
                     ++withDescription;
-                mActorValueText.emplace(
-                    Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+                mActorValueText.emplace(Misc::StringUtils::lowerCase(info.mEditorId),
+                    ActorValueText{ info.mFullName, info.mDescription, info.mIcon });
             }
             Log(Debug::Info) << "Actor values: " << mStore.get<ESM4::ActorValueInfo>().getSize() << " records, "
                              << withDescription << " with a description";

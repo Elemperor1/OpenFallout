@@ -104,6 +104,7 @@ namespace OFLua
                 row["number"] = Chargen::firstAttribute + i;
                 row["name"] = text.mName;
                 row["description"] = text.mDescription;
+                row["icon"] = text.mIcon;
                 row["value"] = chargen.attribute(Chargen::firstAttribute + i);
                 attributeRows[i + 1] = row;
             }
@@ -118,6 +119,7 @@ namespace OFLua
                 row["number"] = skill.mNumber;
                 row["name"] = text.mName;
                 row["description"] = text.mDescription;
+                row["icon"] = text.mIcon;
                 row["attribute"] = skill.mAttribute;
                 row["value"] = chargen.skillValue(skill.mNumber);
                 row["tagged"] = chargen.tagged(skill.mNumber);

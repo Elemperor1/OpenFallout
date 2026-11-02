@@ -375,6 +375,24 @@ local function hitName(opened, tile)
     return nil
 end
 
+-- The counter under the description, as the executables write it: the setting's text is a format with the number of
+-- points that are left, and an 's' follows it unless that number is one. With none left the counter is not shown.
+local function showCounter(opened, setting, fallback, left)
+    local format = word(setting, fallback)
+    local ok, text = pcall(string.format, format, left)
+    opened:set('CGM_PointCounter', 'string', (ok and text or format) .. (left ~= 1 and 's' or ''))
+    opened:set('CGM_PointCounter', 'visible', left ~= 0)
+end
+
+-- What the screen says of the lit row: its description, and its picture, which is the `ICON` of the actor value's record
+-- (the executables take it from there and from nothing else)
+local function showSelection(opened, text, icon)
+    opened:set('CGM_SelectionText', 'string', text or '')
+    local has = icon ~= nil and icon ~= ''
+    opened:set('CGM_SelectionIcon', 'filename', has and icon or '')
+    opened:set('CGM_SelectionIcon', 'visible', has)
+end
+
 -- The list menu of the points and tags (SPECIAL, skills) with the row template for each: nothing if the data lacks them
 local function pointsMenu(template, title)
     local opened = menuModule.open(MENU_POINTS)
@@ -398,11 +416,12 @@ local function specialMenu()
     if not opened then return false end
     local state = chargen.state()
     -- What the screen started with: Reset goes back to it
-    local baseline, numbers, texts = {}, {}, {}
+    local baseline, numbers, texts, icons = {}, {}, {}, {}
     for index, attribute in ipairs(state.attributes) do
         baseline[attribute.number] = attribute.value
         numbers[index] = attribute.number
         texts[index] = attribute.description or ''
+        icons[index] = attribute.icon
     end
     local selected, described = 1, nil
     -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit, and the
@@ -415,7 +434,7 @@ local function specialMenu()
         local row = made.selected()
         if row ~= described and row >= 1 and row <= #numbers then
             described = row
-            opened:set('CGM_SelectionText', 'string', texts[row])
+            showSelection(opened, texts[row], icons[row])
         end
     end
     function updateShown()
@@ -438,8 +457,8 @@ local function specialMenu()
             made.select(selected)
             opened:io('_CurrPoints', total)
             opened:io('_MaxPoints', total + now.pointsLeft)
-            opened:set('CGM_PointCounter', 'string', 'Points Left: ' .. now.pointsLeft)
-            opened:set('CGM_SelectionText', 'string', texts[selected])
+            showCounter(opened, 'sAttributesCount', 'Distribute %d Point', now.pointsLeft)
+            showSelection(opened, texts[selected], icons[selected])
             described = selected
         end)
     end
@@ -488,11 +507,12 @@ local function skillsMenu()
     local opened, made = pointsMenu('CGM_SelectItemTemplate', word('sStatsSkills', 'Skills'))
     if not opened then return false end
     -- What the screen started with (skills may arrive already tagged): Reset goes back to it
-    local numbers, tagged, texts = {}, {}, {}
+    local numbers, tagged, texts, icons = {}, {}, {}, {}
     for index, skill in ipairs(chargen.state().skills) do
         numbers[index] = skill.number
         tagged[skill.number] = skill.tagged == true
         texts[index] = skill.description or ''
+        icons[index] = skill.icon
     end
     local selected, described = 1, nil
     -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit, and the
@@ -505,7 +525,7 @@ local function skillsMenu()
         local row = made.selected()
         if row ~= described and row >= 1 and row <= #numbers then
             described = row
-            opened:set('CGM_SelectionText', 'string', texts[row])
+            showSelection(opened, texts[row], icons[row])
         end
     end
     function updateShown()
@@ -525,8 +545,8 @@ local function skillsMenu()
             made.select(selected)
             opened:io('_CurrPoints', now.tagLimit - now.tagsLeft)
             opened:io('_MaxPoints', now.tagLimit)
-            opened:set('CGM_PointCounter', 'string', 'Tags Left: ' .. now.tagsLeft)
-            opened:set('CGM_SelectionText', 'string', texts[selected])
+            showCounter(opened, 'sSkillsCount', 'Tag %d Skill', now.tagsLeft)
+            showSelection(opened, texts[selected], icons[selected])
             described = selected
         end)
     end

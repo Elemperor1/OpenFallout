@@ -17,14 +17,17 @@ namespace FalloutScript::SettingText
         };
 
         // The labels the menu files of both games ask for (`&-sName;`), as they are on the screens that were drawn
-        // from the files. The caravan, card and roulette games are not here: their words are not needed yet. The length
-        // and the case of the defaults of the buttons and the tabs of the data page were read from both executables
-        // (sMakeActiveQuest 17, sPlayAudio 10, sStopAudio 10, sShowAllNotes 14, sShowActiveNotes 23, sNextChallenge 19,
-        // the tab texts 9, 9, 6, 4 (Misc, New Vegas), 5 (Notes, Fallout 3), 5); the words are the ones that fit, and
-        // the executables' texts were compared with them: all of the data page's words are equal except sNextChallenge,
-        // whose real text is "Next Challenge" and one other four-letter word (the word here is still to be confirmed).
+        // from the files; sAttributesCount and sSkillsCount are formats of the character making screens (read from the
+        // executables: the number of points left, then an 's' unless it is one). The caravan, card and roulette games
+        // are not here: their words are not needed yet. The length and the case of the defaults of the buttons and the
+        // tabs of the data page were read from both executables (sMakeActiveQuest 17, sPlayAudio 10, sStopAudio 10,
+        // sShowAllNotes 14, sShowActiveNotes 23, sNextChallenge 19, the tab texts 9, 9, 6, 4 (Misc, New Vegas), 5
+        // (Notes, Fallout 3), 5); the words are the ones that fit, and the executables' texts were compared with them:
+        // all of the data page's words are equal except sNextChallenge, whose real text is "Next Challenge" and one
+        // other four-letter word (the word here is still to be confirmed).
         constexpr std::array entries = {
             Entry{ "sAccept", "Accept" },
+            Entry{ "sAttributesCount", "Distribute %d Point" },
             Entry{ "sBack", "Back" },
             Entry{ "sCWheelTitle", "Companion Wheel" },
             Entry{ "sCancel", "Cancel" },
@@ -115,6 +118,7 @@ namespace FalloutScript::SettingText
             Entry{ "sShowAllNotes", "Show All Notes" },
             Entry{ "sShowLocation", "Show Location" },
             Entry{ "sSkillRequirement", "Skill Requirement" },
+            Entry{ "sSkillsCount", "Tag %d Skill" },
             Entry{ "sSpace", "Space" },
             Entry{ "sStats", "STATS" },
             Entry{ "sStatsAP", "AP" },

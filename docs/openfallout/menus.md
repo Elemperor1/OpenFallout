@@ -148,11 +148,18 @@ the square of a skill that is tagged). The file asks the code for the title, the
 numbers `_CurrPoints` and `_MaxPoints` (the points given so far and all that can be given), and Done is shown dim until they
 are equal, as the file says. A click on a row picks it and shows its description; the arrows give and take a point; Reset
 goes back to what the screen started with. The keys: up and down pick a row, left and right give and take a point (space
-tags), Enter is Done. The top of the list is where the file leaves it to the code, 60 units down; the words of the counter
-and the picture of the selection (the file hides it) are not read from the executables yet. The sex and race screen
-(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and which of the two trait
-menus (`trait_menu.xml`, `trait_select_menu.xml`) the games open for the traits is not read yet; both keep the stand-in
-widgets, as does any screen whose file the install lacks.
+tags), Enter is Done. The top of the list is where the file leaves it to the code, 60 units down. The counter under the
+description is read from the executables: the setting `sAttributesCount` ("Distribute %d Point", S.P.E.C.I.A.L.) or
+`sSkillsCount` ("Tag %d Skill") is a format for the points that are left, with an "s" after it unless that is one, and the
+counter is hidden when none are left; the number is the same whatever `flagA` of the script command (the points to add on
+top of the values the character has) does, since the screen counts what is left. The picture of the selection (the file hides
+it) is the `ICON` string of the actor value's own record (`SPECIAL_Strength.dds` and the others under
+`Interface\Icons\PipboyImages\S.P.E.C.I.A.L`, `Skills_*.dds` under `Interface\Icons\Stats`; New Vegas's record for
+Throwing names `skills_survival.dds`), taken with its description and name from the same record. The sex and race screen
+(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here. For the traits New Vegas opens
+`trait_menu.xml` (the only script of `FalloutNV.esm` that shows a trait menu, `VCG04ActivatorScript`, calls
+`ShowTraitMenu` after `ShowRaceMenu`; `trait_select_menu.xml` is the unused one) and Fallout 3 has no traits; the page for it
+is not drawn from the file yet, so the traits keep the stand-in widgets, as does any screen whose file the install lacks.
 
 ## The words of the labels
 
