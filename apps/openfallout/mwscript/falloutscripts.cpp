@@ -5290,13 +5290,16 @@ namespace OFScript
         if (!mActorValueTextBuilt)
         {
             mActorValueTextBuilt = true;
+            // The executables leave out of the level-up list the actor value whose record has this flag
+            constexpr std::uint32_t levelUpSkipFlag = 0x2000;
             std::size_t withDescription = 0;
             for (const ESM4::ActorValueInfo& info : mStore.get<ESM4::ActorValueInfo>())
             {
                 if (!info.mDescription.empty())
                     ++withDescription;
                 mActorValueText.emplace(Misc::StringUtils::lowerCase(info.mEditorId),
-                    ActorValueText{ info.mFullName, info.mDescription, info.mIcon });
+                    ActorValueText{
+                        info.mFullName, info.mDescription, info.mIcon, (info.mFlags & levelUpSkipFlag) != 0 });
             }
             Log(Debug::Info) << "Actor values: " << mStore.get<ESM4::ActorValueInfo>().getSize() << " records, "
                              << withDescription << " with a description";

@@ -1,6 +1,7 @@
 #include "falloutscripts.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 #include <components/debug/debuglog.hpp>
@@ -18,6 +19,7 @@
 #include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadweap.hpp>
+#include <components/esm4/script.hpp>
 #include <components/falloutscript/levelling.hpp>
 #include <components/falloutscript/perks.hpp>
 #include <components/falloutscript/settingtext.hpp>
@@ -276,12 +278,64 @@ namespace OFScript
         return result;
     }
 
-    namespace
+    std::string FalloutScripts::actorValueName(int number) const
     {
-        FalloutScripts::PipboyPerk perkRow(const FalloutScript::PerkInfo& info, int rank)
+        // The attributes are the actor values 5 to 11 (the records are named after them with AV in front)
+        constexpr std::array<std::pair<const char*, const char*>, FalloutScript::Chargen::attributeCount> attributes
+            = { {
+                { "AVStrength", "Strength" },
+                { "AVPerception", "Perception" },
+                { "AVEndurance", "Endurance" },
+                { "AVCharisma", "Charisma" },
+                { "AVIntelligence", "Intelligence" },
+                { "AVAgility", "Agility" },
+                { "AVLuck", "Luck" },
+            } };
+        const int attribute = number - FalloutScript::Chargen::firstAttribute;
+        if (attribute >= 0 && attribute < FalloutScript::Chargen::attributeCount)
+            return actorValueText(attributes[attribute].first, attributes[attribute].second).mName;
+        for (const FalloutScript::ChargenSkill& skill : mChargen.skills())
+            if (skill.mNumber == number)
+                return actorValueText(skill.mEditorId, skill.mName).mName;
+        return {};
+    }
+
+    FalloutScripts::PipboyPerk FalloutScripts::pipboyPerkRow(const FalloutScript::PerkInfo& info, int rank)
+    {
+        PipboyPerk row;
+        row.mId = info.mId;
+        row.mName = info.mName;
+        row.mDescription = info.mDescription;
+        row.mIcon = info.mIcon;
+        row.mMinimumLevel = info.mMinimumLevel;
+        row.mRank = rank;
+        row.mRanks = info.mRanks;
+        // The level-up screen writes a line for the conditions that ask for an actor value or for another perk, and
+        // nothing for the rest (the level, the sex, quests), which still count where the list is joined
+        for (const ESM4::TargetCondition& condition : info.mRequirements)
         {
-            return FalloutScripts::PipboyPerk{ info.mId, info.mName, info.mDescription, rank, info.mRanks, true };
+            PipboyRequirement requirement;
+            requirement.mComparison = static_cast<int>((condition.condition >> 5) & 7);
+            requirement.mOr = (condition.condition & ESM4::CTF_Combine) != 0;
+            if (condition.functionIndex == ESM4::FUN_GetPermanentActorValue)
+            {
+                requirement.mKind = PipboyRequirement::Kind::ActorValue;
+                requirement.mActorValue = static_cast<int>(condition.param1);
+                requirement.mName = actorValueName(requirement.mActorValue);
+                // The number of the condition is a float; the screen writes its whole part
+                requirement.mNumber = static_cast<int>(condition.comparison);
+            }
+            else if (condition.functionIndex == ESM4::FUN_HasPerk)
+            {
+                requirement.mKind = PipboyRequirement::Kind::Perk;
+                FalloutScript::PerkInfo needed;
+                if (mPerks.info(static_cast<FalloutScript::FormId>(condition.param1), needed))
+                    requirement.mName = needed.mName;
+                requirement.mNumber = static_cast<int>(condition.param2);
+            }
+            row.mRequirements.push_back(std::move(requirement));
         }
+        return row;
     }
 
     std::vector<FalloutScripts::PipboyPerk> FalloutScripts::pipboyPerks()
@@ -291,7 +345,7 @@ namespace OFScript
         {
             FalloutScript::PerkInfo info;
             if (mPerks.info(id, info) && !info.mName.empty())
-                result.push_back(perkRow(info, rank));
+                result.push_back(pipboyPerkRow(info, rank));
         }
         std::stable_sort(result.begin(), result.end(),
             [](const PipboyPerk& left, const PipboyPerk& right) { return left.mName < right.mName; });
@@ -306,7 +360,7 @@ namespace OFScript
             FalloutScript::PerkInfo info;
             if (mPerks.info(offer.mPerk, info) && !info.mName.empty())
             {
-                PipboyPerk row = perkRow(info, mProgress.perkRank(mPlayer, offer.mPerk));
+                PipboyPerk row = pipboyPerkRow(info, mProgress.perkRank(mPlayer, offer.mPerk));
                 row.mAvailable = offer.mAvailable;
                 result.push_back(std::move(row));
             }

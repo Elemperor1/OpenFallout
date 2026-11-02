@@ -337,19 +337,48 @@ namespace OFScript
             std::vector<PipboyObjective> mObjectives;
         };
         std::vector<PipboyQuest> pipboyQuests();
+        /// A condition of a perk, as the level-up screen writes the list of what the perk asks for. It writes a line
+        /// for two kinds (an actor value at a number, a perk the player has), and nothing for the others (the level,
+        /// the sex, a quest), but they count in how it writes the rest.
+        struct PipboyRequirement
+        {
+            enum class Kind
+            {
+                Other,
+                ActorValue,
+                Perk,
+            };
+            Kind mKind = Kind::Other;
+            int mActorValue = 0;
+            /// The name of the actor value (an attribute or a skill; empty for any other) or of the perk (empty when
+            /// the condition names none)
+            std::string mName;
+            /// The comparison of the condition: 0 equal, 1 not equal, 2 greater, 3 greater or equal, 4 less, 5 less or
+            /// equal
+            int mComparison = 3;
+            /// The number compared with (an actor value), or the rank asked for (a perk; 0: any)
+            int mNumber = 0;
+            /// The condition is joined to the one after it by "or" (and not by "and")
+            bool mOr = false;
+        };
         /// The perks of the player with their ranks, and those it can choose from when it has a perk to spend
         struct PipboyPerk
         {
             FalloutScript::FormId mId = 0;
             std::string mName;
             std::string mDescription;
+            /// The picture of the perk's record, and the least level it asks (the level-up screen shows both)
+            std::string mIcon;
+            int mMinimumLevel = 0;
             int mRank = 0;
             int mRanks = 1;
             /// The perks of the level-up list that cannot be chosen yet are shown dimmed
             bool mAvailable = true;
+            std::vector<PipboyRequirement> mRequirements;
         };
         std::vector<PipboyPerk> pipboyPerks();
         std::vector<PipboyPerk> pipboyOfferedPerks();
+        PipboyPerk pipboyPerkRow(const FalloutScript::PerkInfo& info, int rank);
         /// Spends skill points on a skill (the skill stays at most 100); the points spent, 0 when none could be
         int spendSkillPoints(int skill, int points);
         /// Takes skill points back from a skill (the screen of the level up does when the player takes back what it
@@ -956,8 +985,12 @@ namespace OFScript
             std::string mName;
             std::string mDescription;
             std::string mIcon;
+            /// The record's own flag (0x2000) that keeps the actor value out of the list of the level-up screen
+            bool mLevelUpSkip = false;
         };
         ActorValueText actorValueText(std::string_view editorId, std::string_view fallback) const;
+        /// The name of an attribute or a skill by its actor value number; empty for any other actor value
+        std::string actorValueName(int number) const;
         /// The races the player can be (playable and not children), by their form ids
         struct ChargenRace
         {

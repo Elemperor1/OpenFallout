@@ -166,6 +166,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutdeath.lua
     scripts/omw/falloutvats.lua
     scripts/omw/falloutitemcards.lua
+    scripts/omw/falloutlevelup.lua
     scripts/omw/falloutloot.lua
     scripts/omw/falloutmenu.lua
     scripts/omw/falloutpad.lua
