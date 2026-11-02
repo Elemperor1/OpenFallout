@@ -91,12 +91,22 @@ Shown.__index = Shown
 
 -- Draw the menu again if anything it depends on changed
 function Shown:refresh()
-    if not self.element then return end
-    local version = self.menu:version()
-    if version == self.version then return end
-    self.version = version
-    self.element.layout.content = contentOf(self.menu:pieces())
+    if not self.element or self.batching then return end
+    if self.menu:version() == self.version then return end
+    -- Making the pieces evaluates traits, so the version is read after it
+    local pieces = self.menu:pieces()
+    self.version = self.menu:version()
+    self.element.layout.content = contentOf(pieces)
     self.element:update()
+end
+
+-- Change a number of things and draw the menu once, after the last of them
+function Shown:batch(change)
+    self.batching = true
+    local ok, problem = pcall(change)
+    self.batching = false
+    self:refresh()
+    if not ok then error(problem, 0) end
 end
 
 -- Give the menu the size of the window again if the window changed size
@@ -115,6 +125,9 @@ end
 function Shown:dispatch(tile)
     local handler = self.clicks[self.menu:name(tile)]
     if handler then handler(tile) end
+    -- A tile in a row of a list is the row's click
+    local list, row = self.menu:rowOf(tile)
+    if list and self.rowClicks[list] then self.rowClicks[list](row, tile) end
 end
 
 -- Call `handler(tile)` when the tile of this name is clicked
@@ -129,6 +142,34 @@ end
 
 function Shown:get(tile, trait)
     return self.menu:get(tile, trait)
+end
+
+-- Set a trait of the menu itself: what the host tells a menu file (`_DialogVisible` and the like)
+function Shown:io(trait, value)
+    self.menu:set(self.menu:root(), trait, value)
+    self:refresh()
+end
+
+-- Make a list of the menu: `listTile` is the list (a tile of `list_box.xml`) and `template` the tile that each row is.
+-- Returns an object with `rows(tables of traits)`, `select(row)`, `selected()`, `count()` and `onClick(function(row))`;
+-- the rows are from 1.
+function Shown:list(listTile, template)
+    local number = self.menu:addList(listTile, template)
+    if not number then return nil end
+    local shown = self
+    local list = {}
+    function list.rows(rows)
+        shown.menu:setRows(number, rows)
+        shown:refresh()
+    end
+    function list.select(row, reveal)
+        shown.menu:selectRow(number, row, reveal)
+        shown:refresh()
+    end
+    function list.selected() return shown.menu:selectedRow(number) end
+    function list.count() return shown.menu:rowCount(number) end
+    function list.onClick(handler) shown.rowClicks[number] = handler end
+    return list
 end
 
 -- Put a scrollbar of the menu at a value
@@ -164,7 +205,7 @@ function module.open(file, options)
         print('menu ' .. file .. ' is not shown: ' .. tostring(reason))
         return nil
     end
-    local shown = setmetatable({ menu = menu, file = file, size = size, clicks = {} }, Shown)
+    local shown = setmetatable({ menu = menu, file = file, size = size, clicks = {}, rowClicks = {} }, Shown)
     shown.version = menu:version()
     shown.element = ui.create {
         layer = options.layer or 'Windows',

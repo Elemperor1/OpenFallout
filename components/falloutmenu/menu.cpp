@@ -430,6 +430,11 @@ namespace FalloutMenu
         return result;
     }
 
+    bool Menu::hasTemplate(std::string_view name) const
+    {
+        return mTemplates.count(Xml::lower(name)) > 0;
+    }
+
     Tile* Menu::instantiate(Tile& parent, std::string_view templateName, std::string_view name)
     {
         const auto found = mTemplates.find(Xml::lower(templateName));
@@ -438,11 +443,19 @@ namespace FalloutMenu
             mProblems.push_back("no template " + std::string(templateName));
             return nullptr;
         }
-        // The template is a tile of its own kind that the menu does not show; what is made from it is a rect
-        // with the same traits and children
-        auto copy = std::make_shared<TileDef>(*found->second);
-        copy->mType = TileType::Rect;
-        copy->mName = name.empty() ? found->second->mName : std::string(name);
+        // The files write a template around the one tile that is made from it (`<template name="Row"><hotrect
+        // name="Item">...`); then the tile is the thing to make. A template that holds traits of its own is a tile of
+        // its own kind that the menu does not show, and what is made from it is a rect with the same traits and
+        // children.
+        std::shared_ptr<const TileDef> body = found->second;
+        const bool wrapper
+            = body->mTraits.empty() && body->mChildren.size() == 1 && body->mChildren[0]->mType != TileType::Template;
+        if (wrapper)
+            body = body->mChildren[0];
+        auto copy = std::make_shared<TileDef>(*body);
+        if (!wrapper)
+            copy->mType = TileType::Rect;
+        copy->mName = name.empty() ? body->mName : std::string(name);
         std::unique_ptr<Tile> tile = build(copy, &parent, true);
         Tile* result = tile.get();
         parent.mChildren.push_back(std::move(tile));
@@ -569,10 +582,13 @@ namespace FalloutMenu
     }
 
     void Menu::collect(Tile& tile, float originX, float originY, const std::optional<std::array<float, 4>>& clip,
-        std::vector<DrawItem>& out)
+        bool clipped, std::vector<DrawItem>& out)
     {
         if (!visible(tile))
             return;
+        // A tile that asks to be clipped takes what is in it along: the text of a row of a list is cut at the edge of
+        // the list as the row is
+        clipped = clipped || number(tile, "clips") != 0;
         const float x = originX + number(tile, "x") - anchorShift(tile);
         const float y = originY + number(tile, "y");
         const float width = number(tile, "width");
@@ -609,7 +625,7 @@ namespace FalloutMenu
                 item.mJustify = static_cast<int>(number(tile, "justify"));
                 item.mWrapWidth = number(tile, "wrapwidth");
             }
-            if (number(tile, "clips") != 0 && clip)
+            if (clipped && clip)
             {
                 item.mClipped = true;
                 item.mClipX = (*clip)[0];
@@ -636,21 +652,22 @@ namespace FalloutMenu
         std::stable_sort(ordered.begin(), ordered.end(),
             [](const std::pair<float, Tile*>& a, const std::pair<float, Tile*>& b) { return a.first < b.first; });
         for (const auto& entry : ordered)
-            collect(*entry.second, frameX, frameY, childClip, out);
+            collect(*entry.second, frameX, frameY, childClip, clipped, out);
     }
 
     std::vector<DrawItem> Menu::draw()
     {
         std::vector<DrawItem> out;
-        collect(*mRoot, 0, 0, std::nullopt, out);
+        collect(*mRoot, 0, 0, std::nullopt, false, out);
         return out;
     }
 
     void Menu::hitTest(Tile& tile, float originX, float originY, float px, float py, bool wheel, Tile*& best,
-        std::optional<std::array<float, 4>> clip)
+        std::optional<std::array<float, 4>> clip, bool clipped)
     {
         if (!visible(tile))
             return;
+        clipped = clipped || number(tile, "clips") != 0;
         const float x = originX + number(tile, "x") - anchorShift(tile);
         const float y = originY + number(tile, "y");
         const float width = number(tile, "width");
@@ -663,8 +680,8 @@ namespace FalloutMenu
         if (wanted && width > 0 && height > 0)
         {
             const std::array<float, 4> rect{ x, y, width, height };
-            const bool clipped = number(tile, "clips") != 0 && clip;
-            if (contains(rect, px, py) && (!clipped || contains(*clip, px, py)))
+            const bool outside = clipped && clip && !contains(*clip, px, py);
+            if (contains(rect, px, py) && !outside)
                 best = &tile;
         }
         std::optional<std::array<float, 4>> childClip = clip;
@@ -679,20 +696,20 @@ namespace FalloutMenu
         std::stable_sort(ordered.begin(), ordered.end(),
             [](const std::pair<float, Tile*>& a, const std::pair<float, Tile*>& b) { return a.first < b.first; });
         for (const auto& entry : ordered)
-            hitTest(*entry.second, frameX, frameY, px, py, wheel, best, childClip);
+            hitTest(*entry.second, frameX, frameY, px, py, wheel, best, childClip, clipped);
     }
 
     Tile* Menu::tileAt(float x, float y)
     {
         Tile* best = nullptr;
-        hitTest(*mRoot, 0, 0, x, y, false, best, std::nullopt);
+        hitTest(*mRoot, 0, 0, x, y, false, best, std::nullopt, false);
         return best;
     }
 
     Tile* Menu::wheelTileAt(float x, float y)
     {
         Tile* best = nullptr;
-        hitTest(*mRoot, 0, 0, x, y, true, best, std::nullopt);
+        hitTest(*mRoot, 0, 0, x, y, true, best, std::nullopt, false);
         return best;
     }
 }

@@ -1,5 +1,6 @@
 #include "menubindings.hpp"
 
+#include <map>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -250,6 +251,63 @@ namespace OFLua
                 rows[index++] = tile->uid();
             return rows;
         };
+
+        // Lists (`list_box.xml`): make one of a tile and a template for its rows (the number of the list, from 1), give
+        // it rows (tables of traits to set on each: `string` and the like), pick a row, and find which row a tile is
+        menuT["addList"] = [](sol::this_state state, LuaMenu& self, std::string_view listTile,
+                               std::string_view templateName) -> sol::object {
+            const int number = self.mMenu->addList(listTile, templateName);
+            if (number < 0)
+                return sol::nil;
+            return sol::make_object<int>(state, number + 1);
+        };
+        menuT["setRows"] = [](LuaMenu& self, int number, const sol::table& rows) {
+            FalloutMenu::ListBox* list = self.mMenu->list(number - 1);
+            if (list == nullptr)
+                throw std::runtime_error("The menu has no list " + std::to_string(number));
+            std::vector<std::map<std::string, FalloutMenu::Value>> made;
+            for (std::size_t index = 1; index <= rows.size(); ++index)
+            {
+                std::map<std::string, FalloutMenu::Value> row;
+                const sol::object entry = rows[index];
+                if (entry.is<sol::table>())
+                {
+                    for (const auto& [key, value] : entry.as<sol::table>())
+                    {
+                        if (!key.is<std::string>())
+                            continue;
+                        if (value.is<std::string>())
+                            row[key.as<std::string>()] = FalloutMenu::Value::fromText(value.as<std::string>());
+                        else if (value.is<bool>())
+                            row[key.as<std::string>()] = FalloutMenu::Value(value.as<bool>() ? 1.f : 0.f);
+                        else if (value.is<double>())
+                            row[key.as<std::string>()] = FalloutMenu::Value(static_cast<float>(value.as<double>()));
+                    }
+                }
+                made.push_back(std::move(row));
+            }
+            list->setRows(made);
+        };
+        menuT["selectRow"] = [](LuaMenu& self, int number, int row, sol::optional<bool> reveal) {
+            if (FalloutMenu::ListBox* list = self.mMenu->list(number - 1))
+                list->select(row - 1, reveal.value_or(false));
+        };
+        menuT["selectedRow"] = [](LuaMenu& self, int number) {
+            FalloutMenu::ListBox* list = self.mMenu->list(number - 1);
+            return list == nullptr ? 0 : list->selected() + 1;
+        };
+        menuT["rowCount"] = [](LuaMenu& self, int number) {
+            FalloutMenu::ListBox* list = self.mMenu->list(number - 1);
+            return list == nullptr ? 0 : list->rowCount();
+        };
+        menuT["rowOf"] = [](LuaMenu& self, const sol::object& which) -> std::tuple<sol::object, sol::object> {
+            const auto found = self.mMenu->rowOf(tileOf(self, which));
+            if (!found)
+                return { sol::nil, sol::nil };
+            return { sol::make_object<int>(which.lua_state(), found->first + 1),
+                sol::make_object<int>(which.lua_state(), found->second + 1) };
+        };
+        menuT["root"] = [](sol::this_state state, LuaMenu& self) { return tileId(state, &self.mMenu->menu().root()); };
 
         // Open a menu file (`message_menu.xml`) for a window of some size. `pad` says whether a pad is in use.
         // Nothing, and the reason, if the data lacks the file.

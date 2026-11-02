@@ -1578,6 +1578,20 @@
 -- @function [parent=#FalloutMenu] click
 -- @function [parent=#FalloutMenu] hovered
 -- @function [parent=#FalloutMenu] dragged
+-- @function [parent=#FalloutMenu] root
+
+---
+-- Lists, as the games' code makes them from `list_box.xml`. `addList` makes one from the tile of the list and the name of
+-- the template of its rows (a number counted from 1, nil if the menu has no such tile or template); `setRows` makes the
+-- rows again from a list of tables, each the traits to set on one row (`string`, `_line_alpha`, ...), and works out
+-- their heights, the scrolling and the highlight; `selectRow` (counted from 1, 0 for none; `reveal` scrolls to it),
+-- `selectedRow`, `rowCount`; `rowOf` gives the list and the row that a tile is (or is in).
+-- @function [parent=#FalloutMenu] addList
+-- @function [parent=#FalloutMenu] setRows
+-- @function [parent=#FalloutMenu] selectRow
+-- @function [parent=#FalloutMenu] selectedRow
+-- @function [parent=#FalloutMenu] rowCount
+-- @function [parent=#FalloutMenu] rowOf
 
 ---
 -- Put a scrollbar (a tile whose file gives it a `_current_value`) at a value, as clicks of its arrows would. The

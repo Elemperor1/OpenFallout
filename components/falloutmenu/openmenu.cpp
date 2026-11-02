@@ -189,7 +189,7 @@ namespace FalloutMenu
             if (font == nullptr)
                 return {};
             const Font::Layout layout = font->layout(text, wrapWidth, 1);
-            return { wrapWidth > 0 ? std::max(layout.mWidth, 0.f) : layout.mWidth, layout.mHeight };
+            return { layout.mWidth, layout.mHeight };
         };
         environment.mSystemColor = [shared](int id) { return shared->systemColor(id); };
 
@@ -310,7 +310,7 @@ namespace FalloutMenu
         if (!size)
             return;
         const float scale = this->scale();
-        const Font::Layout layout = font->layout(item.mText, item.mWrapWidth, item.mJustify);
+        const Font::Layout layout = font->layout(item.mText, item.mWrapWidth, item.mJustify, item.mWidth);
 
         Piece base;
         base.mTile = item.mTile;
@@ -344,8 +344,42 @@ namespace FalloutMenu
         }
     }
 
+    int OpenMenu::addList(std::string_view listTile, std::string_view templateName)
+    {
+        Tile* tile = mMenu->find(listTile);
+        if (tile == nullptr || !mMenu->hasTemplate(templateName))
+            return -1;
+        mLists.push_back(std::make_unique<ListBox>(*this, tile->uid(), std::string(templateName)));
+        return static_cast<int>(mLists.size()) - 1;
+    }
+
+    ListBox* OpenMenu::list(int number)
+    {
+        if (number < 0 || number >= static_cast<int>(mLists.size()))
+            return nullptr;
+        return mLists[number].get();
+    }
+
+    std::optional<std::pair<int, int>> OpenMenu::rowOf(const Tile& tile)
+    {
+        for (int number = 0; number < static_cast<int>(mLists.size()); ++number)
+        {
+            const int row = mLists[number]->rowOf(tile);
+            if (row >= 0)
+                return std::make_pair(number, row);
+        }
+        return std::nullopt;
+    }
+
+    void OpenMenu::layoutLists()
+    {
+        for (const std::unique_ptr<ListBox>& list : mLists)
+            list->layout();
+    }
+
     std::vector<Piece> OpenMenu::pieces()
     {
+        layoutLists();
         std::vector<Piece> result;
         for (const DrawItem& item : mMenu->draw())
         {
@@ -384,7 +418,12 @@ namespace FalloutMenu
             if (Tile* old = mMenu->byId(mHover))
                 mMenu->set(*old, "mouseover", 0.f);
             if (over != nullptr)
+            {
                 mMenu->set(*over, "mouseover", 1.f);
+                // The highlight of a list goes to the row the pointer comes to
+                if (const std::optional<std::pair<int, int>> row = rowOf(*over))
+                    mLists[row->first]->select(row->second);
+            }
             mHover = overId;
         }
         if (Tile* dragged = mMenu->byId(mDragged))

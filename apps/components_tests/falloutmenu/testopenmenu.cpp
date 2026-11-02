@@ -428,4 +428,123 @@ namespace
         open.setScrollbar(*bar, 100.f);
         EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 10.f);
     }
+
+    // A list as the files make them: a window that clips, a highlight box, a scrollbar, and a template for the rows
+    const char* const listMenu
+        = "<menu name=\"M\"><hotrect name=\"List\"><x> 0 </x><y> 0 </y><width> 200 </width><height> 100 </height>"
+          "<clipwindow> 1 </clipwindow><_scroll_delta> 20 </_scroll_delta><wheelable> 1 </wheelable>"
+          "<hotrect name=\"lb_highlight_box\"><width> 200 </width></hotrect>"
+          "<hotrect name=\"lb_scrollbar\"><_step_size> 1 </_step_size><_number_of_items> 1 </_number_of_items>"
+          "<_number_of_visible_items> 1 </_number_of_visible_items><_SetInCode></_SetInCode>"
+          "<_current_value><add><copy src=\"child(lb_scrollbar_down)\" trait=\"clicked\"/>"
+          "<sub src=\"child(lb_scrollbar_up)\" trait=\"clicked\"/></add>"
+          "<min><copy src=\"me()\" trait=\"_number_of_items\"/><sub src=\"me()\" trait=\"_number_of_visible_items\"/>"
+          "</min><max> 0 </max></_current_value>"
+          "<image name=\"lb_scrollbar_up\"/><image name=\"lb_scrollbar_down\"/></hotrect></hotrect>"
+          "<template name=\"Row\"><hotrect name=\"Item\"><height> 0 </height><_verticalspacing> 10 </_verticalspacing>"
+          "<_y></_y><y><copy src=\"me()\" trait=\"_y\"/><sub><copy src=\"sibling(lb_scrollbar)\" "
+          "trait=\"_current_value\"/><mul src=\"parent()\" trait=\"_scroll_delta\"/></sub></y>"
+          "<width> 200 </width><target> 1 </target><clips> 1 </clips>"
+          "<text name=\"T\"><font> 1 </font><string><copy src=\"parent()\" trait=\"string\"/></string></text>"
+          "</hotrect></template></menu>";
+
+    std::vector<std::map<std::string, Value>> rowsOf(int count)
+    {
+        std::vector<std::map<std::string, Value>> rows;
+        for (int i = 0; i < count; ++i)
+            rows.push_back({ { "string", Value::fromText("Row " + std::to_string(i + 1)) } });
+        return rows;
+    }
+
+    TEST(FalloutOpenMenuListTest, rows_are_made_from_the_template_and_stacked_by_the_height_of_their_text)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        const int number = open.addList("List", "Row");
+        ASSERT_GE(number, 0);
+        EXPECT_EQ(open.addList("Nothing", "Row"), -1);
+        EXPECT_EQ(open.addList("List", "Nothing"), -1);
+        ListBox& list = *open.list(number);
+        list.setRows(rowsOf(5));
+        ASSERT_EQ(list.rowCount(), 5);
+        // Each row is the height of its text (30, one line of the test font) and 10 of room
+        for (int row = 0; row < 5; ++row)
+        {
+            Tile* item = list.item(row);
+            ASSERT_NE(item, nullptr);
+            EXPECT_EQ(item->name(), "Item");
+            EXPECT_FLOAT_EQ(menu.number(*item, "listindex"), static_cast<float>(row));
+            EXPECT_FLOAT_EQ(menu.number(*item, "height"), 40.f);
+            EXPECT_FLOAT_EQ(menu.number(*item, "_y"), 40.f * static_cast<float>(row));
+            EXPECT_EQ(menu.text(*item, "string"), "Row " + std::to_string(row + 1));
+        }
+        Tile* bar = menu.find("lb_scrollbar");
+        // 200 high in all, 100 high to show, 20 to a step
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_number_of_items"), 10.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_number_of_visible_items"), 5.f);
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("List"), "_num_filtered"), 5.f);
+        // Made again, there are no more than the new rows
+        list.setRows(rowsOf(2));
+        EXPECT_EQ(list.rowCount(), 2);
+        EXPECT_EQ(menu.find("List")->children().size(), 4u);
+    }
+
+    TEST(FalloutOpenMenuListTest, the_highlight_goes_to_the_row_the_pointer_is_on_and_follows_the_scrolling)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(5));
+        Tile* listTile = menu.find("List");
+        EXPECT_FLOAT_EQ(menu.number(*listTile, "_highlight_y"), -1.f);
+        open.pointerMoved(50, 50);
+        EXPECT_EQ(list.selected(), 1);
+        EXPECT_FLOAT_EQ(menu.number(*listTile, "_highlight_y"), 40.f);
+        EXPECT_FLOAT_EQ(menu.number(*listTile, "_selected_height"), 40.f);
+        // The row is found from the text inside it, too
+        EXPECT_EQ(list.rowOf(*menu.find(*list.item(3), "T")), 3);
+        const std::optional<std::pair<int, int>> found = open.rowOf(*list.item(2));
+        ASSERT_TRUE(found);
+        EXPECT_EQ(found->second, 2);
+        // Scrolled by two steps of 20, the rows and the highlight are 40 higher
+        open.setScrollbar(*menu.find("lb_scrollbar"), 2.f);
+        list.layout();
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "y"), 0.f);
+        EXPECT_FLOAT_EQ(menu.number(*listTile, "_highlight_y"), 0.f);
+    }
+
+    TEST(FalloutOpenMenuListTest, a_row_that_is_picked_is_scrolled_into_view)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(5));
+        Tile* bar = menu.find("lb_scrollbar");
+        // The window is 100 high: rows 0 to 2 show (0 to 120 is more than 100, so the third is cut)
+        list.select(4, true);
+        // The last row ends at 200: the window must start at 100, five steps down
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 5.f);
+        list.select(0, true);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 0.f);
+        list.select(-1);
+        EXPECT_EQ(list.selected(), -1);
+    }
+
+    TEST(FalloutOpenMenuListTest, a_row_that_is_outside_the_window_is_cut_and_cannot_be_hit)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(5));
+        bool cut = false;
+        for (const Piece& piece : open.pieces())
+            if (piece.mClipped && piece.mClipHeight == 100)
+                cut = true;
+        EXPECT_TRUE(cut);
+        // Row 3 starts at 120, below the window of 100
+        EXPECT_EQ(open.pointerMoved(50, 130), nullptr);
+    }
 }

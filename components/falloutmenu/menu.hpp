@@ -138,6 +138,7 @@ namespace FalloutMenu
         Tile* byId(int id);
         std::vector<Tile*> tiles();
 
+        bool hasTemplate(std::string_view name) const;
         /// A new tile under `parent` from a template of the menu, named `name` (the template's name if empty)
         Tile* instantiate(Tile& parent, std::string_view templateName, std::string_view name = {});
         /// Take a tile that was made with `instantiate` out of the tree
@@ -171,7 +172,7 @@ namespace FalloutMenu
         Value evaluate(const Tile& tile, const Expression& expression);
         Value evaluateOperand(const Tile& tile, const Operand& operand, const Value& running);
         void collect(Tile& tile, float originX, float originY, const std::optional<std::array<float, 4>>& clip,
-            std::vector<DrawItem>& out);
+            bool clipped, std::vector<DrawItem>& out);
         std::array<float, 4> colorOf(const Tile& tile);
         bool visible(const Tile& tile);
         /// A hotrect whose position is its child's (the buttons that `super_text_box` makes): the child already stands
@@ -182,7 +183,7 @@ namespace FalloutMenu
         void assignIds(Tile& tile);
         void unindex(Tile& tile);
         void hitTest(Tile& tile, float originX, float originY, float x, float y, bool wheel, Tile*& best,
-            std::optional<std::array<float, 4>> clip);
+            std::optional<std::array<float, 4>> clip, bool clipped);
 
         Environment mEnvironment;
         std::unordered_map<std::string, std::shared_ptr<const TileDef>> mTemplates;

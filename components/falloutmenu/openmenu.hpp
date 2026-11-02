@@ -15,6 +15,7 @@
 
 #include "atlas.hpp"
 #include "font.hpp"
+#include "listbox.hpp"
 #include "menu.hpp"
 
 namespace FalloutMenu
@@ -141,6 +142,13 @@ namespace FalloutMenu
         /// The tiles that are scrollbars
         const std::vector<int>& scrollbars() const { return mScrollbars; }
 
+        /// Make a list of a tile that the file gives `list_box.xml` and a template for its rows; the number of the
+        /// list, -1 if the menu has no such tile or template
+        int addList(std::string_view listTile, std::string_view templateName);
+        ListBox* list(int number);
+        /// The list and the row of it that a tile is (or is in), if it is
+        std::optional<std::pair<int, int>> rowOf(const Tile& tile);
+
         /// Take a tile that was made from a template out of the menu (the pointer lets go of it first)
         void remove(Tile& tile);
         void removeChildren(Tile& tile);
@@ -152,6 +160,7 @@ namespace FalloutMenu
         std::array<float, 2> localPoint(const Tile& tile, float designX, float designY);
         void forget(const Tile& tile);
         void findScrollbars();
+        void layoutLists();
         std::vector<std::pair<int, float>> scrollbarValues();
         void restoreScrollbars(const std::vector<std::pair<int, float>>& values);
 
@@ -165,6 +174,7 @@ namespace FalloutMenu
         int mPressed = 0;
         int mDragged = 0;
         std::vector<int> mScrollbars;
+        std::vector<std::unique_ptr<ListBox>> mLists;
     };
 }
 
