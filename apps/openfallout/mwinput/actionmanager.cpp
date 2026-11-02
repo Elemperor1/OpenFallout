@@ -206,7 +206,12 @@ namespace OFInput
         }
         else // Close current GUI
         {
-            OFBase::Environment::get().getWindowManager()->exitCurrentGuiMode();
+            // The script that draws the pause menu goes back a step in a screen of it (the list of saves, the question
+            // that asks to be sure) where Escape would close the whole menu
+            OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+            if (windows->getMode() == OFGui::GM_MainMenu && windows->isMainMenuEscapeLua())
+                return;
+            windows->exitCurrentGuiMode();
         }
     }
 

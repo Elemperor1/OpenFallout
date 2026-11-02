@@ -42,7 +42,12 @@ namespace FalloutMenu
         int index = 0;
         for (const auto& row : rows)
         {
-            Tile* item = menu.instantiate(*tile, mTemplate, {});
+            // A row may name the template it is made from (`_template`): the save list of the start menu has a row for
+            // a new save, which the file makes from another template than the rows for the saves
+            const auto named = row.find("_template");
+            const std::string& templateName
+                = named != row.end() && named->second.isText() ? named->second.text() : mTemplate;
+            Tile* item = menu.instantiate(*tile, templateName, {});
             if (item == nullptr)
                 break;
             // What the screen does not say, the row has lit: the files leave the alpha of a row's text for the code to
@@ -52,6 +57,8 @@ namespace FalloutMenu
             // the text of a row, and the marker that shows an equipped item)
             for (const auto& [trait, value] : row)
             {
+                if (trait == "_template")
+                    continue;
                 const std::size_t dot = trait.find('.');
                 if (dot == std::string::npos)
                     menu.set(*item, trait, value);

@@ -21,7 +21,8 @@ namespace FalloutMenu
         ListBox(OpenMenu& open, int listTile, std::string templateName);
 
         /// Make the rows again: each is a tile of the template with these traits set (`string`, `_line_alpha`, ...); a
-        /// trait named `Tile.trait` is set on the tile of that name inside the row
+        /// trait named `Tile.trait` is set on the tile of that name inside the row, and `_template` (a text) names
+        /// another template for that row
         void setRows(const std::vector<std::map<std::string, Value>>& rows);
         int rowCount() const { return static_cast<int>(mItems.size()); }
         /// The row that is picked out (the one the pointer was last on, or the screen picked), -1 for none

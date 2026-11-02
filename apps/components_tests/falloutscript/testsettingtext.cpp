@@ -16,6 +16,16 @@ namespace
         EXPECT_EQ(SettingText::standIn("sInventoryWeightUpper"), "WG");
     }
 
+    TEST(FalloutSettingText, the_pause_menu_has_the_words_its_list_its_questions_and_its_saves_ask_for)
+    {
+        // The items of the list, the choices and questions of the confirm box, and the rows of the list of saves (the
+        // setting names are the ones round 12V read from the executable)
+        for (const char* name : { "sContinue", "sSave", "sLoad", "sSettings", "sQuit", "sBack", "sConfirmQuit",
+                 "sExitGameAffirm", "sCancel", "sYes", "sNo", "sConfirmSave", "sConfirmLoad", "sNewSave",
+                 "sSavesRemaining", "sNoSaves", "sLevelAbbrev", "sPlayTime", "sQuicksaveAbbrev", "sAutosaveAbbrev" })
+            EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
+    }
+
     TEST(FalloutSettingText, the_words_of_the_data_page_have_the_lengths_the_executables_give_them)
     {
         // Read from the default texts of FalloutNV.exe and Fallout3.exe (the same in both): the length of each, and

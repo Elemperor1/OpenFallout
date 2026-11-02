@@ -526,6 +526,39 @@ namespace
         EXPECT_EQ(menu.find("List")->children().size(), 4u);
     }
 
+    TEST(FalloutOpenMenuListTest, a_row_can_name_another_template_than_the_list_makes_its_rows_from)
+    {
+        Fixture f;
+        // The save list of the start menu has a row for a new save that the file makes from its own template
+        std::string text = listMenu;
+        const std::size_t end = text.rfind("</menu>");
+        ASSERT_NE(end, std::string::npos);
+        text.insert(end,
+            "<template name=\"Other\"><hotrect name=\"OtherItem\"><height> 0 </height><width> 200 </width>"
+            "<text name=\"T\"><font> 1 </font><string><copy src=\"parent()\" trait=\"string\"/></string></text>"
+            "</hotrect></template>");
+        OpenMenu& open = f.open(text.c_str(), 1280.f, 960.f);
+        Menu& menu = open.menu();
+        const int number = open.addList("List", "Row");
+        ASSERT_GE(number, 0);
+        ListBox& list = *open.list(number);
+        auto rows = rowsOf(3);
+        rows[1]["_template"] = Value::fromText("Other");
+        list.setRows(rows);
+        ASSERT_EQ(list.rowCount(), 3);
+        EXPECT_EQ(list.item(0)->name(), "Item");
+        EXPECT_EQ(list.item(1)->name(), "OtherItem");
+        EXPECT_EQ(list.item(2)->name(), "Item");
+        // The traits of the row are set, but the name of the template is not a trait of it
+        EXPECT_EQ(menu.text(*list.item(1), "string"), "Row 2");
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "listindex"), 1.f);
+        EXPECT_FALSE(menu.defines(*list.item(1), "_template"));
+        // A name the menu has no template for ends the rows, as a list with no such template does
+        rows[1]["_template"] = Value::fromText("Nothing");
+        list.setRows(rows);
+        EXPECT_EQ(list.rowCount(), 1);
+    }
+
     TEST(FalloutOpenMenuListTest, the_list_is_the_tile_of_the_name_that_has_a_scrollbar)
     {
         Fixture f;

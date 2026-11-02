@@ -283,6 +283,30 @@ namespace OFGui
     {
         if (mVideo)
             mVideo->commitFrame();
+
+        // The pause menu of a game that is running can be drawn by a script of Lua from the game's own menu file
+        // (start_menu.xml): the buttons stay out of the way while it says it does (every frame) and are back as soon as
+        // it stops, as it does when the file is not there or the script fails
+        if (mButtonBox)
+        {
+            const bool drawnByLua = OFBase::Environment::get().getWindowManager()->isMainMenuDrawnByLua()
+                && OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_Running;
+            mButtonBox->setVisible(!drawnByLua);
+            // A button that was lit when the script took over would still answer Enter and Space: the keys are the
+            // script's now
+            if (drawnByLua)
+            {
+                MyGUI::Widget* focus = MyGUI::InputManager::getInstance().getKeyFocusWidget();
+                for (MyGUI::Widget* widget = focus; widget != nullptr; widget = widget->getParent())
+                {
+                    if (widget == mButtonBox)
+                    {
+                        MyGUI::InputManager::getInstance().resetKeyFocusWidget();
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     bool MainMenu::exit()
