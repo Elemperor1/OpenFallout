@@ -23,8 +23,7 @@ namespace FalloutScript::SettingText
         // tabs of the data page were read from both executables (sMakeActiveQuest 17, sPlayAudio 10, sStopAudio 10,
         // sShowAllNotes 14, sShowActiveNotes 23, sNextChallenge 19, the tab texts 9, 9, 6, 4 (Misc, New Vegas), 5
         // (Notes, Fallout 3), 5); the words are the ones that fit, and the executables' texts were compared with them:
-        // all of the data page's words are equal except sNextChallenge, whose real text is "Next Challenge" and one
-        // other four-letter word (the word here is still to be confirmed).
+        // all of the data page's words are equal to them, sNextChallenge ("Next Challenge Type") included.
         constexpr std::array entries = {
             Entry{ "sAccept", "Accept" },
             Entry{ "sAttributesCount", "Distribute %d Point" },
