@@ -197,19 +197,31 @@ the click handler and the list fill of `LevelUpMenu`):
   expressions. Reset takes back every point given on the page.
 - The selection is the actor value's own `ICON` and `DESC`; on the weapon skills (Big Guns, Energy Weapons, Explosives,
   Melee, Small Guns, Unarmed) the corner badge `stats_icon_badge` shows `weap_skill_icon_*.dds` (New Vegas's file only).
-- The perk page comes when the level gives a perk (`iLevelsPerPerk`, 2 in New Vegas; the engine decides). It lists the
-  perks that are playable, not traits, below their last rank and whose conditions the player meets (a perk the level does
-  not reach yet is dim and cannot be picked); a multi-rank perk the player already has shows its rank in brackets. One perk
-  is picked: a click on the picked row puts it back. The text under it is "Requirements: Level N" (`sRequirementsText` and
-  `sLevelAbbrev`) when the perk asks for more than level 1, then the description; the picture is the perk's `ICON`.
+- The perk page comes when the level gives a perk. New Vegas tests `level % iLevelsPerPerk == 0` (2 by default); Fallout 3
+  has no such setting and opens the page whenever at least one perk qualifies when the menu opens, in practice every level
+  (the engine decides this as it did before; it was not changed). The list is the perks that are playable, not traits, below
+  their last rank and whose conditions the player meets; with `bHideUnavailablePerks` at its default 0, perks the level has
+  not reached are listed too, with the text dim (`_TextAlpha` 128 against 255) and a click on one is ignored (a row that is
+  picked is put back whatever its alpha). The rows are sorted by that alpha (open first), then by the level the perk asks
+  for, then by name. A multi-rank perk the player already has shows the rank it would be picked at in brackets ("%s (%d)",
+  the current rank plus one). One perk is picked: a click on the picked row puts it back.
+- The text under a perk is built by one function of the executables: "R: L 6" (`sRequirementsText`, `sLevelAbbrev` and the
+  level, only when the perk asks for more than level 1; otherwise just "R: "), then a line for each condition that is a
+  `GetPermanentActorValue` (the actor value's name, an operator and a number: a space and the number as it is, except for
+  "greater" (the number less one), "less" (" < ") and "less or equal" (" < " and the number plus one); skipped when the
+  number is 0, the value is Karma or has no name) or a `HasPerk` (the perk's name and the rank when it is above 0),
+  each followed by ", " when another condition comes (an "or"-ed condition by " `sOr` " instead), the first one preceded by
+  ", " when the level was written; the other kinds of conditions write nothing but count as written, and when nothing was
+  written the text is "--". Then a new line, "K: n" (`sRanksText` and the number of ranks), a blank line, and the
+  description. The picture is the perk's `ICON`.
 - Continue goes to the page after, Back to the page before (shown from the second page on), Done on the last page adds the
-  perk (at its next rank) and closes the screen. With nothing left to open the Pip-Boy over, the window closes with it, as
-  the menu of the games does.
+  perk (at its next rank) and closes the screen. The code of Continue checks no points: only the file's own expression
+  (`_CurrPoints == _MaxPoints`) lights it, and the screen sets those numbers. When the level itself opened the screen, the Pip-Boy
+  window closes with it, as the menu of the games does.
 - The keys: up and down light a row, left and right (or space) give or take back a point or pick the perk, Enter is Continue
   or Done, Backspace is Back, R is Reset.
 
-Not done: the sounds, the requirement lines of a perk other than its level, and everything on this page is checked in the
-offline harness only (not in the running game).
+Not done: the sounds, and everything on this page is checked in the offline harness only (not in the running game).
 
 ## The words of the labels
 
