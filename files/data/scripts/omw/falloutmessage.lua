@@ -219,8 +219,9 @@ return {
     interfaceName = 'FalloutMessage',
     interface = {
         version = 1,
-        -- Whether a box is drawn: the screens under it leave the keys, the pad and the wheel to it
-        isOpen = function() return shown ~= nil end,
+        -- Whether a message box is open, drawn here or in the window of the engine (which does not take every key): the
+        -- screens under it leave the keys, the pad and the wheel to it
+        isOpen = function() return shown ~= nil or messagebox.current() ~= nil end,
     },
     engineHandlers = {
         onFrame = function()
