@@ -158,6 +158,11 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testwornarmor.cpp
     esm4/testwornarmorcensus.cpp
 
+    falloutmenu/testfont.cpp
+    falloutmenu/testmenu.cpp
+    falloutmenu/testopenmenu.cpp
+    falloutmenu/testxml.cpp
+
     falloutscript/testactors.cpp
     falloutscript/testactortraits.cpp
     falloutscript/testactorvalues.cpp
@@ -190,6 +195,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testpresentation.cpp
     falloutscript/testqueries.cpp
     falloutscript/testreferencestate.cpp
+    falloutscript/testsettingtext.cpp
     falloutscript/testswitches.cpp
     falloutscript/testreputation.cpp
     falloutscript/testsavecharacters.cpp

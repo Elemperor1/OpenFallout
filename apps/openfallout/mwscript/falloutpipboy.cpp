@@ -20,6 +20,7 @@
 #include <components/esm4/loadweap.hpp>
 #include <components/falloutscript/levelling.hpp>
 #include <components/falloutscript/perks.hpp>
+#include <components/falloutscript/settingtext.hpp>
 #include <components/misc/strings/lower.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -62,7 +63,11 @@ namespace OFScript
             mGameSettingTexts = std::move(texts);
         }
         const auto found = mGameSettingTexts->find(Misc::StringUtils::lowerCase(name));
-        return found != mGameSettingTexts->end() ? found->second : std::string();
+        if (found != mGameSettingTexts->end() && !found->second.empty())
+            return found->second;
+        // The words of the labels are in the executables of the games, not in the plugins (unless a plugin changed
+        // them)
+        return std::string(FalloutScript::SettingText::standIn(name));
     }
 
     std::vector<FalloutScripts::PipboyItem> FalloutScripts::pipboyItems(FalloutScript::FormId holder)

@@ -53,7 +53,7 @@ namespace FalloutScript
     {
         int mNumber = 0;
         int mAttribute = 0;
-        /// The editor id of the actor value (AVIF) that has its name and description
+        /// The editor id of the actor value (AVIF) that has its name and description (the files prefix every one with AV)
         const char* mEditorId = "";
         /// The name when the data has none
         const char* mName = "";

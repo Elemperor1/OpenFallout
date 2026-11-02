@@ -1463,6 +1463,152 @@
 -- @field #boolean crippled Whether the part of the body that was hit is crippled now.
 
 ---
+-- @{#Menus}: the menus of Fallout 3 and New Vegas, opened from the game's own menu files (`menus/*.xml` of the
+-- install). A menu is a tree of tiles whose traits (position, size, text, colour, ...) the files calculate from each
+-- other; the script that shows the menu sets the traits that only the game knows (the text of a line, a count) and
+-- passes the pointer to it. @{#Menus}.open gives a @{#FalloutMenu}; its `pieces` are what to draw. Tiles are named by
+-- the name in the menu file or by the number `find` gives. Not available in load scripts.
+-- @field [parent=#core] #Menus menus
+
+---
+-- @type Menus
+
+---
+-- Open a menu file (`message_menu.xml`) for a window of some size in pixels. `pad` says whether a pad is in use (which
+-- `&xbox;` stands for in the files). Gives nothing and the reason if the install lacks the file.
+-- @function [parent=#Menus] open
+-- @param #string file
+-- @param #number width
+-- @param #number height
+-- @param #boolean pad
+-- @return #FalloutMenu menu, or nil
+-- @return #string error
+
+---
+-- The textures that menus asked for and the install does not have, so far.
+-- @function [parent=#Menus] missingTextures
+-- @return #list<#string>
+
+---
+-- @type FalloutMenu
+
+---
+-- Everything to draw, back to front, as pictures in pixels of the window. Each has `tile` (number), `x`, `y`, `width`,
+-- `height`, `texture` (a path of the data) with the part of it that is drawn (`sourceX`, `sourceY`, `sourceWidth`,
+-- `sourceHeight`), `red`, `green`, `blue`, `alpha` (0 to 1), `glyph` (true for one character of a text), `mirrored`
+-- (drawn from the right to the left) and, when it is cut to a window, `clip` with `x`, `y`, `width`, `height`.
+-- @function [parent=#FalloutMenu] pieces
+-- @return #list<#table>
+
+---
+-- A number that goes up whenever something the pictures depend on may have changed.
+-- @function [parent=#FalloutMenu] version
+-- @return #number
+
+---
+-- Change the size of the window the menu is laid out for.
+-- @function [parent=#FalloutMenu] resize
+-- @param #number width
+-- @param #number height
+
+---
+-- What went wrong while the files were read (a file that an include names is not there, ...).
+-- @function [parent=#FalloutMenu] problems
+-- @return #list<#string>
+
+---
+-- The number of the first tile with this name, or nil.
+-- @function [parent=#FalloutMenu] find
+-- @param #string name
+-- @return #number
+
+---
+-- The name, the parent (number) and the children (numbers) of a tile.
+-- @function [parent=#FalloutMenu] name
+-- @function [parent=#FalloutMenu] parent
+-- @function [parent=#FalloutMenu] children
+
+---
+-- The value of a trait of a tile: a number, or a string if it is a text (`get`); always a number (`getNumber`); always a
+-- string (`getText`).
+-- @function [parent=#FalloutMenu] get
+-- @param tile name or number
+-- @param #string trait
+
+---
+-- Set a trait of a tile to a number, a boolean or a string, which wins over the menu file; nil lets the file decide
+-- again.
+-- @function [parent=#FalloutMenu] set
+-- @param tile name or number
+-- @param #string trait
+-- @param value
+
+---
+-- The rectangle a tile takes in pixels of the window (`x`, `y`, `width`, `height`).
+-- @function [parent=#FalloutMenu] rect
+-- @param tile name or number
+
+---
+-- A tile made from a template of the menu file under another tile, with a name of its own; the number of the new tile.
+-- `remove` takes such a tile out, `removeChildren` all the tiles under a tile.
+-- @function [parent=#FalloutMenu] instantiate
+-- @param parent name or number of the tile it goes under
+-- @param #string template
+-- @param #string name
+-- @return #number
+
+---
+-- The tile and trait that a trait stands for when the menu file writes it as a reference to another
+-- (`<xbuttona><ref src="OK" trait="clicked"/></xbuttona>`): the number of the tile and the name of the trait.
+-- @function [parent=#FalloutMenu] reference
+-- @param tile name or number
+-- @param #string trait
+
+---
+-- The pointer, in pixels of the window, each giving the number of the tile it concerns. `pointerMoved` sets
+-- `mouseover` of the tile under the pointer and clears it on the one it left, and moves a tile that is dragged;
+-- `pointerPressed` starts a drag of a tile that has `draggable`; `pointerReleased` counts `clicked` up by one on the tile
+-- the button went down and up on (and gives it); `wheel` counts `wheelmoved` of the tile under the pointer that takes
+-- the wheel; `click` counts a click on a tile that did not come from the pointer; `hovered` gives the tile under the
+-- pointer.
+-- @function [parent=#FalloutMenu] pointerMoved
+-- @function [parent=#FalloutMenu] pointerPressed
+-- @function [parent=#FalloutMenu] pointerReleased
+-- @function [parent=#FalloutMenu] wheel
+-- @function [parent=#FalloutMenu] click
+-- @function [parent=#FalloutMenu] hovered
+-- @function [parent=#FalloutMenu] dragged
+-- @function [parent=#FalloutMenu] root
+
+---
+-- Lists, as the games' code makes them from `list_box.xml`. `addList` makes one from the tile of the list and the name of
+-- the template of its rows (a number counted from 1, nil if the menu has no such tile or template); `setRows` makes the
+-- rows again from a list of tables, each the traits to set on one row (`string`, `_line_alpha`, ...), and works out
+-- their heights, the scrolling and the highlight; `selectRow` (counted from 1, 0 for none; `reveal` scrolls to it),
+-- `selectedRow`, `rowCount`; `rowOf` gives the list and the row that a tile is (or is in).
+-- @function [parent=#FalloutMenu] addList
+-- @function [parent=#FalloutMenu] setRows
+-- @function [parent=#FalloutMenu] selectRow
+-- @function [parent=#FalloutMenu] selectedRow
+-- @function [parent=#FalloutMenu] rowCount
+-- @function [parent=#FalloutMenu] rowOf
+
+---
+-- Put a scrollbar (a tile whose file gives it a `_current_value`) at a value, as clicks of its arrows would. The
+-- pointer does the same when it lets go of a marker it dragged and when the wheel turns, so that the value stays.
+-- @function [parent=#FalloutMenu] setScrollbar
+-- @param tile name or number
+-- @param #number value
+
+---
+-- Whether the menu file (or `set`) gives a tile a trait, and the numbers of all the tiles of the menu.
+-- @function [parent=#FalloutMenu] defines
+-- @param tile name or number
+-- @param #string trait
+-- @function [parent=#FalloutMenu] tiles
+-- @return #list<#number>
+
+---
 -- @{#Hud}: what the head-up display of Fallout 3 and New Vegas shows besides the stats of the player (see
 -- @{#Pipboy}.stats): the messages, the radiation, the sneak meter, the crippled limbs, the character in the crosshair
 -- and the compass. Not available in load scripts.

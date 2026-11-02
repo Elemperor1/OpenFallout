@@ -54,26 +54,25 @@ namespace FalloutScript
         // Skills are the actor values 32 to 45. The one at 33 (Big Guns) and the one at 44 (Survival) are in one game
         // each: Fallout 3 does not use 44, and New Vegas shows 13 skills without Big Guns.
         std::vector<ChargenSkill> skills = {
-            { 32, charisma, "Barter", "Barter" },
+            { 32, charisma, "AVBarter", "Barter" },
         };
         if (game == Game::Fallout3)
-            skills.push_back({ 33, endurance, "BigGuns", "Big Guns" });
-        skills.push_back({ 34, perception, "EnergyWeapons", "Energy Weapons" });
-        skills.push_back({ 35, perception, "Explosives", "Explosives" });
-        skills.push_back({ 36, perception, "Lockpick", "Lockpick" });
-        skills.push_back({ 37, intelligence, "Medicine", "Medicine" });
-        skills.push_back({ 38, strength, "MeleeWeapons", "Melee Weapons" });
-        skills.push_back({ 39, intelligence, "Repair", "Repair" });
-        skills.push_back({ 40, intelligence, "Science", "Science" });
-        if (game == Game::Fallout3)
-            skills.push_back({ 41, agility, "SmallGuns", "Small Guns" });
-        else
-            skills.push_back({ 41, agility, "Guns", "Guns" });
-        skills.push_back({ 42, agility, "Sneak", "Sneak" });
-        skills.push_back({ 43, charisma, "Speech", "Speech" });
+            skills.push_back({ 33, endurance, "AVBigGuns", "Big Guns" });
+        skills.push_back({ 34, perception, "AVEnergyWeapons", "Energy Weapons" });
+        skills.push_back({ 35, perception, "AVExplosives", "Explosives" });
+        skills.push_back({ 36, perception, "AVLockpick", "Lockpick" });
+        skills.push_back({ 37, intelligence, "AVMedicine", "Medicine" });
+        skills.push_back({ 38, strength, "AVMeleeWeapons", "Melee Weapons" });
+        skills.push_back({ 39, intelligence, "AVRepair", "Repair" });
+        skills.push_back({ 40, intelligence, "AVScience", "Science" });
+        // The record of skill 41 is AVSmallGuns in both games; New Vegas gives it the text "Guns"
+        skills.push_back({ 41, agility, "AVSmallGuns", game == Game::Fallout3 ? "Small Guns" : "Guns" });
+        skills.push_back({ 42, agility, "AVSneak", "Sneak" });
+        skills.push_back({ 43, charisma, "AVSpeech", "Speech" });
+        // New Vegas made Survival of the record that was Throwing, so its record is still AVThrowing
         if (game == Game::NewVegas)
-            skills.push_back({ 44, endurance, "Survival", "Survival" });
-        skills.push_back({ 45, endurance, "Unarmed", "Unarmed" });
+            skills.push_back({ 44, endurance, "AVThrowing", "Survival" });
+        skills.push_back({ 45, endurance, "AVUnarmed", "Unarmed" });
         return skills;
     }
 

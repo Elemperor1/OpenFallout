@@ -878,7 +878,7 @@ namespace OFScript
                   if (blockType != FalloutScript::BlockType::OnTrigger)
                       Log(Debug::Info) << (blockType == FalloutScript::BlockType::OnTriggerEnter ? "Trigger enter: "
                                                                                                  : "Trigger leave: ")
-                                       << std::hex << trigger << " by " << actor;
+                                       << std::hex << trigger << " by " << actor << std::dec;
                   mObjects.trigger(trigger, blockType, actor, filter);
               };
         mTriggers.update(bodies, active, raise);
@@ -5290,9 +5290,16 @@ namespace OFScript
         if (!mActorValueTextBuilt)
         {
             mActorValueTextBuilt = true;
+            std::size_t withDescription = 0;
             for (const ESM4::ActorValueInfo& info : mStore.get<ESM4::ActorValueInfo>())
+            {
+                if (!info.mDescription.empty())
+                    ++withDescription;
                 mActorValueText.emplace(
                     Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+            }
+            Log(Debug::Info) << "Actor values: " << mStore.get<ESM4::ActorValueInfo>().getSize() << " records, "
+                             << withDescription << " with a description";
         }
         ActorValueText text;
         const auto found = mActorValueText.find(Misc::StringUtils::lowerCase(editorId));

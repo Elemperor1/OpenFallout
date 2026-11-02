@@ -3,7 +3,9 @@
 -- carries is the engine's (core.pipboy); this script shows it in the window "Inventory", which it takes over from the
 -- one of Morrowind for content that has a Pip-Boy, and gives the choices of the player back. The windows that Morrowind
 -- shows beside the inventory are left empty. The map is a list of the places found, to travel to (core.interact); there
--- is no radio, no repair and no hot keys yet.
+-- is no radio, no repair and no hot keys yet. The INV page is drawn from the game's own menu file
+-- (falloutpipboyitems.lua); the other pages are still drawn with plain widgets, as is INV when that file is not there.
+-- The row of the three pages is the script's: the games have the buttons of the Pip-Boy itself (a model) for it.
 local core = require('openfallout.core')
 local input = require('openfallout.input')
 local ui = require('openfallout.ui')
@@ -11,6 +13,8 @@ local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
+local itemsPage = require('scripts.omw.falloutpipboyitems')
+local statsPage = require('scripts.omw.falloutpipboystats')
 
 local pipboy = core.pipboy
 
@@ -675,11 +679,51 @@ local function levelUpPage(add)
         end, {}) or widgets.label('', colors.hintColor)))
 end
 
+-- The names of the pages and what picking one does
+local function pageLabel(name)
+    if name == 'stat' then return upper(word('sStatsStats', 'STAT')) end
+    if name == 'inv' then return upper(word('sInventoryItems', 'INV')) end
+    return 'DATA'
+end
+
+local function pickPage(name)
+    tab = name
+    offset = 1
+    selected = 1
+    render()
+end
+
+-- The page of the items is the game's own menu: only the row of the pages is put over it, at the top
+local function pageStrip()
+    widgets = widgetModule.new(update)
+    local rows = {}
+    tabRow(function(layout) rows[#rows + 1] = layout end, tabs, tab, pageLabel, pickPage)
+    return widgets.panel(rows, { position = v2(0.5, 0.01), anchor = v2(0.5, 0) })
+end
+
 function render()
     destroyElement()
     if not visible then
+        itemsPage.hide()
+        statsPage.hide()
         return
     end
+    -- The pages of the items and the stats are the game's own menus: only the row of the pages is put over them
+    if view == 'pipboy' and tab == 'inv' then
+        statsPage.hide()
+        if itemsPage.show() then
+            element = ui.create(pageStrip())
+            return
+        end
+    elseif view == 'pipboy' and tab == 'stat' then
+        itemsPage.hide()
+        if statsPage.show() then
+            element = ui.create(pageStrip())
+            return
+        end
+    end
+    itemsPage.hide()
+    statsPage.hide()
     widgets = widgetModule.new(update)
     local width = math.max(520, math.floor(ui.screenSize().x * 0.5))
     local rows = { { props = { size = v2(width, 0) } } }
@@ -690,16 +734,7 @@ function render()
     if view == 'levelup' then
         levelUpPage(add)
     else
-        tabRow(add, tabs, tab, function(name)
-            if name == 'stat' then return upper(word('sStatsStats', 'STAT')) end
-            if name == 'inv' then return upper(word('sInventoryItems', 'INV')) end
-            return 'DATA'
-        end, function(name)
-            tab = name
-            offset = 1
-            selected = 1
-            render()
-        end)
+        tabRow(add, tabs, tab, pageLabel, pickPage)
         if tab == 'stat' then
             statPage(add)
         elseif tab == 'inv' then
@@ -721,6 +756,8 @@ local function hide()
     visible = false
     keyring = false
     dropPrompt = nil
+    itemsPage.hide()
+    statsPage.hide()
     -- The screen of a level up is not a window to leave: it keeps what was done on it and comes back (onFrame)
     destroyElement()
 end
@@ -732,7 +769,7 @@ for _, name in ipairs({ 'Stats', 'Magic', 'Map' }) do
 end
 
 local function scroll(by)
-    if not visible or view ~= 'pipboy' then
+    if not visible or view ~= 'pipboy' or itemsPage.isOpen() or statsPage.isOpen() then
         return
     end
     if dropPrompt then
@@ -772,6 +809,13 @@ end
 -- over it takes the keys and the buttons)
 local function press(code)
     if not visible or view ~= 'pipboy' or I.UI.getMode() ~= 'Interface' then
+        return
+    end
+    -- The page of the game's menu takes the keys it uses (not Left and Right, which change the page)
+    if itemsPage.isOpen() and itemsPage.press(code) then
+        return
+    end
+    if statsPage.isOpen() and statsPage.press(code) then
         return
     end
     if dropPrompt then
@@ -848,6 +892,12 @@ return {
                 end
             end
             reopenWait = math.max(0, reopenWait - core.getRealFrameDuration())
+            if itemsPage.isOpen() then
+                itemsPage.update()
+            end
+            if statsPage.isOpen() then
+                statsPage.update()
+            end
             if not visible and I.UI.getMode() == nil and not pipboy.playerDead() then
                 if view == 'levelup' then
                     -- The screen was left (Escape, another window) before the points were given: it comes back as it
@@ -895,6 +945,10 @@ return {
         -- A button of the pad, sent by a script (the buttons of a real pad come as onControllerButtonPress)
         PadButton = function(data)
             onPad(data.button)
+        end,
+        -- A key of the keyboard (its code in `code`), sent by a script, for the keys no button of the pad stands for
+        PipboyKey = function(data)
+            press(data.code)
         end,
     },
 }

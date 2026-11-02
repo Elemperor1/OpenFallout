@@ -8,6 +8,7 @@ local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
+local menuModule = require('scripts.omw.falloutmenu')
 
 local pipboy = core.pipboy
 
@@ -36,6 +37,15 @@ local subNames, listedRecipes = {}, {}
 local render
 local widgets
 
+-- The menu is drawn from the game's own file (recipe_menu.xml): the recipes on the left, what the picked one needs and
+-- makes on the right. `shown` is that menu while it is there, `recipesList` and `ingredientsList` its two lists.
+local MENU_FILE = 'recipe_menu.xml'
+local shown, recipesList, ingredientsList = nil, nil, nil
+-- The recipes the list shows, and the one that is picked
+local listedNow = {}
+local pickedRecipeNow = nil
+local moveTab
+
 local function update()
     if element then element:update() end
 end
@@ -45,6 +55,14 @@ local function destroyElement()
         element:destroy()
         element = nil
     end
+    if shown then
+        shown:close()
+        shown, recipesList, ingredientsList = nil, nil, nil
+    end
+end
+
+local function isOpen()
+    return element ~= nil or shown ~= nil
 end
 
 local function openMode()
@@ -109,9 +127,12 @@ local function make(recipe)
         message = 'You do not have enough'
     end
     render()
+    if shown and message ~= '' then
+        ui.showMessage(message)
+    end
 end
 
-function render()
+local function renderLegacy()
     destroyElement()
     local menu = pipboy.recipes()
     if not menu then
@@ -215,6 +236,134 @@ function render()
     element = ui.create(widgets.panel(rows))
 end
 
+
+local function word(setting, fallback)
+    local text = pipboy.text(setting)
+    return text ~= '' and text or fallback
+end
+
+local function openMenu()
+    if shown then
+        return true
+    end
+    local opened = menuModule.open(MENU_FILE)
+    if not opened then
+        return false
+    end
+    local recipes = opened:list('RM_Items_InventoryList', 'RM_list_template')
+    local ingredients = opened:list('RM_Items_IngredientList', 'RM_list_template')
+    if not (recipes and ingredients) then
+        opened:close()
+        return false
+    end
+    shown, recipesList, ingredientsList = opened, recipes, ingredients
+    -- A click picks the recipe; the Accept button makes it
+    recipes.onClick(function(row)
+        local recipe = listedNow[row]
+        if recipe then
+            selected = recipe.id
+            message = ''
+            render()
+        end
+    end)
+    opened:onClick('RM_Items_LeftFilterArrow', function() moveTab(-1) end)
+    opened:onClick('RM_Items_RightFilterArrow', function() moveTab(1) end)
+    opened:onClick('RM_ButtonX', function()
+        local recipe = pickedRecipeNow
+        if recipe and recipe.status == 'ready' then
+            make(recipe)
+        end
+    end)
+    opened:onClick('RM_ButtonB', function() leave() end)
+    return true
+end
+
+local function renderMenu()
+    local menu = pipboy.recipes()
+    if not menu or not openMenu() then
+        return false
+    end
+    -- The sub-categories, in the order the recipes name them
+    local subs, seen = {}, {}
+    for _, recipe in ipairs(menu.recipes) do
+        if recipe.subCategoryName ~= '' and not seen[recipe.subCategoryName] then
+            seen[recipe.subCategoryName] = true
+            subs[#subs + 1] = recipe.subCategoryName
+        end
+    end
+    subNames = subs
+    local listed = {}
+    for _, recipe in ipairs(menu.recipes) do
+        if tab == nil or recipe.subCategoryName == tab then
+            listed[#listed + 1] = recipe
+        end
+    end
+    listedNow, listedRecipes, listLength = listed, listed, #listed
+    local picked = nil
+    for _, recipe in ipairs(listed) do
+        if recipe.id == selected then picked = recipe end
+    end
+    if picked == nil then
+        picked = listed[1]
+        selected = picked and picked.id or nil
+    end
+    pickedRecipeNow = picked
+
+    local rows = {}
+    for index, recipe in ipairs(listed) do
+        rows[index] = {
+            ['ListItemText.string'] = recipe.name,
+            ['ListItemText.alpha'] = recipe.status == 'ready' and 255 or 128,
+            _IsRecipeSelected = recipe.id == selected,
+        }
+    end
+    local ingredientRows = {}
+    if picked then
+        local needed = neededOf(picked.ingredients)
+        for index, item in ipairs(picked.ingredients) do
+            local short = item.have < (needed[item.id] or item.count)
+            ingredientRows[index] = {
+                ['ListItemText.string'] = item.name,
+                ['ListItemText.alpha'] = short and 128 or 255,
+                _Value = string.format('%d/%d', item.have, item.count),
+            }
+        end
+    end
+    shown:batch(function()
+        local row = recipesList.selected()
+        recipesList.rows(rows)
+        if row > 0 and #rows > 0 then
+            recipesList.select(math.min(row, #rows), true)
+        end
+        ingredientsList.rows(ingredientRows)
+        shown:set('RM_ItemsTitle', 'string', tab or word('sAll', 'All'))
+        shown:set('RM_Items_LeftFilterArrow', 'visible', #subs > 0)
+        shown:set('RM_Items_RightFilterArrow', 'visible', #subs > 0)
+        shown:set('RM_MadeAtVariable', 'string', menu.name)
+        local skill = ''
+        if picked and picked.skill >= 0 and picked.level > 0 then
+            skill = string.format('%s %d (%d)', skillName(picked.skill), picked.level,
+                math.floor(picked.skillValue + 0.5))
+        end
+        shown:set('RM_SkillRequirement', 'string', skill)
+        shown:set('RM_ButtonX', 'target', picked ~= nil and picked.status == 'ready')
+    end)
+    return true
+end
+
+function render()
+    if not pipboy.recipes() then
+        destroyElement()
+        return
+    end
+    if element then
+        destroyElement()
+    end
+    if not renderMenu() then
+        renderLegacy()
+    end
+end
+
 local function scroll(by)
     if not element then
         return
@@ -238,7 +387,7 @@ end
 
 -- Picks the next recipe (down when `by` is positive), and moves the list with it when the recipe is not shown
 local function moveRecipe(by)
-    if not element or #listedRecipes == 0 then
+    if not isOpen() or #listedRecipes == 0 then
         return
     end
     local index = math.max(1, math.min(#listedRecipes, pickedIndex() + by))
@@ -250,11 +399,14 @@ local function moveRecipe(by)
         offset = index - listLines + 1
     end
     render()
+    if recipesList then
+        recipesList.select(index, true)
+    end
 end
 
 -- Shows the recipes of the next sub-category (after the last one, all of them)
-local function moveTab(by)
-    if not element or #subNames == 0 then
+function moveTab(by)
+    if not isOpen() or #subNames == 0 then
         return
     end
     local index = 0
@@ -272,7 +424,7 @@ end
 -- left and right a sub-category, Enter makes the recipe
 local function press(code)
     -- (a menu opened over the screen takes the keys and the buttons)
-    if not element or I.UI.getMode() ~= 'Interface' then
+    if not isOpen() or I.UI.getMode() ~= 'Interface' then
         return
     end
     if code == input.KEY.DownArrow then
@@ -295,7 +447,7 @@ local function press(code)
     end
 end
 
-local onPad = pad.handler('craft', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press)
+local onPad = pad.handler('craft', function() return isOpen() and I.UI.getMode() == 'Interface' end, press)
 
 local function sync()
     local menu = pipboy.recipes()
@@ -313,6 +465,9 @@ local function sync()
         openMode()
         render()
     end
+    if shown then
+        shown:checkSize()
+    end
 end
 
 return {
@@ -323,6 +478,10 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            -- the lists of the file's menu take the wheel themselves
+            if shown then
+                return
+            end
             if vertical > 0 then
                 scroll(-1)
             elseif vertical < 0 then

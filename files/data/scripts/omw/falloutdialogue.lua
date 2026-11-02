@@ -8,6 +8,7 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
 local pad = require('scripts.omw.falloutpad')
+local menuModule = require('scripts.omw.falloutmenu')
 
 local conversation = core.conversation
 local v2 = util.vector2
@@ -38,10 +39,20 @@ local lineVoiced = false
 -- The time between a voice that is over and the next line
 local pause = 0.25
 
+-- The dialogue is drawn from the game's own menu file (dialog/dialog_menu.xml): the file lays out the name of the
+-- speaker, the text, the topic list with its scrollbar and the brackets round it. `shown` is that menu while it is
+-- there, `topics` its list of topics and `topicsKey` the topics the list was made from.
+local MENU_FILE = 'dialog/dialog_menu.xml'
+local shown, topics, topicsKey = nil, nil, nil
+
 local function destroyElement()
     if element then
         element:destroy()
         element = nil
+    end
+    if shown then
+        shown:close()
+        shown, topics, topicsKey = nil, nil, nil
     end
 end
 
@@ -49,7 +60,7 @@ local function closeWindow()
     I.UI.removeMode('Dialogue')
 end
 
-local advance, render
+local advance, render, skipLine, activateRow
 
 -- No topic is left: the conversation is over
 local function goodbye()
@@ -63,7 +74,7 @@ local function startLine(index)
     lineIndex, lineElapsed, voiceOverFor = index, 0, 0
     lineVoiced = conversation.say(index)
     -- A response that does not fit the screen shows the lines from the one that is said
-    if responseWindowed and visible then
+    if (responseWindowed or shown) and visible then
         render(conversation.get())
     end
 end
@@ -249,7 +260,7 @@ local function optionRow(text, onPick, width, selected)
     return row
 end
 
-function render(view)
+local function renderLegacy(view)
     destroyElement()
     if not view.active and not view.ended then
         return
@@ -394,6 +405,82 @@ function render(view)
     }
 end
 
+-- The menu of the game's file: open it once, then say what it shows
+local function openMenu()
+    if shown then return true end
+    local opened = menuModule.open(MENU_FILE)
+    if not opened then return false end
+    shown = opened
+    topics = opened:list('DM_TopicList', 'DM_TopicTemplate')
+    if not topics then
+        opened:close()
+        shown = nil
+        return false
+    end
+    -- A click on the text goes on to the next line, a click on a topic picks it
+    local function skip()
+        if conversation.get().speaking then
+            skipLine()
+        end
+    end
+    opened:onClick('DM_ClickRect', skip)
+    opened:onClick('DM_SpeakerText', skip)
+    topics.onClick(function(row)
+        activateRow(row)
+    end)
+    return true
+end
+
+-- The text as the speaker's line and the topics as the rows of the list
+local function renderMenu(view)
+    if not openMenu() then return false end
+    local speaking = view.speaking == true
+    local line = view.lines and view.lines[math.max(1, lineIndex)] or nil
+    local options = view.options or {}
+    shown:batch(function()
+        shown:io('_DialogVisible', true)
+        shown:io('_ShowSubtitles', true)
+        shown:io('_ShowingText', speaking)
+        shown:set('DM_SpeakerNameLabel', 'string', clean(view.speakerName))
+        shown:set('DM_SpeakerText', 'string', speaking and line and clean(line.text) or '')
+        if not speaking then
+            -- the list is made again only when the topics changed, as that puts it back at the top
+            local texts = {}
+            for index, option in ipairs(options) do
+                texts[index] = tostring(option.topic) .. ':' .. tostring(option.text)
+            end
+            local key = table.concat(texts, '\n')
+            if key ~= topicsKey then
+                topicsKey = key
+                local rows = {}
+                for index, option in ipairs(options) do
+                    rows[index] = { string = clean(option.text) }
+                end
+                -- A conversation with no topic left ends with the row that says so
+                if #options == 0 then
+                    rows[1] = { string = 'Goodbye' }
+                end
+                topics.rows(rows)
+            end
+        end
+    end)
+    return true
+end
+
+function render(view)
+    if not view.active and not view.ended then
+        destroyElement()
+        return
+    end
+    -- A menu of the game's file is drawn on top of the one before, as it only changes what the file reads
+    if element then
+        destroyElement()
+    end
+    if not renderMenu(view) then
+        renderLegacy(view)
+    end
+end
+
 -- Moves the list of topics (by a number of topics, down when it is positive) when it does not all fit the screen
 local function scroll(by)
     local view = conversation.get()
@@ -459,6 +546,34 @@ function advance()
     render(view)
 end
 
+-- A click, or Space, on a line that is said goes on to the next line, and on the last one ends the response
+function skipLine()
+    local view = conversation.get()
+    if lineIndex < #view.lines then
+        conversation.stopVoice()
+        startLine(lineIndex + 1)
+    else
+        advance()
+    end
+end
+
+-- The row of the topic list that is picked (a click, Enter): its topic, or the end of the conversation for the row that
+-- is there when no topic is left
+function activateRow(row)
+    local view = conversation.get()
+    if view.speaking then
+        return
+    end
+    if view.options and #view.options > 0 then
+        local option = view.options[row]
+        if option then
+            pick(option.topic)
+        end
+    elseif row == 1 then
+        goodbye()
+    end
+end
+
 local function show()
     visible = true
     optionOffset = 1
@@ -485,6 +600,35 @@ local function press(code)
         return
     end
     local view = conversation.get()
+    if shown and topics then
+        -- the topic list of the file: the arrows and the pages move the pick, Enter takes it
+        if view.speaking then
+            if code == input.KEY.Space or code == input.KEY.Enter then
+                skipLine()
+            end
+            return
+        end
+        local count = topics.count()
+        local picked = topics.selected()
+        if code >= input.KEY._1 and code <= input.KEY._9 then
+            if code - input.KEY._1 + 1 <= count then
+                activateRow(code - input.KEY._1 + 1)
+            end
+        elseif code == input.KEY.DownArrow or code == input.KEY.PageDown then
+            local by = code == input.KEY.DownArrow and 1 or 5
+            topics.select(picked <= 0 and 1 or math.min(count, picked + by), true)
+        elseif code == input.KEY.UpArrow or code == input.KEY.PageUp then
+            local by = code == input.KEY.UpArrow and 1 or 5
+            topics.select(picked <= 0 and count or math.max(1, picked - by), true)
+        elseif code == input.KEY.Enter then
+            if picked > 0 then
+                activateRow(picked)
+            elseif count == 1 and #(view.options or {}) == 0 then
+                goodbye()
+            end
+        end
+        return
+    end
     if view.speaking then
         if code == input.KEY.Space or code == input.KEY.Enter then
             advance()
@@ -522,6 +666,9 @@ return {
         onFrame = function()
             if not visible then
                 return
+            end
+            if shown then
+                shown:checkSize()
             end
             local view = conversation.get()
             -- A conversation that something else ended (a script, core.conversation.close) takes the window with it:
@@ -567,6 +714,10 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            -- the list of the file's menu takes the wheel itself
+            if shown then
+                return
+            end
             if vertical > 0 then
                 scroll(-1)
             elseif vertical < 0 then
