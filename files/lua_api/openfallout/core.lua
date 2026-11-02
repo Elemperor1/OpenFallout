@@ -1750,6 +1750,7 @@
 -- @field #number wordsLeft How many words are still in the dump.
 -- @field #boolean lockedOut The attempts are spent, or the terminal locked the player out on an earlier visit.
 -- @field #boolean solved The password was found; the screen asks `hackFinish` when it has shown it.
+-- @field #number gate The seconds that are left before a board of the game of hacking can be laid out (see `hackGate`).
 -- @field #number serial
 
 ---
