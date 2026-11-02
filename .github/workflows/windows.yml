@@ -149,6 +149,9 @@ jobs:
         variant: ${{ inputs.package && 'sccache' || 'ccache' }}
         key: windows-${{ inputs.image }}-msvc-${{ inputs.msvc }}-${{ runner.arch }}-${{ inputs.build-type }}
         max-size: ${{ inputs.package && '384M' || '1000M' }}
+        # Only master and release builds store caches, so that pull request runs
+        # do not push the caches pull requests start from out of the 10 GB budget.
+        save: ${{ inputs.package || github.ref == 'refs/heads/master' }}
 
     - name: Fingerprint build environment
       id: build-env
@@ -212,7 +215,7 @@ jobs:
       run: python CI/build_cache.py snapshot
 
     - name: Save incremental build
-      if: steps.build-cache.outputs.cache-hit != 'true'
+      if: steps.build-cache.outputs.cache-hit != 'true' && (inputs.package || github.ref == 'refs/heads/master')
       uses: actions/cache/save@v5
       with:
         path: |
@@ -246,13 +249,18 @@ jobs:
         mkdir -Force ${{ github.workspace }}/build/iconengines
         cp -Force plugins/iconengines/qsvgicon.dll ${{ github.workspace }}/build/iconengines
 
+    # The symbol server folder and the pdb archive are only for release packaging
+    # (the upload below needs the same flag). Building them took 10 to 11 minutes
+    # of every pull request run.
     - name: Create symbol server directory structure
+      if: ${{ inputs.package }}
       working-directory: ${{ github.workspace }}/build
       run: |
         ${{ github.workspace }}\CI\Store-Symbols.ps1
         Move-Item ${{ github.workspace }}\build\SymStore ${{ github.workspace }}
 
     - name: Copy pdb files
+      if: ${{ inputs.package }}
       run: |
         robocopy build pdb *.pdb
         if ($lastexitcode -lt 8) {
@@ -281,12 +289,16 @@ jobs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        PACKAGE: ${{ inputs.package }}
       run: |
         printf 'Ref %s\nRun %s\nCommit %s\n' "$GITHUB_REF" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$GITHUB_SHA" > install/CI-ID.txt
-        cp install/CI-ID.txt pdb/CI-ID.txt
-        cp install/CI-ID.txt SymStore/CI-ID.txt
+        if [ "$PACKAGE" = "true" ]; then
+          cp install/CI-ID.txt pdb/CI-ID.txt
+          cp install/CI-ID.txt SymStore/CI-ID.txt
+        fi
 
     - name: Store OpenFallout archived pdb files
+      if: ${{ inputs.package }}
       uses: actions/upload-artifact@v6
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-pdb-${{ github.sha }}
@@ -299,6 +311,7 @@ jobs:
         path: ${{ github.workspace }}/install/*
 
     - name: Store symbol server artifacts
+      if: ${{ inputs.package }}
       uses: actions/upload-artifact@v6
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-sym-store-${{ github.sha }}
