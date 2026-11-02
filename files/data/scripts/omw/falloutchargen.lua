@@ -458,8 +458,12 @@ local function skillsMenu()
     local opened, made = pointsMenu('CGM_SelectItemTemplate', word('sStatsSkills', 'Skills'))
     if not opened then return false end
     shown = opened
-    local numbers = {}
-    for index, skill in ipairs(chargen.state().skills) do numbers[index] = skill.number end
+    -- What the screen started with (skills may arrive already tagged): Reset goes back to it
+    local numbers, tagged = {}, {}
+    for index, skill in ipairs(chargen.state().skills) do
+        numbers[index] = skill.number
+        tagged[skill.number] = skill.tagged == true
+    end
     local selected = 1
     function updateShown()
         local now = chargen.state()
@@ -491,8 +495,12 @@ local function skillsMenu()
         updateShown()
     end)
     opened:onClick('CGM_ResetButton', function()
+        -- Take off the tags that were added first, so that the ones that were there can be put back within the limit
         for _, skill in ipairs(chargen.state().skills) do
-            if skill.tagged then chargen.toggleTag(skill.number) end
+            if skill.tagged == true and not tagged[skill.number] then chargen.toggleTag(skill.number) end
+        end
+        for _, skill in ipairs(chargen.state().skills) do
+            if skill.tagged ~= true and tagged[skill.number] then chargen.toggleTag(skill.number) end
         end
         updateShown()
     end)
@@ -586,6 +594,8 @@ function render()
 end
 
 local function sync()
+    -- A menu drawn from a file keeps the window size it was opened with until it is told the window changed
+    if shown then shown:checkSize() end
     local page = chargen.page()
     if not page then
         if element or modeOpen then
