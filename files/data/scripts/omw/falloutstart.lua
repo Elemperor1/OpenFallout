@@ -357,8 +357,10 @@ local function open()
     return true
 end
 
--- A message box that is open (one that opened before the menu did) has the keys and the buttons of the pad
-local function messageOpen()
+-- A message box that is open (one that opened before the menu did) has the keys and the buttons of the pad, and so has the
+-- console (the keys that are typed in it reach the menu's script as well)
+local function inputTaken()
+    if engine.consoleOpen() then return true end
     local box = core.messageBox
     if box == nil then return false end
     local ok, current = pcall(box.current)
@@ -366,7 +368,7 @@ local function messageOpen()
 end
 
 local function onKey(key)
-    if not shown or messageOpen() then return end
+    if not shown or inputTaken() then return end
     local code = key.code
     local KEY = input.KEY
     local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm or lists.saves
@@ -393,7 +395,7 @@ end
 -- The buttons of the pad: the engine does not give them to its own menu while the script draws this one, and takes B only
 -- in the list (to close the menu), so the pad moves the lit row, picks it, goes back and closes the menu here
 local function onPad(button)
-    if not shown or messageOpen() then return end
+    if not shown or inputTaken() then return end
     local PAD = input.CONTROLLER_BUTTON
     if button == PAD.DPadUp then
         onKey({ code = input.KEY.UpArrow })

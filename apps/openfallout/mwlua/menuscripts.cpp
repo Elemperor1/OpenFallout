@@ -165,6 +165,8 @@ namespace OFLua
                 && OFBase::Environment::get().getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) == -1
                 && OFBase::Environment::get().getWindowManager()->isSavingAllowed();
         };
+        // Whether the console is open: it takes the keys that are typed, and menu scripts are given them as well
+        api["consoleOpen"] = []() { return OFBase::Environment::get().getWindowManager()->isConsoleMode(); };
         // The window manager's window for the settings (the game's own settings screens are not drawn from its menu
         // file yet), and whether it is open
         api["openSettings"] = []() {

@@ -101,6 +101,12 @@
 -- @return #boolean
 
 ---
+-- Whether the console is open. It takes the keys that are typed, and menu scripts are given those keys too, so a script
+-- that acts on keys leaves them alone while it is open
+-- @function [parent=#menu] consoleOpen
+-- @return #boolean
+
+---
 -- Open the engine's window for the settings (nothing when it is already open)
 -- @function [parent=#menu] openSettings
 

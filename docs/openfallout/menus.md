@@ -348,7 +348,9 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   shows the name, the level and the time played of the save that is lit. Writing over a save and loading one ask first.
   The save's picture, its version line, deleting a save, and the sorting the game uses (not read) are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
-  `menu.openSettings`, `menu.settingsOpen` (`openfallout.menu`). The script says every frame that it draws the menu; while
+  `menu.openSettings`, `menu.settingsOpen`, `menu.consoleOpen` (`openfallout.menu`). While the console or a message box is
+  open the script leaves the keys and the buttons of the pad alone (the keys typed in the console reach the menu's scripts
+  as well). The script says every frame that it draws the menu; while
   it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
   back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
   list the engine closes the menu with them. Settings opens the engine's own window until the settings screens are drawn
