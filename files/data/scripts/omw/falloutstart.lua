@@ -37,6 +37,7 @@ local screen = 'list'
 local confirmFrom = 'list'
 local items = {}
 local saveRows = {}
+local lastSaveRow = 1
 -- A click is carried out in the next frame, where the engine's calls for saving and loading are allowed
 local pending = nil
 -- The script cannot draw the menu (the file is not there): the engine's own menu is used and nothing is claimed
@@ -182,7 +183,7 @@ showList = function()
 end
 
 -- The list of saves: a row for a new save (when saving and there is room for one) and a row for each save
-showSaves = function(kind)
+showSaves = function(kind, keepRow)
     local saves = collectSaves(kind == 'load')
     saveRows = {}
     local rows = {}
@@ -206,7 +207,9 @@ showSaves = function(kind)
         lists.saves.rows(rows)
         showScreen(kind)
         hidePanel()
-        lists.saves.select(1)
+        -- The row that was lit before a question (or the first) is lit again and shown: the rows are made again, and the
+        -- scrolling of the list stays where it was
+        lists.saves.select(math.max(1, math.min(keepRow or 1, #rows)), true)
     end)
     screen = kind
 end
@@ -240,7 +243,7 @@ end
 -- Go back one step: from a question to the screen it came from, from a list of saves to the main list
 local function back()
     if screen == 'confirm' then
-        if confirmFrom == 'list' then showList() else showSaves(confirmFrom) end
+        if confirmFrom == 'list' then showList() else showSaves(confirmFrom, lastSaveRow) end
     elseif screen == 'save' or screen == 'load' then
         showList()
     end
@@ -251,6 +254,7 @@ local function pickSave(row)
     local entry = saveRows[row]
     if not entry or entry.none then return end
     local kind = screen
+    lastSaveRow = row
     if kind == 'save' then
         local place = ''
         local ok, info = pcall(function() return core.interact.mapInfo() end)
@@ -267,13 +271,13 @@ local function pickSave(row)
                     engine.saveGame(description, entry.save.file)
                     showList()
                 end },
-                { label = word('sNo'), action = function() showSaves(kind) end },
+                { label = word('sNo'), action = function() showSaves(kind, lastSaveRow) end },
             })
         end
     else
         ask(word('sConfirmLoad'), kind, {
             { label = word('sYes'), action = function() engine.loadGame(entry.save.dir, entry.save.file) end },
-            { label = word('sNo'), action = function() showSaves(kind) end },
+            { label = word('sNo'), action = function() showSaves(kind, lastSaveRow) end },
         })
     end
 end
