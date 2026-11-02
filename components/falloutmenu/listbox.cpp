@@ -79,8 +79,14 @@ namespace FalloutMenu
 
     void ListBox::updateRow(int row, const std::map<std::string, Value>& traits)
     {
-        if (Tile* target = item(row))
-            setTraits(*target, traits);
+        Tile* target = item(row);
+        if (target == nullptr)
+            return;
+        setTraits(*target, traits);
+        // The row can be higher or lower with its new text: it is measured again, and the rows below it move (the
+        // scrolling is left where it is)
+        mOpen.menu().clear(*target, "_fitted");
+        layout();
     }
 
     Tile* ListBox::item(int row)

@@ -82,8 +82,8 @@ end
 -- The settings are written to the user's file once, when the screens of the settings are left
 local function saveOptions()
     if optionsChanged then
-        optionsChanged = false
-        pcall(engine.saveOptions)
+        -- kept for the next time the screens are left when the engine could not write them
+        optionsChanged = not pcall(engine.saveOptions)
     end
 end
 

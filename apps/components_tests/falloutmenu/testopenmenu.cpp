@@ -613,6 +613,27 @@ namespace
         EXPECT_EQ(list.rowCount(), 5);
     }
 
+    TEST(FalloutOpenMenuListTest, a_row_whose_text_changes_height_is_measured_again_and_the_rows_below_it_move)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        ListBox& list = *open.list(open.addList("List", "Row"));
+        list.setRows(rowsOf(4));
+        ASSERT_FLOAT_EQ(menu.number(*list.item(1), "height"), 40.f);
+        ASSERT_FLOAT_EQ(menu.number(*list.item(2), "_y"), 80.f);
+
+        list.updateRow(1, { { "string", Value::fromText("Two\nlines") } });
+        // 30 for each line of the test font and 10 of room
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "height"), 70.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(2), "_y"), 110.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(3), "_y"), 150.f);
+        // and the other way
+        list.updateRow(1, { { "string", Value::fromText("One") } });
+        EXPECT_FLOAT_EQ(menu.number(*list.item(1), "height"), 40.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(3), "_y"), 120.f);
+    }
+
     TEST(FalloutOpenMenuListTest, the_highlight_goes_to_the_row_the_pointer_is_on_and_follows_the_scrolling)
     {
         Fixture f;
