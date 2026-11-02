@@ -392,6 +392,11 @@ local function specialMenu()
         numbers[index] = attribute.number
     end
     local selected = 1
+    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit
+    local function pick()
+        local row = made.selected()
+        if row >= 1 and row <= #numbers then selected = row end
+    end
     function updateShown()
         local now = chargen.state()
         local rows, total = {}, 0
@@ -430,6 +435,7 @@ local function specialMenu()
         updateShown()
     end)
     opened:onClick('CGM_ResetButton', function()
+        pick()
         -- What was taken first, so that the points are there to give back
         for _, sign in ipairs({ -1, 1 }) do
             for _, attribute in ipairs(chargen.state().attributes) do
@@ -442,10 +448,12 @@ local function specialMenu()
     opened:onClick('CGM_DoneButton', finishPage)
     controls = {
         move = function(delta)
+            pick()
             selected = math.max(1, math.min(#numbers, selected + delta))
             updateShown()
         end,
         change = function(delta)
+            pick()
             adjust(selected, delta)
             updateShown()
         end,
@@ -465,6 +473,11 @@ local function skillsMenu()
         tagged[skill.number] = skill.tagged == true
     end
     local selected = 1
+    -- The pointer moves the highlight of the list by itself: the row the keys act on is the one that is lit
+    local function pick()
+        local row = made.selected()
+        if row >= 1 and row <= #numbers then selected = row end
+    end
     function updateShown()
         local now = chargen.state()
         local rows = {}
@@ -495,6 +508,7 @@ local function skillsMenu()
         updateShown()
     end)
     opened:onClick('CGM_ResetButton', function()
+        pick()
         -- Take off the tags that were added first, so that the ones that were there can be put back within the limit
         for _, skill in ipairs(chargen.state().skills) do
             if skill.tagged == true and not tagged[skill.number] then chargen.toggleTag(skill.number) end
@@ -507,10 +521,12 @@ local function skillsMenu()
     opened:onClick('CGM_DoneButton', finishPage)
     controls = {
         move = function(delta)
+            pick()
             selected = math.max(1, math.min(#numbers, selected + delta))
             updateShown()
         end,
         change = function()
+            pick()
             toggle(selected)
             updateShown()
         end,
