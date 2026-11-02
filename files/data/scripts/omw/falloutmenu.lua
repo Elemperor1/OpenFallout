@@ -86,6 +86,27 @@ local function contentOf(pieces)
     return content
 end
 
+-- The box the pages of the Pip-Boy are laid out in (1024 by 768 design units; the games draw them on the screen of the
+-- 3D device), for the `box` option of `open`
+module.PIPBOY_BOX = { width = 1024, height = 768 }
+
+-- Where a menu is drawn in a window of this size. Most menus are laid out for the whole window. A menu laid out in a box
+-- of its own is drawn with the box as large as the window lets it be, in the middle; `pixels` is the size the menu is
+-- told (960 design units are as many pixels as the box is scaled by) and the element is as large as the box, so the
+-- pointer is already in its pixels.
+local function placement(size, box)
+    if not box then
+        return { pixels = size, position = v2(0, 0), size = size }
+    end
+    local scale = math.min(size.x / box.width, size.y / box.height)
+    local width, height = box.width * scale, box.height * scale
+    return {
+        pixels = v2(960 * scale * size.x / size.y, 960 * scale),
+        position = v2(math.floor((size.x - width) / 2), math.floor((size.y - height) / 2)),
+        size = v2(width, height),
+    }
+end
+
 local Shown = {}
 Shown.__index = Shown
 
@@ -115,8 +136,10 @@ function Shown:checkSize()
     local size = ui.screenSize()
     if size.x ~= self.size.x or size.y ~= self.size.y then
         self.size = size
-        self.menu:resize(size.x, size.y)
-        self.element.layout.props.size = size
+        local place = placement(size, self.box)
+        self.menu:resize(place.pixels.x, place.pixels.y)
+        self.element.layout.props.position = place.position
+        self.element.layout.props.size = place.size
         self.version = nil
         self:refresh()
     end
@@ -272,20 +295,24 @@ function Shown:close()
     end
 end
 
--- Open a menu file for the whole window. `options`: layer (default 'Windows'), pad (a pad is in use)
+-- Open a menu file for the whole window. `options`: layer (default 'Windows'), pad (a pad is in use), box (the box the
+-- file is laid out in, like PIPBOY_BOX, which is then drawn in the middle of the window and as large as it can be)
 function module.open(file, options)
     options = options or {}
     local size = ui.screenSize()
-    local menu, reason = core.menus.open(file, size.x, size.y, options.pad == true)
+    local place = placement(size, options.box)
+    local menu, reason = core.menus.open(file, place.pixels.x, place.pixels.y, options.pad == true)
     if not menu then
         print('menu ' .. file .. ' is not shown: ' .. tostring(reason))
         return nil
     end
-    local shown = setmetatable({ menu = menu, file = file, size = size, clicks = {}, rowClicks = {}, dragHooks = {} }, Shown)
+    local shown = setmetatable({
+        menu = menu, file = file, size = size, box = options.box, clicks = {}, rowClicks = {}, dragHooks = {},
+    }, Shown)
     shown.version = menu:version()
     shown.element = ui.create {
         layer = options.layer or 'Windows',
-        props = { position = v2(0, 0), size = size },
+        props = { position = place.position, size = place.size },
         content = contentOf(menu:pieces()),
         events = {
             mouseMove = async:callback(function(e)

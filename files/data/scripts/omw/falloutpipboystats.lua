@@ -206,7 +206,7 @@ local function pickTab(index)
 end
 
 local function open()
-    local opened = menuModule.open(MENU_FILE)
+    local opened = menuModule.open(MENU_FILE, { box = menuModule.PIPBOY_BOX })
     if not opened then return false end
     local made = {}
     for _, tab in ipairs(TABS) do

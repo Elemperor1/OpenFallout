@@ -56,6 +56,13 @@ reason to think the game spreads them so). The Pip-Boy page row (STAT, INV, DATA
 it in the Pip-Boy device, which is a model, and `falloutpipboy.lua` keeps a plain row of its own at the top of the screen
 for it.
 
+The pages of the Pip-Boy (`main/inventory_menu.xml`, `main/stats_menu.xml`, `main/map_menu.xml`; the repair, item mod and
+reputation menus have the same id) are laid out in a box of 1024 by 768 design units, which is the background picture
+`Interface\Shared\Background\pipboy.dds` stretched over it. A script opens them with the box
+(`menu.open(file, { box = menu.PIPBOY_BOX })`) and the renderer draws the box as large as the window lets it be (the window
+height at 16:9) in the middle of the window, with the pointer in the box's own pixels. Every other menu is laid out for the
+whole window.
+
 ### The items page of the Pip-Boy
 
 `falloutpipboyitems.lua` lists what the player carries in the list of `inventory_menu.xml` (the marker of what is worn is
@@ -93,7 +100,8 @@ the lines of the general page.
 
 ## What is not known yet
 
-- How the Pip-Boy background (1024 by 768 design units) is placed on a screen of the design size.
+- How the games place the Pip-Boy background (1024 by 768 design units) on the screen of the device; the box is centred and
+  scaled to the window here, which is a choice of the port and not read from the games.
 - The meaning of the byte `&widescreen;` reads, and of the traits `wraplimit`, `wraplines`, `ishtml`, `cropx`, `cropy`,
   `repeat*`, `explorefade` and `menufade`.
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in

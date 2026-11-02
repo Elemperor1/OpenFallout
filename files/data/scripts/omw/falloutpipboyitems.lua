@@ -212,7 +212,7 @@ local function closeKeyring()
 end
 
 local function open()
-    local opened = menuModule.open(MENU_FILE)
+    local opened = menuModule.open(MENU_FILE, { box = menuModule.PIPBOY_BOX })
     if not opened then return false end
     local made = opened:list('IM_InventoryList', 'IM_InventoryListTemplate')
     if not made then
