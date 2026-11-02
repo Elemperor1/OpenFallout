@@ -148,7 +148,12 @@ the square of a skill that is tagged). The file asks the code for the title, the
 numbers `_CurrPoints` and `_MaxPoints` (the points given so far and all that can be given), and Done is shown dim until they
 are equal, as the file says. A click on a row picks it and shows its description; the arrows give and take a point; Reset
 goes back to what the screen started with. The keys: up and down pick a row, left and right give and take a point (space
-tags), Enter is Done. The top of the list is where the file leaves it to the code, 60 units down. The counter under the
+tags), Enter is Done. The top of the list is where the file leaves it to the code: 105 units down on the S.P.E.C.I.A.L. page
+and 65 on the skills page (the numbers each page sets in both executables). The title is a format of the settings
+`sAttributesTitle` ("ATTRIBUTES: %d/%d Points Assigned") and `sSkillsTitle` ("SKILLS:  %d/%d Selected", two spaces), not
+changed in case: the points given and all that can be given (on the S.P.E.C.I.A.L. page the points are the values above their
+least, 1, and all that can be given is what the script command allows less 7; on the skills page the tags and their
+limit). The counter under the
 description is read from the executables: the setting `sAttributesCount` ("Distribute %d Point", S.P.E.C.I.A.L.) or
 `sSkillsCount` ("Tag %d Skill") is a format for the points that are left, with an "s" after it unless that is one, and the
 counter is hidden when none are left; the number is the same whatever `flagA` of the script command (the points to add on

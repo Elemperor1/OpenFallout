@@ -49,6 +49,9 @@ namespace
         // Read from the executables as format strings (19 and 12 characters, the same in both games)
         EXPECT_EQ(SettingText::standIn("sAttributesCount"), "Distribute %d Point");
         EXPECT_EQ(SettingText::standIn("sSkillsCount"), "Tag %d Skill");
+        // And the titles, read as format strings too (33 and 23 characters, two %d each)
+        EXPECT_EQ(SettingText::standIn("sAttributesTitle"), "ATTRIBUTES: %d/%d Points Assigned");
+        EXPECT_EQ(SettingText::standIn("sSkillsTitle"), "SKILLS:  %d/%d Selected");
     }
 
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)

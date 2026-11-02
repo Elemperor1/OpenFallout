@@ -356,8 +356,10 @@ end
 local MENU_NAME = 'dialog/texteditmenu.xml'
 local MENU_POINTS = 'chargen/char_gen_menu.xml'
 -- Where the list of the character making menu starts in its window (the file leaves the place to the code: its y is 0, the
--- title and its lines are above it)
-local POINTS_LIST_Y = 60
+-- title and its lines are above it): the number each page of the executables sets (105 for the points of S.P.E.C.I.A.L., 65
+-- for the skills)
+local SPECIAL_LIST_Y = 105
+local SKILLS_LIST_Y = 65
 
 local function word(setting, fallback)
     local text = pipboy.text(setting)
@@ -384,6 +386,14 @@ local function showCounter(opened, setting, fallback, left)
     opened:set('CGM_PointCounter', 'visible', left ~= 0)
 end
 
+-- The title, as the executables write it: the setting's text is a format for the points given and all that can be given
+-- ("x/y"), and is not changed in case
+local function showTitle(opened, setting, fallback, current, maximum)
+    local format = word(setting, fallback)
+    local ok, text = pcall(string.format, format, current, maximum)
+    opened:set('CGM_Headline_Title', 'string', ok and text or format)
+end
+
 -- What the screen says of the lit row: its description, and its picture, which is the `ICON` of the actor value's record
 -- (the executables take it from there and from nothing else)
 local function showSelection(opened, text, icon)
@@ -394,7 +404,7 @@ local function showSelection(opened, text, icon)
 end
 
 -- The list menu of the points and tags (SPECIAL, skills) with the row template for each: nothing if the data lacks them
-local function pointsMenu(template, title)
+local function pointsMenu(template, listY)
     local opened = menuModule.open(MENU_POINTS)
     if not opened then return nil end
     -- Kept from here on, so that a failure below is cleaned up by closeShown() where the page is made
@@ -405,14 +415,13 @@ local function pointsMenu(template, title)
         return nil
     end
     opened:batch(function()
-        opened:set('CGM_ItemList', 'y', POINTS_LIST_Y)
-        opened:set('CGM_Headline_Title', 'string', title:upper())
+        opened:set('CGM_ItemList', 'y', listY)
     end)
     return opened, made
 end
 
 local function specialMenu()
-    local opened, made = pointsMenu('CGM_AttributeTemplate', word('sStatsSpecial', 'S.P.E.C.I.A.L.'))
+    local opened, made = pointsMenu('CGM_AttributeTemplate', SPECIAL_LIST_Y)
     if not opened then return false end
     local state = chargen.state()
     -- What the screen started with: Reset goes back to it
@@ -455,8 +464,11 @@ local function specialMenu()
         opened:batch(function()
             made.rows(rows)
             made.select(selected)
-            opened:io('_CurrPoints', total)
-            opened:io('_MaxPoints', total + now.pointsLeft)
+            -- The points given are what the values are above their least (1), as the executables count them
+            local current = total - #now.attributes
+            opened:io('_CurrPoints', current)
+            opened:io('_MaxPoints', current + now.pointsLeft)
+            showTitle(opened, 'sAttributesTitle', 'ATTRIBUTES: %d/%d Points Assigned', current, current + now.pointsLeft)
             showCounter(opened, 'sAttributesCount', 'Distribute %d Point', now.pointsLeft)
             showSelection(opened, texts[selected], icons[selected])
             described = selected
@@ -504,7 +516,7 @@ local function specialMenu()
 end
 
 local function skillsMenu()
-    local opened, made = pointsMenu('CGM_SelectItemTemplate', word('sStatsSkills', 'Skills'))
+    local opened, made = pointsMenu('CGM_SelectItemTemplate', SKILLS_LIST_Y)
     if not opened then return false end
     -- What the screen started with (skills may arrive already tagged): Reset goes back to it
     local numbers, tagged, texts, icons = {}, {}, {}, {}
@@ -545,6 +557,7 @@ local function skillsMenu()
             made.select(selected)
             opened:io('_CurrPoints', now.tagLimit - now.tagsLeft)
             opened:io('_MaxPoints', now.tagLimit)
+            showTitle(opened, 'sSkillsTitle', 'SKILLS:  %d/%d Selected', now.tagLimit - now.tagsLeft, now.tagLimit)
             showCounter(opened, 'sSkillsCount', 'Tag %d Skill', now.tagsLeft)
             showSelection(opened, texts[selected], icons[selected])
             described = selected
