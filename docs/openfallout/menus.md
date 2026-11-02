@@ -148,11 +148,33 @@ the square of a skill that is tagged). The file asks the code for the title, the
 numbers `_CurrPoints` and `_MaxPoints` (the points given so far and all that can be given), and Done is shown dim until they
 are equal, as the file says. A click on a row picks it and shows its description; the arrows give and take a point; Reset
 goes back to what the screen started with. The keys: up and down pick a row, left and right give and take a point (space
-tags), Enter is Done. The top of the list is where the file leaves it to the code, 60 units down; the words of the counter
-and the picture of the selection (the file hides it) are not read from the executables yet. The sex and race screen
-(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and which of the two trait
-menus (`trait_menu.xml`, `trait_select_menu.xml`) the games open for the traits is not read yet; both keep the stand-in
-widgets, as does any screen whose file the install lacks.
+tags), Enter is Done. The top of the list is where the file leaves it to the code: 105 units down on the S.P.E.C.I.A.L. page
+and 65 on the skills page (the numbers each page sets in both executables). The title is a format of the settings
+`sAttributesTitle` ("ATTRIBUTES: %d/%d Points Assigned") and `sSkillsTitle` ("SKILLS:  %d/%d Selected", two spaces), not
+changed in case: the points given and all that can be given (on the S.P.E.C.I.A.L. page the points are the values above their
+least, 1, and all that can be given is what the script command allows less 7; on the skills page the tags and their
+limit). The counter under the
+description is read from the executables: the setting `sAttributesCount` ("Distribute %d Point", S.P.E.C.I.A.L.) or
+`sSkillsCount` ("Tag %d Skill") is a format for the points that are left, with an "s" after it unless that is one, and the
+counter is hidden when none are left; the number is the same whatever `flagA` of the script command (the points to add on
+top of the values the character has) does, since the screen counts what is left. The picture of the selection (the file hides
+it) is the `ICON` string of the actor value's own record (`SPECIAL_Strength.dds` and the others under
+`Interface\Icons\PipboyImages\S.P.E.C.I.A.L`, `Skills_*.dds` under `Interface\Icons\Stats`; New Vegas's record for
+Throwing names `skills_survival.dds`), taken with its description and name from the same record. The sex and race screen
+(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and keeps the stand-in widgets,
+as does any screen whose file the install lacks.
+
+*The traits (New Vegas).* New Vegas opens `trait_menu.xml` for them (the only script of `FalloutNV.esm` that shows a trait
+menu, `VCG04ActivatorScript`, calls `ShowTraitMenu` after `ShowRaceMenu`; `trait_select_menu.xml` is the one that no script
+opens) and Fallout 3 has no traits. The list takes the file's `LUM_PerkTemplate` (the name and a square on each trait that is
+picked); a click picks a trait or takes the pick back, and one past the most does nothing (no message, as in the executable);
+Reset takes all back; Continue is lit whatever the number picked, none included (the file and the code check nothing). The
+description is the perk's own and the picture its `ICON`. The title is `sTraitMenuTitleText` ("CHOOSE UP TO %d TRAITS", or
+`sTraitMenuTitleTextSingular` "CHOOSE %d TRAIT" when the most is one) with the most that can be picked, the counter
+`sTraitMenuCounter` ("%d TRAITS LEFT", or the singular "%d TRAIT LEFT" for exactly one) with the picks that are left; the
+counter is never hidden. The executable's own limit is `iTraitMenuMaxNumTraits` (3 by default; the engine keeps its limit of
+two) and its list is every perk with the trait flag in the order the data handler has them (the engine lists them by name),
+with the conditions of the perk checked for the player (the engine does not check them).
 
 ## The words of the labels
 
@@ -189,9 +211,12 @@ table; a game in another language gets its words from its plugin). The card, car
 - Whether the font or the file draws the tab words of the data page in capitals (the executables' code for the tab bar does
   not change their case; New Vegas was read, Fallout 3 was not), what turns the arrow of the player on the map (the code sets
   its angle to minus the player's heading, minus 0.3, minus the cell's north offset inside; the page has no turning picture
-  yet), the local map tab (zoom 0.1 to 0.9, places 20 to 75, a render of the cell), and which form the cell's extra data of kind
-  1 is that the headline's place text reads outside (the page writes the worldspace's name, or the cell's, where the games
-  write the region's or the cell's map name).
+  yet), the local map tab (zoom 0.1 to 0.9, places 20 to 75, a render of the cell), and the headline's place text outside: the
+  games ask the exterior cell at the player's place for a form by its extra data (a positional lookup; which subrecord of the
+  cell that is, and whether the name written is the form's map name, its editor id or its full name, was not read), and when
+  there is none they write the cell's own name; the regions are scanned (the highest priority wins, an override beats one that
+  is not) only when no cell is there, and the worldspace's name comes last. The page writes the cell's name, else the
+  worldspace's.
 - The words `&xitem;`, `&xlist;`, `&xboxhint;`, `&first;`, `&last;`, `&prev;`, `&next;` are in some menu files but not in
   the executable's table. The loader leaves them as text.
 

@@ -16,10 +16,12 @@ namespace
 {
     using namespace ESM4Test;
 
-    std::string avif(std::uint32_t id, const std::string& editorId, const std::string& name, const std::string& text)
+    std::string avif(std::uint32_t id, const std::string& editorId, const std::string& name, const std::string& text,
+        const std::string& icon = std::string())
     {
         return record("AVIF", id,
-            zString("EDID", editorId) + zString("FULL", name) + zString("DESC", text) + zString("ANAM", "Short"));
+            zString("EDID", editorId) + zString("FULL", name) + zString("DESC", text)
+                + (icon.empty() ? std::string() : zString("ICON", icon)) + zString("ANAM", "Short"));
     }
 
     // The words the games' Pip-Boy shows for a skill or an attribute are in the plugins' AVIF records. This reads a
@@ -29,7 +31,8 @@ namespace
         const ToUTF8::StatelessUtf8Encoder encoder(ToUTF8::WINDOWS_1252);
         const std::string plugin = header()
             + topGroup("AVIF",
-                avif(0x100, "AVStrength", "Strength", "Strength is a measure of your raw physical power.")
+                avif(0x100, "AVStrength", "Strength", "Strength is a measure of your raw physical power.",
+                    "Interface\\Icons\\PipboyImages\\S.P.E.C.I.A.L\\SPECIAL_Strength.dds")
                     + avif(0x101, "AVSmallGuns", "Guns", "Skill with pistols and rifles."));
 
         OFWorld::ESMStore store;
@@ -43,13 +46,16 @@ namespace
         const OFScript::FalloutScripts::ActorValueText strength = scripts.actorValueText("AVStrength", "Fallback");
         EXPECT_EQ(strength.mName, "Strength");
         EXPECT_EQ(strength.mDescription, "Strength is a measure of your raw physical power.");
+        EXPECT_EQ(strength.mIcon, "Interface\\Icons\\PipboyImages\\S.P.E.C.I.A.L\\SPECIAL_Strength.dds");
 
         const OFScript::FalloutScripts::ActorValueText guns = scripts.actorValueText("avsmallguns", "Fallback");
         EXPECT_EQ(guns.mName, "Guns");
         EXPECT_EQ(guns.mDescription, "Skill with pistols and rifles.");
+        EXPECT_EQ(guns.mIcon, "");
 
         const OFScript::FalloutScripts::ActorValueText none = scripts.actorValueText("Nothing", "Fallback");
         EXPECT_EQ(none.mName, "Fallback");
         EXPECT_EQ(none.mDescription, "");
+        EXPECT_EQ(none.mIcon, "");
     }
 }

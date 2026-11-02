@@ -5295,8 +5295,8 @@ namespace OFScript
             {
                 if (!info.mDescription.empty())
                     ++withDescription;
-                mActorValueText.emplace(
-                    Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+                mActorValueText.emplace(Misc::StringUtils::lowerCase(info.mEditorId),
+                    ActorValueText{ info.mFullName, info.mDescription, info.mIcon });
             }
             Log(Debug::Info) << "Actor values: " << mStore.get<ESM4::ActorValueInfo>().getSize() << " records, "
                              << withDescription << " with a description";
@@ -5331,7 +5331,7 @@ namespace OFScript
             return traits;
         for (const ESM4::Perk& perk : mStore.get<ESM4::Perk>())
             if (perk.mData.mTrait != 0 && !perk.mFullName.empty())
-                traits.push_back({ numberOf(perk.mId), perk.mFullName, perk.mDescription });
+                traits.push_back({ numberOf(perk.mId), perk.mFullName, perk.mDescription, perk.mIcon });
         std::sort(traits.begin(), traits.end(), [](const ChargenTrait& left, const ChargenTrait& right) {
             return left.mName != right.mName ? left.mName < right.mName : left.mId < right.mId;
         });

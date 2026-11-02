@@ -76,15 +76,15 @@ caravan_menu,Casino and caravan menus,screen,nv,listed,todo,,
 caravan_results_menu,Casino and caravan menus,screen,nv,listed,todo,,
 roulette_menu,Casino and caravan menus,screen,nv,listed,todo,,
 slot_machine_menu,Casino and caravan menus,screen,nv,listed,todo,,
-chargen/char_gen_menu,Characters and dialogue,screen,both,read,done,"M12 (this PR): the SPECIAL points and the skill tags are laid out and drawn from the file in the offline harness (list, arrows, reset, done that waits for every point, the description and the counter), New Vegas and Fallout 3; not seen in the running game; the list's top (y 60), the counter's words, the titles and the picture of the selection (set in code) are the port's guesses",falloutchargen.lua: S.P.E.C.I.A.L. and tagged skills
+chargen/char_gen_menu,Characters and dialogue,screen,both,read,done,"M12: the SPECIAL points and the skill tags are laid out and drawn from the file in the offline harness (list, arrows, reset, done that waits for every point, the description and the counter), New Vegas and Fallout 3; the titles, the counters (hidden when none are left), the picture of the selection (the record's ICON) and the list's top (y 105 and 65) are what the executables set; not seen in the running game",falloutchargen.lua: S.P.E.C.I.A.L. and tagged skills
 chargen/love_tester_menu,Characters and dialogue,screen,nv,listed,todo,,
 chargen/race_sex_menu,Characters and dialogue,screen,both,listed,stand-in,,"falloutchargen.lua: sex and race; the face is not made (no sliders, no head to turn)"
 chargen/specialbookmenu,Characters and dialogue,screen,both,listed,todo,,
 dialog/dialog_menu,Characters and dialogue,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutdialogue.lua fills the topics and the reply; the layout is the file's
 dialog/texteditmenu,Characters and dialogue,screen,both,read,done,"M12 (this PR): the name of the character is entered on it, drawn from the file in the offline harness; not seen in the running game",falloutchargen.lua: the name (typed with the keys of the keyboard)
 surgerymenu,Characters and dialogue,screen,both,listed,todo,,
-trait_menu,Characters and dialogue,screen,nv,listed,todo,,
-trait_select_menu,Characters and dialogue,screen,nv,listed,stand-in,,falloutchargen.lua: the traits
+trait_menu,Characters and dialogue,screen,nv,read,done,"M12: the traits are laid out and drawn from the file in the offline harness (the list with a square on each that is picked, pick and take back, Reset, Continue that is lit whatever the number picked, the description and the picture of the perk, the title and counter formats from the executables); New Vegas opens this menu for traits (VCG04ActivatorScript); not seen in the running game",falloutchargen.lua: the traits
+trait_select_menu,Characters and dialogue,screen,nv,listed,todo,"New Vegas has the menu but no script of FalloutNV.esm opens it (ShowTraitSelectMenu is never called); the traits use trait_menu",
 barter_menu,Items and trading,screen,both,listed,todo,,
 book_menu,Items and trading,screen,both,listed,todo,,
 container_menu,Items and trading,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutloot.lua fills the two lists and the item cards; things move both ways

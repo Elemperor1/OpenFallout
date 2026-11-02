@@ -948,12 +948,14 @@ namespace OFScript
         /// The player is done with the screen: what it picked becomes the character (the attributes and skills the
         /// player has, the traits as perks) and the next screen of the menu opens
         void finishChargenPage();
-        /// The name and the description that the data has for an actor value (an attribute or a skill) by its editor
-        /// id; the name given when it has none
+        /// The name, the description and the picture that the data has for an actor value (an attribute or a skill) by
+        /// its editor id; the name given when it has none. The picture is the `ICON` of the record: the character
+        /// making screens of both executables show it beside the description.
         struct ActorValueText
         {
             std::string mName;
             std::string mDescription;
+            std::string mIcon;
         };
         ActorValueText actorValueText(std::string_view editorId, std::string_view fallback) const;
         /// The races the player can be (playable and not children), by their form ids
@@ -963,12 +965,14 @@ namespace OFScript
             std::string mName;
         };
         std::vector<ChargenRace> playableRaces() const;
-        /// The traits of the data (New Vegas), by name
+        /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
+        /// the executable shows beside the description
         struct ChargenTrait
         {
             FalloutScript::FormId mId = 0;
             std::string mName;
             std::string mDescription;
+            std::string mIcon;
         };
         std::vector<ChargenTrait> chargenTraits() const;
         /// What the player is now: the sex and race the player picked or else those of its record
