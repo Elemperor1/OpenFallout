@@ -5290,9 +5290,16 @@ namespace OFScript
         if (!mActorValueTextBuilt)
         {
             mActorValueTextBuilt = true;
+            std::size_t withDescription = 0;
             for (const ESM4::ActorValueInfo& info : mStore.get<ESM4::ActorValueInfo>())
+            {
+                if (!info.mDescription.empty())
+                    ++withDescription;
                 mActorValueText.emplace(
                     Misc::StringUtils::lowerCase(info.mEditorId), ActorValueText{ info.mFullName, info.mDescription });
+            }
+            Log(Debug::Info) << "Actor values: " << mStore.get<ESM4::ActorValueInfo>().getSize() << " records, "
+                             << withDescription << " with a description";
         }
         ActorValueText text;
         const auto found = mActorValueText.find(Misc::StringUtils::lowerCase(editorId));

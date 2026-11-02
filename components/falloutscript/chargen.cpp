@@ -65,14 +65,13 @@ namespace FalloutScript
         skills.push_back({ 38, strength, "MeleeWeapons", "Melee Weapons" });
         skills.push_back({ 39, intelligence, "Repair", "Repair" });
         skills.push_back({ 40, intelligence, "Science", "Science" });
-        if (game == Game::Fallout3)
-            skills.push_back({ 41, agility, "SmallGuns", "Small Guns" });
-        else
-            skills.push_back({ 41, agility, "Guns", "Guns" });
+        // The record of skill 41 is named SmallGuns in both games; New Vegas gives it the text "Guns"
+        skills.push_back({ 41, agility, "SmallGuns", game == Game::Fallout3 ? "Small Guns" : "Guns" });
         skills.push_back({ 42, agility, "Sneak", "Sneak" });
         skills.push_back({ 43, charisma, "Speech", "Speech" });
+        // New Vegas made Survival of the record that was Throwing, so its record still has that name
         if (game == Game::NewVegas)
-            skills.push_back({ 44, endurance, "Survival", "Survival" });
+            skills.push_back({ 44, endurance, "Throwing", "Survival" });
         skills.push_back({ 45, endurance, "Unarmed", "Unarmed" });
         return skills;
     }

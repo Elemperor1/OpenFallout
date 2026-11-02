@@ -36,6 +36,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwrender/testskyfallback.cpp
     mwrender/testwaterlook.cpp
 
+    mwscript/testactorvaluetext.cpp
     mwscript/testscripts.cpp
 
     mwsound/testheadcache.cpp

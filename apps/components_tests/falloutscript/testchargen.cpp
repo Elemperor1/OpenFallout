@@ -135,7 +135,8 @@ namespace
         const Chargen vegas(Game::NewVegas);
         EXPECT_TRUE(vegas.isSkill(survival));
         EXPECT_FALSE(vegas.isSkill(bigGuns));
-        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[8].mEditorId, std::string("Guns"));
+        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[8].mEditorId, std::string("SmallGuns"));
+        EXPECT_EQ(Chargen::skillsOf(Game::NewVegas)[11].mEditorId, std::string("Throwing"));
         EXPECT_EQ(Chargen::skillsOf(Game::Fallout3)[9].mEditorId, std::string("SmallGuns"));
     }
 
