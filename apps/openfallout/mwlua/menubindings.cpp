@@ -308,6 +308,22 @@ namespace OFLua
                 sol::make_object<int>(which.lua_state(), found->second + 1) };
         };
         menuT["root"] = [](sol::this_state state, LuaMenu& self) { return tileId(state, &self.mMenu->menu().root()); };
+        // What a text takes in one of the fonts of the games (1 to 9) when it is wrapped at `wrapWidth` (0 for no
+        // wrapping): the width of its longest line, the height and the number of lines. The code of the games measures
+        // the text of a message box this way, where the width of a text tile is at least the room it is wrapped in.
+        menuT["measure"] = [](sol::this_state state, LuaMenu& self, int font, std::string_view text,
+                               sol::optional<double> wrapWidth) {
+            sol::state_view view(state);
+            sol::table result(view, sol::create);
+            const FalloutMenu::Font* face = self.mMenu->fonts().get(font);
+            if (face == nullptr)
+                return result;
+            const FalloutMenu::Font::Layout layout = face->layout(text, static_cast<float>(wrapWidth.value_or(0.0)), 1);
+            result["width"] = layout.mLongest;
+            result["height"] = layout.mHeight;
+            result["lines"] = layout.mLines;
+            return result;
+        };
 
         // Open a menu file (`message_menu.xml`) for a window of some size. `pad` says whether a pad is in use.
         // Nothing, and the reason, if the data lacks the file.

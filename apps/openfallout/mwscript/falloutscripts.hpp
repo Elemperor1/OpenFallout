@@ -962,9 +962,29 @@ namespace OFScript
             std::vector<std::string> mButtons;
             /// The message record, as core.getFormId writes a form
             std::string mForm;
+            /// The name of the message and its words, apart (mText is both); the box of the game has the name as its
+            /// title and the words under it
+            std::string mTitle;
+            std::string mBody;
+            /// A message with no button of its own: the game's box shows no button and closes itself after `mTime`
+            /// seconds (the record's display time); `mButtons` then has the one that closes it
+            bool mTimed = false;
+            double mTime = 0;
+            /// A script of Lua draws this box (the button it picks is the answer); false when the window manager's own
+            /// window is open for it, which a script must not draw a second time
+            bool mLua = false;
         };
         /// The box that is open, if any (any thread)
         std::optional<OpenMessage> openMessage() const;
+        /// A message box that a script of Lua draws is open: it is modal, and the actions of the keys and buttons of
+        /// the game (Escape, which would close the screen under it) are not carried out while it is (any thread)
+        bool luaMessageOpen() const;
+        /// A script of Lua draws the message boxes (message_menu.xml) when `drawn` is true: the box of the window
+        /// manager is not made then, and the button that Lua picks (pressMessageButton) is the answer. When it is
+        /// false again (the file is not there, or the script cannot show a box) a box that is open is made as the
+        /// window manager's in the next frame, and the next ones are too. The script says it every frame: a claim that
+        /// is a second old is no longer one. Any thread.
+        void setMessagesDrawnByLua(bool drawn);
         /// Picks a button of the box that is open, as a click on it would (counted from 0 in the order the box lists
         /// them). False when no box is open or it has no such button. The box closes in the next frame, and the script
         /// that showed it reads the button then.
@@ -1442,6 +1462,10 @@ namespace OFScript
             std::vector<std::string> mPlainButtons;
             std::vector<int> mNumbers;
             std::string mForm;
+            std::string mTitle;
+            std::string mBody;
+            bool mTimed = false;
+            double mTime = 0;
             /// The one who showed it, who gets the button that is picked
             FalloutScript::FormId mOwner = 0;
         };
@@ -1530,6 +1554,15 @@ namespace OFScript
         /// The messages with buttons that wait their turn, and the numbers of the buttons of the one that is open
         std::deque<MessageBox> mMessageQueue;
         bool mMessageOpen = false;
+        /// The box that is open is drawn by Lua, which has not made one of the window manager's (the thread of the
+        /// frame only); `mLuaPressed` is the button it picked (counted from 0), -1 for none yet
+        bool mOpenByLua = false;
+        MessageBox mOpenBox;
+        std::atomic<bool> mMessagesDrawnByLua{ false };
+        /// When Lua last said it draws them (milliseconds of the steady clock): a script that has stopped (the game
+        /// was left, another was loaded) no longer draws, and the next box is the window manager's
+        std::atomic<std::int64_t> mMessagesClaimedAt{ 0 };
+        std::atomic<int> mLuaPressed{ -1 };
         std::uint64_t mOpenBoxId
             = 0; // the box of the window manager that shows it, to tell it from one that replaced it
         std::vector<int> mOpenNumbers;

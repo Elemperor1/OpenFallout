@@ -11,6 +11,11 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local itemsPage = require('scripts.omw.falloutpipboyitems')
@@ -847,7 +852,7 @@ end
 -- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
 -- over it takes the keys and the buttons)
 local function press(code)
-    if not visible or I.UI.getMode() ~= 'Interface' then
+    if not visible or I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     -- The screen of a level up takes the keys it uses (the stand-in widgets, when it is not the game's menu, take none)
@@ -920,7 +925,7 @@ local function press(code)
 end
 
 -- X drops the item; the other buttons stand for the keys of every screen
-local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' end, press,
+local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
 
 return {
@@ -992,6 +997,9 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            if messageOpen() then
+                return
+            end
             if vertical > 0 then
                 scroll(-1)
             elseif vertical < 0 then

@@ -11,6 +11,11 @@ local self = require('openfallout.self')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
 local Player = require('openfallout.types').Player
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
@@ -322,6 +327,9 @@ end
 -- character (left and right) and a part of it (up and down), Space queues the attack on the part and Enter carries the
 -- queue out
 local function press(code)
+    if messageOpen() then
+        return
+    end
     if code == input.KEY.V and not modeOpen and controlsAllowed() then
         open()
     elseif not element or I.UI.getMode() ~= 'Interface' then
@@ -344,10 +352,14 @@ end
 
 -- On the pad Y queues the attack on the part and X carries the queue out; the left bumper opens the screen (the bumpers
 -- pick the character while it is open)
-local handlePad = pad.handler('vats', function() return element ~= nil and I.UI.getMode() == 'Interface' end, press,
+local handlePad = pad.handler('vats',
+    function() return element ~= nil and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
     { [input.CONTROLLER_BUTTON.Y] = input.KEY.Space, [input.CONTROLLER_BUTTON.X] = input.KEY.Enter })
 
 local function onPad(button)
+    if messageOpen() then
+        return
+    end
     if element == nil and not modeOpen and button == input.CONTROLLER_BUTTON.LeftShoulder then
         if I.UI.getMode() == nil and not running and controlsAllowed() then
             pad.log('vats', button, 'open')

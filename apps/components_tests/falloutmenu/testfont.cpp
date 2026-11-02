@@ -142,6 +142,21 @@ namespace
         EXPECT_EQ(font->layout("AA AA AA").mLines, 1);
     }
 
+    TEST(FalloutMenuFontTest, the_longest_line_is_told_apart_from_the_room_the_text_is_wrapped_in)
+    {
+        const std::optional<Font> font = Font::parse(testFont());
+        ASSERT_TRUE(font);
+        // "AA AA AA" wrapped at 100 is one line of 84 (three words of 24 and two spaces of 6): the block is the 100 it
+        // was wrapped to, the line itself 84
+        const Font::Layout wrapped = font->layout("AA AA AA", 100.f);
+        EXPECT_FLOAT_EQ(wrapped.mWidth, 100.f);
+        EXPECT_FLOAT_EQ(wrapped.mLongest, 84.f);
+        // Wrapped at 40 the lines are one word each, 24 wide
+        EXPECT_FLOAT_EQ(font->layout("AA AA AA", 40.f).mLongest, 24.f);
+        // The longest of the lines of a text with new lines, with no wrapping
+        EXPECT_FLOAT_EQ(font->layout("A\nAAAA\nAA").mLongest, 48.f);
+    }
+
     TEST(FalloutMenuFontTest, a_word_wider_than_the_room_stays_whole)
     {
         const std::optional<Font> font = Font::parse(testFont());

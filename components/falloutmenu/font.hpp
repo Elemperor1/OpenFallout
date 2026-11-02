@@ -56,6 +56,8 @@ namespace FalloutMenu
             float mHeight = 0;
             /// How many lines the text took
             int mLines = 0;
+            /// The width of the longest line alone, without the room the text was wrapped or justified in
+            float mLongest = 0;
         };
 
         /// The bytes of a `.fnt` file; nothing if they are not one

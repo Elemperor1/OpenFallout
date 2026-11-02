@@ -6,6 +6,11 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
+
+-- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
 local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local menuModule = require('scripts.omw.falloutmenu')
@@ -424,7 +429,7 @@ end
 -- left and right a sub-category, Enter makes the recipe
 local function press(code)
     -- (a menu opened over the screen takes the keys and the buttons)
-    if not isOpen() or I.UI.getMode() ~= 'Interface' then
+    if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     if code == input.KEY.DownArrow then
@@ -447,7 +452,7 @@ local function press(code)
     end
 end
 
-local onPad = pad.handler('craft', function() return isOpen() and I.UI.getMode() == 'Interface' end, press)
+local onPad = pad.handler('craft', function() return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen() end, press)
 
 local function sync()
     local menu = pipboy.recipes()
@@ -478,6 +483,9 @@ return {
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)
+            if messageOpen() then
+                return
+            end
             -- the lists of the file's menu take the wheel themselves
             if shown then
                 return

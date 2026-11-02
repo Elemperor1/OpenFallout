@@ -17,6 +17,7 @@
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwgui/windowbase.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "actions.hpp"
 #include "bindingsmanager.hpp"
@@ -256,6 +257,12 @@ namespace OFInput
     {
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
 
+        // A message box that a script draws is modal: the buttons do not reach the screens beneath it (the script has
+        // had the button already), as the keys do not (ActionManager::executeAction)
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->luaMessageOpen())
+            return true;
+
         if (Settings::gui().mControllerMenus)
         {
             // Update cursor state.
@@ -357,6 +364,19 @@ namespace OFInput
                 triggerGuiPressed = false;
             }
         };
+
+        // A message box that a script draws is modal: the triggers do not cycle the windows beneath it and the sticks
+        // do not scroll them, as the buttons do not. A trigger is still followed, so one let go under the box can cycle
+        // the windows again when it is gone
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->luaMessageOpen())
+        {
+            if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
+                handleTriggerPress(arg.value, mRightTriggerGuiPressed, [] {});
+            else if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+                handleTriggerPress(arg.value, mLeftTriggerGuiPressed, [] {});
+            return true;
+        }
 
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
 

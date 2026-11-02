@@ -107,6 +107,8 @@ namespace FalloutMenu
             float pixelWidth, float pixelHeight, bool pad, std::string* error = nullptr);
 
         Menu& menu() { return *mMenu; }
+        /// The fonts the menu is drawn in (to measure a text as the game's code does)
+        const FontSet& fonts() const { return mResources->fonts(); }
         const std::vector<std::string>& problems() const { return mLoader->problems(); }
 
         void resize(float pixelWidth, float pixelHeight);

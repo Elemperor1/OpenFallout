@@ -223,6 +223,48 @@ the click handler and the list fill of `LevelUpMenu`):
 
 Not done: the sounds, and everything on this page is checked in the offline harness only (not in the running game).
 
+### Message boxes
+
+`falloutmessage.lua` draws the message boxes of the scripts (a `ShowMessage` with buttons, and the box that names a
+reputation) on `message_menu.xml`. The engine keeps the queue and the answer (`core.messagebox`: `current()` gives the
+box that is open with its `title`, `body`, `buttons`, `timed` and `time`; `press(n)` is the button picked; `claim(true)`,
+said every frame, tells the engine that the script draws the boxes, so that it makes no window of its own, and
+`claim(false)` gives them back, which the script does when the file is not in the install). Read from `FalloutNV.exe`
+(`MessageMenu`, round 12Q):
+
+- The file's six tiles are found by their numbers (the box 0, title 1, icon 2, words 3, the list of buttons 4, the
+  background 5). The code sets: the box's width, the title's words and whether it is shown (not when the message has no
+  name), the words, the icon (shown only when the message has a picture, 100 by 100; the words move over by the file's 120),
+  the list's width and height, and the justify of the title and the words.
+- The width of the box is the widest of three: the title's words in font 6 plus 100, the wrapped words in font 2 plus twice
+  `_horbuf` (40), and the widest button plus 80; never more than `_MaxMenuWidth` (700) and then never less than
+  `_MinMenuWidth` (200). The words wrap at `_MaxMenuWidth` less twice `_horbuf` (and less 120 with an icon), as the file says.
+  The text of a text tile reports at least the room it is wrapped in, so the width of the longest line is measured with
+  `menu:measure(font, text, wrap)`.
+- The title and the words are both centred (justify 2) when the words are one line and both to the left (1) when they are
+  more. A box with no name has no title.
+- The buttons are the rows of `MM_ButtonTemplate`, in the order of the record, one click id for all (7); the list is as
+  high as the rows are together, up to the file's 420, and scrolls beyond that. The file's own scrollbar rule counts every
+  row as one step of 26 units, which shows the bar for a box that fits, so the script says when it is shown.
+- A message with no button closes itself when its display time (the record's `TNAM`) is over, and shows no button. Boxes
+  queue one after the other and a new one does not replace the open one.
+- Keys: Escape picks the last button; a letter picks the first button whose words start with it. Arrows, Enter and Space
+  (the lit button, or the first) are the port's own; the executable leaves them to the list.
+- `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
+- The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
+  pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
+  keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own
+  window too, which takes only the arrows, Enter and Space). The engine's own actions for the keys
+  and buttons (Escape, which would close the screen under the box, the inventory key) are not carried out either while a
+  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys.
+- A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
+  after its claim ran out, has the window manager's own window and is left to it.
+
+Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the sound the box makes
+when it opens (`UIPopUpMessageWindow`) and the click sound (`UIMenuOK`), the message's own sound, and everything in this
+section is checked in the offline harness only (not in the running game). The text under `onlyif` of the file counts a
+text with characters as true (`onlyif` on the words' `string` keeps the buttons below the words).
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

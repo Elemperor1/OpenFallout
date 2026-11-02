@@ -214,32 +214,12 @@ local function perkName(perk)
     return perk.name
 end
 
--- The order of the list: the perks that can be picked first, then those the level has not reached, each by the level the
--- perk asks for and then by name
-local function sortedPerks(offered)
-    local list = {}
-    for index, perk in ipairs(offered) do
-        list[index] = { perk = perk, order = index }
-    end
-    table.sort(list, function(left, right)
-        local a, b = left.perk, right.perk
-        local aOpen, bOpen = a.available ~= false, b.available ~= false
-        if aOpen ~= bOpen then return aOpen end
-        if (a.minLevel or 0) ~= (b.minLevel or 0) then return (a.minLevel or 0) < (b.minLevel or 0) end
-        local aName, bName = a.name:lower(), b.name:lower()
-        if aName ~= bName then return aName < bName end
-        return left.order < right.order
-    end)
-    for index, entry in ipairs(list) do list[index] = entry.perk end
-    return list
-end
-
 -- Put everything the screen shows right: the rows of both lists, the counter, and what is said of the lit row
 local function fill()
     if not shown then return end
     local stats = pipboy.stats()
     local skills = skillList()
-    local offered = stats.perkPoints > 0 and sortedPerks(pipboy.offeredPerks()) or {}
+    local offered = stats.perkPoints > 0 and pipboy.offeredPerks() or {}
     hasPerks = #offered > 0
     if page == 1 and not hasPerks then page = 0 end
 
