@@ -52,6 +52,11 @@ namespace
         // And the titles, read as format strings too (33 and 23 characters, two %d each)
         EXPECT_EQ(SettingText::standIn("sAttributesTitle"), "ATTRIBUTES: %d/%d Points Assigned");
         EXPECT_EQ(SettingText::standIn("sSkillsTitle"), "SKILLS:  %d/%d Selected");
+        // The trait menu (New Vegas): the title takes the most that can be picked, the counter the picks that are left
+        EXPECT_EQ(SettingText::standIn("sTraitMenuTitleText"), "CHOOSE UP TO %d TRAITS");
+        EXPECT_EQ(SettingText::standIn("sTraitMenuTitleTextSingular"), "CHOOSE %d TRAIT");
+        EXPECT_EQ(SettingText::standIn("sTraitMenuCounter"), "%d TRAITS LEFT");
+        EXPECT_EQ(SettingText::standIn("sTraitMenuCounterSingular"), "%d TRAIT LEFT");
     }
 
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)

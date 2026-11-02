@@ -136,6 +136,7 @@ namespace OFLua
                 row["id"] = idText(trait.mId);
                 row["name"] = trait.mName;
                 row["description"] = trait.mDescription;
+                row["icon"] = trait.mIcon;
                 row["picked"] = chargen.hasTrait(trait.mId);
                 traitRows[index++] = row;
             }

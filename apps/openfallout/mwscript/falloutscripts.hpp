@@ -965,12 +965,14 @@ namespace OFScript
             std::string mName;
         };
         std::vector<ChargenRace> playableRaces() const;
-        /// The traits of the data (New Vegas), by name
+        /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
+        /// the executable shows beside the description
         struct ChargenTrait
         {
             FalloutScript::FormId mId = 0;
             std::string mName;
             std::string mDescription;
+            std::string mIcon;
         };
         std::vector<ChargenTrait> chargenTraits() const;
         /// What the player is now: the sex and race the player picked or else those of its record

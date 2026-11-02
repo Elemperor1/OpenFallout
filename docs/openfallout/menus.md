@@ -161,10 +161,20 @@ top of the values the character has) does, since the screen counts what is left.
 it) is the `ICON` string of the actor value's own record (`SPECIAL_Strength.dds` and the others under
 `Interface\Icons\PipboyImages\S.P.E.C.I.A.L`, `Skills_*.dds` under `Interface\Icons\Stats`; New Vegas's record for
 Throwing names `skills_survival.dds`), taken with its description and name from the same record. The sex and race screen
-(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here. For the traits New Vegas opens
-`trait_menu.xml` (the only script of `FalloutNV.esm` that shows a trait menu, `VCG04ActivatorScript`, calls
-`ShowTraitMenu` after `ShowRaceMenu`; `trait_select_menu.xml` is the unused one) and Fallout 3 has no traits; the page for it
-is not drawn from the file yet, so the traits keep the stand-in widgets, as does any screen whose file the install lacks.
+(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and keeps the stand-in widgets,
+as does any screen whose file the install lacks.
+
+*The traits (New Vegas).* New Vegas opens `trait_menu.xml` for them (the only script of `FalloutNV.esm` that shows a trait
+menu, `VCG04ActivatorScript`, calls `ShowTraitMenu` after `ShowRaceMenu`; `trait_select_menu.xml` is the one that no script
+opens) and Fallout 3 has no traits. The list takes the file's `LUM_PerkTemplate` (the name and a square on each trait that is
+picked); a click picks a trait or takes the pick back, and one past the most does nothing (no message, as in the executable);
+Reset takes all back; Continue is lit whatever the number picked, none included (the file and the code check nothing). The
+description is the perk's own and the picture its `ICON`. The title is `sTraitMenuTitleText` ("CHOOSE UP TO %d TRAITS", or
+`sTraitMenuTitleTextSingular` "CHOOSE %d TRAIT" when the most is one) with the most that can be picked, the counter
+`sTraitMenuCounter` ("%d TRAITS LEFT", or the singular "%d TRAIT LEFT" for exactly one) with the picks that are left; the
+counter is never hidden. The executable's own limit is `iTraitMenuMaxNumTraits` (3 by default; the engine keeps its limit of
+two) and its list is every perk with the trait flag in the order the data handler has them (the engine lists them by name),
+with the conditions of the perk checked for the player (the engine does not check them).
 
 ## The words of the labels
 

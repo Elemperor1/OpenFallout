@@ -355,6 +355,7 @@ end
 
 local MENU_NAME = 'dialog/texteditmenu.xml'
 local MENU_POINTS = 'chargen/char_gen_menu.xml'
+local MENU_TRAITS = 'trait_menu.xml'
 -- Where the list of the character making menu starts in its window (the file leaves the place to the code: its y is 0, the
 -- title and its lines are above it): the number each page of the executables sets (105 for the points of S.P.E.C.I.A.L., 65
 -- for the skills)
@@ -396,12 +397,25 @@ end
 
 -- What the screen says of the lit row: its description, and its picture, which is the `ICON` of the actor value's record
 -- (the executables take it from there and from nothing else)
-local function showSelection(opened, text, icon)
-    opened:set('CGM_SelectionText', 'string', text or '')
+local function showPick(opened, textTile, iconTile, text, icon)
+    opened:set(textTile, 'string', text or '')
     local has = icon ~= nil and icon ~= ''
-    opened:set('CGM_SelectionIcon', 'filename', has and icon or '')
-    opened:set('CGM_SelectionIcon', 'visible', has)
+    opened:set(iconTile, 'filename', has and icon or '')
+    opened:set(iconTile, 'visible', has)
 end
+
+local function showSelection(opened, text, icon)
+    showPick(opened, 'CGM_SelectionText', 'CGM_SelectionIcon', text, icon)
+end
+
+-- The title and the counter of the trait menu, as the executables write them: each has a format for many and one for a
+-- single trait (the title by the most that can be picked, the counter by the picks that are left), and the number fills it
+local function traitText(many, manyFallback, one, oneFallback, number)
+    local format = number == 1 and word(one, oneFallback) or word(many, manyFallback)
+    local ok, text = pcall(string.format, format, number)
+    return ok and text or format
+end
+
 
 -- The list menu of the points and tags (SPECIAL, skills) with the row template for each: nothing if the data lacks them
 local function pointsMenu(template, listY)
@@ -599,6 +613,88 @@ local function skillsMenu()
     return true
 end
 
+-- The traits (New Vegas): the list of the file's trait menu, a square on each that is picked, the description and the
+-- picture of the lit one, and the counter of the picks that are left. A click picks a trait or takes the pick back (the
+-- engine refuses one past the most); Reset takes all back; Continue is lit whatever the number picked, as in the file.
+local function traitsMenu()
+    local opened = menuModule.open(MENU_TRAITS)
+    if not opened then return false end
+    shown = opened
+    local made = opened:list('LUM_PerkList', 'LUM_PerkTemplate')
+    if not made then
+        closeShown()
+        return false
+    end
+    local ids, texts, icons = {}, {}, {}
+    for index, trait in ipairs(chargen.state().traits) do
+        ids[index] = trait.id
+        texts[index] = trait.description or ''
+        icons[index] = trait.icon
+    end
+    local selected, described = 1, nil
+    local function describe(row)
+        showPick(opened, 'TM_DescriptionText', 'LUM_SelectionIcon', texts[row], icons[row])
+    end
+    local function pick()
+        local row = made.selected()
+        if row >= 1 and row <= #ids then selected = row end
+    end
+    follow = function()
+        local row = made.selected()
+        if row ~= described and row >= 1 and row <= #ids then
+            described = row
+            describe(row)
+        end
+    end
+    function updateShown()
+        local now = chargen.state()
+        local rows = {}
+        for index, trait in ipairs(now.traits) do
+            rows[index] = { string = trait.name, _selected = trait.picked == true, _TextAlpha = 255 }
+        end
+        opened:batch(function()
+            made.rows(rows)
+            made.select(selected)
+            opened:io('_CurrPoints', now.traitLimit - now.traitsLeft)
+            opened:io('_MaxPoints', now.traitLimit)
+            opened:set('LUM_Headline_Title', 'string',
+                traitText('sTraitMenuTitleText', 'CHOOSE UP TO %d TRAITS', 'sTraitMenuTitleTextSingular', 'CHOOSE %d TRAIT',
+                    now.traitLimit))
+            opened:set('LUM_PointCounter', 'string',
+                traitText('sTraitMenuCounter', '%d TRAITS LEFT', 'sTraitMenuCounterSingular', '%d TRAIT LEFT', now.traitsLeft))
+            describe(selected)
+            described = selected
+        end)
+    end
+    made.onClick(function(row)
+        selected = row
+        chargen.toggleTrait(ids[row])
+        updateShown()
+    end)
+    opened:onClick('LUM_ResetButton', function()
+        pick()
+        for _, trait in ipairs(chargen.state().traits) do
+            if trait.picked then chargen.toggleTrait(trait.id) end
+        end
+        updateShown()
+    end)
+    opened:onClick('LUM_ContinueButton', finishPage)
+    controls = {
+        move = function(delta)
+            pick()
+            selected = math.max(1, math.min(#ids, selected + delta))
+            updateShown()
+        end,
+        change = function()
+            pick()
+            chargen.toggleTrait(ids[selected])
+            updateShown()
+        end,
+    }
+    updateShown()
+    return true
+end
+
 local function nameMenu(state)
     if typed == nil then typed = state.name end
     nameLimit = state.nameLimit
@@ -617,6 +713,7 @@ local menuPages = {
     name = nameMenu,
     special = specialMenu,
     skills = skillsMenu,
+    traits = traitsMenu,
 }
 
 local pages = {
