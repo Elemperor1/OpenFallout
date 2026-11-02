@@ -72,22 +72,37 @@ namespace OFLua
 
         // The number of the terminal that is open (0 for none); it changes with everything the screen shows
         api["terminalSerial"] = []() { return scripts().terminalSerial(); };
+        // The seconds that are left before a board of the game of hacking can be laid out again
+        api["hackGate"] = []() { return scripts().hackGate(); };
         // The terminal the player has open: its name, the text it shows, the lines of its menu (the number that goes
         // back to `choose` and the text), whether Back goes to a menu above it, and while it is closed the game of
-        // hacking: the level, the words, the guesses made (the word and its likeness), the attempts left and the
-        // seconds before it can be tried again
+        // hacking: the level, the words, the guesses made (the word and its likeness), the attempts left, whether it is
+        // locked out (the attempts are spent, or they were on an earlier visit), whether the password was found and
+        // the seconds that are left before a board is laid out
         api["terminal"] = [lua]() -> sol::object {
             const auto screen = scripts().terminalScreen();
             if (!screen)
                 return sol::nil;
             sol::table row(lua, sol::create);
+            row["reference"] = screen->mTerminal;
             row["name"] = screen->mName;
             row["body"] = screen->mBody;
             row["canGoBack"] = screen->mCanGoBack;
             row["hacking"] = screen->mHacking;
             row["hackLevel"] = screen->mHackLevel;
             row["attempts"] = screen->mAttempts;
-            row["lockout"] = screen->mLockout;
+            row["maxAttempts"] = screen->mMaxAttempts;
+            row["dump"] = screen->mDump;
+            row["address"] = screen->mAddress;
+            row["wordsLeft"] = screen->mWordsLeft;
+            row["lockedOut"] = screen->mLockedOut;
+            row["solved"] = screen->mSolved;
+            row["intro"] = screen->mIntro;
+            row["introStars"] = screen->mIntroStars;
+            row["result"] = screen->mResult;
+            row["resultSerial"] = screen->mResultSerial;
+            row["note"] = screen->mNote;
+            row["gate"] = screen->mGate;
             row["serial"] = screen->mSerial;
             sol::table lines(lua, sol::create);
             int index = 1;
@@ -121,6 +136,41 @@ namespace OFLua
         // A word of the game of hacking is guessed (its place in `words`, from 1): its likeness, -1 when no guess was
         // made
         api["guess"] = [](int word) { return scripts().hackGuess(word - 1); };
+        // The game of hacking is a dump of memory (`dump`, 408 characters; `address` is that of its first row, and each
+        // row of 12 is 12 more). A place of it (counted from 1) is a word, a pair of brackets (which begins at an
+        // opening bracket) or a character: `hackUnit` says which and where it begins (from 1) and how long it is
+        api["hackUnit"] = [lua](int position) -> sol::object {
+            const auto unit = scripts().hackUnit(position - 1);
+            if (!unit)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["kind"] = unit->mKind;
+            row["first"] = unit->mFirst + 1;
+            row["length"] = unit->mLength;
+            return row;
+        };
+        // A place of the dump is chosen: nothing comes back when nothing was done. `text` is what was chosen; for a
+        // word `correct` and `likeness`; for a pair of brackets `effect` ("denied" when one word was left, "removed"
+        // for a word that was taken out, "replenished" when the attempts came back); `lockedOut` when the last
+        // attempt was spent
+        api["hackPick"] = [lua](int position) -> sol::object {
+            const auto pick = scripts().hackPick(position - 1);
+            if (pick.mIgnored)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["kind"] = pick.mUnit.mKind;
+            row["first"] = pick.mUnit.mFirst + 1;
+            row["length"] = pick.mUnit.mLength;
+            row["text"] = pick.mText;
+            row["correct"] = pick.mCorrect;
+            row["likeness"] = pick.mLikeness;
+            row["effect"] = pick.mEffect;
+            row["attempts"] = pick.mAttemptsLeft;
+            row["lockedOut"] = pick.mLockedOut;
+            return row;
+        };
+        // The screen of the game of hacking has shown that the password was found: the terminal opens its menu
+        api["hackFinish"] = []() { scripts().hackFinish(); };
         api["closeTerminal"] = []() { scripts().closeTerminal(); };
 
         // The player wants to wait (the Wait key); a bed asks for sleep by itself

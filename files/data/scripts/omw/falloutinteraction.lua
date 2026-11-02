@@ -15,6 +15,8 @@ end
 local pad = require('scripts.omw.falloutpad')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local menuModule = require('scripts.omw.falloutmenu')
+local terminalMenu = require('scripts.omw.falloutterminal')
+local hackMenu = require('scripts.omw.falloutterminalhack')
 
 local interact = core.interact
 local pipboy = core.pipboy
@@ -64,6 +66,13 @@ local function destroyElement()
     end
 end
 
+-- The menus drawn from the files of the terminals (the screen of the menu and the one of the game of hacking) stay while
+-- the screen is drawn again for a change of the engine's; they go with the screen
+local function closeTerminalMenus()
+    terminalMenu.close()
+    hackMenu.close()
+end
+
 local function openMode()
     if not modeOpen then
         modeOpen = true
@@ -94,6 +103,7 @@ end
 local function leave()
     release()
     destroyElement()
+    closeTerminalMenus()
     screen = nil
     shownSerial, shownPins, shownRestSerial, shownTenths = nil, nil, nil, nil
     notice = ''
@@ -158,20 +168,50 @@ local function renderLock()
     element = ui.create(widgets.panel(rows))
 end
 
+-- A line of the menu is chosen, or the player goes back (or leaves from the first menu), on the screen of the game's own
+-- file: the screen that follows is typed again
+local function chooseLine(index)
+    interact.choose(index)
+    shownSerial = interact.terminalSerial()
+    render()
+end
+
+local function goBack()
+    interact.back()
+    shownSerial = interact.terminalSerial()
+    if shownSerial == 0 then
+        leave()
+    else
+        render()
+    end
+end
+
 -- The menu of a terminal, or the game of hacking it while it is closed
 local function renderTerminal()
     local terminal = interact.terminal()
     if not terminal then
         return
     end
+    -- Both are drawn from the game's own files; the widgets below stand in for an install that lacks them
+    if terminal.hacking then
+        terminalMenu.close()
+        if hackMenu.start(terminal, { leave = leave }) then
+            return
+        end
+    else
+        hackMenu.close()
+        if terminalMenu.start(terminal, { choose = chooseLine, back = goBack }) then
+            return
+        end
+    end
+    closeTerminalMenus()
     widgets = widgetModule.new(update)
     local width = widthOf(0.5, 560)
     local rows, add = newRows(width)
     if terminal.hacking then
         add(widgets.label('ENTER PASSWORD NOW', colors.titleColor, textSize + 4))
-        if terminal.lockout > 0 then
-            add(widgets.label(string.format('TERMINAL LOCKED. PLEASE WAIT %d SECONDS.', math.ceil(terminal.lockout)),
-                colors.badColor))
+        if terminal.lockedOut then
+            add(widgets.label('TERMINAL LOCKED. PLEASE CONTACT AN ADMINISTRATOR.', colors.badColor))
         else
             add(widgets.label(string.format('ATTEMPTS LEFT: %d', terminal.attempts), colors.pickedColor))
         end
@@ -182,7 +222,7 @@ local function renderTerminal()
             add(widgets.clickable(text, function()
                 interact.guess(place)
                 render()
-            end, { enabled = terminal.lockout <= 0 and not guessed[text] and terminal.attempts > 0 }))
+            end, { enabled = not terminal.lockedOut and not guessed[text] and terminal.attempts > 0 }))
         end
         for _, guess in ipairs(terminal.guesses) do
             add(widgets.label(string.format('%s  Entry denied. Likeness=%d', guess.word, guess.likeness),
@@ -193,24 +233,35 @@ local function renderTerminal()
         if terminal.name ~= '' then
             add(widgets.label(terminal.name, colors.titleColor, textSize + 4))
         end
-        for _, text in ipairs(widgetModule.wrap(terminal.body, width)) do
-            add(widgets.label(text, colors.focusColor))
-        end
-        for _, line in ipairs(terminal.lines) do
-            local index = line.index
-            add(widgets.clickable('> ' .. line.text, function()
-                interact.choose(index)
-                render()
-            end))
-        end
-        add(widgets.clickable(terminal.canGoBack and word('sBack', 'Back') or word('sExit', 'Exit'), function()
-            if terminal.canGoBack then
-                interact.back()
-                render()
-            else
-                leave()
+        if terminal.note ~= '' then
+            -- A note that a line showed: its text, and Back to the menu
+            for _, text in ipairs(widgetModule.wrap(terminal.note, width)) do
+                add(widgets.label(text, colors.focusColor))
             end
-        end, { color = colors.titleColor }))
+        else
+            for _, text in ipairs(widgetModule.wrap(terminal.body, width)) do
+                add(widgets.label(text, colors.focusColor))
+            end
+            for _, line in ipairs(terminal.lines) do
+                local index = line.index
+                add(widgets.clickable('> ' .. line.text, function()
+                    interact.choose(index)
+                    render()
+                end))
+            end
+            if terminal.result ~= '' then
+                add(widgets.label('> ' .. terminal.result, colors.pickedColor))
+            end
+        end
+        add(widgets.clickable((terminal.canGoBack or terminal.note ~= '') and word('sBack', 'Back') or word('sExit', 'Exit'),
+            function()
+                if terminal.canGoBack or terminal.note ~= '' then
+                    interact.back()
+                    render()
+                else
+                    leave()
+                end
+            end, { color = colors.titleColor }))
     end
     element = ui.create(widgets.panel(rows))
 end
@@ -305,6 +356,9 @@ end
 
 function render()
     destroyElement()
+    if screen ~= 'terminal' then
+        closeTerminalMenus()
+    end
     if screen == 'lock' then
         renderLock()
     elseif screen == 'terminal' then
@@ -361,9 +415,14 @@ local function sync()
         local serial = interact.terminalSerial()
         if serial == 0 then
             leave()
-        elseif serial ~= shownSerial then
-            shownSerial = serial
-            render()
+        else
+            if serial ~= shownSerial then
+                shownSerial = serial
+                render()
+            end
+            local seconds = core.getRealFrameDuration()
+            terminalMenu.update(seconds)
+            hackMenu.update(seconds)
         end
     elseif screen == 'rest' then
         if not interact.rest() then
@@ -412,6 +471,10 @@ local function press(code)
         elseif code == input.KEY.Enter then
             startRest()
         end
+    elseif screen == 'terminal' then
+        if not terminalMenu.press(code) then
+            hackMenu.press(code)
+        end
     elseif screen == 'lock' and code == input.KEY.Enter then
         local lock = interact.lock()
         if lock and not lock.keyOnly and lock.pins > 0 then
@@ -443,6 +506,7 @@ return {
                 modeOpen = false
                 release()
                 destroyElement()
+                closeTerminalMenus()
                 screen = nil
                 shownSerial, shownPins, shownTenths = nil, nil, nil
                 notice = ''

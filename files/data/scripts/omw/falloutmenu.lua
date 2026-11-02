@@ -95,7 +95,14 @@ module.PIPBOY_BOX = { width = 1024, height = 768, top = 40 }
 -- of its own is drawn with the box as large as the window lets it be (below the `top` pixels the box asks to be kept
 -- free), in the middle; `pixels` is the size the menu is told (960 design units are as many pixels as the box is scaled
 -- by) and the element is as large as the box, so the pointer is already in its pixels.
-local function placement(size, box)
+local function placement(size, box, region)
+    if region then
+        -- Only the part of the window that the file draws in (a screen of its own, like the terminal's) is the element,
+        -- in the middle; the menu is still told the size of the window
+        local part = region(size)
+        return { pixels = size, position = v2(math.floor((size.x - part.x) / 2), math.floor((size.y - part.y) / 2)),
+            size = part }
+    end
     if not box then
         return { pixels = size, position = v2(0, 0), size = size }
     end
@@ -139,7 +146,7 @@ function Shown:checkSize()
     local size = ui.screenSize()
     if size.x ~= self.size.x or size.y ~= self.size.y then
         self.size = size
-        local place = placement(size, self.box)
+        local place = placement(size, self.box, self.region)
         self.origin = place.position
         self.menu:resize(place.pixels.x, place.pixels.y)
         self.element.layout.props.position = place.position
@@ -340,18 +347,21 @@ function Shown:close()
 end
 
 -- Open a menu file for the whole window. `options`: layer (default 'Windows'), pad (a pad is in use), box (the box the
--- file is laid out in, like PIPBOY_BOX, which is then drawn in the middle of the window and as large as it can be)
+-- file is laid out in, like PIPBOY_BOX, which is then drawn in the middle of the window and as large as it can be),
+-- region (a function of the size of the window that gives the size of the part of it the file draws in, which is then
+-- put in the middle: the menu is told the size of the window, as the file computes its own size from it)
 function module.open(file, options)
     options = options or {}
     local size = ui.screenSize()
-    local place = placement(size, options.box)
+    local place = placement(size, options.box, options.region)
     local menu, reason = core.menus.open(file, place.pixels.x, place.pixels.y, options.pad == true)
     if not menu then
         print('menu ' .. file .. ' is not shown: ' .. tostring(reason))
         return nil
     end
     local shown = setmetatable({
-        menu = menu, file = file, size = size, box = options.box, origin = place.position, clicks = {}, rowClicks = {},
+        menu = menu, file = file, size = size, box = options.box, region = options.region, origin = place.position,
+        clicks = {}, rowClicks = {},
         dragHooks = {},
     }, Shown)
     shown.version = menu:version()

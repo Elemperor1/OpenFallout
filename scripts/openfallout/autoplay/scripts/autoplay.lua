@@ -210,7 +210,7 @@ local function answerTerminal(dt)
     end
     if terminal.hacking then
         -- Locked out for a while, or no attempts left: the game of hacking goes on when the terminal lets it
-        if terminal.lockout > 0 or terminal.attempts <= 0 then return end
+        if terminal.lockedOut or terminal.attempts <= 0 then return end
         local word = hackGuess(terminal)
         if not word then
             log('hack close', string.format('words=%d guesses=%d', #terminal.words, #terminal.guesses))

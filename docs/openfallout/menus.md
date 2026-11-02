@@ -265,6 +265,69 @@ when it opens (`UIPopUpMessageWindow`) and the click sound (`UIMenuOK`), the mes
 section is checked in the offline harness only (not in the running game). The text under `onlyif` of the file counts a
 text with characters as true (`onlyif` on the words' `string` keeps the buttons below the words).
 
+### Terminals and the game of hacking
+
+`falloutterminal.lua` draws the menu of a terminal on `computers_menu.xml` and `falloutterminalhack.lua` draws the game of
+hacking on `hacking_menu.xml`; `falloutinteraction.lua` owns the screen and keeps its widgets as the stand-in for an install
+that lacks either file. What a terminal holds, what a line does and every rule of the game of hacking are the engine's
+(`core.interact`, `components/falloutscript/hacking.*`, `FalloutScripts::openTerminal` and the calls after it). Read from
+`FalloutNV.exe` in rounds 12R, 12S, 12T and 12U (Fallout 3 only the constants: the same strings, buffer, rows and states).
+
+The menu of a terminal:
+
+- A terminal whose record is not marked as unlocked (the TERM flag 0x02) types an introduction at every visit, also after a
+  hack: four lines (the setting `sHackingIntro01`, `> ` and `sComputersLogon`, `sHackingHeader2`, `> ` and as many stars as
+  the letters of a word of its game of hacking), at the rate of `iHackingInputRate`, then two seconds, then the menu; a click
+  on the picture brings the menu at once. The reference override of that flag (a byte of the reference's extra data) is not
+  read: the record's flag decides.
+- The menu types the two header lines, the terminal's name, the words of the record (wrapped at 600) with the rule under
+  them, and the lines (`> ` and the words, in the order of the record; a line whose conditions fail is not there) at
+  `iComputersDisplayRateMenus` characters a second. A `> Back` line, the last, is there only below the first menu. A menu below
+  the first is rebuilt in place: the header stays, the words and the lines are typed again.
+- A line with result words puts them in the line under the menu (`> ` and the words, typed) for
+  `iComputersResultDisplayTimeout` seconds; the list stays. A line with a note of text (and the note not yet in the
+  inventory, for its add flag) shows the note in the display zone, a page of the zone's `wraplines` (16) at a time at
+  `iComputersDisplayRateNotes`; a click on the zone, or the key that cancels, turns the page and the last one closes the note.
+  A note that is a sound, an image or a voice has its own screens in the game and is only added here.
+- The only key the game's menu knows is the one that cancels (its code 10): it turns or closes a note, goes back a menu, or
+  leaves from the first. Here Backspace does that; Escape closes the whole screen (the engine's own key), and Up, Down and
+  Enter are the port's, the game picks by the pointer.
+
+The game of hacking (`Hacking::Puzzle`):
+
+- A closed terminal (not unlocked, no password note carried) starts it; in New Vegas only when the Science of the player is
+  at least the `fHackingMinSkill*` setting of the level (0, 25, 50, 75, 100; Fallout3.exe has no such setting, so Fallout 3
+  and Tale of Two Wastelands ask nothing): below it the player is told by `sHackIneligible` (as a line of the HUD here; the
+  game uses a pop-up with a picture) and no screen opens. A terminal of difficulty 5 asks for a key and a
+  terminal that locked the player out before shows the locked message (`sHackingLockout3` and `4`) until the player leaves.
+- The dump is 408 characters in 34 rows of 12, two columns of 17, each row with its address (`0x` and four digits; the first is
+  random and each row is 12 more). Each character is one of the 30 symbols; the words (the dictionary file, only the length of
+  the terminal's level: 4 and 2 for each level, 1 more when the terminal's base form id is odd, never more than 12) are laid
+  in with two non-letter characters on each side. How many words: `iHackingMinWords` to `iHackingMaxWords` (5 to 20), more for
+  a lower Science (Science and the perk entry point for hacking, against the level's setting). The picker keeps words that have
+  something in common, and the attempts are 4 or what the worst case of the best guesser needs.
+- A word that is chosen costs an attempt unless it is the password; the line of the log says how many letters are where they
+  are in the password (`>3/7 correct.`); a word can be chosen again and costs again. A pair of brackets of one kind in the
+  same row with no letter between them takes a word out (a dud) or, once per board with a chance of one in four, gives the
+  attempts back; it is spent after that, and with one word left it does nothing. A character that is no part of a word or a
+  pair is a wrong guess with 0 in common.
+- The last attempt locks the terminal: the screen slides up and closes by itself, the terminal stays locked until a script or
+  the console opens it (once more for a player with the perk entry point 20) and the next board waits
+  `iHackingRetryMilliseconds` from the closing of the screen. The counters of the lock-outs are not saved yet.
+- A right guess unlocks the terminal for good, gives the experience of `iXPRewardHackComputer*` of the level, and hands over to
+  the menu of the terminal in the same visit.
+
+The screen: the pointer on a word, a pair or a character lights it (its text in inverse video, over two rows when a word is
+broken at the end of a row) and types it after the prompt of the log; a click chooses it. The log keeps every line (the
+older ones scroll up and off by the file's own rule). The header line with the attempts has a block for each; the warning
+line (`sHackingWarning`) replaces the second header line when one is left.
+
+Not done: the sounds (the humming loop, a key sound for each typed character, the right and wrong password sounds: the names
+are known and the screen plays none), the keyboard and the pad on the dump (the game moves a cursor of one character with the
+arrows, a word is one step), the position of the whole screen (the file centres nothing; the depth rect is put in the middle of
+the window here), the pause after a right guess (half a second here, the game waits 250 ms and then fades), and everything is
+checked in the offline harness only, not in the running game.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

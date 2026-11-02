@@ -50,6 +50,10 @@ namespace FalloutScript::Interaction
     /// character) when it is a leveled one, and never more than 4
     int hackLevel(int difficulty, bool leveled, int characterLevel, const Setting& setting);
 
+    /// The name of the game setting that holds the experience for hacking a terminal of that hacking level
+    /// (iXPRewardHackComputer*, FalloutNV.exe 0x6705B0)
+    const char* hackClassExperience(int level);
+
     /// What stops a character from waiting or sleeping, as far as the host can tell
     struct RestConditions
     {

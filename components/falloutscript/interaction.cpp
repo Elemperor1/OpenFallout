@@ -95,6 +95,23 @@ namespace FalloutScript::Interaction
         return std::min(result, 4);
     }
 
+    const char* hackClassExperience(int level)
+    {
+        switch (std::clamp(level, 0, 4))
+        {
+            case 0:
+                return "iXPRewardHackComputerVeryEasy";
+            case 1:
+                return "iXPRewardHackComputerEasy";
+            case 2:
+                return "iXPRewardHackComputerAverage";
+            case 3:
+                return "iXPRewardHackComputerHard";
+            default:
+                return "iXPRewardHackComputerVeryHard";
+        }
+    }
+
     std::optional<std::string> restRefusal(const RestConditions& conditions)
     {
         const char* kind = conditions.mSleeping ? "sNoSleep" : "sNoWait";

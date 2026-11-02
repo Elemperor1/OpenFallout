@@ -464,17 +464,42 @@ namespace OFScript
             std::string mName;
             std::string mBody;
             std::vector<TerminalLine> mLines;
-            /// A menu above this one, or a result to go back from; else Back leaves the terminal
+            /// A menu above this one: the menus below the first have a Back line, and the first is left by the key
             bool mCanGoBack = false;
+            /// What the line that was chosen last tells, shown under the menu (it stays until another comes or the
+            /// menu changes; `mResultSerial` is another for each text)
+            std::string mResult;
+            int mResultSerial = 0;
+            /// The text of a note that a line showed, in the zone of the screen; Back closes it
+            std::string mNote;
+            /// The introduction of the screen (the terminal asks for a password) is typed before the menu; the stars
+            /// of its last line are as many as the letters of a word of the game of hacking of this terminal
+            bool mIntro = false;
+            int mIntroStars = 0;
             bool mHacking = false;
             int mHackLevel = 0;
             std::vector<std::string> mWords;
             std::vector<HackGuess> mGuesses;
             int mAttempts = 0;
-            /// Seconds before the terminal can be tried again after the attempts were spent
-            double mLockout = 0;
+            int mMaxAttempts = 0;
+            /// The dump of memory of the game of hacking as it stands, the 16 bits of the address of its first row, and
+            /// how many words are still in it
+            std::string mDump;
+            int mAddress = 0;
+            int mWordsLeft = 0;
+            /// The attempts were spent, or the terminal was locked out before: it stays shut until a script opens it
+            bool mLockedOut = false;
+            /// The password was found (the screen of the game of hacking shows it for a moment and then asks
+            /// `hackFinish`)
+            bool mSolved = false;
+            /// Seconds before a board is laid out again, after the screen of a game of hacking was left (the executable
+            /// waits iHackingRetryMilliseconds from the closing of the screen)
+            double mGate = 0;
             int mSerial = 0;
         };
+        /// The seconds that are left before a board of the game of hacking can be laid out (the executable waits
+        /// iHackingRetryMilliseconds from the closing of the screen of the last one)
+        double hackGate();
         /// The number of the screen of the terminal that is open, 0 when none is; another for each change
         int terminalSerial();
         std::optional<TerminalScreen> terminalScreen();
@@ -485,6 +510,34 @@ namespace OFScript
         /// The player guesses a word of the game of hacking (its place in the words); the likeness of it, -1 when the
         /// guess was not made
         int hackGuess(int word);
+        /// What is at a place of the dump (counted from 0): a word, a pair of brackets or a character, where it begins
+        /// and how long it is
+        struct HackUnit
+        {
+            /// "word", "brackets" or "character"
+            std::string mKind;
+            int mFirst = 0;
+            int mLength = 0;
+        };
+        std::optional<HackUnit> hackUnit(int position);
+        /// What choosing a place of the dump did (see FalloutScript::Hacking::Puzzle::Pick)
+        struct HackPick
+        {
+            HackUnit mUnit;
+            std::string mText;
+            /// Nothing was done
+            bool mIgnored = true;
+            bool mCorrect = false;
+            int mLikeness = 0;
+            /// "none", "denied", "removed" or "replenished"
+            std::string mEffect = "none";
+            int mAttemptsLeft = 0;
+            /// The attempts are spent: the terminal is locked for a while
+            bool mLockedOut = false;
+        };
+        HackPick hackPick(int position);
+        /// The screen of the game of hacking has shown that the password was found: the terminal goes on to its menu
+        void hackFinish();
         void closeTerminal();
 
         /// What the screen of waiting and sleeping shows: it was asked for (the Wait key, or a bed)
@@ -1690,21 +1743,37 @@ namespace OFScript
             FalloutScript::FormId mReference = 0;
             /// The terminals (their records) the player went through; the menu that is shown is the last
             std::vector<FalloutScript::FormId> mPath;
-            /// The result of a line that was chosen, shown in place of the text of the menu
+            /// The result of the line that was chosen last, and the text of a note a line showed
             std::string mResult;
-            bool mShowingResult = false;
+            int mResultSerial = 0;
+            std::string mNote;
             /// The game of hacking, while the terminal is closed
             std::unique_ptr<FalloutScript::Hacking::Puzzle> mPuzzle;
             std::vector<HackGuess> mGuesses;
-            double mLockout = 0;
+            /// The attempts were spent, or the terminal was locked out by an earlier visit
+            bool mLockedOut = false;
             int mHackLevel = 0;
+            /// The bit of the terminal that makes the words of its game of hacking one letter longer
+            int mHackParity = 0;
             int mSerial = 0;
         };
+        /// The game of hacking for a terminal of that hacking level: the words of the game's dictionary (the file is
+        /// read once), as many as the Science of the player allows
+        std::unique_ptr<FalloutScript::Hacking::Puzzle> newPuzzle(int level, int parity);
+        const FalloutScript::Hacking::Dictionary& hackingDictionary();
+        /// A guess of the game of hacking has come out: the terminal opens for a right one and locks for the last wrong
+        /// one; mInteractionMutex held
+        void hackGuessed(TerminalState& state, bool correct);
+        std::mutex mHackingDictionaryMutex;
+        std::optional<FalloutScript::Hacking::Dictionary> mHackingDictionary;
         std::optional<TerminalState> mTerminal;
         int mTerminalSerial = 0;
-        /// The seconds that are left before a terminal whose screen was left can be tried again (a terminal that is
-        /// open keeps its own), counted down while the screen is closed. Under mInteractionMutex.
-        std::unordered_map<FalloutScript::FormId, double> mTerminalCooldowns;
+        /// How many times each terminal locked the player out (the low 7 bits of the byte the executable keeps for it:
+        /// 1 is a second try for a perk, 2 or more is shut until a script opens it). Not saved yet. Under
+        /// mInteractionMutex.
+        std::unordered_map<FalloutScript::FormId, int> mTerminalLockouts;
+        /// The seconds that are left before a board can be laid out again, counted down in every frame
+        double mHackGate = 0;
         /// Closes the screen of the terminal and keeps what is left of its lockout; mInteractionMutex held
         void leaveTerminal();
         struct RestState
