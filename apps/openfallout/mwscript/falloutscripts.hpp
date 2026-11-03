@@ -619,6 +619,8 @@ namespace OFScript
             double mHour = 0;
         };
         MapInfo mapInfo();
+        /// The world space whose map was last said in the log (once for each, see `mapInfo`)
+        FalloutScript::FormId mMapSpaceTold = 0;
         /// The player goes to a marker at once: the text of why not, empty when it did
         std::string travelTo(FalloutScript::FormId marker);
 

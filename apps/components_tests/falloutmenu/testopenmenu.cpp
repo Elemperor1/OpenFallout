@@ -327,6 +327,41 @@ namespace
         EXPECT_FLOAT_EQ(menu.number(*off, "clicked"), 0.f);
     }
 
+    TEST(FalloutOpenMenuTest, an_image_or_a_hotrect_that_takes_the_pointer_in_a_hotrect_is_over_and_clicked_alone)
+    {
+        // As the arrows and the value of a toggle in its row: the files show the arrows when exactly one of the row, an
+        // arrow and the value is over, so the row must not stay over with the pointer on one of the others
+        Fixture f;
+        OpenMenu& open = f.open(
+            "<menu name=\"M\"><hotrect name=\"Row\"><x>10</x><y>10</y><width>300</width>"
+            "<height>40</height><target>1</target>"
+            "<image name=\"Arrow\"><x>10</x><y>5</y><width>20</width><height>20</height><target>1</target></image>"
+            "<hotrect name=\"Value\"><x>100</x><y>5</y><width>100</width><height>20</height>"
+            "<target>1</target></hotrect></hotrect></menu>",
+            640.f, 480.f);
+        Menu& menu = open.menu();
+        Tile* row = menu.find("Row");
+        Tile* arrow = menu.find("Arrow");
+        Tile* value = menu.find("Value");
+        // the points are those of the file's own units
+        const float unit = open.scale();
+        const auto move = [&](float x, float y) { return open.pointerMoved(x * unit, y * unit); };
+        // on the row but on none of its children
+        EXPECT_EQ(move(250, 40), row);
+        EXPECT_FLOAT_EQ(menu.number(*row, "mouseover"), 1.f);
+        EXPECT_EQ(move(25, 20), arrow);
+        EXPECT_FLOAT_EQ(menu.number(*arrow, "mouseover"), 1.f);
+        EXPECT_FLOAT_EQ(menu.number(*row, "mouseover"), 0.f);
+        EXPECT_EQ(move(150, 20), value);
+        EXPECT_FLOAT_EQ(menu.number(*arrow, "mouseover"), 0.f);
+        EXPECT_FLOAT_EQ(menu.number(*value, "mouseover"), 1.f);
+        EXPECT_FLOAT_EQ(menu.number(*row, "mouseover"), 0.f);
+        open.pointerPressed(25 * unit, 20 * unit);
+        EXPECT_EQ(open.pointerReleased(25 * unit, 20 * unit), arrow);
+        EXPECT_FLOAT_EQ(menu.number(*arrow, "clicked"), 1.f);
+        EXPECT_FLOAT_EQ(menu.number(*row, "clicked"), 0.f);
+    }
+
     TEST(FalloutOpenMenuTest, the_wheel_counts_on_the_tile_that_takes_it)
     {
         Fixture f;

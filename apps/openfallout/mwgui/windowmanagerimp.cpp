@@ -2674,6 +2674,13 @@ namespace OFGui
 
     bool WindowManager::injectKeyPress(MyGUI::KeyCode key, unsigned int text, bool repeat)
     {
+        // The pause menu that a script draws has the keys: the keyboard navigation of the windows takes the first arrow
+        // key after a click to put the key focus back on a widget it remembers, and the script never gets that key (an
+        // option of the settings did not change with the first Left or Right after a click). The console and a modal
+        // window of the engine still have their keys
+        if (getMode() == OFGui::GM_MainMenu && isMainMenuDrawnByLua() && !isConsoleMode()
+            && !MyGUI::InputManager::getInstance().isModalAny())
+            return false;
         if (!mKeyboardNavigation->injectKeyPress(key, text, repeat))
         {
             MyGUI::Widget* focus = MyGUI::InputManager::getInstance().getKeyFocusWidget();

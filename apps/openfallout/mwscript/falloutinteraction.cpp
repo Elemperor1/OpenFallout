@@ -14,6 +14,7 @@
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -819,7 +820,21 @@ namespace OFScript
         }
         if (info.mWorldspace != 0)
         {
-            if (const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(info.mWorldspace)))
+            const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(info.mWorldspace));
+            // Said once for each world space the page asks about: a page with no picture and no markers is either a
+            // space the plugins do not hold or one whose record has no map
+            if (info.mWorldspace != mMapSpaceTold)
+            {
+                mMapSpaceTold = info.mWorldspace;
+                Log(Debug::Info) << "Map of the world space " << FalloutScript::hex(info.mWorldspace) << ": "
+                                 << (space == nullptr ? "no record" : "record found") << ", name of "
+                                 << (space != nullptr ? space->mFullName.size() : 0) << " characters, picture of "
+                                 << (space != nullptr ? space->mMapFile.size() : 0) << " characters, "
+                                 << (space != nullptr ? space->mMap.width : 0) << "x"
+                                 << (space != nullptr ? space->mMap.height : 0) << " units, outside "
+                                 << (info.mOutside ? "yes" : "no");
+            }
+            if (space != nullptr)
             {
                 info.mWorldName = space->mFullName;
                 info.mMapFile = space->mMapFile;

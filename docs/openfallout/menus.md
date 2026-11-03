@@ -33,6 +33,11 @@ these from the pointer, and the renderer sets them:
 - `mouseover` is 1 on the tile under the pointer. `clicked` and `wheelmoved` only go up (`wheelmoved` goes down for a turn
   of the wheel away from the player); scrollbars and arrows subtract the counters. `dragstartx/y` is -1 while nothing is
   dragged; `dragx/dragy` are the pointer's place in the parent while dragging.
+- A box or a text that the pointer is over also puts `mouseover` and `clicked` on the hotrects around it that have `target` (a
+  tab button is a hotrect with a text box in it, and the file reads the hotrect). An image or a hotrect that has `target`
+  is over alone: the arrows of a toggle or a meter show when exactly one of the row, an arrow and the value is over (the
+  file adds their `mouseover` and compares the sum with 1), so a row that stayed over under an arrow would hide both and
+  the click would fall on the value (found in the running game, round 12AC).
 - A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
   and so are its children.
 - A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).

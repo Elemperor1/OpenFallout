@@ -160,10 +160,7 @@ namespace OFInput
             OFBase::Environment::get().getWindowManager()->notifyInputActionBound();
         }
 
-        void setDetectingKeyboard(bool detecting)
-        {
-            mDetectingKeyboard = detecting;
-        }
+        void setDetectingKeyboard(bool detecting) { mDetectingKeyboard = detecting; }
 
     private:
         ICS::InputControlSystem* mInputBinder;
@@ -257,8 +254,10 @@ namespace OFInput
         defaultKeyBindings[A_MoveForward] = SDL_SCANCODE_W;
         defaultKeyBindings[A_MoveLeft] = SDL_SCANCODE_A;
         defaultKeyBindings[A_MoveRight] = SDL_SCANCODE_D;
-        defaultKeyBindings[A_ToggleWeapon] = SDL_SCANCODE_F;
-        defaultKeyBindings[A_ToggleSpell] = SDL_SCANCODE_R;
+        // The keys of the Pip-Boy, the point of view and the ready item are the games' own (the defaults of the
+        // controls menu, read from the executable: Tab, F and R); a binding that was kept in a player's own
+        // configuration is not changed
+        defaultKeyBindings[A_ToggleWeapon] = SDL_SCANCODE_R;
         defaultKeyBindings[A_CycleSpellLeft] = SDL_SCANCODE_MINUS;
         defaultKeyBindings[A_CycleSpellRight] = SDL_SCANCODE_EQUALS;
         defaultKeyBindings[A_CycleWeaponLeft] = SDL_SCANCODE_LEFTBRACKET;
@@ -273,7 +272,8 @@ namespace OFInput
         defaultKeyBindings[A_Journal] = SDL_SCANCODE_J;
         defaultKeyBindings[A_Rest] = SDL_SCANCODE_T;
         defaultKeyBindings[A_GameMenu] = SDL_SCANCODE_ESCAPE;
-        defaultKeyBindings[A_TogglePOV] = SDL_SCANCODE_TAB;
+        defaultKeyBindings[A_TogglePOV] = SDL_SCANCODE_F;
+        defaultKeyBindings[A_Inventory] = SDL_SCANCODE_TAB;
         defaultKeyBindings[A_QuickKey1] = SDL_SCANCODE_1;
         defaultKeyBindings[A_QuickKey2] = SDL_SCANCODE_2;
         defaultKeyBindings[A_QuickKey3] = SDL_SCANCODE_3;
