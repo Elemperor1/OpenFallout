@@ -1648,6 +1648,20 @@
 -- @return #list<#string>
 
 ---
+-- The texts of the quests since this was last called, oldest first, for the block of the display that writes a heading over
+-- the name of a quest: each has `heading` (the word of the games' settings), `name` (the quest, or the place that was found),
+-- `sound` (the editor id of the sound that goes with it) and `kind` (0 a quest was added, 1 completed, 2 failed, 3 a place was
+-- found).
+-- @function [parent=#Hud] takeQuestText
+-- @return #list<#table>
+
+---
+-- The lines of objectives since this was last called, oldest first: each has `text` (a completed one has the word of the games'
+-- settings in front), `completed` and `reminder` (the line is one that the reminder repeats).
+-- @function [parent=#Hud] takeObjectives
+-- @return #list<#table>
+
+---
 -- The text of a note of text, with the `&name;` tokens in it (the key an action is bound to, the name of the player)
 -- filled in.
 -- @function [parent=#Hud] noteText

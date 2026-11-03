@@ -472,6 +472,13 @@ local function updateLines(dt)
     for _, said in ipairs(hud.takeSubtitles()) do
         lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
     end
+    -- Nor for the quest text: what a quest was told and its objectives are messages too
+    for _, event in ipairs(hud.takeQuestText()) do
+        lines[#lines + 1] = { text = event.heading .. ' ' .. event.name, left = 4 }
+    end
+    for _, objective in ipairs(hud.takeObjectives()) do
+        lines[#lines + 1] = { text = objective.text, left = 4 }
+    end
     local kept = {}
     for _, line in ipairs(lines) do
         line.left = line.left - dt
@@ -515,17 +522,19 @@ local function current(dt)
             return nil
         end
         return { mode = 'messages', messages = hud.takeMessages(), subtitles = hud.takeSubtitles(),
-            regions = hud.takeRegions() }
+            regions = hud.takeRegions(), questTexts = hud.takeQuestText(), objectives = hud.takeObjectives() }
     end
     local stats = pipboy.stats()
     local weapon = core.combat.weapon()
     local status = hud.status()
     -- The display from the file queues the messages itself
-    local incoming, saying, entered = nil, nil, nil
+    local incoming, saying, entered, quest, objectives = nil, nil, nil, nil, nil
     if menuHud then
         incoming = hud.takeMessages()
         saying = hud.takeSubtitles()
         entered = hud.takeRegions()
+        quest = hud.takeQuestText()
+        objectives = hud.takeObjectives()
     else
         updateLines(dt)
     end
@@ -578,6 +587,8 @@ local function current(dt)
         messages = incoming,
         subtitles = saying,
         regions = entered,
+        questTexts = quest,
+        objectives = objectives,
     }
 end
 
@@ -631,6 +642,12 @@ local function refreshFromFile(dt)
             end
             for _, said in ipairs(state.subtitles or {}) do
                 lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
+            end
+            for _, event in ipairs(state.questTexts or {}) do
+                lines[#lines + 1] = { text = event.heading .. ' ' .. event.name, left = 4 }
+            end
+            for _, objective in ipairs(state.objectives or {}) do
+                lines[#lines + 1] = { text = objective.text, left = 4 }
             end
         else
             -- What this frame brought (the messages and subtitles that were taken out of the queues) goes into the new one

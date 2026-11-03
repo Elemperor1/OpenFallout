@@ -76,12 +76,14 @@ namespace
         line.push(Hud::QuestText{ "Quest added", "Ghost Town Gunfight", "UIPopUpQuestNew" });
         line.push(Hud::ObjectiveLine{ "Talk to Sunny", false, false });
         line.push(Hud::ObjectiveLine{ "Talk to Sunny", true, false });
-        line.push(Hud::QuestText{ "Discovered", "Goodsprings", "UIPopUpQuestNew" });
+        line.push(Hud::QuestText{ "Discovered", "Goodsprings", "UIPopUpQuestNew", 3 });
 
         const std::vector<Hud::QuestText> texts = line.takeTexts();
         ASSERT_EQ(texts.size(), 2u);
         EXPECT_EQ(texts[0].mName, "Ghost Town Gunfight");
         EXPECT_EQ(texts[1].mHeading, "Discovered");
+        EXPECT_EQ(texts[0].mKind, 0);
+        EXPECT_EQ(texts[1].mKind, 3);
         const std::vector<Hud::ObjectiveLine> lines = line.takeObjectives();
         ASSERT_EQ(lines.size(), 2u);
         EXPECT_FALSE(lines[0].mCompleted);

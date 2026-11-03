@@ -70,6 +70,7 @@ namespace OFScript
             }
         text.mHeading = gameSettingText("sDiscoveredText");
         text.mSound = "UIPopUpQuestNew";
+        text.mKind = 3;
         mHudQuestText.push(std::move(text));
     }
 

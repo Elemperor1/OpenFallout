@@ -18,12 +18,16 @@
 --   * the name of the region the player comes into is a line of text over the compass: it fades in over 2 s, stays until 4 s
 --     after it began and fades out over 2 s more (Mac rounds 12AO B3 and 12AQ B1); a second line for the name of a place
 --     is in the file, but the executable never shows it.
+--   * the quest text is the block QuestReminder, 170 under the top edge of the safe zone: an event (a quest was added, completed
+--     or failed, a place was found) writes its heading over its name, which comes up one character at a time, and the lines
+--     of the objectives come one after the other under it (falloutmenuquests.lua keeps the times: Mac round 12AR C1).
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
--- threshold, the quest lines).
+-- threshold).
 local ui = require('openfallout.ui')
 local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local subtitles = require('scripts.omw.falloutmenusubtitles')
+local questText = require('scripts.omw.falloutmenuquests')
 
 local module = {}
 
@@ -94,6 +98,7 @@ local function build(self)
         for trait, value in pairs(traits or {}) do m:set(tile, trait, value) end
         return tile
     end
+    self.make = make
 
     m:set(m:root(), 'visible', 1)
     -- The tiles of the file that the code of the game shows only when it has something for them
@@ -163,6 +168,14 @@ local function build(self)
     local lineHeight = measured and measured.height or 0
     t.regionText = make(t.region, 'template_justify_left_text', 'hud_region_text',
         { x = 0, y = lineHeight > 0 and lineHeight or 24, wrapwidth = 2048, alpha = 0 })
+    -- The quest text: the block is 400 by 200, 170 under the top safe edge and 15 in from the left one; the lines of
+    -- the objectives are in the tile QuestStages (40 down) and the name of an event in QuestAdded (80 down), where the
+    -- code makes the tiles it needs (a heading, a tile for each character of the name, a line and a box for each objective)
+    t.quest = find('QuestReminder')
+    place(t.quest, 2 * sx + 15, 2 * sy + 170)
+    t.questStages, t.questAdded = find('QuestStages'), find('QuestAdded')
+    t.questHeading = make(t.questAdded, 'template_justify_left_text', 'hud_quest_heading', {})
+    t.questChars, t.questLines, t.questBoxes = {}, {}, {}
     t.limbs = find('crippled_limb_indicator')
     place(t.limbs, width - 2 * sx - 200, 100 + 2 * sy)
     t.hitPoints, t.actionPoints = hitPoints, actionPoints
@@ -364,6 +377,70 @@ function Hud:showRegion(names, full, dt)
     self:put(t.region, 'visible', alpha > 0 and 1 or 0)
     self:put(t.regionText, 'string', r.text)
     self:put(t.regionText, 'alpha', alpha)
+end
+
+-- A tile of the quest text from a pool: made from its template when it is first wanted
+function Hud:questTile(pool, index, parent, template, name, traits)
+    local list = self.tiles[pool]
+    local tile = list[index]
+    if not tile then
+        tile = self.make(parent, template, name .. index, traits)
+        list[index] = tile
+    end
+    return tile
+end
+
+local BOX_FILLED = 'Interface\\Shared\\Marker\\glow_square_filled_small.dds'
+local BOX_EMPTY = 'Interface\\Shared\\Marker\\glow_square_small.dds'
+
+-- The quest text (falloutmenuquests.lua says what is on the screen): the heading and the characters of the name of an
+-- event, and the lines of the objectives with a box before each
+function Hud:showQuests(full, dt)
+    local t = self.tiles
+    local menu = self.shown.menu
+    self.quests:step(dt, {
+        active = full,
+        width = self.width,
+        measure = function(font, text, wrap) return menu:measure(font, text, wrap) end,
+    })
+    for _, sound in ipairs(self.quests:takeSounds()) do self.shown:playSound(sound) end
+    self:put(t.quest, 'visible', full and 1 or 0)
+    local view = self.quests:view()
+    local heading = view.heading
+    self:put(t.questHeading, 'visible', heading and heading.visible and 1 or 0)
+    if heading then
+        self:put(t.questHeading, 'string', heading.text)
+        self:put(t.questHeading, 'y', heading.y)
+        self:put(t.questHeading, 'alpha', heading.alpha)
+    end
+    for index, char in ipairs(view.chars) do
+        local tile = self:questTile('questChars', index, t.questAdded, 'template_justify_left_text', 'hud_quest_char',
+            { font = char.font })
+        self:put(tile, 'string', char.text)
+        self:put(tile, 'x', char.x)
+        self:put(tile, 'y', char.y)
+        self:put(tile, 'alpha', char.alpha)
+        self:put(tile, 'visible', char.visible and 1 or 0)
+    end
+    for index = #view.chars + 1, #t.questChars do self:put(t.questChars[index], 'visible', 0) end
+    for index, line in ipairs(view.lines) do
+        local tile = self:questTile('questLines', index, t.questStages, 'template_justify_left_text', 'hud_quest_line', {})
+        local box = self:questTile('questBoxes', index, t.questStages, 'template_filled_checkbox', 'hud_quest_box', {})
+        local on = line.visible and 1 or 0
+        self:put(tile, 'string', line.text)
+        self:put(tile, 'wrapwidth', line.wrap)
+        self:put(tile, 'y', line.y)
+        self:put(tile, 'alpha', line.alpha)
+        self:put(tile, 'visible', on)
+        self:put(box, 'filename', line.completed and BOX_FILLED or BOX_EMPTY)
+        self:put(box, 'y', line.y + 3)
+        self:put(box, 'alpha', line.alpha)
+        self:put(box, 'visible', on)
+    end
+    for index = #view.lines + 1, #t.questLines do
+        self:put(t.questLines[index], 'visible', 0)
+        self:put(t.questBoxes[index], 'visible', 0)
+    end
 end
 
 -- The face and the limbs come up when the health changed, for a few seconds
@@ -568,9 +645,12 @@ function Hud:update(state, dt)
     self:queueMessages(state.messages or {})
     for _, line in ipairs(state.subtitles or {}) do self.subtitles:add(line) end
     local subtitle = self.subtitles:step(dt)
+    for _, event in ipairs(state.questTexts or {}) do self.quests:addEvent(event) end
+    for _, line in ipairs(state.objectives or {}) do self.quests:addObjective(line) end
     self.shown:batch(function()
         self:showMessage(dt)
         self:showRegion(state.regions or {}, full, dt)
+        self:showQuests(full, dt)
         -- The subtitles are in the modes of the game (and of a script that holds the player), not under a window
         self:put(t.subtitles, 'visible', (full and subtitle ~= nil) and 1 or 0)
         if subtitle ~= nil then self:put(t.subtitleText, 'string', subtitle) end
@@ -641,7 +721,8 @@ function module.create(pad, previous)
     local self = setmetatable({ shown = shown, size = size, cache = {}, queue = previous and previous.queue or {},
         leaving = previous and previous.leaving or nil, pad = pad == true,
         subtitles = previous and previous.subtitles or subtitles.new(),
-        region = previous and previous.region or { text = '', waiting = false } }, Hud)
+        region = previous and previous.region or { text = '', waiting = false },
+        quests = previous and previous.quests or questText.new() }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then
         print('The head-up display is not drawn from its file: ' .. tostring(problem))

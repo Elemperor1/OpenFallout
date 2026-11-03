@@ -108,6 +108,7 @@ namespace OFLua
                 row["heading"] = text.mHeading;
                 row["name"] = text.mName;
                 row["sound"] = text.mSound;
+                row["kind"] = text.mKind;
                 rows[index++] = row;
             }
             return rows;

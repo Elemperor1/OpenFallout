@@ -467,10 +467,12 @@ namespace OFScript
                 case Kind::Completed:
                     text.mHeading = gameSettingText("sQuestCompletedText");
                     text.mSound = "UIPopUpQuestComplete";
+                    text.mKind = 1;
                     break;
                 default:
                     text.mHeading = gameSettingText("sQuestFailed");
                     text.mSound = "UIPopUpQuestComplete";
+                    text.mKind = 2;
                     break;
             }
             mHudQuestText.push(std::move(text));

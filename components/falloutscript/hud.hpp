@@ -92,6 +92,9 @@ namespace FalloutScript::Hud
         std::string mName;
         /// The name of the sound that goes with it
         std::string mSound;
+        /// What happened, as the executable counts it (0x77A650): 0 a quest was added, 1 completed, 2 failed, 3 a place
+        /// was found. A quest that was completed takes the lines of objectives that wait away.
+        int mKind = 0;
     };
 
     /// A line of an objective (the tile `QuestStages`, FalloutNV.exe 0x77A5B0): one that was displayed, one that was

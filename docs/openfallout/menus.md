@@ -710,9 +710,25 @@ its older drawing for a data folder that lacks the file.
   tile is on the screen, stays until 4 s after it began and fades out over 2 s; the same name that is still on the screen is not
   shown again. `FalloutScript::RegionLine` is the rule, `FalloutScripts::takeRegionNames` looks at the player's cell,
   `core.hud.takeRegions` gives the names.
-- Not drawn: the armour icons, the weapon's name and condition, the needs
-  of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
-  the engine has no clip.
+- The quest text (`QuestReminder`, Mac round 12AR C1, FalloutNV.exe 0x77A650, 0x77B430 and 0x77C170): the block is 400 by 200,
+  15 in from the safe zone and 170 under its top edge; `QuestAdded` (80 down) and `QuestStages` (40 down) are in it.
+  *An event* (a quest was added, completed or failed, a place was found: `kind` 0 to 3 of `core.hud.takeQuestText`) writes the
+  heading (the word of the games' settings, font 7) over the name in upper case, font 8, a character to a tile; the character
+  *k* begins to fade in 0.1 s x (*k* + 1) after the event began, takes 2 s to do it, stays 4 s from then and fades out in
+  2 s. A name of 32 characters or more goes on a second line from the last space within the first 33; no more than 63
+  characters are shown. The sound of the event is made when it begins (`UIPopUpQuestNew` for a quest added or a place found,
+  `UIPopUpQuestComplete` for the others). *The lines of objectives* (`core.hud.takeObjectives`: the text of the objective that
+  was shown, or the word of the settings in front of one that was completed) are taken together when no line is left; each has a box before it
+  (filled for a completed one) and wraps at a third of the menu's width. The first four are looked after: the first fades in
+  over 0.5 s; the second and the third come 1 s and 2 s later; the first stays 3 s after that and fades out (0.5 s), and the
+  lines under it scroll up by its height (0.5 s). Nothing is taken from the queues until 2 s have passed since the last
+  thing was told; the lines wait while an event is on the screen, and a quest that is completed takes the lines that are
+  shown and those that wait away. `falloutmenuquests.lua` keeps the times, `falloutmenuhud.lua` draws them. Not checked
+  in the game: which of the lines of one batch is at the top (the one told last is), the place of a line's box, and the
+  sound of a line (one `UIQuestUpdate` for each); the reminder that repeats the objectives (`AutoDisplayObjectives`, off in
+  the settings) is not made.
+- Not drawn: the armour icons, the weapon's name and condition, the needs of hardcore mode and the breath meter; the
+  weapon's rounds show the rounds carried, as the engine has no clip.
 
 ### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
 
