@@ -241,9 +241,10 @@ local function activate(id)
         flags.staysFar = not flags.staysFar
         pipboy.companionSay(flags.staysFar and 'FollowersTacticsDistanceLong' or 'FollowersTacticsDistanceDefault')
     elseif id == 6 then
+        -- The companion says the topic (its result opens the trade) while the wheel still knows who it is
+        pipboy.companionSay('FollowersTrade')
         pipboy.closeCompanion()
         leave()
-        pipboy.companionSay('FollowersTrade')
         return
     elseif id == 7 then
         flags.ranged = not flags.ranged

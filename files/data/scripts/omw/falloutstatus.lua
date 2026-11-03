@@ -566,6 +566,7 @@ local function current(dt)
         -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
         scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,
         pipboyOff = status.controlsOff ~= nil and status.controlsOff.pipboy == true,
+        fightingOff = status.controlsOff ~= nil and status.controlsOff.fighting == true,
         rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
@@ -660,9 +661,10 @@ local function refreshHotKeys(dt)
             end,
         })
     end
-    -- Not while a window is open, a script holds the player or the Pip-Boy is switched off, or a message waits for an answer
+    -- Not while a window is open, a script holds the player or has switched off the Pip-Boy or the fighting (a hot key
+    -- equips weapons), or a message waits for an answer
     local allowed = shown ~= nil and shown.mode == 'game' and not shown.scripted and not shown.pipboyOff
-        and I.UI.getMode() == nil and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
+        and not shown.fightingOff and I.UI.getMode() == nil and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
     menuHud:updateHotKeys(hotKeys:step(dt, allowed))
 end
 

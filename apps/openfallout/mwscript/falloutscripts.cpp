@@ -587,6 +587,11 @@ namespace OFScript
             rest.mEnded = mRest.mEnded;
             mRest = rest;
         }
+        {
+            // The wheel of a companion of the game that is gone must not open in the next one (the numbers go on)
+            const std::lock_guard lock(mCompanionMutex);
+            mCompanion.reset();
+        }
         mPerks.clear();
         mItemUse.clear();
         mPerkOwners.clear();
