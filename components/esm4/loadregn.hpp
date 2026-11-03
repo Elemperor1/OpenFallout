@@ -101,6 +101,12 @@ namespace ESM4
         bool covers(ESM::FormId worldspace, float x, float y) const;
 
         RegionData mData{};
+
+        /// What the weather entry of the region (RDAT of type 3) says: that it has one, its override byte and its
+        /// priority. The games pick the one region of the player from these (FalloutNV.exe 0x94CAE0).
+        bool mHasWeather = false;
+        bool mWeatherOverride = false;
+        std::uint8_t mWeatherPriority = 0;
         std::vector<RegionSound> mSounds;
 
         void load(ESM4::Reader& reader);
