@@ -37,8 +37,9 @@ namespace FalloutScript
     /// below full health (read after the actors and the equipment, which it adds to; a save made before items wore out has
     /// no such section, and all its items are at full health)
     constexpr std::uint32_t itemWearSectionVersion = 1;
-    void writeItemWear(ActorState& state, Equipment& equipment, SaveWriter& out);
-    void readItemWear(ActorState& state, Equipment& equipment, SaveReader& in, std::uint32_t version);
+    void writeItemWear(ActorState& state, Equipment& equipment, ReferenceState& references, SaveWriter& out);
+    void readItemWear(
+        ActorState& state, Equipment& equipment, ReferenceState& references, SaveReader& in, std::uint32_t version);
 
     /// The base, the modifier and the damage of every actor value that scripts or rules changed
     constexpr std::uint32_t actorValuesSectionVersion = 1;

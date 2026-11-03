@@ -16,6 +16,23 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mLocks.clear();
         mDestroyed.clear();
+        mConditions.clear();
+    }
+
+    int ReferenceState::condition(FormId reference) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mConditions.find(reference);
+        return found == mConditions.end() ? 1000 : found->second;
+    }
+
+    void ReferenceState::setCondition(FormId reference, int condition)
+    {
+        const std::lock_guard lock(mMutex);
+        if (condition >= 1000)
+            mConditions.erase(reference);
+        else
+            mConditions[reference] = std::max(condition, 0);
     }
 
     void ReferenceState::lockOf(FormId reference, bool& locked, int& level)

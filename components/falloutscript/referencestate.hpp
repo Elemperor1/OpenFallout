@@ -49,6 +49,11 @@ namespace FalloutScript
         bool isDestroyed(FormId reference) const;
         void setDestroyed(FormId reference, bool destroyed);
 
+        /// The condition of the item that a reference of the world is, in tenths of a percent (1000 is full health): a
+        /// weapon or a piece of armor that was dropped keeps it, to be picked up again with it
+        int condition(FormId reference) const;
+        void setCondition(FormId reference, int condition);
+
     private:
         /// What scripts made of the lock, as far as they said
         struct LockEdit
@@ -64,6 +69,8 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::map<FormId, LockEdit> mLocks;
         std::set<FormId> mDestroyed;
+        /// The references whose item is below full condition
+        std::map<FormId, int> mConditions;
     };
 
     /// Gives the commands GetLocked, GetLockLevel, Lock, UnLock, GetDestroyed and SetDestroyed to the interpreter.

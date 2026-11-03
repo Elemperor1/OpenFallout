@@ -866,7 +866,7 @@ namespace FalloutScript
     template <>
     struct SaveAccess<ItemWearSection>
     {
-        static void write(ActorState& state, Equipment& equipment, SaveWriter& out)
+        static void write(ActorState& state, Equipment& equipment, ReferenceState& references, SaveWriter& out)
         {
             {
                 const std::lock_guard lock(state.mMutex);
@@ -893,22 +893,32 @@ namespace FalloutScript
                     }
                 }
             }
-            const std::lock_guard lock(equipment.mMutex);
-            out.count(equipment.mWorn.size());
-            for (const auto& [actor, worn] : equipment.mWorn)
             {
-                out.form(actor);
-                out.i32(worn.mWeaponCondition);
-                out.count(worn.mArmorConditions.size());
-                for (const auto& [item, condition] : worn.mArmorConditions)
+                const std::lock_guard lock(equipment.mMutex);
+                out.count(equipment.mWorn.size());
+                for (const auto& [actor, worn] : equipment.mWorn)
                 {
-                    out.form(item);
-                    out.i32(condition);
+                    out.form(actor);
+                    out.i32(worn.mWeaponCondition);
+                    out.count(worn.mArmorConditions.size());
+                    for (const auto& [item, condition] : worn.mArmorConditions)
+                    {
+                        out.form(item);
+                        out.i32(condition);
+                    }
                 }
+            }
+            const std::lock_guard lock(references.mMutex);
+            out.count(references.mConditions.size());
+            for (const auto& [reference, condition] : references.mConditions)
+            {
+                out.form(reference);
+                out.i32(condition);
             }
         }
 
-        static void read(ActorState& state, Equipment& equipment, SaveReader& in, std::uint32_t)
+        static void read(
+            ActorState& state, Equipment& equipment, ReferenceState& references, SaveReader& in, std::uint32_t)
         {
             std::map<FormId, std::map<FormId, std::map<int, int>>> worn;
             const std::size_t holders = in.count(8);
@@ -953,6 +963,19 @@ namespace FalloutScript
                 for (auto& [id, items] : worn)
                     state.mHolders[id].mWorn = std::move(items);
             }
+            std::map<FormId, int> dropped;
+            const std::size_t placed = in.count(8);
+            for (std::size_t i = 0; i < placed; ++i)
+            {
+                const std::optional<FormId> reference = in.form();
+                const int condition = in.i32();
+                if (reference && condition >= 0 && condition < ActorState::fullCondition)
+                    dropped[*reference] = condition;
+            }
+            {
+                const std::lock_guard lock(references.mMutex);
+                references.mConditions = std::move(dropped);
+            }
             const std::lock_guard lock(equipment.mMutex);
             for (auto& [actor, saved] : conditions)
             {
@@ -963,14 +986,15 @@ namespace FalloutScript
         }
     };
 
-    void writeItemWear(ActorState& state, Equipment& equipment, SaveWriter& out)
+    void writeItemWear(ActorState& state, Equipment& equipment, ReferenceState& references, SaveWriter& out)
     {
-        SaveAccess<ItemWearSection>::write(state, equipment, out);
+        SaveAccess<ItemWearSection>::write(state, equipment, references, out);
     }
 
-    void readItemWear(ActorState& state, Equipment& equipment, SaveReader& in, std::uint32_t version)
+    void readItemWear(
+        ActorState& state, Equipment& equipment, ReferenceState& references, SaveReader& in, std::uint32_t version)
     {
-        SaveAccess<ItemWearSection>::read(state, equipment, in, version);
+        SaveAccess<ItemWearSection>::read(state, equipment, references, in, version);
     }
 
     void writeActorValues(ActorValues& values, SaveWriter& out)
