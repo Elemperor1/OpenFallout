@@ -1836,7 +1836,9 @@
 -- @param #table place As for `setPlace`.
 
 ---
--- A light with no fall-off that is a child of the node `node` of the model, `offset` away from it.
+-- A light with no fall-off that is a child of the node `node` of the model, `offset` away from it in that node's own
+-- frame. A node the model does not have (the optimizer removes the nodes that hold nothing, as the nodes of the file's
+-- lights) puts the light under the model's root.
 -- @function [parent=#MenuScene] addLight
 -- @param #string name
 -- @param #string model

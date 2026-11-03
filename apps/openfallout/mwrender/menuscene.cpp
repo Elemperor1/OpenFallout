@@ -359,15 +359,27 @@ namespace OFRender
         auto model = std::make_unique<Model>();
         model->mRoot = new osg::MatrixTransform;
         model->mRoot->setName(name);
-        // The point lights that a script adds (addLight) reach a model through the light list that this callback makes for
-        // its subgraph, as the objects of the world have it; without it only the sunlight (ambient and directional) lights
-        // the model (the lock was black in the first run, Mac round 12AK)
+        // The point lights that a script adds (addLight) reach a model through the light list that this callback makes
+        // for its subgraph, as the objects of the world have it; without it only the sunlight (ambient and directional)
+        // lights the model (the lock was black in the first run, Mac round 12AK)
         model->mRoot->addCullCallback(new SceneUtil::LightListCallback);
         model->mRoot->addChild(instance);
         model->mInstance = instance;
 
         SceneUtil::NodeMapVisitor visitor(model->mNodes);
         instance->accept(visitor);
+        {
+            // What a script can name (the scene file's nodes that the optimizer kept), for the log of a run
+            std::string names;
+            size_t count = 0;
+            for (const auto& entry : model->mNodes)
+            {
+                if (++count > 60)
+                    break;
+                names += " " + entry.first;
+            }
+            Log(Debug::Info) << "Menu scene: " << name << " has the nodes" << names;
+        }
 
         if (const SceneUtil::EmbeddedSequences* sequences = findEmbeddedSequences(*instance))
         {
@@ -435,6 +447,9 @@ namespace OFRender
         const auto found = model->mNodes.find(Misc::StringUtils::lowerCase(node));
         if (found != model->mNodes.end())
             parent = found->second;
+        Log(Debug::Info) << "Menu scene: light of the model " << name << " under "
+                         << (found != model->mNodes.end() ? node : std::string("its root (no node '") + node + "')")
+                         << " at " << offset.x() << " " << offset.y() << " " << offset.z();
         parent->addChild(place);
         return true;
     }

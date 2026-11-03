@@ -39,13 +39,18 @@ local SCENE_ROWS = { 0, 1, 0, 0, 0, 1, 1, 0, 0 }
 -- The pin is turned about the lock's depth axis by the place it is at on the meter: M(A) about model Y, and the root
 -- of the pin is moved so that its pivot stays where it is, 2.2 units above the root's origin (0x790DF0)
 local PIN_RISE, PIN_LEVER = 0.6, 2.2
--- The lights are the two point lights and the ambient light of the lock's file (NifOsg does not read lights, so they are
--- made here with the numbers of the file: 'Omni02' is fixed in the lock's file, 'Omni01' moves with its frame, whose
--- dimmer of 1.4 is in the colour); they have no fall-off
+-- The lights are the two point lights and the ambient light of the lock's file (NifOsg does not read lights, and the
+-- nodes that held them are not kept, so they are made here with the numbers of the file, each at the place its node had
+-- in the node that it is under: 'Omni02' is fixed, at (13.5309, -19.3355, -9.4662) in the file's root; 'Omni01' moves with
+-- its frame and is at (-15.6813, 18.2592, 26.9048) in the frame, whose dimmer of 1.4 is in the colour); they have no
+-- fall-off. The first run put both at the root's origin, which is behind the disc: the lock and the pin were black
+-- (Mac round 12AL).
 local AMBIENT = v3(0.004, 0.031, 0.047)
 local LIGHT_OMNI02 = v3(0.365, 0.471, 0.494)
 local LIGHT_OMNI01 = v3(1.005, 1.274, 1.032)
 local LIGHT_RADIUS = 400
+local OMNI02_PLACE = v3(13.5309, -19.3355, -9.4662)
+local OMNI01_PLACE = v3(-15.6813, 18.2592, 26.9048)
 
 -- The sounds the events of the game make (editor ids of the games' sound records). The tension sound is a loop in the
 -- games and the sound is played by name without a loop, so it is played once.
@@ -151,8 +156,8 @@ local function setUpScene(size)
     menuScene.setScenePlace(SCENE, { position = v3(DEPTH, 0, 0), rows = SCENE_ROWS })
     menuScene.addModel(SCENE, 'lock', LOCK_MODEL)
     menuScene.addModel(SCENE, 'pin', PIN_MODEL)
-    menuScene.addLight(SCENE, 'lock', 'Omni02', v3(0, 0, 0), LIGHT_OMNI02, LIGHT_RADIUS)
-    menuScene.addLight(SCENE, 'lock', 'Omni01', v3(0, 0, 0), LIGHT_OMNI01, LIGHT_RADIUS)
+    menuScene.addLight(SCENE, 'lock', '', OMNI02_PLACE, LIGHT_OMNI02, LIGHT_RADIUS)
+    menuScene.addLight(SCENE, 'lock', 'frame', OMNI01_PLACE, LIGHT_OMNI01, LIGHT_RADIUS)
     menuScene.setSequenceTime(SCENE, 'lock', 'Forward', 0)
     menuScene.setSequenceTime(SCENE, 'pin', 'Forward', 0)
     menuScene.setPlace(SCENE, 'pin', pinPlace(0))
