@@ -76,6 +76,47 @@ namespace FalloutScript::Hud
         mLines.clear();
     }
 
+    void QuestTextLine::push(QuestText text)
+    {
+        const std::lock_guard lock(mMutex);
+        mTexts.push_back(std::move(text));
+        while (mTexts.size() > capacity)
+            mTexts.pop_front();
+    }
+
+    void QuestTextLine::push(ObjectiveLine line)
+    {
+        if (line.mText.empty())
+            return;
+        const std::lock_guard lock(mMutex);
+        mObjectives.push_back(std::move(line));
+        while (mObjectives.size() > capacity)
+            mObjectives.pop_front();
+    }
+
+    std::vector<QuestText> QuestTextLine::takeTexts()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<QuestText> result(mTexts.begin(), mTexts.end());
+        mTexts.clear();
+        return result;
+    }
+
+    std::vector<ObjectiveLine> QuestTextLine::takeObjectives()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<ObjectiveLine> result(mObjectives.begin(), mObjectives.end());
+        mObjectives.clear();
+        return result;
+    }
+
+    void QuestTextLine::clear()
+    {
+        const std::lock_guard lock(mMutex);
+        mTexts.clear();
+        mObjectives.clear();
+    }
+
     void Watchers::note(FormId watcher, Detection::Sighting sighting, bool hostile, double now)
     {
         if (watcher == 0)

@@ -78,7 +78,8 @@ namespace OFLua
         };
 
         // The lines that characters said to the player since this was last called, oldest first, for the subtitles: the
-        // text, how long it stays, how far the speaker is and whether a script forced it
+        // text, how long it stays, how far the speaker is, whether a script forced it and whose line it is (0 the
+        // player's own, 2 another character's)
         api["takeSubtitles"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
@@ -89,8 +90,53 @@ namespace OFLua
                 row["seconds"] = line.mSeconds;
                 row["distance"] = line.mDistance;
                 row["forced"] = line.mForced;
+                row["kind"] = line.mKind;
                 rows[index++] = row;
             }
+            return rows;
+        };
+
+        // The texts of the quest tile since this was last called, oldest first: the heading (the word of the games'
+        // settings: a quest that was added, completed or failed, a place that was found), the name under it and the
+        // name of the sound
+        api["takeQuestText"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::Hud::QuestText& text : scripts().hudQuestText().takeTexts())
+            {
+                sol::table row(lua, sol::create);
+                row["heading"] = text.mHeading;
+                row["name"] = text.mName;
+                row["sound"] = text.mSound;
+                row["kind"] = text.mKind;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+
+        // The lines of objectives since this was last called, oldest first: the text (a completed one has the word of
+        // the games' settings in front), whether it was completed and whether it is the reminder's
+        api["takeObjectives"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::Hud::ObjectiveLine& line : scripts().hudQuestText().takeObjectives())
+            {
+                sol::table row(lua, sol::create);
+                row["text"] = line.mText;
+                row["completed"] = line.mCompleted;
+                row["reminder"] = line.mReminder;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+
+        // The names of the regions the player came into since this was last called, oldest first (the display shows
+        // the last as the line over the compass). It looks when the player's cell is another one.
+        api["takeRegions"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const std::string& name : scripts().takeRegionNames())
+                rows[index++] = name;
             return rows;
         };
 

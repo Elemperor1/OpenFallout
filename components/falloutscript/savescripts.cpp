@@ -169,6 +169,11 @@ namespace FalloutScript
                 quest.mStage = state.mStage;
                 quest.mStagesDone = std::move(state.mStagesDone);
                 quest.mObjectives = std::move(state.mObjectives);
+                // The display told the player of a quest that showed anything before the game was saved
+                quest.mAnnounced = quest.mCompleted || quest.mFailed
+                    || std::any_of(quest.mObjectives.begin(), quest.mObjectives.end(), [](const auto& objective) {
+                           return objective.second.mDisplayed || objective.second.mCompleted;
+                       });
                 quest.mJournal = std::move(state.mJournal);
                 quest.mTimer = state.mTimer;
                 quest.mDelay = state.mDelay;

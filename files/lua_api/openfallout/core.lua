@@ -1633,9 +1633,32 @@
 
 ---
 -- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
--- subtitles: each has `text` (the speaker's name and the words), `seconds` (how long it stays from the moment it was said),
--- `distance` (of the speaker from the player) and `forced` (a script asked for the text whatever the setting says).
+-- subtitles: each has `text` (the words), `seconds` (how long it stays from the moment it was said), `distance` (of the
+-- speaker from the player), `forced` (a script asked for the text whatever the setting says) and `kind` (0 the player's
+-- own line, 2 another character's).
 -- @function [parent=#Hud] takeSubtitles
+-- @return #list<#table>
+
+---
+-- The names of the regions the player came into since this was last called, oldest first, for the line over the compass. The
+-- player's region is looked for when the player's cell is another one (and once after a game was begun or loaded), as the
+-- games do it; a building, a place that no region covers and a region without a name give nothing, and neither does the region
+-- that was shown last.
+-- @function [parent=#Hud] takeRegions
+-- @return #list<#string>
+
+---
+-- The texts of the quests since this was last called, oldest first, for the block of the display that writes a heading over
+-- the name of a quest: each has `heading` (the word of the games' settings), `name` (the quest, or the place that was found),
+-- `sound` (the editor id of the sound that goes with it) and `kind` (0 a quest was added, 1 completed, 2 failed, 3 a place was
+-- found).
+-- @function [parent=#Hud] takeQuestText
+-- @return #list<#table>
+
+---
+-- The lines of objectives since this was last called, oldest first: each has `text` (a completed one has the word of the games'
+-- settings in front), `completed` and `reminder` (the line is one that the reminder repeats).
+-- @function [parent=#Hud] takeObjectives
 -- @return #list<#table>
 
 ---

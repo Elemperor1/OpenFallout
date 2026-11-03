@@ -36,6 +36,28 @@ namespace FalloutScript
         bool mCompleted = false;
     };
 
+    /// What a quest tells the display (FalloutNV.exe 0x77A480 and 0x5EC5D0: Mac round 12AQ B2)
+    struct QuestEvent
+    {
+        enum class Kind
+        {
+            /// The quest was shown for the first time: by an objective of it that was displayed
+            Added,
+            /// The quest was completed (a script, or a log entry of a stage)
+            Completed,
+            /// The quest failed (a log entry of a stage)
+            Failed,
+            /// An objective was displayed: its line
+            ObjectiveShown,
+            /// An objective that was displayed was completed: its line
+            ObjectiveDone,
+        };
+        Kind mKind = Kind::Added;
+        FormId mQuest = 0;
+        /// The text of the objective, for the two kinds of lines
+        std::string mText;
+    };
+
     /// A line of the journal of a quest: the text of the log entry of the stage that was reached
     struct JournalEntry
     {
@@ -55,6 +77,9 @@ namespace FalloutScript
         std::vector<int> mStagesDone; // in the order they were reached
         std::map<int, ObjectiveState> mObjectives;
         std::vector<JournalEntry> mJournal;
+        /// Whether the display told the player that the quest was added (the executable keeps it in bit 0x20 of the
+        /// flags of the quest). It is not saved: a quest of a game that is loaded that has shown anything is told.
+        bool mAnnounced = false;
         /// Seconds since the script of the quest last ran
         float mTimer = 0;
         /// The delay between runs of the script that SetQuestDelay gave, in place of the one the record has
@@ -79,6 +104,7 @@ namespace FalloutScript
         /// Tells whether the conditions of a log entry are met. Without one, every condition is met.
         using ConditionCheck = std::function<bool(const std::vector<ESM4::TargetCondition>&)>;
         using JournalListener = std::function<void(FormId quest, const JournalEntry& entry)>;
+        using EventListener = std::function<void(const QuestEvent& event)>;
 
         /// The longest nesting of SetStage inside SetStage that is run. The games run at least 250.
         static constexpr std::size_t maxNesting = 250;
@@ -87,6 +113,9 @@ namespace FalloutScript
 
         void setConditionCheck(ConditionCheck check) { mConditions = std::move(check); }
         void setJournalListener(JournalListener listener) { mJournalListener = std::move(listener); }
+        /// What the quests tell the display: a quest that is added, completed or failed, an objective that is displayed
+        /// or completed. Called while the script that did it runs.
+        void setEventListener(EventListener listener) { mEventListener = std::move(listener); }
 
         /// Reads the quests again: every quest starts from the beginning, and those that are enabled when the game
         /// starts are running.
@@ -152,11 +181,17 @@ namespace FalloutScript
         void advance(float seconds, std::uint16_t blockType, const BlockFilter& filter = {});
         void runEntry(FormId quest, const ESM4::QuestLogEntry& entry);
         void log(const std::string& message);
+        /// The text of the objective by the record (empty when it has none)
+        static std::string objectiveText(const QuestState& quest, int objective);
+        void tell(FormId quest, QuestEvent::Kind kind, std::string text = {});
+        /// A quest that was not over is, and tells the player so
+        void finish(FormId id, QuestState& quest, bool completes, bool fails);
 
         Interpreter& mInterpreter;
         const QuestRecords& mRecords;
         ConditionCheck mConditions;
         JournalListener mJournalListener;
+        EventListener mEventListener;
         std::map<FormId, QuestState> mQuests;
         /// The scripts that were made ready, by the definition they were made from
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;

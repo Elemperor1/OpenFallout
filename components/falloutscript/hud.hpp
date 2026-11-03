@@ -54,10 +54,14 @@ namespace FalloutScript::Hud
         std::string mText;
         /// How long it stays from the moment it was said
         float mSeconds = 0;
-        /// How far the speaker is from the player: of several lines said at once the display shows the nearest
+        /// How far the speaker is from the player: the display shows the line of a speaker within 500 units, and of
+        /// several said at once the nearest
         float mDistance = 0;
         /// A script forced the text on whatever the setting says; such a line comes before the others
         bool mForced = false;
+        /// Whose line it is, as the executable keeps it (0x774FD0): 0 the player's own, 1 nobody's, 2 another
+        /// character's
+        int mKind = 2;
     };
 
     /// The lines that were said to the player since the display last took them, oldest first (FalloutNV.exe 0x774FD0
@@ -76,6 +80,50 @@ namespace FalloutScript::Hud
     private:
         std::mutex mMutex;
         std::deque<Subtitle> mLines;
+    };
+
+    /// A line of the quest text of the display (the tile `QuestAdded`): a heading and, under it, a name that is written
+    /// one character at a time. A quest that was added, completed or failed has the word of the game's settings for it
+    /// and the name of the quest; a place that was found (FalloutNV.exe 0x76B960) has the word and the name of the
+    /// place.
+    struct QuestText
+    {
+        std::string mHeading;
+        std::string mName;
+        /// The name of the sound that goes with it
+        std::string mSound;
+        /// What happened, as the executable counts it (0x77A650): 0 a quest was added, 1 completed, 2 failed, 3 a place
+        /// was found. A quest that was completed takes the lines of objectives that wait away.
+        int mKind = 0;
+    };
+
+    /// A line of an objective (the tile `QuestStages`, FalloutNV.exe 0x77A5B0): one that was displayed, one that was
+    /// completed (the word of the game's settings in front of the text) or one that the reminder repeats
+    struct ObjectiveLine
+    {
+        std::string mText;
+        bool mCompleted = false;
+        bool mReminder = false;
+    };
+
+    /// What the quests and the finding of places tell the display, in the order it came (FalloutNV.exe 0x77A480 and
+    /// 0x77A5B0 keep two lists: the text of the quests and the lines of objectives). It can be used from any thread.
+    /// Only the newest few are kept, as in MessageLine.
+    class QuestTextLine
+    {
+    public:
+        static constexpr std::size_t capacity = 32;
+
+        void push(QuestText text);
+        void push(ObjectiveLine line);
+        std::vector<QuestText> takeTexts();
+        std::vector<ObjectiveLine> takeObjectives();
+        void clear();
+
+    private:
+        std::mutex mMutex;
+        std::deque<QuestText> mTexts;
+        std::deque<ObjectiveLine> mObjectives;
     };
 
     /// The word the sneak meter shows

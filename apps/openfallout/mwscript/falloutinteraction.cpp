@@ -1415,7 +1415,7 @@ namespace OFScript
             // back to it
             if (mMapMarkers.show(marker.mId, true))
             {
-                markerShown(marker.mId);
+                markerDiscovered(marker.mId);
                 const int reward = static_cast<int>(gameSetting("iXPRewardDiscoverMapMarker", 10));
                 if (reward > 0)
                     rewardExperience(reward);

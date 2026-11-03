@@ -472,6 +472,13 @@ local function updateLines(dt)
     for _, said in ipairs(hud.takeSubtitles()) do
         lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
     end
+    -- Nor for the quest text: what a quest was told and its objectives are messages too
+    for _, event in ipairs(hud.takeQuestText()) do
+        lines[#lines + 1] = { text = event.heading .. ' ' .. event.name, left = 4 }
+    end
+    for _, objective in ipairs(hud.takeObjectives()) do
+        lines[#lines + 1] = { text = objective.text, left = 4 }
+    end
     local kept = {}
     for _, line in ipairs(lines) do
         line.left = line.left - dt
@@ -514,16 +521,20 @@ local function current(dt)
             hud.takeSubtitles()
             return nil
         end
-        return { mode = 'messages', messages = hud.takeMessages(), subtitles = hud.takeSubtitles() }
+        return { mode = 'messages', messages = hud.takeMessages(), subtitles = hud.takeSubtitles(),
+            regions = hud.takeRegions(), questTexts = hud.takeQuestText(), objectives = hud.takeObjectives() }
     end
     local stats = pipboy.stats()
     local weapon = core.combat.weapon()
     local status = hud.status()
     -- The display from the file queues the messages itself
-    local incoming, saying = nil, nil
+    local incoming, saying, entered, quest, objectives = nil, nil, nil, nil, nil
     if menuHud then
         incoming = hud.takeMessages()
         saying = hud.takeSubtitles()
+        entered = hud.takeRegions()
+        quest = hud.takeQuestText()
+        objectives = hud.takeObjectives()
     else
         updateLines(dt)
     end
@@ -566,7 +577,6 @@ local function current(dt)
         -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
         scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,
         pipboyOff = status.controlsOff ~= nil and status.controlsOff.pipboy == true,
-        fightingOff = status.controlsOff ~= nil and status.controlsOff.fighting == true,
         rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
@@ -576,6 +586,9 @@ local function current(dt)
         mode = 'game',
         messages = incoming,
         subtitles = saying,
+        regions = entered,
+        questTexts = quest,
+        objectives = objectives,
     }
 end
 
@@ -618,8 +631,24 @@ local function refreshFromFile(dt)
         menuHud = menuHudModule.create(pad, previous)
         if menuHud == nil then
             menuHudFailed = true
-            -- The stand-in draws the next frame, whatever it drew before
+            -- The stand-in draws the next frame, whatever it drew before, and says what waited for its turn and what this
+            -- frame brought
             shown = nil
+            for _, message in ipairs(previous.queue or {}) do
+                lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds - (message.age or 0) }
+            end
+            for _, message in ipairs(state.messages or {}) do
+                lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds }
+            end
+            for _, said in ipairs(state.subtitles or {}) do
+                lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
+            end
+            for _, event in ipairs(state.questTexts or {}) do
+                lines[#lines + 1] = { text = event.heading .. ' ' .. event.name, left = 4 }
+            end
+            for _, objective in ipairs(state.objectives or {}) do
+                lines[#lines + 1] = { text = objective.text, left = 4 }
+            end
         else
             -- What this frame brought (the messages and subtitles that were taken out of the queues) goes into the new one
             menuHud:update(state, dt)
@@ -671,10 +700,11 @@ local function refreshHotKeys(dt)
             end,
         })
     end
-    -- Not while a window is open, a script holds the player or has switched off the Pip-Boy or the fighting (a hot key
-    -- equips weapons), or a message waits for an answer
-    local allowed = shown ~= nil and shown.mode == 'game' and not shown.scripted and not shown.pipboyOff
-        and not shown.fightingOff and I.UI.getMode() == nil and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
+    -- Not while a window is open or a message waits for an answer, or a script switched the Pip-Boy off. Those are the
+    -- only gates of the executable's loop (0x77DA60, Mac round 12AQ B4): a script that holds the player or took the
+    -- fighting away does not stop it, and nothing looks at the weapon or at combat; the dead do not get here
+    local allowed = shown ~= nil and shown.mode == 'game' and not shown.pipboyOff and I.UI.getMode() == nil
+        and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
     menuHud:updateHotKeys(hotKeys:step(dt, allowed))
 end
 

@@ -56,6 +56,24 @@ namespace OFScript
             tellPlayer(text);
     }
 
+    void FalloutScripts::markerDiscovered(FalloutScript::FormId marker)
+    {
+        // The executable gives the display two lines, the word of the games' settings and the name of the place (it
+        // is written under the word one character at a time, as the name of a quest that was added is), with the sound
+        // of a quest that was added
+        FalloutScript::Hud::QuestText text;
+        for (const PlacedMarker& placed : placedMarkers())
+            if (placed.mId == marker)
+            {
+                text.mName = placed.mName;
+                break;
+            }
+        text.mHeading = gameSettingText("sDiscoveredText");
+        text.mSound = "UIPopUpQuestNew";
+        text.mKind = 3;
+        mHudQuestText.push(std::move(text));
+    }
+
     void FalloutScripts::playSound(FalloutScript::FormId sound, FalloutScript::FormId reference)
     {
         // The world of the sounds is not touched while scripts run on another thread

@@ -118,6 +118,12 @@ void ESM4::Region::load(ESM4::Reader& reader)
             }
             case ESM::fourCC("RDAT"):
                 reader.get(mData);
+                if (mData.type == RDAT_Weather)
+                {
+                    mHasWeather = true;
+                    mWeatherOverride = (mData.flag & 1) != 0;
+                    mWeatherPriority = mData.priority;
+                }
                 break;
             case ESM::fourCC("RDMP"):
             {

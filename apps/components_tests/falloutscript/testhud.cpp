@@ -67,6 +67,38 @@ namespace
         EXPECT_TRUE(line.take().empty());
     }
 
+    TEST(FalloutScriptHudTest, the_quest_text_keeps_the_texts_and_the_objective_lines_apart_in_order)
+    {
+        Hud::QuestTextLine line;
+        Hud::ObjectiveLine empty;
+        line.push(empty);
+        EXPECT_TRUE(line.takeObjectives().empty());
+        line.push(Hud::QuestText{ "Quest added", "Ghost Town Gunfight", "UIPopUpQuestNew" });
+        line.push(Hud::ObjectiveLine{ "Talk to Sunny", false, false });
+        line.push(Hud::ObjectiveLine{ "Talk to Sunny", true, false });
+        line.push(Hud::QuestText{ "Discovered", "Goodsprings", "UIPopUpQuestNew", 3 });
+
+        const std::vector<Hud::QuestText> texts = line.takeTexts();
+        ASSERT_EQ(texts.size(), 2u);
+        EXPECT_EQ(texts[0].mName, "Ghost Town Gunfight");
+        EXPECT_EQ(texts[1].mHeading, "Discovered");
+        EXPECT_EQ(texts[0].mKind, 0);
+        EXPECT_EQ(texts[1].mKind, 3);
+        const std::vector<Hud::ObjectiveLine> lines = line.takeObjectives();
+        ASSERT_EQ(lines.size(), 2u);
+        EXPECT_FALSE(lines[0].mCompleted);
+        EXPECT_TRUE(lines[1].mCompleted);
+        EXPECT_TRUE(line.takeTexts().empty());
+
+        for (int i = 0; i < 40; ++i)
+            line.push(Hud::ObjectiveLine{ "o" + std::to_string(i), false, false });
+        const std::vector<Hud::ObjectiveLine> newest = line.takeObjectives();
+        ASSERT_EQ(newest.size(), Hud::QuestTextLine::capacity);
+        EXPECT_EQ(newest.front().mText, "o8");
+        line.clear();
+        EXPECT_TRUE(line.takeObjectives().empty());
+    }
+
     TEST(FalloutScriptHudTest, nobody_around_leaves_the_player_hidden)
     {
         Hud::Watchers watchers;

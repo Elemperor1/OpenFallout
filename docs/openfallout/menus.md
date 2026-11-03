@@ -683,21 +683,52 @@ its older drawing for a data folder that lacks the file.
   marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
   executable's rule is in B4, but the port has no ownership yet). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
   below).
-- Subtitles (`Subtitles`, Mac round 12AO B3, FalloutNV.exe 0x774FD0, 0x7711F4 and 0x775230): the tile is 800 by 110 and empty in
-  the file; the code makes a centred text in it, just above the block of the text under the crosshair. A line a character says
-  outside of a conversation (the voice of the data, or the text alone when it has no voice) is an entry: it stays from the moment
-  it was said for the length of its text times `fNoticeTextTimePerCharacter` (0.06 in the executable, 0.08 in the files), and is
-  taken when subtitles are on, the line has no voice or a script forced it, and the speaker is near enough to hear. Every 200 ms
-  the display drops the entries that are over, and when none is shown it takes the one of the speaker nearest to the player (a
-  forced one first). The tile is shown in the modes of the game and of a script that holds the player, not under a window.
-  `falloutmenusubtitles.lua` keeps the entries, `core.hud.takeSubtitles` is the engine's side; the stand-in display prints a line
-  as a message. Not known: whether the executable puts the speaker's name before the words (the port does, as it did before),
-  the colour of a line (the entry carries three colours that were not read), the voice's own length as the duration (the port
-  has no length for a voice file), and the exact place (the tile sits 110 above the text under the crosshair; the executable's
-  function that places it, 0x778652, was not decoded).
-- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, the needs
-  of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
-  the engine has no clip.
+- Subtitles (`Subtitles`, Mac rounds 12AO B3 and 12AQ B3, FalloutNV.exe 0x774FD0, 0x7711F4 and 0x775230): the tile is 800 by
+  110 and empty in the file; the code makes a centred text in it, 50 above the block of the text under the crosshair (the
+  executable moves it up with that block when the block's text is taller; the port's block does not move). A line a character
+  says outside of a conversation (the voice of the data, or the text alone when it has no voice) is an entry: it stays from the
+  moment it was said for the length of its text times `fNoticeTextTimePerCharacter` (0.06 in the executable, 0.08 in the files),
+  and is taken when subtitles are on, the line has no voice or a script forced it, and the speaker is near enough to hear. The
+  text is the response alone: the executable puts no name before it. Every 200 ms the display drops the entries that are
+  over, and when none is shown it chooses one: the entries in the order they were said, a forced one takes over whatever was
+  chosen, any other is chosen when its speaker is within 500 units and nearer than the one chosen (and the one chosen is not
+  the player's own line while this is another's: `kind` 0 is the player's, 2 another's). The tile is shown in the modes of the
+  game and of a script that holds the player, not under a window. `falloutmenusubtitles.lua` keeps the entries,
+  `core.hud.takeSubtitles` is the engine's side; the stand-in display prints a line as a message. There is no colour of a
+  speaker (the three values the entry carries are the speaker's place). Not known: the voice's own length as the duration (the
+  port has no length for a voice file, so a voiced line stays as long as its text takes).
+- The region line (`Region_Location`, Mac rounds 12AO B3 and 12AQ B1, FalloutNV.exe 0x94CAE0, 0x7728F0 and 0x772C30): the
+  tile is 100 by 100, 5 to the right of the health block and 75 above its top, and has two lines of text, left-justified,
+  font 7, the second drawn over the first; the executable shows only the first (the one that is to show the name of a place
+  is never given text: the discovery of a place is a message of the quest events, below). The line shows the name (the map
+  name, `RDAT` type 4) of the region the player is in when the player's cell changes and the region is another than the one
+  shown last: the region is the first of those of the cell (`XCLR`) that cover the player's place and have a worldspace of
+  that place or none and are not deleted, which a later one replaces when it has a weather entry and the first has none, or
+  its override is set and the first's is not, or the overrides are the same and its priority is higher. In a building the
+  region is left as it was and nothing is shown; a place that no region covers, or a region with no name, shows nothing
+  and is forgotten as the one shown last (coming back to the one before shows it again). The name fades in over 2 s once the
+  tile is on the screen, stays until 4 s after it began and fades out over 2 s; the same name that is still on the screen is not
+  shown again. `FalloutScript::RegionLine` is the rule, `FalloutScripts::takeRegionNames` looks at the player's cell,
+  `core.hud.takeRegions` gives the names.
+- The quest text (`QuestReminder`, Mac round 12AR C1, FalloutNV.exe 0x77A650, 0x77B430 and 0x77C170): the block is 400 by 200,
+  15 in from the safe zone and 170 under its top edge; `QuestAdded` (80 down) and `QuestStages` (40 down) are in it.
+  *An event* (a quest was added, completed or failed, a place was found: `kind` 0 to 3 of `core.hud.takeQuestText`) writes the
+  heading (the word of the games' settings, font 7) over the name in upper case, font 8, a character to a tile; the character
+  *k* begins to fade in 0.1 s x (*k* + 1) after the event began, takes 2 s to do it, stays 4 s from then and fades out in
+  2 s. A name of 32 characters or more goes on a second line from the last space within the first 33; no more than 63
+  characters are shown. The sound of the event is made when it begins (`UIPopUpQuestNew` for a quest added or a place found,
+  `UIPopUpQuestComplete` for the others). *The lines of objectives* (`core.hud.takeObjectives`: the text of the objective that
+  was shown, or the word of the settings in front of one that was completed) are taken together when no line is left; each has a box before it
+  (filled for a completed one) and wraps at a third of the menu's width. The first four are looked after: the first fades in
+  over 0.5 s; the second and the third come 1 s and 2 s later; the first stays 3 s after that and fades out (0.5 s), and the
+  lines under it scroll up by its height (0.5 s). Nothing is taken from the queues until 2 s have passed since the last
+  thing was told; the lines wait while an event is on the screen, and a quest that is completed takes the lines that are
+  shown and those that wait away. `falloutmenuquests.lua` keeps the times, `falloutmenuhud.lua` draws them. Not checked
+  in the game: which of the lines of one batch is at the top (the one told last is), the place of a line's box, and the
+  sound of a line (one `UIQuestUpdate` for each); the reminder that repeats the objectives (`AutoDisplayObjectives`, off in
+  the settings) is not made.
+- Not drawn: the armour icons, the weapon's name and condition, the needs of hardcore mode and the breath meter; the
+  weapon's rounds show the rounds carried, as the engine has no clip.
 
 ### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
 

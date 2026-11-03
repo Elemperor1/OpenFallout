@@ -124,6 +124,39 @@ namespace
         EXPECT_EQ(region.mAreas[1].mPoints, triangle);
     }
 
+    // An RDAT entry: the type, the override byte, the priority byte and two bytes of nothing
+    std::string dataEntry(std::uint32_t type, std::uint8_t flag, std::uint8_t priority)
+    {
+        std::string data;
+        append<std::uint32_t>(data, type);
+        data.push_back(static_cast<char>(flag));
+        data.push_back(static_cast<char>(priority));
+        data.append(2, '\0');
+        return subRecord("RDAT", data);
+    }
+
+    TEST(ESM4RegionTest, keepsTheOverrideAndPriorityOfTheWeatherEntryAndTheMapName)
+    {
+        const ESM4::Region region = loadRegion(area(0, square) + dataEntry(4, 0, 0) + zString("RDMP", "The Strip")
+            + dataEntry(3, 1, 7) + dataEntry(7, 0, 9));
+
+        EXPECT_TRUE(region.mHasWeather);
+        EXPECT_TRUE(region.mWeatherOverride);
+        EXPECT_EQ(region.mWeatherPriority, 7);
+        EXPECT_EQ(region.mMapName, "The Strip");
+        // The last entry is what mData holds, the weather entry is kept apart
+        EXPECT_EQ(region.mData.type, 7u);
+    }
+
+    TEST(ESM4RegionTest, aRegionWithoutAWeatherEntryHasNone)
+    {
+        const ESM4::Region region = loadRegion(area(0, square) + dataEntry(4, 0, 0) + zString("RDMP", "x"));
+
+        EXPECT_FALSE(region.mHasWeather);
+        EXPECT_FALSE(region.mWeatherOverride);
+        EXPECT_EQ(region.mWeatherPriority, 0);
+    }
+
     TEST(ESM4RegionTest, aDeletedRegionCoversNothing)
     {
         const ESM4::Region region = loadRegion(area(0, square), deletedRecord);
