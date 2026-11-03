@@ -888,6 +888,12 @@ namespace OFScript
                 FalloutScript::readEquipment(mEquipment, in, version);
             });
         section(
+            "itemwear", FalloutScript::itemWearSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeItemWear(mActors, mEquipment, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readItemWear(mActors, mEquipment, in, version);
+            });
+        section(
             "actorvalues", FalloutScript::actorValuesSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActorValues(mActorValues, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {

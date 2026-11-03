@@ -33,6 +33,13 @@ namespace FalloutScript
     void writeEquipment(Equipment& equipment, SaveWriter& out);
     void readEquipment(Equipment& equipment, SaveReader& in, std::uint32_t version);
 
+    /// The condition of the items that characters carry, and of the weapon and the armor that are on: the copies that are
+    /// below full health (read after the actors and the equipment, which it adds to; a save made before items wore out has
+    /// no such section, and all its items are at full health)
+    constexpr std::uint32_t itemWearSectionVersion = 1;
+    void writeItemWear(ActorState& state, Equipment& equipment, SaveWriter& out);
+    void readItemWear(ActorState& state, Equipment& equipment, SaveReader& in, std::uint32_t version);
+
     /// The base, the modifier and the damage of every actor value that scripts or rules changed
     constexpr std::uint32_t actorValuesSectionVersion = 1;
     void writeActorValues(ActorValues& values, SaveWriter& out);

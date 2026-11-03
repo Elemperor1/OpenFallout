@@ -179,6 +179,65 @@ namespace
         EXPECT_EQ(again.bytes(), out.bytes());
     }
 
+    TEST(FalloutScriptSaveCharactersTest, the_condition_of_what_a_character_carries_and_wears_comes_back)
+    {
+        Records records;
+        ActorState state(records);
+        Equipment equipment(records, state);
+        state.addItem(guard, pistol, 1);
+        state.addItem(guard, pistol, 2, 350);
+        state.addItem(guard, vest, 1, 600);
+        EXPECT_EQ(equipment.equip(guard, pistol, 350), Equipment::Outcome::Equipped);
+        EXPECT_EQ(equipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        EXPECT_TRUE(equipment.setEquippedCondition(guard, pistol, 340));
+
+        SaveWriter items;
+        FalloutScript::writeActors(state, items);
+        SaveWriter worn;
+        FalloutScript::writeEquipment(equipment, worn);
+        SaveWriter wear;
+        FalloutScript::writeItemWear(state, equipment, wear);
+
+        ActorState otherState(records);
+        Equipment loaded(records, otherState);
+        SaveReader itemsIn(items.bytes());
+        FalloutScript::readActors(otherState, itemsIn, 1);
+        SaveReader wornIn(worn.bytes());
+        FalloutScript::readEquipment(loaded, wornIn, 1);
+        SaveReader wearIn(wear.bytes());
+        FalloutScript::readItemWear(otherState, loaded, wearIn, 1);
+        EXPECT_TRUE(wearIn.atEnd());
+        EXPECT_EQ(loaded.equippedCondition(guard, pistol), 340);
+        EXPECT_EQ(loaded.equippedCondition(guard, vest), 600);
+        const std::vector<ActorState::ConditionStack> stacks = otherState.conditions(guard, pistol);
+        ASSERT_EQ(stacks.size(), 3u);
+        EXPECT_EQ(stacks[0].mCondition, 1000);
+        EXPECT_EQ(stacks[1].mCondition, 350);
+        EXPECT_EQ(stacks[2].mCondition, 340);
+        SaveWriter again;
+        FalloutScript::writeItemWear(otherState, loaded, again);
+        EXPECT_EQ(again.bytes(), wear.bytes());
+    }
+
+    TEST(FalloutScriptSaveCharactersTest, a_save_with_no_wear_has_every_item_at_full_health)
+    {
+        Records records;
+        ActorState state(records);
+        Equipment equipment(records, state);
+        state.addItem(guard, pistol, 2);
+        equipment.equip(guard, pistol);
+        SaveWriter wear;
+        FalloutScript::writeItemWear(state, equipment, wear);
+        ActorState otherState(records);
+        Equipment loaded(records, otherState);
+        otherState.addItem(guard, pistol, 2);
+        SaveReader in(wear.bytes());
+        FalloutScript::readItemWear(otherState, loaded, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        ASSERT_EQ(otherState.conditions(guard, pistol).size(), 1u);
+        EXPECT_EQ(otherState.conditions(guard, pistol).front().mCondition, 1000);
+    }
+
     TEST(FalloutScriptSaveCharactersTest, the_actor_values_that_scripts_changed_come_back)
     {
         ActorValues values;
