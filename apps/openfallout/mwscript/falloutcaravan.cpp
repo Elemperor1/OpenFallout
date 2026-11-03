@@ -28,6 +28,8 @@ namespace OFScript
         /// The least number of cards a deck has: the menu does not open for a player with fewer cards, and the deck
         /// is not accepted with fewer (FalloutNV.exe 0x741060 and the menu's Play)
         constexpr int leastDeck = 30;
+        /// The most cards the deck takes: with this many in it the executable blocks adding another (0x749740)
+        constexpr int mostDeck = 108;
         /// The miscellaneous statistics that a match of Caravan adds one to when it is won and when it is lost
         constexpr int caravanGamesWonStat = 0x25;
         constexpr int caravanGamesLostStat = 0x26;
@@ -131,6 +133,12 @@ namespace OFScript
             for (int copy = 0; copy < count; ++copy)
                 session.mOwned.push_back({ cardOf(*card, form), card->mFullName, false });
         }
+        // The cards of the screen go by the card's value, the smallest first, and by nothing else (the executable sorts its one
+        // list that way, 0x73CED0; cards of one value stay in the order the pack has them)
+        std::stable_sort(session.mOwned.begin(), session.mOwned.end(),
+            [](const CaravanSession::Owned& left, const CaravanSession::Owned& right) {
+                return left.mCard.mValue < right.mCard.mValue;
+            });
         if (static_cast<int>(session.mOwned.size()) < leastDeck)
         {
             showNotice("You need at least " + std::to_string(leastDeck) + " Caravan cards to play.", 0);
@@ -243,7 +251,14 @@ namespace OFScript
         if (!mCaravan || mCaravan->mStage != CaravanStage::Deck || index < 0
             || index >= static_cast<int>(mCaravan->mOwned.size()))
             return false;
-        mCaravan->mOwned[static_cast<std::size_t>(index)].mInDeck = inDeck;
+        CaravanSession::Owned& owned = mCaravan->mOwned[static_cast<std::size_t>(index)];
+        if (owned.mInDeck == inDeck)
+            return false;
+        if (inDeck
+            && std::count_if(mCaravan->mOwned.begin(), mCaravan->mOwned.end(), [](const auto& card) { return card.mInDeck; })
+                >= mostDeck)
+            return false;
+        owned.mInDeck = inDeck;
         return true;
     }
 
@@ -263,7 +278,7 @@ namespace OFScript
         std::shuffle(order.begin(), order.end(), mCaravanRandom);
         for (CaravanSession::Owned& card : owned)
             card.mInDeck = false;
-        for (int pick = 0; pick < take && pick < count; ++pick)
+        for (int pick = 0; pick < take && pick < count && pick < mostDeck; ++pick)
             owned[static_cast<std::size_t>(order[static_cast<std::size_t>(pick)])].mInDeck = true;
         return true;
     }

@@ -1026,22 +1026,30 @@ a game setting, which the file names (`&-sName;`) and the executable writes itse
 `sNavigateText`, a title `sCaravanDeckText` and the button of the right bumper written as `sRSMRandomize` and `sCaravanDeckText`
 with a space; match `sSelectCardText`, `sDiscardCardText`, `sDiscardTrackText`, the give-up button `sCancel` (the file says
 `sForfeitGameText`, the code writes `sBack` and then `sCancel` over it), `sAntePotText`, `sNetTotalText`, `sWinLossText`; result
-`sCaravanYouWinText` or `sCaravanYouLoseText` and later `sCaravanPressAnyKeyText`, `sCaravanWinningsText`, `sCaravanLossesText`,
+`sCaravanYouWinText` or `sCaravanYouLoseText` (the match board's line when the match ends) and `sCaravanPressAnyKeyText` (the
+result screen's), `sCaravanWinningsText`, `sCaravanLossesText`,
 `sCaravanWinLossText`, `sCaravanBiggestAnteText`; the question `sQuitCaravanText` with `sYes` and `sNo`. The keys (the executable's key
 handler, 0x749360, reads the letters in both cases; the files name the same letters on their buttons): stake W Auto-Match, A Raise,
 F Accept, R Exit; deck W Add, A Remove, F Play Caravan, R leaves at once; match W Select Card, Q Discard Card, E Discard Caravan, R
-Cancel; any key on the result closes it. Escape is not handled by the Caravan code. R on the match puts a picked card back and asks
+Cancel; any key on the result closes it at once (Mac round 12AW S9: the result screen comes only when the table's 2.0 s
+sequence after the match is over, the words that ask for a key are written then, keys before that do nothing, and a click or the
+pad's B works a second later). Escape is not handled by the Caravan code (the executable's menu never sees it; the pause menu
+opens on top, a static reading). R on the match puts a picked card back and asks
 nothing; with nothing picked it asks the one question, and Yes is a loss with the pot paid. The pad (the files' buttons, but A, which
 the engine clicks with): the stake X Raise, Y Accept, B Exit; the deck the right bumper for the button of the deck, X Remove, Y Play
-Caravan, the D-pad for the cursor (Add is A on the file); the match the bumpers for the triggers (Discard Card, Discard Caravan).
+Caravan, the D-pad for the cursor (Add is A on the file); the match the bumpers for the triggers (Discard Card, Discard Caravan);
+A closes the result a second after it is up.
 The deck has plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
-move, the wheel to scroll, Enter to add or remove). The button of the deck is a button that says "Randomize" and the word of the
-deck; it makes a deck of the executable's size, which is read from its label (what the executable does with it, and what the S key
-does on the deck screen, were not read). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
+move, the wheel to scroll, Enter to add or remove). The executable keeps one list of every card the player has, sorted by the
+card's value, smallest first, and by nothing else (12AW S9; the screen's list is sorted so too), takes at most 108 cards into the
+deck (adding is blocked at 108) and lets Play Caravan work from 30. The button of the deck, which says "Randomize" and the word of
+the deck (key S, the right bumper), empties the deck and fills it with random cards without a repeat: 12AS read the count as a
+number from 30 to the number of cards, 12AW S9 as the smaller of the number of cards and 30 (not settled; the first is built,
+at most 108). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
 the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card picked up by a click (or W) and put on a
 caravan by a click on it, the totals coloured by sold, over or not yet; the file's counts of the corner show the pot, the net
-caps won at Caravan in all and the matches won over lost (what the last two hold is guessed from their names and the result
-screen: the code was not read), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
+caps won at Caravan in all and the matches won over lost (12AW S9: the pot of the corner is twice the stake of each side, the net
+is the player's caps won less lost at Caravan, the matches won over lost as "%i/%i"; written once when the match starts), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
 opponent moves after a second, its card lights the row it went on, and the result comes two seconds after the match ends. The
 suit numbers of the card records are 1 hearts, 2 spades, 3 diamonds, 4 clubs and 5 the Joker, the values 1 to 10, 12 Jack, 13
 Queen, 14 King and 15 Joker (no 11); the face of a card is the record's `TX00` texture
@@ -1055,8 +1063,9 @@ screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). 
 engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
 E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
 `Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, the text the executable writes into the title of the
-opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B, which leave at once and
-forfeit without the question.
+opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B on the match, which leave
+at once and forfeit without the question (the engine has no way yet for a screen of a script to keep them; the executable's B
+puts a picked card back, else asks sQuitCaravanText, and its Escape opens the pause menu), and a mouse click on the result.
 
 ### The loading screen (Mac round 12AR C2, FalloutNV.exe 0x788CC0 and the functions around it)
 
