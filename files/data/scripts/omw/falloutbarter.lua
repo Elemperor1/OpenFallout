@@ -442,7 +442,7 @@ end
 local function press(code, symbol)
     if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then return end
     if quantity.isOpen() then
-        quantity.press(code)
+        quantity.press(code, symbol)
         return
     end
     local arrow = code == input.KEY.UpArrow or code == input.KEY.DownArrow or code == input.KEY.LeftArrow

@@ -872,7 +872,7 @@ local function press(code, symbol)
         return
     end
     -- The page of the game's menu takes the keys it uses (not Left and Right, which change the page)
-    if itemsPage.isOpen() and itemsPage.press(code) then
+    if itemsPage.isOpen() and itemsPage.press(code, symbol) then
         return
     end
     if statsPage.isOpen() and statsPage.press(code) then

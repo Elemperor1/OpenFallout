@@ -570,6 +570,47 @@ button 0x72f6f0, the price of one 0x72ed00).
 - Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
+### Models in a menu, and the lockpicking screen
+
+Three screens of the games draw a model of their own inside the menu: the lock and the bobby pin of `lockpick_menu.xml`
+(`Meshes\Terminals\LockInterface01.NIF` and `BobbyPin01.NIF`), the model behind the pause menu and the item of the
+Pip-Boy. The code of the games has no picture for them in the files: it draws a scene straight into the back buffer after
+the world and before the 2D tiles (Mac round 12AJ A2, `FalloutNV.exe` 0x78E1C0 to 0x790F40). OpenFallout draws the scene
+to a texture and shows it in a layer under the windows, so the tiles of the menu file are over it.
+
+| Part | What it does |
+| --- | --- |
+| `apps/openfallout/mwrender/menuscene.*` | One scene: a render texture, a camera (frustum, place, direction), one ambient and one directional light, models by name with a place each, point lights that are children of a node of a model, and, for a model with sequences, `setSequenceTime` that puts it at a time of one of its `NiControllerSequence`s (the games set the time by hand for the lock and the pin). `placement` and `placementFromRows` turn the numbers of the games' files (angles about X, Y, Z in degrees, or the rows of a matrix) into the matrix of a node. |
+| `apps/openfallout/mwgui/menuscenes.*` | The scenes by name; each texture is registered with MyGUI as `scene:<name>` (`RenderManager::registerTexture`) and stays registered, because a widget may still point at it. |
+| `apps/openfallout/mwlua/menuscenebindings.cpp` | `core.menuScene`. Every call is queued (`LuaManager::addAction`) because the scripts run beside the frame; the calls are done in the order they were made, so a script can make a scene and fill it at once, and `ready(name)` says when the picture can be shown. |
+| `files/data/scripts/omw/falloutscene.lua` | Makes a scene and, once it is ready, a widget in the layer `MenuScenes` (after the HUD, not hit by the pointer) that shows its texture. |
+
+The rules of the lockpicking screen are `FalloutScript::Lockpick` (`components/falloutscript/lockpick.*`, tested in
+`apps/components_tests/falloutscript/testlockpick.cpp`); `core.lockpick.new{class, skill, picks, meter}` gives the Lua side a game
+to `step{seconds, move, turn}` and `force()`, with the events of each step ("enter", "move", "turn", "squeakA", "squeakB", "stop",
+"tensionStart", "tensionEnd", "break", "unlock", "forceFailed", "outOfPicks") and what to draw (the sequence and time of the
+lock and of the pin, the turn of the pin). Round 12AI A1 has the numbers: five lock classes (very easy to very hard) with a
+sweet spot of 400, 200, 100, 50 and 25 menu units on a meter as wide as the safe area, six nested bands around its centre that let the
+cylinder turn 90, 75, 60, 45, 30 and 15 degrees, a pin that lasts `1 + 0.01 * skill` seconds of strain, forcing at
+`skill - gate + 10` per cent, one experience reward per lock, the skill that each class needs (0, 25, 50, 75, 100, and a key
+only). The skill does not change the size of the sweet spot in either game's data.
+
+`falloutlockpick.lua` is the screen: it opens `lockpick_menu.xml`, writes the rows the file leaves to the code (the skill, the pins,
+the level word, the Force button's text with the chance), puts the scene together with the numbers of the code (the scene root 125
+units ahead and turned so that the x of a model is to the right, its z up and its y away; the camera at the origin looking
+along +X; a frustum of `tan(75 degrees * 0.15) * 0.75` at distance 1 and as high as the window is; the pin turned about the
+depth axis by where it is on the meter), and each frame feeds the game with the mouse's movement along X in menu units (1:1 with
+the cursor) and with the four movement keys. F and E are the letters the file ties to its buttons (Force and Exit), X on a pad forces,
+B leaves; the pointer is hidden over the area the pin moves in. What happens outside the screen is the engine's
+(`core.interact.lockOutcome`): the lock is opened with its experience, a pin is taken, the player is told that none is left, a
+failed force breaks the lock for good. `falloutinteraction.lua` shows the older widgets (a chance per pin) when the screen cannot be
+shown (no menu file, no scenes).
+
+Not seen in the running game yet: the picture of the scene (its lights are the lock file's, made by hand because the file reader
+skips lights), the pointer at the edge of the screen (the games read relative movement, the port the moves of the window's
+pointer), the pad's axes (inferred), the sound of strain (a loop in the games, played once here), and the karma that a stolen lock
+costs. The pause menu's model (three flat quads, no motion) and the Pip-Boy's item are not drawn yet.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
