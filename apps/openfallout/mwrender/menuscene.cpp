@@ -5,6 +5,7 @@
 
 #include <osg/BlendFunc>
 #include <osg/Camera>
+#include <osg/FrontFace>
 #include <osg/MatrixTransform>
 #include <osg/Texture2D>
 
@@ -113,6 +114,15 @@ namespace OFRender
         return osg::Matrixf::scale(scale, scale, scale) * rotation * osg::Matrixf::translate(translation);
     }
 
+    osg::Matrixf upsideDown(const osg::Matrixf& projection)
+    {
+        // OSG multiplies a row vector: the second column makes the y of a point on the screen
+        osg::Matrixf result = projection;
+        for (int row = 0; row < 4; ++row)
+            result(row, 1) = -result(row, 1);
+        return result;
+    }
+
     class MenuSceneRTTNode : public SceneUtil::RTTNode
     {
     public:
@@ -123,7 +133,11 @@ namespace OFRender
             setColorBufferInternalFormat(GL_RGBA);
             setDepthBufferInternalFormat(GL_DEPTH24_STENCIL8);
             updateProjection();
-            mGroup->getOrCreateStateSet()->addUniform(mProjectionUniform);
+            osg::StateSet* stateset = mGroup->getOrCreateStateSet();
+            stateset->addUniform(mProjectionUniform);
+            // The projection is upside down (see upsideDown): the faces that look at the camera are the ones whose
+            // corners go round the other way
+            stateset->setAttributeAndModes(new osg::FrontFace(osg::FrontFace::CLOCKWISE), osg::StateAttribute::ON);
         }
 
         void setDefaults(osg::Camera* camera) override
@@ -181,6 +195,7 @@ namespace OFRender
                     SceneUtil::getReversedZProjectionMatrixAsPerspective(mFovYDegrees, mAspectRatio, mNear, mFar));
             else
                 mProjection = osg::Matrixf::perspective(mFovYDegrees, mAspectRatio, mNear, mFar);
+            mProjection = upsideDown(mProjection);
             mProjectionUniform->set(mProjection);
         }
 

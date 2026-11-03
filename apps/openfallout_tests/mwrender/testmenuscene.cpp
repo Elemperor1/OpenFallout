@@ -81,4 +81,39 @@ namespace
         for (const osg::Vec3f& p : { osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0), osg::Vec3f(0, 0, 1) })
             expectNear(placed(byRows, p), placed(byAngles, p));
     }
+
+    // A point in front of the camera (the camera looks down -z in OSG's own convention) above its axis
+    osg::Vec3f onScreen(const osg::Matrixf& projection, const osg::Vec3f& point)
+    {
+        const osg::Vec4f clip = osg::Vec4f(point, 1.f) * projection;
+        return osg::Vec3f(clip.x() / clip.w(), clip.y() / clip.w(), clip.z() / clip.w());
+    }
+
+    TEST(OFRenderMenuSceneProjection, putsAPointAboveTheAxisBelowTheMiddleOfTheUpsideDownPicture)
+    {
+        const osg::Matrixf projection = osg::Matrixf::perspective(60.0, 16.0 / 9.0, 1.0, 1000.0);
+        const osg::Vec3f above(0.f, 1.f, -10.f);
+        EXPECT_GT(onScreen(projection, above).y(), 0.f);
+        EXPECT_LT(onScreen(OFRender::upsideDown(projection), above).y(), 0.f);
+    }
+
+    TEST(OFRenderMenuSceneProjection, keepsTheOtherAxesAndTheDepthOfAPointWhenTurnedUpsideDown)
+    {
+        const osg::Matrixf projection = osg::Matrixf::perspective(45.0, 1.5, 0.5, 200.0);
+        const osg::Vec3f point(2.f, 3.f, -17.f);
+        const osg::Vec3f upright = onScreen(projection, point);
+        const osg::Vec3f turned = onScreen(OFRender::upsideDown(projection), point);
+        EXPECT_NEAR(turned.x(), upright.x(), 1e-5f);
+        EXPECT_NEAR(turned.y(), -upright.y(), 1e-5f);
+        EXPECT_NEAR(turned.z(), upright.z(), 1e-5f);
+    }
+
+    TEST(OFRenderMenuSceneProjection, turnsAnUpsideDownProjectionBackWhenTurnedAgain)
+    {
+        const osg::Matrixf projection = osg::Matrixf::perspective(75.0, 1.0, 5.0, 2000.0);
+        const osg::Matrixf twice = OFRender::upsideDown(OFRender::upsideDown(projection));
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+                EXPECT_EQ(twice(row, column), projection(row, column));
+    }
 }

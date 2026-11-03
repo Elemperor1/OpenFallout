@@ -46,6 +46,13 @@ namespace OFRender
     /// the game's code writes a rotation: the first row gives the x of the turned point)
     osg::Matrixf placementFromRows(const osg::Vec3f& translation, const std::array<float, 9>& rows, float scale = 1.f);
 
+    /// The projection with its picture turned upside down: a point above the axis of the camera lands below the middle
+    /// of the picture. A texture that was drawn into has its first row at the bottom, and a widget reads the first row
+    /// of a texture as its top, so a scene is drawn upside down to stand upright on the screen (a mirrored projection
+    /// turns the order of the corners of a face round: the scene draws the faces that look the other way round as its
+    /// front).
+    osg::Matrixf upsideDown(const osg::Matrixf& projection);
+
     /// A few models of the game drawn to a texture that a menu shows: the lock and pick of the lockpicking screen,
     /// the model behind the pause menu, the item of the Pip-Boy. The game draws these inside its menus with a camera
     /// and lights of the menu's own; here the scene has the same parts (a frustum, a place and direction for the
