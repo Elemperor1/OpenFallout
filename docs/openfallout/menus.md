@@ -84,7 +84,8 @@ headline, and the cards of the thing the pointer is on in the file's `item_stats
 (puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
-yet: the picture of the thing (the games show its model), the hot keys, repair and mods (their buttons are hidden).
+yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
+hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
 
 ### The stats page of the Pip-Boy
 
@@ -623,6 +624,233 @@ Not seen yet: the lit lock and pin (after the fix above), the pointer at the edg
 movement, the port the moves of the window's pointer), the pad's axes (inferred), the sound of strain (a loop in the games,
 played once here), and the karma that a stolen lock costs. The pause menu's model (three flat quads, no motion) and the
 Pip-Boy's item are not drawn yet.
+
+### The head-up display (Mac rounds 12AL and 12AM, FalloutNV.exe)
+
+`main/hud_main_menu.xml` is mostly empty containers (health, action points, messages, the sneak meter, the experience bar,
+the radiation, the enemy bar, the limbs, the crosshair, the text under it): the code of the games finds them by name, puts them
+in place from the size of the screen, makes their parts from the templates of `HUDTemplates.xml` and writes the numbers into
+them every 200 milliseconds (`HUDMainMenu`, id 0x3EC, create 0x76BFE0, update 0x770430). `falloutmenuhud.lua` does the same with the
+menu engine; `falloutstatus.lua` gathers what the display shows (`core.pipboy.stats`, `core.hud`, `core.combat.weapon`) and keeps
+its older drawing for a data folder that lacks the file.
+
+- The menu is 960 units high and as wide as the window (1280 wide when the window is taller than wide); the safe zone is 15 on
+  each side (`iSafeZoneX`, `iSafeZoneY`: the INI is not read here), so a block keeps 2 x 15 from the edge. The health block sits at
+  `x = 40`, `y = H - 157`, the action points block at `x = W - 386`, the radiation at the top right, the enemy bar in
+  the middle above the health, the sneak meter at the top middle, the messages at `(25, 55)`, the experience bar at
+  `(W - 420, H - 310)`, the limbs at the right (`W - 230`, `130`), the crosshair in the middle of the window.
+- A bar is a row of whole tick marks (`hud_tick_mark.dds`, 8 wide): `round(_TotalWidth * share / _ImageWidth) * _ImageWidth`, at
+  least one tick; the health bar grows from the left, the action points bar from the right, the enemy bar from its middle (in
+  steps of two ticks, so the halves are whole).
+- Messages are one at a time: a message is shown for the seconds it came with (2), fades in and out in 0.35 seconds, waits behind
+  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings.
+- The compass is a strip of 360 degrees of the interface atlas (1023 texels) of which 345 texels, about 121 degrees, are
+  shown. The executable shifts the texture of the strip by the heading over 360 less 0.15 (and adds 1 when that is below
+  0); the menu engine scrolls a picture with the trait `_sourcex` (a window of the texture at its natural size from that
+  texel on, going on at the left edge when it runs past the right one), and the script gives it the same number of texels
+  (Mac round 12AN B8). A mark is drawn when 1.45 times its bearing is within 70 degrees of the front (a bearing within
+  48.3 degrees), at x = (1.45 x bearing + 70) x 274 / 140 of the strip, so the marks stretch over 274 of its 345 texels and
+  the one straight ahead stands at 137 (the player's mark is put there: its x was not read). They fade out towards the
+  ends (read for the right end, where they are lit up to 1.6 x 137 and go dark at 274; the left end is taken to be the
+  same). The marks of places (quest, landmark, characters) are made from the templates and put by their `_Heading`. Not
+  there: the blink of the marks, the discovery of a place when the player comes within 1000 units, the north of the cell
+  that is added to the heading, and the rule that picks the characters that show as ticks (at most 10 within 1500 units,
+  3000 outside).
+- When a window is open only the messages are shown, and nothing while the player is dead. The executable picks what the
+  display shows by a mode of 17 bits, and a script that holds the player still (`DisablePlayerControls` on movement, Mac round
+  12AM B5) puts it in mode 0xC: only the radiation, the experience bar, the messages, the subtitles and the quest reminder
+  stay, and the health, the action points, the crosshair, the sneak meter, the limbs and the enemy bar are hidden. A
+  script that disables rollover hides the text under the crosshair. `core.hud.status` has the disabled controls
+  (`controlsOff`); `falloutstatus.lua` turns them into `scripted` and `rolloverOff`.
+- The text under the crosshair (`Info`, Mac rounds 12AM B2 and 12AN B7) is a block 320 wide, centred, 110 above the lower
+  safe edge: the word of what the player does with the thing (the file's hot rect, with the key that does it next to it, or the
+  button of the pad: the file is opened for the one in use and made again when the player changes it), its name (with the
+  number in brackets for a stack), a row of weight and value (a number of nothing is two dashes, a value under 1 has a
+  decimal; the executable's builder, Mac round 12AO B4, shows it for armor, miscellaneous things, aid and item mods, for a
+  weapon or ammunition only when it is playable, and not for a book, an ingredient or a key: the name alone), and a line for
+  its lock. The words are the game's settings: `sTargetTypeTake`
+  (also for a book that lies in the world), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
+  `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
+  the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
+  not fight the player), `sSearch` (a body); a character that fights, and a
+  creature that is alive, have no word. The lock line is, as the executable writes it, `sBroken` for a lock that forcing
+  broke, else for a locked thing `[sHUDUseKey - sLocked]` when the player carries the key, `[<class word>]` when only a key
+  opens it, and `[<class word> - sLocked]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
+  object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
+  pickpocket, steal and pick (the port has no
+  such actions yet), disarming a mine, the weight and value
+  row for containers, doors and characters (the executable has none for them), and the colour that
+  marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
+  executable's rule is in B4, but the port has no ownership yet). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
+  below).
+- Subtitles (`Subtitles`, Mac round 12AO B3, FalloutNV.exe 0x774FD0, 0x7711F4 and 0x775230): the tile is 800 by 110 and empty in
+  the file; the code makes a centred text in it, just above the block of the text under the crosshair. A line a character says
+  outside of a conversation (the voice of the data, or the text alone when it has no voice) is an entry: it stays from the moment
+  it was said for the length of its text times `fNoticeTextTimePerCharacter` (0.06 in the executable, 0.08 in the files), and is
+  taken when subtitles are on, the line has no voice or a script forced it, and the speaker is near enough to hear. Every 200 ms
+  the display drops the entries that are over, and when none is shown it takes the one of the speaker nearest to the player (a
+  forced one first). The tile is shown in the modes of the game and of a script that holds the player, not under a window.
+  `falloutmenusubtitles.lua` keeps the entries, `core.hud.takeSubtitles` is the engine's side; the stand-in display prints a line
+  as a message. Not known: whether the executable puts the speaker's name before the words (the port does, as it did before),
+  the colour of a line (the entry carries three colours that were not read), the voice's own length as the duration (the port
+  has no length for a voice file), and the exact place (the tile sits 110 above the text under the crosshair; the executable's
+  function that places it, 0x778652, was not decoded).
+- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, the needs
+  of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
+  the engine has no clip.
+
+### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
+
+`book_menu.xml` is the screen of a book (two pages, the page numbers, the arrows, Take and Exit) and of a scroll (a
+roll with a scrollbar). The file turns the pages itself: the number of the left page counts the clicks of the arrows
+(`_pagenum`), and the text tiles ask for `pagenum`. What the code puts in the menu is three traits of the menu itself:
+`user0` (a book, not a scroll), `user2` (the words) and `user3` (it can be taken); the page width (`user4`) and the font
+(`user5`) the file has. `falloutbook.lua` does that and wires the buttons; the words come from the record of the book
+(`core.pipboy.book` for what the player carries, `core.interact.book` for one that lies in the world, which has the
+Take button: the activation of a book in the world opens this screen in place of picking it up).
+
+The words are laid out by the menu engine (`components/falloutmenu/richtext.cpp`) for a text tile that says `ishtml`;
+the executable's text engine is shared with the notes of the terminals:
+
+- It is marked up text only when the string begins with `<`; else it is plain (broken at the new lines).
+- The marks are `IMG` (`SRC`, `WIDTH`, `HEIGHT`), `DIV ALIGN=LEFT|CENTER|RIGHT`, `FONT FACE=<number>` and
+  `COLOR=RRGGBB` with `/FONT`, `BR` (the text goes on one line down), `P` (two lines down) and `HR`: a new page when the
+  tile has a `wraplimit`, two lines down when it has none. Other marks are left out. The default colour of the letters is
+  (117, 59, 33). A setting name between `&` and `;` stands for the words of that game setting (the Lua side fills them).
+- `wrapwidth` is the width the lines are broken at (at the last space; a word wider than that is broken where it fills
+  the line), `wraplimit` the height of a page: a line stays on the page while the height used, the line and the
+  `linegap` (added to the height of every line) fit in it. `pagenum` (from 0) says which page the tile draws, a number
+  that is no page draws nothing, and the tile's `pagecount` trait says how many pages there are. The width and height of
+  the tile are those of the page it shows.
+
+Read in round 12AN B9: in marked up text a carriage return and a line feed are left out wherever they stand (only `BR` and
+`P` break lines), a space and a tab are a space each and a run of them stays (a space that would overflow the line is dropped
+and the line breaks at the last one; the port keeps no space at the start of a line, which was not read); in plain text a line
+feed breaks the line, a carriage return and the other characters below 0x20 are left out and a tab is a space. `FONT FACE`
+takes 1 to 8 (the font files `sFontFile_1` to `sFontFile_8`; a face given by name matches the name of the font object, whose
+source was not found). `DIV ALIGN` takes LEFT, CENTER and RIGHT and the executable has no closing tag for it (the port ends
+it at `/DIV`, and whether the executable applies it at all is not proven). `IMG` takes `SRC`, `WIDTH` and `HEIGHT` as whole
+numbers; where the picture stands, its line height and the path rule were not found. The colour of plain text was not read.
+A skill book gives its points when the player reads it from the Pip-Boy (the executable's function that puts an item on does
+it: the book must be the player's, the skill below 200, the points `fBookPerkBonus` adjusted by the perk entry point 11, the
+message `sSkillIncreasedNum`, and the book is removed), not when its screen is left, and the screen of a book that lies in the
+world (Take and Exit) runs no skill code, so such a book gives nothing until it is read from the Pip-Boy. The Pip-Boy shows
+the words as the points are given. The keys of the screen on the PC were not read (here: the arrows, the pages and the wheel;
+Escape or Backspace leave; T takes).
+
+### The help manual (Mac round 12AN B3, FalloutNV.exe)
+
+`tutorial_menu.xml` is the screen of the help pages: a title, the words of the page (a text tile that is marked up text
+when the words begin with `<`), `Previous` and `Next` buttons, the number of the page and a scrollbar for a page that is
+longer than the tile. The executable fills it from the form list of messages named `HelpManual` (`HelpManualXBox` when a
+pad is in use); every message of the list is a page (its title and its description), and the pause menu has a Help
+button that opens it. `falloutmanual.lua` does the same: `core.pipboy.helpManual(pad)` gives the pages (the form lists
+are found by their editor id and the messages by their form id), `core.pipboy.helpMessage(id)` one message by its
+editor id (a page that is shown alone, with no page number and no buttons to turn it). The start menu (the port's pause
+menu) has a Help row after Settings when the data has a manual; Escape or Backspace (B on the pad) leaves, the
+arrows and the pages (the sides of the pad) turn the pages, and the letters of the buttons work as they do in the menu.
+
+Not there yet: the help hints that the game queues while the player plays (the first time a thing is met), and the keys of
+the screen on the PC, which were not read (the arrows are a choice of the port).
+
+### The companion wheel (Mac round 12AN B3, FalloutNV.exe; New Vegas only)
+
+`companion_wheel_menu.xml` is the wheel of eight slices the player gets when it activates a companion (a character that
+follows it as a teammate), where it would otherwise talk. The slices (angles clockwise from the top, 30 degrees each, rings
+76 to 332 of a picture of 760 units): 0 be aggressive or passive, 1 use a stimpak, 2 wait here or follow me, 3 talk to, 4 back
+up, 5 stay close or keep a distance, 6 open its inventory, 7 use ranged or melee weapons. The wheel keeps nothing of its
+own: it reads four variables of the companion's script when it opens (`FollowerSwitchAggressive` is 1, `IsFollowingLong` is
+1, `CombatStyleRanged` is 1, `Waiting` is 0), each click flips the flag it shows and makes the companion say a topic
+(`FollowersTacticsCombatAggressive` or `...Passive`, `FollowersLetsGo` or `FollowersWait`, `FollowersTacticsDistanceLong` or
+`...Default`, `FollowersTacticsCombatRanged` or `...Melee`, `FollowersTrade`), and the results of those responses (the plugin's
+scripts) are what changes the companion. Slice 0 writes `FollowerSwitchAggressive` itself as well. A stimpak of the player is
+used on the companion. The label of the slice under the pointer is the word of the setting (`sCWheelBeAggressive` and its
+neighbours), and under the wheel the stimpaks and the companion's health, what it carries of what it can, or the weapon in its
+hands. The sounds are `UIPopUpMessageGeneral` (open), `UIPipBoyScroll` (another slice) and `UIMenuOK` (a click).
+
+`falloutcompanion.lua` draws it and lights the slice under the pointer (the left stick moves the pointer; the arrows and the
+sides of the pad turn the lit slice, Enter and Y use it); the engine side is `core.pipboy.companion*`
+(`mwscript/falloutcompanion.cpp`). The middle of the rings is taken as the middle of the picture, not as the file has it (55
+units lower: the pad does not care and the executable's pointer test was not found). Not there yet: what Back Up does (the
+executable calls a function that is not read), the fade the wheel closes with, the heal of a stimpak is what the item's effects
+give, and whether the player says the topic or the companion (the companion says it here: the conditions of the lines are
+about it).
+
+### The hot keys (Mac round 12AN B2, FalloutNV.exe)
+
+The number keys 1 to 8 are eight slots (`HotKeyWheel`, 0x701610; the control names are `sUActnHotKey1` and `3` to `8`), each
+holding an item that the player put there. The second slot is not one of them: the wheel shows the ammunition swap
+(`IM_AmmoSwap` of `prefabs/hotkeys.xml`) there, and the key changes the ammunition of the weapon in hand (not made). The
+head-up display handles them every frame (0x77DA60), not while a menu is open, a script holds the player or the Pip-Boy is
+switched off: a key that is let go before `fHotKeyDownTimer` (half a second) uses the item of the slot (a weapon or armor is put
+on or, when it is on, taken off; an aid item is used; a stimpak at full health is refused with the word `sFullHealth` and the
+sound `UIVATSInsufficientAP`); a key that is held longer shows the wheel of the eight slots with the held one lit
+(`HK_SelectionBox`), and the picture and the name of the item (`%s (%d)` with the count when there is more than one) are on the
+screen for `fHotKeyShowTimer` (a second and a half) after the key. All of it is in the file: the block `Hokeys` of
+`hud_main_menu.xml` (300 by 300, over the action points) holds `template_hotkey_selector` (which includes the wheel of
+`prefabs/hotkeys.xml`, with the big picture `hotkey_icon`) and a line of text for the name.
+
+With a pad (0x701BD0, 0x77DA60) the D-pad chooses the slot, eight ways round the wheel: down is the slot 7, down and left 6, down
+and right 8, up and left 1, up and right 3, left 4, right 5 (up alone would be the swap of ammunition, no slot). A new combination
+has to stay more than 50 ms to replace the old one, except to or from none. The picture and the name come up at once, a direction
+held longer than `fHotKeyDownTimer` shows the wheel, and letting go uses the item of the slot that was chosen (`padSlot` and
+`stepPad` of `falloutmenuhotkeys.lua`).
+
+`falloutmenuhotkeys.lua` keeps the timing of the keys (`I.FalloutHud` draws it through `falloutmenuhud.lua`; the keys are read
+with `input.isActionPressed` of `QuickKey1` to `QuickKey8`, and the engine's own quick keys of Morrowind do nothing for
+Fallout); `core.pipboy.hotKeys` and `assignHotKey` are the engine's side (`mwscript/fallouthotkeys.cpp`, the class
+`HotKeys` of `components/falloutscript`, whose eight slots are saved in the section `hotkeys`). Only slots 0 and 2 to 7 take an
+item (the second key is the swap of ammunition, with no `sUActnHotKey2`).
+
+In the Pip-Boy (Mac round 12AO B2, FalloutNV.exe 0x781BA0 and 0x780140) the number key is held and the item clicked: a number key
+that is pressed or held (not on the keyring) shows the file's wheel `IM_HotKeyWheel` with that slot lit (`_SelectedHotkey`, and
+`_SelectedText` the name of what the slot holds, the picture in `IM_HotkeyIcon`, each slot's `_HotKeyIcon` and `_HotKeyAssigned`);
+while it is up, a click on a thing (or Enter) puts it on the lit slot instead of using it; when no number key is down any more the
+wheel goes (`falloutpipboyitems.lua`). Nothing is said and no sound is played for a thing put on a slot. Ammunition does nothing at
+all; a thing that cannot be used, and a book, is refused with `sCantHotkeyItem` and the sound `UIVATSInsufficientAP`. A thing has
+one key, so it moves from the one it was on. The key goes with the entry of the inventory, so a slot whose thing the player no
+longer carries (dropped, sold, used up) is empty: the engine empties it when the slots are asked for.
+
+Not read or not made: whether a bare number press with no click assigns in the same frame (not traced; here only the click does),
+the executable's `sCantHotkeyBrokenItem` (this engine has no condition yet), what the executable does with the count of a thing
+that is only reduced (here a slot is emptied only when none is left), the Hot Key button that only a player with a pad sees and the
+pad's way to hold the wheel in the Pip-Boy (a direction held shows it, let go assigns: 0x701BD0; the button is the right bumper
+there, which the page's pad handler gives to the page down key), and the tiles of the display that the executable hides while the
+wheel is up on a pad. Seen only in the offline harness (`hotkeys.lua`, `hotpad.lua`, `itemwheel.lua`), not in the running game.
+
+### The credits (Mac round 12AO B5, FalloutNV.exe 0x75FB90 and 0x75F9B8)
+
+`options/credits_menu.xml` (id 0x417) is a full-screen backdrop (`background`, dark blue, its picture changes in turn) and an empty
+tile `credits_rect` (at x 640, clipping) that holds the lines. The text is `DATA\<LANGUAGE>\CREDITS.TXT` (ENGLISH, GERMAN, FRENCH,
+SPANISH or ITALIAN, from `sLanguage`), else `DATA\CREDITS.TXT` (the module asks the engine's file system for them from the data folder,
+as `english\credits.txt` and `credits.txt`); a `CREDITSPATCH.TXT` in the same place replaces it when it is there;
+the Wild Wasteland trait, a Ctrl key held or the global `PlayCredits` at 2 make it `CREDITSWACKY.TXT`. It is one buffer, not
+pages: a line that is only a line end is a blank line, a line that begins with `*` is a comment, and every run of characters up
+to a line end, `<`, `>` or `*` (255 at most) is a text tile of its own, put under the one before by the height of its font. The marks
+(`<X:n>` `<X:+n>` `<X:-n>` across, `<Y:n>` `<Y:+n>` `<Y:-n>` down with `+` moving down, `<J:C>` `<J:R>` `<J:L>`, `<F:n>` the font,
+`<C:r g b a>` in columns of four, `<I:wwwww hhhhh aaaa name>` a picture, `<B:name>` a background from `Interface\Credits`) set the
+state; the units are those of the 1280 wide menu. The block starts 1020 down and goes up by `fCreditsScrollSpeed:Menu` (55) a
+second; the backgrounds change with a slide time of the block's height over the speed over their number; it ends when the block
+has left (the executable's limit was not read: it uses the size of the tile), or with the key of the menu. `falloutcredits.lua`
+parses and shows it (`menu:create` makes the tiles, and only those near the window exist); it has no trigger yet. What starts the
+credits in the games (the global `PlayCredits`, which the executable makes itself and which no record of the data names; a
+command of that name is registered next to it) and the question that follows them (`sContinuePlayingAfterCredits`, Yes and No)
+are the game's and not made. Not read: the end limit, what reads the accumulated height, the third number of a picture, which
+`sFontFile_n` is which font slot, the order of the colour numbers (taken as red, green, blue, alpha), the control that speeds up
+or hides the layer (0x3E9), and the music (none is played by the screen; the main menu starts `EndCredits.mp3`).
+Seen only in the offline harness (`credits.lua`) with a made-up file, not in the running game.
+
+### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
+
+A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at
+the string of their operand first: a text counts as true whatever its number (the engine takes a text of no characters as none:
+the executable's reading of an empty one was not found); a text that stands first, as a bare `copy`, is the number 0 and so
+false. `eq`, `neq`, `gt` and the others compare numbers only, so two texts are always equal and a text equals a number only when
+that is 0; there is no comparison of strings. This is what makes the hint of the PC key of a button show: the file's
+`PCShortcutLabel` is visible when `not(_Has360Controller) and (_PCButtonText of its parent)`, so a button whose `_PCButtonText` has
+text (`&-sPCMenuHintA;`, the setting's words: the executable's defaults are the letter and a closing bracket, for R, A, E, S, X, F,
+W, Q and RMB) shows its letter next to it while no pad is in use. `_Has360Controller` is written by the executable when the menus
+are set up and again when a pad is plugged or unplugged.
 
 ## The words of the labels
 

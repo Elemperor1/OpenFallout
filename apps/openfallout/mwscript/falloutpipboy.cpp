@@ -581,6 +581,22 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::openTeammateContainer(FalloutScript::FormId teammate)
+    {
+        if (teammate == 0 || teammate == mPlayer)
+            return false;
+        const OFWorld::Ptr object = findReference(teammate);
+        if (object.isEmpty())
+            return false;
+        std::string name(object.getClass().getName(object));
+        {
+            const std::lock_guard lock(mLootMutex);
+            mLoot = Loot{ teammate, std::move(name), ++mLootSerial };
+        }
+        containerOpened(teammate, true);
+        return true;
+    }
+
     std::optional<FalloutScripts::Loot> FalloutScripts::loot()
     {
         const std::lock_guard lock(mLootMutex);

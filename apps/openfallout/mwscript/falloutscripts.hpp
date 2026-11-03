@@ -44,6 +44,7 @@
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
+#include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
@@ -419,6 +420,9 @@ namespace OFScript
         /// The player activates a container or a character that is dead: its things can be taken. False when the
         /// object has nothing to open (the player is told when it is locked, and that opens nothing either).
         bool openContainer(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// The things a companion carries are open for the player (the result of the wheel's trade topic calls the
+        /// command OpenTeammateContainer on the companion). Main thread.
+        bool openTeammateContainer(FalloutScript::FormId teammate);
         /// What the player has open to take things from: the holder, its name, and a number that is another for each
         /// time something is opened. Nothing when nothing is open.
         struct Loot
@@ -471,6 +475,49 @@ namespace OFScript
         /// open. The player is told by the line of messages, and the activation goes on when the lock opens.
         std::string pickLock();
         void closeLockScreen();
+
+        /// What a book or a scroll says, for the screen that shows it: its name and its words (the setting names in
+        /// them, `&sName;`, are for the screen to fill in), whether it is a scroll and not a book, and whether the
+        /// player may take it from where it lies. Nothing for an item that is no book.
+        struct BookText
+        {
+            std::string mName;
+            std::string mText;
+            bool mScroll = false;
+            bool mCanTake = true;
+        };
+        std::optional<BookText> bookText(FalloutScript::FormId item);
+
+        /// A page of the help manual or a hint of the game: the editor id of the message that holds it, its title and
+        /// its words (the marked up text of a message, `&sName;` for the words of game settings)
+        struct HelpPage
+        {
+            std::string mId;
+            std::string mTitle;
+            std::string mText;
+        };
+        /// The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when the player
+        /// plays with a pad), in the order of the list; empty when the data has no such list
+        std::vector<HelpPage> helpManual(bool pad);
+        /// The message of a hint by its editor id (`HelpCrafting`), nothing when there is none
+        std::optional<HelpPage> helpMessage(std::string_view editorId);
+        /// The player activates a book or a scroll that lies in the world: its screen opens, and the activation stops
+        /// there until the player takes it or puts it down. False for an object that is no book, or an actor that is
+        /// not the player (a character takes it as any item).
+        bool openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// The book that the player has open from the world: where it lies, what it says, and a number that is another
+        /// for each time one opens
+        struct BookScreen
+        {
+            FalloutScript::FormId mReference = 0;
+            BookText mBook;
+            int mSerial = 0;
+        };
+        std::optional<BookScreen> bookScreen();
+        void closeBookScreen();
+        /// The player takes the book that is open from where it lies (it goes to the inventory, and the screen closes);
+        /// false when none is open or it may not be taken
+        bool takeBookScreen();
 
         /// The player activates a terminal: it opens, or the game of hacking starts when it is closed and the player
         /// has not got its password. False for an object that is no terminal.
@@ -715,6 +762,81 @@ namespace OFScript
         std::optional<BarterMenu> barterMenu();
         /// The player is done with the menu
         void closeBarter();
+
+        // ---- The companion wheel (M12) ----
+        /// The wheel the player has open on a companion (companion_wheel_menu.xml, FalloutNV.exe 0x754DE0): the
+        /// character, its name, a number that is another for each time a wheel opens and what the script of the
+        /// companion says when the wheel opens: its variables FollowerSwitchAggressive (1: aggressive), IsFollowingLong
+        /// (1: keeps far), CombatStyleRanged (1: ranged) and Waiting (0: following; a variable the script has not
+        /// counts as -1, so it is not any of them)
+        struct CompanionWheel
+        {
+            FalloutScript::FormId mActor = 0;
+            std::string mName;
+            int mSerial = 0;
+            bool mAggressive = false;
+            bool mStaysFar = false;
+            bool mRanged = false;
+            bool mFollowing = false;
+            bool mWaiting = false;
+            /// A pad was the last thing the player used when the wheel opened
+            bool mPad = false;
+        };
+        /// What the wheel tells under the slice the pointer is on: the stimpaks of the player, the health of the
+        /// companion, what it carries of what it can carry, and the weapon in its hands
+        struct CompanionStatus
+        {
+            int mStimpaks = 0;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+            double mCarried = 0;
+            double mCapacity = 0;
+            std::string mWeapon;
+        };
+        /// A character that follows the player and is alive: the player gets the wheel when it activates it, and not a
+        /// conversation (Activate on a companion, FalloutNV.exe 0x5FA330 and 0x754D90)
+        bool isCompanion(const OFWorld::Ptr& actor);
+        /// The player activated the companion. The thread of the frame: the variables of its script are read here.
+        bool openCompanionWheel(const OFWorld::Ptr& actor);
+        std::optional<CompanionWheel> companionWheel();
+        CompanionStatus companionStatus();
+        /// The companion says a topic of the commands (FollowersWait, FollowersLetsGo, FollowersTacticsCombatAggressive
+        /// ...) found by its editor id: the result of the response is what changes the companion. False when there
+        /// is no such topic or nothing to say.
+        bool companionSay(std::string_view topic);
+        /// The wheel writes FollowerSwitchAggressive itself when the player toggles it (0x755260)
+        void companionSetAggressive(bool aggressive);
+        /// A stimpak of the player's goes to the companion and is used on it; false when the player has none
+        bool companionStimpak();
+        /// The wheel is closed and the conversation with the companion begins
+        void companionTalk();
+        /// The player is done with the wheel
+        void closeCompanionWheel();
+
+        // ---- The hot keys (M12) ----
+        /// One slot of the hot key wheel: what the player put on that number key (nothing when mItem is 0)
+        struct HotKeySlot
+        {
+            int mSlot = 0;
+            /// The second slot is the ammunition swap, which takes no item
+            bool mAssignable = true;
+            FalloutScript::FormId mItem = 0;
+            std::string mName;
+            /// How many of it the player carries now
+            int mCount = 0;
+            /// The picture of the item (the record's ICON)
+            std::string mIcon;
+            bool mEquipped = false;
+        };
+        /// The eight slots, in order. A slot whose item the player no longer carries (dropped, sold, used up) is
+        /// emptied here: the executable keeps the key on the entry of the inventory, so it goes with the entry.
+        std::vector<HotKeySlot> hotKeySlots();
+        /// Puts an item the player carries on the key of the slot: "assigned", "ammo" (ammunition goes on no key),
+        /// "cannot" (a thing that is neither held, worn nor used up, or one the player does not carry) or "slot" (the
+        /// ammunition swap, or none)
+        std::string assignHotKey(int slot, FalloutScript::FormId item);
+        /// The picture of an item (its record's ICON), empty for a form that has none
+        std::string itemIcon(FalloutScript::FormId item);
         /// The container that holds a vendor's goods: the one a script gave it (SetMerchantContainer; none after
         /// RemoveMerchantContainer), else the XMRC of its placed reference. 0 for none.
         FalloutScript::FormId merchantContainer(FalloutScript::FormId vendor);
@@ -904,6 +1026,8 @@ namespace OFScript
         /// The head-up display. The line of messages the games print in the corner (a reference to it: the display
         /// takes what was said, other code says things).
         FalloutScript::Hud::MessageLine& hudMessages() { return mHudMessages; }
+        /// What the characters say to the player outside of a conversation, for the subtitles of the display
+        FalloutScript::Hud::SubtitleLine& hudSubtitles() { return mHudSubtitles; }
         /// What the meters of the display that are not the player's stats show
         struct HudStatus
         {
@@ -915,6 +1039,9 @@ namespace OFScript
             /// The names of the textures of the limbs that are crippled (under Interface\Stats)
             std::vector<std::string> mCrippled;
             bool mWeaponDrawn = false;
+            /// The controls that DisablePlayerControls took away, one bit for each in the order of
+            /// FalloutScript::PlayerControl
+            unsigned mControlsOff = 0;
         };
         HudStatus hudStatus();
         /// The character or creature that the crosshair is on: its name, health and whether it fights the player. False
@@ -928,6 +1055,35 @@ namespace OFScript
             bool mDead = false;
         };
         bool hudTarget(const OFWorld::Ptr& target, HudTarget& result);
+        /// What the text under the crosshair says of the object that the crosshair is on (FalloutNV.exe 0x775A00, Mac
+        /// rounds 12AM B2 and 12AN B7): its name, what the player does with it, its weight and value, and what its lock
+        /// is. False for an object the text says nothing of (one with no name, or a static one).
+        struct HudInfo
+        {
+            std::string mName;
+            /// How many there are, when it is a stack of things
+            int mCount = 1;
+            /// The setting that holds the word for what the player does with it (sTargetTypeTake, sSearch ...), empty
+            /// when the player can do nothing with it
+            std::string mVerb;
+            /// The weight and value row is under the name (not for every thing that can be taken: see hudInfo)
+            bool mStats = false;
+            double mWeight = 0;
+            double mValue = 0;
+            /// Its lock is broken (forcing it failed)
+            bool mBroken = false;
+            /// It is locked, whether the player carries its key, the setting that holds the word for how hard the lock
+            /// is, and whether only the key opens it
+            bool mLocked = false;
+            bool mHasKey = false;
+            std::string mLockWord;
+            bool mKeyOnly = false;
+            /// The name of the key (or of the button of the pad) that activates, as the player has it set
+            std::string mKeyText;
+            /// The player plays with the pad
+            bool mPad = false;
+        };
+        bool hudInfo(const OFWorld::Ptr& target, HudInfo& result);
         /// A thing the compass shows
         struct HudMarker
         {
@@ -1654,6 +1810,7 @@ namespace OFScript
         FalloutScript::Reputation mReputation;
         FalloutScript::ObjectState mObjectState;
         FalloutScript::MapMarkers mMapMarkers;
+        FalloutScript::HotKeys mHotKeys;
         FalloutScript::Presentation mPresentation;
         FalloutScript::Switches mSwitches;
         /// Which script forms have been told that the program was started or that a game was started or loaded
@@ -1859,6 +2016,8 @@ namespace OFScript
         std::mutex mInteractionMutex;
         std::optional<LockScreen> mLockScreen;
         int mLockSerial = 0;
+        std::optional<BookScreen> mBookScreen;
+        int mBookSerial = 0;
         /// The locks that gave their experience, and those that forcing broke (kept for the run, not in saves)
         std::set<FalloutScript::FormId> mLockExperienceGiven;
         std::set<FalloutScript::FormId> mLockBroken;
@@ -1963,6 +2122,10 @@ namespace OFScript
         std::mutex mBarterMutex;
         std::optional<BarterMenu> mBarter;
         int mBarterSerial = 0;
+        /// The companion wheel the player has open, under mCompanionMutex
+        std::mutex mCompanionMutex;
+        std::optional<CompanionWheel> mCompanion;
+        int mCompanionSerial = 0;
         /// The merchant containers that scripts gave to vendors (0: taken away), under mBarterMutex
         std::map<FalloutScript::FormId, FalloutScript::FormId> mMerchantContainers;
         /// Where a vendor's goods are, in the order they are taken from: its container, then the vendor itself
@@ -2005,6 +2168,7 @@ namespace OFScript
         /// What is printed in the corner of the screen, what the characters around make of the player, and the clock
         /// (seconds of play) that the second is told by
         FalloutScript::Hud::MessageLine mHudMessages;
+        FalloutScript::Hud::SubtitleLine mHudSubtitles;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
         /// Whether the log last said that the player sneaks (it says when that changes)

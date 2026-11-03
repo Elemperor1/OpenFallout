@@ -282,6 +282,13 @@ namespace OFScript
         mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
             return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
         });
+        // The things a companion carries: the result of the wheel's trade topic calls this on the companion, and the
+        // screen of the containers shows them (what the player puts into the pack of a companion is not made yet)
+        mInterpreter.setHandler("OpenTeammateContainer", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId teammate = call.mReference;
+            runOnMainThread([this, teammate] { openTeammateContainer(teammate); });
+            return 0.0;
+        });
         // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
         mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
             setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));
@@ -517,6 +524,7 @@ namespace OFScript
         }
         mWeaponLoops.clear();
         mHudMessages.clear();
+        mHudSubtitles.clear();
         mWatchers.clear();
         mReferences.clear();
         mTriggerShapes.clear();
@@ -548,6 +556,7 @@ namespace OFScript
         mReputation.clear();
         mObjectState.clear();
         mMapMarkers.clear();
+        mHotKeys.reset();
         mPresentation.clear();
         mSwitches.clear();
         mMagic.clear();
@@ -571,6 +580,7 @@ namespace OFScript
             // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
+            mBookScreen.reset();
             mLockExperienceGiven.clear();
             mLockBroken.clear();
             mTerminal.reset();
@@ -583,6 +593,11 @@ namespace OFScript
             rest.mSerial = mRest.mSerial;
             rest.mEnded = mRest.mEnded;
             mRest = rest;
+        }
+        {
+            // The wheel of a companion of the game that is gone must not open in the next one (the numbers go on)
+            const std::lock_guard lock(mCompanionMutex);
+            mCompanion.reset();
         }
         mPerks.clear();
         mItemUse.clear();
@@ -3700,15 +3715,24 @@ namespace OFScript
                     return at != nullptr && with != nullptr && at->isExterior() && with->isExterior()
                         && at->getCell()->getWorldSpace() == with->getCell()->getWorldSpace();
                 };
-                const bool near = !player.isEmpty() && sameplace()
-                    && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
-                            .length()
-                        <= hearingDistance;
+                const float distance = player.isEmpty() || !sameplace()
+                    ? std::numeric_limits<float>::max()
+                    : (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
+                          .length();
+                const bool near = distance <= hearingDistance;
                 if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
                 {
+                    // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
+                    // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from
+                    // the moment it is said, and of several said at once the nearest speaker's is shown
                     const std::string name(speaker.getClass().getName(speaker));
-                    OFBase::Environment::get().getWindowManager()->messageBox(
-                        name.empty() ? line.mText : name + ": " + line.mText, OFGui::ShowInDialogueMode_Never);
+                    FalloutScript::Hud::Subtitle subtitle;
+                    subtitle.mText = name.empty() ? line.mText : name + ": " + line.mText;
+                    subtitle.mSeconds
+                        = static_cast<float>(line.mText.size() * gameSetting("fNoticeTextTimePerCharacter", 0.06));
+                    subtitle.mDistance = distance;
+                    subtitle.mForced = line.mForceSubtitles;
+                    mHudSubtitles.push(std::move(subtitle));
                 }
             }
             else

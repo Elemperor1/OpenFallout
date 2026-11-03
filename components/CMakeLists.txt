@@ -365,11 +365,11 @@ add_component_dir (esm4
 )
 
 add_component_dir (falloutmenu
-    atlas font listbox menu menufile openmenu value xml
+    atlas font listbox menu menufile openmenu richtext value xml
     )
 
 add_component_dir (falloutscript
-    actors actortraits actorvalues aimemory animationcommands animgroups barter calendar chargen combatcommands combatstate commandtable conditions crafting damage derivedstats detection dialogue enableparents equipment exesettings extendercommands fightai formlists furniture hacking hud interaction itemuse levelling limbs lockpick magic mapmarkers messagecommands perks pipboy messagetext objectcommands objects objectstate packagecommands placementcommands playercontrols playerprogress presentation queries referencestate reputation savecharacters savescripts savestate saveworld script interpreter settingtext switches quests triggervolumes vanillacommands vats voicefiles
+    actors actortraits actorvalues aimemory animationcommands animgroups barter calendar chargen combatcommands combatstate commandtable conditions crafting damage derivedstats detection dialogue enableparents equipment exesettings extendercommands fightai formlists furniture hacking hotkeys hud interaction itemuse levelling limbs lockpick magic mapmarkers messagecommands perks pipboy messagetext objectcommands objects objectstate packagecommands placementcommands playercontrols playerprogress presentation queries referencestate reputation savecharacters savescripts savestate saveworld script interpreter settingtext switches quests triggervolumes vanillacommands vats voicefiles
     )
 
 add_component_dir (misc

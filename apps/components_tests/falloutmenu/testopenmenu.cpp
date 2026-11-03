@@ -200,6 +200,36 @@ namespace
         EXPECT_EQ(pieces[0].mSourceWidth, 20);
     }
 
+    TEST(FalloutOpenMenuTest, a_picture_that_scrolls_shows_a_window_of_its_texture_and_goes_on_at_the_left_edge)
+    {
+        Fixture f;
+        // The strip is 20 texels wide; the window is 12 wide and starts at texel 15, so it shows 15..19 and then 0..6
+        OpenMenu& menu = f.open(
+            "<menu name=\"M\"><image name=\"I\"><x> 3 </x><width> 12 </width><height> 8 </height>"
+            "<filename> Interface\\Main\\Strip.dds </filename><_sourcex> 15 </_sourcex></image></menu>");
+        std::vector<Piece> pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 2u);
+        EXPECT_EQ(pieces[0].mX, 3);
+        EXPECT_EQ(pieces[0].mWidth, 5);
+        EXPECT_EQ(pieces[0].mSourceX, 15);
+        EXPECT_EQ(pieces[0].mSourceWidth, 5);
+        EXPECT_EQ(pieces[1].mX, 8);
+        EXPECT_EQ(pieces[1].mWidth, 7);
+        EXPECT_EQ(pieces[1].mSourceX, 0);
+        EXPECT_EQ(pieces[1].mSourceWidth, 7);
+        // Scrolled by whole turns and by a negative number it is the same window
+        menu.menu().set(*menu.menu().find("I"), "_sourcex", Value(-5.f));
+        pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 2u);
+        EXPECT_EQ(pieces[0].mSourceX, 15);
+        // A window that does not run past the edge is one piece
+        menu.menu().set(*menu.menu().find("I"), "_sourcex", Value(4.f));
+        pieces = menu.pieces();
+        ASSERT_EQ(pieces.size(), 1u);
+        EXPECT_EQ(pieces[0].mSourceX, 4);
+        EXPECT_EQ(pieces[0].mSourceWidth, 12);
+    }
+
     TEST(FalloutOpenMenuTest, a_text_is_one_piece_for_each_character_cut_from_the_font_texture)
     {
         Fixture f;

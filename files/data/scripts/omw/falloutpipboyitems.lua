@@ -5,7 +5,7 @@
 -- click does is the engine's (core.pipboy); this module lists it and gives the choices of the player back. It is a module
 -- of falloutpipboy.lua, not a script.
 --
--- Not there yet: the picture of the thing (the games show the model of it), the hot keys, repair and mods.
+-- Not there yet: the picture of the thing (the games show the model of it), repair and mods.
 --
 --   local page = require('scripts.omw.falloutpipboyitems')
 --   page.show()            -- true when the page is on the screen, false when the menu file is not there
@@ -14,10 +14,13 @@
 --   page.hide()
 local core = require('openfallout.core')
 local input = require('openfallout.input')
+local ui = require('openfallout.ui')
 
 local menuModule = require('scripts.omw.falloutmenu')
+local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
+local bookMenu = require('scripts.omw.falloutbook')
 
 local pipboy = core.pipboy
 
@@ -176,6 +179,99 @@ local function dropItem(item)
     fill()
 end
 
+-- ---- The hot keys ----
+-- As the executable's items menu does it (FalloutNV.exe 0x781BA0 and 0x780140; Mac round 12AO B2): a number key that is
+-- pressed or held shows the wheel of the eight slots (the file's IM_HotKeyWheel) with that slot lit; while the wheel is up,
+-- picking a thing (a click or Enter) puts it on the lit slot instead of using it; when no number key is down any more the
+-- wheel goes. There is no message and no sound for a thing put on a slot, and a thing already on a slot moves to the new one.
+-- The second key is the swap of ammunition and takes nothing.
+local wheelSlot = nil
+-- Frames to wait before the keys are looked at, so that a key that is let go at once still shows the wheel for a frame
+local wheelGrace = 0
+
+-- A refusal: the words of the game's setting and the sound the executable makes (UIVATSInsufficientAP)
+local function refuse(setting, fallback)
+    local text = pipboy.text(setting)
+    ui.showMessage(text ~= '' and text or fallback)
+    pipboy.playSoundNamed('UIVATSInsufficientAP')
+end
+
+-- The slot (counted from 0) of a number key; nil for any other key
+local function slotOfKey(code)
+    for slot = 0, hotKeys.SLOTS - 1 do
+        if code == input.KEY['_' .. (slot + 1)] then return slot end
+    end
+    return nil
+end
+
+-- The slot whose key is down now (the swap of ammunition is no slot to choose)
+local function heldSlot()
+    for slot = 0, hotKeys.SLOTS - 1 do
+        if slot ~= hotKeys.AMMO_SWAP and input.isKeyPressed(input.KEY['_' .. (slot + 1)]) then return slot end
+    end
+    return nil
+end
+
+-- The wheel as the file wants it: shown with the lit slot, the name and the picture of what the lit slot holds, and in
+-- each slot the picture of its thing (an empty slot has none)
+local function drawWheel()
+    if not shown or not shown:find('IM_HotKeyWheel') then return end
+    local rows = wheelSlot ~= nil and pipboy.hotKeys() or {}
+    local lit = rows[(wheelSlot or 0) + 1]
+    local named = lit ~= nil and lit.id ~= '' and lit or nil
+    local litIcon = named and hotKeys.iconPath(named.icon) or nil
+    shown:batch(function()
+        shown:set('IM_HotKeyWheel', '_SelectedHotkey', wheelSlot or -1)
+        shown:set('IM_HotKeyWheel', '_SelectedText', named and hotKeys.itemText(named) or '')
+        if shown:find('IM_HotkeyIcon') then
+            shown:set('IM_HotkeyIcon', 'filename', litIcon or '')
+            shown:set('IM_HotkeyIcon', 'visible', litIcon ~= nil)
+        end
+        for slot = 0, hotKeys.SLOTS - 1 do
+            local name = 'HK_Item_' .. slot
+            if slot ~= hotKeys.AMMO_SWAP and shown:find(name) then
+                local row = rows[slot + 1]
+                local icon = row ~= nil and row.id ~= '' and hotKeys.iconPath(row.icon) or nil
+                shown:set(name, '_HotKeyIcon', icon or '')
+                shown:set(name, '_HotKeyAssigned', icon ~= nil and 1 or 0)
+            end
+        end
+        shown:set('IM_HotKeyWheel', 'visible', wheelSlot ~= nil)
+    end)
+end
+
+-- Show the wheel with the slot lit, or take it away (nil)
+local function setWheel(slot)
+    wheelSlot = slot
+    drawWheel()
+end
+
+-- The thing that was picked goes on the lit slot. Ammunition does nothing at all; a thing that cannot be used (or a
+-- book) is refused with the words of the game's setting and its sound.
+local function assignToWheel(item)
+    if not item or item.keyring or wheelSlot == nil then return end
+    if item.category == 'ammo' then return end
+    if item.book or not equippable(item) then
+        refuse('sCantHotkeyItem', 'This item cannot be assigned to a hotkey.')
+        return
+    end
+    if pipboy.assignHotKey(wheelSlot, item.id) == 'cannot' then
+        refuse('sCantHotkeyItem', 'This item cannot be assigned to a hotkey.')
+    end
+    drawWheel()
+end
+
+-- Each frame: the wheel stays while a number key is down, and the lit slot follows the key
+local function updateWheel()
+    if wheelSlot == nil then return end
+    if wheelGrace > 0 then
+        wheelGrace = wheelGrace - 1
+        return
+    end
+    local held = heldSlot()
+    if held ~= wheelSlot then setWheel(held) end
+end
+
 local function pickTab(index)
     if index == tabIndex and not keyring then return end
     tabIndex = index
@@ -190,12 +286,32 @@ end
 local function activate(row)
     local item = listed[row]
     if not item then return end
+    -- With the wheel of the hot keys up the thing goes on the lit slot, and is not used
+    if wheelSlot ~= nil then
+        assignToWheel(item)
+        return
+    end
     if item.keyring then
         keyring = true
         shown:io('_KeyringOpen', true)
         fill()
         if list.count() > 0 then list.select(1, true) end
         return
+    end
+    if item.book and equippable(item) then
+        -- A book is read on its own screen, and what reading it gives (the points of a skill book, the book used up) is
+        -- given at once: the executable's function that puts an item on does it when the player reads it, and the screen is
+        -- only the words (Mac round 12AN B9)
+        local words = pipboy.book(item.id)
+        if words then
+            words.canTake = false
+            pipboy.use(item.id)
+            bookMenu.show(words, { onLeave = function()
+                if shown then fill() end
+            end })
+            fill()
+            return
+        end
     end
     if equippable(item) then
         pipboy.use(item.id)
@@ -262,19 +378,23 @@ end
 
 function module.hide()
     quantity.close()
+    bookMenu.close()
     if shown then
         shown:close()
     end
     shown, list, tabs = nil, nil, nil
     keyring = false
     cardRow = nil
+    wheelSlot, wheelGrace = nil, 0
 end
 
--- Each frame the page is shown: the window size, and the cards of what the pointer is on
+-- Each frame the page is shown: the window size, the wheel of the hot keys, and the cards of what the pointer is on
 function module.update()
     if not shown then return end
     shown:checkSize()
+    updateWheel()
     quantity.update()
+    bookMenu.update()
     updateCards()
 end
 
@@ -283,8 +403,21 @@ end
 -- the page of the Pip-Boy).
 function module.press(code, symbol)
     if not shown then return false end
+    if bookMenu.isOpen() then
+        return bookMenu.press(code, symbol)
+    end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
+    end
+    -- The number keys are the keys of the slots: one that is pressed or held shows the wheel with its slot lit (not on the
+    -- keyring, and the second key is the ammunition swap, which takes nothing); the wheel goes when no number key is down
+    local slot = slotOfKey(code)
+    if slot ~= nil then
+        if not keyring and slot ~= hotKeys.AMMO_SWAP then
+            wheelGrace = 1
+            if wheelSlot ~= slot then setWheel(slot) end
+        end
+        return true
     end
     local count = list.count()
     local picked = list.selected()

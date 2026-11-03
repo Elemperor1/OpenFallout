@@ -221,6 +221,16 @@ namespace OFLua
             return tileId(
                 state, self.mMenu->menu().instantiate(under, templateName, name.value_or(std::string_view())));
         };
+        // A tile with no traits under a tile (kind "text", "image", "rect" or "hotrect"), which the script gives its
+        // traits with `set`: the number of the new tile, nothing for another kind
+        menuT["create"] = [](sol::this_state state, LuaMenu& self, const sol::object& parent, std::string_view kind,
+                              sol::optional<std::string_view> name) -> sol::object {
+            const std::optional<FalloutMenu::TileType> type = FalloutMenu::tileTypeOf(kind);
+            if (!type || *type == FalloutMenu::TileType::Template || *type == FalloutMenu::TileType::Menu)
+                return sol::nil;
+            FalloutMenu::Tile& under = tileOf(self, parent);
+            return tileId(state, self.mMenu->menu().create(under, *type, name.value_or(std::string_view())));
+        };
         menuT["remove"] = [](LuaMenu& self, const sol::object& which) { self.mMenu->remove(tileOf(self, which)); };
         menuT["removeChildren"]
             = [](LuaMenu& self, const sol::object& which) { self.mMenu->removeChildren(tileOf(self, which)); };

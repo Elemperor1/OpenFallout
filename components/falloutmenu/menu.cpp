@@ -21,8 +21,12 @@ namespace FalloutMenu
             return x >= rect[0] && y >= rect[1] && x < rect[0] + rect[2] && y < rect[1] + rect[3];
         }
 
-        /// What `onlyif` and `onlyifnot` ask of a value: a number that is not 0, or a text that has characters (the
-        /// message menu keeps the room under its words only `onlyif` the tile of the words has a string)
+        /// What `and`, `or`, `not`, `onlyif` and `onlyifnot` ask of their operand: a number that is not 0, or a text.
+        /// The executable looks at the string of the operand first, and a text counts as true whatever its number is (a
+        /// text is the number 0): the hint of the PC key of a button (`PCShortcutLabel`) is there when the button's
+        /// `_PCButtonText` has text (FalloutNV.exe 0xA09BF7-0xA09DA9, Mac round 12AO B1). A text of no characters is
+        /// taken as none: the executable's own reading of it was not found. A text that comes first, as a bare `copy`,
+        /// is the number 0.
         bool conditionHolds(const Value& value)
         {
             return value.truth() || (value.isText() && !value.text().empty());
@@ -164,6 +168,18 @@ namespace FalloutMenu
             return Value::emptyText();
         if (key == "childcount" || key == "child_count")
             return static_cast<float>(tile.mChildren.size());
+        // A text with marks knows how many pages it has, and its size is that of the page it shows
+        if (key == "pagecount" && tile.mType == TileType::Text && isRich(tile))
+            return static_cast<float>(richPages(tile).size());
+        if ((key == "width" || key == "height") && tile.mType == TileType::Text && isRich(tile))
+        {
+            const std::vector<RichPage>& pages = richPages(tile);
+            const long number = std::lround(get(tile, "pagenum").number());
+            if (number < 0 || number >= static_cast<long>(pages.size()))
+                return 0.f;
+            const RichPage& page = pages[static_cast<size_t>(number)];
+            return key == "width" ? page.mWidth : page.mHeight;
+        }
         if (key == "width" || key == "height")
         {
             const bool isWidth = key == "width";
@@ -205,6 +221,90 @@ namespace FalloutMenu
             return key == "filewidth" ? size->mWidth : size->mHeight;
         }
         return Value();
+    }
+
+    bool Menu::isRich(const Tile& tile)
+    {
+        return tile.mType == TileType::Text && mEnvironment.mTextSize && mEnvironment.mLineHeight
+            && get(tile, "ishtml").number() != 0;
+    }
+
+    const std::vector<RichPage>& Menu::richPages(const Tile& tile)
+    {
+        RichParams params;
+        params.mFont = static_cast<int>(std::lround(get(tile, "font").number()));
+        params.mWrapWidth = get(tile, "wrapwidth").number();
+        params.mWrapLimit = get(tile, "wraplimit").number();
+        params.mLineGap = get(tile, "linegap").number();
+        const std::string string = get(tile, "string").text();
+        const std::string key = std::to_string(params.mFont) + '|' + std::to_string(params.mWrapWidth) + '|'
+            + std::to_string(params.mWrapLimit) + '|' + std::to_string(params.mLineGap) + '|' + string;
+        RichCache& cache = mRich[tile.mId];
+        if (cache.mPages.empty() || cache.mKey != key)
+        {
+            RichMeasure measure;
+            measure.mWidth = [this](int font, std::string_view text) {
+                return mEnvironment.mTextSize(font, std::string(text), 0.f).mWidth;
+            };
+            measure.mLineHeight = mEnvironment.mLineHeight;
+            if (mEnvironment.mImageSize)
+                measure.mImageSize = [this](const std::string& file) -> std::optional<std::array<float, 2>> {
+                    if (const auto size = mEnvironment.mImageSize(file, std::string()))
+                        return std::array<float, 2>{ size->mWidth, size->mHeight };
+                    return std::nullopt;
+                };
+            cache.mKey = key;
+            cache.mPages = layoutRichText(string, params, measure);
+        }
+        return cache.mPages;
+    }
+
+    void Menu::collectRich(Tile& tile, float x, float y, const std::optional<std::array<float, 4>>& clip, bool clipped,
+        std::vector<DrawItem>& out)
+    {
+        const std::vector<RichPage>& pages = richPages(tile);
+        const long number = std::lround(get(tile, "pagenum").number());
+        // A page number that is not a page of the text shows nothing
+        if (number < 0 || number >= static_cast<long>(pages.size()))
+            return;
+        const float own = this->number(tile, "brightness");
+        const float brightness = own < 0.f ? 1.f : own / 255.f;
+        const float alpha = std::clamp(this->number(tile, "alpha") / 255.f, 0.f, 1.f);
+        for (const RichItem& part : pages[static_cast<size_t>(number)].mItems)
+        {
+            DrawItem item;
+            item.mTile = &tile;
+            item.mX = x + part.mX;
+            item.mY = y + part.mY;
+            item.mWidth = part.mWidth;
+            item.mHeight = part.mHeight;
+            if (part.mImage)
+            {
+                item.mType = TileType::Image;
+                item.mFile = part.mFile;
+                item.mColor = { 1.f, 1.f, 1.f, alpha };
+            }
+            else
+            {
+                item.mType = TileType::Text;
+                item.mText = part.mText;
+                item.mFont = part.mFont;
+                item.mJustify = 1;
+                item.mColor = { std::clamp(part.mColor[0] * brightness, 0.f, 1.f),
+                    std::clamp(part.mColor[1] * brightness, 0.f, 1.f),
+                    std::clamp(part.mColor[2] * brightness, 0.f, 1.f), alpha };
+            }
+            if (clipped && clip)
+            {
+                item.mClipped = true;
+                item.mClipX = (*clip)[0];
+                item.mClipY = (*clip)[1];
+                item.mClipWidth = (*clip)[2];
+                item.mClipHeight = (*clip)[3];
+            }
+            if (item.mType == TileType::Text ? !item.mText.empty() : !item.mFile.empty())
+                out.push_back(std::move(item));
+        }
     }
 
     Value Menu::evaluateOperand(const Tile& tile, const Operand& operand, const Value& running)
@@ -285,11 +385,10 @@ namespace FalloutMenu
                 case Op::Eq:
                 case Op::Neq:
                 {
-                    bool same;
-                    if (acc.isText() || operand.isText())
-                        same = acc.text() == operand.text();
-                    else
-                        same = a == b;
+                    // The executable compares the numbers only, and a text is the number 0: two texts are always equal
+                    // and a text equals a number only when that is 0 (FalloutNV.exe 0xA09AFB-0xA09B79, Mac round 12AO
+                    // B1)
+                    const bool same = a == b;
                     acc = (same == (step.mOp == Op::Eq)) ? 1.f : 0.f;
                     break;
                 }
@@ -306,13 +405,14 @@ namespace FalloutMenu
                     acc = a <= b ? 1.f : 0.f;
                     break;
                 case Op::And:
-                    acc = (acc.truth() && operand.truth()) ? 1.f : 0.f;
+                    acc = (acc.truth() && conditionHolds(operand)) ? 1.f : 0.f;
                     break;
                 case Op::Or:
-                    acc = (acc.truth() || operand.truth()) ? 1.f : 0.f;
+                    acc = (acc.truth() || conditionHolds(operand)) ? 1.f : 0.f;
                     break;
                 case Op::Not:
-                    acc = (step.mOperand.mKind == Operand::Kind::None ? !acc.truth() : !operand.truth()) ? 1.f : 0.f;
+                    acc = (step.mOperand.mKind == Operand::Kind::None ? !acc.truth() : !conditionHolds(operand)) ? 1.f
+                                                                                                                 : 0.f;
                     break;
                 case Op::OnlyIf:
                     if (!conditionHolds(operand))
@@ -412,6 +512,7 @@ namespace FalloutMenu
     void Menu::unindex(Tile& tile)
     {
         mById.erase(tile.mId);
+        mRich.erase(tile.mId);
         for (const std::unique_ptr<Tile>& child : tile.mChildren)
             unindex(*child);
     }
@@ -458,6 +559,18 @@ namespace FalloutMenu
             copy->mType = TileType::Rect;
         copy->mName = name.empty() ? body->mName : std::string(name);
         std::unique_ptr<Tile> tile = build(copy, &parent, true);
+        Tile* result = tile.get();
+        parent.mChildren.push_back(std::move(tile));
+        ++mGeneration;
+        return result;
+    }
+
+    Tile* Menu::create(Tile& parent, TileType type, std::string_view name)
+    {
+        auto definition = std::make_shared<TileDef>();
+        definition->mType = type;
+        definition->mName = std::string(name);
+        std::unique_ptr<Tile> tile = build(definition, &parent, true);
         Tile* result = tile.get();
         parent.mChildren.push_back(std::move(tile));
         ++mGeneration;
@@ -616,7 +729,9 @@ namespace FalloutMenu
         // what is in it (`alpha 255` on a container) is not a fill. It is a picture of `solid.dds` of the shared atlas.
         const bool isFill = !isImage && !isText && tile.mType == TileType::HotRect && defines(tile, "alpha")
             && width > 0 && height > 0 && number(tile, "alpha") > 0;
-        if (isImage || isText || isFill)
+        if (isText && isRich(tile))
+            collectRich(tile, x, y, clip, clipped, out);
+        else if (isImage || isText || isFill)
         {
             DrawItem item;
             item.mTile = &tile;
@@ -634,6 +749,8 @@ namespace FalloutMenu
                 item.mRepeatY = number(tile, "repeatvertical") != 0 || get(tile, "tile").number() > 0;
                 item.mCropX = number(tile, "cropx");
                 item.mCropY = number(tile, "cropy");
+                item.mScrolls = defines(tile, "_sourcex");
+                item.mScrollX = number(tile, "_sourcex");
             }
             else if (isFill)
             {

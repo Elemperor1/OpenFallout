@@ -8,22 +8,40 @@
 #include <sstream>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadacti.hpp>
+#include <components/esm4/loadalch.hpp>
+#include <components/esm4/loadammo.hpp>
+#include <components/esm4/loadarmo.hpp>
+#include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loaddoor.hpp>
+#include <components/esm4/loadflst.hpp>
+#include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadimod.hpp>
+#include <components/esm4/loadingr.hpp>
+#include <components/esm4/loadkeym.hpp>
+#include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadnote.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadterm.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/lockpick.hpp>
 #include <components/falloutscript/messagetext.hpp>
+#include <components/misc/strings/lower.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/vfs/manager.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -152,6 +170,169 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::hudInfo(const OFWorld::Ptr& target, HudInfo& result)
+    {
+        if (target.isEmpty() || !target.isInCell())
+            return false;
+        const std::uint32_t type = target.getType();
+        const ESM::RefId base = target.getCellRef().getRefId();
+        bool item = false;
+        // Whether the line of weight and value is under the name: the executable's builder (FalloutNV.exe 0x775A00, Mac
+        // round 12AO B4) shows it for armor, miscellaneous things, aid and item mods, for a weapon or ammunition only
+        // when it is playable, and for books, ingredients and keys not at all (the name line alone)
+        bool row = false;
+        std::string verb;
+        // The things the player takes: their weight and value are in the record, and the word is Take (a book that lies
+        // in the world has that word too: the executable shows the word of Take for the activation of a readable item)
+        if (const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+            row = !record->mHasGameData || (record->mGame.mFlags1 & ESM4::Weapon::GameData::NonPlayable) == 0;
+        }
+        else if (const ESM4::Armor* record = mStore.get<ESM4::Armor>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+            row = true;
+        }
+        else if (const ESM4::Ammunition* record = mStore.get<ESM4::Ammunition>().search(base))
+        {
+            result.mWeight = record->mData.mWeight;
+            result.mValue = record->mData.mValue;
+            item = true;
+            // The second bit of the flags of an ammunition record is the one that keeps it from the player
+            row = (record->mData.mFlags & 0x02) == 0;
+        }
+        else if (const ESM4::Potion* record = mStore.get<ESM4::Potion>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mItem.value;
+            item = true;
+            row = true;
+        }
+        else if (const ESM4::MiscItem* record = mStore.get<ESM4::MiscItem>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+            row = true;
+        }
+        else if (const ESM4::Book* record = mStore.get<ESM4::Book>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::Ingredient* record = mStore.get<ESM4::Ingredient>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::ItemMod* record = mStore.get<ESM4::ItemMod>().search(base))
+        {
+            result.mWeight = record->mData.mWeight;
+            result.mValue = record->mData.mValue;
+            item = true;
+            row = true;
+        }
+        else if (const ESM4::Key* record = mStore.get<ESM4::Key>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        if (item)
+            verb = "sTargetTypeTake";
+        else if (type == ESM4::Container::sRecordId)
+            verb = "sTargetTypeOpen";
+        else if (type == ESM4::Door::sRecordId)
+            verb = "sTargetTypeOpenDoor";
+        else if (type == ESM4::Activator::sRecordId || type == ESM4::TalkingActivator::sRecordId
+            || type == ESM4::Terminal::sRecordId)
+            verb = "sTargetTypeActivate";
+        else if (type == ESM4::Furniture::sRecordId)
+        {
+            // Sitting and sleeping are the words for furniture whose markers say so (the activation types 3 and 5 of
+            // the executable's table, FalloutNV.exe 0x11D5160; that they follow the kind of the marker is a reading of
+            // the port's, the executable's function that tells was not read): a marker that the record has switched on
+            // and that is of a sleeping kind makes it a bed, of a sitting kind a seat
+            verb = "sTargetTypeActivate";
+            const std::uint32_t flags = target.get<ESM4::Furniture>()->mBase->mActiveMarkerFlags;
+            const std::vector<FalloutScript::FurnitureEntry> entries = furnitureEntries(target);
+            bool sleeps = false;
+            bool sits = false;
+            for (std::size_t i = 0; i < entries.size(); ++i)
+            {
+                if (!FalloutScript::furnitureEntryEnabled(flags, i))
+                    continue;
+                const std::uint8_t kind = entries[i].mRef;
+                sleeps = sleeps || (kind >= 1 && kind <= 6);
+                sits = sits || (kind >= 10 && kind <= 20);
+            }
+            if (sleeps)
+                verb = "sTargetTypeSleep";
+            else if (sits)
+                verb = "sTargetTypeSit";
+        }
+        else if (type == ESM4::Npc::sRecordId || type == ESM4::Creature::sRecordId)
+        {
+            const FalloutScript::FormId actor = scriptReferenceOf(target);
+            if (actor == 0 || actor == mPlayer)
+                return false;
+            if (mActors.isDead(actor))
+                verb = "sSearch";
+            else if (type == ESM4::Npc::sRecordId && mCombat.target(actor) != mPlayer)
+                verb = "sTargetTypeTalk";
+        }
+        else
+            return false;
+
+        result.mName = std::string(target.getClass().getName(target));
+        // A thing with no name has no text (the executable's name line is blank, and the games show nothing)
+        if (result.mName.empty())
+            return false;
+        result.mVerb = verb;
+        result.mStats = row;
+        if (item)
+            result.mCount = std::max(1, std::abs(target.getCellRef().getCount()));
+
+        if (type == ESM4::Door::sRecordId || type == ESM4::Container::sRecordId)
+        {
+            const FalloutScript::FormId reference = referenceOf(target);
+            if (reference != 0)
+            {
+                result.mBroken = mLockBroken.count(reference) > 0;
+                if (mReferenceState.isLocked(reference))
+                {
+                    result.mLocked = true;
+                    const ESM4::Reference* record
+                        = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+                    result.mHasKey = record != nullptr && !record->mKey.isZeroOrUnset()
+                        && mActors.itemCount(mPlayer, record->mKey.toUint32()) > 0;
+                    const Interaction::Setting setting
+                        = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
+                    const bool leveled = record != nullptr && (record->mLockFlags & 0x04) != 0;
+                    const int level = Interaction::lockLevel(
+                        mReferenceState.lockLevel(reference), leveled, mProgress.level(), setting);
+                    const Interaction::LockClass lockClass = Interaction::lockClass(level, setting);
+                    result.mLockWord = Interaction::lockClassWord(lockClass);
+                    result.mKeyOnly = lockClass == Interaction::LockClass::Impossible;
+                }
+            }
+        }
+
+        // The key (or button) of the activation is named as the player has it set
+        if (const auto key = messageToken("sUActnGrab"))
+            result.mKeyText = *key;
+        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+            result.mPad = input->joystickLastUsed();
+        return true;
+    }
+
     std::optional<FalloutScripts::LockScreen> FalloutScripts::lockScreen()
     {
         const std::lock_guard lock(mInteractionMutex);
@@ -164,6 +345,113 @@ namespace OFScript
     {
         const std::lock_guard lock(mInteractionMutex);
         mLockScreen.reset();
+    }
+
+    // ---- Books ----
+
+    std::optional<FalloutScripts::BookText> FalloutScripts::bookText(FalloutScript::FormId item)
+    {
+        const ESM4::Book* book = mStore.get<ESM4::Book>().search(refIdOf(item));
+        if (book == nullptr)
+            return std::nullopt;
+        BookText text;
+        text.mName = book->mFullName;
+        text.mText = book->mText;
+        text.mScroll = (book->mData.flags & ESM4::Book::Flag_Scroll) != 0;
+        text.mCanTake = (book->mData.flags & ESM4::Book::Flag_NoTake) == 0;
+        return text;
+    }
+
+    // ---- The help manual ----
+
+    std::vector<FalloutScripts::HelpPage> FalloutScripts::helpManual(bool pad)
+    {
+        std::vector<HelpPage> pages;
+        const std::string wanted = pad ? "helpmanualxbox" : "helpmanual";
+        for (const ESM4::FormIdList& list : mStore.get<ESM4::FormIdList>())
+        {
+            if (Misc::StringUtils::lowerCase(list.mEditorId) != wanted)
+                continue;
+            for (const ESM::FormId& entry : list.mObjects)
+            {
+                const ESM4::Message* message = mStore.get<ESM4::Message>().search(entry);
+                if (message == nullptr)
+                    continue;
+                HelpPage page;
+                page.mId = message->mEditorId;
+                page.mTitle = message->mFullName;
+                page.mText = message->mDescription;
+                pages.push_back(std::move(page));
+            }
+            break;
+        }
+        return pages;
+    }
+
+    std::optional<FalloutScripts::HelpPage> FalloutScripts::helpMessage(std::string_view editorId)
+    {
+        const std::string wanted = Misc::StringUtils::lowerCase(editorId);
+        for (const ESM4::Message& message : mStore.get<ESM4::Message>())
+        {
+            if (Misc::StringUtils::lowerCase(message.mEditorId) != wanted)
+                continue;
+            HelpPage page;
+            page.mId = message.mEditorId;
+            page.mTitle = message.mFullName;
+            page.mText = message.mDescription;
+            return page;
+        }
+        return std::nullopt;
+    }
+
+    bool FalloutScripts::openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
+        if (object.isEmpty() || actor.isEmpty() || object.getType() != ESM4::Book::sRecordId
+            || actor != OFBase::Environment::get().getWorld()->getPlayerPtr())
+            return false;
+        const FalloutScript::FormId reference = referenceOf(object);
+        ESM::FormId base;
+        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset() || !base.hasContentFile()
+            || base.mContentFile > 0xfe)
+            return false;
+        std::optional<BookText> text = bookText(base.toUint32());
+        if (!text)
+            return false;
+        const std::lock_guard lock(mInteractionMutex);
+        BookScreen screen;
+        screen.mReference = reference;
+        screen.mBook = std::move(*text);
+        screen.mSerial = ++mBookSerial;
+        mBookScreen = std::move(screen);
+        return true;
+    }
+
+    std::optional<FalloutScripts::BookScreen> FalloutScripts::bookScreen()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        return mBookScreen;
+    }
+
+    void FalloutScripts::closeBookScreen()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        mBookScreen.reset();
+    }
+
+    bool FalloutScripts::takeBookScreen()
+    {
+        FalloutScript::FormId reference = 0;
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            if (!mBookScreen || !mBookScreen->mBook.mCanTake)
+                return false;
+            reference = mBookScreen->mReference;
+            mBookScreen.reset();
+        }
+        const OFWorld::Ptr object = findReference(reference);
+        if (object.isEmpty())
+            return false;
+        return pickUp(object, OFBase::Environment::get().getWorld()->getPlayerPtr());
     }
 
     std::string FalloutScripts::pickLock()

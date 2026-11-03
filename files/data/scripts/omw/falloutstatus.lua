@@ -7,6 +7,10 @@
 -- experience bar, the radiation, the limbs, the enemy bar) and the field of the compass are stand-ins, and where a
 -- picture is missing a plain bar is drawn. The numbers are the engine's (core.pipboy.stats, core.combat.weapon,
 -- core.hud). `I.FalloutHud.state()` is what the display shows now, for tests and probes.
+--
+-- The display is drawn from the games' own menu file (main/hud_main_menu.xml) by scripts/omw/falloutmenuhud.lua, in the
+-- places and with the parts that the executable gives it; the drawing in this file is what is shown when that file is not
+-- in the data (it is the older stand-in).
 local core = require('openfallout.core')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
@@ -16,6 +20,9 @@ local camera = require('openfallout.camera')
 local nearby = require('openfallout.nearby')
 local vfs = require('openfallout.vfs')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local menuHudModule = require('scripts.omw.falloutmenuhud')
+local hotKeysModule = require('scripts.omw.falloutmenuhotkeys')
+local input = require('openfallout.input')
 
 local pipboy = core.pipboy
 local hud = core.hud
@@ -114,6 +121,12 @@ local function looseTexture(path)
     end
     return found or nil
 end
+
+-- The display drawn from the games' menu file once it was made, and whether making it failed (the stand-in is drawn then)
+local menuHud = nil
+local menuHudFailed = false
+-- The number keys: what the Pip-Boy put on them (falloutmenuhotkeys.lua keeps their timing)
+local hotKeys = nil
 
 local element = nil
 local compassElement = nil
@@ -407,10 +420,57 @@ local function aimedTarget(stats)
     return hud.target(result.hitObject)
 end
 
+-- The text under the crosshair, from the object the crosshair is on if it is within reach: the words are those of the
+-- game's settings (the executable's own: FalloutNV.exe 0x775A00, Mac round 12AN B7)
+local function infoState()
+    local ray = camera.getFocusRay()
+    local object = ray and ray.hitObject
+    if object == nil then return nil end
+    local info = hud.info(object)
+    if info == nil then return nil end
+    local result = {
+        name = info.count > 1 and string.format('%s (%d)', info.name, info.count) or info.name,
+        verb = info.verb and word(info.verb, '') or nil,
+        keyText = info.keyText,
+        pad = info.pad,
+    }
+    -- What the lock says, as the executable does: broken first, then the key (the word for using it), the class of the
+    -- lock and "locked" (a lock that only a key opens says its class alone)
+    if info.broken then
+        result.status = word('sBroken', 'Broken')
+    elseif info.locked then
+        local locked = word('sLocked', 'Locked')
+        if info.hasKey then
+            result.status = string.format('[%s - %s]', word('sHUDUseKey', 'Use Key'), locked)
+        elseif info.keyOnly then
+            result.status = string.format('[%s]', word(info.lockWord, 'Requires Key'))
+        else
+            result.status = string.format('[%s - %s]', word(info.lockWord, ''), locked)
+        end
+    end
+    if info.stats then
+        -- A weight or a value of nothing is two dashes; a value under 1 has a decimal
+        local weight = info.weight > 0 and string.format('%.1f', info.weight) or '--'
+        local value = info.value <= 0 and '--' or info.value < 1 and string.format('%.1f', info.value)
+            or string.format('%.0f', info.value)
+        result.stats = {
+            weightLabel = word('sInventoryWeightUpper', 'WG'),
+            weight = weight,
+            valueLabel = word('sInventoryValue', 'VAL'),
+            value = value,
+        }
+    end
+    return result
+end
+
 -- Takes the messages that were printed, and lets the lit ones burn down
 local function updateLines(dt)
     for _, message in ipairs(hud.takeMessages()) do
         lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds }
+    end
+    -- The stand-in has no tile for the subtitles: a line that is said is a message
+    for _, said in ipairs(hud.takeSubtitles()) do
+        lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
     end
     local kept = {}
     for _, line in ipairs(lines) do
@@ -444,19 +504,38 @@ end
 
 -- What the display shows now, nothing while a window is open or the player is dead
 local function current(dt)
-    if I.UI.getMode() ~= nil or pipboy.playerDead() then
-        return nil
+    if pipboy.playerDead() then
+        return menuHud and { mode = 'off' } or nil
+    end
+    if I.UI.getMode() ~= nil then
+        -- While a window is open the display from the file shows the messages that come, and the stand-in nothing
+        if not menuHud then
+            -- What was said while a window was open is over by the time it closes
+            hud.takeSubtitles()
+            return nil
+        end
+        return { mode = 'messages', messages = hud.takeMessages(), subtitles = hud.takeSubtitles() }
     end
     local stats = pipboy.stats()
     local weapon = core.combat.weapon()
     local status = hud.status()
-    updateLines(dt)
+    -- The display from the file queues the messages itself
+    local incoming, saying = nil, nil
+    if menuHud then
+        incoming = hud.takeMessages()
+        saying = hud.takeSubtitles()
+    else
+        updateLines(dt)
+    end
     local experience = experienceState(stats, dt)
     local target = nil
     if status.weaponDrawn then
         target = aimedTarget(weapon)
         if target ~= nil and target.dead then target = nil end
     end
+    -- Only the display from the file has the text under the crosshair, and a script that stops the rollover hides it
+    local rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true
+    local info = menuHud and not rolloverOff and infoState() or nil
     local lit = {}
     for index, line in ipairs(lines) do
         -- A line is in steps of a tenth of a second, which is as often as the display looks
@@ -484,10 +563,19 @@ local function current(dt)
         sneakText = status.sneakText ~= '' and status.sneakText or status.sneak:upper(),
         crippled = status.crippled,
         reticle = status.weaponDrawn,
+        -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
+        scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,
+        pipboyOff = status.controlsOff ~= nil and status.controlsOff.pipboy == true,
+        fightingOff = status.controlsOff ~= nil and status.controlsOff.fighting == true,
+        rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
+        info = info,
         lines = lit,
         screen = ui.screenSize(),
+        mode = 'game',
+        messages = incoming,
+        subtitles = saying,
     }
 end
 
@@ -505,7 +593,43 @@ local function same(a, b)
     return true
 end
 
+-- The display from the file: made when the game is first on screen, made again when the window changes its size
+local function refreshFromFile(dt)
+    if menuHud == nil and not menuHudFailed and not pipboy.playerDead() and I.UI.getMode() == nil then
+        menuHud = menuHudModule.create()
+        if menuHud == nil then menuHudFailed = true end
+    end
+    if menuHud == nil then return false end
+    local state = current(dt)
+    -- What the stand-in showed is gone
+    if element then
+        element:destroy()
+        element = nil
+    end
+    shown = state and state.mode == 'game' and state or nil
+    if state and not menuHud:update(state, dt) then
+        -- The size of the window changed (the places are worked out from it) or the player took the pad up or put it down
+        -- (the key or the button next to the verb): the display is made again
+        local pad = menuHud.wantsPad == true
+        if state.info ~= nil then pad = state.info.pad == true end
+        local previous = menuHud
+        menuHud:close()
+        -- The messages and subtitles that wait their turn go to the new display
+        menuHud = menuHudModule.create(pad, previous)
+        if menuHud == nil then
+            menuHudFailed = true
+            -- The stand-in draws the next frame, whatever it drew before
+            shown = nil
+        else
+            -- What this frame brought (the messages and subtitles that were taken out of the queues) goes into the new one
+            menuHud:update(state, dt)
+        end
+    end
+    return true
+end
+
 local function refresh(dt)
+    if refreshFromFile(dt) then return end
     local state = current(dt)
     if same(state, shown) then
         return
@@ -521,8 +645,55 @@ local function refresh(dt)
     end
 end
 
+-- The number keys are looked at every frame (a key that is let go quickly is another thing than one that is held), apart
+-- from the rest of the display
+local function refreshHotKeys(dt)
+    if menuHud == nil then return end
+    if hotKeys == nil then
+        hotKeys = hotKeysModule.new({
+            pressed = function(slot) return input.isActionPressed(input.ACTION['QuickKey' .. (slot + 1)]) end,
+            -- The D-pad chooses the slot with a pad (it is bound to nothing else while the game is played)
+            direction = function()
+                local button = input.CONTROLLER_BUTTON
+                return {
+                    up = input.isControllerButtonPressed(button.DPadUp),
+                    down = input.isControllerButtonPressed(button.DPadDown),
+                    left = input.isControllerButtonPressed(button.DPadLeft),
+                    right = input.isControllerButtonPressed(button.DPadRight),
+                }
+            end,
+            slots = pipboy.hotKeys,
+            use = pipboy.use,
+            sound = pipboy.playSoundNamed,
+            seconds = function(name, default)
+                local value = pipboy.setting(name)
+                return value ~= nil and value > 0 and value or default
+            end,
+        })
+    end
+    -- Not while a window is open, a script holds the player or has switched off the Pip-Boy or the fighting (a hot key
+    -- equips weapons), or a message waits for an answer
+    local allowed = shown ~= nil and shown.mode == 'game' and not shown.scripted and not shown.pipboyOff
+        and not shown.fightingOff and I.UI.getMode() == nil and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
+    menuHud:updateHotKeys(hotKeys:step(dt, allowed))
+end
+
 -- The compass moves with every turn of the player, so it is drawn on its own and looked at more often
 local function refreshCompass()
+    if menuHud then
+        if compassElement then
+            compassElement:destroy()
+            compassElement = nil
+        end
+        local compass = nil
+        if shown ~= nil then
+            compass = hud.compass()
+            compass.heading = math.floor(compass.heading * 10) / 10
+        end
+        shownCompass = compass
+        menuHud:updateCompass(compass, shown ~= nil)
+        return
+    end
     local compass = nil
     if shown ~= nil then
         compass = hud.compass()
@@ -561,6 +732,7 @@ return {
             sinceChecked = sinceChecked + dt
             sinceCompass = sinceCompass + dt
             clock = clock + dt
+            refreshHotKeys(dt)
             -- A change of a tenth of a second is not seen
             if sinceChecked >= 0.1 then
                 refresh(sinceChecked)

@@ -1,5 +1,6 @@
 #include "hudbindings.hpp"
 
+#include <iterator>
 #include <stdexcept>
 
 #include <components/esm/refid.hpp>
@@ -76,9 +77,27 @@ namespace OFLua
             return rows;
         };
 
+        // The lines that characters said to the player since this was last called, oldest first, for the subtitles: the
+        // text, how long it stays, how far the speaker is and whether a script forced it
+        api["takeSubtitles"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::Hud::Subtitle& line : scripts().hudSubtitles().take())
+            {
+                sol::table row(lua, sol::create);
+                row["text"] = line.mText;
+                row["seconds"] = line.mSeconds;
+                row["distance"] = line.mDistance;
+                row["forced"] = line.mForced;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the
-        // textures (names under Interface\Stats) of the limbs that are crippled, and whether the weapon is drawn
+        // textures (names under Interface\Stats) of the limbs that are crippled, whether the weapon is drawn and the
+        // controls that are off
         api["status"] = [lua]() {
             const OFScript::FalloutScripts::HudStatus status = scripts().hudStatus();
             sol::table row(lua, sol::create);
@@ -88,6 +107,17 @@ namespace OFLua
             row["sneak"] = sneakName(status.mSneak);
             row["sneakText"] = status.mSneakText;
             row["weaponDrawn"] = status.mWeaponDrawn;
+            // The controls a script took away (DisablePlayerControls): the display shows less while the player cannot
+            // move (the executable's mode 0xC: only the radiation, the experience and the messages), and no text under
+            // the crosshair while the rollover is off
+            sol::table controls(lua, sol::create);
+            static constexpr const char* controlNames[]
+                = { "movement", "pipboy", "fighting", "pointOfView", "looking", "rollover", "sneaking" };
+            static_assert(std::size(controlNames) == FalloutScript::playerControlCount,
+                "every player control needs a name for Lua");
+            for (std::size_t control = 0; control < FalloutScript::playerControlCount; ++control)
+                controls[controlNames[control]] = (status.mControlsOff & (1u << control)) != 0;
+            row["controlsOff"] = controls;
             sol::table limbs(lua, sol::create);
             int index = 1;
             for (const std::string& limb : status.mCrippled)
@@ -110,6 +140,36 @@ namespace OFLua
             row["maxHealth"] = target.mMaxHealth;
             row["dead"] = target.mDead;
             row["hostile"] = target.mHostile;
+            return row;
+        };
+
+        // What the text under the crosshair says of an object (the one the crosshair is on): its name and how many
+        // there are, the setting that holds the word of what the player does with it (`verb`, nothing for no word),
+        // whether the weight and value row is there and what they are, whether its lock is broken, whether it is locked
+        // (with whether the player has the key, the setting that holds the word of how hard the lock is, and whether
+        // only the key opens it) and the name of the key or button that activates. Nothing for an object it says
+        // nothing of.
+        api["info"] = [lua](sol::optional<LObject> object) -> sol::object {
+            if (!object)
+                return sol::nil;
+            OFScript::FalloutScripts::HudInfo info;
+            if (!scripts().hudInfo(object->ptr(), info))
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["name"] = info.mName;
+            row["count"] = info.mCount;
+            if (!info.mVerb.empty())
+                row["verb"] = info.mVerb;
+            row["stats"] = info.mStats;
+            row["weight"] = info.mWeight;
+            row["value"] = info.mValue;
+            row["broken"] = info.mBroken;
+            row["locked"] = info.mLocked;
+            row["hasKey"] = info.mHasKey;
+            row["lockWord"] = info.mLockWord;
+            row["keyOnly"] = info.mKeyOnly;
+            row["keyText"] = info.mKeyText;
+            row["pad"] = info.mPad;
             return row;
         };
 

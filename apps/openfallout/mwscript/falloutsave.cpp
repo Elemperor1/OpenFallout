@@ -948,6 +948,12 @@ namespace OFScript
                 FalloutScript::readMapMarkers(mMapMarkers, in, version);
             });
         section(
+            "hotkeys", FalloutScript::hotKeysSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeHotKeys(mHotKeys, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readHotKeys(mHotKeys, in, version);
+            });
+        section(
             "formlists", FalloutScript::formListsSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeFormLists(mFormLists, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {

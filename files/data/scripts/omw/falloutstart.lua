@@ -10,9 +10,9 @@
 -- the options of the one that is picked, toggles and meters (falloutsettingsitems.lua has the items). A change is made
 -- at once, as in the game, and written to the user's file when the screens are left. The list of the submenus ends with a
 -- row of the port's own that opens the engine's window of settings, which has what the game's screens do not (the size
--- and the mode of the window, the shaders, the mods). The Help item of the game, and the item that goes to the title
--- screen, are not here (the title screen is the engine's too, because no content, and so no words of the game, is loaded
--- there).
+-- and the mode of the window, the shaders, the mods). Help opens the manual (falloutmanual.lua, on the game's own
+-- tutorial_menu.xml) when the data has one; the item that goes to the title screen is not here (the title screen is the
+-- engine's too, because no content, and so no words of the game, is loaded there).
 --
 -- The script says every frame that it draws the menu (claimMainMenu), so that a script that fails gives it back to the
 -- engine, and keeps Escape and the B button for itself in a screen of the menu below the list (they go back one step);
@@ -25,6 +25,7 @@ local engine = require('openfallout.menu')
 local storage = require('openfallout.storage')
 local menuModule = require('scripts.omw.falloutmenu')
 local settingsItems = require('scripts.omw.falloutsettingsitems')
+local manual = require('scripts.omw.falloutmanual')
 
 local FILE = 'options/start_menu.xml'
 -- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
@@ -89,6 +90,7 @@ end
 
 local function closeShown()
     pending = nil
+    manual.close()
     saveOptions()
     if shown then
         shown:close()
@@ -183,7 +185,7 @@ local function showScreen(name)
     if name ~= 'save' and name ~= 'load' then hidePanel() end
 end
 
-local showList, showSaves, ask, showSettings, showOptions
+local showList, showSaves, ask, showSettings, showOptions, showManual
 
 -- The main list, with the items that the state of the game allows
 showList = function()
@@ -196,6 +198,11 @@ showList = function()
         items[#items + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
     end
     items[#items + 1] = { label = word('sSettings'), action = function() showSettings() end }
+    -- Help is there when the data has a manual (the game greys it when its tutorial menu does not exist)
+    local hasManual, pages = pcall(core.pipboy.helpManual, false)
+    if hasManual and type(pages) == 'table' and #pages > 0 then
+        items[#items + 1] = { label = word('sHelp'), action = function() showManual() end }
+    end
     items[#items + 1] = {
         label = word('sQuit'),
         action = function()
@@ -316,6 +323,22 @@ showSettings = function()
     end)
 end
 
+-- Help: the manual (the game's tutorial menu) is shown over the menu; leaving it brings the list back
+showManual = function()
+    local function open(pad)
+        return manual.show({
+            layer = LAYER,
+            pad = pad,
+            onLeave = function() screen = 'list' end,
+        })
+    end
+    -- The list shows Help when the PC manual exists; a pad whose manual is not in the data reads the PC one
+    local pad = engine.controllerConnected()
+    local opened = open(pad)
+    if not opened and pad then opened = open(false) end
+    if opened then screen = 'help' end
+end
+
 -- The items of a submenu, as toggles and meters in the container of the options; `keepRow` is the row to light
 showOptions = function(group, keepRow)
     optionGroup = group
@@ -402,6 +425,8 @@ local function back()
     elseif screen == 'settings' then
         saveOptions()
         showList()
+    elseif screen == 'help' then
+        manual.leave()
     end
 end
 
@@ -537,6 +562,11 @@ local function onKey(key)
     if not shown or inputTaken() then return end
     local code = key.code
     local KEY = input.KEY
+    -- The manual has its own keys
+    if screen == 'help' then
+        manual.press(code, key.symbol)
+        return
+    end
     local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm
         or screen == 'settings' and lists.settings or screen == 'options' and lists.options or lists.saves
     if code == KEY.Escape then
@@ -574,6 +604,17 @@ end
 local function onPad(button)
     if not shown or inputTaken() then return end
     local PAD = input.CONTROLLER_BUTTON
+    if screen == 'help' then
+        -- the pages turn with the sides of the pad, B leaves (the game puts them on the triggers and B)
+        if button == PAD.DPadLeft then
+            onKey({ code = input.KEY.LeftArrow })
+        elseif button == PAD.DPadRight then
+            onKey({ code = input.KEY.RightArrow })
+        elseif button == PAD.B then
+            manual.leave()
+        end
+        return
+    end
     if button == PAD.DPadUp then
         onKey({ code = input.KEY.UpArrow })
     elseif button == PAD.DPadDown then
@@ -632,6 +673,7 @@ return {
             if shown then
                 shown:checkSize()
                 updatePanel()
+                manual.update()
             end
         end,
         onKeyPress = onKey,

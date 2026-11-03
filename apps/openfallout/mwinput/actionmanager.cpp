@@ -257,6 +257,10 @@ namespace OFInput
 
     void ActionManager::quickKey(int index)
     {
+        // The number keys of Fallout are the hot keys of its head-up display (a script reads them), not the quick keys
+        // of Morrowind
+        if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+            return;
         if (!OFBase::Environment::get().getInputManager()->getControlSwitch("playercontrols")
             || !OFBase::Environment::get().getInputManager()->getControlSwitch("playerfighting")
             || !OFBase::Environment::get().getInputManager()->getControlSwitch("playermagic"))

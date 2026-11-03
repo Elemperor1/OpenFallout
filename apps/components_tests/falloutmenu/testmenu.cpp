@@ -26,6 +26,7 @@ namespace
             mEnvironment.mTextSize = [](int, const std::string& text, float) {
                 return TextSize{ 10.f * static_cast<float>(text.size()), text.empty() ? 0.f : 20.f };
             };
+            mEnvironment.mLineHeight = [](int) { return 20.f; };
             mEnvironment.mImageSize = [](const std::string& file, const std::string&) -> std::optional<TextSize> {
                 if (file.find("missing") != std::string::npos)
                     return std::nullopt;
@@ -235,6 +236,39 @@ namespace
         EXPECT_FLOAT_EQ(numberOf(menu, "A", "_notNone"), 7.f);
     }
 
+    TEST(FalloutMenuEvaluationTest, a_text_is_true_as_the_operand_of_a_condition_and_the_number_0_in_a_comparison)
+    {
+        // FalloutNV.exe 0xA09AFB-0xA09DA9 (Mac round 12AO B1): `and`, `or`, `not`, `onlyif` and `onlyifnot` count a
+        // text as true, a text that comes first (a bare `copy`) is the number 0, and `eq` and `neq` compare numbers
+        // only
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"P\">"
+            "<text name=\"Hint\"><string> A) </string></text>"
+            "<text name=\"Other\"><string> B) </string></text>"
+            "<rect name=\"A\">"
+            "<_and><copy> 1 </copy><and src=\"sibling(Hint)\" trait=\"string\"/></_and>"
+            "<_andNot><copy> 1 </copy><and><not src=\"sibling(Hint)\" trait=\"string\"/></and></_andNot>"
+            "<_or><copy> 0 </copy><or src=\"sibling(Hint)\" trait=\"string\"/></_or>"
+            "<_not><copy> 1 </copy><not src=\"sibling(Hint)\" trait=\"string\"/></_not>"
+            "<_first><copy src=\"sibling(Hint)\" trait=\"string\"/><or><copy> 0 </copy></or></_first>"
+            "<_same><copy src=\"sibling(Hint)\" trait=\"string\"/><eq src=\"sibling(Other)\" trait=\"string\"/></_same>"
+            "<_differ><copy src=\"sibling(Hint)\" trait=\"string\"/><neq src=\"sibling(Other)\" "
+            "trait=\"string\"/></_differ>"
+            "<_zero><copy src=\"sibling(Hint)\" trait=\"string\"/><eq> 0 </eq></_zero>"
+            "<_one><copy src=\"sibling(Hint)\" trait=\"string\"/><eq> 1 </eq></_one>"
+            "</rect></rect></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_and"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_andNot"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_or"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_not"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_first"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_same"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_differ"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_zero"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_one"), 0.f);
+    }
+
     TEST(FalloutMenuEvaluationTest, a_trait_can_come_from_the_tiles_around)
     {
         Fixture f;
@@ -356,6 +390,26 @@ namespace
         menu.instantiate(*list, "row");
         menu.removeChildren(*list);
         EXPECT_TRUE(list->children().empty());
+    }
+
+    TEST(FalloutMenuEvaluationTest, a_tile_made_by_the_code_has_the_traits_the_screen_gives_it)
+    {
+        Fixture f;
+        Menu& menu = f.open("<menu name=\"M\"><rect name=\"Lines\"><x> 640 </x></rect></menu>");
+        Tile* lines = menu.find("Lines");
+        ASSERT_NE(lines, nullptr);
+        Tile* line = menu.create(*lines, TileType::Text, "Line1");
+        ASSERT_NE(line, nullptr);
+        EXPECT_EQ(line->name(), "Line1");
+        EXPECT_EQ(line->type(), TileType::Text);
+        EXPECT_EQ(menu.find("Line1"), line);
+        menu.set(*line, "string", Value::fromText("words"));
+        menu.set(*line, "y", Value(30.f));
+        EXPECT_EQ(menu.text(*line, "string"), "words");
+        EXPECT_FLOAT_EQ(menu.number(*line, "y"), 30.f);
+        EXPECT_EQ(lines->children().size(), 1u);
+        menu.removeChildren(*lines);
+        EXPECT_TRUE(lines->children().empty());
     }
 
     TEST(FalloutMenuDrawTest, tiles_are_drawn_back_to_front_by_depth_and_what_is_not_visible_is_left_out)
@@ -646,5 +700,59 @@ namespace
         // Either answer will do; what matters is that this comes back
         (void)numberOf(menu, "A", "x");
         SUCCEED();
+    }
+
+    TEST(FalloutMenuLayoutTest, a_text_with_marks_has_pages_and_draws_the_one_that_pagenum_names)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"R\"><x> 100 </x><y> 200 </y>"
+            "<text name=\"T\"><ishtml> &true; </ishtml><x> 5 </x><y> 7 </y>"
+            "<wrapwidth> 100 </wrapwidth><wraplimit> 50 </wraplimit><pagenum> 1 </pagenum></text>"
+            "</rect></menu>");
+        Tile& text = *menu.find("T");
+        menu.set(text, "string", Value::fromText("<font color=00FF00>one</font><br>two<br>three<br>four<br>five"));
+        // Five lines of 20 are three pages of at most 50
+        EXPECT_FLOAT_EQ(menu.number(text, "pagecount"), 3.f);
+        // The size of the text is that of the page that is shown: two lines, the widest has five letters
+        EXPECT_FLOAT_EQ(menu.number(text, "width"), 50.f);
+        EXPECT_FLOAT_EQ(menu.number(text, "height"), 40.f);
+        std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mText, "three");
+        EXPECT_FLOAT_EQ(items[0].mX, 105.f);
+        EXPECT_FLOAT_EQ(items[0].mY, 207.f);
+        EXPECT_EQ(items[1].mText, "four");
+        EXPECT_FLOAT_EQ(items[1].mY, 227.f);
+        // The letters have the colour of the book where the text does not give one
+        EXPECT_NEAR(items[0].mColor[0], 117.f / 255.f, 1e-4f);
+
+        menu.set(text, "pagenum", Value(0.f));
+        items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mText, "one");
+        EXPECT_FLOAT_EQ(items[0].mColor[0], 0.f);
+        EXPECT_FLOAT_EQ(items[0].mColor[1], 1.f);
+
+        // A number that is no page shows nothing, and so does the pages' end
+        menu.set(text, "pagenum", Value(3.f));
+        EXPECT_TRUE(menu.draw().empty());
+        menu.set(text, "pagenum", Value(-1.f));
+        EXPECT_TRUE(menu.draw().empty());
+
+        // Another text makes other pages
+        menu.set(text, "pagenum", Value(0.f));
+        menu.set(text, "string", Value::fromText("<b>short"));
+        EXPECT_FLOAT_EQ(menu.number(text, "pagecount"), 1.f);
+    }
+
+    TEST(FalloutMenuLayoutTest, a_text_without_ishtml_is_drawn_as_one_text)
+    {
+        Fixture f;
+        Menu& menu = f.open("<menu name=\"M\"><text name=\"T\"><string> hello </string></text></menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        EXPECT_EQ(items[0].mText, "hello");
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("T"), "pagecount"), 0.f);
     }
 }

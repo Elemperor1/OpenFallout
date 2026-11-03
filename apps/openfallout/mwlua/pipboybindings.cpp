@@ -291,6 +291,46 @@ namespace OFLua
         // The player puts on or takes off, eats or reads the item; what happened ("equipped", "unequipped", "used",
         // "read"), or "" when nothing did
         api["use"] = [](std::string_view item) { return scripts().useItemFromList(parseId(item)); };
+        // What a book or a scroll the player carries says (the words, with the names of settings in them as `&sName;`):
+        // its name, text, whether it is a scroll and whether it may be taken; nothing for an item that is no book
+        api["book"] = [lua](std::string_view item) -> sol::object {
+            const auto book = scripts().bookText(parseId(item));
+            if (!book)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["name"] = book->mName;
+            row["text"] = book->mText;
+            row["scroll"] = book->mScroll;
+            row["canTake"] = book->mCanTake;
+            return row;
+        };
+        // The pages of the help manual (the messages of the form list `HelpManual`, or `HelpManualXBox` for a pad):
+        // a list of tables with the id of the message, its title and its words; empty when the data has none
+        api["helpManual"] = [lua](sol::optional<bool> pad) {
+            sol::table list(lua, sol::create);
+            int index = 1;
+            for (const auto& page : scripts().helpManual(pad.value_or(false)))
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = page.mId;
+                row["title"] = page.mTitle;
+                row["text"] = page.mText;
+                list[index++] = row;
+            }
+            return list;
+        };
+        // One hint of the game by its editor id (`HelpCrafting`): the same table as a page of the manual; nothing when
+        // there is none
+        api["helpMessage"] = [lua](std::string_view editorId) -> sol::object {
+            const auto page = scripts().helpMessage(editorId);
+            if (!page)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["id"] = page->mId;
+            row["title"] = page->mTitle;
+            row["text"] = page->mText;
+            return row;
+        };
         // The most items one drop puts on the floor
         api["dropLimit"] = OFScript::FalloutScripts::sDropLimit;
         // The player drops items in front of it; how many
@@ -372,6 +412,72 @@ namespace OFLua
             return row;
         };
         api["closeBarter"] = []() { scripts().closeBarter(); };
+
+        // The wheel of commands of a companion (the player activated a character that follows it): its id and name, a
+        // number that is another for each time the wheel opens and what the companion's script said when it opened
+        // (aggressive, staysFar, ranged, following, waiting) and whether a pad was in use; nothing when none is open
+        api["companion"] = [lua]() -> sol::object {
+            const auto wheel = scripts().companionWheel();
+            if (!wheel)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["actor"] = idText(wheel->mActor);
+            row["name"] = wheel->mName;
+            row["serial"] = wheel->mSerial;
+            row["aggressive"] = wheel->mAggressive;
+            row["staysFar"] = wheel->mStaysFar;
+            row["ranged"] = wheel->mRanged;
+            row["following"] = wheel->mFollowing;
+            row["waiting"] = wheel->mWaiting;
+            row["pad"] = wheel->mPad;
+            return row;
+        };
+        // What the wheel tells about the companion and the player's stimpaks: stimpaks, health, maxHealth, carried,
+        // capacity, weapon
+        api["companionStatus"] = [lua]() {
+            const OFScript::FalloutScripts::CompanionStatus status = scripts().companionStatus();
+            sol::table row(lua, sol::create);
+            row["stimpaks"] = status.mStimpaks;
+            row["health"] = status.mHealth;
+            row["maxHealth"] = status.mMaxHealth;
+            row["carried"] = status.mCarried;
+            row["capacity"] = status.mCapacity;
+            row["weapon"] = status.mWeapon;
+            return row;
+        };
+        // The companion says a topic of the commands, found by its editor id; false when there is nothing to say
+        api["companionSay"] = [](std::string_view topic) { return scripts().companionSay(topic); };
+        api["companionSetAggressive"] = [](bool aggressive) { scripts().companionSetAggressive(aggressive); };
+        // A stimpak of the player's is used on the companion; false when the player has none
+        api["companionStimpak"] = []() { return scripts().companionStimpak(); };
+        // The wheel is over and the conversation with the companion begins
+        api["companionTalk"] = []() { scripts().companionTalk(); };
+        api["closeCompanion"] = []() { scripts().closeCompanionWheel(); };
+
+        // The eight slots of the hot key wheel, in order: each a table with the slot (counted from 0), whether it takes
+        // an item (the second is the ammunition swap), and what the player put there: the item's id, name, how many of
+        // it the player carries, its picture and whether it is equipped (id is "" for an empty slot)
+        api["hotKeys"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::HotKeySlot& slot : scripts().hotKeySlots())
+            {
+                sol::table row(lua, sol::create);
+                row["slot"] = slot.mSlot;
+                row["assignable"] = slot.mAssignable;
+                row["id"] = slot.mItem != 0 ? idText(slot.mItem) : std::string();
+                row["name"] = slot.mName;
+                row["count"] = slot.mCount;
+                row["icon"] = slot.mIcon;
+                row["equipped"] = slot.mEquipped;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+        // The player puts an item on the key of a slot (counted from 0): "assigned", "ammo" (ammunition goes on no
+        // key), "cannot" (a thing that is neither held, worn nor used up) or "slot" (the ammunition swap, or none)
+        api["assignHotKey"]
+            = [](int slot, std::string_view item) { return scripts().assignHotKey(slot, parseId(item)); };
 
         // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
         // "ITMBottlecapsUp"), in 2D; false when the data has no such sound

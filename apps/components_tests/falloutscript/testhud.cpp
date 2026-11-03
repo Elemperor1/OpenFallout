@@ -43,6 +43,30 @@ namespace
         EXPECT_EQ(taken.back().mText, "m19");
     }
 
+    TEST(FalloutScriptHudTest, the_subtitle_line_hands_over_the_lines_in_order_and_keeps_the_newest)
+    {
+        Hud::SubtitleLine line;
+        Hud::Subtitle empty;
+        line.push(empty);
+        EXPECT_EQ(line.size(), 0u);
+        for (int i = 0; i < 12; ++i)
+        {
+            Hud::Subtitle said;
+            said.mText = "s" + std::to_string(i);
+            said.mSeconds = 3.f;
+            said.mDistance = static_cast<float>(i);
+            said.mForced = i == 11;
+            line.push(said);
+        }
+        const std::vector<Hud::Subtitle> taken = line.take();
+        ASSERT_EQ(taken.size(), Hud::SubtitleLine::capacity);
+        EXPECT_EQ(taken.front().mText, "s4");
+        EXPECT_EQ(taken.back().mText, "s11");
+        EXPECT_TRUE(taken.back().mForced);
+        EXPECT_FLOAT_EQ(taken.back().mDistance, 11.f);
+        EXPECT_TRUE(line.take().empty());
+    }
+
     TEST(FalloutScriptHudTest, nobody_around_leaves_the_player_hidden)
     {
         Hud::Watchers watchers;

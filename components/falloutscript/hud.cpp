@@ -46,6 +46,36 @@ namespace FalloutScript::Hud
         mMessages.clear();
     }
 
+    void SubtitleLine::push(Subtitle line)
+    {
+        if (line.mText.empty())
+            return;
+        const std::lock_guard lock(mMutex);
+        mLines.push_back(std::move(line));
+        while (mLines.size() > capacity)
+            mLines.pop_front();
+    }
+
+    std::vector<Subtitle> SubtitleLine::take()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<Subtitle> result(mLines.begin(), mLines.end());
+        mLines.clear();
+        return result;
+    }
+
+    std::size_t SubtitleLine::size()
+    {
+        const std::lock_guard lock(mMutex);
+        return mLines.size();
+    }
+
+    void SubtitleLine::clear()
+    {
+        const std::lock_guard lock(mMutex);
+        mLines.clear();
+    }
+
     void Watchers::note(FormId watcher, Detection::Sighting sighting, bool hostile, double now)
     {
         if (watcher == 0)

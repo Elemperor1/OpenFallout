@@ -161,9 +161,13 @@ set(BUILTIN_DATA_FILES
     scripts/omw/skillhandlers.lua
     scripts/omw/crimes.lua
     scripts/omw/falloutbarter.lua
+    scripts/omw/falloutcompanion.lua
+    scripts/omw/falloutbook.lua
+    scripts/omw/falloutmanual.lua
     scripts/omw/falloutchargen.lua
     scripts/omw/falloutcombat.lua
     scripts/omw/falloutcraft.lua
+    scripts/omw/falloutcredits.lua
     scripts/omw/falloutdeath.lua
     scripts/omw/falloutvats.lua
     scripts/omw/falloutitemcards.lua
@@ -171,6 +175,9 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutlockpick.lua
     scripts/omw/falloutloot.lua
     scripts/omw/falloutmenu.lua
+    scripts/omw/falloutmenuhotkeys.lua
+    scripts/omw/falloutmenusubtitles.lua
+    scripts/omw/falloutmenuhud.lua
     scripts/omw/falloutmessage.lua
     scripts/omw/falloutpad.lua
     scripts/omw/falloutinteraction.lua

@@ -191,6 +191,10 @@ namespace FalloutMenu
             const Font::Layout layout = font->layout(text, wrapWidth, 1);
             return { layout.mWidth, layout.mHeight };
         };
+        environment.mLineHeight = [shared](int number) -> float {
+            const Font* font = shared->fonts().get(number);
+            return font != nullptr ? font->lineHeight() : 0.f;
+        };
         environment.mSystemColor = [shared](int id) { return shared->systemColor(id); };
 
         result->mMenu = std::make_unique<Menu>(definition, globals, result->mLoader->templates(), environment);
@@ -267,6 +271,34 @@ namespace FalloutMenu
             base.mClipY = roundToInt(item.mClipY * scale);
             base.mClipWidth = roundToInt((item.mClipX + item.mClipWidth) * scale) - base.mClipX;
             base.mClipHeight = roundToInt((item.mClipY + item.mClipHeight) * scale) - base.mClipY;
+        }
+
+        // A picture that scrolls shows the window of its texture that starts at the scroll, one texel for each unit,
+        // and goes on at the left edge of the texture when the window runs past the right one
+        if (item.mScrolls)
+        {
+            float start = std::fmod(item.mScrollX, sourceWidth);
+            if (start < 0)
+                start += sourceWidth;
+            float drawn = 0;
+            for (int part = 0; part < 4 && drawn < width - 1e-4f; ++part)
+            {
+                const float length = std::min(width - drawn, sourceWidth - start);
+                Piece piece = base;
+                piece.mX = roundToInt((left + drawn) * scale);
+                piece.mY = roundToInt(item.mY * scale);
+                piece.mWidth = roundToInt((left + drawn + length) * scale) - piece.mX;
+                piece.mHeight = roundToInt((item.mY + height) * scale) - piece.mY;
+                piece.mSourceX = roundToInt(sourceX + start);
+                piece.mSourceY = roundToInt(sourceY);
+                piece.mSourceWidth = std::max(1, roundToInt(length));
+                piece.mSourceHeight = std::max(1, roundToInt(sourceHeight));
+                if (piece.mWidth > 0 && piece.mHeight > 0)
+                    out.push_back(std::move(piece));
+                drawn += length;
+                start = 0;
+            }
+            return;
         }
 
         // A picture that repeats is cut into as many as it takes (the last one cut short), each at its natural size

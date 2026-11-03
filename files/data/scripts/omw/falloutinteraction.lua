@@ -18,6 +18,7 @@ local menuModule = require('scripts.omw.falloutmenu')
 local terminalMenu = require('scripts.omw.falloutterminal')
 local hackMenu = require('scripts.omw.falloutterminalhack')
 local lockpickMenu = require('scripts.omw.falloutlockpick')
+local bookMenu = require('scripts.omw.falloutbook')
 
 local interact = core.interact
 local pipboy = core.pipboy
@@ -94,6 +95,8 @@ local function release()
         interact.closeLock()
     elseif screen == 'terminal' then
         interact.closeTerminal()
+    elseif screen == 'book' then
+        interact.closeBook()
     elseif screen == 'rest' or screen == 'resting' then
         interact.cancelRest()
     end
@@ -104,6 +107,7 @@ end
 local function leave()
     release()
     lockpickMenu.close()
+    bookMenu.close()
     destroyElement()
     closeTerminalMenus()
     screen = nil
@@ -361,6 +365,24 @@ local function renderResting()
     element = ui.create(widgets.panel(rows))
 end
 
+-- The book or scroll that lies in the world: its screen, and the Take button that puts it in the inventory. A game whose
+-- data lacks the menu file takes the book as any item
+local function renderBook()
+    local book = interact.book()
+    if not book then return end
+    local shownOk = bookMenu.show(book, {
+        onLeave = function() leave() end,
+        onTake = function()
+            interact.takeBook()
+            leave()
+        end,
+    })
+    if not shownOk then
+        interact.takeBook()
+        leave()
+    end
+end
+
 function render()
     destroyElement()
     if screen ~= 'terminal' then
@@ -370,6 +392,8 @@ function render()
         renderLock()
     elseif screen == 'terminal' then
         renderTerminal()
+    elseif screen == 'book' then
+        renderBook()
     elseif screen == 'rest' then
         local request = interact.rest()
         if request then renderRest(request) end
@@ -393,6 +417,12 @@ local function sync()
             shownSerial = lock.serial
             shownPins = lock.pins
             show('lock')
+            return
+        end
+        local book = interact.book()
+        if book then
+            shownSerial = book.serial
+            show('book')
             return
         end
         local terminal = interact.terminalSerial()
@@ -423,6 +453,12 @@ local function sync()
             shownSerial = lock.serial
             shownPins = lock.pins
             render()
+        end
+    elseif screen == 'book' then
+        if not interact.book() then
+            leave()
+        else
+            bookMenu.update()
         end
     elseif screen == 'terminal' then
         local serial = interact.terminalSerial()
@@ -487,6 +523,8 @@ local function press(code, symbol)
             -- The letters the file gives to its buttons (W waits, E leaves)
             restMenu:pcButton(symbol)
         end
+    elseif screen == 'book' then
+        bookMenu.press(code, symbol)
     elseif screen == 'terminal' then
         if not terminalMenu.press(code) then
             hackMenu.press(code)
@@ -503,10 +541,22 @@ local function press(code, symbol)
     end
 end
 
--- X forces the lock on the lockpicking screen (B leaves, which the engine does for every screen)
+-- X forces the lock on the lockpicking screen and takes the book on the screen of a book (B leaves, which the engine does
+-- for every screen)
+local padKeys = setmetatable({}, {
+    __index = function(_, button)
+        if button == input.CONTROLLER_BUTTON.X then
+            return screen == 'book' and input.KEY.T or input.KEY.F
+        end
+        return nil
+    end,
+})
 local onPad = pad.handler('interaction',
-    function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' and not messageOpen() end,
-    press, { [input.CONTROLLER_BUTTON.X] = input.KEY.F })
+    function()
+        return (screen == 'rest' or screen == 'lock' or screen == 'book') and I.UI.getMode() == 'Interface'
+            and not messageOpen()
+    end,
+    press, padKeys)
 
 return {
     engineHandlers = {
@@ -527,6 +577,7 @@ return {
                 modeOpen = false
                 release()
                 lockpickMenu.close()
+                bookMenu.close()
                 destroyElement()
                 closeTerminalMenus()
                 screen = nil

@@ -20,9 +20,14 @@ namespace OFWorld
     {
         if (actor != OFMechanics::getPlayer())
             return;
-        // A character of Fallout talks with the dialogue of the games it is from
+        // A character of Fallout talks with the dialogue of the games it is from, and a companion gives the wheel of
+        // its commands first (it has "Talk To" among them)
         if (ESM::isESM4Rec(static_cast<ESM::RecNameInts>(getTarget().getType())))
-            OFBase::Environment::get().getFalloutScripts()->talkTo(getTarget());
+        {
+            const auto scripts = OFBase::Environment::get().getFalloutScripts();
+            if (!scripts->isCompanion(getTarget()) || !scripts->openCompanionWheel(getTarget()))
+                scripts->talkTo(getTarget());
+        }
         else
             OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, getTarget());
     }

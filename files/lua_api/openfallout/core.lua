@@ -1558,6 +1558,15 @@
 -- @return #number
 
 ---
+-- A tile with no traits under another tile (kind "text", "image", "rect" or "hotrect"), which the script gives its traits
+-- with `set`: the lines of the credits are made so. `remove` and `removeChildren` take it out. Nothing for another kind.
+-- @function [parent=#FalloutMenu] create
+-- @param parent name or number of the tile it goes under
+-- @param #string kind
+-- @param #string name
+-- @return #number
+
+---
 -- The tile and trait that a trait stands for when the menu file writes it as a reference to another
 -- (`<xbuttona><ref src="OK" trait="clicked"/></xbuttona>`): the number of the tile and the name of the trait.
 -- @function [parent=#FalloutMenu] reference
@@ -1623,6 +1632,13 @@
 -- @return #list<#HudMessage>
 
 ---
+-- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
+-- subtitles: each has `text` (the speaker's name and the words), `seconds` (how long it stays from the moment it was said),
+-- `distance` (of the speaker from the player) and `forced` (a script asked for the text whatever the setting says).
+-- @function [parent=#Hud] takeSubtitles
+-- @return #list<#table>
+
+---
 -- The text of a note of text, with the `&name;` tokens in it (the key an action is bound to, the name of the player)
 -- filled in.
 -- @function [parent=#Hud] noteText
@@ -1648,6 +1664,8 @@
 -- @field #string sneak What the characters around make of the player: "hidden", "caution", "detected" or "danger".
 -- @field #string sneakText The word the games print for it.
 -- @field #boolean weaponDrawn
+-- @field #table controlsOff The controls that DisablePlayerControls took away, true for each that is off: `movement`,
+-- `pipboy`, `fighting`, `pointOfView`, `looking`, `rollover` and `sneaking`.
 -- @field #list<#string> crippled The textures (names under Interface\Stats) of the limbs that are crippled.
 
 ---
@@ -1663,6 +1681,30 @@
 -- @field #number maxHealth
 -- @field #boolean dead
 -- @field #boolean hostile Whether it fights the player.
+
+---
+-- What the text under the crosshair says of the object that the crosshair is on (FalloutNV.exe 0x775A00).
+-- @function [parent=#Hud] info
+-- @param #Object object
+-- @return #HudInfo Nothing for an object that has no name or is of a kind the text says nothing of.
+
+---
+-- @type HudInfo
+-- @field #string name
+-- @field #number count How many there are when it is a stack of things (1 for a single thing).
+-- @field #string verb The name of the game setting that holds the word of what the player does with it
+-- (sTargetTypeTake, sTargetTypeOpen, sTargetTypeOpenDoor, sTargetTypeActivate, sTargetTypeTalk, sSearch); nothing when
+-- the player can do nothing with it.
+-- @field #boolean stats Whether the weight and value row is shown (for something that can be taken).
+-- @field #number weight
+-- @field #number value
+-- @field #boolean broken Whether its lock is broken.
+-- @field #boolean locked Whether it is locked.
+-- @field #boolean hasKey Whether the player carries its key.
+-- @field #string lockWord The name of the game setting that holds the word of how hard the lock is (sLockLevelName*).
+-- @field #boolean keyOnly Whether only the key opens the lock.
+-- @field #string keyText The name of the key (or button of the pad) that activates, as the player has it set.
+-- @field #boolean pad Whether the player plays with the pad.
 
 ---
 -- The way the player faces and the things in the window of the compass.
@@ -1911,6 +1953,29 @@
 
 ---
 -- @function [parent=#Interact] closeLock
+
+---
+-- The book or scroll the player activated where it lies (the screen of a book, with its Take button).
+-- @function [parent=#Interact] book
+-- @return #InteractBook Nothing when none is open.
+
+---
+-- @type InteractBook
+-- @field #string reference The form id of the book's reference.
+-- @field #string name
+-- @field #string text The words of the book, with marks (`<BR>`, `<FONT>`, `<IMG>`...) and names of settings (`&sName;`).
+-- @field #boolean scroll Whether it is a scroll and not a book.
+-- @field #boolean canTake Whether the player may take it from where it lies.
+-- @field #number serial Another for each time one is opened.
+
+---
+-- Closes the screen of the book that lies in the world.
+-- @function [parent=#Interact] closeBook
+
+---
+-- The player takes the book that is open from where it lies: it goes to the inventory and the screen closes.
+-- @function [parent=#Interact] takeBook
+-- @return #boolean False when none is open or it may not be taken.
 
 ---
 -- The number of the terminal that is open, 0 for none. It changes with everything the screen of the terminal shows.
@@ -2213,6 +2278,33 @@
 -- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
 
 ---
+-- What a book or a scroll that the player carries says, for its screen.
+-- @function [parent=#Pipboy] book
+-- @param #string item
+-- @return #table nil for an item that is no book; else a table with `name`, `text` (with marks and names of settings,
+-- see @{#Interact.book}), `scroll` (a scroll and not a book) and `canTake`.
+
+---
+-- A page of the help manual or a hint of the game.
+-- @type HelpPage
+-- @field #string id The editor id of the message that holds it.
+-- @field #string title Its title.
+-- @field #string text Its words: marked up text when it begins with `<` (see @{#Interact.book}), with names of settings.
+
+---
+-- The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when `pad` is true), in the
+-- order of the list.
+-- @function [parent=#Pipboy] helpManual
+-- @param #boolean pad
+-- @return #list<#HelpPage> Empty when the data has no such list.
+
+---
+-- A hint of the game by the editor id of its message (`HelpCrafting`).
+-- @function [parent=#Pipboy] helpMessage
+-- @param #string editorId
+-- @return #HelpPage nil when there is none.
+
+---
 -- The most items that one drop puts on the floor.
 -- @field [parent=#Pipboy] #number dropLimit
 
@@ -2338,6 +2430,69 @@
 ---
 -- The player is done with the barter menu.
 -- @function [parent=#Pipboy] closeBarter
+
+---
+-- The wheel of commands of a companion: the player activated a character that follows it.
+-- @function [parent=#Pipboy] companion
+-- @return #PipboyCompanion nothing when no wheel is open
+
+---
+-- @type PipboyCompanion
+-- @field #string actor The id of the companion.
+-- @field #string name
+-- @field #number serial Another number for each time a wheel opens.
+-- @field #boolean aggressive The companion's variable FollowerSwitchAggressive is 1 (as the wheel read it when it opened).
+-- @field #boolean staysFar IsFollowingLong is 1.
+-- @field #boolean ranged CombatStyleRanged is 1.
+-- @field #boolean following Waiting is 0.
+-- @field #boolean waiting Waiting is not 0.
+-- @field #boolean pad A pad was the last thing the player used when the wheel opened.
+
+---
+-- What the wheel tells about the companion and the player's stimpaks.
+-- @function [parent=#Pipboy] companionStatus
+-- @return #table `{stimpaks, health, maxHealth, carried, capacity, weapon}`
+
+---
+-- The companion says a topic of the commands (found by its editor id): the results of its response change the
+-- companion's variables.
+-- @function [parent=#Pipboy] companionSay
+-- @param #string topic
+-- @return #boolean false when there is no such topic or nothing to say
+
+---
+-- The wheel writes the variable FollowerSwitchAggressive of the companion itself when the player toggles it.
+-- @function [parent=#Pipboy] companionSetAggressive
+-- @param #boolean aggressive
+
+---
+-- A stimpak of the player's is used on the companion.
+-- @function [parent=#Pipboy] companionStimpak
+-- @return #boolean false when the player has no stimpak
+
+---
+-- The wheel is over and the conversation with the companion begins.
+-- @function [parent=#Pipboy] companionTalk
+
+---
+-- The player is done with the wheel.
+-- @function [parent=#Pipboy] closeCompanion
+
+---
+-- The eight slots of the hot key wheel, in order: each a table with the slot (counted from 0), whether it takes an item
+-- (the second is the ammunition swap), and what the player put there: the item's id, name, how many of it the player
+-- carries, its picture (the record's inventory icon) and whether it is equipped (`id` is "" for an empty slot).
+-- @function [parent=#Pipboy] hotKeys
+-- @return #list<#table>
+
+---
+-- The player puts an item on the key of a slot (counted from 0): "assigned", "ammo" (ammunition goes on no key),
+-- "cannot" (a thing that is neither held, worn nor used up, or one the player does not carry) or "slot" (the ammunition
+-- swap, or none). An item has one key: it leaves the one it was on.
+-- @function [parent=#Pipboy] assignHotKey
+-- @param #number slot
+-- @param #string item
+-- @return #string
 
 ---
 -- Play the sound that a menu file or the code of the game names by its editor id (the files' `clicksound` and
