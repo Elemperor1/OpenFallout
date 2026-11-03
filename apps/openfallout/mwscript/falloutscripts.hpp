@@ -312,7 +312,8 @@ namespace OFScript
             int mClip = 0;
             int mLoaded = 0;
             int mReserve = 0;
-            /// The picture of the item in the inventory (the record's ICON), as the file names it; empty when it has none
+            /// The picture of the item in the inventory (the record's ICON), as the file names it; empty when it has
+            /// none
             std::string mIcon;
         };
         /// What a holder carries, the items the host knows by name, in the order the holder got them
@@ -2002,6 +2003,7 @@ namespace OFScript
         std::mutex mSoundNamesMutex;
         std::unordered_map<std::string, FalloutScript::FormId> mSoundNames;
         bool mSoundNamesBuilt = false;
+        std::set<std::string> mInterfaceSoundsLogged;
         /// The idle records by editor id (lower case), made when the first PlayIdle asks, and the idles that a PlayIdle
         /// could not play (told once in the log)
         std::mutex mIdleMutex;

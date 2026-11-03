@@ -3476,9 +3476,21 @@ namespace OFScript
         if (sound == nullptr)
             return false;
         const FalloutScript::FormId id = soundByEditorId(name);
-        if (id == 0)
-            return false;
-        const std::vector<std::string> files = soundFilesOf(id);
+        const std::vector<std::string> files = id != 0 ? soundFilesOf(id) : std::vector<std::string>();
+        {
+            // Said once for each name: what the data gives, as the file that the interface plays
+            const std::lock_guard lock(mSoundNamesMutex);
+            if (mInterfaceSoundsLogged.emplace(Misc::StringUtils::lowerCase(name)).second)
+            {
+                if (id == 0)
+                    Log(Debug::Warning) << "Interface sound " << name << ": no sound record has this editor id";
+                else if (files.empty())
+                    Log(Debug::Warning) << "Interface sound " << name << ": the sound record has no file";
+                else
+                    Log(Debug::Info) << "Interface sound " << name << ": " << files.size() << " file(s), the first is "
+                                     << files[0];
+            }
+        }
         if (files.empty())
             return false;
         // The interface's sounds are one file each; a sound that names a folder plays its first file
