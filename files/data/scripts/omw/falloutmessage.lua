@@ -248,10 +248,15 @@ local function onKey(key)
             list.select(math.max(1, math.min(count, at + step)), true)
             return
         end
-        if code == KEY.Enter or code == KEY.Space then
-            -- The lit button, and the first one when none is lit
+        if code == KEY.Space then
+            -- The game's code takes the key and does nothing with it (Mac round 12AG A1)
+            return
+        end
+        if code == KEY.Enter then
+            -- The button that is lit (picked with the arrows, or the one under the pointer) is clicked; with none lit
+            -- nothing happens, as in the game, where no button is lit when the box opens (round 12AH A4)
             local at = list.selected()
-            press(at > 0 and at or 1)
+            if at > 0 then press(at) end
             return
         end
     end

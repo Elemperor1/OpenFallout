@@ -275,10 +275,11 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   of either game's plugins has an `&` (none in 1567 New Vegas and 672 Fallout 3 messages, round 12AH), so the letters are for
   mods only.
   Space is taken by the box and does nothing there (`HandleClick(-1, ...)` is a no-op). Enter, the arrows and the pad do
-  not come from the box: they go to the interface manager's generic code, which steps along the neighbours of the selected
-  tile (the buttons have `repeatvertical`, so up and down walk the buttons, left and right nothing) and activates the
-  selected tile; which button is lit when the box opens, and what Enter does with none lit, was not traced (asked in 12AG,
-  A7). The port's own meanwhile: Enter and Space pick the lit button (the first when none is lit). The pad: the engine's
+  not come from the box: they go to the interface manager's generic code (round 12AH A4, `0x70f6e0`). No button is lit when
+  the box opens, and the file has no `xdefault`, `xup` or the like, so the arrow keys do nothing at all in the game's box; Enter
+  clicks the selected tile or, with none selected, the one under the pointer, and with neither nothing happens (the root is no
+  target). The script keeps the arrows as its own addition (they light a button, the pad's D-pad uses them), and Enter clicks
+  the button that is lit (a hover lights it) and does nothing otherwise; Space does nothing. The pad: the engine's
   pad handling steps aside while a box that the script draws is open, so the script takes the pad itself: D-pad up and
   down move the lit button, A picks it, B does nothing (as Escape; not seen in the running game yet).
   Fallout 3's `ShowMessage` (0x53dd40) and message menu (key handler 0x6694d0, creator 0x6698e0) are the same code with
@@ -445,6 +446,18 @@ once, when the screens are left (`menu.saveOptions`).
   running game (the game disables it under conditions that were not decoded), and what the Fallout 3 screens differ in
   (not checked; the same file is drawn). Nothing was seen in the running game.
 
+### Keys of the Pip-Boy (round 12AH A3, FalloutNV.exe; Fallout 3's control table and defaults only)
+
+- The key that opens and closes it is the control "Menu Mode" (Tab), the only one: a release before `fPlayerPipBoyLightTimer`
+  has run out opens it, holding it longer toggles the Pip-Boy's light instead (sounds `UIPipBoyLightOn` and `UIPipBoyLightOff`);
+  in the open Pip-Boy a Tab release closes it, unless a text field has the input. No control exists for the previous or next
+  page. F1, F2 and F3 (raw keys) go to Stats, Inventory and Data: closed they open the Pip-Boy on that page, open they switch
+  to it directly, and the key of the page that is up closes it. Escape does not close the Pip-Boy: it puts the pause menu on
+  top (the Pip-Boy stays under it), and with the pause menu open it closes only that.
+- The port's own differences, none changed yet: the engine's Tab binding opens and closes it at once (no light), Left and Right
+  change the page, F1 and F2 are the engine's quick keys and post-processing keys, and Escape closes the screen. The 28 numbered
+  controls and their defaults are in `mac-12ah-results.md` (Part A3).
+
 ### Trading (barter)
 
 `barter_menu.xml` is drawn by `falloutbarter.lua`; the engine side is `core.pipboy.barter*` (`apps/openfallout/mwscript/falloutbarter.cpp`)
@@ -498,6 +511,11 @@ button 0x72f6f0, the price of one 0x72ed00).
 - Accept moves the things (a worn one is taken off first), then the caps (the vendor's container gets what the player pays and
   the player what the vendor pays), adds the caps to the statistic "Barter Amount Traded" (id 0x27), and leaves the menu open with
   empty piles.
+- The first key: with nothing picked, the first of the arrows (up, down, left or right, the same for all four) picks the first
+  row of the first list that has rows, the player's (round 12AH A4: every list row has `xdefault` 1 and the player's list is
+  first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
+  on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
+  selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
 - Not done: the sounds of the menu (the caps up and down, the clicks), the item card's picture (BM_ItemIcon shows the form's
   inventory icon in the executable), the exit event the executable
   raises after a deal (0x61a2d0 and 0x7640a0, not decoded), the condition of things (every thing is at full condition),

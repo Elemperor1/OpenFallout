@@ -396,6 +396,21 @@ local function press(code, symbol)
         quantity.press(code)
         return
     end
+    local arrow = code == input.KEY.UpArrow or code == input.KEY.DownArrow or code == input.KEY.LeftArrow
+        or code == input.KEY.RightArrow
+    if arrow and sides.player.list.selected() <= 0 and sides.vendor.list.selected() <= 0 then
+        -- Nothing is picked: the first arrow picks the first row of the first list that has any, whichever it is (the
+        -- executable finds the tile with the highest `xdefault`, and every row has 1)
+        for _, name in ipairs({ 'player', 'vendor' }) do
+            if sides[name].list.count() > 0 then
+                active, focusSide = name, name
+                sides[name].list.select(1, true)
+                updateCards()
+                return
+            end
+        end
+        return
+    end
     local side = sides[active]
     local count = side.list.count()
     local picked = side.list.selected()
