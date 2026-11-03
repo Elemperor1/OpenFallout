@@ -641,6 +641,16 @@ local function refreshHotKeys(dt)
     if hotKeys == nil then
         hotKeys = hotKeysModule.new({
             pressed = function(slot) return input.isActionPressed(input.ACTION['QuickKey' .. (slot + 1)]) end,
+            -- The D-pad chooses the slot with a pad (it is bound to nothing else while the game is played)
+            direction = function()
+                local button = input.CONTROLLER_BUTTON
+                return {
+                    up = input.isControllerButtonPressed(button.DPadUp),
+                    down = input.isControllerButtonPressed(button.DPadDown),
+                    left = input.isControllerButtonPressed(button.DPadLeft),
+                    right = input.isControllerButtonPressed(button.DPadRight),
+                }
+            end,
             slots = pipboy.hotKeys,
             use = pipboy.use,
             sound = pipboy.playSoundNamed,
