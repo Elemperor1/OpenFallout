@@ -606,10 +606,23 @@ B leaves; the pointer is hidden over the area the pin moves in. What happens out
 failed force breaks the lock for good. `falloutinteraction.lua` shows the older widgets (a chance per pin) when the screen cannot be
 shown (no menu file, no scenes).
 
-Not seen in the running game yet: the picture of the scene (its lights are the lock file's, made by hand because the file reader
-skips lights), the pointer at the edge of the screen (the games read relative movement, the port the moves of the window's
-pointer), the pad's axes (inferred), the sound of strain (a loop in the games, played once here), and the karma that a stolen lock
-costs. The pause menu's model (three flat quads, no motion) and the Pip-Boy's item are not drawn yet.
+Seen in the running game (Mac rounds 12AK and 12AL, New Vegas, 1920 by 1080): the screen opens with the picture on the
+screen after one frame; the intro lasts 1.32 seconds and the entering sound comes on its first frame, as the code of the game
+does it (with no pin the player is told so at that frame and no sound plays); the pointer moves the pin one to one with
+the menu units and reaches both ends of the meter; the cylinder turns, binds (the stop sound and the strain sound), breaks
+the pin after `1 + 0.01 * skill` seconds of strain, a new pin comes in a second later and can be used two seconds after
+that; the force button turns the cylinder 90 degrees in 0.98 seconds with the two squeaks at 30 and 60 degrees and the unlock
+sound, closes the screen and opens the container (experience 30 for an easy lock); a failed force closes the screen and the lock
+stays shut for good (every later try shows a box); E leaves; all the sounds resolve. The lock file's own `shadow` mesh darkens
+the world round the disc (0.58 at its edge, none beyond 1.7 radii): that is the games' picture, not a dimming by the port.
+The first two runs drew the disc and the pin black: the nodes of the lock's file that held the point lights are not kept by
+the model loader, so the lights were put at the root of the model, behind the disc; the lights are now made under the nodes
+that are kept, at the places the file gives them (the scene logs its nodes and where each light went).
+
+Not seen yet: the lit lock and pin (after the fix above), the pointer at the edge of the screen (the games read relative
+movement, the port the moves of the window's pointer), the pad's axes (inferred), the sound of strain (a loop in the games,
+played once here), and the karma that a stolen lock costs. The pause menu's model (three flat quads, no motion) and the
+Pip-Boy's item are not drawn yet.
 
 ## The words of the labels
 
