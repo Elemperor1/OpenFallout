@@ -93,13 +93,11 @@ namespace OFScript
     {
         const ESM::RefId record = refId(item);
         const ESM::RefId otherRecord = refId(other);
+        // The list as the scripts have it now: its record and what AddFormToFormList put in it since
         const auto listHas = [this, other](const ESM::FormId& list) {
-            if (list.isZeroOrUnset())
+            if (list.isZeroOrUnset() || !list.hasContentFile() || list.mContentFile > 0xfe)
                 return false;
-            const ESM4::FormIdList* found = mStore.get<ESM4::FormIdList>().search(list);
-            return found != nullptr
-                && std::any_of(found->mObjects.begin(), found->mObjects.end(),
-                    [other](const ESM::FormId& object) { return object.toUint32() == other; });
+            return mFormLists.contains(list.toUint32(), other);
         };
         if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(record))
         {
@@ -163,6 +161,10 @@ namespace OFScript
         {
             if (!row.mHasCondition || row.mCount <= 0 || row.mHidden)
                 continue;
+            // The executable turns a candidate down when it is a quest item, a copy of the same item as well (Mac
+            // round 12AW F6)
+            if (isQuestItem(row.mId))
+                continue;
             int units = row.mCount;
             bool wornUnit = row.mEquipped;
             if (row.mId == item)
@@ -184,7 +186,7 @@ namespace OFScript
             }
             else
             {
-                if (isQuestItem(row.mId) || !repairsWith(item, row.mId))
+                if (!repairsWith(item, row.mId))
                     continue;
             }
             for (int unit = 0; unit < units; ++unit)
