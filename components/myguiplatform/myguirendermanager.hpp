@@ -26,6 +26,7 @@ namespace osg
     class Camera;
     class RenderInfo;
     class StateSet;
+    class Texture2D;
 }
 
 namespace MyGUIPlatform
@@ -94,6 +95,11 @@ namespace MyGUIPlatform
         void destroyTexture(MyGUI::ITexture* texture) override;
         /** @see RenderManager::getTexture */
         MyGUI::ITexture* getTexture(const std::string& name) override;
+
+        /// Makes a texture that is drawn by the engine (and not loaded from a file) known by `name`, so that a widget
+        /// can show it by that name. A name that is taken is given to the new texture; the entry stays for the whole
+        /// run (a widget may still point at it), so a screen that shows a texture of the same name again finds it.
+        MyGUI::ITexture* registerTexture(const std::string& name, osg::Texture2D* texture, osg::StateSet* injectState);
 
         // Called by the update traversal
         void update();

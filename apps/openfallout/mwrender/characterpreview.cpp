@@ -32,6 +32,7 @@
 #include "../mwmechanics/weapontype.hpp"
 
 #include "npcanimation.hpp"
+#include "premultipliedblend.hpp"
 #include "util.hpp"
 #include "vismask.hpp"
 
@@ -86,68 +87,12 @@ namespace OFRender
         osg::ref_ptr<osg::Node> mSubgraph;
     };
 
-    // Set up alpha blending mode to avoid issues caused by transparent objects writing onto the alpha value of the FBO
-    // This makes the RTT have premultiplied alpha, though, so the source blend factor must be GL_ONE when it's applied
-    class SetUpBlendVisitor : public osg::NodeVisitor
-    {
-    public:
-        SetUpBlendVisitor()
-            : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
-        {
-        }
-
-        void apply(osg::Node& node) override
-        {
-            if (osg::ref_ptr<osg::StateSet> stateset = node.getStateSet())
-            {
-                osg::ref_ptr<osg::StateSet> newStateSet;
-                if (stateset->getAttribute(osg::StateAttribute::BLENDFUNC)
-                    || stateset->getBinNumber() == osg::StateSet::TRANSPARENT_BIN)
-                {
-                    osg::BlendFunc* blendFunc
-                        = static_cast<osg::BlendFunc*>(stateset->getAttribute(osg::StateAttribute::BLENDFUNC));
-
-                    if (blendFunc)
-                    {
-                        newStateSet = new osg::StateSet(*stateset, osg::CopyOp::SHALLOW_COPY);
-                        node.setStateSet(newStateSet);
-                        osg::ref_ptr<osg::BlendFunc> newBlendFunc = new osg::BlendFunc(*blendFunc);
-                        newStateSet->setAttribute(newBlendFunc, osg::StateAttribute::ON);
-                        // I *think* (based on some by-hand maths) that the RGB and dest alpha factors are unchanged,
-                        // and only dest determines source alpha factor This has the benefit of being idempotent if we
-                        // assume nothing used glBlendFuncSeparate before we touched it
-                        if (blendFunc->getDestination() == osg::BlendFunc::ONE_MINUS_SRC_ALPHA)
-                            newBlendFunc->setSourceAlpha(osg::BlendFunc::ONE);
-                        else if (blendFunc->getDestination() == osg::BlendFunc::ONE)
-                            newBlendFunc->setSourceAlpha(osg::BlendFunc::ZERO);
-                        // Other setups barely exist in the wild and aren't worth supporting as they're not equippable
-                        // gear
-                        else
-                            Log(Debug::Info) << "Unable to adjust blend mode for character preview. Source factor 0x"
-                                             << std::hex << blendFunc->getSource() << ", destination factor 0x"
-                                             << blendFunc->getDestination() << std::dec;
-                    }
-                }
-                if (stateset->getMode(GL_BLEND) & osg::StateAttribute::ON)
-                {
-                    if (!newStateSet)
-                    {
-                        newStateSet = new osg::StateSet(*stateset, osg::CopyOp::SHALLOW_COPY);
-                        node.setStateSet(newStateSet);
-                    }
-                    newStateSet->setDefine("FORCE_OPAQUE", "0", osg::StateAttribute::ON);
-                }
-            }
-            traverse(node);
-        }
-    };
-
     class CharacterPreviewRTTNode : public SceneUtil::RTTNode
     {
     public:
         CharacterPreviewRTTNode(uint32_t sizeX, uint32_t sizeY)
             : RTTNode(sizeX, sizeY, Settings::video().mAntialiasing, false, 0,
-                StereoAwareness::Unaware_MultiViewShaders, shouldAddMSAAIntermediateTarget())
+                  StereoAwareness::Unaware_MultiViewShaders, shouldAddMSAAIntermediateTarget())
             , mAspectRatio(static_cast<float>(sizeX) / static_cast<float>(sizeY))
         {
             if (SceneUtil::AutoDepth::isReversed())
@@ -494,7 +439,7 @@ namespace OFRender
 
     RaceSelectionPreview::RaceSelectionPreview(osg::Group* parent, Resource::ResourceSystem* resourceSystem)
         : CharacterPreview(
-            parent, resourceSystem, OFMechanics::getPlayer(), 512, 512, osg::Vec3f(0, 125, 8), osg::Vec3f(0, 0, 8))
+              parent, resourceSystem, OFMechanics::getPlayer(), 512, 512, osg::Vec3f(0, 125, 8), osg::Vec3f(0, 0, 8))
         , mBase(*mCharacter.get<ESM::NPC>()->mBase)
         , mRef(ESM::makeBlankCellRef(), &mBase)
         , mPitchRadians(osg::DegreesToRadians(6.f))
