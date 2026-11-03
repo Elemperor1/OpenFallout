@@ -790,6 +790,12 @@ screen for `fHotKeyShowTimer` (a second and a half) after the key. All of it is 
 `hud_main_menu.xml` (300 by 300, over the action points) holds `template_hotkey_selector` (which includes the wheel of
 `prefabs/hotkeys.xml`, with the big picture `hotkey_icon`) and a line of text for the name.
 
+With a pad (0x701BD0, 0x77DA60) the D-pad chooses the slot, eight ways round the wheel: down is the slot 7, down and left 6, down
+and right 8, up and left 1, up and right 3, left 4, right 5 (up alone would be the swap of ammunition, no slot). A new combination
+has to stay more than 50 ms to replace the old one, except to or from none. The picture and the name come up at once, a direction
+held longer than `fHotKeyDownTimer` shows the wheel, and letting go uses the item of the slot that was chosen (`padSlot` and
+`stepPad` of `falloutmenuhotkeys.lua`).
+
 `falloutmenuhotkeys.lua` keeps the timing of the keys (`I.FalloutHud` draws it through `falloutmenuhud.lua`; the keys are read
 with `input.isActionPressed` of `QuickKey1` to `QuickKey8`, and the engine's own quick keys of Morrowind do nothing for
 Fallout); `core.pipboy.hotKeys` and `assignHotKey` are the engine's side (`mwscript/fallouthotkeys.cpp`, the class
@@ -808,9 +814,9 @@ longer carries (dropped, sold, used up) is empty: the engine empties it when the
 Not read or not made: whether a bare number press with no click assigns in the same frame (not traced; here only the click does),
 the executable's `sCantHotkeyBrokenItem` (this engine has no condition yet), what the executable does with the count of a thing
 that is only reduced (here a slot is emptied only when none is left), the Hot Key button that only a player with a pad sees and the
-pad's way to hold the wheel (a direction held shows it, let go assigns: 0x701BD0), and the HUD's pad flow (a direction held half a
-second shows the wheel, let go uses the thing). Seen only in the offline harness (`hotkeys.lua`, `itemwheel.lua`), not in the
-running game.
+pad's way to hold the wheel in the Pip-Boy (a direction held shows it, let go assigns: 0x701BD0; the button is the right bumper
+there, which the page's pad handler gives to the page down key), and the tiles of the display that the executable hides while the
+wheel is up on a pad. Seen only in the offline harness (`hotkeys.lua`, `hotpad.lua`, `itemwheel.lua`), not in the running game.
 
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 
