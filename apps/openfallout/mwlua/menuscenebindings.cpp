@@ -73,6 +73,12 @@ namespace OFLua
         }
     }
 
+    void clearMenuSceneReady()
+    {
+        std::lock_guard<std::mutex> lock(sReadyMutex);
+        sReady.clear();
+    }
+
     sol::table initCoreMenuSceneBindings(const Context& context)
     {
         sol::state_view lua = context.sol();

@@ -35,6 +35,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwgui/menuscenes.hpp"
 
 #include "../mwscript/falloutscripts.hpp"
 
@@ -50,6 +51,7 @@
 #include "../mwworld/worldmodel.hpp"
 
 #include "luabindings.hpp"
+#include "menuscenebindings.hpp"
 #include "playerscripts.hpp"
 #include "types/types.hpp"
 #include "userdataserializer.hpp"
@@ -438,6 +440,12 @@ namespace OFLua
     {
         mActionQueue.clear();
         mTeleportPlayerAction.reset();
+        // The scenes of the menus that a script made go with it: nothing would close them (a lockpicking screen that
+        // was open when a game was loaded or left), and they would go on drawing into their textures
+        if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+            if (OFGui::MenuScenes* scenes = windows->getMenuScenes())
+                scenes->clear();
+        clearMenuSceneReady();
         LuaUi::clearGameInterface();
         for (const std::string& name : mUiResourceManager.gameCursorNames())
             OFBase::Environment::get().getWindowManager()->removeLuaCursor(name);
