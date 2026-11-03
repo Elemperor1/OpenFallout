@@ -3483,7 +3483,8 @@ namespace OFScript
             mSoundNamesBuilt = true;
             for (const ESM4::Sound& sound : mStore.get<ESM4::Sound>())
                 if (!sound.mEditorId.empty())
-                    mSoundNames.emplace(Misc::StringUtils::lowerCase(sound.mEditorId), sound.mId.toUint32());
+                    // The executable's table of editor ids keeps the last form put in under a name (Mac round 12AI A4)
+                    mSoundNames[Misc::StringUtils::lowerCase(sound.mEditorId)] = sound.mId.toUint32();
         }
         const auto found = mSoundNames.find(Misc::StringUtils::lowerCase(name));
         return found != mSoundNames.end() ? found->second : 0;
