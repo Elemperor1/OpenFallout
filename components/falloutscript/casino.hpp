@@ -104,6 +104,41 @@ namespace FalloutScript::Casino
     constexpr std::uint32_t ledgerSectionVersion = 1;
     void writeLedger(Ledger& ledger, SaveWriter& out);
     void readLedger(Ledger& ledger, SaveReader& in, std::uint32_t version);
+
+    /// What the player has won and lost at Caravan, which the result screen shows: the caps of the pots won and lost,
+    /// the matches won and lost, and the biggest pot won (fields of the player's data in FalloutNV.exe: 0x61C, 0x620,
+    /// 0x624, 0x628 and 0x62C, set by the result code at 0x740980; Mac round 12AV S2)
+    struct CaravanTotals
+    {
+        int mMoneyWon = 0;
+        int mMoneyLost = 0;
+        int mGamesWon = 0;
+        int mGamesLost = 0;
+        int mBiggestAnte = 0;
+    };
+
+    /// The totals of the player's matches. It can be used from any thread.
+    class CaravanRecord
+    {
+        template <class T>
+        friend struct FalloutScript::SaveAccess;
+
+    public:
+        /// A match is over with `pot` at stake: a win adds the pot to the money won, one to the matches won and raises
+        /// the biggest ante to the pot when that is more; a loss adds the pot to the money lost and one to the matches
+        /// lost. The totals after it.
+        CaravanTotals add(bool won, int pot);
+        CaravanTotals totals() const;
+        void reset();
+
+    private:
+        mutable std::mutex mMutex;
+        CaravanTotals mTotals;
+    };
+
+    constexpr std::uint32_t caravanRecordSectionVersion = 1;
+    void writeCaravanRecord(CaravanRecord& record, SaveWriter& out);
+    void readCaravanRecord(CaravanRecord& record, SaveReader& in, std::uint32_t version);
 }
 
 #endif

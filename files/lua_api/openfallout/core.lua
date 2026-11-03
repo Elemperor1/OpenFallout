@@ -2004,13 +2004,15 @@
 -- the four stages of a match. The money moves when the match is over. Everything counts from 1: the caravans (the player's
 -- are 1 to 3, the opponent's 4 to 6, and the player's n faces 7 - n), their rows (up to 7), the cards of the hand (up to 8)
 -- and the cards the player owns. A card is its `value` (1 to 10, 12 Jack, 13 Queen, 14 King, 15 Joker) and its `suit`
--- (1 to 4, 5 for the Joker).
+-- (1 hearts, 2 spades, 3 diamonds, 4 clubs, 5 for the Joker: the first of the two numbers of the card record, Mac round 12AV).
 
 ---
 -- Where the match is: the `stage` ("bet", "deck", "game" or "results"), the `opponent`'s name, the stake (`funds` the
 -- player has, the `ante` the opponent asks, the `bet` the player puts up, the `ceiling` the opponent follows a raise to,
 -- `mostRaise`, the `pot`, `canMatch` and `canAccept`), the deck (`inDeck`, `owned` and `canPlay`: 30 cards or more) and,
--- when the match is over, `won` and `forfeited`. `serial` is another for each match.
+-- when the match is over, `won` and `forfeited`. `serial` is another for each match. What the player has won and lost at
+-- Caravan in all (with the match that is over) is `moneyWon`, `moneyLost`, `gamesWon`, `gamesLost` and `biggestAnte` (the
+-- biggest pot won), for the result screen.
 -- @function [parent=#Caravan] screen
 -- @return #table Nil when no match is open.
 

@@ -28,6 +28,9 @@ namespace OFScript
         /// The least number of cards a deck has: the menu does not open for a player with fewer cards, and the deck
         /// is not accepted with fewer (FalloutNV.exe 0x741060 and the menu's Play)
         constexpr int leastDeck = 30;
+        /// The miscellaneous statistics that a match of Caravan adds one to when it is won and when it is lost
+        constexpr int caravanGamesWonStat = 0x25;
+        constexpr int caravanGamesLostStat = 0x26;
 
         FalloutScript::FormId numberOf(const ESM::FormId& form)
         {
@@ -174,6 +177,7 @@ namespace OFScript
             screen.mCanPlay = screen.mInDeck >= leastDeck;
             screen.mWon = session.mWon;
             screen.mForfeited = session.mForfeited;
+            screen.mTotals = mCaravanRecord.totals();
         }
         // The name is the one of the opponent's reference, which only the thread of the frame may look up
         if (lookup != 0)
@@ -393,6 +397,10 @@ namespace OFScript
         session.mStage = CaravanStage::Results;
         session.mWon = session.mGame->playerWon();
         const int pot = session.mStake ? session.mStake->pot() : 0;
+        // The result code adds the pot to the money won or lost and one to the matches won or lost, and one to the Pip-Boy
+        // statistic "Caravan games won" or "lost" (0x740980, stats 0x25 and 0x26; Mac round 12AV S2)
+        mCaravanRecord.add(session.mWon, pot);
+        mProgress.modifyMiscStat(session.mWon ? caravanGamesWonStat : caravanGamesLostStat, 1);
         if (pot <= 0)
             return;
         // The side that lost pays the pot: its caravan money first, item by item, and the rest in caps (0x74CC70)

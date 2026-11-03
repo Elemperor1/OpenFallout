@@ -644,6 +644,8 @@ namespace OFScript
             /// The result, when the match is over
             bool mWon = false;
             bool mForfeited = false;
+            /// What the player has won and lost at Caravan in all (with this match), for the result screen
+            FalloutScript::Casino::CaravanTotals mTotals;
         };
         /// The player sits down to play the opponent (the reference the script is called on) with the deck record and
         /// the kind of opponent (0 and 1 are what the game has) and the share of its money it opens with. Nothing
@@ -2348,6 +2350,7 @@ namespace OFScript
         };
         std::mutex mCaravanMutex;
         std::optional<CaravanSession> mCaravan;
+        FalloutScript::Casino::CaravanRecord mCaravanRecord;
         int mCaravanSerial = 0;
         std::mt19937 mCaravanRandom{ std::random_device()() };
         /// The match is over: the pot is paid, in caravan money first and then in caps, by the side that lost

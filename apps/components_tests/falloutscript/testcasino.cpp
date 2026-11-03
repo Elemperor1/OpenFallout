@@ -483,6 +483,50 @@ namespace
         EXPECT_FALSE(again.known(0x00100003));
     }
 
+    TEST(FalloutScriptCasinoTest, the_caravan_totals_count_the_pots_the_matches_and_the_biggest_pot_won)
+    {
+        CaravanRecord record;
+        EXPECT_EQ(record.totals().mGamesWon, 0);
+        record.add(true, 40);
+        record.add(false, 25);
+        const CaravanTotals after = record.add(true, 15);
+        EXPECT_EQ(after.mMoneyWon, 55);
+        EXPECT_EQ(after.mMoneyLost, 25);
+        EXPECT_EQ(after.mGamesWon, 2);
+        EXPECT_EQ(after.mGamesLost, 1);
+        // The biggest ante is the biggest pot of a win: a bigger pot that was lost does not count
+        EXPECT_EQ(after.mBiggestAnte, 40);
+        record.add(false, 500);
+        EXPECT_EQ(record.totals().mBiggestAnte, 40);
+        record.reset();
+        EXPECT_EQ(record.totals().mMoneyWon, 0);
+        EXPECT_EQ(record.totals().mBiggestAnte, 0);
+    }
+
+    TEST(FalloutScriptCasinoTest, the_caravan_totals_go_through_a_saved_game)
+    {
+        CaravanRecord record;
+        record.add(true, 30);
+        record.add(false, 12);
+        FalloutScript::SaveWriter out;
+        writeCaravanRecord(record, out);
+        const std::string bytes = out.take();
+
+        CaravanRecord again;
+        again.add(true, 999);
+        FalloutScript::SaveReader in(bytes, [](FalloutScript::FormId form) -> std::optional<FalloutScript::FormId> {
+            return form;
+        });
+        readCaravanRecord(again, in, caravanRecordSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        const CaravanTotals totals = again.totals();
+        EXPECT_EQ(totals.mMoneyWon, 30);
+        EXPECT_EQ(totals.mMoneyLost, 12);
+        EXPECT_EQ(totals.mGamesWon, 1);
+        EXPECT_EQ(totals.mGamesLost, 1);
+        EXPECT_EQ(totals.mBiggestAnte, 30);
+    }
+
     TEST(FalloutScriptCasinoTest, the_level_of_the_winnings_is_the_highest_quarter_they_reach)
     {
         // A quarter, a half, three quarters and all of the most (400): 100, 200, 300 and 400

@@ -259,9 +259,12 @@ namespace FalloutMenu
     {
         std::string name = Xml::lower(Xml::trim(source));
         std::replace(name.begin(), name.end(), '\\', '/');
+        // The executable's include handler reads the file from the folder Data\Menus\Prefabs\ (FalloutNV.exe 0xA02D40, the
+        // format at 0x1094A4C): a file of that folder wins over one of the same name next to the menu (the four Caravan
+        // files are in both, and the ones next to the menu have no controls: Mac round 12AV S2)
         const std::string candidates[] = {
-            directoryOf(from) + name,
             "menus/prefabs/" + name,
+            directoryOf(from) + name,
             "menus/" + name,
             name,
         };

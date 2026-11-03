@@ -1001,18 +1001,42 @@ is its caps and its caravan money (form type 0x74, read as the kind of `CMNY`) a
 item in the order of the pack (here: of the forms) and then the rest in caps. Nothing moves until the match is over, and a match
 that the player leaves is a forfeit, which is a loss.
 
-`falloutcaravan.lua` draws the four screens. The stake is the game's `caravan_bet_menu.xml` (the two antes, the funds, Auto-Match, Raise
-with the quantity prompt, Accept, Exit); the deck is `caravan_builddeck_menu.xml` (the counts, the two lists, Add, Remove, Play
-Caravan) with plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
-move, the wheel to scroll, Enter to add or remove, R for a random deck of the executable's size, the pad's shoulders for the lists).
-The files of the match and of the result have no controls ("all controls will be handled in code"), so the match is tiles too: the
-caravans as columns (the opponent's above the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card
-picked up by a click and put on a caravan by a click on it, the totals coloured by sold, over or not yet, Discard Card, Discard
-Caravan and Forfeit (asked twice). The opponent moves after a second, its card lights the row it went on, and the result comes two
-seconds after the match ends. Seen only in the offline harness with a made-up engine (`caravan.lua`), not in the running game. Not
-made: the 3D table, deck strips and hands (the scenes catalogued in 12AS E2), the pictures of the cards, the sounds, the Pip-Boy
-statistics of the matches (their numbers were not read), the executable's words for the match tiles, the card suits' letters (the
-order of the suits was not read) and the confirmation the game asks before a forfeit by Escape.
+`falloutcaravan.lua` draws the four screens from the files of the folder `Menus\Prefabs` (the executable's include handler reads
+`<include src>` from there, `FalloutNV.exe` 0xA02D40, and the four files of the same names next to `caravan_menu.xml` have no
+controls: the loader reads a file of the prefabs folder before one of the menu's own folder, Mac round 12AV S2). Every label is
+a game setting, which the file names (`&-sName;`) and the executable writes itself: stake `sAutoMatchText`, `sRaiseText`,
+`sAcceptText`, `sExit`, `sCurrentAnteText`, `sTotalFundsText`; deck `sAddText`, `sRemoveText`, `sPlayCaravanText`, `sAllCardsText`,
+`sNavigateText`, a title `sCaravanDeckText` and the button of the right bumper written as `sRSMRandomize` and `sCaravanDeckText`
+with a space; match `sSelectCardText`, `sDiscardCardText`, `sDiscardTrackText`, the give-up button `sCancel` (the file says
+`sForfeitGameText`, the code writes `sBack` and then `sCancel` over it), `sAntePotText`, `sNetTotalText`, `sWinLossText`; result
+`sCaravanYouWinText` or `sCaravanYouLoseText` and later `sCaravanPressAnyKeyText`, `sCaravanWinningsText`, `sCaravanLossesText`,
+`sCaravanWinLossText`, `sCaravanBiggestAnteText`; the question `sQuitCaravanText` with `sYes` and `sNo`. The keys (the executable's key
+handler, 0x749360, reads the letters in both cases; the files name the same letters on their buttons): stake W Auto-Match, A Raise,
+F Accept, R Exit; deck W Add, A Remove, F Play Caravan, R leaves at once; match W Select Card, Q Discard Card, E Discard Caravan, R
+Cancel; any key on the result closes it. Escape is not handled by the Caravan code. R on the match puts a picked card back and asks
+nothing; with nothing picked it asks the one question, and Yes is a loss with the pot paid. The pad (the files' buttons, but A, which
+the engine clicks with): the stake X Raise, Y Accept, B Exit; the deck the right bumper for the button of the deck, X Remove, Y Play
+Caravan, the D-pad for the cursor (Add is A on the file); the match the bumpers for the triggers (Discard Card, Discard Caravan).
+The deck has plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
+move, the wheel to scroll, Enter to add or remove). The button of the deck is a button that says "Randomize" and the word of the
+deck; it makes a deck of the executable's size, which is read from its label (what the executable does with it, and what the S key
+does on the deck screen, were not read). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
+the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card picked up by a click (or W) and put on a
+caravan by a click on it, the totals coloured by sold, over or not yet; the file's counts of the corner show the pot, the net
+caps won at Caravan in all and the matches won over lost (what the last two hold is guessed from their names and the result
+screen: the code was not read), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
+opponent moves after a second, its card lights the row it went on, and the result comes two seconds after the match ends. The
+suit numbers of the card records are 1 hearts, 2 spades, 3 diamonds, 4 clubs and 5 the Joker, the values 1 to 10, 12 Jack, 13
+Queen, 14 King and 15 Joker (no 11); the face of a card is the record's `TX00` texture
+(`terminals\NV_PlayingCards\Deck<X>\card<X>_<suit letter>NN.dds`, five art sets B, G, L, T and U) and the back is `TX01`; the
+code never works an image out from suit and value. Each match adds one to the Pip-Boy statistic "Caravan games won" (0x25) or
+"lost" (0x26) and to the player's own totals (caps won, caps lost, matches won, matches lost, the biggest pot won), which the result
+screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). Seen only in the offline harness with a made-up
+engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
+E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
+`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the pictures of the cards, the sounds, the text the executable writes into the title of the
+opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B, which leave at once and
+forfeit without the question.
 
 ### The loading screen (Mac round 12AR C2, FalloutNV.exe 0x788CC0 and the functions around it)
 

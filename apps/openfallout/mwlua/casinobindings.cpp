@@ -332,6 +332,12 @@ namespace OFLua
             row["canPlay"] = screen->mCanPlay;
             row["won"] = screen->mWon;
             row["forfeited"] = screen->mForfeited;
+            // What the player has won and lost at Caravan in all (the result screen shows it)
+            row["moneyWon"] = screen->mTotals.mMoneyWon;
+            row["moneyLost"] = screen->mTotals.mMoneyLost;
+            row["gamesWon"] = screen->mTotals.mGamesWon;
+            row["gamesLost"] = screen->mTotals.mGamesLost;
+            row["biggestAnte"] = screen->mTotals.mBiggestAnte;
             return row;
         };
         caravan["match"] = []() { return scripts().caravanMatch(); };

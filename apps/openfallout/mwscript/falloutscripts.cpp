@@ -692,6 +692,7 @@ namespace OFScript
             mCaravan.reset();
         }
         mCasinoLedger.reset();
+        mCaravanRecord.reset();
         mPerks.clear();
         mItemUse.clear();
         mPerkOwners.clear();
