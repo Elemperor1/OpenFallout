@@ -1667,6 +1667,30 @@
 -- @field #boolean hostile Whether it fights the player.
 
 ---
+-- What the text under the crosshair says of the object that the crosshair is on (FalloutNV.exe 0x775A00).
+-- @function [parent=#Hud] info
+-- @param #Object object
+-- @return #HudInfo Nothing for an object that has no name or is of a kind the text says nothing of.
+
+---
+-- @type HudInfo
+-- @field #string name
+-- @field #number count How many there are when it is a stack of things (1 for a single thing).
+-- @field #string verb The name of the game setting that holds the word of what the player does with it
+-- (sTargetTypeTake, sTargetTypeOpen, sTargetTypeOpenDoor, sTargetTypeActivate, sTargetTypeTalk, sSearch); nothing when
+-- the player can do nothing with it.
+-- @field #boolean stats Whether the weight and value row is shown (for something that can be taken).
+-- @field #number weight
+-- @field #number value
+-- @field #boolean broken Whether its lock is broken.
+-- @field #boolean locked Whether it is locked.
+-- @field #boolean hasKey Whether the player carries its key.
+-- @field #string lockWord The name of the game setting that holds the word of how hard the lock is (sLockLevelName*).
+-- @field #boolean keyOnly Whether only the key opens the lock.
+-- @field #string keyText The name of the key (or button of the pad) that activates, as the player has it set.
+-- @field #boolean pad Whether the player plays with the pad.
+
+---
 -- The way the player faces and the things in the window of the compass.
 -- @function [parent=#Hud] compass
 -- @return #HudCompass

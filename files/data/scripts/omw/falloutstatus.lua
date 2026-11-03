@@ -416,6 +416,49 @@ local function aimedTarget(stats)
     return hud.target(result.hitObject)
 end
 
+-- The text under the crosshair, from the object the crosshair is on if it is within reach: the words are those of the
+-- game's settings (the executable's own: FalloutNV.exe 0x775A00, Mac round 12AN B7)
+local function infoState()
+    local ray = camera.getFocusRay()
+    local object = ray and ray.hitObject
+    if object == nil then return nil end
+    local info = hud.info(object)
+    if info == nil then return nil end
+    local result = {
+        name = info.count > 1 and string.format('%s (%d)', info.name, info.count) or info.name,
+        verb = info.verb and word(info.verb, '') or nil,
+        keyText = info.keyText,
+        pad = info.pad,
+    }
+    -- What the lock says, as the executable does: broken first, then the key (the word for using it), the class of the
+    -- lock and "locked" (a lock that only a key opens says its class alone)
+    if info.broken then
+        result.status = word('sBroken', 'Broken')
+    elseif info.locked then
+        local locked = word('sLocked', 'Locked')
+        if info.hasKey then
+            result.status = string.format('[%s - %s]', word('sHUDUseKey', 'Use Key'), locked)
+        elseif info.keyOnly then
+            result.status = string.format('[%s]', word(info.lockWord, 'Requires Key'))
+        else
+            result.status = string.format('[%s - %s]', word(info.lockWord, ''), locked)
+        end
+    end
+    if info.stats then
+        -- A weight or a value of nothing is two dashes; a value under 1 has a decimal
+        local weight = info.weight > 0 and string.format('%.1f', info.weight) or '--'
+        local value = info.value <= 0 and '--' or info.value < 1 and string.format('%.1f', info.value)
+            or string.format('%.0f', info.value)
+        result.stats = {
+            weightLabel = word('sInventoryWeightUpper', 'WG'),
+            weight = weight,
+            valueLabel = word('sInventoryValue', 'VAL'),
+            value = value,
+        }
+    end
+    return result
+end
+
 -- Takes the messages that were printed, and lets the lit ones burn down
 local function updateLines(dt)
     for _, message in ipairs(hud.takeMessages()) do
@@ -477,6 +520,9 @@ local function current(dt)
         target = aimedTarget(weapon)
         if target ~= nil and target.dead then target = nil end
     end
+    -- Only the display from the file has the text under the crosshair, and a script that stops the rollover hides it
+    local rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true
+    local info = menuHud and not rolloverOff and infoState() or nil
     local lit = {}
     for index, line in ipairs(lines) do
         -- A line is in steps of a tenth of a second, which is as often as the display looks
@@ -509,6 +555,7 @@ local function current(dt)
         rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
+        info = info,
         lines = lit,
         screen = ui.screenSize(),
         mode = 'game',
@@ -545,9 +592,11 @@ local function refreshFromFile(dt)
     end
     shown = state and state.mode == 'game' and state or nil
     if state and not menuHud:update(state, dt) then
-        -- The size of the window changed: the places are worked out from it, so the display is made again
+        -- The size of the window changed (the places are worked out from it) or the player took the pad up or put it down
+        -- (the key or the button next to the verb): the display is made again
+        local pad = menuHud.wantsPad == true
         menuHud:close()
-        menuHud = menuHudModule.create()
+        menuHud = menuHudModule.create(pad)
         if menuHud == nil then menuHudFailed = true end
     end
     return true

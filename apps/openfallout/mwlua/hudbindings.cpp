@@ -123,6 +123,36 @@ namespace OFLua
             return row;
         };
 
+        // What the text under the crosshair says of an object (the one the crosshair is on): its name and how many
+        // there are, the setting that holds the word of what the player does with it (`verb`, nothing for no word),
+        // whether the weight and value row is there and what they are, whether its lock is broken, whether it is locked
+        // (with whether the player has the key, the setting that holds the word of how hard the lock is, and whether
+        // only the key opens it) and the name of the key or button that activates. Nothing for an object it says
+        // nothing of.
+        api["info"] = [lua](sol::optional<LObject> object) -> sol::object {
+            if (!object)
+                return sol::nil;
+            OFScript::FalloutScripts::HudInfo info;
+            if (!scripts().hudInfo(object->ptr(), info))
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["name"] = info.mName;
+            row["count"] = info.mCount;
+            if (!info.mVerb.empty())
+                row["verb"] = info.mVerb;
+            row["stats"] = info.mStats;
+            row["weight"] = info.mWeight;
+            row["value"] = info.mValue;
+            row["broken"] = info.mBroken;
+            row["locked"] = info.mLocked;
+            row["hasKey"] = info.mHasKey;
+            row["lockWord"] = info.mLockWord;
+            row["keyOnly"] = info.mKeyOnly;
+            row["keyText"] = info.mKeyText;
+            row["pad"] = info.mPad;
+            return row;
+        };
+
         // The way the player faces (degrees clockwise from north) and the things in the window of the compass: the kind
         // ("quest", "landmark" or "enemy"), where in the window it is (0 at the left edge, 1 at the right), how far
         // away it is along the floor and its name

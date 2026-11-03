@@ -12,8 +12,11 @@
 --   * the compass is a strip of 360 degrees of the interface atlas that is shown 345 texels at a time, its texture shifted by
 --     the heading over 360 less 0.15 (Mac round 12AN B8); a marker is drawn when 1.45 times its bearing is within 70 degrees
 --     of the front, at x = (1.45 x bearing + 70) x 274 / 140, and fades near the two ends.
+--   * the text under the crosshair (Info) is three lines in the middle of the bottom: the word of what the player does with
+--     the thing (with the key that does it, or the button of the pad) over its name, and a row of its weight and value
+--     (or, for a locked thing, what the lock is, in brackets) under it (Mac rounds 12AM B2 and 12AN B7).
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
--- threshold, the place's name, subtitles, the text under the crosshair).
+-- threshold, the place's name, subtitles).
 local ui = require('openfallout.ui')
 local menuModule = require('scripts.omw.falloutmenu')
 
@@ -108,6 +111,18 @@ local function build(self)
     place(t.sneak, math.floor(width / 2), 2 * sy)
     t.messages = find('Messages')
     place(t.messages, 2 * sx - 5, 2 * sy + 25)
+    -- The text under the crosshair: the block is 320 wide, centred, 110 above the lower safe edge; the verb is the hot rect
+    -- of the file (it keeps the word and the key or the button next to it), the code makes the other lines
+    t.info = find('Info')
+    place(t.info, math.floor(width / 2) - 160, height - 2 * sy - 80 - 30)
+    t.infoVerb = find('justify_center_hotrect')
+    m:set(t.infoVerb, '_x', 160)
+    t.infoName = make(t.info, 'template_justify_center_text', 'hud_info_name', { x = 160, y = 0, wrapwidth = 320 })
+    t.infoStatus = make(t.info, 'template_justify_center_text', 'hud_info_status', { x = 160, y = 65, alpha = 0 })
+    t.infoWeightLabel = make(t.info, 'template_justify_left_text', 'hud_info_weight_label', { x = 10, y = 60 })
+    t.infoWeight = make(t.info, 'template_justify_right_text', 'hud_info_weight', { x = 135, y = 60 })
+    t.infoValueLabel = make(t.info, 'template_justify_left_text', 'hud_info_value_label', { x = 165, y = 60 })
+    t.infoValue = make(t.info, 'template_justify_right_text', 'hud_info_value', { x = 290, y = 60 })
     t.xp = find('XPMeter')
     place(t.xp, width - 2 * sx - 390, height - 2 * sy - 280)
     t.limbs = find('crippled_limb_indicator')
@@ -333,6 +348,41 @@ function Hud:showRadiation(state)
     self:put(t.radsPointer, 'x', 15 + 300 * share(state.rads, state.radsMax))
 end
 
+-- The text under the crosshair: what the player can do with the thing, what it is called, what it weighs and is worth, or
+-- how its lock stands
+function Hud:showInfo(info)
+    local t = self.tiles
+    if info == nil then
+        self:put(t.info, 'visible', 0)
+        return
+    end
+    self:put(t.info, 'visible', 1)
+    local verb = info.verb ~= nil and info.verb ~= ''
+    self:put(t.infoVerb, 'visible', verb and 1 or 0)
+    if verb then
+        self:put(t.infoVerb, 'string', info.verb)
+        -- The key is written on the PC and the button of the pad (the button's picture is the exe's own token) when a pad is used
+        self:put(t.infoVerb, '_PCButtonText', info.keyText or '')
+    end
+    self:put(t.infoName, 'string', info.name)
+    local status = info.status ~= nil and info.status ~= ''
+    self:put(t.infoStatus, 'string', status and info.status or '')
+    self:put(t.infoStatus, 'alpha', status and 255 or 0)
+    local stats = info.stats
+    for _, tile in ipairs({ t.infoWeightLabel, t.infoValueLabel }) do
+        self:put(tile, 'visible', stats and 1 or 0)
+        self:put(tile, 'alpha', stats and 255 or 0)
+    end
+    self:put(t.infoWeight, 'visible', stats and 1 or 0)
+    self:put(t.infoValue, 'visible', stats and 1 or 0)
+    if stats then
+        self:put(t.infoWeightLabel, 'string', stats.weightLabel)
+        self:put(t.infoWeight, 'string', stats.weight)
+        self:put(t.infoValueLabel, 'string', stats.valueLabel)
+        self:put(t.infoValue, 'string', stats.value)
+    end
+end
+
 -- The bar of an enemy stays for a while after its target or its health changed, then goes
 function Hud:showEnemy(state, dt)
     local t = self.tiles
@@ -391,6 +441,12 @@ end
 function Hud:update(state, dt)
     local size = ui.screenSize()
     if size.x ~= self.size.x or size.y ~= self.size.y then return false end
+    -- The file is opened for the keyboard or for the pad (what its key or button hint shows): when the player changes the
+    -- one it plays with the display is made again
+    if state.info ~= nil and (state.info.pad == true) ~= self.pad then
+        self.wantsPad = state.info.pad == true
+        return false
+    end
     local t = self.tiles
     local full = state.mode == 'game'
     local off = state.mode == 'off'
@@ -398,7 +454,7 @@ function Hud:update(state, dt)
     self.shown:batch(function()
         self:showMessage(dt)
         self:put(t.messages, 'visible', off and 0 or 1)
-        for _, tile in ipairs({ t.hitPoints, t.actionPoints, t.rads, t.reticle, t.sneak, t.xp, t.limbs, t.enemy }) do
+        for _, tile in ipairs({ t.hitPoints, t.actionPoints, t.rads, t.reticle, t.sneak, t.xp, t.limbs, t.enemy, t.info }) do
             if not full then self:put(tile, 'visible', 0) end
         end
         if not full then return end
@@ -408,7 +464,7 @@ function Hud:update(state, dt)
         self:put(t.hitPoints, 'visible', scripted and 0 or 1)
         self:put(t.actionPoints, 'visible', scripted and 0 or 1)
         if scripted then
-            for _, tile in ipairs({ t.reticle, t.sneak, t.limbs, t.enemy }) do self:put(tile, 'visible', 0) end
+            for _, tile in ipairs({ t.reticle, t.sneak, t.limbs, t.enemy, t.info }) do self:put(tile, 'visible', 0) end
             self:showExperience(state)
             self:showRadiation(state)
             return
@@ -436,6 +492,7 @@ function Hud:update(state, dt)
             local alert = state.sneak == 'caution' or state.sneak == 'danger'
             self:put(t.sneakText, 'systemcolor', alert and 2 or 1)
         end
+        self:showInfo(state.info)
         self:showExperience(state)
         self:showRadiation(state)
         self:showEnemy(state, dt)
@@ -454,12 +511,12 @@ function Hud:close()
     self.shown:close()
 end
 
--- The display, or nil when the file of the game cannot be shown
-function module.create()
+-- The display, or nil when the file of the game cannot be shown (`pad`: the player plays with the pad)
+function module.create(pad)
     local size = ui.screenSize()
-    local shown = menuModule.open(FILE, { layer = 'HUD', passive = true })
+    local shown = menuModule.open(FILE, { layer = 'HUD', passive = true, pad = pad == true })
     if not shown then return nil end
-    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = {} }, Hud)
+    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = {}, pad = pad == true }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then
         print('The head-up display is not drawn from its file: ' .. tostring(problem))

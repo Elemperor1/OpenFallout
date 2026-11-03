@@ -974,6 +974,35 @@ namespace OFScript
             bool mDead = false;
         };
         bool hudTarget(const OFWorld::Ptr& target, HudTarget& result);
+        /// What the text under the crosshair says of the object that the crosshair is on (FalloutNV.exe 0x775A00, Mac
+        /// rounds 12AM B2 and 12AN B7): its name, what the player does with it, its weight and value, and what its lock
+        /// is. False for an object the text says nothing of (one with no name, or a static one).
+        struct HudInfo
+        {
+            std::string mName;
+            /// How many there are, when it is a stack of things
+            int mCount = 1;
+            /// The setting that holds the word for what the player does with it (sTargetTypeTake, sSearch ...), empty
+            /// when the player can do nothing with it
+            std::string mVerb;
+            /// The weight and value row is there for something that can be taken
+            bool mStats = false;
+            double mWeight = 0;
+            double mValue = 0;
+            /// Its lock is broken (forcing it failed)
+            bool mBroken = false;
+            /// It is locked, whether the player carries its key, the setting that holds the word for how hard the lock
+            /// is, and whether only the key opens it
+            bool mLocked = false;
+            bool mHasKey = false;
+            std::string mLockWord;
+            bool mKeyOnly = false;
+            /// The name of the key (or of the button of the pad) that activates, as the player has it set
+            std::string mKeyText;
+            /// The player plays with the pad
+            bool mPad = false;
+        };
+        bool hudInfo(const OFWorld::Ptr& target, HudInfo& result);
         /// A thing the compass shows
         struct HudMarker
         {

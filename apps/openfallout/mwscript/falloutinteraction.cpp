@@ -8,15 +8,28 @@
 #include <sstream>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadacti.hpp>
+#include <components/esm4/loadalch.hpp>
+#include <components/esm4/loadammo.hpp>
+#include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadflst.hpp>
+#include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadimod.hpp>
+#include <components/esm4/loadingr.hpp>
+#include <components/esm4/loadkeym.hpp>
 #include <components/esm4/loadmesg.hpp>
+#include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadnote.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadterm.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/arguments.hpp>
@@ -28,6 +41,7 @@
 #include <components/vfs/manager.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -153,6 +167,138 @@ namespace OFScript
             screen.mSerial = ++mLockSerial;
             mLockScreen = screen;
         }
+        return true;
+    }
+
+    bool FalloutScripts::hudInfo(const OFWorld::Ptr& target, HudInfo& result)
+    {
+        if (target.isEmpty() || !target.isInCell())
+            return false;
+        const std::uint32_t type = target.getType();
+        const ESM::RefId base = target.getCellRef().getRefId();
+        bool item = false;
+        std::string verb;
+        // The things the player takes: their weight and value are in the record, and the word is Take (a book that lies
+        // in the world has that word too: the executable shows the word of Take for the activation of a readable item)
+        if (const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::Armor* record = mStore.get<ESM4::Armor>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::Ammunition* record = mStore.get<ESM4::Ammunition>().search(base))
+        {
+            result.mWeight = record->mData.mWeight;
+            result.mValue = record->mData.mValue;
+            item = true;
+        }
+        else if (const ESM4::Potion* record = mStore.get<ESM4::Potion>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mItem.value;
+            item = true;
+        }
+        else if (const ESM4::MiscItem* record = mStore.get<ESM4::MiscItem>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::Book* record = mStore.get<ESM4::Book>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::Ingredient* record = mStore.get<ESM4::Ingredient>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        else if (const ESM4::ItemMod* record = mStore.get<ESM4::ItemMod>().search(base))
+        {
+            result.mWeight = record->mData.mWeight;
+            result.mValue = record->mData.mValue;
+            item = true;
+        }
+        else if (const ESM4::Key* record = mStore.get<ESM4::Key>().search(base))
+        {
+            result.mWeight = record->mData.weight;
+            result.mValue = record->mData.value;
+            item = true;
+        }
+        if (item)
+            verb = "sTargetTypeTake";
+        else if (type == ESM4::Container::sRecordId)
+            verb = "sTargetTypeOpen";
+        else if (type == ESM4::Door::sRecordId)
+            verb = "sTargetTypeOpenDoor";
+        else if (type == ESM4::Activator::sRecordId || type == ESM4::TalkingActivator::sRecordId
+            || type == ESM4::Terminal::sRecordId || type == ESM4::Furniture::sRecordId)
+        {
+            // Sitting and sleeping are words for furniture too, and which one it is comes from the markers of the
+            // furniture, which are not read: the plain word
+            verb = "sTargetTypeActivate";
+        }
+        else if (type == ESM4::Npc::sRecordId || type == ESM4::Creature::sRecordId)
+        {
+            const FalloutScript::FormId actor = scriptReferenceOf(target);
+            if (actor == 0 || actor == mPlayer)
+                return false;
+            if (mActors.isDead(actor))
+                verb = "sSearch";
+            else if (type == ESM4::Npc::sRecordId && mCombat.target(actor) != mPlayer)
+                verb = "sTargetTypeTalk";
+        }
+        else
+            return false;
+
+        result.mName = std::string(target.getClass().getName(target));
+        // A thing with no name has no text (the executable's name line is blank, and the games show nothing)
+        if (result.mName.empty())
+            return false;
+        result.mVerb = verb;
+        result.mStats = item;
+        if (item)
+            result.mCount = std::max(1, std::abs(target.getCellRef().getCount()));
+
+        if (type == ESM4::Door::sRecordId || type == ESM4::Container::sRecordId)
+        {
+            const FalloutScript::FormId reference = referenceOf(target);
+            if (reference != 0)
+            {
+                result.mBroken = mLockBroken.count(reference) > 0;
+                if (mReferenceState.isLocked(reference))
+                {
+                    result.mLocked = true;
+                    const ESM4::Reference* record
+                        = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+                    result.mHasKey = record != nullptr && !record->mKey.isZeroOrUnset()
+                        && mActors.itemCount(mPlayer, record->mKey.toUint32()) > 0;
+                    const Interaction::Setting setting
+                        = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
+                    const bool leveled = record != nullptr && (record->mLockFlags & 0x04) != 0;
+                    const int level = Interaction::lockLevel(
+                        mReferenceState.lockLevel(reference), leveled, mProgress.level(), setting);
+                    const Interaction::LockClass lockClass = Interaction::lockClass(level, setting);
+                    result.mLockWord = Interaction::lockClassWord(lockClass);
+                    result.mKeyOnly = lockClass == Interaction::LockClass::Impossible;
+                }
+            }
+        }
+
+        // The key (or button) of the activation is named as the player has it set
+        if (const auto key = messageToken("sUActnGrab"))
+            result.mKeyText = *key;
+        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+            result.mPad = input->joystickLastUsed();
         return true;
     }
 

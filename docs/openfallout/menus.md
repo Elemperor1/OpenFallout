@@ -661,10 +661,25 @@ its older drawing for a data folder that lacks the file.
   stay, and the health, the action points, the crosshair, the sneak meter, the limbs and the enemy bar are hidden. A
   script that disables rollover hides the text under the crosshair. `core.hud.status` has the disabled controls
   (`controlsOff`); `falloutstatus.lua` turns them into `scripted` and `rolloverOff`.
-- Not drawn: the text under the crosshair (`Info`), the armour icons, the weapon's name and condition, the place's name that
-  shows on entering, subtitles, the hot keys, the needs of hardcore mode, the breath meter and the quest reminder; the weapon's
-  rounds show the rounds carried, as the engine has no clip. Mac round 12AM B2 read the text under the crosshair (name, verb,
-  weight and value): it is the next piece.
+- The text under the crosshair (`Info`, Mac rounds 12AM B2 and 12AN B7) is a block 320 wide, centred, 110 above the lower
+  safe edge: the word of what the player does with the thing (the file's hot rect, with the key that does it next to it, or the
+  button of the pad: the file is opened for the one in use and made again when the player changes it), its name (with the
+  number in brackets for a stack), a row of weight and value for something that can be taken (a number of nothing is two
+  dashes, a value under 1 has a decimal), and a line for its lock. The words are the game's settings: `sTargetTypeTake`
+  (also for a book that lies in the world), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
+  `sTargetTypeTalk` (a character that does not fight the player), `sSearch` (a body); a character that fights, and a
+  creature that is alive, have no word. The lock line is, as the executable writes it, `sBroken` for a lock that forcing
+  broke, else for a locked thing `[sHUDUseKey - sLocked]` when the player carries the key, `[<class word>]` when only a key
+  opens it, and `[<class word> - sLocked]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
+  object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there: the
+  words for sitting and sleeping (the port does not tell a bed from a chair), pickpocket, steal and pick (the port has no
+  such actions yet), disarming a mine, the key hint on the PC (the hint tile of the file stays hidden: the file's rule for
+  it is a text trait taken as true, which the menu engine does not do; asked of the Mac in round 12AO), the weight and value
+  row for containers, doors and characters (whether the executable shows it for them is not clear), and the colour that
+  marks a thing that is owned.
+- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, subtitles, the hot
+  keys, the needs of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
+  the engine has no clip.
 
 ### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
 
