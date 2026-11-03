@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <components/falloutscript/lockpick.hpp>
 
 #include <gtest/gtest.h>
@@ -86,5 +88,223 @@ namespace
         EXPECT_DOUBLE_EQ(forceChance(60, 2), 20);
         EXPECT_DOUBLE_EQ(forceChance(100, 0), 100);
         EXPECT_DOUBLE_EQ(forceChance(15, 0), 25);
+    }
+
+    // ---- The game ----
+
+    struct LockpickGameTest : Test
+    {
+        static Game::Setup setup(int lockClass = 2, double skill = 15, int picks = 3)
+        {
+            Game::Setup result;
+            result.mLockClass = lockClass;
+            result.mSkill = skill;
+            result.mPicks = picks;
+            result.mMeterWidth = 1200;
+            return result;
+        }
+
+        static bool has(const std::vector<Event>& events, Event event)
+        {
+            return std::find(events.begin(), events.end(), event) != events.end();
+        }
+
+        // The sweet spot is in the middle of the meter, as the first number from `random` is a half
+        static Game make(const Game::Setup& setup)
+        {
+            return Game(setup, [] { return 0.5; });
+        }
+
+        // Steps for some seconds, with the same input; every event of the steps
+        static std::vector<Event> run(Game& game, double seconds, const Game::Input& input)
+        {
+            std::vector<Event> all;
+            const double step = 1.0 / 60;
+            for (double t = 0; t < seconds - 1e-9; t += step)
+            {
+                Game::Input in = input;
+                in.mSeconds = step;
+                const auto events = game.step(in);
+                all.insert(all.end(), events.begin(), events.end());
+            }
+            return all;
+        }
+
+        static Game ready(const Game::Setup& s)
+        {
+            Game game = make(s);
+            run(game, Game::lockForward + 0.05, {});
+            return game;
+        }
+    };
+
+    TEST_F(LockpickGameTest, flysTheLockAndThePinInThenSaysSo)
+    {
+        Game game = make(setup());
+        EXPECT_EQ(game.state(), Game::State::Intro);
+        EXPECT_EQ(game.view().mLockSequence, "Forward");
+        EXPECT_FALSE(has(run(game, 1.0, {}), Event::Enter));
+        EXPECT_TRUE(has(run(game, 0.5, {}), Event::Enter));
+        EXPECT_EQ(game.state(), Game::State::Idle);
+    }
+
+    TEST_F(LockpickGameTest, saysThereAreNoPicksInsteadOfTheEnterSoundWhenThereAreNone)
+    {
+        Game game = make(setup(2, 15, 0));
+        const auto events = run(game, 1.5, {});
+        EXPECT_TRUE(has(events, Event::OutOfPicks));
+        EXPECT_FALSE(has(events, Event::Enter));
+    }
+
+    TEST_F(LockpickGameTest, doesNotTurnTheCylinderWithoutAPick)
+    {
+        Game game = make(setup(2, 15, 0));
+        run(game, 1.5, {});
+        Game::Input turn;
+        turn.mTurn = 1;
+        run(game, 1.0, turn);
+        EXPECT_EQ(game.state(), Game::State::Idle);
+        EXPECT_EQ(game.view().mAngle, 0);
+    }
+
+    TEST_F(LockpickGameTest, opensTheLockWhenThePickIsInTheInnermostBand)
+    {
+        Game game = ready(setup());
+        EXPECT_EQ(game.limit(), 90);
+        Game::Input turn;
+        turn.mTurn = 1;
+        const auto events = run(game, 1.2, turn);
+        EXPECT_TRUE(has(events, Event::Turn));
+        EXPECT_TRUE(has(events, Event::SqueakA));
+        EXPECT_TRUE(has(events, Event::SqueakB));
+        EXPECT_TRUE(has(events, Event::Unlock));
+        EXPECT_EQ(game.state(), Game::State::Opened);
+    }
+
+    TEST_F(LockpickGameTest, bindsAtTheLimitOfAPickThatIsOffTheSpotAndBreaksItAfterItsHealth)
+    {
+        Game game = ready(setup(2, 15, 2));
+        // Move the pick 100 units from the middle: the third band (half-widths 50, 90, 130 ...), a turn of 60 degrees
+        Game::Input move;
+        move.mMove = 100;
+        run(game, 1.0 / 60, move);
+        const double limit = game.limit();
+        EXPECT_LT(limit, 90);
+        EXPECT_GT(limit, 0);
+
+        Game::Input turn;
+        turn.mTurn = 1;
+        auto events = run(game, 1.0, turn);
+        EXPECT_TRUE(has(events, Event::Stop));
+        EXPECT_TRUE(has(events, Event::TensionStart));
+        EXPECT_EQ(game.state(), Game::State::Binding);
+        EXPECT_NEAR(game.view().mAngle, limit, 1e-9);
+        EXPECT_FALSE(has(events, Event::Break));
+        // The pick has 1.15 of health and loses one in a second of strain: the strain began before the end of that
+        // second of turning, so a second more is more than it holds
+        events = run(game, 1.2, turn);
+        EXPECT_TRUE(has(events, Event::Break));
+        EXPECT_TRUE(has(events, Event::TensionEnd));
+        EXPECT_EQ(game.picks(), 1);
+        EXPECT_EQ(game.state(), Game::State::Snapping);
+        EXPECT_EQ(game.view().mPinSequence, "Left");
+    }
+
+    TEST_F(LockpickGameTest, takesANewPickAfterABreakWithTheSpotWhereItWas)
+    {
+        Game game = ready(setup(2, 0, 2));
+        const double center = game.sweetSpot().mCenter;
+        Game::Input move;
+        move.mMove = 200;
+        run(game, 1.0 / 60, move);
+        Game::Input turn;
+        turn.mTurn = 1;
+        run(game, 2.0, turn);
+        ASSERT_EQ(game.state(), Game::State::Snapping);
+        run(game, Game::resetSeconds + 0.1, {});
+        EXPECT_EQ(game.state(), Game::State::Waiting);
+        EXPECT_EQ(game.view().mAngle, 0);
+        EXPECT_DOUBLE_EQ(game.view().mPick, 600);
+        EXPECT_EQ(game.sweetSpot().mCenter, center);
+        EXPECT_EQ(game.view().mPinSequence, "Forward");
+        run(game, Game::pinForward + 0.1, {});
+        EXPECT_EQ(game.state(), Game::State::Idle);
+        EXPECT_NEAR(game.view().mHealth, 1.0, 1e-9);
+    }
+
+    TEST_F(LockpickGameTest, saysThePicksAreGoneWhenTheLastOneBreaks)
+    {
+        Game game = ready(setup(2, 0, 1));
+        Game::Input move;
+        move.mMove = 200;
+        run(game, 1.0 / 60, move);
+        Game::Input turn;
+        turn.mTurn = 1;
+        run(game, 2.0, turn);
+        EXPECT_EQ(game.picks(), 0);
+        EXPECT_TRUE(has(run(game, Game::resetSeconds + 0.1, {}), Event::OutOfPicks));
+        run(game, Game::pinForward + 0.1, {});
+        run(game, 1.0, turn);
+        EXPECT_EQ(game.state(), Game::State::Idle);
+    }
+
+    TEST_F(LockpickGameTest, lowersTheCylinderAgainWhenTheTurnIsLetGo)
+    {
+        Game game = ready(setup());
+        Game::Input move;
+        move.mMove = 150;
+        run(game, 1.0 / 60, move);
+        Game::Input turn;
+        turn.mTurn = 1;
+        run(game, 0.3, turn);
+        const double turned = game.view().mAngle;
+        EXPECT_GT(turned, 20);
+        EXPECT_EQ(game.state(), Game::State::Turning);
+        run(game, 0.1, {});
+        EXPECT_EQ(game.state(), Game::State::Idle);
+        EXPECT_LT(game.view().mAngle, turned);
+        run(game, 1.1, {});
+        EXPECT_EQ(game.view().mAngle, 0);
+    }
+
+    TEST_F(LockpickGameTest, forcesALockWithTheChanceOfTheSkill)
+    {
+        // Skill 60 against an average lock (gate 50) is 20 per cent
+        Game game = ready(setup(2, 60, 1));
+        const auto won = game.force(19.9);
+        EXPECT_TRUE(has(won, Event::Turn));
+        EXPECT_TRUE(game.forcing());
+        EXPECT_TRUE(has(run(game, 1.2, {}), Event::Unlock));
+        EXPECT_EQ(game.picks(), 1);
+
+        Game lost = ready(setup(2, 60, 1));
+        EXPECT_TRUE(has(lost.force(20.0), Event::ForceFailed));
+        EXPECT_EQ(lost.state(), Game::State::Failed);
+        EXPECT_EQ(lost.picks(), 1);
+    }
+
+    TEST_F(LockpickGameTest, putsThePinStraightUpAtTheMiddleAndPointsItToTheSidesAtTheEnds)
+    {
+        Game game = ready(setup());
+        EXPECT_NEAR(game.view().mPickAngle, 0, 1e-9);
+        Game::Input left;
+        left.mMove = -5000;
+        run(game, 1.0 / 60, left);
+        EXPECT_NEAR(game.view().mPickAngle, 90, 1e-9);
+        Game::Input right;
+        right.mMove = 5000;
+        run(game, 1.0 / 60, right);
+        EXPECT_NEAR(game.view().mPickAngle, -90, 1e-9);
+    }
+
+    TEST_F(LockpickGameTest, setsTheLockToTheTimeOfItsSequenceFromTheTurn)
+    {
+        Game game = ready(setup());
+        Game::Input turn;
+        turn.mTurn = 1;
+        run(game, 0.5, turn);
+        EXPECT_NEAR(game.view().mAngle, 45, 1.0);
+        EXPECT_EQ(game.view().mLockSequence, "Backward");
+        EXPECT_NEAR(game.view().mLockTime, Game::lockBackward * game.view().mAngle / 90, 1e-9);
     }
 }

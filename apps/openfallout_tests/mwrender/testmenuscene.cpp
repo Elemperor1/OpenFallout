@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cmath>
+
 #include <apps/openfallout/mwrender/menuscene.hpp>
 
 namespace
@@ -54,5 +57,28 @@ namespace
     {
         const osg::Matrixf m = OFRender::placement({ 10, 20, 30 }, { 0, 0, 90 }, 2.f);
         expectNear(placed(m, { 1, 0, 0 }), { 10, 22, 30 });
+    }
+
+    TEST(OFRenderMenuScenePlacement, turnsAPointByTheRowsOfAMatrixOnAColumnVector)
+    {
+        // The turn of the scene root of the lockpick screen: the y of a point becomes the x, the z the y and the x the
+        // z
+        const osg::Matrixf m
+            = OFRender::placementFromRows({ 125, 0, 0 }, std::array<float, 9>{ 0, 1, 0, 0, 0, 1, 1, 0, 0 });
+        expectNear(placed(m, { 1, 0, 0 }), { 125, 0, 1 });
+        expectNear(placed(m, { 0, 1, 0 }), { 126, 0, 0 });
+        expectNear(placed(m, { 0, 0, 1 }), { 125, 1, 0 });
+    }
+
+    TEST(OFRenderMenuScenePlacement, givesTheSameTurnFromRowsAsFromAnglesOfAFile)
+    {
+        const float a = 30.f * osg::PI / 180.f;
+        // About Y, rows [cos, 0, -sin], [0, 1, 0], [sin, 0, cos] (the pin of the lockpick screen), is -30 degrees
+        // about Y as a rotation of the right-handed axes
+        const osg::Matrixf byRows = OFRender::placementFromRows(
+            { 0, 0, 0 }, std::array<float, 9>{ std::cos(a), 0, -std::sin(a), 0, 1, 0, std::sin(a), 0, std::cos(a) });
+        const osg::Matrixf byAngles = OFRender::placement({ 0, 0, 0 }, { 0, -30, 0 });
+        for (const osg::Vec3f& p : { osg::Vec3f(1, 0, 0), osg::Vec3f(0, 1, 0), osg::Vec3f(0, 0, 1) })
+            expectNear(placed(byRows, p), placed(byAngles, p));
     }
 }

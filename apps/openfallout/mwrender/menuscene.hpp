@@ -1,6 +1,7 @@
 #ifndef OPENFALLOUT_APPS_OPENFALLOUT_MWRENDER_MENUSCENE_H
 #define OPENFALLOUT_APPS_OPENFALLOUT_MWRENDER_MENUSCENE_H
 
+#include <array>
 #include <map>
 #include <memory>
 #include <string>
@@ -16,6 +17,7 @@
 namespace osg
 {
     class Group;
+    class MatrixTransform;
     class Node;
     class StateSet;
     class Texture2D;
@@ -39,6 +41,10 @@ namespace OFRender
     /// in degrees of the file (R = Rz(z) * Ry(y) * Rx(x) on a column vector: about X first, then Y, then Z, all about
     /// the axes of the parent) and one scale. A point `p` of the model is at `p * placement(...)` (OSG order).
     osg::Matrixf placement(const osg::Vec3f& translation, const osg::Vec3f& eulerDegrees, float scale = 1.f);
+
+    /// The same from a rotation as the nine numbers of a 3 by 3 matrix, row by row, that turns a column vector (the way
+    /// the game's code writes a rotation: the first row gives the x of the turned point)
+    osg::Matrixf placementFromRows(const osg::Vec3f& translation, const std::array<float, 9>& rows, float scale = 1.f);
 
     /// A few models of the game drawn to a texture that a menu shows: the lock and pick of the lockpicking screen,
     /// the model behind the pause menu, the item of the Pip-Boy. The game draws these inside its menus with a camera
@@ -80,6 +86,13 @@ namespace OFRender
 
         /// The model's place in the scene: translation, rotation and scale as one matrix
         void setTransform(const std::string& name, const osg::Matrixf& transform);
+        /// The place of all the models together (the game puts its scene under a node of its own, turned so that the
+        /// x of a model is to the right in the picture, its z up and its y away from the camera)
+        void setSceneTransform(const osg::Matrixf& transform);
+        /// A point light that is a child of the node `node` of the model (the root of the model when the name is
+        /// empty or not found) at `offset` from it, with no fall-off, as the lights of the game's files are
+        bool addLight(const std::string& name, const std::string& node, const osg::Vec3f& offset,
+            const osg::Vec3f& diffuse, float radius);
         void setVisible(const std::string& name, bool visible);
 
         struct Sequence
@@ -111,7 +124,7 @@ namespace OFRender
         osg::ref_ptr<osg::StateSet> mTextureStateSet;
         osg::ref_ptr<MenuSceneRTTNode> mRTTNode;
         osg::ref_ptr<SceneUtil::Light> mLight;
-        osg::ref_ptr<osg::Group> mModels;
+        osg::ref_ptr<osg::MatrixTransform> mModels;
         std::map<std::string, std::unique_ptr<Model>> mModelsByName;
         bool mStopped = false;
     };

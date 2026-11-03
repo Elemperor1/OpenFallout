@@ -1,5 +1,6 @@
 #include "menuscenebindings.hpp"
 
+#include <array>
 #include <mutex>
 #include <set>
 #include <string>
@@ -53,6 +54,22 @@ namespace OFLua
         {
             sol::object value = table[key];
             return value.is<osg::Vec3f>() ? value.as<osg::Vec3f>() : fallback;
+        }
+
+        osg::Matrixf placementOf(const sol::table& place)
+        {
+            const osg::Vec3f position = vec3(place, "position", osg::Vec3f());
+            const float scale = place.get_or("scale", 1.f);
+            sol::object rows = place["rows"];
+            if (rows.is<sol::table>())
+            {
+                const sol::table list = rows.as<sol::table>();
+                std::array<float, 9> numbers{ 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+                for (size_t i = 0; i < numbers.size(); ++i)
+                    numbers[i] = list.get_or<float>(i + 1, numbers[i]);
+                return OFRender::placementFromRows(position, numbers, scale);
+            }
+            return OFRender::placement(position, vec3(place, "euler", osg::Vec3f()), scale);
         }
     }
 
@@ -118,16 +135,23 @@ namespace OFLua
         api["removeModel"] = [context](const std::string& name, const std::string& model) {
             onScene(context, name, [model](OFRender::MenuScene& scene) { scene.removeModel(model); });
         };
-        // The place of a model: a table with `position` (a vector), `euler` (a vector of the angles of the game's
-        // files in degrees: about X, then Y, then Z) and `scale` (a number); what the table leaves out is zero, zero
-        // and one
+        // The place of a model: a table with `position` (a vector), the turn as `euler` (a vector of the angles of the
+        // game's files in degrees: about X, then Y, then Z) or as `rows` (nine numbers, the rows of the 3 by 3 matrix
+        // that turns a column vector) and `scale` (a number); what the table leaves out is zero, no turn and one
         api["setPlace"] = [context](const std::string& name, const std::string& model, const sol::table& place) {
-            const osg::Vec3f position = vec3(place, "position", osg::Vec3f());
-            const osg::Vec3f euler = vec3(place, "euler", osg::Vec3f());
-            const float scale = place.get_or("scale", 1.f);
-            onScene(context, name, [model, position, euler, scale](OFRender::MenuScene& scene) {
-                scene.setTransform(model, OFRender::placement(position, euler, scale));
-            });
+            const osg::Matrixf matrix = placementOf(place);
+            onScene(context, name, [model, matrix](OFRender::MenuScene& scene) { scene.setTransform(model, matrix); });
+        };
+        // The place of all the models together (see setPlace)
+        api["setScenePlace"] = [context](const std::string& name, const sol::table& place) {
+            const osg::Matrixf matrix = placementOf(place);
+            onScene(context, name, [matrix](OFRender::MenuScene& scene) { scene.setSceneTransform(matrix); });
+        };
+        // A light with no fall-off that is a child of the node `node` of the model, `offset` away from it
+        api["addLight"] = [context](const std::string& name, const std::string& model, const std::string& node,
+                              const osg::Vec3f& offset, const osg::Vec3f& diffuse, float radius) {
+            onScene(context, name,
+                [=](OFRender::MenuScene& scene) { scene.addLight(model, node, offset, diffuse, radius); });
         };
         api["setVisible"] = [context](const std::string& name, const std::string& model, bool visible) {
             onScene(context, name, [model, visible](OFRender::MenuScene& scene) { scene.setVisible(model, visible); });

@@ -105,6 +105,14 @@ namespace OFRender
             * osg::Matrixf::translate(translation);
     }
 
+    osg::Matrixf placementFromRows(const osg::Vec3f& translation, const std::array<float, 9>& rows, float scale)
+    {
+        // The rows turn a column vector; OSG multiplies a row vector, with the transposed matrix
+        const osg::Matrixf rotation(rows[0], rows[3], rows[6], 0.f, rows[1], rows[4], rows[7], 0.f, rows[2], rows[5],
+            rows[8], 0.f, 0.f, 0.f, 0.f, 1.f);
+        return osg::Matrixf::scale(scale, scale, scale) * rotation * osg::Matrixf::translate(translation);
+    }
+
     class MenuSceneRTTNode : public SceneUtil::RTTNode
     {
     public:
@@ -259,7 +267,7 @@ namespace OFRender
         lightManager->setSunlight(mLight);
         setLight(osg::Vec3f(0.5f, 0.5f, 0.5f), osg::Vec3f(0.5f, 0.5f, 0.5f), osg::Vec3f(0.f, 0.f, -1.f));
 
-        mModels = new osg::Group;
+        mModels = new osg::MatrixTransform;
         lightManager->addChild(mModels);
         mRTTNode->mGroup->addChild(lightManager);
 
@@ -391,6 +399,40 @@ namespace OFRender
     {
         if (Model* model = find(name))
             model->mRoot->setMatrix(transform);
+    }
+
+    void MenuScene::setSceneTransform(const osg::Matrixf& transform)
+    {
+        mModels->setMatrix(transform);
+    }
+
+    bool MenuScene::addLight(const std::string& name, const std::string& node, const osg::Vec3f& offset,
+        const osg::Vec3f& diffuse, float radius)
+    {
+        Model* model = find(name);
+        if (model == nullptr)
+            return false;
+
+        osg::ref_ptr<SceneUtil::Light> light = new SceneUtil::Light;
+        light->setDiffuse(osg::Vec4f(diffuse, 1.f));
+        light->setAmbient(osg::Vec4f(0.f, 0.f, 0.f, 1.f));
+        light->setSpecular(osg::Vec4f(diffuse, 1.f));
+        light->setConstantAttenuation(1.f);
+        light->setLinearAttenuation(0.f);
+        light->setQuadraticAttenuation(0.f);
+        osg::ref_ptr<SceneUtil::LightSource> source = new SceneUtil::LightSource;
+        source->setRadius(radius);
+        source->setLight(light);
+
+        osg::ref_ptr<osg::MatrixTransform> place = new osg::MatrixTransform(osg::Matrixf::translate(offset));
+        place->addChild(source);
+
+        osg::Group* parent = model->mRoot;
+        const auto found = model->mNodes.find(Misc::StringUtils::lowerCase(node));
+        if (found != model->mNodes.end())
+            parent = found->second;
+        parent->addChild(place);
+        return true;
     }
 
     void MenuScene::setVisible(const std::string& name, bool visible)
