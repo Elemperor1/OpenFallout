@@ -177,6 +177,10 @@ namespace OFScript
         const std::uint32_t type = target.getType();
         const ESM::RefId base = target.getCellRef().getRefId();
         bool item = false;
+        // Whether the line of weight and value is under the name: the executable's builder (FalloutNV.exe 0x775A00, Mac
+        // round 12AO B4) shows it for armor, miscellaneous things, aid and item mods, for a weapon or ammunition only
+        // when it is playable, and for books, ingredients and keys not at all (the name line alone)
+        bool row = false;
         std::string verb;
         // The things the player takes: their weight and value are in the record, and the word is Take (a book that lies
         // in the world has that word too: the executable shows the word of Take for the activation of a readable item)
@@ -185,30 +189,36 @@ namespace OFScript
             result.mWeight = record->mData.weight;
             result.mValue = record->mData.value;
             item = true;
+            row = !record->mHasGameData || (record->mGame.mFlags1 & ESM4::Weapon::GameData::NonPlayable) == 0;
         }
         else if (const ESM4::Armor* record = mStore.get<ESM4::Armor>().search(base))
         {
             result.mWeight = record->mData.weight;
             result.mValue = record->mData.value;
             item = true;
+            row = true;
         }
         else if (const ESM4::Ammunition* record = mStore.get<ESM4::Ammunition>().search(base))
         {
             result.mWeight = record->mData.mWeight;
             result.mValue = record->mData.mValue;
             item = true;
+            // The second bit of the flags of an ammunition record is the one that keeps it from the player
+            row = (record->mData.mFlags & 0x02) == 0;
         }
         else if (const ESM4::Potion* record = mStore.get<ESM4::Potion>().search(base))
         {
             result.mWeight = record->mData.weight;
             result.mValue = record->mItem.value;
             item = true;
+            row = true;
         }
         else if (const ESM4::MiscItem* record = mStore.get<ESM4::MiscItem>().search(base))
         {
             result.mWeight = record->mData.weight;
             result.mValue = record->mData.value;
             item = true;
+            row = true;
         }
         else if (const ESM4::Book* record = mStore.get<ESM4::Book>().search(base))
         {
@@ -227,6 +237,7 @@ namespace OFScript
             result.mWeight = record->mData.mWeight;
             result.mValue = record->mData.mValue;
             item = true;
+            row = true;
         }
         else if (const ESM4::Key* record = mStore.get<ESM4::Key>().search(base))
         {
@@ -285,7 +296,7 @@ namespace OFScript
         if (result.mName.empty())
             return false;
         result.mVerb = verb;
-        result.mStats = item;
+        result.mStats = row;
         if (item)
             result.mCount = std::max(1, std::abs(target.getCellRef().getCount()));
 

@@ -665,8 +665,10 @@ its older drawing for a data folder that lacks the file.
 - The text under the crosshair (`Info`, Mac rounds 12AM B2 and 12AN B7) is a block 320 wide, centred, 110 above the lower
   safe edge: the word of what the player does with the thing (the file's hot rect, with the key that does it next to it, or the
   button of the pad: the file is opened for the one in use and made again when the player changes it), its name (with the
-  number in brackets for a stack), a row of weight and value for something that can be taken (a number of nothing is two
-  dashes, a value under 1 has a decimal), and a line for its lock. The words are the game's settings: `sTargetTypeTake`
+  number in brackets for a stack), a row of weight and value (a number of nothing is two dashes, a value under 1 has a
+  decimal; the executable's builder, Mac round 12AO B4, shows it for armor, miscellaneous things, aid and item mods, for a
+  weapon or ammunition only when it is playable, and not for a book, an ingredient or a key: the name alone), and a line for
+  its lock. The words are the game's settings: `sTargetTypeTake`
   (also for a book that lies in the world), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
   `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
   the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
@@ -677,8 +679,9 @@ its older drawing for a data folder that lacks the file.
   object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
   pickpocket, steal and pick (the port has no
   such actions yet), disarming a mine, the weight and value
-  row for containers, doors and characters (whether the executable shows it for them is not clear), and the colour that
-  marks a thing that is owned. The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
+  row for containers, doors and characters (the executable has none for them), and the colour that
+  marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
+  executable's rule is in B4, but the port has no ownership yet). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
   below).
 - Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, subtitles, the needs
   of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as

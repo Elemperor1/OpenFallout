@@ -1061,7 +1061,7 @@ namespace OFScript
             /// The setting that holds the word for what the player does with it (sTargetTypeTake, sSearch ...), empty
             /// when the player can do nothing with it
             std::string mVerb;
-            /// The weight and value row is there for something that can be taken
+            /// The weight and value row is under the name (not for every thing that can be taken: see hudInfo)
             bool mStats = false;
             double mWeight = 0;
             double mValue = 0;
