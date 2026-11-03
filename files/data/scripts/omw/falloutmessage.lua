@@ -82,15 +82,28 @@ local function press(index)
     messagebox.press(index)
 end
 
--- A '&' in the words of a button marks the letter that picks it (the code of the game collects those letters from the
--- words of the buttons): the words are shown without it
+-- A '&' in the words of a button marks the letter that picks it. The game's code (FalloutNV.exe 0x7a8e60, round 12AG)
+-- takes the one character after the first '&' of each button's words, appends it to one string of letters (a button
+-- without a '&' adds none) and erases the '&' from the words, which are shown without it
 local function shownLabel(label)
-    return (label:gsub('&(.)', '%1'))
+    return (label:gsub('&(.)', '%1', 1))
 end
 
 local function hotkeyOf(label)
     local at = label:find('&', 1, true)
     return at and label:sub(at + 1, at + 1) or ''
+end
+
+-- The letters of the buttons in the order of the buttons that have one. A letter found at place i picks the i-th BUTTON
+-- (the game's key handler uses the place in the string as the number of the button), so a button without a '&' ahead of
+-- one that has it moves the letters one button up: kept as the game has it
+local function hotkeysOf(buttons)
+    local letters = {}
+    for _, label in ipairs(buttons) do
+        local letter = hotkeyOf(label)
+        if letter ~= '' then letters[#letters + 1] = letter end
+    end
+    return letters
 end
 
 local function numberOf(tile, trait, default)
@@ -214,13 +227,12 @@ local function onKey(key)
             return
         end
     end
-    -- Another key picks the button that has it marked with a '&' in its words (a plain "OK" has none)
+    -- Another key picks the button its place in the string of letters says (a plain "OK" has no letter)
     local symbol = key.symbol or ''
     if symbol == '' then return end
-    for index, label in ipairs(current.buttons) do
-        local letter = hotkeyOf(label)
-        if letter ~= '' and letter:upper() == symbol:upper() then
-            press(index)
+    for index, letter in ipairs(hotkeysOf(current.buttons)) do
+        if letter:upper() == symbol:upper() then
+            if index <= count then press(index) end
             return
         end
     end
