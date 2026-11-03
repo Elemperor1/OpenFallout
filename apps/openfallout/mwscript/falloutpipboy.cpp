@@ -77,7 +77,8 @@ namespace OFScript
         return std::string(FalloutScript::SettingText::standIn(name));
     }
 
-    void FalloutScripts::loadExecutableTexts(const std::vector<std::filesystem::path>& dataDirs)
+    void FalloutScripts::loadExecutableTexts(
+        const std::vector<std::filesystem::path>& dataDirs, const ToUTF8::StatelessUtf8Encoder* encoder)
     {
         // Tale of Two Wastelands has the data of both games: the executable of the one that is played comes first, and
         // the other one gives what the first has not
@@ -90,7 +91,7 @@ namespace OFScript
             const std::filesystem::path path = FalloutScript::ExeSettings::find(dataDirs, executable);
             if (path.empty())
                 continue;
-            FalloutScript::ExeSettings::Texts found = FalloutScript::ExeSettings::read(path);
+            FalloutScript::ExeSettings::Texts found = FalloutScript::ExeSettings::read(path, encoder);
             Log(Debug::Info) << "Settings texts: " << found.size() << " read from " << Files::pathToUnicodeString(path);
             for (auto& [name, text] : found)
                 texts.emplace(name, std::move(text));

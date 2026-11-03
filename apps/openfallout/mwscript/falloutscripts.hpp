@@ -98,6 +98,11 @@ namespace Loading
     class Listener;
 }
 
+namespace ToUTF8
+{
+    class StatelessUtf8Encoder;
+}
+
 namespace OFRender
 {
     class ObjectAnimation;
@@ -176,8 +181,10 @@ namespace OFScript
         /// directory of one of these directories (the plugins hold only the settings that were changed from their
         /// defaults, and the labels of the screens, the texts of the terminals and the counters of the level-up screen
         /// are defaults). The executable of the game that is played is read first, then the other one. A game without
-        /// its executable next to the data is left with the port's own words for the labels.
-        void loadExecutableTexts(const std::vector<std::filesystem::path>& dataDirs);
+        /// its executable next to the data is left with the port's own words for the labels. The texts are made UTF-8
+        /// with `encoder`, the code page that is set for the data of the game (Windows-1252 when there is none).
+        void loadExecutableTexts(
+            const std::vector<std::filesystem::path>& dataDirs, const ToUTF8::StatelessUtf8Encoder* encoder = nullptr);
 
         /// A saved game holds what the games keep (the stages of the quests, the variables of scripts, what characters
         /// carry, who is dead ...) as sections, one record each (REC_FOSV), after those of the world. A save that has

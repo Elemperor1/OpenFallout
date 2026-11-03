@@ -8,6 +8,7 @@
 #include <system_error>
 
 #include <components/misc/strings/algorithm.hpp>
+#include <components/toutf8/toutf8.hpp>
 
 namespace FalloutScript::ExeSettings
 {
@@ -169,17 +170,28 @@ namespace FalloutScript::ExeSettings
             return result;
         }
 
-        void add(Texts& texts, std::string_view name, std::string_view text, bool replace)
+        /// The text in UTF-8: in the code page that the player set for the data of the game when there is one (a
+        /// localised executable has its words in the code page of its language), else in Windows-1252
+        std::string toUtf8(std::string_view text, const ToUTF8::StatelessUtf8Encoder* encoder)
+        {
+            if (encoder == nullptr)
+                return fromWindows1252(text);
+            std::string buffer;
+            return std::string(encoder->getUtf8(text, ToUTF8::BufferAllocationPolicy::FitToRequiredSize, buffer));
+        }
+
+        void add(Texts& texts, std::string_view name, std::string_view text, bool replace,
+            const ToUTF8::StatelessUtf8Encoder* encoder)
         {
             if (replace)
-                texts[lowered(name)] = fromWindows1252(text);
+                texts[lowered(name)] = toUtf8(text, encoder);
             else
-                texts.emplace(lowered(name), fromWindows1252(text));
+                texts.emplace(lowered(name), toUtf8(text, encoder));
         }
 
         /// The code of a static initialiser: push the address of the text, push the address of the name, load the
         /// object into ecx (a static one: `B9 <object>`; one that was just made: `8B C8+n`) and call the constructor
-        void scanCode(const Image& image, Texts& texts)
+        void scanCode(const Image& image, Texts& texts, const ToUTF8::StatelessUtf8Encoder* encoder)
         {
             for (const Section& section : image.mSections)
             {
@@ -205,14 +217,14 @@ namespace FalloutScript::ExeSettings
                     std::string_view text;
                     if (textAt(image, nameAddress, maxName, name) && isSettingName(name)
                         && textAt(image, textAddress, maxText, text))
-                        add(texts, name, text, true);
+                        add(texts, name, text, true, encoder);
                 }
             }
         }
 
         /// A static setting in the data: three addresses, those of the text, of the name and of the table of
         /// functions of the class
-        void scanTables(const Image& image, Texts& texts)
+        void scanTables(const Image& image, Texts& texts, const ToUTF8::StatelessUtf8Encoder* encoder)
         {
             const std::uint64_t first = image.mBase;
             const std::uint64_t last = image.mBase + addressRange;
@@ -234,24 +246,24 @@ namespace FalloutScript::ExeSettings
                     std::string_view text;
                     if (textAt(image, nameAddress, maxName, name) && isSettingName(name)
                         && textAt(image, textAddress, maxText, text))
-                        add(texts, name, text, false);
+                        add(texts, name, text, false, encoder);
                 }
             }
         }
     }
 
-    Texts scan(std::string_view image)
+    Texts scan(std::string_view image, const ToUTF8::StatelessUtf8Encoder* encoder)
     {
         Texts texts;
         Image parsed;
         if (!parse(image, parsed))
             return texts;
-        scanCode(parsed, texts);
-        scanTables(parsed, texts);
+        scanCode(parsed, texts, encoder);
+        scanTables(parsed, texts, encoder);
         return texts;
     }
 
-    Texts read(const std::filesystem::path& path)
+    Texts read(const std::filesystem::path& path, const ToUTF8::StatelessUtf8Encoder* encoder)
     {
         std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file)
@@ -264,7 +276,7 @@ namespace FalloutScript::ExeSettings
         file.seekg(0);
         if (!file.read(image.data(), size))
             return {};
-        return scan(image);
+        return scan(image, encoder);
     }
 
     std::filesystem::path find(const std::vector<std::filesystem::path>& directories, std::string_view fileName)

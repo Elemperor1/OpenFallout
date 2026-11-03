@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <components/falloutscript/exesettings.hpp>
+#include <components/toutf8/toutf8.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -156,6 +157,17 @@ namespace
         // the trade mark sign (0x99) and an e with an acute accent (0xE9), and a plain letter
         exe.staticInitialiser(0x20, exe.text(0x10, "A\x99 caf\xE9"), exe.text(0x40, "sCoded"));
         EXPECT_EQ(ExeSettings::scan(exe.bytes()).at("scoded"), "A\xE2\x84\xA2 caf\xC3\xA9");
+    }
+
+    TEST(FalloutExeSettings, the_texts_of_a_localised_executable_are_made_utf_8_from_the_code_page_that_is_set)
+    {
+        Executable exe;
+        // two Cyrillic capitals (0xC0 and 0xC1 in Windows-1251) and a plain letter
+        exe.staticInitialiser(0x20, exe.text(0x10, "\xC0\xC1x"), exe.text(0x40, "sCoded"));
+        const ToUTF8::StatelessUtf8Encoder cyrillic(ToUTF8::WINDOWS_1251);
+        EXPECT_EQ(ExeSettings::scan(exe.bytes(), &cyrillic).at("scoded"), "\xD0\x90\xD0\x91x");
+        // without a code page the bytes are read as Windows-1252
+        EXPECT_EQ(ExeSettings::scan(exe.bytes()).at("scoded"), "\xC3\x80\xC3\x81x");
     }
 
     TEST(FalloutExeSettings, a_file_that_is_not_an_executable_gives_nothing)

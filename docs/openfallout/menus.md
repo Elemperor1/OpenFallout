@@ -436,7 +436,7 @@ by two layouts that were read in round 12AC: the code `68 <text> 68 <name> B9 <o
 address of the default text, push the address of the name, load `ecx`, call the constructor), and, in Fallout3.exe for most
 of the settings, a table in the data of records of three addresses (text, name, table of functions). Round 12AC counted
 1319 string settings in FalloutNV.exe and 1371 in Fallout3.exe this way, and every one of the 55 names the settings
-screens use was found in New Vegas (49 in Fallout 3). The texts are converted from Windows-1252 to UTF-8; nothing of them
+screens use was found in New Vegas (49 in Fallout 3). The texts are converted to UTF-8 from the code page that is set for the data of the game (`encoding`; Windows-1252 by default); nothing of them
 is kept in the repository or the user's files, and the line `Settings texts: N read from <path>` in the log says that it
 worked. Before that (round 12AB, first run of the settings screens) every label of them was drawn as the name of its
 setting, since the table had none of them and the plugins hold none. The card, caravan and roulette games' words are
