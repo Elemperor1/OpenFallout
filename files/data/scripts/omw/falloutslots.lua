@@ -507,14 +507,14 @@ local function press(code, symbol)
     end
 end
 
--- On the pad the shoulders stand for the triggers (down and up with the bet), A pulls the arm, X is the greatest bet and Y the
--- payout list; the engine clicks with A where the pointer is and leaves with B
+-- On the pad the shoulders stand for the triggers (down and up with the bet), X is the greatest bet and Y the payout list; A is
+-- left to the engine, which clicks with it where the pointer is (so the arm is pulled by clicking Spin, as in the other casino
+-- screens: a second binding on A would spin on top of whatever else the click hit), and B leaves
 local PAD_KEYS = {
     [input.CONTROLLER_BUTTON.LeftShoulder] = 'q',
     [input.CONTROLLER_BUTTON.RightShoulder] = 'e',
     [input.CONTROLLER_BUTTON.X] = 's',
     [input.CONTROLLER_BUTTON.Y] = 'f',
-    [input.CONTROLLER_BUTTON.A] = 'w',
 }
 
 local function onPad(button)
