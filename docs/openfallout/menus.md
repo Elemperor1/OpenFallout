@@ -271,7 +271,9 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   ignores Escape (Escape gives value 0). The code takes the one character after the first `&` of each button's words,
   appends it to one string of letters (a button with no `&` adds none) and erases the `&` from the shown words; a typed
   letter is upper-cased and the place it has in that string is the NUMBER OF THE BUTTON it picks, so a button without a
-  `&` ahead of one that has it moves the letters up by one button (kept as it is, `hotkeysOf` in `falloutmessage.lua`).
+  `&` ahead of one that has it moves the letters up by one button (kept as it is, `hotkeysOf` in `falloutmessage.lua`). No button
+  of either game's plugins has an `&` (none in 1567 New Vegas and 672 Fallout 3 messages, round 12AH), so the letters are for
+  mods only.
   Space is taken by the box and does nothing there (`HandleClick(-1, ...)` is a no-op). Enter, the arrows and the pad do
   not come from the box: they go to the interface manager's generic code, which steps along the neighbours of the selected
   tile (the buttons have `repeatvertical`, so up and down walk the buttons, left and right nothing) and activates the
@@ -285,7 +287,9 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - The background of the box is the file's `solid_black.dds` tile with the alpha `_background_fill_alpha` (32 in `globals.xml`),
   and when a menu is already open under the box (the Pip-Boy, the dialogue, a container, barter...) the code writes its
   alpha as the setting `fPopUpBackgroundOpacity` times 255 (the INI of both games has 0.87, the executable's own default is
-  1.0; FalloutNV.exe 0x7a8d10, round 12AG); the brightness is never written. The script does the same over an open screen.
+  1.0; FalloutNV.exe 0x7a8d10, round 12AG); the brightness is never written. The script does the same over an open screen,
+  with 0.87, since the port reads no INI. Seen on the Mac (round 12AH): over the Pip-Boy the page text shows through at 13 to 17 %
+  of its brightness, and over the plain world the box is about 10 % darker (the file's alpha of 32).
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
   keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own

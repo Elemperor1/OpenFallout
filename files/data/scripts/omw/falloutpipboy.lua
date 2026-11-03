@@ -849,6 +849,14 @@ local function pickedItem()
     return sortedItems(invTab)[selected]
 end
 
+-- The letter a key code stands for (nothing for a key that is no letter), for the scripts that send the code alone
+local function symbolOf(code)
+    for letter in ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'):gmatch('.') do
+        if input.KEY[letter] == code then return letter:lower() end
+    end
+    return nil
+end
+
 -- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
 -- over it takes the keys and the buttons)
 local function press(code, symbol)
@@ -1014,7 +1022,8 @@ return {
         end,
         -- A key of the keyboard (its code in `code`), sent by a script, for the keys no button of the pad stands for
         PipboyKey = function(data)
-            press(data.code)
+            -- (the letter shortcuts of a menu file go by the letter, which a script's code stands for)
+            press(data.code, data.symbol or symbolOf(data.code))
         end,
     },
 }

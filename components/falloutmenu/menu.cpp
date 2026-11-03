@@ -561,7 +561,11 @@ namespace FalloutMenu
         float r = number(tile, "red");
         float g = number(tile, "green");
         float b = number(tile, "blue");
-        for (const Tile* t = &tile; t != nullptr; t = t->mParent)
+        // A negative brightness (`&uselocalcolor;`) is the tile's own red, green and blue as they are; the executable
+        // does not look for a system colour then, nor scale the colour by the brightness (FalloutNV.exe, round 12AG)
+        const float own = number(tile, "brightness");
+        const bool local = own < 0.f;
+        for (const Tile* t = &tile; t != nullptr && !local; t = t->mParent)
         {
             if (!defines(*t, "systemcolor"))
                 continue;
@@ -577,7 +581,7 @@ namespace FalloutMenu
             }
             break;
         }
-        const float brightness = number(tile, "brightness") / 255.f;
+        const float brightness = local ? 1.f : own / 255.f;
         const float alpha = number(tile, "alpha") / 255.f;
         const auto clamp = [](float v) { return std::clamp(v, 0.f, 1.f); };
         return { clamp(r / 255.f * brightness), clamp(g / 255.f * brightness), clamp(b / 255.f * brightness),

@@ -422,6 +422,28 @@ namespace
         EXPECT_NEAR(items[0].mColor[3], 0.2f, 1e-4);
     }
 
+    TEST(FalloutMenuDrawTest, a_tile_that_uses_its_local_colour_is_drawn_in_its_own_red_green_and_blue)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
+            "<hotrect name=\"Own\"><alpha> 255 </alpha><brightness> &uselocalcolor; </brightness><red> 255 </red>"
+            "<green> 128 </green><blue> 0 </blue><width> 30 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"System\"><alpha> 255 </alpha><brightness> 255 </brightness><red> 255 </red>"
+            "<green> 128 </green><blue> 0 </blue><width> 30 </width><height> 30 </height></hotrect>"
+            "</menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mTile->name(), "Own");
+        EXPECT_NEAR(items[0].mColor[0], 1.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[1], 128.f / 255.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[2], 0.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[3], 1.f, 1e-4);
+        // The same numbers with a brightness of 0 or more are the system colour's (here nothing names one, so these
+        // stay)
+        EXPECT_EQ(items[1].mTile->name(), "System");
+    }
+
     TEST(FalloutMenuDrawTest, positions_add_up_through_the_tiles_a_tile_is_in)
     {
         Fixture f;

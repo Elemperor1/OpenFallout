@@ -466,7 +466,8 @@ function module.press(code, symbol)
     elseif code == input.KEY.Backspace then
         if page > 0 then goTo(page - 1) end
     elseif code == input.KEY.R then
-        reset()
+        -- Reset by the file's own letter (or the pad's button for it): the button is clicked when it is shown and works
+        shown:pcButton('r')
     elseif not shown:pcButton(symbol) then
         -- (the file's own letters: A is Continue and E is Back)
         return false
