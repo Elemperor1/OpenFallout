@@ -57,9 +57,9 @@ namespace OFScript
             return card;
         }
 
-        FalloutScripts::CaravanBoardCard boardCard(const Caravan::Card& card)
+        FalloutScripts::CaravanBoardCard boardCard(const Caravan::Card& card, std::string face)
         {
-            return { card.mValue, card.mSuit };
+            return { card.mValue, card.mSuit, std::move(face) };
         }
     }
 
@@ -224,8 +224,17 @@ namespace OFScript
             return cards;
         cards.reserve(mCaravan->mOwned.size());
         for (const CaravanSession::Owned& owned : mCaravan->mOwned)
-            cards.push_back({ owned.mCard.mForm, owned.mCard.mValue, owned.mCard.mSuit, owned.mName, owned.mInDeck });
+            cards.push_back({ owned.mCard.mForm, owned.mCard.mValue, owned.mCard.mSuit, owned.mName, owned.mInDeck,
+                caravanFace(owned.mCard.mForm) });
         return cards;
+    }
+
+    std::string FalloutScripts::caravanFace(FalloutScript::FormId card) const
+    {
+        if (card == 0)
+            return {};
+        const ESM4::CaravanCard* record = mStore.get<ESM4::CaravanCard>().search(formOf(card));
+        return record != nullptr ? record->mFrontFace : std::string();
     }
 
     bool FalloutScripts::caravanSetInDeck(int index, bool inDeck)
@@ -294,11 +303,11 @@ namespace OFScript
             {
                 std::vector<CaravanBoardCard>& cards = shown.mRows.emplace_back();
                 for (const Caravan::Card& card : track.mRows[static_cast<std::size_t>(row)])
-                    cards.push_back(boardCard(card));
+                    cards.push_back(boardCard(card, caravanFace(card.mForm)));
             }
         }
         for (const Caravan::Card& card : game.hand(Caravan::Side::Player))
-            board.mHand.push_back(boardCard(card));
+            board.mHand.push_back(boardCard(card, caravanFace(card.mForm)));
         board.mOpponentHand = static_cast<int>(game.hand(Caravan::Side::Opponent).size());
         board.mPile = static_cast<int>(game.pile(Caravan::Side::Player).size());
         board.mOpponentPile = static_cast<int>(game.pile(Caravan::Side::Opponent).size());
@@ -379,7 +388,10 @@ namespace OFScript
         const Caravan::Move move = game.chooseOpponentMove();
         const std::vector<Caravan::Card>& hand = game.hand(Caravan::Side::Opponent);
         if (move.mHand >= 0 && move.mHand < static_cast<int>(hand.size()))
-            made.mCard = boardCard(hand[static_cast<std::size_t>(move.mHand)]);
+            {
+            const Caravan::Card& used = hand[static_cast<std::size_t>(move.mHand)];
+            made.mCard = boardCard(used, caravanFace(used.mForm));
+        }
         game.opponentMove();
         made.mMade = true;
         made.mType = static_cast<int>(move.mType);

@@ -1029,12 +1029,15 @@ opponent moves after a second, its card lights the row it went on, and the resul
 suit numbers of the card records are 1 hearts, 2 spades, 3 diamonds, 4 clubs and 5 the Joker, the values 1 to 10, 12 Jack, 13
 Queen, 14 King and 15 Joker (no 11); the face of a card is the record's `TX00` texture
 (`terminals\NV_PlayingCards\Deck<X>\card<X>_<suit letter>NN.dds`, five art sets B, G, L, T and U) and the back is `TX01`; the
-code never works an image out from suit and value. Each match adds one to the Pip-Boy statistic "Caravan games won" (0x25) or
+code never works an image out from suit and value. The cards of the deck screen and of the hand are drawn with that texture (the
+slot has the record's picture over its tile; `core.casino.caravan.cards()` and `board()` give it as `face`); the strips of the
+caravans on the board have the words of the card (rank and suit letter) because the strips of the game are partly covered 3D cards.
+Each match adds one to the Pip-Boy statistic "Caravan games won" (0x25) or
 "lost" (0x26) and to the player's own totals (caps won, caps lost, matches won, matches lost, the biggest pot won), which the result
 screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). Seen only in the offline harness with a made-up
 engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
 E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
-`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the pictures of the cards, the sounds, the text the executable writes into the title of the
+`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, the text the executable writes into the title of the
 opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B, which leave at once and
 forfeit without the question.
 

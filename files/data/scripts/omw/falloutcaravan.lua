@@ -200,11 +200,24 @@ local function setColor(tile, color)
     m:set(tile, 'blue', color[3])
 end
 
--- A card slot: the edge, the face (which takes the pointer) and the words on it
+-- A picture over a tile: the texture of a card's record, which the game puts on the shapes of the card (the picture takes no
+-- pointer, the tile under it does)
+local function picture(parent, name)
+    local m = shown.menu
+    local tile = m:create(parent, 'image', name)
+    if not tile then return nil end
+    m:set(tile, 'target', 0)
+    m:set(tile, 'visible', 0)
+    return tile
+end
+
+-- A card slot: the edge, the face (which takes the pointer), the picture of the card over it when there is one and the words
+-- on it when there is not
 local function makeSlot(parent, prefix, index, onClick)
     local slot = {
         edge = fill(parent, prefix .. 'Edge' .. index, COLOR.edge),
         face = fill(parent, prefix .. 'Card' .. index, COLOR.face, 255, true),
+        art = picture(parent, prefix .. 'Art' .. index),
         text = label(parent, prefix .. 'Text' .. index, COLOR.black, 1),
     }
     if onClick then
@@ -216,15 +229,24 @@ end
 local function hideSlot(slot)
     hide(slot.edge)
     hide(slot.face)
+    if slot.art then hide(slot.art) end
     hide(slot.text)
 end
 
--- A card in a slot: where, how big, the words (and the ink of the suit), the ground and the edge
-local function drawSlot(slot, x, y, width, height, text, ink, ground, edge)
+-- A card in a slot: where, how big, the words (and the ink of the suit), the ground and the edge; `face` is the texture of the
+-- card's record, which is drawn instead of the words when there is one (the cards that are strips of a caravan have words only)
+local function drawSlot(slot, x, y, width, height, text, ink, ground, edge, face)
     put(slot.edge, x - 2, y - 2, width + 4, height + 4)
     setColor(slot.edge, edge or COLOR.edge)
     put(slot.face, x, y, width, height)
     setColor(slot.face, ground or COLOR.face)
+    if face and face ~= '' and slot.art then
+        shown.menu:set(slot.art, 'filename', face)
+        put(slot.art, x, y, width, height)
+        hide(slot.text)
+        return
+    end
+    if slot.art then hide(slot.art) end
     if text and text ~= '' then
         put(slot.text, x + 4, y + 2)
         setText(slot.text, text, ink or COLOR.black)
@@ -369,7 +391,8 @@ local function drawDeck()
                     local edge = COLOR.edge
                     if card.inDeck then edge = COLOR.inDeck end
                     if list == activeList and position == cursor[list] then edge = COLOR.picked end
-                    drawSlot(tiles, left + (slot - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card), nil, edge)
+                    drawSlot(tiles, left + (slot - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card), nil, edge,
+                        card.face)
                 else
                     hideSlot(tiles)
                 end
@@ -543,7 +566,7 @@ local function drawGame()
                 local edge = index == pickedHand and COLOR.picked or COLOR.edge
                 local y = index == pickedHand and handY - 12 or handY
                 drawSlot(slot, boardLeft - 40 + (index - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card),
-                    nil, edge)
+                    nil, edge, card.face)
             else
                 hideSlot(slot)
             end

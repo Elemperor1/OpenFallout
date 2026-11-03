@@ -620,6 +620,8 @@ namespace OFScript
             int mSuit = 0;
             std::string mName;
             bool mInDeck = false;
+            /// The face of the card: the texture of its record (TX00), as the record writes it, under Textures
+            std::string mFace;
         };
         /// Where the match is: the stage, who plays, the money and the deck
         struct CaravanScreen
@@ -668,6 +670,8 @@ namespace OFScript
         {
             int mValue = 0;
             int mSuit = 0;
+            /// The face of the card (see CaravanCardView::mFace)
+            std::string mFace;
         };
         struct CaravanBoardTrack
         {
@@ -2351,6 +2355,8 @@ namespace OFScript
         std::mutex mCaravanMutex;
         std::optional<CaravanSession> mCaravan;
         FalloutScript::Casino::CaravanRecord mCaravanRecord;
+        /// The face texture that the record of a card names (empty for a form that is not a card)
+        std::string caravanFace(FalloutScript::FormId card) const;
         int mCaravanSerial = 0;
         std::mt19937 mCaravanRandom{ std::random_device()() };
         /// The match is over: the pot is paid, in caravan money first and then in caps, by the side that lost
