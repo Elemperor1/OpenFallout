@@ -54,7 +54,7 @@ namespace OFInput
         // navigation of the windows would take it (it moves the key focus), so it is not given to them then; in any
         // other window, with a text that is typed and with a window of the engine that has the keys it does what it did
         const bool pipboyKey = kc == MyGUI::KeyCode::Tab && !taken && !SDL_IsTextInputActive()
-            && OFBase::Environment::get().getFalloutScripts() != nullptr
+            && OFBase::Environment::get().hasFalloutScripts()
             && OFBase::Environment::get().getWindowManager()->getMode() == OFGui::GM_Inventory
             && mBindingsManager->getKeyBinding(A_Inventory) == arg.keysym.scancode;
         if (kc != MyGUI::KeyCode::None && !mBindingsManager->isDetectingBindingState() && !pipboyKey)

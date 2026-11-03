@@ -226,6 +226,20 @@ local function onKey(key)
     end
 end
 
+-- The buttons of the pad: the engine does not give them to the windows under a box that a script draws (it has had the
+-- button already), so the pad moves the lit button and picks it here. B does nothing, as Escape does not
+local function onPad(button)
+    if not shown or not current or answered then return end
+    local PAD = input.CONTROLLER_BUTTON
+    if button == PAD.DPadUp then
+        onKey({ code = input.KEY.UpArrow })
+    elseif button == PAD.DPadDown then
+        onKey({ code = input.KEY.DownArrow })
+    elseif button == PAD.A then
+        onKey({ code = input.KEY.Enter })
+    end
+end
+
 return {
     interfaceName = 'FalloutMessage',
     interface = {
@@ -262,5 +276,6 @@ return {
             end
         end,
         onKeyPress = onKey,
+        onControllerButtonPress = onPad,
     },
 }

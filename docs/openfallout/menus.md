@@ -259,7 +259,9 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - Keys: Space picks the lit button; a letter picks the button that has it marked with a `&` in its words (a plain "OK" has
   none; the words are shown without the `&`: not read from the executable yet). Escape does nothing: the code picks the
   last button with it except in a box of `ShowMessage`, which ignores it. Arrows and Enter (the lit button, or the first)
-  are the port's own.
+  are the port's own. The pad: the engine's pad handling steps aside while a box that the script draws is open, so the
+  script takes the pad itself: D-pad up and down move the lit button, A picks it, B does nothing (as Escape; not seen in
+  the running game yet).
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
