@@ -1285,12 +1285,12 @@ namespace OFScript
         FalloutScript::Hud::QuestTextLine& hudQuestText() { return mHudQuestText; }
         /// What the line over the compass is told since this was last called, for the display: the name of the region
         /// the player came into, and, when the cell the player came to is not the next one of the outside (a door, a
-        /// teleport, a load), the name of the cell (FalloutNV.exe 0x7728F0 and 0x772C30). It is looked for when the
-        /// player's cell is another one. Lua thread.
+        /// teleport, a load) and is in the outside, the name of its world space (FalloutNV.exe 0x7728F0 and 0x772C30). It is
+        /// looked for when the player's cell is another one. Lua thread.
         struct RegionEvent
         {
             std::string mName;
-            /// The name of a cell after a transition (else the name of a region)
+            /// The name of the world space after a placement in the outside (else the name of a region)
             bool mCell = false;
         };
         std::vector<RegionEvent> takeRegionEvents();

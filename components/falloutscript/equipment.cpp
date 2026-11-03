@@ -93,12 +93,46 @@ namespace FalloutScript
                                   if (mState.itemCount(actor, item) > 0)
                                       return false;
                                   noteChange(actor, item, false);
+                                  worn.mArmorConditions.erase(item);
                                   return true;
                               }),
             worn.mArmor.end());
+        // The copy that is on is gone when the character has no copy like it (a script took it away and left others):
+        // another copy of the item is on then
+        if (worn.mWeapon != 0)
+            worn.mWeaponCondition = chooseCopy(actor, worn.mWeapon, worn.mWeaponCondition);
+        for (const FormId item : worn.mArmor)
+        {
+            const auto set = worn.mArmorConditions.find(item);
+            const int condition = chooseCopy(actor, item, set == worn.mArmorConditions.end() ? ActorState::fullCondition : set->second);
+            if (condition >= ActorState::fullCondition)
+                worn.mArmorConditions.erase(item);
+            else
+                worn.mArmorConditions[item] = condition;
+        }
     }
 
-    void Equipment::wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note)
+    int Equipment::chooseCopy(FormId actor, FormId item, int asked)
+    {
+        const std::vector<ActorState::ConditionStack> stacks = mState.conditions(actor, item);
+        if (stacks.empty())
+            return ActorState::fullCondition;
+        if (asked >= 0)
+            for (const ActorState::ConditionStack& stack : stacks)
+                if (stack.mCondition == asked)
+                    return asked;
+        return stacks.front().mCondition;
+    }
+
+    int Equipment::conditionOn(const Worn& worn, FormId item) const
+    {
+        if (worn.mWeapon == item)
+            return worn.mWeaponCondition;
+        const auto set = worn.mArmorConditions.find(item);
+        return set == worn.mArmorConditions.end() ? ActorState::fullCondition : set->second;
+    }
+
+    void Equipment::wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note, int condition)
     {
         // What covers any of the same parts of the body comes off
         const auto covers = [&](FormId other) {
@@ -109,11 +143,18 @@ namespace FalloutScript
             for (const FormId other : worn.mArmor)
                 if (covers(other))
                     noteChange(actor, other, false);
+        for (const FormId other : worn.mArmor)
+            if (covers(other))
+                worn.mArmorConditions.erase(other);
         worn.mArmor.erase(std::remove_if(worn.mArmor.begin(), worn.mArmor.end(), covers), worn.mArmor.end());
         worn.mArmor.push_back(item);
+        if (condition < ActorState::fullCondition)
+            worn.mArmorConditions[item] = condition;
+        else
+            worn.mArmorConditions.erase(item);
     }
 
-    Equipment::Outcome Equipment::equip(FormId actor, FormId item)
+    Equipment::Outcome Equipment::equip(FormId actor, FormId item, int condition)
     {
         ItemInfo info;
         if (actor == 0 || item == 0 || !mRecords.itemInfo(item, info))
@@ -126,14 +167,28 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         Worn& worn = wornOf(actor);
         tidy(actor, worn);
+        // The copy that goes on: the one that was asked for, else the one that is on already, else the best
+        const bool on = (info.mKind == ItemKind::Weapon && worn.mWeapon == item)
+            || (info.mKind == ItemKind::Armor
+                && std::find(worn.mArmor.begin(), worn.mArmor.end(), item) != worn.mArmor.end());
+        const int copy = chooseCopy(actor, item, condition >= 0 ? condition : (on ? conditionOn(worn, item) : -1));
+        if (condition >= 0 && copy != condition)
+            return Outcome::NotCarried;
         switch (info.mKind)
         {
             case ItemKind::Weapon:
                 if (worn.mWeapon == item)
-                    return Outcome::AlreadyEquipped;
+                {
+                    if (copy == worn.mWeaponCondition)
+                        return Outcome::AlreadyEquipped;
+                    // Another copy of the weapon in the hands: nothing is put on or taken off
+                    worn.mWeaponCondition = copy;
+                    return Outcome::Equipped;
+                }
                 if (worn.mWeapon != 0)
                     noteChange(actor, worn.mWeapon, false);
                 worn.mWeapon = item;
+                worn.mWeaponCondition = copy;
                 break;
             case ItemKind::Ammo:
                 if (worn.mAmmo == item)
@@ -143,9 +198,17 @@ namespace FalloutScript
                 worn.mAmmo = item;
                 break;
             case ItemKind::Armor:
-                if (std::find(worn.mArmor.begin(), worn.mArmor.end(), item) != worn.mArmor.end())
-                    return Outcome::AlreadyEquipped;
-                wearArmor(actor, worn, item, info, true);
+                if (on)
+                {
+                    if (copy == conditionOn(worn, item))
+                        return Outcome::AlreadyEquipped;
+                    if (copy < ActorState::fullCondition)
+                        worn.mArmorConditions[item] = copy;
+                    else
+                        worn.mArmorConditions.erase(item);
+                    return Outcome::Equipped;
+                }
+                wearArmor(actor, worn, item, info, true, copy);
                 break;
             default:
                 break;
@@ -178,7 +241,53 @@ namespace FalloutScript
         if (armor == worn.mArmor.end())
             return false;
         worn.mArmor.erase(armor);
+        worn.mArmorConditions.erase(item);
         noteChange(actor, item, false);
+        return true;
+    }
+
+    bool Equipment::isEquipped(FormId actor, FormId item, int condition)
+    {
+        return equippedCondition(actor, item) == std::clamp(condition, 0, int(ActorState::fullCondition));
+    }
+
+    int Equipment::equippedCondition(FormId actor, FormId item)
+    {
+        if (item == 0 || actor == 0)
+            return -1;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        if (worn.mAmmo == item)
+            return ActorState::fullCondition;
+        if (worn.mWeapon != item && std::find(worn.mArmor.begin(), worn.mArmor.end(), item) == worn.mArmor.end())
+            return -1;
+        return conditionOn(worn, item);
+    }
+
+    bool Equipment::setEquippedCondition(FormId actor, FormId item, int condition)
+    {
+        if (item == 0 || actor == 0)
+            return false;
+        condition = std::clamp(condition, 0, int(ActorState::fullCondition));
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        const bool weapon = worn.mWeapon == item;
+        if (!weapon && std::find(worn.mArmor.begin(), worn.mArmor.end(), item) == worn.mArmor.end())
+            return false;
+        const int before = conditionOn(worn, item);
+        if (before == condition)
+            return true;
+        // The copy that is on is the one that changes
+        if (mState.setCondition(actor, item, before, condition) < 1)
+            return false;
+        if (weapon)
+            worn.mWeaponCondition = condition;
+        else if (condition < ActorState::fullCondition)
+            worn.mArmorConditions[item] = condition;
+        else
+            worn.mArmorConditions.erase(item);
         return true;
     }
 

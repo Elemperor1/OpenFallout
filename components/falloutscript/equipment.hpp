@@ -95,11 +95,20 @@ namespace FalloutScript
         };
 
         /// Puts the item on. A weapon takes the place of the weapon held, armor the place of the armor that covers
-        /// any of the same body parts, and ammunition the place of the ammunition chosen.
-        Outcome equip(FormId actor, FormId item);
+        /// any of the same body parts, and ammunition the place of the ammunition chosen. `condition` says which copy of
+        /// the item goes on (the condition it has, as ActorState counts it); a negative one is the best copy. A copy of
+        /// the item that is on already is put in place of by the other copy (it is not a change of what is worn).
+        Outcome equip(FormId actor, FormId item, int condition = -1);
         /// Takes the item off; false when it was not on
         bool unequip(FormId actor, FormId item);
         bool isEquipped(FormId actor, FormId item);
+        /// Whether that copy of the item (the one at that condition) is the one on
+        bool isEquipped(FormId actor, FormId item, int condition);
+        /// The condition of the copy that is on, -1 when the item is not on. Ammunition has none: it is full.
+        int equippedCondition(FormId actor, FormId item);
+        /// The copy of the item that is on wears out or is mended to that condition (the copy in ActorState goes with
+        /// it). False when the item is not on.
+        bool setEquippedCondition(FormId actor, FormId item, int condition);
 
         /// The weapon held (0 for none, hands only), the ammunition chosen, and the armor worn
         FormId weapon(FormId actor);
@@ -138,6 +147,9 @@ namespace FalloutScript
             FormId mWeapon = 0;
             FormId mAmmo = 0;
             std::vector<FormId> mArmor; // in the order it was put on
+            /// The condition of the copies that are on (a copy of full condition is not listed for armor)
+            int mWeaponCondition = 1000;
+            std::map<FormId, int> mArmorConditions;
             bool mDrawn = false;
             bool mSeeded = false; // what the character wears at the start is in mArmor
         };
@@ -150,7 +162,12 @@ namespace FalloutScript
         void tidy(FormId actor, Worn& worn);
 
         /// Puts the armor on in the place of what covers any of the same parts of the body. The caller holds the lock.
-        void wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note);
+        void wearArmor(FormId actor, Worn& worn, FormId item, const ItemInfo& info, bool note, int condition);
+        /// The condition that the copy of the item that is on has, in the copies that the actor holds. The caller holds
+        /// the lock.
+        int conditionOn(const Worn& worn, FormId item) const;
+        /// Which copy: the condition asked for if the actor has a copy like that, else the best (-1 for no copy).
+        int chooseCopy(FormId actor, FormId item, int asked);
 
         void noteChange(FormId actor, FormId item, bool worn);
 

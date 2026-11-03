@@ -1650,8 +1650,9 @@
 -- What the line over the compass is told since this was last called, oldest first. Each row has `name` and `cell`: `cell` is
 -- false for the name of a region the player came into (looked for when the player's cell is another one, and once after a game
 -- was begun or loaded, as the games do it; a building, a place that no region covers and a region without a name give nothing,
--- and neither does the region that was shown last), true for the name of the cell the player came to after a door, a teleport
--- or a load (not for the step to the next cell of the outside; a cell without a name gives nothing).
+-- and neither does the region that was shown last), true for the name of the world space of the outside that the player was
+-- placed in by a door, a teleport or a load (not for the step to the next cell of the outside, and nothing for a building, as
+-- in the executable; a world space without a name gives nothing).
 -- @function [parent=#Hud] takeRegions
 -- @return #list<#table>
 

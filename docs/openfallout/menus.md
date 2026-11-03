@@ -709,15 +709,20 @@ its older drawing for a data folder that lacks the file.
   and is forgotten as the one shown last (coming back to the one before shows it again). What the executable does with the
   name (Mac round 12AV S1): a region name is only written to the line (and its hold flag cleared) when the line is not on the
   screen (alpha 0) or has the same text, and fades in from nothing over 2 s, the old text gone, only when the line is on the
-  screen with another text; the line that normally fades in is the name of the cell (`FULL`) of the player's parent cell at the
-  end of a door, a teleport or a load (0x772C30, called from 0x93CC9A), which is written with the hold flag set (so a region
-  that comes in the same change of cell is overwritten by it) and starts its fade in once the tile is shown by the mode of the
+  screen with another text; the line that normally fades in is the name of the world space (its `FULL`) that the player is
+  placed in, at the end of every placement of the player (a door, fast travel, a script's MoveTo, the console's COC, a load, the
+  push back at the border: the one caller 0x93CC9A of 0x772C30, Mac round 12AW S10; the argument is NULL for a building, so a
+  building has no such line, and a new game of both games starts in a building), which is written with the hold flag set (so a
+  region that comes in the same change of cell is overwritten by it); the name of the exterior cell itself is never used and starts its fade in once the tile is shown by the mode of the
   game (bit 0x20 of the mode mask) and the second line is idle. The fade out begins in the first update more than 4 s after the
   start of the fade in, from the alpha it has then, and takes 2 s; the text stays on the tile. The text tile is always visible
   and only its alpha is animated (target 255 times `fHudOpacity:Interface`; the port uses 255); the tile `Region_Location`
   follows the mode. `FalloutScript::RegionLine` is the rule for the regions, `FalloutScripts::takeRegionEvents` looks at the
-  player's cell (a step to a cell next to the last in the same world space is not a transition; the port cannot tell the
-  executable's transitions apart further), `core.hud.takeRegions` gives the rows `{ name, cell }`.
+  player's cell (a step to a cell next to the last in the same world space is not a placement; the port cannot tell the
+  executable's placements apart further, and the push back at the border is not made), `core.hud.takeRegions` gives the rows
+  `{ name, cell }` (`cell` is true for the name of the world space). The default of `fHudOpacity:Interface` is 1.0 (it is in no
+  .ini of the games; Mac round 12AW S10), so the target alpha 255 is what the games have until the player changes the option.
+  Not checked in `Fallout3.exe`: the rule for the name of the world space.
 - The quest text (`QuestReminder`, Mac round 12AR C1, FalloutNV.exe 0x77A650, 0x77B430 and 0x77C170): the block is 400 by 200,
   15 in from the safe zone and 170 under its top edge; `QuestAdded` (80 down) and `QuestStages` (40 down) are in it.
   *An event* (a quest was added, completed or failed, a place was found: `kind` 0 to 3 of `core.hud.takeQuestText`) writes the

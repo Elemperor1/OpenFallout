@@ -8,6 +8,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadregn.hpp>
+#include <components/esm4/loadwrld.hpp>
 
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -32,8 +33,8 @@ namespace OFScript
             return events;
 
         const bool exterior = cell->isExterior();
-        // The executable tells the name of the cell at the end of a door, a teleport or a load (0x93CC9A), and does not when
-        // the player walks over to the next cell of the outside: that is a step of one cell in the same world space
+        // The executable tells the name of the world space at the end of a door, a teleport or a load (0x93CC9A), and does not
+        // when the player walks over to the next cell of the outside: that is a step of one cell in the same world space
         const ESM::RefId world = cell->getCell()->getWorldSpace();
         const int gridX = cell->getCell()->getGridX();
         const int gridY = cell->getCell()->getGridY();
@@ -76,16 +77,21 @@ namespace OFScript
                              << " characters";
             events.push_back({ std::move(*name), false });
         }
-        if (!step)
+        if (!step && exterior)
         {
-            // (the region comes first: in the executable it is looked for inside the change of the cell, the name of the
-            // cell at the end of the transition)
-            const std::string cellName(cell->getCell()->getDisplayName());
-            if (!cellName.empty())
+            // The line over the compass tells the name of the world space at the end of every placement of the player
+            // into an exterior (a door, fast travel, a move, a load), and nothing for an interior; the name of the
+            // exterior cell itself is never used (Mac round 12AW S10, FalloutNV.exe 0x93CC5D)
+            const ESM::RefId space = cell->getCell()->getWorldSpace();
+            const ESM::FormId* worldspace = space.getIf<ESM::FormId>();
+            const ESM4::World* record = worldspace != nullptr ? mStore.get<ESM4::World>().search(*worldspace) : nullptr;
+            if (record != nullptr)
             {
-                Log(Debug::Info) << "Region line: the player came to a cell whose name has " << cellName.size()
-                                 << " characters";
-                events.push_back({ cellName, true });
+                // (the region comes first: in the executable it is looked for inside the change of the cell, the name of
+                // the world space at the end of the transition)
+                Log(Debug::Info) << "Region line: the player was placed in a world space whose name has "
+                                 << record->mFullName.size() << " characters";
+                events.push_back({ record->mFullName, true });
             }
         }
         return events;

@@ -52,18 +52,39 @@ namespace FalloutScript
     public:
         explicit ActorState(ActorRecords& records);
 
+        /// The condition of a copy of an item in tenths of a percent of its health: 1000 is full health, 0 is broken
+        static constexpr int fullCondition = 1000;
+        /// The copies of an item that share a condition
+        struct ConditionStack
+        {
+            int mCondition = fullCondition;
+            int mCount = 0;
+        };
+
         /// Forgets everything, as for a new game
         void clear();
 
         /// How many of the item the holder has
         int itemCount(FormId holder, FormId item);
         void addItem(FormId holder, FormId item, int count);
-        /// Takes away up to `count` of the item (all it has when it has fewer) and tells how many it took
+        /// Takes away up to `count` of the item (all it has when it has fewer) and tells how many it took: the copies of
+        /// full condition first, then the worn ones from the best to the worst
         int removeItem(FormId holder, FormId item, int count);
         /// Takes away all of the items (the form and how many) or none: false, and nothing taken, when the holder has
         /// fewer of any. It is one step, so of two calls at once for the same items only as many succeed as the
         /// holder has the items for.
         bool takeItems(FormId holder, const std::vector<std::pair<FormId, int>>& wanted);
+        /// How the copies of the item that the holder has stand: the stacks by condition, the best first (a copy has full
+        /// condition unless it was worn or given less: weapons and armor wear out, and AddItemHealthPercent gives
+        /// less). The counts add up to itemCount.
+        std::vector<ConditionStack> conditions(FormId holder, FormId item);
+        /// Adds copies of the item with that condition (a condition from 0 to 1000; more is full)
+        void addItem(FormId holder, FormId item, int count, int condition);
+        /// Takes away up to `count` copies of the item that have exactly that condition and tells how many it took
+        int removeItem(FormId holder, FormId item, int count, int condition);
+        /// Changes the condition of up to `count` copies from one to another (they wear out, or are mended) and tells how
+        /// many it changed
+        int setCondition(FormId holder, FormId item, int from, int to, int count = 1);
         /// Everything the holder has (the form of the item and how many, in the order of the forms). False when the
         /// host can not tell yet what the record holds, for a reference in a cell that is not loaded.
         bool items(FormId holder, std::vector<std::pair<FormId, int>>& result);
@@ -158,6 +179,8 @@ namespace FalloutScript
         struct Holder
         {
             std::map<FormId, int> mItems; // what the holder has, once the records have been asked
+            /// The copies that are below full condition: condition (0 to 999) -> how many. The rest of the count is full.
+            std::map<FormId, std::map<int, int>> mWorn;
             std::map<FormId, ItemEdit> mItemEdits; // what scripts did until then
             std::map<FormId, int> mFactions; // the same for the factions
             std::map<FormId, int> mFactionEdits; // until then: the rank scripts gave, -1 for out of the faction
@@ -173,6 +196,18 @@ namespace FalloutScript
         int heldLocked(FormId id, FormId item);
         /// The caller holds the lock
         int removeLocked(FormId id, FormId item, int count);
+        /// Takes `count` copies off the count without asking which: the caller says which stacks it took them from. The
+        /// caller holds the lock.
+        int removeCountLocked(FormId id, FormId item, int count);
+        /// Adds to the count only, and tells how many were added. The caller holds the lock.
+        int addCountLocked(FormId id, FormId item, int count);
+        /// The copies that are below full condition (condition -> how many), cut to what the holder has. The caller holds
+        /// the lock.
+        std::map<int, int> wornLocked(FormId id, FormId item);
+        /// How many copies of exactly that condition the holder has. The caller holds the lock.
+        int availableLocked(FormId id, FormId item, int condition);
+        /// Forgets `count` copies of that worn condition. The caller holds the lock.
+        void takeWornLocked(FormId id, FormId item, int condition, int count);
         void knowFactions(FormId id, Holder& entry);
 
         ActorRecords& mRecords;
