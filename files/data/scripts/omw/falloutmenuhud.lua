@@ -15,9 +15,12 @@
 --   * the text under the crosshair (Info) is three lines in the middle of the bottom: the word of what the player does with
 --     the thing (with the key that does it, or the button of the pad) over its name, and a row of its weight and value
 --     (or, for a locked thing, what the lock is, in brackets) under it (Mac rounds 12AM B2 and 12AN B7).
---   * the name of the region the player comes into is a line of text over the compass: it fades in over 2 s, stays until 4 s
---     after it began and fades out over 2 s more (Mac rounds 12AO B3 and 12AQ B1); a second line for the name of a place
---     is in the file, but the executable never shows it.
+--   * the line of text over the compass is written by two events (Mac rounds 12AO B3, 12AQ B1 and 12AV S1): the name of the
+--     cell the player comes to after a door, a teleport or a load is written and waits for the tile to be on the screen, then
+--     fades in over 2 s; the name of the region the player comes into is shown only when a line that is on the screen has
+--     another text (and then fades in from nothing, the old text gone), else it is only written. The fade out begins 4 s
+--     after the fade in did and takes 2 s more. A second line for the name of a place is in the file, but the executable never
+--     shows it.
 --   * the quest text is the block QuestReminder, 170 under the top edge of the safe zone: an event (a quest was added, completed
 --     or failed, a place was found) writes its heading over its name, which comes up one character at a time, and the lines
 --     of the objectives come one after the other under it (falloutmenuquests.lua keeps the times: Mac round 12AR C1).
@@ -46,9 +49,11 @@ local MARK_SPAN = 274
 local MARK_FRONT = 137
 local MARK_FADE = 55
 local SAFE = 15
--- The line of the region name: seconds it takes to fade in and out, and from its start until it begins to fade out
+-- The line of the region name: seconds it takes to fade in and out, and from the start of the fade in until the fade out may
+-- begin, and the alpha it fades in to (the executable takes 255 times its setting fHudOpacity:Interface, 1.0 by default)
 local REGION_FADE = 2
 local REGION_HOLD = 4
+local REGION_ALPHA = 255
 
 -- The limbs by the names that the engine gives them, and the tiles of the file they are
 local LIMBS = {
@@ -167,7 +172,7 @@ local function build(self)
     local measured = m:measure(7, 'Ag', 2048)
     local lineHeight = measured and measured.height or 0
     t.regionText = make(t.region, 'template_justify_left_text', 'hud_region_text',
-        { x = 0, y = lineHeight > 0 and lineHeight or 24, wrapwidth = 2048, alpha = 0 })
+        { x = 0, y = lineHeight > 0 and lineHeight or 24, wrapwidth = 2048, alpha = 0, visible = 1 })
     -- The quest text: the block is 400 by 200, 170 under the top safe edge and 15 in from the left one; the lines of
     -- the objectives are in the tile QuestStages (40 down) and the name of an event in QuestAdded (80 down), where the
     -- code makes the tiles it needs (a heading, a tile for each character of the name, a line and a box for each objective)
@@ -342,41 +347,62 @@ function Hud:showMessage(dt)
     self:put(t.messageIcon, 'alpha', icon and alpha or 0)
 end
 
--- How much of the region name shows `age` seconds after it began, as the alpha of its text (0 to 255)
-local function regionAlpha(age)
-    if age == nil then return 0 end
-    local share = 0
-    if age < REGION_FADE then
-        share = age / REGION_FADE
-    elseif age < REGION_HOLD then
-        share = 1
-    elseif age < REGION_HOLD + REGION_FADE then
-        share = 1 - (age - REGION_HOLD) / REGION_FADE
-    end
-    return math.floor(255 * share + 0.5)
+-- A fade of the text of the region line from one alpha to another over some seconds (the executable's 0xA07C60: it starts at
+-- the first alpha at once, and a fade that runs is cancelled)
+local function startRegionFade(r, from, to, seconds)
+    if from == to or seconds <= 0 then return end
+    r.alpha = from
+    r.fade = { from = from, to = to, seconds = seconds, age = 0 }
 end
 
--- The line with the name of the region the player came into (FalloutNV.exe 0x772C30 and the update at 0x770874): a name is
--- written at once and waits for the tile to be on the screen, then it fades in; a name that is the one on the screen is
--- not shown again
-function Hud:showRegion(names, full, dt)
+-- The line with the name of the region or the cell the player came into (FalloutNV.exe 0x7728F0 for a region, 0x772C30 for a
+-- cell and the update at 0x770430). `events` are what the engine took since the last time: { name = the text, cell = true when
+-- it is the name of a cell after a transition, false for a region }. Nothing but the text, the alpha and, for the tile, whether
+-- the modes of the game show it are written, as in the executable
+function Hud:showRegion(events, full, dt)
     local r = self.region
-    for _, name in ipairs(names) do
-        if name ~= '' and not (r.text == name and regionAlpha(r.age) > 0) then
-            r.text, r.waiting = name, true
+    r.clock = r.clock + dt
+    for _, event in ipairs(events) do
+        local name = event.name
+        if name ~= '' then
+            if event.cell then
+                -- The name of the cell waits (_Hold) for the tile to be on the screen and for the fade to start from the update
+                r.text, r.hold = name, true
+            else
+                -- A region: a line that is not on the screen only takes the text (it is shown when a name of a cell comes, or
+                -- the next name of a region that is another than this one while the line shows); a line that is shows the
+                -- name from nothing unless it says the same
+                local same = r.alpha <= 0 or r.text == name
+                r.hold, r.text = false, name
+                if not same then
+                    startRegionFade(r, 0, REGION_ALPHA, REGION_FADE)
+                    r.stamp = r.clock
+                end
+            end
         end
     end
-    if r.waiting and full then
-        r.age, r.waiting = 0, false
-    elseif r.age ~= nil then
-        r.age = r.age + dt
-        if r.age >= REGION_HOLD + REGION_FADE then r.age = nil end
+    local fade = r.fade
+    if fade then
+        fade.age = fade.age + dt
+        if fade.age >= fade.seconds then
+            r.alpha, r.fade = fade.to, nil
+        else
+            r.alpha = fade.from + (fade.to - fade.from) * fade.age / fade.seconds
+        end
+    end
+    -- The fade out begins when the line is on the screen, no fade runs and more than REGION_HOLD s have passed since the start
+    if r.alpha > 0 and r.fade == nil and r.clock - r.stamp > REGION_HOLD then
+        startRegionFade(r, r.alpha, 0, REGION_FADE)
+    end
+    -- The name of a cell begins to fade in when the tile is shown by the mode of the game
+    if r.hold and full then
+        startRegionFade(r, 0, REGION_ALPHA, REGION_FADE)
+        r.stamp, r.hold = r.clock, false
     end
     local t = self.tiles
-    local alpha = full and regionAlpha(r.age) or 0
-    self:put(t.region, 'visible', alpha > 0 and 1 or 0)
+    self:put(t.region, 'visible', full and 1 or 0)
     self:put(t.regionText, 'string', r.text)
-    self:put(t.regionText, 'alpha', alpha)
+    self:put(t.regionText, 'alpha', math.floor(r.alpha + 0.5))
 end
 
 -- A tile of the quest text from a pool: made from its template when it is first wanted
@@ -721,7 +747,7 @@ function module.create(pad, previous)
     local self = setmetatable({ shown = shown, size = size, cache = {}, queue = previous and previous.queue or {},
         leaving = previous and previous.leaving or nil, pad = pad == true,
         subtitles = previous and previous.subtitles or subtitles.new(),
-        region = previous and previous.region or { text = '', waiting = false },
+        region = previous and previous.region or { text = '', alpha = 0, clock = 0, stamp = 0, hold = false },
         quests = previous and previous.quests or questText.new() }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then

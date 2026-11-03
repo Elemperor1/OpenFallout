@@ -1647,12 +1647,13 @@
 -- @param #boolean show
 
 ---
--- The names of the regions the player came into since this was last called, oldest first, for the line over the compass. The
--- player's region is looked for when the player's cell is another one (and once after a game was begun or loaded), as the
--- games do it; a building, a place that no region covers and a region without a name give nothing, and neither does the region
--- that was shown last.
+-- What the line over the compass is told since this was last called, oldest first. Each row has `name` and `cell`: `cell` is
+-- false for the name of a region the player came into (looked for when the player's cell is another one, and once after a game
+-- was begun or loaded, as the games do it; a building, a place that no region covers and a region without a name give nothing,
+-- and neither does the region that was shown last), true for the name of the cell the player came to after a door, a teleport
+-- or a load (not for the step to the next cell of the outside; a cell without a name gives nothing).
 -- @function [parent=#Hud] takeRegions
--- @return #list<#string>
+-- @return #list<#table>
 
 ---
 -- The texts of the quests since this was last called, oldest first, for the block of the display that writes a heading over

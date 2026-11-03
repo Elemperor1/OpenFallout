@@ -131,13 +131,19 @@ namespace OFLua
             return rows;
         };
 
-        // The names of the regions the player came into since this was last called, oldest first (the display shows
-        // the last as the line over the compass). It looks when the player's cell is another one.
+        // What the line over the compass is told since this was last called, oldest first: the names of the regions the
+        // player came into, and the name of the cell the player came to after a door, a teleport or a load. It looks when
+        // the player's cell is another one.
         api["takeRegions"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
-            for (const std::string& name : scripts().takeRegionNames())
-                rows[index++] = name;
+            for (const OFScript::FalloutScripts::RegionEvent& event : scripts().takeRegionEvents())
+            {
+                sol::table row(lua, sol::create);
+                row["name"] = event.mName;
+                row["cell"] = event.mCell;
+                rows[index++] = row;
+            }
             return rows;
         };
 

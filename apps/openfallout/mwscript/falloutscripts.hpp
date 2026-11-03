@@ -1306,9 +1306,17 @@ namespace OFScript
         /// What the quests and the finding of places tell the display: the quest that was added, completed or failed, the
         /// place that was found, and the lines of the objectives
         FalloutScript::Hud::QuestTextLine& hudQuestText() { return mHudQuestText; }
-        /// The names of the regions the player came into since this was last called, for the display (a name or none:
-        /// it is looked for when the player's cell is another one). Lua thread.
-        std::vector<std::string> takeRegionNames();
+        /// What the line over the compass is told since this was last called, for the display: the name of the region
+        /// the player came into, and, when the cell the player came to is not the next one of the outside (a door, a
+        /// teleport, a load), the name of the cell (FalloutNV.exe 0x7728F0 and 0x772C30). It is looked for when the
+        /// player's cell is another one. Lua thread.
+        struct RegionEvent
+        {
+            std::string mName;
+            /// The name of a cell after a transition (else the name of a region)
+            bool mCell = false;
+        };
+        std::vector<RegionEvent> takeRegionEvents();
         /// What the meters of the display that are not the player's stats show
         struct HudStatus
         {
@@ -2508,6 +2516,11 @@ namespace OFScript
         FalloutScript::RegionLine::Announcer mRegionLine;
         ESM::RefId mRegionCell;
         bool mRegionCellKnown = false;
+        /// Where the cell of the last look was, to tell a step to the next cell of the outside from a transition
+        bool mRegionExterior = false;
+        ESM::RefId mRegionWorld;
+        int mRegionGridX = 0;
+        int mRegionGridY = 0;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
         /// Whether the log last said that the player sneaks (it says when that changes)

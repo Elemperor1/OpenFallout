@@ -706,10 +706,18 @@ its older drawing for a data folder that lacks the file.
   that place or none and are not deleted, which a later one replaces when it has a weather entry and the first has none, or
   its override is set and the first's is not, or the overrides are the same and its priority is higher. In a building the
   region is left as it was and nothing is shown; a place that no region covers, or a region with no name, shows nothing
-  and is forgotten as the one shown last (coming back to the one before shows it again). The name fades in over 2 s once the
-  tile is on the screen, stays until 4 s after it began and fades out over 2 s; the same name that is still on the screen is not
-  shown again. `FalloutScript::RegionLine` is the rule, `FalloutScripts::takeRegionNames` looks at the player's cell,
-  `core.hud.takeRegions` gives the names.
+  and is forgotten as the one shown last (coming back to the one before shows it again). What the executable does with the
+  name (Mac round 12AV S1): a region name is only written to the line (and its hold flag cleared) when the line is not on the
+  screen (alpha 0) or has the same text, and fades in from nothing over 2 s, the old text gone, only when the line is on the
+  screen with another text; the line that normally fades in is the name of the cell (`FULL`) of the player's parent cell at the
+  end of a door, a teleport or a load (0x772C30, called from 0x93CC9A), which is written with the hold flag set (so a region
+  that comes in the same change of cell is overwritten by it) and starts its fade in once the tile is shown by the mode of the
+  game (bit 0x20 of the mode mask) and the second line is idle. The fade out begins in the first update more than 4 s after the
+  start of the fade in, from the alpha it has then, and takes 2 s; the text stays on the tile. The text tile is always visible
+  and only its alpha is animated (target 255 times `fHudOpacity:Interface`; the port uses 255); the tile `Region_Location`
+  follows the mode. `FalloutScript::RegionLine` is the rule for the regions, `FalloutScripts::takeRegionEvents` looks at the
+  player's cell (a step to a cell next to the last in the same world space is not a transition; the port cannot tell the
+  executable's transitions apart further), `core.hud.takeRegions` gives the rows `{ name, cell }`.
 - The quest text (`QuestReminder`, Mac round 12AR C1, FalloutNV.exe 0x77A650, 0x77B430 and 0x77C170): the block is 400 by 200,
   15 in from the safe zone and 170 under its top edge; `QuestAdded` (80 down) and `QuestStages` (40 down) are in it.
   *An event* (a quest was added, completed or failed, a place was found: `kind` 0 to 3 of `core.hud.takeQuestText`) writes the
