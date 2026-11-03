@@ -297,6 +297,12 @@ namespace OFScript
             int mValue = 0;
             FalloutScript::Pipboy::ItemCategory mCategory = FalloutScript::Pipboy::ItemCategory::Misc;
             bool mEquipped = false;
+            /// A weapon or a piece of armor has a condition (tenths of a percent of its health). Copies with another
+            /// condition are rows of their own (mStack: the row is the copies at exactly that condition, and its id
+            /// tells so)
+            bool mHasCondition = false;
+            bool mStack = false;
+            int mCondition = 1000;
             /// A weapon: the damage of a blow of the record; armor: its rating and damage threshold
             double mDamage = 0;
             double mRating = 0;
@@ -413,14 +419,20 @@ namespace OFScript
         /// Spends the perk point on a perk the player is offered; false when it is not
         bool choosePerk(FalloutScript::FormId perk);
         /// The player does with the item what its kind asks (wear a weapon, armor or ammunition, or take it off again,
-        /// use up an aid item or read a book); the words that tell what happened, empty when nothing did
-        std::string useItemFromList(FalloutScript::FormId item);
-        /// The player puts items on the floor in front of it
-        int dropItem(FalloutScript::FormId item, int count);
+        /// use up an aid item or read a book); the words that tell what happened, empty when nothing did. A weapon or a
+        /// piece of armor is the copy at that condition (tenths of a percent of its health, as the list gives it).
+        /// A negative condition names no copy: the one that is on, else the best.
+        std::string useItemFromList(FalloutScript::FormId item, int condition = -1);
+        /// The player puts items on the floor in front of it (the copies at that condition, the best when none is
+        /// named)
+        int dropItem(FalloutScript::FormId item, int count, int condition = -1);
         /// The most objects one drop makes (each is an object of its own in the world)
         static constexpr int sDropLimit = 10;
-        /// Items go from one holder to another (a container); the count that moved
-        int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count);
+        /// Items go from one holder to another (a container); the count that moved. The copies at that condition go; a
+        /// negative condition moves copies in the order the holder gives them up (the full ones first), each with the
+        /// condition it has.
+        int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count,
+            int condition = -1);
         /// The player opens or closes a container, for the scripts that hear of it (OnOpen, OnClose)
         void containerOpened(FalloutScript::FormId container, bool opened);
         /// The player activates a container or a character that is dead: its things can be taken. False when the
@@ -1104,7 +1116,14 @@ namespace OFScript
         /// What the vendor sells (`vendorSide`) or what the player carries, as the menu lists it
         std::vector<BarterRow> barterRows(bool vendorSide);
         /// What is picked out to buy or to sell: the item and how many
-        using BarterPiles = std::vector<std::pair<FalloutScript::FormId, int>>;
+        struct BarterPick
+        {
+            FalloutScript::FormId mItem = 0;
+            int mCount = 0;
+            /// The copies at that condition (tenths of a percent of the health); negative: the best ones
+            int mCondition = -1;
+        };
+        using BarterPiles = std::vector<BarterPick>;
         /// What the menu shows for the two piles: the balance (what the vendor owes the player is plus), the caps that
         /// would move, whether the Accept button works, the caps each side has and the holder of the vendor's things
         struct BarterQuote
@@ -2451,13 +2470,18 @@ namespace OFScript
         std::vector<FalloutScript::FormId> barterSources(FalloutScript::FormId vendor);
         /// How many of an item the vendor sells (its container's and its own, not what it wears), and the move of
         /// that many to a holder, taken from the container first; the number that moved
-        int barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item);
-        int barterMove(FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count);
+        int barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item, int condition = -1);
+        int barterMove(FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count,
+            int condition = -1);
+        /// A pile in which every pick names its condition: a pick that named none takes the best copies there are
+        /// (what the vendor sells, or what the player carries), the next best for what is left
+        BarterPiles barterNamed(const BarterPiles& pile, bool buying);
         /// The value of an item record (0 for a form that is no item), the settings the prices go by and the price of
         /// one of an item for the player buying (or selling)
         int itemValue(FalloutScript::FormId item);
         FalloutScript::Barter::Settings barterSettings();
-        double barterPrice(const BarterMenu& menu, FalloutScript::FormId item, bool buying);
+        double barterPrice(const BarterMenu& menu, FalloutScript::FormId item, bool buying,
+            int condition = FalloutScript::ActorState::fullCondition);
         FalloutScript::CombatState mCombat;
         /// Whether the doors and switches are open, and the animations they play for it
         FalloutScript::OpenStates mOpenStates;

@@ -2232,7 +2232,8 @@ namespace OFScript
         FalloutScript::ItemInfo info;
         if (!itemInfo(form, info))
             return false;
-        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1));
+        // A weapon or armor lying in the world is as worn as it was when it was dropped (or placed)
+        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1), mReferenceState.condition(reference));
         setDisabled(reference, true);
         return true;
     }
