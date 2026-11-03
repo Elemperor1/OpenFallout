@@ -1632,6 +1632,13 @@
 -- @return #list<#HudMessage>
 
 ---
+-- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
+-- subtitles: each has `text` (the speaker's name and the words), `seconds` (how long it stays from the moment it was said),
+-- `distance` (of the speaker from the player) and `forced` (a script asked for the text whatever the setting says).
+-- @function [parent=#Hud] takeSubtitles
+-- @return #list<#table>
+
+---
 -- The text of a note of text, with the `&name;` tokens in it (the key an action is bound to, the name of the player)
 -- filled in.
 -- @function [parent=#Hud] noteText

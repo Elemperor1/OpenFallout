@@ -76,6 +76,23 @@ namespace OFLua
             return rows;
         };
 
+        // The lines that characters said to the player since this was last called, oldest first, for the subtitles: the
+        // text, how long it stays, how far the speaker is and whether a script forced it
+        api["takeSubtitles"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::Hud::Subtitle& line : scripts().hudSubtitles().take())
+            {
+                sol::table row(lua, sol::create);
+                row["text"] = line.mText;
+                row["seconds"] = line.mSeconds;
+                row["distance"] = line.mDistance;
+                row["forced"] = line.mForced;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the
         // textures (names under Interface\Stats) of the limbs that are crippled, whether the weapon is drawn and the

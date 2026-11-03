@@ -683,7 +683,19 @@ its older drawing for a data folder that lacks the file.
   marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
   executable's rule is in B4, but the port has no ownership yet). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
   below).
-- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, subtitles, the needs
+- Subtitles (`Subtitles`, Mac round 12AO B3, FalloutNV.exe 0x774FD0, 0x7711F4 and 0x775230): the tile is 800 by 110 and empty in
+  the file; the code makes a centred text in it, just above the block of the text under the crosshair. A line a character says
+  outside of a conversation (the voice of the data, or the text alone when it has no voice) is an entry: it stays from the moment
+  it was said for the length of its text times `fNoticeTextTimePerCharacter` (0.06 in the executable, 0.08 in the files), and is
+  taken when subtitles are on, the line has no voice or a script forced it, and the speaker is near enough to hear. Every 200 ms
+  the display drops the entries that are over, and when none is shown it takes the one of the speaker nearest to the player (a
+  forced one first). The tile is shown in the modes of the game and of a script that holds the player, not under a window.
+  `falloutmenusubtitles.lua` keeps the entries, `core.hud.takeSubtitles` is the engine's side; the stand-in display prints a line
+  as a message. Not known: whether the executable puts the speaker's name before the words (the port does, as it did before),
+  the colour of a line (the entry carries three colours that were not read), the voice's own length as the duration (the port
+  has no length for a voice file), and the exact place (the tile sits 110 above the text under the crosshair; the executable's
+  function that places it, 0x778652, was not decoded).
+- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, the needs
   of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
   the engine has no clip.
 

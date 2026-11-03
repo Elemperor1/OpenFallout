@@ -1023,6 +1023,8 @@ namespace OFScript
         /// The head-up display. The line of messages the games print in the corner (a reference to it: the display
         /// takes what was said, other code says things).
         FalloutScript::Hud::MessageLine& hudMessages() { return mHudMessages; }
+        /// What the characters say to the player outside of a conversation, for the subtitles of the display
+        FalloutScript::Hud::SubtitleLine& hudSubtitles() { return mHudSubtitles; }
         /// What the meters of the display that are not the player's stats show
         struct HudStatus
         {
@@ -2163,6 +2165,7 @@ namespace OFScript
         /// What is printed in the corner of the screen, what the characters around make of the player, and the clock
         /// (seconds of play) that the second is told by
         FalloutScript::Hud::MessageLine mHudMessages;
+        FalloutScript::Hud::SubtitleLine mHudSubtitles;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
         /// Whether the log last said that the player sneaks (it says when that changes)

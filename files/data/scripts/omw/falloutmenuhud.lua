@@ -20,6 +20,7 @@
 local ui = require('openfallout.ui')
 local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
+local subtitles = require('scripts.omw.falloutmenusubtitles')
 
 local module = {}
 
@@ -143,6 +144,11 @@ local function build(self)
     end
     t.hotAmmo = m:find('IM_AmmoSwap')
     if t.hotAmmo then m:set(t.hotAmmo, 'visible', 0) end
+    -- The subtitles: the tile is 800 by 110 and empty in the file; the code makes a centred line of text in it, just above
+    -- the block of the text under the crosshair
+    t.subtitles = find('Subtitles')
+    place(t.subtitles, math.floor(width / 2) - 400, height - 2 * sy - 80 - 30 - 110)
+    t.subtitleText = make(t.subtitles, 'template_justify_center_text', 'hud_subtitle_text', { x = 400, y = 0, wrapwidth = 800 })
     t.limbs = find('crippled_limb_indicator')
     place(t.limbs, width - 2 * sx - 200, 100 + 2 * sy)
     t.hitPoints, t.actionPoints = hitPoints, actionPoints
@@ -509,8 +515,13 @@ function Hud:update(state, dt)
     local full = state.mode == 'game'
     local off = state.mode == 'off'
     self:queueMessages(state.messages or {})
+    for _, line in ipairs(state.subtitles or {}) do self.subtitles:add(line) end
+    local subtitle = self.subtitles:step(dt)
     self.shown:batch(function()
         self:showMessage(dt)
+        -- The subtitles are in the modes of the game (and of a script that holds the player), not under a window
+        self:put(t.subtitles, 'visible', (full and subtitle ~= nil) and 1 or 0)
+        if subtitle ~= nil then self:put(t.subtitleText, 'string', subtitle) end
         self:put(t.messages, 'visible', off and 0 or 1)
         for _, tile in ipairs({ t.hitPoints, t.actionPoints, t.rads, t.reticle, t.sneak, t.xp, t.limbs, t.enemy, t.info }) do
             if not full then self:put(tile, 'visible', 0) end
@@ -574,7 +585,8 @@ function module.create(pad)
     local size = ui.screenSize()
     local shown = menuModule.open(FILE, { layer = 'HUD', passive = true, pad = pad == true })
     if not shown then return nil end
-    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = {}, pad = pad == true }, Hud)
+    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = {}, pad = pad == true,
+        subtitles = subtitles.new() }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then
         print('The head-up display is not drawn from its file: ' .. tostring(problem))

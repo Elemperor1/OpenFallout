@@ -48,6 +48,36 @@ namespace FalloutScript::Hud
         std::deque<Message> mMessages;
     };
 
+    /// A line a character says, for the subtitles of the head-up display (the tile `Subtitles` of its menu file)
+    struct Subtitle
+    {
+        std::string mText;
+        /// How long it stays from the moment it was said
+        float mSeconds = 0;
+        /// How far the speaker is from the player: of several lines said at once the display shows the nearest
+        float mDistance = 0;
+        /// A script forced the text on whatever the setting says; such a line comes before the others
+        bool mForced = false;
+    };
+
+    /// The lines that were said to the player since the display last took them, oldest first (FalloutNV.exe 0x774FD0
+    /// makes the entry and 0x7711F4 and 0x775230 show it: Mac round 12AO B3). It can be used from any thread. Only the
+    /// newest few are kept, as in MessageLine.
+    class SubtitleLine
+    {
+    public:
+        static constexpr std::size_t capacity = 8;
+
+        void push(Subtitle line);
+        std::vector<Subtitle> take();
+        std::size_t size();
+        void clear();
+
+    private:
+        std::mutex mMutex;
+        std::deque<Subtitle> mLines;
+    };
+
     /// The word the sneak meter shows
     enum class Sneak
     {

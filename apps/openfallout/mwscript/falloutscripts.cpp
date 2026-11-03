@@ -517,6 +517,7 @@ namespace OFScript
         }
         mWeaponLoops.clear();
         mHudMessages.clear();
+        mHudSubtitles.clear();
         mWatchers.clear();
         mReferences.clear();
         mTriggerShapes.clear();
@@ -3702,15 +3703,24 @@ namespace OFScript
                     return at != nullptr && with != nullptr && at->isExterior() && with->isExterior()
                         && at->getCell()->getWorldSpace() == with->getCell()->getWorldSpace();
                 };
-                const bool near = !player.isEmpty() && sameplace()
-                    && (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
-                            .length()
-                        <= hearingDistance;
+                const float distance = player.isEmpty() || !sameplace()
+                    ? std::numeric_limits<float>::max()
+                    : (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
+                          .length();
+                const bool near = distance <= hearingDistance;
                 if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
                 {
+                    // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
+                    // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from
+                    // the moment it is said, and of several said at once the nearest speaker's is shown
                     const std::string name(speaker.getClass().getName(speaker));
-                    OFBase::Environment::get().getWindowManager()->messageBox(
-                        name.empty() ? line.mText : name + ": " + line.mText, OFGui::ShowInDialogueMode_Never);
+                    FalloutScript::Hud::Subtitle subtitle;
+                    subtitle.mText = name.empty() ? line.mText : name + ": " + line.mText;
+                    subtitle.mSeconds
+                        = static_cast<float>(line.mText.size() * gameSetting("fNoticeTextTimePerCharacter", 0.06));
+                    subtitle.mDistance = distance;
+                    subtitle.mForced = line.mForceSubtitles;
+                    mHudSubtitles.push(std::move(subtitle));
                 }
             }
             else

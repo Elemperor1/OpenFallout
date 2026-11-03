@@ -468,6 +468,10 @@ local function updateLines(dt)
     for _, message in ipairs(hud.takeMessages()) do
         lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds }
     end
+    -- The stand-in has no tile for the subtitles: a line that is said is a message
+    for _, said in ipairs(hud.takeSubtitles()) do
+        lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
+    end
     local kept = {}
     for _, line in ipairs(lines) do
         line.left = line.left - dt
@@ -505,16 +509,21 @@ local function current(dt)
     end
     if I.UI.getMode() ~= nil then
         -- While a window is open the display from the file shows the messages that come, and the stand-in nothing
-        if not menuHud then return nil end
-        return { mode = 'messages', messages = hud.takeMessages() }
+        if not menuHud then
+            -- What was said while a window was open is over by the time it closes
+            hud.takeSubtitles()
+            return nil
+        end
+        return { mode = 'messages', messages = hud.takeMessages(), subtitles = hud.takeSubtitles() }
     end
     local stats = pipboy.stats()
     local weapon = core.combat.weapon()
     local status = hud.status()
     -- The display from the file queues the messages itself
-    local incoming = nil
+    local incoming, saying = nil, nil
     if menuHud then
         incoming = hud.takeMessages()
+        saying = hud.takeSubtitles()
     else
         updateLines(dt)
     end
@@ -565,6 +574,7 @@ local function current(dt)
         screen = ui.screenSize(),
         mode = 'game',
         messages = incoming,
+        subtitles = saying,
     }
 end
 
