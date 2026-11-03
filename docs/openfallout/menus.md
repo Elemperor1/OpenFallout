@@ -822,7 +822,8 @@ wheel is up on a pad. Seen only in the offline harness (`hotkeys.lua`, `hotpad.l
 
 `options/credits_menu.xml` (id 0x417) is a full-screen backdrop (`background`, dark blue, its picture changes in turn) and an empty
 tile `credits_rect` (at x 640, clipping) that holds the lines. The text is `DATA\<LANGUAGE>\CREDITS.TXT` (ENGLISH, GERMAN, FRENCH,
-SPANISH or ITALIAN, from `sLanguage`), else `DATA\CREDITS.TXT`; a `CREDITSPATCH.TXT` in the same place replaces it when it is there;
+SPANISH or ITALIAN, from `sLanguage`), else `DATA\CREDITS.TXT` (the module asks the engine's file system for them from the data folder,
+as `english\credits.txt` and `credits.txt`); a `CREDITSPATCH.TXT` in the same place replaces it when it is there;
 the Wild Wasteland trait, a Ctrl key held or the global `PlayCredits` at 2 make it `CREDITSWACKY.TXT`. It is one buffer, not
 pages: a line that is only a line end is a blank line, a line that begins with `*` is a comment, and every run of characters up
 to a line end, `<`, `>` or `*` (255 at most) is a text tile of its own, put under the one before by the height of its font. The marks

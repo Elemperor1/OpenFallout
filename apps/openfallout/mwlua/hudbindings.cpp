@@ -1,5 +1,6 @@
 #include "hudbindings.hpp"
 
+#include <iterator>
 #include <stdexcept>
 
 #include <components/esm/refid.hpp>
@@ -112,6 +113,8 @@ namespace OFLua
             sol::table controls(lua, sol::create);
             static constexpr const char* controlNames[]
                 = { "movement", "pipboy", "fighting", "pointOfView", "looking", "rollover", "sneaking" };
+            static_assert(std::size(controlNames) == FalloutScript::playerControlCount,
+                "every player control needs a name for Lua");
             for (std::size_t control = 0; control < FalloutScript::playerControlCount; ++control)
                 controls[controlNames[control]] = (status.mControlsOff & (1u << control)) != 0;
             row["controlsOff"] = controls;

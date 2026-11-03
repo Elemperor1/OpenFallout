@@ -136,13 +136,14 @@ function module.parse(text, lineHeight)
 end
 
 -- The names of the files to try, in the order the executable decides between them: the language folder's credits (and its
--- patch, which replaces it) else the plain folder's
+-- patch, which replaces it) else the plain folder's. The executable's paths start with Data\ ; the virtual file system of the
+-- engine is rooted at the data folder, so they are given from there.
 function module.candidates(language, wacky)
     local name = wacky and 'CREDITSWACKY' or 'CREDITS'
-    local folder = 'DATA\\' .. language:upper() .. '\\'
+    local folder = language:upper() .. '\\'
     return {
         language = folder .. name .. '.TXT', languagePatch = folder .. name .. 'PATCH.TXT',
-        plain = 'DATA\\' .. name .. '.TXT', plainPatch = 'DATA\\' .. name .. 'PATCH.TXT',
+        plain = name .. '.TXT', plainPatch = name .. 'PATCH.TXT',
     }
 end
 
