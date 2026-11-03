@@ -2238,6 +2238,33 @@
 -- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
 
 ---
+-- What a book or a scroll that the player carries says, for its screen.
+-- @function [parent=#Pipboy] book
+-- @param #string item
+-- @return #table nil for an item that is no book; else a table with `name`, `text` (with marks and names of settings,
+-- see @{#Interact.book}), `scroll` (a scroll and not a book) and `canTake`.
+
+---
+-- A page of the help manual or a hint of the game.
+-- @type HelpPage
+-- @field #string id The editor id of the message that holds it.
+-- @field #string title Its title.
+-- @field #string text Its words: marked up text when it begins with `<` (see @{#Interact.book}), with names of settings.
+
+---
+-- The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when `pad` is true), in the
+-- order of the list.
+-- @function [parent=#Pipboy] helpManual
+-- @param #boolean pad
+-- @return #list<#HelpPage> Empty when the data has no such list.
+
+---
+-- A hint of the game by the editor id of its message (`HelpCrafting`).
+-- @function [parent=#Pipboy] helpMessage
+-- @param #string editorId
+-- @return #HelpPage nil when there is none.
+
+---
 -- The most items that one drop puts on the floor.
 -- @field [parent=#Pipboy] #number dropLimit
 

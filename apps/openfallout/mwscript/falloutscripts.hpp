@@ -483,6 +483,20 @@ namespace OFScript
             bool mCanTake = true;
         };
         std::optional<BookText> bookText(FalloutScript::FormId item);
+
+        /// A page of the help manual or a hint of the game: the editor id of the message that holds it, its title and
+        /// its words (the marked up text of a message, `&sName;` for the words of game settings)
+        struct HelpPage
+        {
+            std::string mId;
+            std::string mTitle;
+            std::string mText;
+        };
+        /// The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when the player
+        /// plays with a pad), in the order of the list; empty when the data has no such list
+        std::vector<HelpPage> helpManual(bool pad);
+        /// The message of a hint by its editor id (`HelpCrafting`), nothing when there is none
+        std::optional<HelpPage> helpMessage(std::string_view editorId);
         /// The player activates a book or a scroll that lies in the world: its screen opens, and the activation stops
         /// there until the player takes it or puts it down. False for an object that is no book, or an actor that is
         /// not the player (a character takes it as any item).

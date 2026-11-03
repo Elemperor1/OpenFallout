@@ -39,6 +39,9 @@ local function filled(text)
     end))
 end
 
+-- The words of a text with the names of the game's settings filled in (the screens of the help manual use it too)
+module.filled = filled
+
 function module.isOpen()
     return shown ~= nil
 end

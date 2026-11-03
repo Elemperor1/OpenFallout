@@ -689,6 +689,21 @@ number is the font of the tile traits), the colour of plain text, the keys of th
 the pages and the wheel; Escape or Backspace leave; T takes), and whether a skill book gives its points when its screen
 opens or when it is left (here: when it is left).
 
+### The help manual (Mac round 12AN B3, FalloutNV.exe)
+
+`tutorial_menu.xml` is the screen of the help pages: a title, the words of the page (a text tile that is marked up text
+when the words begin with `<`), `Previous` and `Next` buttons, the number of the page and a scrollbar for a page that is
+longer than the tile. The executable fills it from the form list of messages named `HelpManual` (`HelpManualXBox` when a
+pad is in use); every message of the list is a page (its title and its description), and the pause menu has a Help
+button that opens it. `falloutmanual.lua` does the same: `core.pipboy.helpManual(pad)` gives the pages (the form lists
+are found by their editor id and the messages by their form id), `core.pipboy.helpMessage(id)` one message by its
+editor id (a page that is shown alone, with no page number and no buttons to turn it). The start menu (the port's pause
+menu) has a Help row after Settings when the data has a manual; Escape or Backspace (B on the pad) leaves, the
+arrows and the pages (the sides of the pad) turn the pages, and the letters of the buttons work as they do in the menu.
+
+Not there yet: the help hints that the game queues while the player plays (the first time a thing is met), and the keys of
+the screen on the PC, which were not read (the arrows are a choice of the port).
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

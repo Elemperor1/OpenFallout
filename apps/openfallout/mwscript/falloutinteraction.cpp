@@ -12,6 +12,8 @@
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loaddoor.hpp>
+#include <components/esm4/loadflst.hpp>
+#include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadterm.hpp>
@@ -21,6 +23,7 @@
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/lockpick.hpp>
 #include <components/falloutscript/messagetext.hpp>
+#include <components/misc/strings/lower.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/vfs/manager.hpp>
 
@@ -180,6 +183,48 @@ namespace OFScript
         text.mScroll = (book->mData.flags & ESM4::Book::Flag_Scroll) != 0;
         text.mCanTake = (book->mData.flags & ESM4::Book::Flag_NoTake) == 0;
         return text;
+    }
+
+    // ---- The help manual ----
+
+    std::vector<FalloutScripts::HelpPage> FalloutScripts::helpManual(bool pad)
+    {
+        std::vector<HelpPage> pages;
+        const std::string wanted = pad ? "helpmanualxbox" : "helpmanual";
+        for (const ESM4::FormIdList& list : mStore.get<ESM4::FormIdList>())
+        {
+            if (Misc::StringUtils::lowerCase(list.mEditorId) != wanted)
+                continue;
+            for (const ESM::FormId& entry : list.mObjects)
+            {
+                const ESM4::Message* message = mStore.get<ESM4::Message>().search(entry);
+                if (message == nullptr)
+                    continue;
+                HelpPage page;
+                page.mId = message->mEditorId;
+                page.mTitle = message->mFullName;
+                page.mText = message->mDescription;
+                pages.push_back(std::move(page));
+            }
+            break;
+        }
+        return pages;
+    }
+
+    std::optional<FalloutScripts::HelpPage> FalloutScripts::helpMessage(std::string_view editorId)
+    {
+        const std::string wanted = Misc::StringUtils::lowerCase(editorId);
+        for (const ESM4::Message& message : mStore.get<ESM4::Message>())
+        {
+            if (Misc::StringUtils::lowerCase(message.mEditorId) != wanted)
+                continue;
+            HelpPage page;
+            page.mId = message.mEditorId;
+            page.mTitle = message.mFullName;
+            page.mText = message.mDescription;
+            return page;
+        }
+        return std::nullopt;
     }
 
     bool FalloutScripts::openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)

@@ -304,6 +304,33 @@ namespace OFLua
             row["canTake"] = book->mCanTake;
             return row;
         };
+        // The pages of the help manual (the messages of the form list `HelpManual`, or `HelpManualXBox` for a pad):
+        // a list of tables with the id of the message, its title and its words; empty when the data has none
+        api["helpManual"] = [lua](sol::optional<bool> pad) {
+            sol::table list(lua, sol::create);
+            int index = 1;
+            for (const auto& page : scripts().helpManual(pad.value_or(false)))
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = page.mId;
+                row["title"] = page.mTitle;
+                row["text"] = page.mText;
+                list[index++] = row;
+            }
+            return list;
+        };
+        // One hint of the game by its editor id (`HelpCrafting`): the same table as a page of the manual; nothing when
+        // there is none
+        api["helpMessage"] = [lua](std::string_view editorId) -> sol::object {
+            const auto page = scripts().helpMessage(editorId);
+            if (!page)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["id"] = page->mId;
+            row["title"] = page->mTitle;
+            row["text"] = page->mText;
+            return row;
+        };
         // The most items one drop puts on the floor
         api["dropLimit"] = OFScript::FalloutScripts::sDropLimit;
         // The player drops items in front of it; how many
