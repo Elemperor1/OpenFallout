@@ -1211,6 +1211,8 @@ template class OFWorld::TypedDynamicStore<ESM4::LevelledItem>;
 template class OFWorld::TypedDynamicStore<ESM4::LevelledNpc>;
 template class OFWorld::TypedDynamicStore<ESM4::Light>;
 template class OFWorld::TypedDynamicStore<ESM4::LightingTemplate>;
+template class OFWorld::TypedDynamicStore<ESM4::LoadScreen>;
+template class OFWorld::TypedDynamicStore<ESM4::LoadScreenType>;
 template class OFWorld::TypedDynamicStore<ESM4::MagicEffect>;
 template class OFWorld::TypedDynamicStore<ESM4::Message>;
 template class OFWorld::TypedDynamicStore<ESM4::MiscItem>;

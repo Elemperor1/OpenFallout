@@ -1006,6 +1006,39 @@ made: the 3D table, deck strips and hands (the scenes catalogued in 12AS E2), th
 statistics of the matches (their numbers were not read), the executable's words for the match tiles, the card suits' letters (the
 order of the suits was not read) and the confirmation the game asks before a forfeit by Escape.
 
+### The loading screen (Mac round 12AR C2, FalloutNV.exe 0x788CC0 and the functions around it)
+
+`loading_menu.xml` (one object in the executable, `[0x11DA0C0]`, with a thread of its own at about 20 Hz) has a full-screen image for the
+last frame of the world (`loading_world_image`, id 12), two full-screen slides (`loading_tile_slide_01` and `_02`, ids 32 and 33,
+black until a picture is put on them), a tip text and a black matte behind it for each slide (`tip_text_01` and `_02`, ids 34 and
+35; `tip_matte_01` and `_02`, ids 36 and 37), the pinwheel (`loading_nif`, `Interface\Loading\LoadingAnim01.NIF`) and the groups
+of text of the other kinds of load screen (objective, level progress, stats, plate), which the executable builds hidden.
+The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use the one `LSCT` of type 3. What the code does:
+
+- The menu fades in over `menufade` (0.75 s) over the last frame of the world, which fades out as the menu comes (every tile's
+  alpha is `p * 255`, the world image's `(1 - p) * 255`).
+- It picks the pictures when the load begins: from the `LSCR` whose picture is for the main menu (record flag 0x400) when the load
+  is from the main menu, else from those that are not for one place only (no `LNAM` locations), `iMaxScreens:Loading` (4) of
+  them (20 from the main menu), at random, none twice (the same file is the same picture). A load of an interior cell shows the
+  pinwheel and no picture.
+- The first picture is on the screen at once, on slide 1; every ten seconds (four from the main menu) the next picture is put on
+  the other slide and cross-fades over the one before in 2.2 s (`p = clamp((now - stamp) * 0.00045)`; its tip and matte fade
+  with it). The picture is `Textures\<ICON>` of the record and the tip its `DESC`.
+- The tip is laid out by the `LSCT` (`DATA`: type at 0, x, y, width and height on a canvas of 1280 by 960 at 4, 8, 0xC and 0x10,
+  the angle, the font, the colour as three floats and the justification at 0x14, 0x18, 0x1C and 0x28): the window is `left =
+  max(x / 1280 * W, 15)`, `top = max(y / 960 * H, 15)`, `right = min(W - 15, left + width)`, `bottom = min(H - 15, top + height)` in the
+  units of the menu, the text starts at the left, the middle or the right of it by the justification and wraps at its width, and
+  the matte is 15 above it and 30 higher than it. New Vegas: font 6, 255/180/53, centred, 850 by 400 at (210, 100).
+- There is no input and no least time; the screen goes when the load is done.
+
+`components/falloutscript/loadscreens` has these rules (the window, the choice, the slide show; tested) and `loadingmenu` puts
+them on the menu file; `mwgui/falloutloading` draws the pieces of the menu as widgets under the loading box of the engine, over
+the frame the engine keeps of the world, and takes the pictures from the `LoadScreen` and `LoadScreenType` stores. A game
+without load screens or without the menu file keeps the screens of the engine. Not done: the pinwheel (a 3D scene; its NIF
+and what the code moves in it were not read) and the pictures of a place in particular (the executable's choice of those whose
+locations match the destination was not read; they are left out), so the box of the engine (the label and the progress bar)
+stays at the bottom as a stand-in. Seen only in the offline harness and in tests, not in the running game.
+
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 
 A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at

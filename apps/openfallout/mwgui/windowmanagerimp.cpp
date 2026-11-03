@@ -610,6 +610,7 @@ namespace OFGui
     void WindowManager::setStore(const OFWorld::ESMStore& store)
     {
         mStore = &store;
+        mLoadingScreen->setStore(store);
     }
 
     void WindowManager::cleanupGarbage()

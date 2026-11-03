@@ -198,6 +198,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testplayerprogress.cpp
     falloutscript/testmagic.cpp
     falloutscript/testhud.cpp
+    falloutscript/testloadingmenu.cpp
+    falloutscript/testloadscreens.cpp
     falloutscript/testregionline.cpp
     falloutscript/testmapmarkers.cpp
     falloutscript/testaimemory.cpp

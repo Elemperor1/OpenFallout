@@ -2,19 +2,14 @@
 
 #include <map>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 
 #include <components/falloutmenu/openmenu.hpp>
-#include <components/files/istreamptr.hpp>
 #include <components/lua/luastate.hpp>
 #include <components/lua/util.hpp>
-#include <components/resource/resourcesystem.hpp>
-#include <components/vfs/manager.hpp>
-#include <components/vfs/pathutil.hpp>
 
 #include "../mwbase/environment.hpp"
-#include "../mwscript/falloutscripts.hpp"
+#include "../mwgui/falloutmenuresources.hpp"
 
 #include "context.hpp"
 
@@ -26,40 +21,6 @@ namespace OFLua
         {
             std::unique_ptr<FalloutMenu::OpenMenu> mMenu;
         };
-
-        std::shared_ptr<FalloutMenu::Resources> makeResources()
-        {
-            const VFS::Manager* vfs = OFBase::Environment::get().getResourceSystem()->getVFS();
-            FalloutMenu::Data data;
-            data.mRead = [vfs](const std::string& path) -> std::optional<std::string> {
-                Files::IStreamPtr stream = vfs->find(VFS::Path::Normalized(path));
-                if (!stream)
-                    return std::nullopt;
-                std::ostringstream bytes;
-                if (stream->peek() != std::istream::traits_type::eof())
-                    bytes << stream->rdbuf();
-                return bytes.str();
-            };
-            data.mReadStart = [vfs](const std::string& path, std::size_t count) -> std::optional<std::string> {
-                Files::IStreamPtr stream = vfs->find(VFS::Path::Normalized(path));
-                if (!stream)
-                    return std::nullopt;
-                std::string bytes(count, '\0');
-                stream->read(bytes.data(), static_cast<std::streamsize>(count));
-                bytes.resize(static_cast<std::size_t>(stream->gcount()));
-                return bytes;
-            };
-            data.mSetting = [](std::string_view name) -> std::optional<std::string> {
-                OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts();
-                if (host == nullptr)
-                    return std::nullopt;
-                std::string text = host->gameSettingText(name);
-                if (text.empty())
-                    return std::nullopt;
-                return text;
-            };
-            return std::make_shared<FalloutMenu::Resources>(std::move(data));
-        }
 
         // A tile is named by its name in the menu file or by the number `find` gave
         FalloutMenu::Tile& tileOf(LuaMenu& self, const sol::object& which)
@@ -352,7 +313,7 @@ namespace OFLua
         api["open"] = [resources](sol::this_state state, std::string_view file, double width, double height,
                           sol::optional<bool> pad) -> std::tuple<sol::object, sol::object> {
             if (!*resources)
-                *resources = makeResources();
+                *resources = OFGui::makeFalloutMenuResources();
             std::string error;
             std::unique_ptr<FalloutMenu::OpenMenu> menu = FalloutMenu::OpenMenu::open(
                 *resources, std::string(file), float(width), float(height), pad.value_or(false), &error);

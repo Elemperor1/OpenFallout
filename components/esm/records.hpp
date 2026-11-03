@@ -79,6 +79,8 @@
 #include <components/esm4/loadland.hpp>
 #include <components/esm4/loadlgtm.hpp>
 #include <components/esm4/loadligh.hpp>
+#include <components/esm4/loadlscr.hpp>
+#include <components/esm4/loadlsct.hpp>
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadlvlc.hpp>
 #include <components/esm4/loadlvli.hpp>

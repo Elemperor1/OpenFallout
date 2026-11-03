@@ -25,10 +25,16 @@ namespace Resource
     class ResourceSystem;
 }
 
+namespace OFWorld
+{
+    class ESMStore;
+}
+
 namespace OFGui
 {
     class BackgroundImage;
     class CopyFramebufferToTextureCallback;
+    class FalloutLoading;
 
     class LoadingScreen : public WindowBase, public Loading::Listener
     {
@@ -48,6 +54,9 @@ namespace OFGui
 
         double getTargetFrameRate() const;
 
+        /// The data of the game has load screens of its own: with them the screen shows their pictures and tips
+        void setStore(const OFWorld::ESMStore& store);
+
     private:
         void findSplashScreens();
         bool needToDrawLoadingScreen();
@@ -65,6 +74,10 @@ namespace OFGui
         double mLoadingOnTime;
 
         bool mImportantLabel;
+        /// The label that was set last is the one of an interior cell that is about to load
+        bool mInteriorLabel = false;
+        std::unique_ptr<FalloutLoading> mFalloutLoading;
+        bool mFalloutActive = false;
 
         int mNestedLoadingCount;
 
