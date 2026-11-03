@@ -116,10 +116,8 @@ namespace FalloutScript
                     mJournalListener(id, quest->mJournal.back());
             }
             // A quest that is completed or failed can still be running: its scripts stop it when they should
-            if ((entry.mFlags & ESM4::QuestLogEntry::Flag_CompleteQuest) != 0)
-                quest->mCompleted = true;
-            if ((entry.mFlags & ESM4::QuestLogEntry::Flag_FailQuest) != 0)
-                quest->mFailed = true;
+            finish(id, *quest, (entry.mFlags & ESM4::QuestLogEntry::Flag_CompleteQuest) != 0,
+                (entry.mFlags & ESM4::QuestLogEntry::Flag_FailQuest) != 0);
             runEntry(id, entry);
             if (!entry.mNextQuest.isZeroOrUnset())
                 start(entry.mNextQuest.toUint32());
@@ -180,19 +178,75 @@ namespace FalloutScript
     void QuestManager::complete(FormId id)
     {
         if (QuestState* quest = find(id))
-            quest->mCompleted = true;
+            finish(id, *quest, true, false);
+    }
+
+    void QuestManager::finish(FormId id, QuestState& quest, bool completes, bool fails)
+    {
+        // A quest that is over (completed, or failed: the executable keeps both in one bit) is not told again
+        const bool over = quest.mCompleted || quest.mFailed;
+        if (completes)
+            quest.mCompleted = true;
+        if (fails)
+            quest.mFailed = true;
+        if (!over && (completes || fails))
+            tell(id, fails ? QuestEvent::Kind::Failed : QuestEvent::Kind::Completed);
+    }
+
+    std::string QuestManager::objectiveText(const QuestState& quest, int objective)
+    {
+        if (quest.mRecord != nullptr)
+            for (const ESM4::QuestObjective& candidate : quest.mRecord->mObjectives)
+                if (candidate.mIndex == objective)
+                    return candidate.mText;
+        return {};
+    }
+
+    void QuestManager::tell(FormId quest, QuestEvent::Kind kind, std::string text)
+    {
+        if (!mEventListener)
+            return;
+        QuestEvent event;
+        event.mKind = kind;
+        event.mQuest = quest;
+        event.mText = std::move(text);
+        mEventListener(event);
     }
 
     void QuestManager::setObjectiveDisplayed(FormId id, int objective, bool displayed)
     {
-        if (QuestState* quest = find(id))
-            quest->mObjectives[objective].mDisplayed = displayed;
+        QuestState* quest = find(id);
+        if (quest == nullptr)
+            return;
+        ObjectiveState& state = quest->mObjectives[objective];
+        const bool was = state.mDisplayed;
+        state.mDisplayed = displayed;
+        // An objective that is shown while its quest is not over puts its line on the display, and the first of a quest
+        // tells that the quest was added (FalloutNV.exe 0x5EC5D0)
+        if (!displayed || was || quest->mCompleted || quest->mFailed)
+            return;
+        std::string text = objectiveText(*quest, objective);
+        if (!text.empty())
+            tell(id, QuestEvent::Kind::ObjectiveShown, std::move(text));
+        if (!quest->mAnnounced)
+        {
+            quest->mAnnounced = true;
+            tell(id, QuestEvent::Kind::Added);
+        }
     }
 
     void QuestManager::setObjectiveCompleted(FormId id, int objective, bool completed)
     {
-        if (QuestState* quest = find(id))
-            quest->mObjectives[objective].mCompleted = completed;
+        QuestState* quest = find(id);
+        if (quest == nullptr)
+            return;
+        ObjectiveState& state = quest->mObjectives[objective];
+        const bool line = completed && !state.mCompleted && state.mDisplayed && !quest->mCompleted && !quest->mFailed;
+        state.mCompleted = completed;
+        // An objective that was shown and is completed puts a line of its own on the display
+        if (line)
+            if (std::string text = objectiveText(*quest, objective); !text.empty())
+                tell(id, QuestEvent::Kind::ObjectiveDone, std::move(text));
     }
 
     void QuestManager::completeAllObjectives(FormId id)

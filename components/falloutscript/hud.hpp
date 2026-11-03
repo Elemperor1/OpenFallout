@@ -82,6 +82,47 @@ namespace FalloutScript::Hud
         std::deque<Subtitle> mLines;
     };
 
+    /// A line of the quest text of the display (the tile `QuestAdded`): a heading and, under it, a name that is written
+    /// one character at a time. A quest that was added, completed or failed has the word of the game's settings for it
+    /// and the name of the quest; a place that was found (FalloutNV.exe 0x76B960) has the word and the name of the
+    /// place.
+    struct QuestText
+    {
+        std::string mHeading;
+        std::string mName;
+        /// The name of the sound that goes with it
+        std::string mSound;
+    };
+
+    /// A line of an objective (the tile `QuestStages`, FalloutNV.exe 0x77A5B0): one that was displayed, one that was
+    /// completed (the word of the game's settings in front of the text) or one that the reminder repeats
+    struct ObjectiveLine
+    {
+        std::string mText;
+        bool mCompleted = false;
+        bool mReminder = false;
+    };
+
+    /// What the quests and the finding of places tell the display, in the order it came (FalloutNV.exe 0x77A480 and
+    /// 0x77A5B0 keep two lists: the text of the quests and the lines of objectives). It can be used from any thread.
+    /// Only the newest few are kept, as in MessageLine.
+    class QuestTextLine
+    {
+    public:
+        static constexpr std::size_t capacity = 32;
+
+        void push(QuestText text);
+        void push(ObjectiveLine line);
+        std::vector<QuestText> takeTexts();
+        std::vector<ObjectiveLine> takeObjectives();
+        void clear();
+
+    private:
+        std::mutex mMutex;
+        std::deque<QuestText> mTexts;
+        std::deque<ObjectiveLine> mObjectives;
+    };
+
     /// The word the sneak meter shows
     enum class Sneak
     {

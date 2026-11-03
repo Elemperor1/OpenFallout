@@ -686,4 +686,108 @@ namespace
         EXPECT_TRUE(setup.mQuests.stageDone(questA, 10));
         EXPECT_THAT(setup.mHost.mLog, SizeIs(1));
     }
+
+    namespace
+    {
+        using Kind = FalloutScript::QuestEvent::Kind;
+
+        /// What the quests told the display, as "kind text" for each event
+        std::string described(const FalloutScript::QuestEvent& event)
+        {
+            static const char* const names[] = { "added", "completed", "failed", "shown", "done" };
+            return std::string(names[static_cast<int>(event.mKind)]) + " " + std::to_string(event.mQuest)
+                + (event.mText.empty() ? "" : " " + event.mText);
+        }
+    }
+
+    TEST(FalloutScriptQuestsTest, the_first_objective_shown_adds_the_quest_and_each_puts_its_line_on_the_display)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        quest.mObjectives.resize(2);
+        quest.mObjectives[0].mIndex = 10;
+        quest.mObjectives[0].mText = "Find the key";
+        quest.mObjectives[1].mIndex = 20;
+        quest.mObjectives[1].mText = "Open the door";
+        setup.start();
+        std::vector<std::string> told;
+        setup.mQuests.setEventListener(
+            [&](const FalloutScript::QuestEvent& event) { told.push_back(described(event)); });
+        const std::string id = std::to_string(questA);
+
+        setup.mQuests.setObjectiveDisplayed(questA, 10, true);
+        // Shown again, and hidden, and shown after that: the line comes when it is shown from not shown, the quest is
+        // added once
+        setup.mQuests.setObjectiveDisplayed(questA, 10, true);
+        setup.mQuests.setObjectiveDisplayed(questA, 10, false);
+        setup.mQuests.setObjectiveDisplayed(questA, 20, true);
+
+        EXPECT_THAT(
+            told, ElementsAre("shown " + id + " Find the key", "added " + id, "shown " + id + " Open the door"));
+    }
+
+    TEST(FalloutScriptQuestsTest, an_objective_that_was_shown_and_is_completed_puts_a_line_of_its_own_on_the_display)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        quest.mObjectives.resize(2);
+        quest.mObjectives[0].mIndex = 10;
+        quest.mObjectives[0].mText = "Find the key";
+        quest.mObjectives[1].mIndex = 20;
+        quest.mObjectives[1].mText = "Open the door";
+        setup.start();
+        setup.mQuests.setObjectiveDisplayed(questA, 10, true);
+        std::vector<std::string> told;
+        setup.mQuests.setEventListener(
+            [&](const FalloutScript::QuestEvent& event) { told.push_back(described(event)); });
+
+        // One that was not shown is completed in silence, and one that is completed twice is told once
+        setup.mQuests.setObjectiveCompleted(questA, 20, true);
+        setup.mQuests.setObjectiveCompleted(questA, 10, true);
+        setup.mQuests.setObjectiveCompleted(questA, 10, true);
+
+        EXPECT_THAT(told, ElementsAre("done " + std::to_string(questA) + " Find the key"));
+    }
+
+    TEST(FalloutScriptQuestsTest, a_quest_that_is_over_shows_no_objective_lines_and_is_told_over_once)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        quest.mObjectives.resize(1);
+        quest.mObjectives[0].mIndex = 10;
+        quest.mObjectives[0].mText = "Find the key";
+        TestRecords::addEntry(quest, 10, "", ESM4::QuestLogEntry::Flag_CompleteQuest);
+        TestRecords::addEntry(quest, 20, "", ESM4::QuestLogEntry::Flag_FailQuest);
+        setup.mRecords.addQuest(questB);
+        setup.start();
+        std::vector<std::string> told;
+        setup.mQuests.setEventListener(
+            [&](const FalloutScript::QuestEvent& event) { told.push_back(described(event)); });
+
+        setup.mQuests.setStage(questA, 10);
+        // Over: a stage that fails it, a second completion and an objective are not told
+        setup.mQuests.setStage(questA, 20);
+        setup.mQuests.complete(questA);
+        setup.mQuests.setObjectiveDisplayed(questA, 10, true);
+        setup.mQuests.complete(questB);
+        setup.mQuests.complete(questB);
+
+        EXPECT_THAT(told, ElementsAre("completed " + std::to_string(questA), "completed " + std::to_string(questB)));
+        EXPECT_TRUE(setup.mQuests.state(questA)->mFailed);
+    }
+
+    TEST(FalloutScriptQuestsTest, a_quest_that_fails_while_it_runs_is_told_as_failed)
+    {
+        Runner setup;
+        ESM4::Quest& quest = setup.mRecords.addQuest(questA);
+        TestRecords::addEntry(quest, 30, "", ESM4::QuestLogEntry::Flag_FailQuest);
+        setup.start();
+        std::vector<std::string> told;
+        setup.mQuests.setEventListener(
+            [&](const FalloutScript::QuestEvent& event) { told.push_back(described(event)); });
+
+        setup.mQuests.setStage(questA, 30);
+
+        EXPECT_THAT(told, ElementsAre("failed " + std::to_string(questA)));
+    }
 }

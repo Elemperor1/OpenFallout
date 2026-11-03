@@ -433,9 +433,47 @@ namespace OFScript
             return mConditions.holds(conditions, FalloutScript::ConditionContext());
         });
         // What the player reads of a quest: the text of the log entry of each stage that is reached
+        // (the display does not print it: the Pip-Boy has it; the display shows the objectives and the quests that are
+        // added, completed or failed, below)
         mQuests.setJournalListener([this](FalloutScript::FormId quest, const FalloutScript::JournalEntry& entry) {
             Log(Debug::Info) << "Journal: " << editorId(quest) << " stage " << entry.mStage << ": " << entry.mText;
-            tellPlayer(entry.mText);
+        });
+        mQuests.setEventListener([this](const FalloutScript::QuestEvent& event) {
+            using Kind = FalloutScript::QuestEvent::Kind;
+            switch (event.mKind)
+            {
+                case Kind::ObjectiveShown:
+                    mHudQuestText.push(FalloutScript::Hud::ObjectiveLine{ event.mText, false, false });
+                    return;
+                case Kind::ObjectiveDone:
+                    // The word of the games' settings comes in front of the text, joined as the executable does
+                    mHudQuestText.push(FalloutScript::Hud::ObjectiveLine{
+                        gameSettingText("sHUDQuestCompleted") + event.mText, true, false });
+                    return;
+                default:
+                    break;
+            }
+            const FalloutScript::QuestState* state = mQuests.state(event.mQuest);
+            if (state == nullptr || state->mRecord == nullptr)
+                return;
+            FalloutScript::Hud::QuestText text;
+            text.mName = state->mRecord->mQuestName;
+            switch (event.mKind)
+            {
+                case Kind::Added:
+                    text.mHeading = gameSettingText("sQuestAddedText");
+                    text.mSound = "UIPopUpQuestNew";
+                    break;
+                case Kind::Completed:
+                    text.mHeading = gameSettingText("sQuestCompletedText");
+                    text.mSound = "UIPopUpQuestComplete";
+                    break;
+                default:
+                    text.mHeading = gameSettingText("sQuestFailed");
+                    text.mSound = "UIPopUpQuestComplete";
+                    break;
+            }
+            mHudQuestText.push(std::move(text));
         });
     }
 
@@ -525,6 +563,7 @@ namespace OFScript
         mWeaponLoops.clear();
         mHudMessages.clear();
         mHudSubtitles.clear();
+        mHudQuestText.clear();
         {
             // The first look at the regions in the next game announces the one the player is in
             const std::lock_guard lock(mRegionMutex);

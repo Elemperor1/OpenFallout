@@ -1029,6 +1029,9 @@ namespace OFScript
         FalloutScript::Hud::MessageLine& hudMessages() { return mHudMessages; }
         /// What the characters say to the player outside of a conversation, for the subtitles of the display
         FalloutScript::Hud::SubtitleLine& hudSubtitles() { return mHudSubtitles; }
+        /// What the quests and the finding of places tell the display: the quest that was added, completed or failed, the
+        /// place that was found, and the lines of the objectives
+        FalloutScript::Hud::QuestTextLine& hudQuestText() { return mHudQuestText; }
         /// The names of the regions the player came into since this was last called, for the display (a name or none:
         /// it is looked for when the player's cell is another one). Lua thread.
         std::vector<std::string> takeRegionNames();
@@ -1396,6 +1399,8 @@ namespace OFScript
         bool markerFlags(FalloutScript::FormId marker, std::uint8_t& flags) override;
         /// Tells the player that a map marker was uncovered
         void markerShown(FalloutScript::FormId marker);
+        /// The player came near the place and found it: the display says so (FalloutNV.exe 0x76B960)
+        void markerDiscovered(FalloutScript::FormId marker);
         void playSound(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
         bool isSoundPlaying(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
         bool isMusicPlaying() override;
@@ -2173,6 +2178,7 @@ namespace OFScript
         /// (seconds of play) that the second is told by
         FalloutScript::Hud::MessageLine mHudMessages;
         FalloutScript::Hud::SubtitleLine mHudSubtitles;
+        FalloutScript::Hud::QuestTextLine mHudQuestText;
         /// The region line of the display: the cell the player was last looked for in, and the region it showed
         std::mutex mRegionMutex;
         FalloutScript::RegionLine::Announcer mRegionLine;
