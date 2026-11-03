@@ -624,6 +624,36 @@ movement, the port the moves of the window's pointer), the pad's axes (inferred)
 played once here), and the karma that a stolen lock costs. The pause menu's model (three flat quads, no motion) and the
 Pip-Boy's item are not drawn yet.
 
+### The head-up display (Mac rounds 12AL and 12AM, FalloutNV.exe)
+
+`main/hud_main_menu.xml` is mostly empty containers (health, action points, messages, the sneak meter, the experience bar,
+the radiation, the enemy bar, the limbs, the crosshair, the text under it): the code of the games finds them by name, puts them
+in place from the size of the screen, makes their parts from the templates of `HUDTemplates.xml` and writes the numbers into
+them every 200 milliseconds (`HUDMainMenu`, id 0x3EC, create 0x76BFE0, update 0x770430). `falloutmenuhud.lua` does the same with the
+menu engine; `falloutstatus.lua` gathers what the display shows (`core.pipboy.stats`, `core.hud`, `core.combat.weapon`) and keeps
+its older drawing for a data folder that lacks the file.
+
+- The menu is 960 units high and as wide as the window (1280 wide when the window is taller than wide); the safe zone is 15 on
+  each side (`iSafeZoneX`, `iSafeZoneY`: the INI is not read here), so a block keeps 2 x 15 from the edge. The health block sits at
+  `x = 40`, `y = H - 157`, the action points block at `x = W - 386`, the radiation at the top right, the enemy bar in
+  the middle above the health, the sneak meter at the top middle, the messages at `(25, 55)`, the experience bar at
+  `(W - 420, H - 310)`, the limbs at the right (`W - 230`, `130`), the crosshair in the middle of the window.
+- A bar is a row of whole tick marks (`hud_tick_mark.dds`, 8 wide): `round(_TotalWidth * share / _ImageWidth) * _ImageWidth`, at
+  least one tick; the health bar grows from the left, the action points bar from the right, the enemy bar from its middle (in
+  steps of two ticks, so the halves are whole).
+- Messages are one at a time: a message is shown for the seconds it came with (2), fades in and out in 0.35 seconds, waits behind
+  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings.
+- The compass is a strip of 360 degrees of the interface atlas (1023 texels, `N` at both ends) of which 345 texels, about 121
+  degrees, are shown from the heading on. The menu engine scrolls a picture with the trait `_sourcex` (a window of the texture
+  at its natural size from that texel on, going on at the left edge when it runs past the right one). The marks of places
+  (quest, landmark, characters) are made from the templates and put by their `_Heading`. How the games scroll the strip was
+  not read; the scroll and the 120 degrees the engine marks places in are the port's.
+- When a window is open only the messages are shown, and nothing while the player is dead.
+- Not drawn: the text under the crosshair (`Info`), the armour icons, the weapon's name and condition, the place's name that
+  shows on entering, subtitles, the hot keys, the needs of hardcore mode, the breath meter and the quest reminder; the weapon's
+  rounds show the rounds carried, as the engine has no clip. Mac round 12AM B2 read the text under the crosshair (name, verb,
+  weight and value): it is the next piece.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
