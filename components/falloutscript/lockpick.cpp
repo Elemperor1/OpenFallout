@@ -211,6 +211,9 @@ namespace FalloutScript::Lockpick
     std::vector<Event> Game::force(double roll)
     {
         std::vector<Event> events;
+        // A force that was accepted runs to its end: a second request cannot turn a success into a failure
+        if (mForcing)
+            return events;
         if (mState != State::Idle && mState != State::Turning && mState != State::Binding)
             return events;
         if (mState == State::Binding)

@@ -288,6 +288,18 @@ namespace
         EXPECT_EQ(lost.picks(), 1);
     }
 
+    TEST_F(LockpickGameTest, aForceThatWonIsNotReversedByAnotherRequestWhileTheCylinderTurns)
+    {
+        Game game = ready(setup(2, 60, 1));
+        EXPECT_TRUE(has(game.force(0.0), Event::Turn));
+        EXPECT_TRUE(game.forcing());
+        // Pressing the key again, or the button, while the cylinder turns by itself
+        EXPECT_TRUE(game.force(99.0).empty());
+        EXPECT_EQ(game.state(), Game::State::Turning);
+        EXPECT_TRUE(has(run(game, 1.2, {}), Event::Unlock));
+        EXPECT_NE(game.state(), Game::State::Failed);
+    }
+
     TEST_F(LockpickGameTest, putsThePinStraightUpAtTheMiddleAndPointsItToTheSidesAtTheEnds)
     {
         Game game = ready(setup());
