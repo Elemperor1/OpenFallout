@@ -290,16 +290,20 @@ namespace OFScript
         for (const FalloutScript::FormId holder : barterSources(vendor))
             quote.mVendorCaps += mActors.itemCount(holder, caps);
         std::vector<FalloutScript::Barter::Line> lines;
-        // A pile that asks for more than the holder has, or for a thing without a worth, is no deal
+        // A pile that asks for more than the holder has (counting the lines of one thing together, a request from a
+        // script can name a thing twice), or for a thing without a worth, is no deal
         const auto add = [&](const BarterPiles& pile, bool buying) {
+            std::map<FalloutScript::FormId, int> asked;
             for (const auto& [item, count] : pile)
             {
                 const int have = buying ? barterStock(vendor, item) : mActors.itemCount(mPlayer, item);
-                if (count <= 0 || itemValue(item) <= 0 || have < count)
+                int& total = asked[item];
+                if (count <= 0 || itemValue(item) <= 0 || have - total < count)
                 {
                     quote.mValid = false;
                     continue;
                 }
+                total += count;
                 lines.push_back({ barterPrice(*menu, item, buying), count, buying });
             }
         };
