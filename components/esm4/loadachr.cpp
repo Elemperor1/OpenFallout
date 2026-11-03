@@ -29,7 +29,7 @@
 #include <stdexcept>
 
 #include "reader.hpp"
-//#include "writer.hpp"
+// #include "writer.hpp"
 
 void ESM4::ActorCharacter::load(ESM4::Reader& reader)
 {
@@ -102,10 +102,17 @@ void ESM4::ActorCharacter::load(ESM4::Reader& reader)
                 reader.get(mCount);
                 break;
             }
+            case ESM::fourCC("XMRC"):
+                // The container reference that holds what a vendor sells (the plugins of both games write one
+                // reference)
+                if (subHdr.dataSize == 4)
+                    reader.getFormId(mMerchantContainer);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("XRGD"): // ragdoll
             case ESM::fourCC("XRGB"): // ragdoll biped
             case ESM::fourCC("XHRS"): // horse formId
-            case ESM::fourCC("XMRC"): // merchant container formId
             // TES5
             case ESM::fourCC("XAPD"): // activation parent
             case ESM::fourCC("XAPR"): // active parent

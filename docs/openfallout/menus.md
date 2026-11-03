@@ -445,6 +445,48 @@ once, when the screens are left (`menu.saveOptions`).
   running game (the game disables it under conditions that were not decoded), and what the Fallout 3 screens differ in
   (not checked; the same file is drawn). Nothing was seen in the running game.
 
+### Trading (barter)
+
+`barter_menu.xml` is drawn by `falloutbarter.lua`; the engine side is `core.pipboy.barter*` (`apps/openfallout/mwscript/falloutbarter.cpp`)
+and the prices and checks are `FalloutScript::Barter` (`components/falloutscript/barter.*`), all as the Mac read them from
+`FalloutNV.exe` in round 12AG (menu class `BarterMenu`, id 0x41d, `Create` 0x72d250, the deal 0x72fd10, the checks of the Accept
+button 0x72f6f0, the price of one 0x72ed00).
+
+- The only way in is the script command `ShowBarterMenu` (0x1173), which the response of a dialogue line calls (New Vegas: 90 lines in
+  58 topics; Fallout 3: 157 in 41). The reference it is called on is the vendor; its optional integer is a percent from -100 to
+  100. Nothing about the character's services (the AIDT bits) decides whether the line is there. The dialogue stays
+  open under the menu and is back when the menu closes (inferred; the dialogue's code was not read).
+- What the vendor sells is the container of its placed reference (the `XMRC` of its ACHR or ACRE record, which the ESM4 loader now
+  reads), else what the character itself carries. The vendor's caps are the caps in that container; they are never made
+  up, and a vendor that has none pays nothing. Caps are not listed (they are the money), and neither is what is worth nothing.
+  The player's side leaves out keys and the armor the files keep from the player, as the Pip-Boy does.
+- The price of one is `value * Base + Mult * (1 - Base) * value * c^Exp` with the settings `fItemConditionValueBase`, `Mult` and
+  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing the port keeps no condition for, which makes the base
+  value the value. Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
+  (1.55 at skill 0, 1.10 at 100) and `fBarterSellBase + skill * fBarterSellMult / 100` for what it sells (0.45 to 0.90), from
+  the Barter skill read once when the menu opens. Then the percent of the script (a positive one is less to pay and more for
+  what is sold), the perk entry point 0x11 (`EntryPoint::buyPrice`, with the vendor and the item as its context), and the
+  rounding: above 1 up to a whole number, else up in tenths. What the player buys costs at least the base value and what it
+  sells brings at most the base value. The settings the executable has and nothing reads (`fBarterHaggle*`, `fBarterDisp*`,
+  `fBarterMin/Max`) are not used.
+- The two lists are the player's things (left) and the vendor's (right), each with the six tabs of the container
+  (everything, weapons, apparel, aid, misc, ammo). A click moves one thing into the pile of the deal; of a stack of more
+  than `iInventoryAskQuantityAt` (5) the quantity prompt asks how many. A thing in a pile shows in the list of the other side
+  with an empty square (`_IsBarterSelected`), at the price of its new side, and a click on it takes it out again; a worn thing has
+  the filled square. Nothing changes hands until Accept.
+- In the middle the caps that would move are shown on the arrow (`BM_CapsFlow`; the file's two pictures are for what the player
+  pays and what it gets), faint when the vendor has less than it owes or the player has too little to pay. Accept works only
+  with something in a pile and, when the player pays, only with the caps for it; when the vendor owes it always works and the
+  payout is cut at what the vendor has. Exit asks "sCancelBarter" first when a pile has something in it; Escape does nothing in
+  that box. The letters of the file work: A is Accept and X is Exit.
+- Accept moves the things (a worn one is taken off first), then the caps (the vendor's container gets what the player pays and
+  the player what the vendor pays), adds the caps to the statistic "Barter Amount Traded" (id 0x27), and leaves the menu open with
+  empty piles.
+- Not done: the sounds of the menu (the caps up and down, the clicks), the item card's picture, the exit event the executable
+  raises after a deal (0x61a2d0 and 0x7640a0, not decoded), the condition of things (every thing is at full condition),
+  the keys of the first pick (no tile picked: the port picks the first row), and the pad's B, which the engine uses to leave
+  at once without the question. Nothing was seen in the running game.
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

@@ -277,6 +277,11 @@ namespace OFScript
         mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
             return openRecipes(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
         });
+        // The barter menu of a conversation: the character the script is called on trades with the player, and the
+        // screen shows it. The argument is the percent the vendor gives (or asks for) on top of the prices.
+        mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
+            return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
+        });
         // V.A.T.S. is open while the screen of Lua says so
         mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);

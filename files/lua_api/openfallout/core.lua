@@ -2088,6 +2088,63 @@
 -- @function [parent=#Pipboy] closeRecipes
 
 ---
+-- The barter menu that a conversation opened (the response of a dialogue line that calls `ShowBarterMenu`): who trades,
+-- the holder of what it sells (the container of its placed reference, else the character itself), its name, the percent
+-- the script gave (the player pays that much less, and gets that much more for what it sells, when it is above 0) and a
+-- number that is another for each time a menu opens.
+-- @function [parent=#Pipboy] barter
+-- @return #PipboyBarter Nil when no menu is open.
+
+---
+-- @type PipboyBarter
+-- @field #string vendor Form id of the character that trades.
+-- @field #string holder Form id of what holds its things.
+-- @field #string name
+-- @field #number percent
+-- @field #number serial
+
+---
+-- What the barter menu lists on one side: the things as `items` gives them (the caps, what is worth nothing, and for
+-- the player's side the keys and the armor the files keep from the player, are left out), each with the price of one
+-- in caps as the menu works it out (the Barter skill, the settings of the games, the percent of the script and the
+-- perks that change prices).
+-- @function [parent=#Pipboy] barterRows
+-- @param #string side "vendor" or "player".
+-- @return #list<#PipboyItem> Each with a field `price` in addition.
+
+---
+-- What the two piles of the barter menu come to. Each pile is a list of `{id = ..., count = ...}`: what the player buys
+-- from the vendor and what it sells to it.
+-- @function [parent=#Pipboy] barterQuote
+-- @param #list<#table> buy
+-- @param #list<#table> sell
+-- @return #PipboyBarterQuote
+
+---
+-- @type PipboyBarterQuote
+-- @field #boolean valid False when a pile asks for more than is there, or for what is worth nothing.
+-- @field #boolean empty True when both piles are empty.
+-- @field #boolean accept Whether the Accept button works: not with both piles empty, always when the vendor owes the
+--   player, else only when the player has the caps to pay.
+-- @field #number balance What the vendor owes the player (below 0 when the player pays).
+-- @field #number amount The caps that would move: the balance rounded, and no more than the vendor has when it pays.
+-- @field #number playerCaps
+-- @field #number vendorCaps The caps in the vendor's container.
+
+---
+-- The player accepts the deal: the things change hands and so do the caps (the vendor pays no more than it has).
+-- @function [parent=#Pipboy] barterDeal
+-- @param #list<#table> buy
+-- @param #list<#table> sell
+-- @return #table `{status, amount, received}`; the status is "done", "empty" (both piles empty), "items" (a pile asks
+--   for what is not there), "caps" (the player has too few) or "closed" (no menu is open); `received` is true when the
+--   vendor paid the caps.
+
+---
+-- The player is done with the barter menu.
+-- @function [parent=#Pipboy] closeBarter
+
+---
 -- The level the player reached whose points have not been handed out to a screen yet, since this was last called.
 -- The games show one screen for each level, so there is one level at a time: the next is handed out after
 -- `levelUpDone`.

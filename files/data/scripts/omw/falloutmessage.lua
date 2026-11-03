@@ -51,6 +51,10 @@ local blocker = nil
 local ownsMode = false
 -- The game's own window is back in charge of the boxes (the file is not there, or does not have what the box needs)
 local given = false
+-- A box that a screen asked for (a question with buttons, I.FalloutMessage.ask), not the engine's: the box and what is
+-- called with the number of the button that was picked. It is drawn as the engine's boxes are and has the keys as they do.
+local asked = nil
+local askedSerial = 0
 
 local function closeMode()
     if ownsMode then
@@ -77,12 +81,26 @@ local function giveBack()
     given = true
     close()
     messagebox.claim(false)
+    -- A question cannot be shown: its asker is told that no button was picked
+    if asked then
+        local callback = asked.callback
+        asked = nil
+        if callback then callback(nil) end
+    end
 end
 
 -- The button `index` (from 1) is picked: said once, the engine closes the box in the next frame
 local function press(index)
     if answered or not current then return end
     answered = true
+    if asked and current == asked.box then
+        -- The question of a screen is answered at once
+        local callback = asked.callback
+        asked = nil
+        close()
+        if callback then callback(index) end
+        return
+    end
     messagebox.press(index)
 end
 
@@ -268,14 +286,23 @@ return {
         version = 1,
         -- Whether a message box is open, drawn here or in the window of the engine (which does not take every key): the
         -- screens under it leave the keys, the pad and the wheel to it
-        isOpen = function() return shown ~= nil or messagebox.current() ~= nil end,
+        isOpen = function() return shown ~= nil or asked ~= nil or messagebox.current() ~= nil end,
+        -- A screen asks the player a question in a box of the game's own look: `text` is the words, `buttons` the
+        -- labels (a '&' marks the letter that picks one), and `callback(index)` is called with the place of the button
+        -- that was picked (from 1), or with nothing when the box cannot be shown. False when it cannot be asked.
+        ask = function(text, buttons, callback)
+            if given or asked then return false end
+            askedSerial = askedSerial + 1
+            asked = { box = { serial = -askedSerial, lua = true, title = '', body = text, buttons = buttons }, callback = callback }
+            return true
+        end,
     },
     engineHandlers = {
         onFrame = function()
             if given then return end
             -- The script says every frame that it draws the boxes: a script that is gone stops being asked
             messagebox.claim(true)
-            local box = messagebox.current()
+            local box = asked and asked.box or messagebox.current()
             -- A box that the window manager has made its own window for (it opened before the claim, or the claim ran
             -- out) is that window's: it is not drawn a second time
             if not box or not box.lua then

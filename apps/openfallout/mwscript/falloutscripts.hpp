@@ -27,6 +27,7 @@
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/animationcommands.hpp>
+#include <components/falloutscript/barter.hpp>
 #include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/combatcommands.hpp>
@@ -682,6 +683,58 @@ namespace OFScript
         /// The name of an item (a weapon, armor, ammunition, aid item, book, key, item mod, ingredient, other thing
         /// that is carried), its editor id when it has none; empty for a form that is none
         std::string itemName(FalloutScript::FormId item);
+
+        // ---- The barter menu (M12) ----
+        /// The barter menu a script showed (ShowBarterMenu, from the response of a conversation): the character that
+        /// trades, its name, the percent that the script gave (the player pays that much less when it is above 0) and a
+        /// number that is another for each time a menu is opened
+        struct BarterMenu
+        {
+            FalloutScript::FormId mVendor = 0;
+            std::string mName;
+            int mPercent = 0;
+            int mSerial = 0;
+        };
+        /// A script opens the barter menu for the character it is called on; false when there is none to trade with
+        bool openBarter(FalloutScript::FormId vendor, int percent);
+        std::optional<BarterMenu> barterMenu();
+        /// The player is done with the menu
+        void closeBarter();
+        /// Where a vendor keeps what it sells: the container of its placed reference (XMRC), else the vendor itself
+        FalloutScript::FormId barterHolder(FalloutScript::FormId vendor);
+        /// A row of a list of the menu: the item as the Pip-Boy lists it and the price of one of it
+        struct BarterRow
+        {
+            PipboyItem mItem;
+            double mPrice = 0;
+        };
+        /// What the vendor sells (`vendorSide`) or what the player carries, as the menu lists it
+        std::vector<BarterRow> barterRows(bool vendorSide);
+        /// What is picked out to buy or to sell: the item and how many
+        using BarterPiles = std::vector<std::pair<FalloutScript::FormId, int>>;
+        /// What the menu shows for the two piles: the balance (what the vendor owes the player is plus), the caps that
+        /// would move, whether the Accept button works, the caps each side has and the holder of the vendor's things
+        struct BarterQuote
+        {
+            bool mValid = false;
+            bool mPilesEmpty = true;
+            bool mAccept = false;
+            double mBalance = 0;
+            int mAmount = 0;
+            int mPlayerCaps = 0;
+            int mVendorCaps = 0;
+            FalloutScript::FormId mHolder = 0;
+        };
+        BarterQuote barterQuote(const BarterPiles& buy, const BarterPiles& sell);
+        /// The player accepts the deal: "done" (with the caps that moved and whether the vendor paid them), or
+        /// "empty", "items" (a pile asks for what is not there), "caps" (the player has too few) or "closed"
+        struct BarterOutcome
+        {
+            std::string mStatus;
+            int mAmount = 0;
+            bool mReceived = false;
+        };
+        BarterOutcome barterDeal(const BarterPiles& buy, const BarterPiles& sell);
 
         /// The 3D of an object that holds animations of its own is built (a door, a switch): an object that rests open
         /// starts so
@@ -1865,6 +1918,15 @@ namespace OFScript
         std::mutex mRecipeMutex;
         std::optional<RecipeMenu> mRecipeMenu;
         int mRecipeSerial = 0;
+        /// The barter menu the player has open, under mBarterMutex
+        std::mutex mBarterMutex;
+        std::optional<BarterMenu> mBarter;
+        int mBarterSerial = 0;
+        /// The value of an item record (0 for a form that is no item), the settings the prices go by and the price of
+        /// one of an item for the player buying (or selling)
+        int itemValue(FalloutScript::FormId item);
+        FalloutScript::Barter::Settings barterSettings();
+        double barterPrice(const BarterMenu& menu, FalloutScript::FormId item, bool buying);
         FalloutScript::CombatState mCombat;
         /// Whether the doors and switches are open, and the animations they play for it
         FalloutScript::OpenStates mOpenStates;
