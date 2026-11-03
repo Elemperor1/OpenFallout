@@ -200,17 +200,17 @@ local function activate(row)
     end
     if item.book and equippable(item) then
         -- A book is read on its own screen, and what reading it gives (the points of a skill book, the book used up) is
-        -- done when the player leaves the screen
+        -- given at once: the executable's function that puts an item on does it when the player reads it, and the screen is
+        -- only the words (Mac round 12AN B9)
         local words = pipboy.book(item.id)
-        local id = item.id
         if words then
             words.canTake = false
-            if bookMenu.show(words, { onLeave = function()
-                pipboy.use(id)
+            pipboy.use(item.id)
+            bookMenu.show(words, { onLeave = function()
                 if shown then fill() end
-            end }) then
-                return
-            end
+            end })
+            fill()
+            return
         end
     end
     if equippable(item) then

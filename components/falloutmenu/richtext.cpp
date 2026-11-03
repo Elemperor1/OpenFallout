@@ -213,21 +213,22 @@ namespace FalloutMenu
             void runPlain(std::string_view text)
             {
                 std::string word;
+                // Plain text (FalloutNV.exe 0xA18C79, Mac round 12AN B9): a line feed breaks the line, a space and a
+                // tab are a space each (a run of them stays), the other characters below 0x20 (a carriage return too)
+                // are left out
                 for (const char c : text)
                 {
-                    if (c == '\r')
-                        continue;
                     if (c == '\n')
                     {
                         flushWord(word);
                         newLines(1);
                     }
-                    else if (isSpace(c))
+                    else if (c == ' ' || c == '\t')
                     {
                         flushWord(word);
-                        mPendingSpace = true;
+                        ++mPendingSpaces;
                     }
-                    else
+                    else if (static_cast<unsigned char>(c) >= 0x20)
                         word.push_back(c);
                 }
                 flushWord(word);
@@ -253,12 +254,18 @@ namespace FalloutMenu
                         i = close + 1;
                         continue;
                     }
-                    if (isSpace(c))
+                    // In marked up text (0xA17390) a carriage return and a line feed are left out wherever they stand
+                    // (only the marks break lines), a space and a tab are a space each and a run of them is not made
+                    // one
+                    if (c == '\r' || c == '\n')
+                    {
+                    }
+                    else if (c == ' ' || c == '\t')
                     {
                         flushWord(word);
-                        mPendingSpace = true;
+                        ++mPendingSpaces;
                     }
-                    else
+                    else if (static_cast<unsigned char>(c) >= 0x20)
                         word.push_back(c);
                     ++i;
                 }
@@ -402,9 +409,11 @@ namespace FalloutMenu
             /// Put a word or a picture on the line, on the next one when it does not fit
             void place(Fragment fragment)
             {
-                const bool spaced = mPendingSpace && !mLine.mFragments.empty();
-                mPendingSpace = false;
-                const float space = spaced ? width(fragment.mStyle, " ") : 0.f;
+                // The spaces that stood before it (none at the start of a line)
+                const int spaces = mPendingSpaces;
+                const bool spaced = spaces > 0 && !mLine.mFragments.empty();
+                mPendingSpaces = 0;
+                const float space = spaced ? static_cast<float>(spaces) * width(fragment.mStyle, " ") : 0.f;
                 if (wraps() && !mLine.mFragments.empty() && mLine.mWidth + space + fragment.mWidth > mParams.mWrapWidth)
                 {
                     // (the space that stood before the word is not carried over)
@@ -412,14 +421,14 @@ namespace FalloutMenu
                 }
                 else if (spaced && !fragment.mImage)
                 {
-                    fragment.mText.insert(fragment.mText.begin(), ' ');
+                    fragment.mText.insert(0, static_cast<size_t>(spaces), ' ');
                     fragment.mWidth += space;
                 }
                 else if (spaced)
                 {
-                    // A picture after a word: the space is a run of its own
+                    // A picture after a word: the spaces are a run of their own
                     Fragment gap;
-                    gap.mText = " ";
+                    gap.mText = std::string(static_cast<size_t>(spaces), ' ');
                     gap.mStyle = fragment.mStyle;
                     gap.mWidth = space;
                     gap.mHeight = lineHeight(fragment.mStyle);
@@ -450,7 +459,7 @@ namespace FalloutMenu
             /// End the line; an empty one is a blank line when `blank` says so, and nothing otherwise
             void finishLine(bool blank)
             {
-                mPendingSpace = false;
+                mPendingSpaces = 0;
                 if (mLine.mFragments.empty())
                 {
                     if (!blank)
@@ -476,7 +485,7 @@ namespace FalloutMenu
             Align mAlign = Align::Left;
             Line mLine;
             std::vector<Line> mLines;
-            bool mPendingSpace = false;
+            int mPendingSpaces = 0;
             bool mBreakPending = false;
         };
 

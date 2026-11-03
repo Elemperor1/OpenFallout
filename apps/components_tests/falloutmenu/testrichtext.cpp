@@ -169,12 +169,26 @@ namespace
         EXPECT_EQ(none[0].mItems[0].mText, "x");
     }
 
-    TEST(FalloutRichText, white_space_between_words_is_one_space_and_none_stands_at_the_start_of_a_line)
+    // FalloutNV.exe 0xA17390 and 0xA18C79 (Mac round 12AN B9)
+    TEST(FalloutRichText, in_marked_up_text_line_ends_are_left_out_and_every_space_stays_but_none_starts_a_line)
     {
         const auto pages = layoutRichText("<b>  one \r\n  two<br>   three", params(0), measure());
         ASSERT_EQ(pages.size(), 1u);
         ASSERT_EQ(pages[0].mItems.size(), 2u);
-        EXPECT_EQ(pages[0].mItems[0].mText, "one two");
+        EXPECT_EQ(pages[0].mItems[0].mText, "one   two");
         EXPECT_EQ(pages[0].mItems[1].mText, "three");
+        // A line end in the middle of a word does not split it, and a tab is a space
+        const auto joined = layoutRichText("<b>wo\r\nrd\tx", params(0), measure());
+        ASSERT_EQ(joined[0].mItems.size(), 1u);
+        EXPECT_EQ(joined[0].mItems[0].mText, "word x");
+    }
+
+    TEST(FalloutRichText, in_plain_text_a_line_feed_breaks_the_line_and_a_run_of_spaces_stays)
+    {
+        const auto pages = layoutRichText("aa  bb\tcc\r\ndd", params(0), measure());
+        ASSERT_EQ(pages.size(), 1u);
+        ASSERT_EQ(pages[0].mItems.size(), 2u);
+        EXPECT_EQ(pages[0].mItems[0].mText, "aa  bb cc");
+        EXPECT_EQ(pages[0].mItems[1].mText, "dd");
     }
 }

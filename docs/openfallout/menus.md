@@ -705,11 +705,20 @@ the executable's text engine is shared with the notes of the terminals:
   that is no page draws nothing, and the tile's `pagecount` trait says how many pages there are. The width and height of
   the tile are those of the page it shows.
 
-Not known yet, asked of the next Mac round (12AN B9): what the text engine does with line feeds and runs of spaces in the
-marked text (here: one space), where a picture stands in a line, which names `FACE` takes (here: numbers only, and the
-number is the font of the tile traits), the colour of plain text, the keys of the screen on the PC (here: the arrows,
-the pages and the wheel; Escape or Backspace leave; T takes), and whether a skill book gives its points when its screen
-opens or when it is left (here: when it is left).
+Read in round 12AN B9: in marked up text a carriage return and a line feed are left out wherever they stand (only `BR` and
+`P` break lines), a space and a tab are a space each and a run of them stays (a space that would overflow the line is dropped
+and the line breaks at the last one; the port keeps no space at the start of a line, which was not read); in plain text a line
+feed breaks the line, a carriage return and the other characters below 0x20 are left out and a tab is a space. `FONT FACE`
+takes 1 to 8 (the font files `sFontFile_1` to `sFontFile_8`; a face given by name matches the name of the font object, whose
+source was not found). `DIV ALIGN` takes LEFT, CENTER and RIGHT and the executable has no closing tag for it (the port ends
+it at `/DIV`, and whether the executable applies it at all is not proven). `IMG` takes `SRC`, `WIDTH` and `HEIGHT` as whole
+numbers; where the picture stands, its line height and the path rule were not found. The colour of plain text was not read.
+A skill book gives its points when the player reads it from the Pip-Boy (the executable's function that puts an item on does
+it: the book must be the player's, the skill below 200, the points `fBookPerkBonus` adjusted by the perk entry point 11, the
+message `sSkillIncreasedNum`, and the book is removed), not when its screen is left, and the screen of a book that lies in the
+world (Take and Exit) runs no skill code, so such a book gives nothing until it is read from the Pip-Boy. The Pip-Boy shows
+the words as the points are given. The keys of the screen on the PC were not read (here: the arrows, the pages and the wheel;
+Escape or Backspace leave; T takes).
 
 ### The help manual (Mac round 12AN B3, FalloutNV.exe)
 
