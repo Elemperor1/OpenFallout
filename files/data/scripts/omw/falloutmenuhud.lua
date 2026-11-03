@@ -7,8 +7,10 @@
 --     15 on each side, so the blocks keep 2 x 15 from the edges;
 --   * a bar is a row of whole tick marks: width = round(_TotalWidth x share / _ImageWidth) x _ImageWidth, at least one
 --     tick (the bar of the action points is anchored at its right edge, the one of the enemy in its middle);
---   * a message is shown alone, for the seconds it came with, with 0.35 s to fade in and out; a message that is the same as
---     the one queued last is dropped;
+--   * a message is shown alone, for the seconds it came with, with 0.35 s to fade in and out; the seconds of the first
+--     message after a pause count from the end of its fade in, and the next one follows at once at full strength (the
+--     fade out comes only when the queue is empty; Mac round 12AW S11); a message that is the same as the one queued
+--     last is dropped;
 --   * the compass is a strip of 360 degrees of the interface atlas that is shown 345 texels at a time, its texture shifted by
 --     the heading over 360 less 0.15 (Mac round 12AN B8); a marker is drawn when 1.45 times its bearing is within 70 degrees
 --     of the front, at x = (1.45 x bearing + 70) x 274 / 140, and fades near the two ends.
@@ -302,17 +304,21 @@ function Hud:queueMessages(messages)
     end
 end
 
--- The message that is shown and how far it has faded in (or out)
+-- The message that is shown and how far it has faded in (or out). The first message after a pause fades in for FADE_SECONDS
+-- and its seconds are counted from the end of that; one that follows another is on the screen at once, and the fade out
+-- comes only after the last (the executable stamps the time when the fade in has finished, and at the turn of a message
+-- that follows: 0x7714F9, 0x7756E0).
 function Hud:stepMessages(dt)
     local head = self.queue[1]
     if head then
         self.leaving = nil
         head.age = (head.age or 0) + dt
-        if head.age >= head.seconds then
+        if head.age >= head.seconds + (head.followed and 0 or FADE_SECONDS) then
             table.remove(self.queue, 1)
             local following = self.queue[1]
             if following then
                 following.age = 0
+                following.followed = true
             else
                 self.leaving = { message = head, left = FADE_SECONDS }
             end
@@ -322,7 +328,7 @@ function Hud:stepMessages(dt)
         self.leaving.left = self.leaving.left - dt
         if self.leaving.left <= 0 then self.leaving = nil end
     end
-    if head then return head, math.min(1, head.age / FADE_SECONDS) end
+    if head then return head, head.followed and 1 or math.min(1, head.age / FADE_SECONDS) end
     if self.leaving then return self.leaving.message, math.max(0, self.leaving.left / FADE_SECONDS) end
     return nil, 0
 end
