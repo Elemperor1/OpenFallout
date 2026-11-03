@@ -1,8 +1,10 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/equipment.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/playerprogress.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -46,6 +48,7 @@ namespace
     constexpr std::uint16_t OpGetEquipped = 0x10B6;
     constexpr std::uint16_t OpEquipItem = 0x10EE;
     constexpr std::uint16_t OpUnequipItem = 0x10EF;
+    constexpr std::uint16_t OpGetWeaponHealthPerc = 0x11F4;
 
     class FakeRecords : public FalloutScript::ActorRecords, public FalloutScript::ItemRecords
     {
@@ -635,5 +638,27 @@ namespace
         EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 100);
         EXPECT_TRUE(setup.mEquipment.modWeaponPercent(guard, -500));
         EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 0);
+    }
+
+    TEST(FalloutScriptEquipmentCommandsTest, the_actor_value_commands_leave_the_health_of_a_weapon_to_the_equipment)
+    {
+        // The game registers the commands of the equipment first and those of the actor values after them, and a later
+        // handler of a command takes the place of an earlier one
+        Runner setup;
+        FalloutScript::ActorValues values;
+        FalloutScript::PlayerProgress progress;
+        FalloutScript::addActorValueCommands(setup.mInterpreter, values, setup.mSetup.mState, progress);
+        setup.mSetup.mRecords.mInfo[pistol].mHealth = 500;
+        setup.mSetup.mEquipment.equip(guard, pistol);
+        ASSERT_TRUE(setup.mSetup.mEquipment.setWeaponPercent(guard, 50));
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('f', 1), callToken(OpGetWeaponHealthPerc, arguments(0))) + end());
+        builder.variable(1, 0, "health");
+
+        setup.run(builder);
+
+        EXPECT_DOUBLE_EQ(setup.variable(1), setup.mSetup.mEquipment.weaponPercent(guard));
+        EXPECT_LT(setup.variable(1), 100);
     }
 }

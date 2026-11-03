@@ -52,7 +52,6 @@ namespace
     constexpr std::uint16_t OpForceActorValue = 0x110E;
     constexpr std::uint16_t OpGetHealthPercentage = 0x11AF;
     constexpr std::uint16_t OpGetPermanentActorValue = 0x11EF;
-    constexpr std::uint16_t OpGetWeaponHealthPerc = 0x11F4;
     constexpr std::uint16_t OpDamageActorValue = 0x1181;
     constexpr std::uint16_t OpRestoreActorValue = 0x1182;
     constexpr std::uint16_t OpRewardXP = 0x1177;
@@ -641,19 +640,6 @@ namespace
 
         EXPECT_EQ(setup.variable(guard, 1), 30);
         EXPECT_EQ(setup.mProgress.karma(), 0);
-    }
-
-    TEST(FalloutScriptActorValueCommandsTest, a_weapon_that_nothing_wore_out_is_as_good_as_new)
-    {
-        Runner setup;
-        ScriptBuilder builder;
-        builder.code(scriptName() + begin(BlockType::OnActivate)
-            + setTo(var('f', 1), callToken(OpGetWeaponHealthPerc, arguments(0))) + end());
-        builder.variable(1, 0, "weapon");
-
-        setup.run(thePlayer, builder);
-
-        EXPECT_EQ(setup.variable(thePlayer, 1), 100);
     }
 
     TEST(FalloutScriptActorValueCommandsTest,
