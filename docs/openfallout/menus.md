@@ -539,8 +539,9 @@ button 0x72f6f0, the price of one 0x72ed00).
   play the two names of the list template.
 - Leaving: after a deal was made the vendor says a line of the dialogue topic of subtype BarterExit (the table of the engine's own
   topics, kind 5 index 4; the response whose conditions pass, said by the speaker, then the dialogue menu is refreshed); leaving
-  without a deal says nothing. Not done: the port does not say it (no hook to say a topic's line for the dialogue that is
-  open under the menu was written; `FalloutScripts::sayTopic` exists).
+  without a deal says nothing, and nothing is said without a conversation open. The port says it the way a script's `Say` does
+  (`closeBarter` finds the topic by the editor id "BarterExit" and has the vendor say it: voice and subtitle; the line is not put
+  in the dialogue's own text, which the executable refreshes). Not seen in the running game.
 - Not done: the item card's picture (BM_ItemIcon shows the form's inventory icon in the executable), the condition of things
   (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.

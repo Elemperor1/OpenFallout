@@ -81,8 +81,30 @@ namespace OFScript
 
     void FalloutScripts::closeBarter()
     {
-        const std::lock_guard lock(mBarterMutex);
-        mBarter.reset();
+        FalloutScript::FormId vendor = 0;
+        bool dealt = false;
+        {
+            const std::lock_guard lock(mBarterMutex);
+            if (mBarter)
+            {
+                vendor = mBarter->mVendor;
+                dealt = mBarter->mDealt;
+            }
+            mBarter.reset();
+        }
+        // After a deal the vendor says a line of the topic of subtype BarterExit, when a conversation is open
+        // (FalloutNV.exe 0x72d6d0 and 0x7640a0, round 12AH A5); without one nothing is said
+        if (dealt && vendor != 0)
+        {
+            FalloutScript::FormId topic = 0;
+            {
+                const std::lock_guard lock(mDialogueMutex);
+                if (mDialogue.active())
+                    topic = mDialogue.findTopic("BarterExit");
+            }
+            if (topic != 0)
+                sayTopic(vendor, topic, 0, false, false);
+        }
     }
 
     FalloutScript::FormId FalloutScripts::merchantContainer(FalloutScript::FormId vendor)
@@ -334,6 +356,11 @@ namespace OFScript
             else
                 transferItems(mPlayer, holder, caps, quote.mAmount);
             mProgress.modifyMiscStat(barterAmountStat, quote.mAmount);
+        }
+        {
+            const std::lock_guard lock(mBarterMutex);
+            if (mBarter && mBarter->mSerial == menu->mSerial)
+                mBarter->mDealt = true;
         }
         outcome.mStatus = "done";
         outcome.mAmount = quote.mAmount;

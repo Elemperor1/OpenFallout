@@ -694,6 +694,8 @@ namespace OFScript
             std::string mName;
             int mPercent = 0;
             int mSerial = 0;
+            /// A deal was made while the menu was open: the vendor says a line when it closes
+            bool mDealt = false;
         };
         /// A script opens the barter menu for the character it is called on; false when there is none to trade with
         bool openBarter(FalloutScript::FormId vendor, int percent);
