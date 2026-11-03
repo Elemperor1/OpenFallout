@@ -300,9 +300,10 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
   after its claim ran out, has the window manager's own window and is left to it.
 
-Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the sound the box makes
-when it opens (`UIPopUpMessageWindow`) and the click sound (`UIMenuOK`), the message's own sound, and everything in this
-section is checked in the offline harness only (not in the running game). The text under `onlyif` of the file counts a
+Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the message's own sound,
+and everything in this section is checked in the offline harness only (not in the running game). The sounds of the box
+that are done: `UIPopUpMessageWindow` when it opens, `UIMenuOK` when a button is clicked with the pointer, Enter or a
+letter, and `UIMenuFocus` when an arrow key lights another button. The text under `onlyif` of the file counts a
 text with characters as true (`onlyif` on the words' `string` keeps the buttons below the words).
 
 ### Terminals and the game of hacking
@@ -458,7 +459,8 @@ tile that was hit or the first above it that names one, on the pointer's move to
 sound, not for each box inside it). The list rows (`list_box_template.xml`) have `UIMenuOK` and `UIMenuFocus`, so every list
 of every screen makes them; `text_box.xml` has `UIMenuFocus`; the quantity menu has the focus sound only (its clicks are silent).
 A message box plays `UIPopUpMessageWindow` when it opens (the sound of the message when it has one is not read). Where a key
-lights or clicks a row the screen plays the names itself (barter does). The Pip-Boy's own sounds (`UIPipBoyAccessUp`,
+lights or clicks a row the screen plays the names itself (barter and the message box do; the other lists are silent for keys
+so far). The Pip-Boy's own sounds (`UIPipBoyAccessUp`,
 `UIPipBoyAccessDown`, the hum `UIPipBoyHumLP`, the light) and the container's (`UIItemTakeAll`) are not played yet. The sound
 files were not heard in the running game.
 

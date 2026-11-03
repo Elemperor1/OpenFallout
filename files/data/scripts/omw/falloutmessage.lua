@@ -38,6 +38,9 @@ local TITLE_EXTRA, BUTTON_EXTRA = 100, 80
 local BUTTON_ROOM = 60
 -- The most the file lets the list of buttons be high (<min> 420 on its height): the rows beyond that scroll
 local LIST_MOST = 420
+-- The sounds that the rows of the buttons' list name in the file (prefabs\list_box_template.xml), for the keys that light
+-- or click a row as the pointer does
+local ROW_FOCUS, ROW_CLICK = 'UIMenuFocus', 'UIMenuOK'
 -- The icon of a message is not shown yet: the records that hold the pictures (MICN) are not read by the engine
 
 local shown = nil
@@ -247,7 +250,11 @@ local function onKey(key)
             local at = list.selected()
             local step = code == KEY.UpArrow and -1 or 1
             if at == 0 then at = step > 0 and 0 or count + 1 end
-            list.select(math.max(1, math.min(count, at + step)), true)
+            local lit = list.selected()
+            local to = math.max(1, math.min(count, at + step))
+            list.select(to, true)
+            -- A key that lights another row makes the sound the row names (the list rows' mouseoversound, round 12AH A5)
+            if to ~= lit then shown:playSound(ROW_FOCUS) end
             return
         end
         if code == KEY.Space then
@@ -258,7 +265,10 @@ local function onKey(key)
             -- The button that is lit (picked with the arrows, or the one under the pointer) is clicked; with none lit
             -- nothing happens, as in the game, where no button is lit when the box opens (round 12AH A4)
             local at = list.selected()
-            if at > 0 then press(at) end
+            if at > 0 then
+                shown:playSound(ROW_CLICK)
+                press(at)
+            end
             return
         end
     end
@@ -267,7 +277,10 @@ local function onKey(key)
     if symbol == '' then return end
     for index, letter in ipairs(hotkeysOf(current.buttons)) do
         if letter:upper() == symbol:upper() then
-            if index <= count then press(index) end
+            if index <= count then
+                shown:playSound(ROW_CLICK)
+                press(index)
+            end
             return
         end
     end
