@@ -537,6 +537,15 @@ button 0x72f6f0, the price of one 0x72ed00).
   first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
   on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
   selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
+- Which list has the pointer (round 12AI B8): the file's `_IsContainerListSelected` (default -1) is 0 for the player's list and 1
+  for the vendor's. Two hotrects over a half of the menu each (`BM_Items_FocusRect` id 0 and `BM_Container_FocusRect` id 1, alpha 0,
+  depth 5) are targets only while their list is not the selected one, and the file says "mousing over them switches the focus":
+  the list below is under a rect that takes the pointer, so it cannot be hovered or clicked until the focus is switched. The
+  port sets the trait to 0 when the menu opens, to the side the pointer has come to (the rect it is over; `mouseover` is read
+  every frame) and to the side a key goes to (left or right, the first arrow). That the executable sets it the same way, and
+  to 0 at the start, is inferred from the file and the keys; the code that does it was not read. The wrapping of names
+  of 22 or more characters to a second line is the file's own (`wrapwidth` 300 on `ListItemText`); the prompt for a number
+  of things takes no digit keys in the port (not known for the game).
 - Fallout 3 (round 12AH A6, `Fallout3.exe` partly compared): the same menu class with another layout of fields and other
   click ids (Exit 14 and a row 18, where New Vegas has 19 and 23); the file is the same, drawn by tile names. The close and its
   BarterExit line, the cancel box, the quantity prompt, the arrow counters and the caps sounds were found the same; the price

@@ -126,7 +126,8 @@ Shown.__index = Shown
 local function soundOf(menu, tile, trait)
     while tile do
         local name = menu:getText(tile, trait)
-        if name and name ~= '' then
+        -- (a tile whose trait is not set reads as 0 for a number: no sound is named then, and the ones above are asked)
+        if name and name ~= '' and name ~= '0' then
             return name:match('^%s*(.-)%s*$'), tile
         end
         tile = menu:parent(tile)
