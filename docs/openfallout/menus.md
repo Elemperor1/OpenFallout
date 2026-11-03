@@ -251,10 +251,15 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - The buttons are the rows of `MM_ButtonTemplate`, in the order of the record, one click id for all (7); the list is as
   high as the rows are together, up to the file's 420, and scrolls beyond that. The file's own scrollbar rule counts every
   row as one step of 26 units, which shows the bar for a box that fits, so the script says when it is shown.
-- A message with no button closes itself when its display time (the record's `TNAM`) is over, and shows no button. Boxes
-  queue one after the other and a new one does not replace the open one.
-- Keys: Escape picks the last button; a letter picks the first button whose words start with it. Arrows, Enter and Space
-  (the lit button, or the first) are the port's own; the executable leaves them to the list.
+- A message with the box flag and no button has one button, "OK" (the literal of the executable, in capitals, not the
+  word of the setting `sOk`; the engine adds it), and stays until it is picked: the display time of a message (`TNAM`) is
+  the one of the notification in the corner of the screen (a message without the box flag), and the box of `ShowMessage`
+  is made with the time 0, which closes nothing (round 12AE). A button whose conditions fail keeps its place with empty
+  words in the game (the port leaves it out). Boxes queue one after the other and a new one does not replace the open one.
+- Keys: Space picks the lit button; a letter picks the button that has it marked with a `&` in its words (a plain "OK" has
+  none; the words are shown without the `&`: not read from the executable yet). Escape does nothing: the code picks the
+  last button with it except in a box of `ShowMessage`, which ignores it. Arrows and Enter (the lit button, or the first)
+  are the port's own.
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the

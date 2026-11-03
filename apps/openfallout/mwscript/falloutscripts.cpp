@@ -1339,12 +1339,9 @@ namespace OFScript
         box.mText = escapeTags(box.mPlainText);
         box.mTitle = record->mFullName;
         box.mBody = text;
-        // The game's box has no button for a message that has none, and closes itself when its display time is over
-        if (box.mButtons.empty() && record->mDisplayTime > 0)
-        {
-            box.mTimed = true;
-            box.mTime = static_cast<double>(record->mDisplayTime);
-        }
+        // The display time of a message (TNAM) is the one of the notification at the corner of the screen; the box of a
+        // message with the box flag is made with the time 0 (the executable's ShowMessage, round 12AE), which no
+        // closing by time follows: a box with no button has the button "OK" and stays until it is picked
         // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
         // is queued in the next frame
         ++mMessageBoxCount;
@@ -1455,15 +1452,13 @@ namespace OFScript
             return;
         MessageBox box = std::move(mMessageQueue.front());
         mMessageQueue.pop_front();
-        // A box with nothing to pick has the button that closes it, and that is the button 0. Its word is the game's
-        // own (sOk, in the executable; the plugins hold none, and the window manager's setting store gave an empty
-        // text, a square with no word in it). The game's own menu makes no such button for a message that has none
-        // (round 12AD): it is the port's, so that a box that has no display time can be closed
+        // A box with nothing to pick has the button that closes it, and that is the button 0. The executable adds it
+        // for a message with the box flag that has no button (ShowMessage, round 12AE) with the literal "OK", in
+        // capitals, and not with the word of the setting sOk
         if (box.mButtons.empty())
         {
-            std::string ok = gameSettingText("sOK");
-            box.mButtons.push_back(escapeTags(ok));
-            box.mPlainButtons.push_back(std::move(ok));
+            box.mButtons.emplace_back("OK");
+            box.mPlainButtons.push_back(box.mButtons.back());
             box.mNumbers.push_back(0);
         }
         mOpenNumbers = box.mNumbers;

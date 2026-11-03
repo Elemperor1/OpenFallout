@@ -2,10 +2,11 @@
 -- and the like), drawn on the game's own menu file (message_menu.xml). The file lays out the box; what the game's code
 -- puts in it is here, as the Mac read it from the executable (round 12Q): the title and the words of the message, the
 -- buttons in the order of the record, the width of the box from the widest of the title, the words and the buttons (kept
--- between the file's least and most), the words and the title both centred when the words are one line and both to the
--- left when they are more, and a message with no button that closes itself once its display time is over. Which message
--- is open and which button was picked is the engine's (core.messageBox); this script shows the box and presses the
--- button. A game whose data lacks the file keeps the window of the engine's own: the script gives the boxes back to it.
+-- between the file's least and most), and the words and the title both centred when the words are one line and both to
+-- the left when they are more. The box of a message that has no button has the button "OK" (the engine adds it), and
+-- no box closes itself by time (round 12AE). Which message is open and which button was picked is the engine's
+-- (core.messageBox); this script shows the box and presses the button. A game whose data lacks the file keeps the window
+-- of the engine's own: the script gives the boxes back to it.
 local core = require('openfallout.core')
 local async = require('openfallout.async')
 local I = require('openfallout.interfaces')
@@ -81,6 +82,17 @@ local function press(index)
     messagebox.press(index)
 end
 
+-- A '&' in the words of a button marks the letter that picks it (the code of the game collects those letters from the
+-- words of the buttons): the words are shown without it
+local function shownLabel(label)
+    return (label:gsub('&(.)', '%1'))
+end
+
+local function hotkeyOf(label)
+    local at = label:find('&', 1, true)
+    return at and label:sub(at + 1, at + 1) or ''
+end
+
 local function numberOf(tile, trait, default)
     local value = shown.menu:getNumber(tile, trait)
     return value or default
@@ -98,7 +110,7 @@ local function fill(box)
     if title == '' and body == '' then body = box.text or '' end
     local labels = {}
     if not box.timed then
-        for index, label in ipairs(box.buttons) do labels[index] = label end
+        for index, label in ipairs(box.buttons) do labels[index] = shownLabel(label) end
     end
 
     -- The words wrap at what is left of the most the box is wide when the sides are kept free (no icon is shown)
@@ -178,21 +190,15 @@ local function show(box)
     end
 end
 
-local function labelStartsWith(label, symbol)
-    return label ~= '' and symbol ~= '' and label:sub(1, 1):upper() == symbol:upper()
-end
-
 local function onKey(key)
     if not shown or not current or answered then return end
     local count = #current.buttons
     local code = key.code
     local KEY = input.KEY
     if current.timed or count == 0 then return end
-    if code == KEY.Escape then
-        -- The last button is the way out, as in the game
-        press(count)
-        return
-    end
+    -- Escape does nothing: the game's box picks the last button with it, except a box that a script's ShowMessage made
+    -- (all of these), which ignores it
+    if code == KEY.Escape then return end
     if list then
         if code == KEY.UpArrow or code == KEY.DownArrow then
             local at = list.selected()
@@ -208,10 +214,12 @@ local function onKey(key)
             return
         end
     end
-    -- Another key picks the first button whose words start with it
+    -- Another key picks the button that has it marked with a '&' in its words (a plain "OK" has none)
     local symbol = key.symbol or ''
+    if symbol == '' then return end
     for index, label in ipairs(current.buttons) do
-        if labelStartsWith(label, symbol) then
+        local letter = hotkeyOf(label)
+        if letter ~= '' and letter:upper() == symbol:upper() then
             press(index)
             return
         end
