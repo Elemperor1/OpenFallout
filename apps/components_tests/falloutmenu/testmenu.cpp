@@ -236,6 +236,39 @@ namespace
         EXPECT_FLOAT_EQ(numberOf(menu, "A", "_notNone"), 7.f);
     }
 
+    TEST(FalloutMenuEvaluationTest, a_text_is_true_as_the_operand_of_a_condition_and_the_number_0_in_a_comparison)
+    {
+        // FalloutNV.exe 0xA09AFB-0xA09DA9 (Mac round 12AO B1): `and`, `or`, `not`, `onlyif` and `onlyifnot` count a
+        // text as true, a text that comes first (a bare `copy`) is the number 0, and `eq` and `neq` compare numbers
+        // only
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"P\">"
+            "<text name=\"Hint\"><string> A) </string></text>"
+            "<text name=\"Other\"><string> B) </string></text>"
+            "<rect name=\"A\">"
+            "<_and><copy> 1 </copy><and src=\"sibling(Hint)\" trait=\"string\"/></_and>"
+            "<_andNot><copy> 1 </copy><and><not src=\"sibling(Hint)\" trait=\"string\"/></and></_andNot>"
+            "<_or><copy> 0 </copy><or src=\"sibling(Hint)\" trait=\"string\"/></_or>"
+            "<_not><copy> 1 </copy><not src=\"sibling(Hint)\" trait=\"string\"/></_not>"
+            "<_first><copy src=\"sibling(Hint)\" trait=\"string\"/><or><copy> 0 </copy></or></_first>"
+            "<_same><copy src=\"sibling(Hint)\" trait=\"string\"/><eq src=\"sibling(Other)\" trait=\"string\"/></_same>"
+            "<_differ><copy src=\"sibling(Hint)\" trait=\"string\"/><neq src=\"sibling(Other)\" "
+            "trait=\"string\"/></_differ>"
+            "<_zero><copy src=\"sibling(Hint)\" trait=\"string\"/><eq> 0 </eq></_zero>"
+            "<_one><copy src=\"sibling(Hint)\" trait=\"string\"/><eq> 1 </eq></_one>"
+            "</rect></rect></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_and"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_andNot"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_or"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_not"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_first"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_same"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_differ"), 0.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_zero"), 1.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "_one"), 0.f);
+    }
+
     TEST(FalloutMenuEvaluationTest, a_trait_can_come_from_the_tiles_around)
     {
         Fixture f;

@@ -21,8 +21,12 @@ namespace FalloutMenu
             return x >= rect[0] && y >= rect[1] && x < rect[0] + rect[2] && y < rect[1] + rect[3];
         }
 
-        /// What `onlyif` and `onlyifnot` ask of a value: a number that is not 0, or a text that has characters (the
-        /// message menu keeps the room under its words only `onlyif` the tile of the words has a string)
+        /// What `and`, `or`, `not`, `onlyif` and `onlyifnot` ask of their operand: a number that is not 0, or a text.
+        /// The executable looks at the string of the operand first, and a text counts as true whatever its number is (a
+        /// text is the number 0): the hint of the PC key of a button (`PCShortcutLabel`) is there when the button's
+        /// `_PCButtonText` has text (FalloutNV.exe 0xA09BF7-0xA09DA9, Mac round 12AO B1). A text of no characters is
+        /// taken as none: the executable's own reading of it was not found. A text that comes first, as a bare `copy`,
+        /// is the number 0.
         bool conditionHolds(const Value& value)
         {
             return value.truth() || (value.isText() && !value.text().empty());
@@ -381,11 +385,10 @@ namespace FalloutMenu
                 case Op::Eq:
                 case Op::Neq:
                 {
-                    bool same;
-                    if (acc.isText() || operand.isText())
-                        same = acc.text() == operand.text();
-                    else
-                        same = a == b;
+                    // The executable compares the numbers only, and a text is the number 0: two texts are always equal
+                    // and a text equals a number only when that is 0 (FalloutNV.exe 0xA09AFB-0xA09B79, Mac round 12AO
+                    // B1)
+                    const bool same = a == b;
                     acc = (same == (step.mOp == Op::Eq)) ? 1.f : 0.f;
                     break;
                 }
@@ -402,13 +405,14 @@ namespace FalloutMenu
                     acc = a <= b ? 1.f : 0.f;
                     break;
                 case Op::And:
-                    acc = (acc.truth() && operand.truth()) ? 1.f : 0.f;
+                    acc = (acc.truth() && conditionHolds(operand)) ? 1.f : 0.f;
                     break;
                 case Op::Or:
-                    acc = (acc.truth() || operand.truth()) ? 1.f : 0.f;
+                    acc = (acc.truth() || conditionHolds(operand)) ? 1.f : 0.f;
                     break;
                 case Op::Not:
-                    acc = (step.mOperand.mKind == Operand::Kind::None ? !acc.truth() : !operand.truth()) ? 1.f : 0.f;
+                    acc = (step.mOperand.mKind == Operand::Kind::None ? !acc.truth() : !conditionHolds(operand)) ? 1.f
+                                                                                                                 : 0.f;
                     break;
                 case Op::OnlyIf:
                     if (!conditionHolds(operand))

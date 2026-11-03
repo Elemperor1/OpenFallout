@@ -676,12 +676,12 @@ its older drawing for a data folder that lacks the file.
   opens it, and `[<class word> - sLocked]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
   object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
   pickpocket, steal and pick (the port has no
-  such actions yet), disarming a mine, the key hint on the PC (the hint tile of the file stays hidden: the file's rule for
-  it is a text trait taken as true, which the menu engine does not do; asked of the Mac in round 12AO), the weight and value
+  such actions yet), disarming a mine, the weight and value
   row for containers, doors and characters (whether the executable shows it for them is not clear), and the colour that
-  marks a thing that is owned.
-- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, subtitles, the hot
-  keys, the needs of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
+  marks a thing that is owned. The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
+  below).
+- Not drawn: the armour icons, the weapon's name and condition, the place's name that shows on entering, subtitles, the needs
+  of hardcore mode, the breath meter and the quest reminder; the weapon's rounds show the rounds carried, as
   the engine has no clip.
 
 ### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
@@ -788,6 +788,18 @@ assigned and has left the inventory (the slot keeps it here and uses nothing whi
 thing (the games refuse one that is broken with `sCantHotkeyBrokenItem`; this engine has no condition yet), the wheel that the
 file has beside the Pip-Boy's list (`IM_HotKeyWheel`, with the Hot Key button that only a player with a pad sees) and the pad's
 way to hold the wheel. Seen only in the offline harness (`hotkeys.lua`), not in the running game.
+
+### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
+
+A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at
+the string of their operand first: a text counts as true whatever its number (the engine takes a text of no characters as none:
+the executable's reading of an empty one was not found); a text that stands first, as a bare `copy`, is the number 0 and so
+false. `eq`, `neq`, `gt` and the others compare numbers only, so two texts are always equal and a text equals a number only when
+that is 0; there is no comparison of strings. This is what makes the hint of the PC key of a button show: the file's
+`PCShortcutLabel` is visible when `not(_Has360Controller) and (_PCButtonText of its parent)`, so a button whose `_PCButtonText` has
+text (`&-sPCMenuHintA;`, the setting's words: the executable's defaults are the letter and a closing bracket, for R, A, E, S, X, F,
+W, Q and RMB) shows its letter next to it while no pad is in use. `_Has360Controller` is written by the executable when the menus
+are set up and again when a pad is plugged or unplugged.
 
 ## The words of the labels
 
