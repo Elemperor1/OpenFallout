@@ -371,7 +371,13 @@ end
 
 local function changeAmount(increase)
     if closeIn ~= nil then return end
-    local changed = increase and casino.roulette.increase() or casino.roulette.decrease()
+    -- (not `increase and a() or b()`: a call that changes nothing would then be followed by the opposite one)
+    local changed
+    if increase then
+        changed = casino.roulette.increase()
+    else
+        changed = casino.roulette.decrease()
+    end
     if changed then sound(increase and SOUND.increase or SOUND.decrease) end
     fillAll()
 end

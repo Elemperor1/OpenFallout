@@ -358,7 +358,9 @@ local function drawDeck()
     end
     if #deckIndexes.deck == 0 then activeList = 'all' end
     local width, height = rectSize(RECTS.deck)
-    local count = deckTiles.count
+    -- The slots that were made, and how many of them the window has room for now (a narrower window hides the rest)
+    local made = deckTiles.count
+    local count = math.min(made, visibleCount(width))
     local middle = height / 2
     local lineH = lineHeight()
     local left = (width - (count * (CARD_W + 8) - 8)) / 2
@@ -372,12 +374,14 @@ local function drawDeck()
             if cursor[list] > firstShown[list] + count - 1 then firstShown[list] = cursor[list] - count + 1 end
             firstShown[list] = math.max(1, math.min(firstShown[list], math.max(#indexes - count + 1, 1)))
             local y = list == 'deck' and deckY or allY
-            local base = list == 'deck' and 0 or count
-            for slot = 1, count do
+            local base = list == 'deck' and 0 or made
+            for slot = 1, made do
                 local tiles = deckTiles.slots[base + slot]
                 local position = firstShown[list] + slot - 1
                 local cardIndex = indexes[position]
-                if cardIndex then
+                if slot > count then
+                    hideSlot(tiles)
+                elseif cardIndex then
                     local card = cards[cardIndex]
                     local edge = COLOR.edge
                     if card.inDeck then edge = COLOR.inDeck end
