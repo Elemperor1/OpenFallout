@@ -414,8 +414,11 @@ local function sync()
         if not lock then
             leave()
         elseif lockpickMenu.isOpen() then
-            -- (the pins change as they break; the screen of the game keeps its own count)
-            lockpickMenu.update(core.getRealFrameDuration())
+            -- (the pins change as they break; the screen of the game keeps its own count) It stands still while another
+            -- window (the pause menu) or a box of a message is over it
+            if I.UI.getMode() == 'Interface' and not messageOpen() then
+                lockpickMenu.update(core.getRealFrameDuration())
+            end
         elseif lock.serial ~= shownSerial or lock.pins ~= shownPins then
             shownSerial = lock.serial
             shownPins = lock.pins

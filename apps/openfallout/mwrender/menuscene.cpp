@@ -158,10 +158,10 @@ namespace OFRender
             mFar = farPlane;
             // The picture is centred on the camera's axis in all of the game's menu scenes that matter; an off-centre
             // frustum is made centred by its height and width
-            const float height = top - bottom;
+            const float frustumHeight = top - bottom;
             const float widthOnNear = right - left;
-            mFovYDegrees = osg::RadiansToDegrees(2.f * std::atan(0.5f * height / nearPlane));
-            mAspectRatio = height > 0.f ? widthOnNear / height : static_cast<float>(width()) / height;
+            mFovYDegrees = osg::RadiansToDegrees(2.f * std::atan(0.5f * frustumHeight / nearPlane));
+            mAspectRatio = widthOnNear / frustumHeight;
             updateProjection();
         }
 
@@ -295,7 +295,8 @@ namespace OFRender
 
     void MenuScene::setFrustum(float left, float right, float bottom, float top, float nearPlane, float farPlane)
     {
-        if (nearPlane <= 0.f || farPlane <= nearPlane || top == bottom || right == left)
+        // (a frustum that is not a box with the top above the bottom and the right of the left has no picture)
+        if (nearPlane <= 0.f || farPlane <= nearPlane || top <= bottom || right <= left)
             return;
         mRTTNode->setFrustum(left, right, bottom, top, nearPlane, farPlane);
     }

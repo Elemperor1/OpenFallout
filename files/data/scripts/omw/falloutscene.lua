@@ -41,7 +41,7 @@ function module.open(name)
     end
     local size = ui.screenSize()
     core.menuScene.create(name, math.floor(size.x), math.floor(size.y))
-    return setmetatable({ name = name, size = size }, Scene)
+    return setmetatable({ name = name, size = size, texture = v2(math.floor(size.x), math.floor(size.y)) }, Scene)
 end
 
 -- Each frame the scene is there: once it is made and its layer is, the picture is put on the screen. True when the
@@ -60,7 +60,14 @@ function Scene:update()
             props = {
                 position = v2(0, 0),
                 size = self.size,
-                resource = ui.texture { path = core.menuScene.texture(self.name) },
+                -- A texture that was drawn into has its first row at the bottom, a widget's picture its first at the top:
+                -- the picture is read from the bottom row up (the height is read as negative, as a mirrored piece of a
+                -- menu reads its width)
+                resource = ui.texture {
+                    path = core.menuScene.texture(self.name),
+                    offset = v2(0, self.texture.y),
+                    size = v2(self.texture.x, -self.texture.y),
+                },
                 ignorePointerEvents = true,
             },
         }

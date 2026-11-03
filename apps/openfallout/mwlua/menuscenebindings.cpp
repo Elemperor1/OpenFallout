@@ -97,6 +97,8 @@ namespace OFLua
             context.mLuaManager->addAction([name] {
                 if (OFGui::MenuScenes* scenes = OFBase::Environment::get().getWindowManager()->getMenuScenes())
                     scenes->destroy(name);
+                // (a create that was queued before this ran after the flag was cleared above and set it again)
+                setReady(name, false);
             });
         };
         api["ready"] = [](const std::string& name) {
