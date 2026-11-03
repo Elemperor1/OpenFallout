@@ -164,6 +164,14 @@ namespace OFLua
         api["setVisible"] = [context](const std::string& name, const std::string& model, bool visible) {
             onScene(context, name, [model, visible](OFRender::MenuScene& scene) { scene.setVisible(model, visible); });
         };
+        // Puts the picture of the file `path` on the shape `shape` of the model (by the name of its node in the model's
+        // file) in place of the one it has
+        api["setTexture"] = [context](const std::string& name, const std::string& model, const std::string& shape,
+                                const std::string& path) {
+            onScene(context, name, [model, shape, path](OFRender::MenuScene& scene) {
+                scene.setTexture(model, shape, VFS::Path::Normalized(path));
+            });
+        };
         // Puts the model at `time` seconds of its sequence `sequence` ("Forward", "Backward", "Left"): the nodes that
         // the sequence moves are where it has them at that time
         api["setSequenceTime"] = [context](const std::string& name, const std::string& model,

@@ -161,6 +161,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/skillhandlers.lua
     scripts/omw/crimes.lua
     scripts/omw/falloutbarter.lua
+    scripts/omw/falloutblackjack.lua
     scripts/omw/falloutcompanion.lua
     scripts/omw/falloutbook.lua
     scripts/omw/falloutmanual.lua
@@ -187,10 +188,14 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutpipboyitems.lua
     scripts/omw/falloutpipboystats.lua
     scripts/omw/falloutquantity.lua
+    scripts/omw/falloutroulette.lua
+    scripts/omw/falloutroulettetable.lua
     scripts/omw/falloutscene.lua
     scripts/omw/falloutstatus.lua
     scripts/omw/falloutstart.lua
     scripts/omw/falloutsettingsitems.lua
+    scripts/omw/falloutslots.lua
+    scripts/omw/falloutcaravan.lua
     scripts/omw/falloutterminal.lua
     scripts/omw/falloutterminalhack.lua
     scripts/omw/falloutwidgets.lua

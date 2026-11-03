@@ -915,6 +915,11 @@ namespace Resource
                 return false;
         }
 
+        // The slot machine's reels are changed face by face by the name of the shape (core.menuScene.setTexture), and
+        // the optimizer would merge the shapes that share a picture and take their nodes away
+        if (filename.find("_slotmachine") != std::string_view::npos)
+            return false;
+
         // For spell VFX, DummyXX nodes must remain intact. Not adding those to reservedNames to avoid being overly
         // cautious - instead, decide on filename
         if (filename.find("vfx_pattern") != std::string_view::npos)

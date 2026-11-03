@@ -177,6 +177,10 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testdamage.cpp
     falloutscript/testdetection.cpp
     falloutscript/testhacking.cpp
+    falloutscript/testblackjack.cpp
+    falloutscript/testcaravan.cpp
+    falloutscript/testcasino.cpp
+    falloutscript/testslots.cpp
     falloutscript/testhotkeys.cpp
     falloutscript/testinteraction.cpp
     falloutscript/testderivedstats.cpp
@@ -194,6 +198,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testplayerprogress.cpp
     falloutscript/testmagic.cpp
     falloutscript/testhud.cpp
+    falloutscript/testloadingmenu.cpp
+    falloutscript/testloadscreens.cpp
     falloutscript/testregionline.cpp
     falloutscript/testmapmarkers.cpp
     falloutscript/testaimemory.cpp

@@ -102,6 +102,12 @@ namespace OFRender
             const osg::Vec3f& diffuse, float radius);
         void setVisible(const std::string& name, bool visible);
 
+        /// Puts the picture of the file `path` on the shape `shape` of the model (the node of the file that holds the
+        /// shape, by its name) in place of the diffuse picture it has: the faces of the reels of the slot machine are
+        /// given the pictures that the casino's record names. Only that shape changes (the picture of the other
+        /// shapes that shared its state stays). False when the model or the shape is not there or has no picture.
+        bool setTexture(const std::string& name, const std::string& shape, VFS::Path::NormalizedView path);
+
         struct Sequence
         {
             std::string mName;

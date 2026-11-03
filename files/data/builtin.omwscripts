@@ -45,6 +45,10 @@ PLAYER: scripts/omw/falloutcraft.lua
 PLAYER: scripts/omw/falloutdeath.lua
 PLAYER: scripts/omw/falloutmessage.lua
 PLAYER: scripts/omw/falloutvats.lua
+PLAYER: scripts/omw/falloutroulette.lua
+PLAYER: scripts/omw/falloutblackjack.lua
+PLAYER: scripts/omw/falloutslots.lua
+PLAYER: scripts/omw/falloutcaravan.lua
 MENU: scripts/omw/falloutstart.lua
 
 # Lua console

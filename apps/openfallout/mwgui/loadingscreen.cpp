@@ -26,6 +26,7 @@
 #include "../mwbase/windowmanager.hpp"
 
 #include "backgroundimage.hpp"
+#include "falloutloading.hpp"
 
 namespace OFGui
 {
@@ -56,6 +57,13 @@ namespace OFGui
 
     LoadingScreen::~LoadingScreen() {}
 
+    void LoadingScreen::setStore(const OFWorld::ESMStore& store)
+    {
+        if (!mFalloutLoading)
+            mFalloutLoading = std::make_unique<FalloutLoading>();
+        mFalloutLoading->setStore(store);
+    }
+
     void LoadingScreen::findSplashScreens()
     {
         auto isSupportedExtension = [](const std::string_view& ext) {
@@ -78,6 +86,8 @@ namespace OFGui
     void LoadingScreen::setLabel(const std::string& label, bool important)
     {
         mImportantLabel = important;
+        // (an interior cell sets its label before the load begins, an exterior one after)
+        mInteriorLabel = label == "#{OFEngine:LoadingInterior}";
 
         mLoadingText->setCaptionWithReplacing(label);
         int padding = mLoadingBox->getWidth() - mLoadingText->getWidth();
@@ -164,6 +174,12 @@ namespace OFGui
 
         mShowWallpaper = OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_NoGame;
 
+        // Where the data has the load screens of the game, their pictures and tips are what shows
+        mFalloutActive
+            = mFalloutLoading && mFalloutLoading->begin(mShowWallpaper, mInteriorLabel, mTimer.time_m() / 1000.0);
+        mInteriorLabel = false;
+        mSceneImage->setAlpha(1.f);
+
         if (mShowWallpaper)
         {
             changeWallpaper();
@@ -193,6 +209,11 @@ namespace OFGui
         mViewer->getSceneData()->setComputeBoundingSphereCallback(nullptr);
         mViewer->getSceneData()->dirtyBound();
 
+        if (mFalloutActive)
+            mFalloutLoading->end();
+        mFalloutActive = false;
+        mSceneImage->setAlpha(1.f);
+
         setVisible(false);
 
         if (osgUtil::IncrementalCompileOperation* ico = mViewer->getIncrementalCompileOperation())
@@ -207,7 +228,12 @@ namespace OFGui
 
     void LoadingScreen::changeWallpaper()
     {
-        if (!mSplashScreens.empty())
+        if (mFalloutActive)
+        {
+            mSplashImage->setBackgroundImage({});
+            mSplashImage->setVisible(false);
+        }
+        else if (!mSplashScreens.empty())
         {
             std::string const& randomSplash = mSplashScreens.at(Misc::Rng::rollDice(mSplashScreens.size()));
 
@@ -320,7 +346,12 @@ namespace OFGui
         if (!needToDrawLoadingScreen())
             return;
 
-        if (mShowWallpaper && mTimer.time_m() > mLastWallpaperChangeTime + 5000 * 1)
+        if (mFalloutActive)
+        {
+            mFalloutLoading->update(mTimer.time_m() / 1000.0);
+            mSceneImage->setAlpha(mFalloutLoading->worldAlpha());
+        }
+        else if (mShowWallpaper && mTimer.time_m() > mLastWallpaperChangeTime + 5000 * 1)
         {
             mLastWallpaperChangeTime = mTimer.time_m();
             changeWallpaper();

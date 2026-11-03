@@ -289,6 +289,35 @@ namespace OFScript
             runOnMainThread([this, teammate] { openTeammateContainer(teammate); });
             return 0.0;
         });
+        // The casino games (FalloutNV.exe 0x5CF1A0): the casino, the least bet, the most and the winnings that the
+        // player needs there (0 for none). The command says 1 whether the table opens or the player is told it cannot
+        // play.
+        mInterpreter.setHandler("ShowRouletteMenuParams", [this](FalloutScript::CallContext& call) {
+            openCasino(CasinoGame::Roulette, FalloutScript::formArgument(call, 0), FalloutScript::intArgument(call, 1),
+                FalloutScript::intArgument(call, 2), FalloutScript::intArgument(call, 3));
+            return 1.0;
+        });
+        // The slot machine takes the same four arguments (FalloutNV.exe 0x5CF040)
+        mInterpreter.setHandler("ShowSlotMachineMenuParams", [this](FalloutScript::CallContext& call) {
+            openCasino(CasinoGame::Slots, FalloutScript::formArgument(call, 0), FalloutScript::intArgument(call, 1),
+                FalloutScript::intArgument(call, 2), FalloutScript::intArgument(call, 3));
+            return 1.0;
+        });
+        // Blackjack reads the winnings of the fourth argument and does not use them (FalloutNV.exe 0x5CF0F0)
+        mInterpreter.setHandler("ShowBlackJackMenuParams", [this](FalloutScript::CallContext& call) {
+            openCasino(CasinoGame::Blackjack, FalloutScript::formArgument(call, 0), FalloutScript::intArgument(call, 1),
+                FalloutScript::intArgument(call, 2), 0);
+            return 1.0;
+        });
+        // The card game Caravan (FalloutNV.exe 0x741060): the character the script is called on plays the player with
+        // the cards of the deck record, as the kind of opponent that the integer says (0, or 1 for the four of the
+        // tournament), and asks for the share of its money that the float is
+        mInterpreter.setHandler("ShowCaravanMenu", [this](FalloutScript::CallContext& call) {
+            return openCaravan(call.mReference, FalloutScript::formArgument(call, 0),
+                       FalloutScript::intArgument(call, 1), static_cast<float>(FalloutScript::argument(call, 2)))
+                ? 1.0
+                : 0.0;
+        });
         // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
         mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
             setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));
@@ -392,13 +421,19 @@ namespace OFScript
             return playerInRegion(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
         });
         // The games keep a record of the winnings of the player in a casino, which the menus of the slot machines,
-        // blackjack and roulette add the first time they are opened and no command adds. There are no such menus here,
-        // so the player has no record in any casino, and for a casino without one the stage is 0 (GetCasinoWinningStage
-        // is the condition 0x262, GetCasinoWinningsLevel the command that works it out the same way) and
-        // SetCasinoWinningsLevel changes nothing.
-        mConditions.setFunction(0x262, [](FalloutScript::ConditionCall&) { return 0.0; });
-        mInterpreter.setHandler("GetCasinoWinningsLevel", [](FalloutScript::CallContext&) { return 0.0; });
-        mInterpreter.setHandler("SetCasinoWinningsLevel", [](FalloutScript::CallContext&) { return 1.0; });
+        // blackjack and roulette make the first time they are opened. GetCasinoWinningStage (the condition 0x262) and
+        // GetCasinoWinningsLevel (the command 0x125C) tell where the winnings are among the four quarters of the most
+        // the casino lets the player win, 0 for a casino with no record; SetCasinoWinningsLevel (0x125D) sets the level
+        // and the winnings that make it, for 0 to 4 and a casino with a record, and starts nothing (Mac round 12AQ B9).
+        mConditions.setFunction(
+            0x262, [this](FalloutScript::ConditionCall& call) { return casinoWinningsLevel(call.mFirst); });
+        mInterpreter.setHandler("GetCasinoWinningsLevel", [this](FalloutScript::CallContext& call) {
+            return casinoWinningsLevel(FalloutScript::formArgument(call, 0));
+        });
+        mInterpreter.setHandler("SetCasinoWinningsLevel", [this](FalloutScript::CallContext& call) {
+            setCasinoWinningsLevel(FalloutScript::formArgument(call, 0), FalloutScript::intArgument(call, 1));
+            return 1.0;
+        });
         // Perks and the effects of items look at the conditions of their records, about the character who has them
         const auto conditionsHold
             = [this](const std::vector<ESM4::TargetCondition>& conditions,
@@ -646,6 +681,17 @@ namespace OFScript
             const std::lock_guard lock(mCompanionMutex);
             mCompanion.reset();
         }
+        {
+            // A table of a casino does not go on in the next game; what was won in the casinos is not kept either
+            const std::lock_guard lock(mCasinoMutex);
+            mCasino.reset();
+        }
+        {
+            // A match of Caravan is not taken into the next game either, and is not settled: nothing was staked yet
+            const std::lock_guard lock(mCaravanMutex);
+            mCaravan.reset();
+        }
+        mCasinoLedger.reset();
         mPerks.clear();
         mItemUse.clear();
         mPerkOwners.clear();

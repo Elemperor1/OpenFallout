@@ -228,8 +228,8 @@ Also in this part of the table, `GetCasinoWinningStage` (the condition `0x262`) 
 tell the highest of 1 to 4 for which the winnings of the player in that casino reach that quarter of the casino's limit,
 and 0 for a casino that the player has no record in; the record is made only by the menus of the slot machines,
 blackjack and roulette (`ShowSlotMachineMenu`, `ShowBlackJackMenu`, `ShowRouletteMenu`), and `SetCasinoWinningsLevel`
-changes a record that exists and makes none. OpenFallout has none of those menus, so the player never has a record: the
-condition and the command answer 0 and `SetCasinoWinningsLevel` does nothing.
+changes a record that exists and makes none. OpenFallout has the blackjack, roulette and slot machine menus (see
+`menus.md`), so the record exists once the player has sat down at one of them.
 `smoke --only exterior` and `--only interior` check the region, from the command and from a condition of a log entry.
 
 ## Not done

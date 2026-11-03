@@ -20,6 +20,7 @@
 #include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 
+#include "casinobindings.hpp"
 #include "chargenbindings.hpp"
 #include "combatbindings.hpp"
 #include "context.hpp"
@@ -143,6 +144,8 @@ namespace OFLua
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
             api["hud"]
                 = context.cachePackage("openfallout_core_hud", [context]() { return initCoreHudBindings(context); });
+            api["casino"] = context.cachePackage(
+                "openfallout_core_casino", [context]() { return initCoreCasinoBindings(context); });
             api["menus"]
                 = context.cachePackage("openfallout_core_menus", [context]() { return initCoreMenuBindings(context); });
             api["interact"] = context.cachePackage(

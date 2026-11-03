@@ -10,7 +10,9 @@
 #include <osg/Texture2D>
 
 #include <components/debug/debuglog.hpp>
+#include <components/misc/resourcehelpers.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/resource/imagemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/controller.hpp>
@@ -220,6 +222,8 @@ namespace OFRender
         // The controllers that are on the nodes now, and the sequence they belong to
         std::vector<std::pair<osg::ref_ptr<osg::Node>, osg::ref_ptr<osg::Callback>>> mActive;
         std::string mActiveSequence;
+        // The picture each shape was given by setTexture (by the shape's name in lower case)
+        std::map<std::string, std::string> mTextures;
     };
 
     MenuScene::MenuScene(osg::Group* parent, Resource::ResourceSystem* resourceSystem, int width, int height)
@@ -475,6 +479,82 @@ namespace OFRender
     {
         if (Model* model = find(name))
             model->mRoot->setNodeMask(visible ? ~0u : 0u);
+    }
+
+    namespace
+    {
+        /// The picture of the first texture unit (where the loader puts the diffuse picture) of a node or of the shapes
+        /// directly under it, in place of what it holds
+        bool replaceDiffuse(osg::Node& node, const osg::ref_ptr<osg::Image>& image)
+        {
+            const auto replace = [&image](osg::Node& target) {
+                osg::StateSet* stateset = target.getStateSet();
+                if (stateset == nullptr)
+                    return false;
+                const osg::Texture2D* old = dynamic_cast<const osg::Texture2D*>(
+                    stateset->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+                if (old == nullptr)
+                    return false;
+                osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D(image);
+                texture->setTextureSize(image->s(), image->t());
+                texture->setWrap(osg::Texture::WRAP_S, old->getWrap(osg::Texture::WRAP_S));
+                texture->setWrap(osg::Texture::WRAP_T, old->getWrap(osg::Texture::WRAP_T));
+                texture->setFilter(osg::Texture::MIN_FILTER, old->getFilter(osg::Texture::MIN_FILTER));
+                texture->setFilter(osg::Texture::MAG_FILTER, old->getFilter(osg::Texture::MAG_FILTER));
+                texture->setMaxAnisotropy(old->getMaxAnisotropy());
+                // The state is shared with the other shapes of the file (and with every copy of the model): this
+                // shape gets a state of its own with the one picture changed
+                osg::ref_ptr<osg::StateSet> own = new osg::StateSet(*stateset, osg::CopyOp::SHALLOW_COPY);
+                own->setTextureAttribute(0, texture, osg::StateAttribute::ON);
+                target.setStateSet(own);
+                return true;
+            };
+            if (replace(node))
+                return true;
+            if (osg::Group* group = node.asGroup())
+                for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+                    if (replace(*group->getChild(i)))
+                        return true;
+            return false;
+        }
+    }
+
+    bool MenuScene::setTexture(const std::string& name, const std::string& shape, VFS::Path::NormalizedView path)
+    {
+        Model* model = find(name);
+        if (model == nullptr)
+            return false;
+        const auto found = model->mNodes.find(shape);
+        if (found == model->mNodes.end())
+        {
+            Log(Debug::Warning) << "Menu scene: the model " << name << " has no shape '" << shape << "' to put " << path
+                                << " on";
+            return false;
+        }
+        const std::string key = Misc::StringUtils::lowerCase(shape);
+        const auto given = model->mTextures.find(key);
+        if (given != model->mTextures.end() && given->second == path.value())
+            return true;
+
+        osg::ref_ptr<osg::Image> image;
+        try
+        {
+            image = mResourceSystem->getImageManager()->getImage(
+                Misc::ResourceHelpers::correctTexturePath(path, *mResourceSystem->getVFS()));
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Error) << "Menu scene: cannot load " << path << ": " << e.what();
+            return false;
+        }
+        if (image == nullptr || !replaceDiffuse(*found->second, image))
+        {
+            Log(Debug::Warning) << "Menu scene: the shape '" << shape << "' of the model " << name
+                                << " has no picture to change";
+            return false;
+        }
+        model->mTextures[key] = std::string(path.value());
+        return true;
     }
 
     std::vector<MenuScene::Sequence> MenuScene::sequences(const std::string& name) const

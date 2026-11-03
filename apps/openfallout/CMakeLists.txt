@@ -37,7 +37,7 @@ add_openfallout_dir (mwgui
     mapwindow windowpinnablebase tooltips scrollwindow bookwindow resourceskin
     formatting inventorywindow container hud countdialog tradewindow settingswindow
     confirmationdialog alchemywindow referenceinterface spellwindow mainmenu quickkeysmenu menuscenes
-    itemselection spellbuyingwindow loadingscreen levelupdialog waitdialog spellcreationdialog
+    itemselection spellbuyingwindow loadingscreen falloutloading falloutmenuresources levelupdialog waitdialog spellcreationdialog
     enchantingdialog trainingwindow travelwindow exposedwindow cursor spellicons
     merchantrepair repair soulgemdialog companionwindow bookpage journalviewmodel journalbooks
     itemmodel containeritemmodel inventoryitemmodel sortfilteritemmodel itemview
@@ -55,13 +55,13 @@ add_openfallout_dir (mwscript
     locals scriptmanagerimp compilercontext interpretercontext cellextensions miscextensions
     guiextensions soundextensions skyextensions statsextensions containerextensions
     aiextensions controlextensions extensions globalscripts ref dialogueextensions
-    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutcrafting falloutbarter falloutcompanion fallouthotkeys falloutregionline falloutvats falloutsave
+    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutcrafting falloutbarter falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave
     )
 
 add_openfallout_dir (mwlua
     objectcache luamanagerimp object objectlists userdataserializer luaevents engineevents objectvariant loadscripts contentbindings
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
-    mwscriptbindings questbindings conversationbindings chargenbindings messagebindings menuscenebindings lockpickbindings combatbindings hudbindings menubindings interactbindings pipboybindings vatsbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
+    mwscriptbindings questbindings conversationbindings chargenbindings messagebindings menuscenebindings lockpickbindings combatbindings casinobindings hudbindings menubindings interactbindings pipboybindings vatsbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
     postprocessingbindings stats recordstore debugbindings corebindings worldbindings worker landbindings magicbindings factionbindings
     classbindings itemdata inputprocessor animationbindings birthsignbindings racebindings markupbindings weatherbindings regionbindings
     types/types types/door types/item types/actor types/container types/lockable types/weapon types/npc types/bodypart

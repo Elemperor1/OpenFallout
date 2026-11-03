@@ -28,7 +28,10 @@
 #include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/animationcommands.hpp>
 #include <components/falloutscript/barter.hpp>
+#include <components/falloutscript/blackjack.hpp>
 #include <components/falloutscript/calendar.hpp>
+#include <components/falloutscript/caravan.hpp>
+#include <components/falloutscript/casino.hpp>
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/combatstate.hpp>
@@ -67,7 +70,9 @@
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/regionline.hpp>
 #include <components/falloutscript/reputation.hpp>
+#include <components/falloutscript/roulette.hpp>
 #include <components/falloutscript/saveaccess.hpp>
+#include <components/falloutscript/slots.hpp>
 #include <components/falloutscript/switches.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
@@ -435,6 +440,275 @@ namespace OFScript
         std::optional<Loot> loot();
         /// The player is done with what it had open
         void closeLoot();
+
+        // ---- The games of the casinos (M12) ----
+
+        enum class CasinoGame
+        {
+            Blackjack,
+            Roulette,
+            Slots,
+        };
+        /// A game of a casino that the player has open (ShowBlackJackMenu, ShowRouletteMenu, ShowSlotMachineMenu):
+        /// which, where, what the table takes and the chips the player sat down with. A number that is another for each
+        /// game that is opened tells the screen that it is a new one.
+        struct CasinoScreen
+        {
+            CasinoGame mGame = CasinoGame::Roulette;
+            FalloutScript::FormId mCasino = 0;
+            std::string mName;
+            int mMinBet = 0;
+            int mMaxBet = 0;
+            int mSerial = 0;
+            /// What the player has won in this casino so far, and the chips it had when it sat down
+            int mEarnings = 0;
+            int mStartChips = 0;
+        };
+        /// The player is to play a game at the casino (the commands of the menus). Nothing opens, and the player is
+        /// told why, when the casino does not play with it any more, when it has not the chips for the least bet or
+        /// when it has won less than the script asks (`needed`, 0 for none). False then.
+        bool openCasino(CasinoGame game, FalloutScript::FormId casino, int minBet, int maxBet, int needed);
+        /// GetCasinoWinningsLevel and the condition GetCasinoWinningStage: where the winnings in the casino are among
+        /// the four quarters of the most it lets the player win (0 for a player who never played there)
+        int casinoWinningsLevel(FalloutScript::FormId casino);
+        /// SetCasinoWinningsLevel
+        bool setCasinoWinningsLevel(FalloutScript::FormId casino, int level);
+        std::optional<CasinoScreen> casinoScreen();
+        /// The roulette table of the open game, nothing for another game
+        struct RouletteView
+        {
+            int mAmount = 0;
+            int mTotal = 0;
+            int mChips = 0;
+            int mBets = 0;
+            int mMinBet = 0;
+            int mMaxTotal = 0;
+            bool mCanSpin = false;
+            int mEarnings = 0;
+            /// The table closes after the spin: it took the winnings to a new quarter of the casino's most, or the
+            /// chips are fewer than the least bet (mBroke, and the player is told so)
+            bool mCloses = false;
+            bool mBroke = false;
+            /// The stake on each area that has one (the place of the area in the list of areas, the stake)
+            std::vector<std::pair<int, int>> mStakes;
+        };
+        std::optional<RouletteView> rouletteView();
+        bool rouletteAmount(bool increase);
+        bool roulettePlace(int area);
+        bool rouletteRemove(int area);
+        std::optional<FalloutScript::Casino::Roulette::Result> rouletteSpin();
+        /// The slot machine of the open game, nothing for another game
+        struct SlotsView
+        {
+            int mBet = 0;
+            int mChips = 0;
+            int mMinBet = 0;
+            int mMaxBet = 0;
+            int mEarnings = 0;
+            /// The stops the three reels show now (0 to 13: the even numbers are the seven symbols, the odd ones the
+            /// blank after a symbol)
+            std::array<int, 3> mStops{};
+            bool mCanSpin = false;
+            /// The player has no chips left: the machine closes after the pull and says so
+            bool mBroke = false;
+            /// The machine closes after the pull: the winnings reached a new quarter of the casino's most, or no chips
+            /// are left
+            bool mCloses = false;
+            /// The files of the casino's record that the screen is made from: the model of the machine (its eighth
+            /// model) and the pictures of the seven symbols, as paths of the virtual file system (empty for one the
+            /// record does not have)
+            std::string mScene;
+            std::array<std::string, 7> mSymbols;
+        };
+        enum class SlotsMove
+        {
+            Increase,
+            Decrease,
+            Highest,
+        };
+        std::optional<SlotsView> slotsView();
+        bool slotsMove(SlotsMove move);
+        /// One pull of the lever: what the reels came to, nothing when the machine cannot be played now
+        std::optional<FalloutScript::Casino::SlotMachine::Result> slotsSpin();
+        /// The blackjack table of the open game, nothing for another game
+        struct BlackjackView
+        {
+            enum class State
+            {
+                Betting,
+                Playing,
+                Finished,
+            };
+            struct Card
+            {
+                int mRank = 0;
+                int mSuit = 0;
+            };
+            struct Hand
+            {
+                std::vector<Card> mCards;
+                int mBet = 0;
+                /// The numbers of the executable: 0 none, 1 lose, 2 push, 3 win, 4 bust, 5 blackjack, 6 surrender
+                int mResult = 0;
+                bool mDoubled = false;
+                bool mDone = false;
+            };
+            State mState = State::Betting;
+            int mBet = 0;
+            int mChips = 0;
+            int mMinBet = 0;
+            int mMaxBet = 0;
+            int mEarnings = 0;
+            std::vector<Card> mDealer;
+            bool mHoleHidden = false;
+            std::vector<Hand> mHands;
+            int mActive = 0;
+            bool mCanDeal = false;
+            bool mCanHit = false;
+            bool mCanStay = false;
+            bool mCanDouble = false;
+            bool mCanSplit = false;
+            bool mCanSurrender = false;
+            bool mCanSwitch = false;
+            /// What the last round came to, which of Luck's helps was used, and that the player has not the chips for
+            /// the least bet any more
+            int mNet = 0;
+            bool mDealerHelped = false;
+            bool mPlayerHelped = false;
+            bool mBroke = false;
+            /// The round took the winnings to a new quarter of the casino's most: the table closes after it
+            bool mCloses = false;
+        };
+        enum class BlackjackMove
+        {
+            Increase,
+            Decrease,
+            Highest,
+            Deal,
+            Hit,
+            Stay,
+            Double,
+            Split,
+            Surrender,
+            Switch,
+        };
+        std::optional<BlackjackView> blackjackView();
+        /// One thing the player does at the table; false when it cannot be done now
+        bool blackjackMove(BlackjackMove move);
+        /// The player gets up from the table: the chips it has more or less than when it sat down are put in or taken
+        /// out of its pack, and the player is told
+        void closeCasino();
+
+        // ---- The card game Caravan (M12) ----
+        // The character a script runs ShowCaravanMenu on plays against the player in four steps, each of them a screen:
+        // the stake, the deck the player builds from its cards, the match and its result (FalloutNV.exe, the menu
+        // 0x43B; Mac round 12AS E3). The money moves when the match ends.
+
+        enum class CaravanStage
+        {
+            Bet,
+            Deck,
+            Game,
+            Results,
+        };
+        /// The cards the player owns, one entry for each card (a stack of three is three entries), and whether each is
+        /// in the deck
+        struct CaravanCardView
+        {
+            FalloutScript::FormId mForm = 0;
+            int mValue = 0;
+            int mSuit = 0;
+            std::string mName;
+            bool mInDeck = false;
+        };
+        /// Where the match is: the stage, who plays, the money and the deck
+        struct CaravanScreen
+        {
+            CaravanStage mStage = CaravanStage::Bet;
+            int mSerial = 0;
+            std::string mOpponent;
+            /// The stake: what the player has, what the opponent asks, what the player puts up, the most the opponent
+            /// follows a raise to, the most the player may raise by, and the pot of the match
+            int mFunds = 0;
+            int mAnte = 0;
+            int mBet = 0;
+            int mCeiling = 0;
+            int mMostRaise = 0;
+            int mPot = 0;
+            bool mCanMatch = false;
+            bool mCanAccept = false;
+            /// The deck: the cards in it and the cards the player owns, and whether it is big enough to play with
+            int mInDeck = 0;
+            int mOwned = 0;
+            bool mCanPlay = false;
+            /// The result, when the match is over
+            bool mWon = false;
+            bool mForfeited = false;
+        };
+        /// The player sits down to play the opponent (the reference the script is called on) with the deck record and
+        /// the kind of opponent (0 and 1 are what the game has) and the share of its money it opens with. Nothing
+        /// opens, and the player is told why, when it has fewer than 30 cards. False then.
+        bool openCaravan(FalloutScript::FormId opponent, FalloutScript::FormId deck, int aiType, float fraction);
+        std::optional<CaravanScreen> caravanScreen();
+        /// The stake: match what the opponent asks, raise (the most is CaravanScreen::mMostRaise), accept
+        bool caravanMatch();
+        bool caravanRaise(int amount);
+        bool caravanAccept();
+        /// The deck: the cards, one of them in or out, a random choice of them (as many as the game takes), and the
+        /// match
+        std::vector<CaravanCardView> caravanCards();
+        bool caravanSetInDeck(int index, bool inDeck);
+        bool caravanRandomize();
+        bool caravanPlay();
+        /// The match: the six caravans (the player's are 1 to 3, the opponent's 4 to 6; the player's n faces 7 - n),
+        /// what the sides hold, whose turn it is and whether it is over
+        struct CaravanBoardCard
+        {
+            int mValue = 0;
+            int mSuit = 0;
+        };
+        struct CaravanBoardTrack
+        {
+            /// The rows, the number card first and the face cards on it after it
+            std::vector<std::vector<CaravanBoardCard>> mRows;
+            int mTotal = 0;
+            int mDirection = 0;
+            int mSuit = 0;
+        };
+        struct CaravanBoard
+        {
+            std::array<CaravanBoardTrack, 6> mTracks;
+            std::vector<CaravanBoardCard> mHand;
+            int mOpponentHand = 0;
+            int mPile = 0;
+            int mOpponentPile = 0;
+            /// "start", "play" or "over"
+            std::string mPhase;
+            bool mPlayersTurn = false;
+            bool mOver = false;
+            bool mWon = false;
+        };
+        std::optional<CaravanBoard> caravanBoard();
+        /// Whether the card of the hand (counted from 0) can go on the row of the caravan (both counted from 0)
+        bool caravanCanPlace(int track, int row, int hand);
+        bool caravanPlace(int track, int row, int hand);
+        bool caravanDiscardCard(int hand);
+        bool caravanDiscardTrack(int track);
+        /// The player gives the match up
+        bool caravanForfeit();
+        /// What the opponent did: the kind of move (the numbers of FalloutScript::Casino::Caravan::MoveType), where,
+        /// and the card of its hand it used
+        struct CaravanOpponentMove
+        {
+            bool mMade = false;
+            int mType = 0;
+            int mTrack = 0;
+            int mRow = 0;
+            CaravanBoardCard mCard;
+        };
+        CaravanOpponentMove caravanOpponentMove();
+        /// The player gets up: a match that is not over is lost
+        void closeCaravan();
 
         // ---- Locks, terminals, waiting and sleeping, the map (M10 slice 4) ----
         // What the player has open is kept here and read by the screens of Lua (core.interact), which show it and give
@@ -2021,6 +2295,56 @@ namespace OFScript
         std::mutex mLootMutex;
         std::optional<Loot> mLoot;
         int mLootSerial = 0;
+        /// What the player has won in each casino
+        FalloutScript::Casino::Ledger mCasinoLedger;
+        /// The game of a casino that the player has open, under mCasinoMutex
+        struct CasinoSession
+        {
+            CasinoScreen mScreen;
+            FalloutScript::FormId mCurrency = 0;
+            int mMaxWinnings = 0;
+            /// The quest the casino starts when the table closes after the winnings reached a new quarter (CSNO)
+            FalloutScript::FormId mWinningsQuest = 0;
+            bool mNewLevel = false;
+            std::optional<FalloutScript::Casino::Roulette> mRoulette;
+            std::optional<FalloutScript::Casino::Blackjack> mBlackjack;
+            std::optional<FalloutScript::Casino::SlotMachine> mSlots;
+            /// The result of the round is in the winnings of the casino
+            bool mRoundSettled = true;
+        };
+        std::mutex mCasinoMutex;
+        std::optional<CasinoSession> mCasino;
+        int mCasinoSerial = 0;
+        std::mt19937 mCasinoRandom{ std::random_device()() };
+        /// The match of Caravan that the player has open, under mCaravanMutex
+        struct CaravanSession
+        {
+            CaravanStage mStage = CaravanStage::Bet;
+            int mSerial = 0;
+            FalloutScript::FormId mOpponent = 0;
+            std::string mOpponentName;
+            FalloutScript::FormId mDeck = 0;
+            int mAiType = 0;
+            std::optional<FalloutScript::Casino::CaravanStake> mStake;
+            struct Owned
+            {
+                FalloutScript::Casino::Caravan::Card mCard;
+                std::string mName;
+                bool mInDeck = false;
+            };
+            std::vector<Owned> mOwned;
+            std::vector<FalloutScript::Casino::Caravan::Card> mOpponentCards;
+            std::optional<FalloutScript::Casino::Caravan> mGame;
+            bool mWon = false;
+            bool mForfeited = false;
+        };
+        std::mutex mCaravanMutex;
+        std::optional<CaravanSession> mCaravan;
+        int mCaravanSerial = 0;
+        std::mt19937 mCaravanRandom{ std::random_device()() };
+        /// The match is over: the pot is paid, in caravan money first and then in caps, by the side that lost
+        /// (0x74CC70)
+        void payCaravan(CaravanSession& session);
         /// The lock, the terminal and the rest that the player has open, under mInteractionMutex
         std::mutex mInteractionMutex;
         std::optional<LockScreen> mLockScreen;
