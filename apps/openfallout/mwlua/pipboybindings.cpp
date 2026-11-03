@@ -291,19 +291,6 @@ namespace OFLua
         // The player puts on or takes off, eats or reads the item; what happened ("equipped", "unequipped", "used",
         // "read"), or "" when nothing did
         api["use"] = [](std::string_view item) { return scripts().useItemFromList(parseId(item)); };
-        // What a book or a scroll the player carries says (the words, with the names of settings in them as `&sName;`):
-        // its name, text, whether it is a scroll and whether it may be taken; nothing for an item that is no book
-        api["book"] = [lua](std::string_view item) -> sol::object {
-            const auto book = scripts().bookText(parseId(item));
-            if (!book)
-                return sol::nil;
-            sol::table row(lua, sol::create);
-            row["name"] = book->mName;
-            row["text"] = book->mText;
-            row["scroll"] = book->mScroll;
-            row["canTake"] = book->mCanTake;
-            return row;
-        };
         // The pages of the help manual (the messages of the form list `HelpManual`, or `HelpManualXBox` for a pad):
         // a list of tables with the id of the message, its title and its words; empty when the data has none
         api["helpManual"] = [lua](sol::optional<bool> pad) {

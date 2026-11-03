@@ -36,6 +36,47 @@ namespace OFScript
             return form.toUint32();
         }
 
+        /// A text of a game setting that has the places of a printf (`%s increased by %d`), with the first filled by the
+        /// name and the next by the number (the executable's formatter 0x406F60 takes the arguments in this order);
+        /// `%%` stands for a percent sign
+        std::string fillPlaces(const std::string& format, const std::string& name, long amount)
+        {
+            std::string result;
+            bool nameGiven = false;
+            for (std::size_t i = 0; i < format.size(); ++i)
+            {
+                if (format[i] != '%')
+                {
+                    result += format[i];
+                    continue;
+                }
+                if (i + 1 < format.size() && format[i + 1] == '%')
+                {
+                    result += '%';
+                    ++i;
+                    continue;
+                }
+                // The flags, the width and the precision, then the letter of the conversion
+                std::size_t end = i + 1;
+                while (end < format.size() && std::strchr("-+ #0123456789.", format[end]) != nullptr)
+                    ++end;
+                if (end >= format.size())
+                {
+                    result += format.substr(i);
+                    break;
+                }
+                if (format[end] == 's' && !nameGiven)
+                {
+                    result += name;
+                    nameGiven = true;
+                }
+                else
+                    result += std::to_string(amount);
+                i = end;
+            }
+            return result;
+        }
+
         /// The float an entry point of a perk works with
         double floatOf(const std::vector<std::uint8_t>& bytes)
         {
@@ -387,14 +428,30 @@ namespace OFScript
     {
         ensureLevellingRules();
         const FalloutScript::ItemUse::Result result = mItemUse.use(actor, item);
-        if (actor != mPlayer || result.mOutcome != FalloutScript::ItemUse::Outcome::Read || result.mSkill < 0)
+        if (actor != mPlayer)
             return result;
-        // "Barter increased by 3"
+        if (result.mOutcome == FalloutScript::ItemUse::Outcome::Refused)
+        {
+            // A fight is on: the player is told so, and the book stays (the executable plays no sound then)
+            const std::string text = gameSettingText("sCanNotReadBook");
+            tellPlayer(text.empty() ? "You cannot read a book in combat." : text);
+            return result;
+        }
+        if (result.mOutcome != FalloutScript::ItemUse::Outcome::Read)
+            return result;
+        // The sound of an item that was put to use (the executable plays it for a book that does nothing as well)
+        playInterfaceSound("UIItemGenericUp");
+        if (result.mSkill < 0)
+            return result;
+        // "Barter increased by 3": the setting sSkillIncreasedNum with the name of the skill and the points
         std::string name = "Skill";
         for (const FalloutScript::ChargenSkill& skill : mChargen.skills())
             if (skill.mNumber == result.mSkill)
                 name = skill.mName;
-        tellPlayer(name + " increased by " + std::to_string(static_cast<int>(std::lround(result.mGained))));
+        const long points = std::lround(result.mGained);
+        const std::string format = gameSettingText("sSkillIncreasedNum");
+        tellPlayer(format.empty() ? name + " increased by " + std::to_string(points)
+                                  : fillPlaces(format, name, points));
         return result;
     }
 }

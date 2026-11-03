@@ -453,6 +453,7 @@ namespace OFScript
         });
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
+        mItemUse.setFighting([this](FalloutScript::FormId actor) { return mCombat.inCombat(actor); });
         // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
         // item does it, and what an ability or a disease changes stays until it is taken away
         mItemUse.setEffectListener(
@@ -662,7 +663,6 @@ namespace OFScript
             // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
-            mBookScreen.reset();
             mLockExperienceGiven.clear();
             mLockBroken.clear();
             mTerminal.reset();

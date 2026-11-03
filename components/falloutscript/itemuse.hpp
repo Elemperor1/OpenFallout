@@ -87,8 +87,11 @@ namespace FalloutScript
             Nothing,
             /// An aid item was used up
             Consumed,
-            /// A book was read: a skill book is used up, another book stays
+            /// The player used a book: a skill book was read (its points are given and it is used up), any other book
+            /// does nothing (mSkill is -1)
             Read,
+            /// The player may not read the skill book now (a fight is going on): nothing is given and the book stays
+            Refused,
         };
 
         struct Result
@@ -125,10 +128,13 @@ namespace FalloutScript
         void setRandom(std::function<double()> random);
         /// The player, whose counters of the Pip-Boy count what is used
         void setPlayer(FormId player);
-        /// The points a book gives when no perk changes them. A skill book is never refused: the executables turn it
-        /// away only at 200 of a skill that is read as 100 at most, so one read at 100 adds points that show only
-        /// when a penalty takes the shown value down
+        /// The points a book gives when no perk changes them. A skill book is never turned away for the skill: the
+        /// executables do it only at 200 of a skill that is read as 100 at most, so one read at 100 adds points that
+        /// show only when a penalty takes the shown value down
         void setBookRules(double points);
+        /// Whether the character is in a fight, in which the player cannot read a skill book (the executable refuses it
+        /// with a message of its own)
+        void setFighting(std::function<bool(FormId)> fighting);
         /// Whether the perks that make the effects of a chem last longer (entry point 25) work only on an item that
         /// can make one addicted, as in Fallout 3; New Vegas lets them work on every effect that is not hostile
         void setChemDurationNeedsAddiction(bool needsAddiction);
@@ -175,6 +181,7 @@ namespace FalloutScript
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> mConditions;
         std::function<double()> mRandom;
         std::function<void(FormId, FormId, FormId, double)> mEffectListener;
+        std::function<bool(FormId)> mFighting;
         double mBookPoints = 1;
         bool mChemDurationNeedsAddiction = false;
         FormId mPlayer = 0;

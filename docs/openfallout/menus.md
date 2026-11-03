@@ -744,9 +744,11 @@ its older drawing for a data folder that lacks the file.
 roll with a scrollbar). The file turns the pages itself: the number of the left page counts the clicks of the arrows
 (`_pagenum`), and the text tiles ask for `pagenum`. What the code puts in the menu is three traits of the menu itself:
 `user0` (a book, not a scroll), `user2` (the words) and `user3` (it can be taken); the page width (`user4`) and the font
-(`user5`) the file has. `falloutbook.lua` does that and wires the buttons; the words come from the record of the book
-(`core.pipboy.book` for what the player carries, `core.interact.book` for one that lies in the world, which has the
-Take button: the activation of a book in the world opens this screen in place of picking it up).
+(`user5`) the file has. `falloutbook.lua` does that and wires the buttons. **Nothing in play opens this screen** (Mac
+round 12AV S3): the executable's only way to the function that makes it is the console (the command parser that also has
+`use workbook`), a book that the player reads from the Pip-Boy has no screen and the Pip-Boy stays as it is, and a book that
+lies in the world is picked up as any other item (the activation of a book is the generic one of an item that goes into
+the pack). The port opens it from no place; the module stays for a console command.
 
 The words are laid out by the menu engine (`components/falloutmenu/richtext.cpp`) for a text tile that says `ishtml`;
 the executable's text engine is shared with the notes of the terminals:
@@ -770,12 +772,18 @@ takes 1 to 8 (the font files `sFontFile_1` to `sFontFile_8`; a face given by nam
 source was not found). `DIV ALIGN` takes LEFT, CENTER and RIGHT and the executable has no closing tag for it (the port ends
 it at `/DIV`, and whether the executable applies it at all is not proven). `IMG` takes `SRC`, `WIDTH` and `HEIGHT` as whole
 numbers; where the picture stands, its line height and the path rule were not found. The colour of plain text was not read.
-A skill book gives its points when the player reads it from the Pip-Boy (the executable's function that puts an item on does
-it: the book must be the player's, the skill below 200, the points `fBookPerkBonus` adjusted by the perk entry point 11, the
-message `sSkillIncreasedNum`, and the book is removed), not when its screen is left, and the screen of a book that lies in the
-world (Take and Exit) runs no skill code, so such a book gives nothing until it is read from the Pip-Boy. The Pip-Boy shows
-the words as the points are given. The keys of the screen on the PC were not read (here: the arrows, the pages and the wheel;
-Escape or Backspace leave; T takes).
+The keys the screen has in the console case: Space closes it (the Escape key and the Pip-Boy key do not), a click on the exit
+tile closes it and a click on the take tile (id 32) puts the book in the pack and closes it; the wheel turns the pages by two
+(a scroll scrolls). The screen plays no sound of its own except the page turn from the menu sound table (opening and leaving
+are silent).
+
+**Reading a skill book** (the use function of the actor, `0x515040`, read in round 12AV S3; `ItemUse` does it): the reader must
+be the player (for anyone else nothing happens); in combat the player is refused with the message `sCanNotReadBook` and the
+book stays; the points are the setting `fBookPerkBonus` changed by the perk entry point 11 and are added to the skill for good;
+the message is `sSkillIncreasedNum` with the name of the skill and the points as a whole number, the sound is
+`UIItemGenericUp`, the Books Read count of the Pip-Boy goes up by one, and the book is removed at once. A book with no skill
+(a plain book) does nothing when it is used, with no message and no count; only the sound of the item plays. A skill of 200
+or more turns the book away with no message (the value is read as 100 at most, so this never happens in the port).
 
 ### The help manual (Mac round 12AN B3, FalloutNV.exe)
 

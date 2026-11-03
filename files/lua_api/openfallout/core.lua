@@ -2288,29 +2288,6 @@
 -- @function [parent=#Interact] closeLock
 
 ---
--- The book or scroll the player activated where it lies (the screen of a book, with its Take button).
--- @function [parent=#Interact] book
--- @return #InteractBook Nothing when none is open.
-
----
--- @type InteractBook
--- @field #string reference The form id of the book's reference.
--- @field #string name
--- @field #string text The words of the book, with marks (`<BR>`, `<FONT>`, `<IMG>`...) and names of settings (`&sName;`).
--- @field #boolean scroll Whether it is a scroll and not a book.
--- @field #boolean canTake Whether the player may take it from where it lies.
--- @field #number serial Another for each time one is opened.
-
----
--- Closes the screen of the book that lies in the world.
--- @function [parent=#Interact] closeBook
-
----
--- The player takes the book that is open from where it lies: it goes to the inventory and the screen closes.
--- @function [parent=#Interact] takeBook
--- @return #boolean False when none is open or it may not be taken.
-
----
 -- The number of the terminal that is open, 0 for none. It changes with everything the screen of the terminal shows.
 -- @function [parent=#Interact] terminalSerial
 -- @return #number
@@ -2605,24 +2582,19 @@
 
 ---
 -- The player does with the item what it is for: wears, holds or takes off a weapon, armor or ammunition, uses up an aid
--- item, reads a book.
+-- item, reads a skill book (its points are given at once and it is used up, with a message and a sound; the game has no
+-- screen of a book for it).
 -- @function [parent=#Pipboy] use
 -- @param #string item
--- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
-
----
--- What a book or a scroll that the player carries says, for its screen.
--- @function [parent=#Pipboy] book
--- @param #string item
--- @return #table nil for an item that is no book; else a table with `name`, `text` (with marks and names of settings,
--- see @{#Interact.book}), `scroll` (a scroll and not a book) and `canTake`.
+-- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened (a book that is no skill book, or
+-- that cannot be read now, does nothing).
 
 ---
 -- A page of the help manual or a hint of the game.
 -- @type HelpPage
 -- @field #string id The editor id of the message that holds it.
 -- @field #string title Its title.
--- @field #string text Its words: marked up text when it begins with `<` (see @{#Interact.book}), with names of settings.
+-- @field #string text Its words: marked up text when it begins with `<` (`<BR>`, `<FONT>`, `<IMG>`...), with names of settings (`&sName;`).
 
 ---
 -- The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when `pad` is true), in the
