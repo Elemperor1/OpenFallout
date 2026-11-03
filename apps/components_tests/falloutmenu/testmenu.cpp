@@ -393,6 +393,57 @@ namespace
         EXPECT_FLOAT_EQ(items[0].mWidth, 200.f);
     }
 
+    TEST(FalloutMenuDrawTest, a_hot_rectangle_with_an_alpha_and_no_file_is_a_plain_colour_and_a_rectangle_never_is)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
+            // The bar behind the lit row of a list: a box, whose alpha is the `_fill_alpha` of its file
+            "<hotrect name=\"Lit\"><_fill_alpha> 51 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
+            "</alpha><brightness> 128 </brightness><width> 300 </width><height> 30 </height></hotrect>"
+            // No alpha, an alpha of 0, no size: nothing is drawn (the files turn a hotrect off with `alpha 0`)
+            "<hotrect name=\"Plain\"><width> 300 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"Off\"><alpha> 0 </alpha><width> 300 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"NoSize\"><alpha> 90 </alpha></hotrect>"
+            // A rectangle draws nothing whatever its alpha: it gives the alpha to what is in it
+            "<rect name=\"Container\"><alpha> 255 </alpha><width> 300 </width><height> 30 </height></rect>"
+            "<rect name=\"Box\"><_fill_alpha> 90 </_fill_alpha><alpha><copy src=\"me()\" "
+            "trait=\"_fill_alpha\"/></alpha>"
+            "<width> 300 </width><height> 30 </height></rect>"
+            "</menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        EXPECT_EQ(items[0].mTile->name(), "Lit");
+        EXPECT_EQ(items[0].mType, TileType::Image);
+        EXPECT_EQ(items[0].mFile, "solid.dds");
+        EXPECT_EQ(items[0].mAtlas, "Interface\\InterfaceShared.tai");
+        EXPECT_FLOAT_EQ(items[0].mWidth, 300.f);
+        EXPECT_FLOAT_EQ(items[0].mHeight, 30.f);
+        EXPECT_NEAR(items[0].mColor[3], 0.2f, 1e-4);
+    }
+
+    TEST(FalloutMenuDrawTest, a_tile_that_uses_its_local_colour_is_drawn_in_its_own_red_green_and_blue)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
+            "<hotrect name=\"Own\"><alpha> 255 </alpha><brightness> &uselocalcolor; </brightness><red> 255 </red>"
+            "<green> 128 </green><blue> 0 </blue><width> 30 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"System\"><alpha> 255 </alpha><brightness> 255 </brightness><red> 255 </red>"
+            "<green> 128 </green><blue> 0 </blue><width> 30 </width><height> 30 </height></hotrect>"
+            "</menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mTile->name(), "Own");
+        EXPECT_NEAR(items[0].mColor[0], 1.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[1], 128.f / 255.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[2], 0.f, 1e-4);
+        EXPECT_NEAR(items[0].mColor[3], 1.f, 1e-4);
+        // The same numbers with a brightness of 0 or more are the system colour's (here nothing names one, so these
+        // stay)
+        EXPECT_EQ(items[1].mTile->name(), "System");
+    }
+
     TEST(FalloutMenuDrawTest, positions_add_up_through_the_tiles_a_tile_is_in)
     {
         Fixture f;

@@ -561,7 +561,11 @@ namespace FalloutMenu
         float r = number(tile, "red");
         float g = number(tile, "green");
         float b = number(tile, "blue");
-        for (const Tile* t = &tile; t != nullptr; t = t->mParent)
+        // A negative brightness (`&uselocalcolor;`) is the tile's own red, green and blue as they are; the executable
+        // does not look for a system colour then, nor scale the colour by the brightness (FalloutNV.exe, round 12AG)
+        const float own = number(tile, "brightness");
+        const bool local = own < 0.f;
+        for (const Tile* t = &tile; t != nullptr && !local; t = t->mParent)
         {
             if (!defines(*t, "systemcolor"))
                 continue;
@@ -577,7 +581,7 @@ namespace FalloutMenu
             }
             break;
         }
-        const float brightness = number(tile, "brightness") / 255.f;
+        const float brightness = local ? 1.f : own / 255.f;
         const float alpha = number(tile, "alpha") / 255.f;
         const auto clamp = [](float v) { return std::clamp(v, 0.f, 1.f); };
         return { clamp(r / 255.f * brightness), clamp(g / 255.f * brightness), clamp(b / 255.f * brightness),
@@ -605,11 +609,18 @@ namespace FalloutMenu
         const bool isImage
             = tile.mType == TileType::Image || (tile.mType == TileType::HotRect && !text(tile, "filename").empty());
         const bool isText = tile.mType == TileType::Text;
-        if (isImage || isText)
+        // A hot rectangle with no file is a plain colour of its own alpha, as the executable draws it (round 12AG): the
+        // bar behind the lit row of a list (`list_box.xml`), the band behind a button. The game gives every hotrect and
+        // picture a quad, with a texture when it names a file; the files that do not want one say `alpha 0`, and the
+        // port draws the ones that say an alpha. A rectangle draws nothing, and one that only passes its alpha down to
+        // what is in it (`alpha 255` on a container) is not a fill. It is a picture of `solid.dds` of the shared atlas.
+        const bool isFill = !isImage && !isText && tile.mType == TileType::HotRect && defines(tile, "alpha")
+            && width > 0 && height > 0 && number(tile, "alpha") > 0;
+        if (isImage || isText || isFill)
         {
             DrawItem item;
             item.mTile = &tile;
-            item.mType = isImage ? TileType::Image : tile.mType;
+            item.mType = isImage || isFill ? TileType::Image : tile.mType;
             item.mX = x;
             item.mY = y;
             item.mWidth = width;
@@ -623,6 +634,11 @@ namespace FalloutMenu
                 item.mRepeatY = number(tile, "repeatvertical") != 0 || get(tile, "tile").number() > 0;
                 item.mCropX = number(tile, "cropx");
                 item.mCropY = number(tile, "cropy");
+            }
+            else if (isFill)
+            {
+                item.mFile = "solid.dds";
+                item.mAtlas = "Interface\\InterfaceShared.tai";
             }
             else
             {
@@ -639,7 +655,7 @@ namespace FalloutMenu
                 item.mClipWidth = (*clip)[2];
                 item.mClipHeight = (*clip)[3];
             }
-            const bool empty = isImage ? item.mFile.empty() : item.mText.empty();
+            const bool empty = isImage || isFill ? item.mFile.empty() : item.mText.empty();
             if (!empty)
                 out.push_back(std::move(item));
         }

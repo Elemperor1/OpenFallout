@@ -38,6 +38,12 @@ these from the pointer, and the renderer sets them:
   is over alone: the arrows of a toggle or a meter show when exactly one of the row, an arrow and the value is over (the
   file adds their `mouseover` and compares the sum with 1), so a row that stayed over under an arrow would hide both and
   the click would fall on the value (found in the running game, round 12AC).
+- A letter typed in a menu clicks the tile its file names for it: the root has `_PCButton_<letter>` traits whose value is a
+  tile name (`stats_menu.xml`: S stimpak, A Rad-Away, X Rad-X, R repair, E doctor's bag; `inventory_menu.xml`: R repair, E
+  cancel, X mod; `barter_menu.xml`: A Accept, X Exit; `trait_menu.xml`: R Reset, A Continue, E Back; `sleep_wait_menu.xml`: W
+  wait, E cancel; and so on). The game's interface manager (FalloutNV.exe 0x70e2b1-0x70e3d2, round 12AG) clicks the tile if it
+  is visible and takes the pointer. `Shown:pcButton(symbol)` does that; the rest, level-up and (to come) barter screens use
+  it. The other screens still have only the keys of the port.
 - A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
   and so are its children.
 - A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).
@@ -254,15 +260,36 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - A message with the box flag and no button has one button, "OK" (the literal of the executable, in capitals, not the
   word of the setting `sOk`; the engine adds it), and stays until it is picked: the display time of a message (`TNAM`) is
   the one of the notification in the corner of the screen (a message without the box flag), and the box of `ShowMessage`
-  is made with the time 0, which closes nothing (round 12AE). A button whose conditions fail keeps its place with empty
-  words in the game (the port leaves it out). Boxes queue one after the other and a new one does not replace the open one.
-- Keys: Space picks the lit button; a letter picks the button that has it marked with a `&` in its words (a plain "OK" has
-  none; the words are shown without the `&`: not read from the executable yet). Escape does nothing: the code picks the
-  last button with it except in a box of `ShowMessage`, which ignores it. Arrows and Enter (the lit button, or the first)
-  are the port's own. The pad: the engine's pad handling steps aside while a box that the script draws is open, so the
-  script takes the pad itself: D-pad up and down move the lit button, A picks it, B does nothing (as Escape; not seen in
-  the running game yet).
-- `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
+  is made with the time 0, which closes nothing (round 12AE). A button whose conditions fail is not there at all in the
+  game (`ShowMessage`, 0x5b4630, gives it a one-space text, the box's creator leaves that out of the words and the button
+  builder makes no button for an empty slot: it is not shown, cannot be clicked or reached by keys; the buttons after it
+  keep their original numbers, so the answer a script reads has gaps, as the port's does); if every button fails, the
+  first one becomes the literal "OK". Boxes queue one after the other and a new one does not replace the open one.
+- Keys, as the code of the box reads them (FalloutNV.exe, round 12AG: `MessageMenu` handler 0x7aa110, creator 0x7a8e60):
+  the box's own key code is only this: a letter picks a button, and the key the OS reports as the menu's accept (value 1,
+  the control 0x1c, not named) picks the LAST button except in a box of `ShowMessage` (kind 0x17), which ignores it, as it
+  ignores Escape (Escape gives value 0). The code takes the one character after the first `&` of each button's words,
+  appends it to one string of letters (a button with no `&` adds none) and erases the `&` from the shown words; a typed
+  letter is upper-cased and the place it has in that string is the NUMBER OF THE BUTTON it picks, so a button without a
+  `&` ahead of one that has it moves the letters up by one button (kept as it is, `hotkeysOf` in `falloutmessage.lua`). No button
+  of either game's plugins has an `&` (none in 1567 New Vegas and 672 Fallout 3 messages, round 12AH), so the letters are for
+  mods only.
+  Space is taken by the box and does nothing there (`HandleClick(-1, ...)` is a no-op). Enter, the arrows and the pad do
+  not come from the box: they go to the interface manager's generic code, which steps along the neighbours of the selected
+  tile (the buttons have `repeatvertical`, so up and down walk the buttons, left and right nothing) and activates the
+  selected tile; which button is lit when the box opens, and what Enter does with none lit, was not traced (asked in 12AG,
+  A7). The port's own meanwhile: Enter and Space pick the lit button (the first when none is lit). The pad: the engine's
+  pad handling steps aside while a box that the script draws is open, so the script takes the pad itself: D-pad up and
+  down move the lit button, A picks it, B does nothing (as Escape; not seen in the running game yet).
+  Fallout 3's `ShowMessage` (0x53dd40) and message menu (key handler 0x6694d0, creator 0x6698e0) are the same code with
+  other addresses (round 12AG, A2): the same flag bit, 10 slots, one-space blank for a failed button, 'OK' when none passes,
+  kind 0x17, the same three key rules and `&` handling; the only difference is five button tiles instead of six.
+- The background of the box is the file's `solid_black.dds` tile with the alpha `_background_fill_alpha` (32 in `globals.xml`),
+  and when a menu is already open under the box (the Pip-Boy, the dialogue, a container, barter...) the code writes its
+  alpha as the setting `fPopUpBackgroundOpacity` times 255 (the INI of both games has 0.87, the executable's own default is
+  1.0; FalloutNV.exe 0x7a8d10, round 12AG); the brightness is never written. The script does the same over an open screen,
+  with 0.87, since the port reads no INI. Seen on the Mac (round 12AH): over the Pip-Boy the page text shows through at 13 to 17 %
+  of its brightness, and over the plain world the box is about 10 % darker (the file's alpha of 32).
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
   keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own
@@ -452,6 +479,19 @@ found the same way.
   centre or right end).
 - A hot rectangle that names a file (`filename`) is a picture that takes the pointer: the picture of the world map, the
   cursor of the hacking menu (seen in the files, not yet in the running game).
+- A hotrect with no file is a plain colour of its own alpha: the executable gives every picture and hotrect a quad (a
+  texture on it when a file is named) and none to a rectangle, menu or window (FalloutNV.exe tile factory 0xa00c20, round
+  12AG, A6); each tile draws with its OWN alpha, never multiplied by its parent's (a rectangle's alpha is only a value
+  that the tiles in it copy). The port draws a hotrect that says an `alpha` above 0 and has a size, as the 7 by 7 pixel
+  `solid.dds` of the shared atlas stretched, in the tile's colour times its brightness; the files turn a hotrect off with
+  `alpha 0`. The bar behind the lit row of a list is one (`list_box.xml`: its alpha is the list's `_fill_alpha`, 40, and the
+  terminals set 224 and turn the row's text dark, which made the lit row of a terminal vanish in the running game before
+  the bars were drawn); so are the fill of a lit tab of the Pip-Boy and the band behind a lit button of the start menu.
+  Not as the executable has it: it reads a hotrect with no alpha as fully opaque (default 255), which cannot be so for the
+  containers of the files (`SWM_MainRect` of the wait menu is 860 by 400 and says none), so the port draws only the ones
+  that say one. Colour in the executable: brightness 0 or more gives the system colour (the nearest tile above that names
+  one, else 1) times brightness/255 and ignores the tile's red, green and blue; a negative brightness (`uselocalcolor`)
+  gives red, green and blue. The port's `colorOf` still uses the tile's red, green and blue when no system colour is named.
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
 

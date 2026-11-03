@@ -345,6 +345,25 @@ function Shown:click(tile)
     self:refresh()
 end
 
+-- The letter shortcut of a menu on the PC: the file names, as `_PCButton_<letter>` on the menu itself, the tile that the
+-- typed letter clicks, and the game's interface manager (FalloutNV.exe 0x70e2b1-0x70e3d2, round 12AG) clicks it when the
+-- tile is visible and takes the pointer. True when a tile was clicked.
+function Shown:pcButton(symbol)
+    if type(symbol) ~= 'string' or #symbol ~= 1 then return false end
+    local name = self.menu:getText(self.menu:root(), '_PCButton_' .. symbol:upper())
+    if not name or name == '' then return false end
+    local tile = self.menu:find(name)
+    if not tile then return false end
+    local up = tile
+    while up do
+        if self.menu:getNumber(up, 'visible') == 0 then return false end
+        up = self.menu:parent(up)
+    end
+    if self.menu:getNumber(tile, 'target') == 0 then return false end
+    self:click(tile)
+    return true
+end
+
 function Shown:close()
     if self.element then
         self.element:destroy()
