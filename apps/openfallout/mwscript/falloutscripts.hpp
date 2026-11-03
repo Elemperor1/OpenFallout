@@ -825,13 +825,13 @@ namespace OFScript
             std::string mIcon;
             bool mEquipped = false;
         };
-        /// The eight slots, in order
+        /// The eight slots, in order. A slot whose item the player no longer carries (dropped, sold, used up) is
+        /// emptied here: the executable keeps the key on the entry of the inventory, so it goes with the entry.
         std::vector<HotKeySlot> hotKeySlots();
         /// Puts an item the player carries on the key of the slot: "assigned", "ammo" (ammunition goes on no key),
         /// "cannot" (a thing that is neither held, worn nor used up, or one the player does not carry) or "slot" (the
         /// ammunition swap, or none)
         std::string assignHotKey(int slot, FalloutScript::FormId item);
-        void clearHotKey(int slot);
         /// The picture of an item (its record's ICON), empty for a form that has none
         std::string itemIcon(FalloutScript::FormId item);
         /// The container that holds a vendor's goods: the one a script gave it (SetMerchantContainer; none after

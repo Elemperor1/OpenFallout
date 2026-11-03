@@ -84,8 +84,8 @@ headline, and the cards of the thing the pointer is on in the file's `item_stats
 (puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
-yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). The number keys put the
-picked thing on a hot key (see the hot keys below).
+yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
+hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
 
 ### The stats page of the Pip-Boy
 
@@ -777,17 +777,25 @@ screen for `fHotKeyShowTimer` (a second and a half) after the key. All of it is 
 
 `falloutmenuhotkeys.lua` keeps the timing of the keys (`I.FalloutHud` draws it through `falloutmenuhud.lua`; the keys are read
 with `input.isActionPressed` of `QuickKey1` to `QuickKey8`, and the engine's own quick keys of Morrowind do nothing for
-Fallout); `core.pipboy.hotKeys`, `assignHotKey` and `clearHotKey` are the engine's side (`mwscript/fallouthotkeys.cpp`, the class
-`HotKeys` of `components/falloutscript`, whose eight slots are saved in the section `hotkeys`). In the Pip-Boy a number key
-puts the picked thing on that key (the executable's check: ammunition goes on no key, nothing else that cannot be held, worn
-or used up does either, and a book is refused with `sCantHotkeyItem` and the sound `UIVATSInsufficientAP`); a thing has one key,
-so it leaves the one it was on, and the key it is on already takes it off (a way to clear a slot that was not read).
+Fallout); `core.pipboy.hotKeys` and `assignHotKey` are the engine's side (`mwscript/fallouthotkeys.cpp`, the class
+`HotKeys` of `components/falloutscript`, whose eight slots are saved in the section `hotkeys`). Only slots 0 and 2 to 7 take an
+item (the second key is the swap of ammunition, with no `sUActnHotKey2`).
 
-Not read or not made: whether a weapon that is in hand is taken off by its key (it is, as the Pip-Boy's list does it), the exact default keys (the number row is taken), what the executable does with a thing that was
-assigned and has left the inventory (the slot keeps it here and uses nothing while the player has none), the condition of a
-thing (the games refuse one that is broken with `sCantHotkeyBrokenItem`; this engine has no condition yet), the wheel that the
-file has beside the Pip-Boy's list (`IM_HotKeyWheel`, with the Hot Key button that only a player with a pad sees) and the pad's
-way to hold the wheel. Seen only in the offline harness (`hotkeys.lua`), not in the running game.
+In the Pip-Boy (Mac round 12AO B2, FalloutNV.exe 0x781BA0 and 0x780140) the number key is held and the item clicked: a number key
+that is pressed or held (not on the keyring) shows the file's wheel `IM_HotKeyWheel` with that slot lit (`_SelectedHotkey`, and
+`_SelectedText` the name of what the slot holds, the picture in `IM_HotkeyIcon`, each slot's `_HotKeyIcon` and `_HotKeyAssigned`);
+while it is up, a click on a thing (or Enter) puts it on the lit slot instead of using it; when no number key is down any more the
+wheel goes (`falloutpipboyitems.lua`). Nothing is said and no sound is played for a thing put on a slot. Ammunition does nothing at
+all; a thing that cannot be used, and a book, is refused with `sCantHotkeyItem` and the sound `UIVATSInsufficientAP`. A thing has
+one key, so it moves from the one it was on. The key goes with the entry of the inventory, so a slot whose thing the player no
+longer carries (dropped, sold, used up) is empty: the engine empties it when the slots are asked for.
+
+Not read or not made: whether a bare number press with no click assigns in the same frame (not traced; here only the click does),
+the executable's `sCantHotkeyBrokenItem` (this engine has no condition yet), what the executable does with the count of a thing
+that is only reduced (here a slot is emptied only when none is left), the Hot Key button that only a player with a pad sees and the
+pad's way to hold the wheel (a direction held shows it, let go assigns: 0x701BD0), and the HUD's pad flow (a direction held half a
+second shows the wheel, let go uses the thing). Seen only in the offline harness (`hotkeys.lua`, `itemwheel.lua`), not in the
+running game.
 
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 

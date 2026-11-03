@@ -2488,11 +2488,6 @@
 -- @return #string
 
 ---
--- Empties a slot of the hot key wheel.
--- @function [parent=#Pipboy] clearHotKey
--- @param #number slot
-
----
 -- Play the sound that a menu file or the code of the game names by its editor id (the files' `clicksound` and
 -- `mouseoversound` and the games' own sounds: "UIMenuOK", "UIMenuFocus", "ITMBottlecapsUp"), in 2D.
 -- @function [parent=#Pipboy] playSoundNamed

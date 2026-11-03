@@ -478,7 +478,6 @@ namespace OFLua
         // key), "cannot" (a thing that is neither held, worn nor used up) or "slot" (the ammunition swap, or none)
         api["assignHotKey"]
             = [](int slot, std::string_view item) { return scripts().assignHotKey(slot, parseId(item)); };
-        api["clearHotKey"] = [](int slot) { scripts().clearHotKey(slot); };
 
         // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
         // "ITMBottlecapsUp"), in 2D; false when the data has no such sound

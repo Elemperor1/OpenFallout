@@ -60,7 +60,13 @@ namespace OFScript
             HotKeySlot row;
             row.mSlot = slot;
             row.mAssignable = FalloutScript::HotKeys::assignable(slot);
-            const FalloutScript::FormId item = mHotKeys.item(slot);
+            FalloutScript::FormId item = mHotKeys.item(slot);
+            if (item != 0 && mPlayer != 0 && mActors.itemCount(mPlayer, item) <= 0)
+            {
+                // The key is kept by the entry of the inventory, and goes when the entry does
+                mHotKeys.clearItem(item);
+                item = 0;
+            }
             if (item != 0)
             {
                 row.mItem = item;
@@ -93,8 +99,4 @@ namespace OFScript
         return "assigned";
     }
 
-    void FalloutScripts::clearHotKey(int slot)
-    {
-        mHotKeys.clear(slot);
-    }
 }
