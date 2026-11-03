@@ -404,7 +404,8 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   game, round 12AB, drew the question over its play-time line). Not read yet, so estimated: which tile is lit first (the
   first row), and the format of the time
   played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
-  picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
+  picture there). The sounds are the file's: a tile's `clicksound` and `mouseoversound` (see "Sounds of the menu files"), played
+by the menu module; the game's own sounds for the back step were not found. Nothing was seen in the running game.
 
 ### The settings screens
 
