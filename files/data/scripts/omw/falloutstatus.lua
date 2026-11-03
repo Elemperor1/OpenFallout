@@ -612,8 +612,10 @@ local function refreshFromFile(dt)
         -- (the key or the button next to the verb): the display is made again
         local pad = menuHud.wantsPad == true
         if state.info ~= nil then pad = state.info.pad == true end
+        local previous = menuHud
         menuHud:close()
-        menuHud = menuHudModule.create(pad)
+        -- The messages and subtitles that wait their turn go to the new display
+        menuHud = menuHudModule.create(pad, previous)
         if menuHud == nil then
             menuHudFailed = true
             -- The stand-in draws the next frame, whatever it drew before

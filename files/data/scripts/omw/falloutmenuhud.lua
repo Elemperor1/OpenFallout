@@ -580,13 +580,15 @@ function Hud:close()
     self.shown:close()
 end
 
--- The display, or nil when the file of the game cannot be shown (`pad`: the player plays with the pad)
-function module.create(pad)
+-- The display, or nil when the file of the game cannot be shown (`pad`: the player plays with the pad). `previous` is the
+-- display that this one replaces (the window changed its size): what waits to be said is kept
+function module.create(pad, previous)
     local size = ui.screenSize()
     local shown = menuModule.open(FILE, { layer = 'HUD', passive = true, pad = pad == true })
     if not shown then return nil end
-    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = {}, pad = pad == true,
-        subtitles = subtitles.new() }, Hud)
+    local self = setmetatable({ shown = shown, size = size, cache = {}, queue = previous and previous.queue or {},
+        leaving = previous and previous.leaving or nil, pad = pad == true,
+        subtitles = previous and previous.subtitles or subtitles.new() }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then
         print('The head-up display is not drawn from its file: ' .. tostring(problem))
