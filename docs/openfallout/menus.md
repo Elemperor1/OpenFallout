@@ -296,7 +296,10 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own
   window too, which takes only the arrows, Enter and Space). The engine's own actions for the keys
   and buttons (Escape, which would close the screen under the box, the inventory key) are not carried out either while a
-  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys.
+  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys. A question that a
+  screen asks (`I.FalloutMessage.ask`, as barter does when it is left with things in its piles) has no box of the engine, so
+  the script says it to the engine every frame it is open (`core.messageBox.setQuestion`; a second without it and it is
+  gone), and the engine counts it as a box that the script draws: Escape and B do not close the screen under it.
 - A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
   after its claim ran out, has the window manager's own window and is left to it.
 

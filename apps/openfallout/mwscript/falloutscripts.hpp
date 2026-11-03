@@ -1117,6 +1117,11 @@ namespace OFScript
         /// A message box that a script of Lua draws is open: it is modal, and the actions of the keys and buttons of
         /// the game (Escape, which would close the screen under it) are not carried out while it is (any thread)
         bool luaMessageOpen() const;
+        /// A screen of Lua has a question open in a box of its own (I.FalloutMessage.ask, which the engine knows
+        /// nothing of otherwise): it is modal as a message box is. The script says it every frame while the question is
+        /// open, and a question that has not been said for a second is gone (a script that stopped must not leave the
+        /// keys dead). Any thread.
+        void setLuaQuestion(bool open);
         /// A script of Lua draws the message boxes (message_menu.xml) when `drawn` is true: the box of the window
         /// manager is not made then, and the button that Lua picks (pressMessageButton) is the answer. When it is
         /// false again (the file is not there, or the script cannot show a box) a box that is open is made as the
@@ -1715,6 +1720,8 @@ namespace OFScript
         /// The script says it draws them and said it within `leaseMilliseconds` (any thread)
         bool luaClaimIsFresh(std::int64_t leaseMilliseconds) const;
         std::atomic<int> mLuaPressed{ -1 };
+        /// When a script of Lua last said it has a question open (milliseconds of the steady clock), 0 for none
+        std::atomic<std::int64_t> mLuaQuestionAt{ 0 };
         std::uint64_t mOpenBoxId
             = 0; // the box of the window manager that shows it, to tell it from one that replaced it
         std::vector<int> mOpenNumbers;

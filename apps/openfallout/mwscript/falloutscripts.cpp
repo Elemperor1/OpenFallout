@@ -1558,8 +1558,27 @@ namespace OFScript
 
     bool FalloutScripts::luaMessageOpen() const
     {
-        const std::lock_guard lock(mOpenMessageMutex);
-        return mOpenMessage && mOpenMessage->mLua;
+        {
+            const std::lock_guard lock(mOpenMessageMutex);
+            if (mOpenMessage && mOpenMessage->mLua)
+                return true;
+        }
+        const std::int64_t askedAt = mLuaQuestionAt.load();
+        if (askedAt == 0)
+            return false;
+        const std::int64_t since
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            - askedAt;
+        return since < 1000;
+    }
+
+    void FalloutScripts::setLuaQuestion(bool open)
+    {
+        mLuaQuestionAt = open
+            ? std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            : 0;
     }
 
     bool FalloutScripts::pressMessageButton(std::size_t button)

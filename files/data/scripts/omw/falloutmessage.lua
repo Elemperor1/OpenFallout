@@ -59,6 +59,12 @@ local given = false
 local asked = nil
 local askedSerial = 0
 
+-- The engine is told whether a question of a screen is open, so that the keys and buttons of the game (Escape, B) are not
+-- carried out under it as they are not under a box of the game's (the screen under it would close and its offer with it)
+local function tellQuestion()
+    if messagebox.setQuestion then messagebox.setQuestion(asked ~= nil) end
+end
+
 local function closeMode()
     if ownsMode then
         ownsMode = false
@@ -88,6 +94,7 @@ local function giveBack()
     if asked then
         local callback = asked.callback
         asked = nil
+        tellQuestion()
         if callback then callback(nil) end
     end
 end
@@ -100,6 +107,7 @@ local function press(index)
         -- The question of a screen is answered at once
         local callback = asked.callback
         asked = nil
+        tellQuestion()
         close()
         if callback then callback(index) end
         return
@@ -314,6 +322,7 @@ return {
             if given or asked then return false end
             askedSerial = askedSerial + 1
             asked = { box = { serial = -askedSerial, lua = true, title = '', body = text, buttons = buttons }, callback = callback }
+            tellQuestion()
             return true
         end,
     },
@@ -322,6 +331,7 @@ return {
             if given then return end
             -- The script says every frame that it draws the boxes: a script that is gone stops being asked
             messagebox.claim(true)
+            if asked then tellQuestion() end
             local box = asked and asked.box or messagebox.current()
             -- A box that the window manager has made its own window for (it opened before the claim, or the claim ran
             -- out) is that window's: it is not drawn a second time

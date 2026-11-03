@@ -52,6 +52,13 @@ namespace OFLua
             if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
                 scripts->setMessagesDrawnByLua(drawn);
         };
+        // A screen of Lua has a question open in a box of its own (the engine has none open for it): the keys and
+        // buttons of the game are not carried out under it, as under a box of the game. Said every frame while it is
+        // open; one that is a second old is gone.
+        api["setQuestion"] = [](bool open) {
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                scripts->setLuaQuestion(open);
+        };
         // Picks a button of the box, as a click on it would (counted from 1); false when no box is open or it has no
         // such button
         api["press"] = [](int button) {
