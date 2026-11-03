@@ -453,6 +453,7 @@ namespace OFScript
         });
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
+        mItemUse.setFighting([this](FalloutScript::FormId actor) { return mCombat.inCombat(actor); });
         // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
         // item does it, and what an ability or a disease changes stays until it is taken away
         mItemUse.setEffectListener(
@@ -662,7 +663,6 @@ namespace OFScript
             // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
-            mBookScreen.reset();
             mLockExperienceGiven.clear();
             mLockBroken.clear();
             mTerminal.reset();
@@ -692,6 +692,7 @@ namespace OFScript
             mCaravan.reset();
         }
         mCasinoLedger.reset();
+        mCaravanRecord.reset();
         mPerks.clear();
         mItemUse.clear();
         mPerkOwners.clear();
@@ -2231,7 +2232,8 @@ namespace OFScript
         FalloutScript::ItemInfo info;
         if (!itemInfo(form, info))
             return false;
-        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1));
+        // A weapon or armor lying in the world is as worn as it was when it was dropped (or placed)
+        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1), mReferenceState.condition(reference));
         setDisabled(reference, true);
         return true;
     }

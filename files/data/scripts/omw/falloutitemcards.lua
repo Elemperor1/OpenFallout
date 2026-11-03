@@ -28,7 +28,9 @@ end
 -- stack, the threshold of armor and the pellets of a shot; Fallout 3 tells those of one.
 local function cardsOf(item, nv)
     local list = {}
-    local function add(card, value, title) list[#list + 1] = { card = card, value = value, title = title } end
+    local function add(card, value, title, meter)
+        list[#list + 1] = { card = card, value = value, title = title, meter = meter }
+    end
     local one = item.cardWeight and item.cardWeight > 0 and item.cardWeight or item.weight or 0
     local function weight()
         if nv then
@@ -40,6 +42,12 @@ local function cardsOf(item, nv)
     end
     local function value()
         add('ValueInfo', amount(nv and item.value * item.count or math.ceil(item.value)))
+    end
+    -- A weapon and a piece of armor have a condition, shown as a bar (the file's meter takes a value from 0 to 1)
+    local function condition()
+        if item.hasCondition then
+            add('ConditionInfo', '', nil, math.max(0, math.min(1, (item.condition or 1000) / 1000)))
+        end
     end
     if item.category == 'weapons' then
         local damage = item.cardDamage and item.cardDamage > 0 and item.cardDamage or item.damage or 0
@@ -56,6 +64,7 @@ local function cardsOf(item, nv)
                 or item.ammoName
         end
         add('AmmoInfo', ammo, word('sInventoryAmmo', 'AMMO'))
+        condition()
     elseif item.category == 'apparel' then
         if item.rating > 0 or item.threshold > 0 then
             add('DamageResistInfo', string.format('%d', math.floor(item.rating)))
@@ -65,6 +74,7 @@ local function cardsOf(item, nv)
         end
         weight()
         value()
+        condition()
     else
         weight()
         value()
@@ -88,6 +98,8 @@ function module.show(shown, item)
                 if card then
                     shown:set(name, '_Value', card.value)
                     if card.title then shown:set(name, '_Title', card.title) end
+                    -- The condition is a bar: the meter of the card reads the fifth user trait
+                    if card.meter then shown:set(name, 'user5', card.meter) end
                     -- The file hides some cards by their alpha (the damage, the strength needed) until the code shows them
                     shown:set(name, 'alpha', 255)
                 end

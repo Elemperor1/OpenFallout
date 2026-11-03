@@ -657,8 +657,17 @@ local function refreshFromFile(dt)
     return true
 end
 
+-- Whether the box with the name of the aimed object (the old display's) was turned off for the display from the file
+local worldTooltipOff = nil
+
 local function refresh(dt)
-    if refreshFromFile(dt) then return end
+    local fromFile = refreshFromFile(dt)
+    -- The display from the file has its own text for the aimed object (Info); the stand-in has none and keeps the box
+    if fromFile ~= worldTooltipOff then
+        worldTooltipOff = fromFile
+        hud.setWorldTooltip(not fromFile)
+    end
+    if fromFile then return end
     local state = current(dt)
     if same(state, shown) then
         return

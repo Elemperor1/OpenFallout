@@ -1640,12 +1640,21 @@
 -- @return #list<#table>
 
 ---
--- The names of the regions the player came into since this was last called, oldest first, for the line over the compass. The
--- player's region is looked for when the player's cell is another one (and once after a game was begun or loaded), as the
--- games do it; a building, a place that no region covers and a region without a name give nothing, and neither does the region
--- that was shown last.
+-- Whether the name box over the object that the player aims at (the old display's, drawn at the top of the screen when
+-- no window is open) is shown. The display that is drawn from the game's own menu file has its own text for the object
+-- (the `Info` tile) and turns the box off; it is on again for the stand-in display.
+-- @function [parent=#Hud] setWorldTooltip
+-- @param #boolean show
+
+---
+-- What the line over the compass is told since this was last called, oldest first. Each row has `name` and `cell`: `cell` is
+-- false for the name of a region the player came into (looked for when the player's cell is another one, and once after a game
+-- was begun or loaded, as the games do it; a building, a place that no region covers and a region without a name give nothing,
+-- and neither does the region that was shown last), true for the name of the world space of the outside that the player was
+-- placed in by a door, a teleport or a load (not for the step to the next cell of the outside, and nothing for a building, as
+-- in the executable; a world space without a name gives nothing).
 -- @function [parent=#Hud] takeRegions
--- @return #list<#string>
+-- @return #list<#table>
 
 ---
 -- The texts of the quests since this was last called, oldest first, for the block of the display that writes a heading over
@@ -1996,13 +2005,15 @@
 -- the four stages of a match. The money moves when the match is over. Everything counts from 1: the caravans (the player's
 -- are 1 to 3, the opponent's 4 to 6, and the player's n faces 7 - n), their rows (up to 7), the cards of the hand (up to 8)
 -- and the cards the player owns. A card is its `value` (1 to 10, 12 Jack, 13 Queen, 14 King, 15 Joker) and its `suit`
--- (1 to 4, 5 for the Joker).
+-- (1 hearts, 2 spades, 3 diamonds, 4 clubs, 5 for the Joker: the first of the two numbers of the card record, Mac round 12AV); and its `face`, the texture of the card's record that is its picture, under Textures).
 
 ---
 -- Where the match is: the `stage` ("bet", "deck", "game" or "results"), the `opponent`'s name, the stake (`funds` the
 -- player has, the `ante` the opponent asks, the `bet` the player puts up, the `ceiling` the opponent follows a raise to,
 -- `mostRaise`, the `pot`, `canMatch` and `canAccept`), the deck (`inDeck`, `owned` and `canPlay`: 30 cards or more) and,
--- when the match is over, `won` and `forfeited`. `serial` is another for each match.
+-- when the match is over, `won` and `forfeited`. `serial` is another for each match. What the player has won and lost at
+-- Caravan in all (with the match that is over) is `moneyWon`, `moneyLost`, `gamesWon`, `gamesLost` and `biggestAnte` (the
+-- biggest pot won), for the result screen.
 -- @function [parent=#Caravan] screen
 -- @return #table Nil when no match is open.
 
@@ -2278,29 +2289,6 @@
 -- @function [parent=#Interact] closeLock
 
 ---
--- The book or scroll the player activated where it lies (the screen of a book, with its Take button).
--- @function [parent=#Interact] book
--- @return #InteractBook Nothing when none is open.
-
----
--- @type InteractBook
--- @field #string reference The form id of the book's reference.
--- @field #string name
--- @field #string text The words of the book, with marks (`<BR>`, `<FONT>`, `<IMG>`...) and names of settings (`&sName;`).
--- @field #boolean scroll Whether it is a scroll and not a book.
--- @field #boolean canTake Whether the player may take it from where it lies.
--- @field #number serial Another for each time one is opened.
-
----
--- Closes the screen of the book that lies in the world.
--- @function [parent=#Interact] closeBook
-
----
--- The player takes the book that is open from where it lies: it goes to the inventory and the screen closes.
--- @function [parent=#Interact] takeBook
--- @return #boolean False when none is open or it may not be taken.
-
----
 -- The number of the terminal that is open, 0 for none. It changes with everything the screen of the terminal shows.
 -- @function [parent=#Interact] terminalSerial
 -- @return #number
@@ -2570,7 +2558,13 @@
 
 ---
 -- @type PipboyItem
--- @field #string id
+-- @field #string id The id of the row: the form, and for a row of the copies of a weapon or armor that have one condition
+-- when the item has copies of more than one, "~" and that condition. The functions that take the id of a row (`use`,
+-- `drop`, `transfer`, the piles of a barter) take either kind; the form alone names no copy (the one that is on, else the
+-- best).
+-- @field #string form The form alone.
+-- @field #boolean hasCondition Weapons and armor: they have a condition.
+-- @field #number condition Their condition in tenths of a percent of the health (1000 is full).
 -- @field #string name
 -- @field #number count
 -- @field #number weight What one weighs.
@@ -2595,24 +2589,19 @@
 
 ---
 -- The player does with the item what it is for: wears, holds or takes off a weapon, armor or ammunition, uses up an aid
--- item, reads a book.
+-- item, reads a skill book (its points are given at once and it is used up, with a message and a sound; the game has no
+-- screen of a book for it).
 -- @function [parent=#Pipboy] use
 -- @param #string item
--- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened.
-
----
--- What a book or a scroll that the player carries says, for its screen.
--- @function [parent=#Pipboy] book
--- @param #string item
--- @return #table nil for an item that is no book; else a table with `name`, `text` (with marks and names of settings,
--- see @{#Interact.book}), `scroll` (a scroll and not a book) and `canTake`.
+-- @return #string "equipped", "unequipped", "used" or "read"; "" when nothing happened (a book that is no skill book, or
+-- that cannot be read now, does nothing).
 
 ---
 -- A page of the help manual or a hint of the game.
 -- @type HelpPage
 -- @field #string id The editor id of the message that holds it.
 -- @field #string title Its title.
--- @field #string text Its words: marked up text when it begins with `<` (see @{#Interact.book}), with names of settings.
+-- @field #string text Its words: marked up text when it begins with `<` (`<BR>`, `<FONT>`, `<IMG>`...), with names of settings (`&sName;`).
 
 ---
 -- The pages of the help manual: the messages of the form list `HelpManual` (`HelpManualXBox` when `pad` is true), in the

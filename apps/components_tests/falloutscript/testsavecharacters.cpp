@@ -453,6 +453,74 @@ namespace
         bool baseFormOf(FormId, FormId&) override { return false; }
     };
 
+    TEST(FalloutScriptSaveCharactersTest, the_condition_of_what_a_character_carries_and_wears_comes_back)
+    {
+        Records records;
+        Locks locks;
+        ReferenceState references(locks);
+        ReferenceState otherReferences(locks);
+        references.setCondition(cube, 120);
+        ActorState state(records);
+        Equipment equipment(records, state);
+        state.addItem(guard, pistol, 1);
+        state.addItem(guard, pistol, 2, 350);
+        state.addItem(guard, vest, 1, 600);
+        EXPECT_EQ(equipment.equip(guard, pistol, 350), Equipment::Outcome::Equipped);
+        EXPECT_EQ(equipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        EXPECT_TRUE(equipment.setEquippedCondition(guard, pistol, 340));
+
+        SaveWriter items;
+        FalloutScript::writeActors(state, items);
+        SaveWriter worn;
+        FalloutScript::writeEquipment(equipment, worn);
+        SaveWriter wear;
+        FalloutScript::writeItemWear(state, equipment, references, wear);
+
+        ActorState otherState(records);
+        Equipment loaded(records, otherState);
+        SaveReader itemsIn(items.bytes());
+        FalloutScript::readActors(otherState, itemsIn, 1);
+        SaveReader wornIn(worn.bytes());
+        FalloutScript::readEquipment(loaded, wornIn, 1);
+        SaveReader wearIn(wear.bytes());
+        FalloutScript::readItemWear(otherState, loaded, otherReferences, wearIn, 1);
+        EXPECT_TRUE(wearIn.atEnd());
+        EXPECT_EQ(otherReferences.condition(cube), 120);
+        EXPECT_EQ(otherReferences.condition(door), 1000);
+        EXPECT_EQ(loaded.equippedCondition(guard, pistol), 340);
+        EXPECT_EQ(loaded.equippedCondition(guard, vest), 600);
+        const std::vector<ActorState::ConditionStack> stacks = otherState.conditions(guard, pistol);
+        ASSERT_EQ(stacks.size(), 3u);
+        EXPECT_EQ(stacks[0].mCondition, 1000);
+        EXPECT_EQ(stacks[1].mCondition, 350);
+        EXPECT_EQ(stacks[2].mCondition, 340);
+        SaveWriter again;
+        FalloutScript::writeItemWear(otherState, loaded, otherReferences, again);
+        EXPECT_EQ(again.bytes(), wear.bytes());
+    }
+
+    TEST(FalloutScriptSaveCharactersTest, a_save_with_no_wear_has_every_item_at_full_health)
+    {
+        Records records;
+        Locks locks;
+        ReferenceState references(locks);
+        ReferenceState otherReferences(locks);
+        ActorState state(records);
+        Equipment equipment(records, state);
+        state.addItem(guard, pistol, 2);
+        equipment.equip(guard, pistol);
+        SaveWriter wear;
+        FalloutScript::writeItemWear(state, equipment, references, wear);
+        ActorState otherState(records);
+        Equipment loaded(records, otherState);
+        otherState.addItem(guard, pistol, 2);
+        SaveReader in(wear.bytes());
+        FalloutScript::readItemWear(otherState, loaded, otherReferences, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        ASSERT_EQ(otherState.conditions(guard, pistol).size(), 1u);
+        EXPECT_EQ(otherState.conditions(guard, pistol).front().mCondition, 1000);
+    }
+
     TEST(FalloutScriptSaveCharactersTest, locks_destroyed_references_and_form_lists_come_back)
     {
         Locks locks;

@@ -124,6 +124,71 @@ namespace
         EXPECT_TRUE(setup.mEquipment.isEquipped(guard, rifle));
     }
 
+    TEST(FalloutScriptEquipmentTest, a_weapon_that_goes_on_is_the_best_copy_unless_a_copy_is_asked_for)
+    {
+        Wardrobe setup;
+        setup.mState.addItem(guard, pistol, 1, 400);
+        setup.mState.addItem(guard, pistol, 1, 700);
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 1000);
+        // Another copy in the hands is no change of what is held
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 400), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 400);
+        EXPECT_TRUE(setup.mEquipment.isEquipped(guard, pistol, 400));
+        EXPECT_FALSE(setup.mEquipment.isEquipped(guard, pistol, 700));
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::AlreadyEquipped);
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 400), Equipment::Outcome::AlreadyEquipped);
+        // A copy that the character does not have is not put on
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 550), Equipment::Outcome::NotCarried);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 400);
+        EXPECT_THAT(setup.mEquipment.takeChanges(), SizeIs(1));
+    }
+
+    TEST(FalloutScriptEquipmentTest, the_copy_that_is_on_wears_out_and_is_mended_in_its_holder_too)
+    {
+        Wardrobe setup;
+        setup.mEquipment.equip(guard, pistol);
+        EXPECT_TRUE(setup.mEquipment.setEquippedCondition(guard, pistol, 930));
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 930);
+        const std::vector<ActorState::ConditionStack> stacks = setup.mState.conditions(guard, pistol);
+        ASSERT_EQ(stacks.size(), 1u);
+        EXPECT_EQ(stacks[0].mCondition, 930);
+        EXPECT_TRUE(setup.mEquipment.setEquippedCondition(guard, pistol, 5000));
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 1000);
+        EXPECT_EQ(setup.mState.conditions(guard, pistol).front().mCondition, 1000);
+        // What is not on does not wear
+        EXPECT_FALSE(setup.mEquipment.setEquippedCondition(guard, rifle, 10));
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, rifle), -1);
+    }
+
+    TEST(FalloutScriptEquipmentTest, armor_keeps_the_condition_of_the_copy_that_is_worn)
+    {
+        Wardrobe setup;
+        setup.mState.addItem(guard, vest, 1, 250);
+        EXPECT_EQ(setup.mEquipment.equip(guard, vest, 250), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, vest), 250);
+        EXPECT_TRUE(setup.mEquipment.setEquippedCondition(guard, vest, 100));
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, vest), 100);
+        // The suit that covers the same place replaces it, and the vest is not worn with any condition any more
+        setup.mEquipment.equip(guard, armoredSuit);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, vest), -1);
+        setup.mEquipment.equip(guard, vest);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, vest), 1000);
+    }
+
+    TEST(FalloutScriptEquipmentTest, when_the_copy_that_is_on_is_taken_away_another_copy_is_on)
+    {
+        Wardrobe setup;
+        setup.mState.addItem(guard, pistol, 1, 400);
+        setup.mEquipment.equip(guard, pistol, 400);
+        // A script takes the copy that is on
+        EXPECT_EQ(setup.mState.removeItem(guard, pistol, 1, 400), 1);
+        EXPECT_EQ(setup.mEquipment.weapon(guard), pistol);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 1000);
+        EXPECT_EQ(setup.mState.removeItem(guard, pistol, 1, 1000), 1);
+        EXPECT_EQ(setup.mEquipment.weapon(guard), 0u);
+    }
+
     TEST(FalloutScriptEquipmentTest, ammunition_is_chosen_apart_from_the_weapon)
     {
         Wardrobe setup;

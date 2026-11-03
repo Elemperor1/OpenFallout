@@ -888,6 +888,12 @@ namespace OFScript
                 FalloutScript::readEquipment(mEquipment, in, version);
             });
         section(
+            "itemwear", FalloutScript::itemWearSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeItemWear(mActors, mEquipment, mReferenceState, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readItemWear(mActors, mEquipment, mReferenceState, in, version);
+            });
+        section(
             "actorvalues", FalloutScript::actorValuesSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActorValues(mActorValues, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
@@ -952,6 +958,12 @@ namespace OFScript
             [this](FalloutScript::SaveWriter& out) { FalloutScript::Casino::writeLedger(mCasinoLedger, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::Casino::readLedger(mCasinoLedger, in, version);
+            });
+        section(
+            "caravanrecord", FalloutScript::Casino::caravanRecordSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::Casino::writeCaravanRecord(mCaravanRecord, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::Casino::readCaravanRecord(mCaravanRecord, in, version);
             });
         section(
             "hotkeys", FalloutScript::hotKeysSectionVersion,

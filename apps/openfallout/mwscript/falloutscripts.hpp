@@ -297,6 +297,12 @@ namespace OFScript
             int mValue = 0;
             FalloutScript::Pipboy::ItemCategory mCategory = FalloutScript::Pipboy::ItemCategory::Misc;
             bool mEquipped = false;
+            /// A weapon or a piece of armor has a condition (tenths of a percent of its health). Copies with another
+            /// condition are rows of their own (mStack: the row is the copies at exactly that condition, and its id
+            /// tells so)
+            bool mHasCondition = false;
+            bool mStack = false;
+            int mCondition = 1000;
             /// A weapon: the damage of a blow of the record; armor: its rating and damage threshold
             double mDamage = 0;
             double mRating = 0;
@@ -413,14 +419,20 @@ namespace OFScript
         /// Spends the perk point on a perk the player is offered; false when it is not
         bool choosePerk(FalloutScript::FormId perk);
         /// The player does with the item what its kind asks (wear a weapon, armor or ammunition, or take it off again,
-        /// use up an aid item or read a book); the words that tell what happened, empty when nothing did
-        std::string useItemFromList(FalloutScript::FormId item);
-        /// The player puts items on the floor in front of it
-        int dropItem(FalloutScript::FormId item, int count);
+        /// use up an aid item or read a book); the words that tell what happened, empty when nothing did. A weapon or a
+        /// piece of armor is the copy at that condition (tenths of a percent of its health, as the list gives it).
+        /// A negative condition names no copy: the one that is on, else the best.
+        std::string useItemFromList(FalloutScript::FormId item, int condition = -1);
+        /// The player puts items on the floor in front of it (the copies at that condition, the best when none is
+        /// named)
+        int dropItem(FalloutScript::FormId item, int count, int condition = -1);
         /// The most objects one drop makes (each is an object of its own in the world)
         static constexpr int sDropLimit = 10;
-        /// Items go from one holder to another (a container); the count that moved
-        int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count);
+        /// Items go from one holder to another (a container); the count that moved. The copies at that condition go; a
+        /// negative condition moves copies in the order the holder gives them up (the full ones first), each with the
+        /// condition it has.
+        int transferItems(FalloutScript::FormId from, FalloutScript::FormId to, FalloutScript::FormId item, int count,
+            int condition = -1);
         /// The player opens or closes a container, for the scripts that hear of it (OnOpen, OnClose)
         void containerOpened(FalloutScript::FormId container, bool opened);
         /// The player activates a container or a character that is dead: its things can be taken. False when the
@@ -620,6 +632,8 @@ namespace OFScript
             int mSuit = 0;
             std::string mName;
             bool mInDeck = false;
+            /// The face of the card: the texture of its record (TX00), as the record writes it, under Textures
+            std::string mFace;
         };
         /// Where the match is: the stage, who plays, the money and the deck
         struct CaravanScreen
@@ -644,6 +658,8 @@ namespace OFScript
             /// The result, when the match is over
             bool mWon = false;
             bool mForfeited = false;
+            /// What the player has won and lost at Caravan in all (with this match), for the result screen
+            FalloutScript::Casino::CaravanTotals mTotals;
         };
         /// The player sits down to play the opponent (the reference the script is called on) with the deck record and
         /// the kind of opponent (0 and 1 are what the game has) and the share of its money it opens with. Nothing
@@ -666,6 +682,8 @@ namespace OFScript
         {
             int mValue = 0;
             int mSuit = 0;
+            /// The face of the card (see CaravanCardView::mFace)
+            std::string mFace;
         };
         struct CaravanBoardTrack
         {
@@ -751,18 +769,6 @@ namespace OFScript
         std::string pickLock();
         void closeLockScreen();
 
-        /// What a book or a scroll says, for the screen that shows it: its name and its words (the setting names in
-        /// them, `&sName;`, are for the screen to fill in), whether it is a scroll and not a book, and whether the
-        /// player may take it from where it lies. Nothing for an item that is no book.
-        struct BookText
-        {
-            std::string mName;
-            std::string mText;
-            bool mScroll = false;
-            bool mCanTake = true;
-        };
-        std::optional<BookText> bookText(FalloutScript::FormId item);
-
         /// A page of the help manual or a hint of the game: the editor id of the message that holds it, its title and
         /// its words (the marked up text of a message, `&sName;` for the words of game settings)
         struct HelpPage
@@ -776,23 +782,6 @@ namespace OFScript
         std::vector<HelpPage> helpManual(bool pad);
         /// The message of a hint by its editor id (`HelpCrafting`), nothing when there is none
         std::optional<HelpPage> helpMessage(std::string_view editorId);
-        /// The player activates a book or a scroll that lies in the world: its screen opens, and the activation stops
-        /// there until the player takes it or puts it down. False for an object that is no book, or an actor that is
-        /// not the player (a character takes it as any item).
-        bool openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
-        /// The book that the player has open from the world: where it lies, what it says, and a number that is another
-        /// for each time one opens
-        struct BookScreen
-        {
-            FalloutScript::FormId mReference = 0;
-            BookText mBook;
-            int mSerial = 0;
-        };
-        std::optional<BookScreen> bookScreen();
-        void closeBookScreen();
-        /// The player takes the book that is open from where it lies (it goes to the inventory, and the screen closes);
-        /// false when none is open or it may not be taken
-        bool takeBookScreen();
 
         /// The player activates a terminal: it opens, or the game of hacking starts when it is closed and the player
         /// has not got its password. False for an object that is no terminal.
@@ -1127,7 +1116,14 @@ namespace OFScript
         /// What the vendor sells (`vendorSide`) or what the player carries, as the menu lists it
         std::vector<BarterRow> barterRows(bool vendorSide);
         /// What is picked out to buy or to sell: the item and how many
-        using BarterPiles = std::vector<std::pair<FalloutScript::FormId, int>>;
+        struct BarterPick
+        {
+            FalloutScript::FormId mItem = 0;
+            int mCount = 0;
+            /// The copies at that condition (tenths of a percent of the health); negative: the best ones
+            int mCondition = -1;
+        };
+        using BarterPiles = std::vector<BarterPick>;
         /// What the menu shows for the two piles: the balance (what the vendor owes the player is plus), the caps that
         /// would move, whether the Accept button works, the caps each side has and the holder of the vendor's things
         struct BarterQuote
@@ -1306,9 +1302,17 @@ namespace OFScript
         /// What the quests and the finding of places tell the display: the quest that was added, completed or failed, the
         /// place that was found, and the lines of the objectives
         FalloutScript::Hud::QuestTextLine& hudQuestText() { return mHudQuestText; }
-        /// The names of the regions the player came into since this was last called, for the display (a name or none:
-        /// it is looked for when the player's cell is another one). Lua thread.
-        std::vector<std::string> takeRegionNames();
+        /// What the line over the compass is told since this was last called, for the display: the name of the region
+        /// the player came into, and, when the cell the player came to is not the next one of the outside (a door, a
+        /// teleport, a load) and is in the outside, the name of its world space (FalloutNV.exe 0x7728F0 and 0x772C30). It is
+        /// looked for when the player's cell is another one. Lua thread.
+        struct RegionEvent
+        {
+            std::string mName;
+            /// The name of the world space after a placement in the outside (else the name of a region)
+            bool mCell = false;
+        };
+        std::vector<RegionEvent> takeRegionEvents();
         /// What the meters of the display that are not the player's stats show
         struct HudStatus
         {
@@ -2340,6 +2344,9 @@ namespace OFScript
         };
         std::mutex mCaravanMutex;
         std::optional<CaravanSession> mCaravan;
+        FalloutScript::Casino::CaravanRecord mCaravanRecord;
+        /// The face texture that the record of a card names (empty for a form that is not a card)
+        std::string caravanFace(FalloutScript::FormId card) const;
         int mCaravanSerial = 0;
         std::mt19937 mCaravanRandom{ std::random_device()() };
         /// The match is over: the pot is paid, in caravan money first and then in caps, by the side that lost
@@ -2349,8 +2356,6 @@ namespace OFScript
         std::mutex mInteractionMutex;
         std::optional<LockScreen> mLockScreen;
         int mLockSerial = 0;
-        std::optional<BookScreen> mBookScreen;
-        int mBookSerial = 0;
         /// The locks that gave their experience, and those that forcing broke (kept for the run, not in saves)
         std::set<FalloutScript::FormId> mLockExperienceGiven;
         std::set<FalloutScript::FormId> mLockBroken;
@@ -2465,13 +2470,18 @@ namespace OFScript
         std::vector<FalloutScript::FormId> barterSources(FalloutScript::FormId vendor);
         /// How many of an item the vendor sells (its container's and its own, not what it wears), and the move of
         /// that many to a holder, taken from the container first; the number that moved
-        int barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item);
-        int barterMove(FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count);
+        int barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item, int condition = -1);
+        int barterMove(FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count,
+            int condition = -1);
+        /// A pile in which every pick names its condition: a pick that named none takes the best copies there are
+        /// (what the vendor sells, or what the player carries), the next best for what is left
+        BarterPiles barterNamed(const BarterPiles& pile, bool buying);
         /// The value of an item record (0 for a form that is no item), the settings the prices go by and the price of
         /// one of an item for the player buying (or selling)
         int itemValue(FalloutScript::FormId item);
         FalloutScript::Barter::Settings barterSettings();
-        double barterPrice(const BarterMenu& menu, FalloutScript::FormId item, bool buying);
+        double barterPrice(const BarterMenu& menu, FalloutScript::FormId item, bool buying,
+            int condition = FalloutScript::ActorState::fullCondition);
         FalloutScript::CombatState mCombat;
         /// Whether the doors and switches are open, and the animations they play for it
         FalloutScript::OpenStates mOpenStates;
@@ -2508,6 +2518,11 @@ namespace OFScript
         FalloutScript::RegionLine::Announcer mRegionLine;
         ESM::RefId mRegionCell;
         bool mRegionCellKnown = false;
+        /// Where the cell of the last look was, to tell a step to the next cell of the outside from a transition
+        bool mRegionExterior = false;
+        ESM::RefId mRegionWorld;
+        int mRegionGridX = 0;
+        int mRegionGridY = 0;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
         /// Whether the log last said that the player sneaks (it says when that changes)

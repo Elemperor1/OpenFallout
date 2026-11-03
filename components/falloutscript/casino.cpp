@@ -147,8 +147,77 @@ namespace FalloutScript
     };
 }
 
+namespace FalloutScript
+{
+    template <>
+    struct SaveAccess<Casino::CaravanRecord>
+    {
+        static void write(Casino::CaravanRecord& record, SaveWriter& out)
+        {
+            const std::lock_guard lock(record.mMutex);
+            out.i32(record.mTotals.mMoneyWon);
+            out.i32(record.mTotals.mMoneyLost);
+            out.i32(record.mTotals.mGamesWon);
+            out.i32(record.mTotals.mGamesLost);
+            out.i32(record.mTotals.mBiggestAnte);
+        }
+
+        static void read(Casino::CaravanRecord& record, SaveReader& in, std::uint32_t)
+        {
+            Casino::CaravanTotals totals;
+            totals.mMoneyWon = std::max<std::int32_t>(in.i32(), 0);
+            totals.mMoneyLost = std::max<std::int32_t>(in.i32(), 0);
+            totals.mGamesWon = std::max<std::int32_t>(in.i32(), 0);
+            totals.mGamesLost = std::max<std::int32_t>(in.i32(), 0);
+            totals.mBiggestAnte = std::max<std::int32_t>(in.i32(), 0);
+            const std::lock_guard lock(record.mMutex);
+            record.mTotals = totals;
+        }
+    };
+}
+
 namespace FalloutScript::Casino
 {
+    CaravanTotals CaravanRecord::add(bool won, int pot)
+    {
+        const std::lock_guard lock(mMutex);
+        pot = std::max(pot, 0);
+        if (won)
+        {
+            mTotals.mMoneyWon += pot;
+            mTotals.mGamesWon += 1;
+            mTotals.mBiggestAnte = std::max(mTotals.mBiggestAnte, pot);
+        }
+        else
+        {
+            mTotals.mMoneyLost += pot;
+            mTotals.mGamesLost += 1;
+        }
+        return mTotals;
+    }
+
+    CaravanTotals CaravanRecord::totals() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mTotals;
+    }
+
+    void CaravanRecord::reset()
+    {
+        const std::lock_guard lock(mMutex);
+        mTotals = CaravanTotals();
+    }
+
+    void writeCaravanRecord(CaravanRecord& record, SaveWriter& out)
+    {
+        SaveAccess<CaravanRecord>::write(record, out);
+    }
+
+    void readCaravanRecord(CaravanRecord& record, SaveReader& in, std::uint32_t version)
+    {
+        SaveAccess<CaravanRecord>::read(record, in, version);
+    }
+
     int winningsLevel(int earnings, int maxWinnings)
     {
         int level = 0;

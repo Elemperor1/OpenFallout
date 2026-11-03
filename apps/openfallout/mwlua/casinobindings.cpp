@@ -332,6 +332,12 @@ namespace OFLua
             row["canPlay"] = screen->mCanPlay;
             row["won"] = screen->mWon;
             row["forfeited"] = screen->mForfeited;
+            // What the player has won and lost at Caravan in all (the result screen shows it)
+            row["moneyWon"] = screen->mTotals.mMoneyWon;
+            row["moneyLost"] = screen->mTotals.mMoneyLost;
+            row["gamesWon"] = screen->mTotals.mGamesWon;
+            row["gamesLost"] = screen->mTotals.mGamesLost;
+            row["biggestAnte"] = screen->mTotals.mBiggestAnte;
             return row;
         };
         caravan["match"] = []() { return scripts().caravanMatch(); };
@@ -349,6 +355,7 @@ namespace OFLua
                 row["suit"] = card.mSuit;
                 row["name"] = card.mName;
                 row["inDeck"] = card.mInDeck;
+                row["face"] = card.mFace;
                 rows[index++] = row;
             }
             return rows;
@@ -368,6 +375,7 @@ namespace OFLua
                 sol::table row(lua, sol::create);
                 row["value"] = card.mValue;
                 row["suit"] = card.mSuit;
+                row["face"] = card.mFace;
                 return row;
             };
             sol::table row(lua, sol::create);

@@ -83,8 +83,11 @@ the file's), puts the weight, health, resistance (Fallout 3) or threshold (New V
 headline, and the cards of the thing the pointer is on in the file's `item_stats_display`. A click on a thing uses it
 (puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
-than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
-yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
+than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. A weapon
+and a piece of armor have a condition (tenths of a percent of their health, 1000 is full): copies with another condition are
+rows of their own (the best first; the row id carries the condition after a `~`), the cards show the condition as the file's
+bar (`ConditionInfo`, its meter reads `user5`, 0 to 1), and use, drop, take and barter work on the copies of that row.
+Not there yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
 hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
 
 ### The stats page of the Pip-Boy
@@ -503,8 +506,9 @@ button 0x72f6f0, the price of one 0x72ed00).
   the armor the files keep from the player, as the Pip-Boy does. A buy is taken from the container first, then from the
   vendor; what the player sells and pays goes to the container (the vendor without one).
 - The price of one is `value * Base + Mult * (1 - Base) * value * c^Exp` with the settings `fItemConditionValueBase`, `Mult` and
-  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing the port keeps no condition for, which makes the base
-  value the value. Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
+  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing at full health (and for everything that has no
+  condition), which makes the base value the value, less for a worn weapon or piece of armor (the rows of the lists are per
+  condition, each with the price of its own). Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
   (1.55 at skill 0, 1.10 at 100) and `fBarterSellBase + skill * fBarterSellMult / 100` for what it sells (0.45 to 0.90), from
   the Barter skill read once when the menu opens. Then the percent of the script (a positive one is less to pay and more for
   what is sold), the perk entry point 0x11 (`EntryPoint::buyPrice`, with the vendor and the item as its context), and the
@@ -706,10 +710,23 @@ its older drawing for a data folder that lacks the file.
   that place or none and are not deleted, which a later one replaces when it has a weather entry and the first has none, or
   its override is set and the first's is not, or the overrides are the same and its priority is higher. In a building the
   region is left as it was and nothing is shown; a place that no region covers, or a region with no name, shows nothing
-  and is forgotten as the one shown last (coming back to the one before shows it again). The name fades in over 2 s once the
-  tile is on the screen, stays until 4 s after it began and fades out over 2 s; the same name that is still on the screen is not
-  shown again. `FalloutScript::RegionLine` is the rule, `FalloutScripts::takeRegionNames` looks at the player's cell,
-  `core.hud.takeRegions` gives the names.
+  and is forgotten as the one shown last (coming back to the one before shows it again). What the executable does with the
+  name (Mac round 12AV S1): a region name is only written to the line (and its hold flag cleared) when the line is not on the
+  screen (alpha 0) or has the same text, and fades in from nothing over 2 s, the old text gone, only when the line is on the
+  screen with another text; the line that normally fades in is the name of the world space (its `FULL`) that the player is
+  placed in, at the end of every placement of the player (a door, fast travel, a script's MoveTo, the console's COC, a load, the
+  push back at the border: the one caller 0x93CC9A of 0x772C30, Mac round 12AW S10; the argument is NULL for a building, so a
+  building has no such line, and a new game of both games starts in a building), which is written with the hold flag set (so a
+  region that comes in the same change of cell is overwritten by it); the name of the exterior cell itself is never used and starts its fade in once the tile is shown by the mode of the
+  game (bit 0x20 of the mode mask) and the second line is idle. The fade out begins in the first update more than 4 s after the
+  start of the fade in, from the alpha it has then, and takes 2 s; the text stays on the tile. The text tile is always visible
+  and only its alpha is animated (target 255 times `fHudOpacity:Interface`; the port uses 255); the tile `Region_Location`
+  follows the mode. `FalloutScript::RegionLine` is the rule for the regions, `FalloutScripts::takeRegionEvents` looks at the
+  player's cell (a step to a cell next to the last in the same world space is not a placement; the port cannot tell the
+  executable's placements apart further, and the push back at the border is not made), `core.hud.takeRegions` gives the rows
+  `{ name, cell }` (`cell` is true for the name of the world space). The default of `fHudOpacity:Interface` is 1.0 (it is in no
+  .ini of the games; Mac round 12AW S10), so the target alpha 255 is what the games have until the player changes the option.
+  Not checked in `Fallout3.exe`: the rule for the name of the world space.
 - The quest text (`QuestReminder`, Mac round 12AR C1, FalloutNV.exe 0x77A650, 0x77B430 and 0x77C170): the block is 400 by 200,
   15 in from the safe zone and 170 under its top edge; `QuestAdded` (80 down) and `QuestStages` (40 down) are in it.
   *An event* (a quest was added, completed or failed, a place was found: `kind` 0 to 3 of `core.hud.takeQuestText`) writes the
@@ -736,9 +753,11 @@ its older drawing for a data folder that lacks the file.
 roll with a scrollbar). The file turns the pages itself: the number of the left page counts the clicks of the arrows
 (`_pagenum`), and the text tiles ask for `pagenum`. What the code puts in the menu is three traits of the menu itself:
 `user0` (a book, not a scroll), `user2` (the words) and `user3` (it can be taken); the page width (`user4`) and the font
-(`user5`) the file has. `falloutbook.lua` does that and wires the buttons; the words come from the record of the book
-(`core.pipboy.book` for what the player carries, `core.interact.book` for one that lies in the world, which has the
-Take button: the activation of a book in the world opens this screen in place of picking it up).
+(`user5`) the file has. `falloutbook.lua` does that and wires the buttons. **Nothing in play opens this screen** (Mac
+round 12AV S3): the executable's only way to the function that makes it is the console (the command parser that also has
+`use workbook`), a book that the player reads from the Pip-Boy has no screen and the Pip-Boy stays as it is, and a book that
+lies in the world is picked up as any other item (the activation of a book is the generic one of an item that goes into
+the pack). The port opens it from no place; the module stays for a console command.
 
 The words are laid out by the menu engine (`components/falloutmenu/richtext.cpp`) for a text tile that says `ishtml`;
 the executable's text engine is shared with the notes of the terminals:
@@ -762,12 +781,18 @@ takes 1 to 8 (the font files `sFontFile_1` to `sFontFile_8`; a face given by nam
 source was not found). `DIV ALIGN` takes LEFT, CENTER and RIGHT and the executable has no closing tag for it (the port ends
 it at `/DIV`, and whether the executable applies it at all is not proven). `IMG` takes `SRC`, `WIDTH` and `HEIGHT` as whole
 numbers; where the picture stands, its line height and the path rule were not found. The colour of plain text was not read.
-A skill book gives its points when the player reads it from the Pip-Boy (the executable's function that puts an item on does
-it: the book must be the player's, the skill below 200, the points `fBookPerkBonus` adjusted by the perk entry point 11, the
-message `sSkillIncreasedNum`, and the book is removed), not when its screen is left, and the screen of a book that lies in the
-world (Take and Exit) runs no skill code, so such a book gives nothing until it is read from the Pip-Boy. The Pip-Boy shows
-the words as the points are given. The keys of the screen on the PC were not read (here: the arrows, the pages and the wheel;
-Escape or Backspace leave; T takes).
+The keys the screen has in the console case: Space closes it (the Escape key and the Pip-Boy key do not), a click on the exit
+tile closes it and a click on the take tile (id 32) puts the book in the pack and closes it; the wheel turns the pages by two
+(a scroll scrolls). The screen plays no sound of its own except the page turn from the menu sound table (opening and leaving
+are silent).
+
+**Reading a skill book** (the use function of the actor, `0x515040`, read in round 12AV S3; `ItemUse` does it): the reader must
+be the player (for anyone else nothing happens); in combat the player is refused with the message `sCanNotReadBook` and the
+book stays; the points are the setting `fBookPerkBonus` changed by the perk entry point 11 and are added to the skill for good;
+the message is `sSkillIncreasedNum` with the name of the skill and the points as a whole number, the sound is
+`UIItemGenericUp`, the Books Read count of the Pip-Boy goes up by one, and the book is removed at once. A book with no skill
+(a plain book) does nothing when it is used, with no message and no count; only the sound of the item plays. A skill of 200
+or more turns the book away with no message (the value is read as 100 at most, so this never happens in the port).
 
 ### The help manual (Mac round 12AN B3, FalloutNV.exe)
 
@@ -993,18 +1018,45 @@ is its caps and its caravan money (form type 0x74, read as the kind of `CMNY`) a
 item in the order of the pack (here: of the forms) and then the rest in caps. Nothing moves until the match is over, and a match
 that the player leaves is a forfeit, which is a loss.
 
-`falloutcaravan.lua` draws the four screens. The stake is the game's `caravan_bet_menu.xml` (the two antes, the funds, Auto-Match, Raise
-with the quantity prompt, Accept, Exit); the deck is `caravan_builddeck_menu.xml` (the counts, the two lists, Add, Remove, Play
-Caravan) with plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
-move, the wheel to scroll, Enter to add or remove, R for a random deck of the executable's size, the pad's shoulders for the lists).
-The files of the match and of the result have no controls ("all controls will be handled in code"), so the match is tiles too: the
-caravans as columns (the opponent's above the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card
-picked up by a click and put on a caravan by a click on it, the totals coloured by sold, over or not yet, Discard Card, Discard
-Caravan and Forfeit (asked twice). The opponent moves after a second, its card lights the row it went on, and the result comes two
-seconds after the match ends. Seen only in the offline harness with a made-up engine (`caravan.lua`), not in the running game. Not
-made: the 3D table, deck strips and hands (the scenes catalogued in 12AS E2), the pictures of the cards, the sounds, the Pip-Boy
-statistics of the matches (their numbers were not read), the executable's words for the match tiles, the card suits' letters (the
-order of the suits was not read) and the confirmation the game asks before a forfeit by Escape.
+`falloutcaravan.lua` draws the four screens from the files of the folder `Menus\Prefabs` (the executable's include handler reads
+`<include src>` from there, `FalloutNV.exe` 0xA02D40, and the four files of the same names next to `caravan_menu.xml` have no
+controls: the loader reads a file of the prefabs folder before one of the menu's own folder, Mac round 12AV S2). Every label is
+a game setting, which the file names (`&-sName;`) and the executable writes itself: stake `sAutoMatchText`, `sRaiseText`,
+`sAcceptText`, `sExit`, `sCurrentAnteText`, `sTotalFundsText`; deck `sAddText`, `sRemoveText`, `sPlayCaravanText`, `sAllCardsText`,
+`sNavigateText`, a title `sCaravanDeckText` and the button of the right bumper written as `sRSMRandomize` and `sCaravanDeckText`
+with a space; match `sSelectCardText`, `sDiscardCardText`, `sDiscardTrackText`, the give-up button `sCancel` (the file says
+`sForfeitGameText`, the code writes `sBack` and then `sCancel` over it), `sAntePotText`, `sNetTotalText`, `sWinLossText`; result
+`sCaravanYouWinText` or `sCaravanYouLoseText` and later `sCaravanPressAnyKeyText`, `sCaravanWinningsText`, `sCaravanLossesText`,
+`sCaravanWinLossText`, `sCaravanBiggestAnteText`; the question `sQuitCaravanText` with `sYes` and `sNo`. The keys (the executable's key
+handler, 0x749360, reads the letters in both cases; the files name the same letters on their buttons): stake W Auto-Match, A Raise,
+F Accept, R Exit; deck W Add, A Remove, F Play Caravan, R leaves at once; match W Select Card, Q Discard Card, E Discard Caravan, R
+Cancel; any key on the result closes it. Escape is not handled by the Caravan code. R on the match puts a picked card back and asks
+nothing; with nothing picked it asks the one question, and Yes is a loss with the pot paid. The pad (the files' buttons, but A, which
+the engine clicks with): the stake X Raise, Y Accept, B Exit; the deck the right bumper for the button of the deck, X Remove, Y Play
+Caravan, the D-pad for the cursor (Add is A on the file); the match the bumpers for the triggers (Discard Card, Discard Caravan).
+The deck has plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
+move, the wheel to scroll, Enter to add or remove). The button of the deck is a button that says "Randomize" and the word of the
+deck; it makes a deck of the executable's size, which is read from its label (what the executable does with it, and what the S key
+does on the deck screen, were not read). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
+the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card picked up by a click (or W) and put on a
+caravan by a click on it, the totals coloured by sold, over or not yet; the file's counts of the corner show the pot, the net
+caps won at Caravan in all and the matches won over lost (what the last two hold is guessed from their names and the result
+screen: the code was not read), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
+opponent moves after a second, its card lights the row it went on, and the result comes two seconds after the match ends. The
+suit numbers of the card records are 1 hearts, 2 spades, 3 diamonds, 4 clubs and 5 the Joker, the values 1 to 10, 12 Jack, 13
+Queen, 14 King and 15 Joker (no 11); the face of a card is the record's `TX00` texture
+(`terminals\NV_PlayingCards\Deck<X>\card<X>_<suit letter>NN.dds`, five art sets B, G, L, T and U) and the back is `TX01`; the
+code never works an image out from suit and value. The cards of the deck screen and of the hand are drawn with that texture (the
+slot has the record's picture over its tile; `core.casino.caravan.cards()` and `board()` give it as `face`); the strips of the
+caravans on the board have the words of the card (rank and suit letter) because the strips of the game are partly covered 3D cards.
+Each match adds one to the Pip-Boy statistic "Caravan games won" (0x25) or
+"lost" (0x26) and to the player's own totals (caps won, caps lost, matches won, matches lost, the biggest pot won), which the result
+screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). Seen only in the offline harness with a made-up
+engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
+E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
+`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, the text the executable writes into the title of the
+opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B, which leave at once and
+forfeit without the question.
 
 ### The loading screen (Mac round 12AR C2, FalloutNV.exe 0x788CC0 and the functions around it)
 

@@ -118,6 +118,21 @@ namespace
         EXPECT_TRUE(f.mLoader->problems().empty());
     }
 
+    TEST(FalloutMenuLoaderTest, an_include_is_read_from_the_prefabs_folder_before_the_folder_of_the_menu)
+    {
+        // The four Caravan files are in both folders and only those of the prefabs have controls
+        Fixture f;
+        f.mFiles["menus/box.xml"] = "<width> 1 </width>";
+        f.mFiles["menus/prefabs/box.xml"] = "<width> 5 </width>";
+        f.mFiles["menus/only_beside.xml"] = "<height> 4 </height>";
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"A\"><include src=\"box.xml\"/></rect>"
+            "<rect name=\"B\"><include src=\"only_beside.xml\"/></rect></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "A", "width"), 5.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "B", "height"), 4.f);
+        EXPECT_TRUE(f.mLoader->problems().empty());
+    }
+
     TEST(FalloutMenuLoaderTest, an_include_that_is_not_there_is_told_and_does_not_stop_the_menu)
     {
         Fixture f;

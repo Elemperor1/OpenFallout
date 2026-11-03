@@ -66,6 +66,12 @@ namespace FalloutScript
         mBookPoints = points;
     }
 
+    void ItemUse::setFighting(std::function<bool(FormId)> fighting)
+    {
+        const std::lock_guard lock(mMutex);
+        mFighting = std::move(fighting);
+    }
+
     void ItemUse::setChemDurationNeedsAddiction(bool needsAddiction)
     {
         const std::lock_guard lock(mMutex);
@@ -228,6 +234,7 @@ namespace FalloutScript
 
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
         std::function<void(FormId, FormId, FormId, double)> listener;
+        std::function<bool(FormId)> fighting;
         PerkEngine* perks = nullptr;
         double bookPoints = 1;
         bool durationNeedsAddiction = false;
@@ -236,6 +243,7 @@ namespace FalloutScript
             const std::lock_guard lock(mMutex);
             check = mConditions;
             listener = mEffectListener;
+            fighting = mFighting;
             perks = mPerks;
             bookPoints = mBookPoints;
             durationNeedsAddiction = mChemDurationNeedsAddiction;
@@ -321,15 +329,23 @@ namespace FalloutScript
         BookInfo book;
         if (mRecords.book(item, book))
         {
-            result.mSkill = book.mSkill;
+            // The executable's use function reads a book only for the player (Mac round 12AV S3, 0x515040): nothing
+            // happens for anyone else, and nothing is counted for a book without a skill
+            if (!counts || mState.itemCount(actor, item) < 1)
+                return result;
             if (book.mSkill < 0 || !ActorValues::isValid(book.mSkill))
             {
-                // A book to read stays with its owner
+                // A book to read stays with its owner and does nothing
                 result.mOutcome = Outcome::Read;
-                if (counts)
-                    mProgress.modifyMiscStat(statBooksRead, 1);
                 return result;
             }
+            // A fight stops the reading: the book stays
+            if (fighting && fighting(actor))
+            {
+                result.mOutcome = Outcome::Refused;
+                return result;
+            }
+            result.mSkill = book.mSkill;
             // Two books read at the same time add up: the skill is read, raised and written by one at a time
             const std::lock_guard reading(mBookMutex);
             const double skill = mValues.base(actor, book.mSkill);
@@ -343,8 +359,8 @@ namespace FalloutScript
             mValues.setBase(actor, book.mSkill, skill + gained);
             result.mOutcome = Outcome::Read;
             result.mGained = gained;
-            if (counts)
-                mProgress.modifyMiscStat(statBooksRead, 1);
+            // Only a skill book that was read counts as a book read
+            mProgress.modifyMiscStat(statBooksRead, 1);
         }
         return result;
     }

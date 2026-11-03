@@ -2,13 +2,20 @@
 -- this script draws the four screens of the game's CaravanMenu (caravan_menu.xml, which includes caravan_bet_menu.xml,
 -- caravan_builddeck_menu.xml, caravan_game_menu.xml and caravan_results_menu.xml): the stake, the deck, the match and its result.
 --
--- The stake is the game's own file: the opponent's ante, the player's ante and funds, and the buttons Auto-Match, Raise (the
--- quantity prompt, as the game asks "how many") and Accept. The file of the deck gives the two counts, the two buttons that pick
--- the list (the caravan deck above, all the cards below) and Add, Remove and Play Caravan; its cards are 3D in the game and plain
--- tiles here. The files of the match and of the result hold nothing ("all controls will be handled in code"), so their controls
--- are the tiles of this script: the six caravans as columns of rows (the opponent's above the player's, the player's n under
--- the opponent's 7 - n), the eight cards of the hand below, the totals, and the buttons that throw a card or a caravan away and
--- give the match up. The words on the tiles of the match are not the game's: the executable's text for them was not read.
+-- The files are the ones of the folder Menus\Prefabs (the executable's include handler reads them from there; the four files of
+-- the same names next to caravan_menu.xml have no controls: Mac round 12AV S2). Every word of them is a game setting (the
+-- executable writes the same settings itself), and the keys are the letters the files name (_PCButtonText): the stake has W
+-- Auto-Match, A Raise, F Accept and R Exit, the deck W Add, A Remove and F Play Caravan (R leaves at once), the match W Select
+-- Card, Q Discard Card, E Discard Caravan and R Cancel, and a key on the result closes it.
+-- The stake is the game's own file: the opponent's ante, the player's ante and funds, and the buttons (Raise opens the quantity
+-- prompt, as the game asks "how many"). The file of the deck gives the two counts, the button that randomizes the deck and the
+-- label of the list of all the cards, Add, Remove and Play Caravan; its cards are 3D in the game and plain tiles here. The match
+-- file gives the three counts of the corner (the pot of the match, the net total won and the matches won over lost, which are
+-- the names' meaning, not read from the code) and the four buttons; the six caravans, their totals and the cards are 3D in the
+-- game and are plain tiles of this script: the caravans as columns of rows (the opponent's above the player's, the player's n
+-- under the opponent's 7 - n), the eight cards of the hand below. The result file has what the player has won and lost at
+-- Caravan in all and the words of the result. The words on the tiles of this script (the line that tells what the opponent did
+-- and the like) are not the game's: the executable has none that were read.
 local core = require('openfallout.core')
 local input = require('openfallout.input')
 local I = require('openfallout.interfaces')
@@ -26,7 +33,7 @@ end
 
 local caravan = casino.caravan
 local FILE = 'caravan_menu.xml'
-local RECTS = { bet = 'CBM_MainRect', deck = 'CDM_MainRect', game = 'CDG_MainRect', results = 'CDR_MainRect' }
+local RECTS = { bet = 'CBM_MainRect', deck = 'CDM_MainRect', game = 'CDG_MainRect', results = 'CRM_MainRect' }
 
 local FONT = 7
 local CARD_W, CARD_H = 72, 100
@@ -60,7 +67,6 @@ local lastWidth = nil
 -- The tiles that are made once, in the files' rects: the cards of the deck screen and of the match, the labels and the buttons
 local deckTiles = nil
 local gameTiles = nil
-local resultTiles = nil
 
 -- The deck screen: which list the cursor is in ('deck' or 'all'), where in each, and the first card of each that is shown
 local activeList = 'all'
@@ -68,17 +74,17 @@ local cursor = { deck = 1, all = 1 }
 local firstShown = { deck = 1, all = 1 }
 local deckIndexes = { deck = {}, all = {} }
 
--- The match: the card of the hand that is picked up, whether a caravan is to be thrown away, whether giving up is asked
--- for once already, the seconds the opponent waits, and what it did last (to light it)
+-- The match: the card of the hand that is picked up, whether a caravan is to be thrown away, the seconds the opponent
+-- waits, and what it did last (to light it)
 local pickedHand = nil
 local discarding = false
-local forfeitAsked = false
 local opponentWait = 0
 local lastMove = nil
 local markLeft = 0
 local statusText = ''
--- The seconds left before the result is shown
+-- The seconds left before the result is shown, and the seconds the result has been shown
 local resultIn = nil
+local resultAge = nil
 
 local function word(setting, fallback)
     local text = pipboy.text(setting)
@@ -105,9 +111,9 @@ local function destroyMenu()
         shown:close()
     end
     shown, drawn, lastWidth = nil, nil, nil
-    deckTiles, gameTiles, resultTiles = nil, nil, nil
+    deckTiles, gameTiles = nil, nil
     activeList, cursor, firstShown = 'all', { deck = 1, all = 1 }, { deck = 1, all = 1 }
-    pickedHand, discarding, forfeitAsked, lastMove, resultIn = nil, false, false, nil, nil
+    pickedHand, discarding, lastMove, resultIn, resultAge = nil, false, nil, nil, nil
     opponentWait, markLeft, statusText = 0, 0, ''
 end
 
@@ -194,11 +200,24 @@ local function setColor(tile, color)
     m:set(tile, 'blue', color[3])
 end
 
--- A card slot: the edge, the face (which takes the pointer) and the words on it
+-- A picture over a tile: the texture of a card's record, which the game puts on the shapes of the card (the picture takes no
+-- pointer, the tile under it does)
+local function picture(parent, name)
+    local m = shown.menu
+    local tile = m:create(parent, 'image', name)
+    if not tile then return nil end
+    m:set(tile, 'target', 0)
+    m:set(tile, 'visible', 0)
+    return tile
+end
+
+-- A card slot: the edge, the face (which takes the pointer), the picture of the card over it when there is one and the words
+-- on it when there is not
 local function makeSlot(parent, prefix, index, onClick)
     local slot = {
         edge = fill(parent, prefix .. 'Edge' .. index, COLOR.edge),
         face = fill(parent, prefix .. 'Card' .. index, COLOR.face, 255, true),
+        art = picture(parent, prefix .. 'Art' .. index),
         text = label(parent, prefix .. 'Text' .. index, COLOR.black, 1),
     }
     if onClick then
@@ -210,15 +229,24 @@ end
 local function hideSlot(slot)
     hide(slot.edge)
     hide(slot.face)
+    if slot.art then hide(slot.art) end
     hide(slot.text)
 end
 
--- A card in a slot: where, how big, the words (and the ink of the suit), the ground and the edge
-local function drawSlot(slot, x, y, width, height, text, ink, ground, edge)
+-- A card in a slot: where, how big, the words (and the ink of the suit), the ground and the edge; `face` is the texture of the
+-- card's record, which is drawn instead of the words when there is one (the cards that are strips of a caravan have words only)
+local function drawSlot(slot, x, y, width, height, text, ink, ground, edge, face)
     put(slot.edge, x - 2, y - 2, width + 4, height + 4)
     setColor(slot.edge, edge or COLOR.edge)
     put(slot.face, x, y, width, height)
     setColor(slot.face, ground or COLOR.face)
+    if face and face ~= '' and slot.art then
+        shown.menu:set(slot.art, 'filename', face)
+        put(slot.art, x, y, width, height)
+        hide(slot.text)
+        return
+    end
+    if slot.art then hide(slot.art) end
     if text and text ~= '' then
         put(slot.text, x + 4, y + 2)
         setText(slot.text, text, ink or COLOR.black)
@@ -227,34 +255,11 @@ local function drawSlot(slot, x, y, width, height, text, ink, ground, edge)
     end
 end
 
-local function button(parent, name, text, onClick)
-    local tile = {
-        edge = fill(parent, name .. 'Edge', COLOR.edge),
-        face = fill(parent, name, COLOR.button, 255, true),
-        text = label(parent, name .. 'Text', COLOR.text, 2),
-    }
-    shown:onClick(name, onClick)
-    tile.string = text
-    return tile
-end
-
-local function drawButton(tile, x, y, width, height, text)
-    put(tile.edge, x - 2, y - 2, width + 4, height + 4)
-    put(tile.face, x, y, width, height)
-    put(tile.text, x + width / 2, y + (height - lineHeight()) / 2)
-    setText(tile.text, text or tile.string)
-end
-
-local function hideButton(tile)
-    hide(tile.edge)
-    hide(tile.face)
-    hide(tile.text)
-end
-
 -- ---- Cards ----------------------------------------------------------------------------------------------------------------
 
 local RANKS = { [1] = 'A', [10] = '10', [12] = 'J', [13] = 'Q', [14] = 'K', [15] = 'Jk' }
-local SUITS = { 'C', 'D', 'H', 'S', '*' }
+-- The suit numbers of the card records: 1 hearts, 2 spades, 3 diamonds, 4 clubs, 5 the Joker (Mac round 12AV S2)
+local SUITS = { 'H', 'S', 'D', 'C', '*' }
 
 local function rankOf(value)
     return RANKS[value] or tostring(value)
@@ -265,7 +270,7 @@ local function cardText(card)
 end
 
 local function inkOf(card)
-    return (card.suit == 2 or card.suit == 3) and COLOR.red or COLOR.black
+    return (card.suit == 1 or card.suit == 3) and COLOR.red or COLOR.black
 end
 
 -- ---- The stake --------------------------------------------------------------------------------------------------------------
@@ -386,7 +391,8 @@ local function drawDeck()
                     local edge = COLOR.edge
                     if card.inDeck then edge = COLOR.inDeck end
                     if list == activeList and position == cursor[list] then edge = COLOR.picked end
-                    drawSlot(tiles, left + (slot - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card), nil, edge)
+                    drawSlot(tiles, left + (slot - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card), nil, edge,
+                        card.face)
                 else
                     hideSlot(tiles)
                 end
@@ -398,10 +404,14 @@ local function drawDeck()
         setButton('CDM_AddButton', nil, card ~= nil and not card.inDeck)
         setButton('CDM_RemoveButton', nil, card ~= nil and card.inDeck)
         setButton('CDM_PlayButton', nil, screen.canPlay)
-        setButton('CDM_CaravanDeckButton', nil, true)
+        -- The words of the deck screen that the executable writes itself (0x73D850): the title of the first count is the word of the
+        -- deck, and the button on the right bumper says "Randomize" and the word of the deck
+        setButton('CDM_CDM_CardsInDeckTitle', word('sCaravanDeckText', 'Caravan Deck'), true)
+        setButton('CDM_CaravanDeckButton',
+            word('sRSMRandomize', 'Randomize') .. ' ' .. word('sCaravanDeckText', 'Caravan Deck'), true)
         setButton('CDM_AllCardsButton', nil, true)
         setButton('CDM_NavigateButton', nil, false)
-        local bar = shown:find('SWM_Scrollbar')
+        local bar = shown:find('CDM_Scrollbar')
         if bar then shown:set(bar, 'visible', 0) end
     end)
 end
@@ -449,7 +459,7 @@ end
 local function makeGameTiles()
     local main = shown:find(RECTS.game)
     if not main then return nil end
-    local tiles = { rows = {}, hand = {}, opponentHand = {}, totals = {}, buttons = {} }
+    local tiles = { rows = {}, hand = {}, opponentHand = {}, totals = {} }
     for index = 1, TRACKS * ROWS do
         tiles.rows[index] = makeSlot(main, 'CaravanRow', index, onRow)
     end
@@ -466,9 +476,6 @@ local function makeGameTiles()
     tiles.status = label(main, 'CaravanStatus', COLOR.text, 2)
     tiles.opponent = label(main, 'CaravanOpponent', COLOR.text, 1)
     tiles.piles = label(main, 'CaravanPiles', COLOR.text, 1)
-    tiles.buttons.discardCard = button(main, 'CaravanDiscardCard', 'Discard Card', function() gameTiles.discardCard() end)
-    tiles.buttons.discardTrack = button(main, 'CaravanDiscardTrack', 'Discard Caravan', function() gameTiles.discardTrack() end)
-    tiles.buttons.forfeit = button(main, 'CaravanForfeit', 'Forfeit', function() gameTiles.forfeit() end)
     return tiles
 end
 
@@ -495,7 +502,8 @@ local function drawGame()
     local width, height = rectSize(RECTS.game)
     local lineH = lineHeight()
     local colW, gap = 150, 36
-    local panel = 210
+    -- The right side is the file's (the counts of the corner on top, the four buttons at the bottom), the opponent under the counts
+    local panel = 320
     local boardLeft = (width - panel - (3 * colW + 2 * gap)) / 2
     -- How far apart the rows of a caravan are: as far as the room goes (two caravans of seven rows, four lines of totals and
     -- words, the hand and the gaps), a line at most
@@ -558,7 +566,7 @@ local function drawGame()
                 local edge = index == pickedHand and COLOR.picked or COLOR.edge
                 local y = index == pickedHand and handY - 12 or handY
                 drawSlot(slot, boardLeft - 40 + (index - 1) * (CARD_W + 8), y, CARD_W, CARD_H, cardText(card), inkOf(card),
-                    nil, edge)
+                    nil, edge, card.face)
             else
                 hideSlot(slot)
             end
@@ -568,37 +576,33 @@ local function drawGame()
             local back = gameTiles.opponentHand[index]
             if index <= board.opponentHand then
                 local x = width - panel + (index - 1) * 22
-                put(back.edge, x - 1, 10 - 1, 20, 28)
-                put(back.face, x, 10, 18, 26)
+                put(back.edge, x - 1, 150 - 1, 20, 28)
+                put(back.face, x, 150, 18, 26)
             else
                 hide(back.edge)
                 hide(back.face)
             end
         end
-        put(gameTiles.opponent, width - panel, 48)
+        put(gameTiles.opponent, width - panel, 186)
         setText(gameTiles.opponent, screen.opponent)
-        put(gameTiles.piles, width - panel, 48 + lineH)
+        put(gameTiles.piles, width - panel, 186 + lineH)
         setText(gameTiles.piles, string.format('Cards left: %d (you) %d', board.pile, board.opponentPile))
-        -- The buttons
-        local buttonY = handY - 60
+        -- The counts of the corner and the buttons are the file's: the pot of the match, what the player has won in all at
+        -- Caravan (net) and the matches won over lost, and the four buttons (Cancel is the word the executable writes
+        -- on the one the file calls Forfeit, 0x74087E). The file's tiles for the totals over the caravans and the numbers of
+        -- cards are for the 3D scene and stay hidden
         local playing = board.playersTurn and not board.over
-        drawButton(gameTiles.buttons.discardCard, width - panel, buttonY - 2 * (lineH + 20), panel - 30, lineH + 8)
-        drawButton(gameTiles.buttons.discardTrack, width - panel, buttonY - (lineH + 20), panel - 30, lineH + 8,
-            discarding and 'Pick a Caravan' or 'Discard Caravan')
-        drawButton(gameTiles.buttons.forfeit, width - panel, buttonY, panel - 30, lineH + 8,
-            forfeitAsked and 'Sure?' or 'Forfeit')
-        if board.over then
-            hideButton(gameTiles.buttons.discardCard)
-            hideButton(gameTiles.buttons.discardTrack)
-            hideButton(gameTiles.buttons.forfeit)
-        else
-            if not playing then
-                hideButton(gameTiles.buttons.discardCard)
-                hideButton(gameTiles.buttons.discardTrack)
-            end
-            if board.phase == 'start' then hideButton(gameTiles.buttons.discardTrack) end
+        setDisplay('CGM_AnteDisplay', nil, screen.pot)
+        setDisplay('CGM_NetTotalDisplay', nil, screen.moneyWon - screen.moneyLost)
+        setDisplay('CGM_WinLossDisplay', nil, string.format('%d/%d', screen.gamesWon, screen.gamesLost))
+        for _, name in ipairs({ 'CGM_NPCTrackRect', 'CGM_PlayerTrackRect', 'CGM_CardNumRect' }) do
+            setButton(name, nil, false)
         end
-        put(gameTiles.status, width / 2 - panel / 2, playerRows - lineH - 6)
+        setButton('CGM_SelectCardButton', nil, playing and #board.hand > 0)
+        setButton('CGM_DiscardCardButton', nil, playing)
+        setButton('CGM_DiscardTrackButton', nil, playing and board.phase ~= 'start')
+        setButton('CGM_ForfeitGameButton', word('sCancel', 'Cancel'), not board.over)
+        put(gameTiles.status, (width - panel) / 2, playerRows - lineH - 6)
         shown.menu:set(gameTiles.status, 'justify', 2)
         setText(gameTiles.status, statusText)
         shown.menu:set(gameTiles.status, 'visible', statusText ~= '' and 1 or 0)
@@ -606,7 +610,7 @@ local function drawGame()
 end
 
 local function afterMove()
-    pickedHand, discarding, forfeitAsked = nil, false, false
+    pickedHand, discarding = nil, false
     opponentWait = 0
     local board = caravan.board()
     if board and board.over then
@@ -664,7 +668,15 @@ local function installGameActions()
         if not board or not board.playersTurn or board.over then return end
         if not board.hand[slot] then return end
         pickedHand = pickedHand ~= slot and slot or nil
-        discarding, forfeitAsked = false, false
+        discarding = false
+        drawGame()
+    end
+    -- Select Card (W): picks up the next card of the hand (the 3D scene of the game has a cursor over the hand)
+    gameTiles.select = function()
+        local board = caravan.board()
+        if not board or not board.playersTurn or board.over or #board.hand == 0 then return end
+        pickedHand = ((pickedHand or 0) % #board.hand) + 1
+        discarding = false
         drawGame()
     end
     gameTiles.pick = function(track, row)
@@ -704,47 +716,60 @@ local function installGameActions()
         local board = caravan.board()
         if not board or not board.playersTurn or board.over or board.phase == 'start' then return end
         discarding = not discarding
-        forfeitAsked, pickedHand = false, nil
+        pickedHand = nil
         setStatus(discarding and 'Pick the caravan to throw away.' or 'Your move.')
         drawGame()
     end
+    -- Cancel (R): a card that is picked up (or a caravan that is to be thrown away) is put back, and nothing is asked; with
+    -- nothing picked the one question is asked ("quit Caravan", Yes or No), and Yes is a loss with the pot paid (0x7490E0, 0x74A270)
     gameTiles.forfeit = function()
         local board = caravan.board()
         if not board or board.over then return end
-        if not forfeitAsked then
-            forfeitAsked, discarding, pickedHand = true, false, nil
-            setStatus('Press Forfeit again to give the match up.')
+        if pickedHand or discarding then
+            pickedHand, discarding = nil, false
+            setStatus(board.playersTurn and 'Your move.' or statusText)
             drawGame()
             return
         end
-        caravan.forfeit()
-        afterMove()
+        local function giveUp()
+            caravan.forfeit()
+            afterMove()
+        end
+        local asked = I.FalloutMessage ~= nil and I.FalloutMessage.ask(
+            word('sQuitCaravanText', 'Quit Caravan?'), { word('sYes', 'Yes'), word('sNo', 'No') },
+            function(index)
+                if index == 1 then giveUp() end
+            end)
+        if not asked then
+            giveUp()
+        end
     end
 end
 
 -- ---- The result -------------------------------------------------------------------------------------------------------------
 
-local function makeResultTiles()
-    local main = shown:find(RECTS.results)
-    if not main then return nil end
-    return {
-        title = label(main, 'CaravanResultTitle', COLOR.text, 2),
-        pot = label(main, 'CaravanResultPot', COLOR.text, 2),
-        exit = button(main, 'CaravanResultExit', word('sExit', 'Exit'), function() leave() end),
-    }
-end
+-- The result is the file's: the money won and lost and the matches won over lost in all, the biggest ante, and under them the
+-- words of the result, which a moment later ask for a key (0x740980 and the update at 0x7420B2)
+local PRESS_KEY_AFTER = 3
 
 local function drawResults(screen)
-    local width, height = rectSize(RECTS.results)
-    local lineH = lineHeight()
     shown:batch(function()
-        put(resultTiles.title, width / 2, height / 2 - lineH * 2)
-        setText(resultTiles.title, screen.won and word('sYouWin', 'You win') or word('sYouLose', 'You lose'))
-        put(resultTiles.pot, width / 2, height / 2 - lineH * 0.5)
-        local text = screen.pot > 0 and ((screen.won and 'You won ' or 'You lost ') .. screen.pot) or ''
-        if screen.forfeited then text = (text ~= '' and (text .. ' - ') or '') .. 'you gave the match up' end
-        setText(resultTiles.pot, text)
-        drawButton(resultTiles.exit, width / 2 - 70, height / 2 + lineH, 140, lineH + 8)
+        setDisplay('CRM_NPCBetDisplay', nil, screen.moneyWon)
+        setDisplay('CRM_Losses', nil, screen.moneyLost)
+        setDisplay('CRM_WinLoss', nil, string.format('%d/%d', screen.gamesWon, screen.gamesLost))
+        setDisplay('CRM_LargestWinning', nil, screen.biggestAnte)
+        local info = shown:find('CRM_Info')
+        if info then
+            local text
+            if resultAge ~= nil and resultAge >= PRESS_KEY_AFTER then
+                text = word('sCaravanPressAnyKeyText', 'Press any key to continue')
+            elseif screen.won then
+                text = word('sCaravanYouWinText', 'You win')
+            else
+                text = word('sCaravanYouLoseText', 'You lose')
+            end
+            shown:set(info, 'string', text)
+        end
     end)
 end
 
@@ -774,11 +799,11 @@ local function enterStage(screen)
             gameTiles = makeGameTiles()
             installGameActions()
         end
-        pickedHand, discarding, forfeitAsked, lastMove, markLeft = nil, false, false, nil, 0
+        pickedHand, discarding, lastMove, markLeft = nil, false, nil, 0
         opponentWait = 0
         afterMove()
     else
-        resultTiles = resultTiles or makeResultTiles()
+        resultAge = 0
         drawResults(screen)
     end
 end
@@ -803,8 +828,13 @@ local function openMenu()
     shown:onClick('CBM_ExitButton', leave)
     shown:onClick('CDM_AddButton', function() addCard(true) end)
     shown:onClick('CDM_RemoveButton', function() addCard(false) end)
-    shown:onClick('CDM_CaravanDeckButton', function() chooseList('deck') end)
+    -- The button of the deck says "Randomize" and the word of the deck (the executable writes it, 0x73D850), so it makes a deck
+    shown:onClick('CDM_CaravanDeckButton', function() randomize() end)
     shown:onClick('CDM_AllCardsButton', function() chooseList('all') end)
+    shown:onClick('CGM_SelectCardButton', function() if gameTiles then gameTiles.select() end end)
+    shown:onClick('CGM_DiscardCardButton', function() if gameTiles then gameTiles.discardCard() end end)
+    shown:onClick('CGM_DiscardTrackButton', function() if gameTiles then gameTiles.discardTrack() end end)
+    shown:onClick('CGM_ForfeitGameButton', function() if gameTiles then gameTiles.forfeit() end end)
     shown:onClick('CDM_PlayButton', function()
         if caravan.play() then
             local screen = caravan.screen()
@@ -870,6 +900,14 @@ local function stepFrame(dt)
         markLeft = markLeft - dt
         if markLeft <= 0 and drawn == 'game' then drawGame() end
     end
+    if resultAge ~= nil and drawn == 'results' then
+        local before = resultAge
+        resultAge = resultAge + dt
+        if before < PRESS_KEY_AFTER and resultAge >= PRESS_KEY_AFTER then
+            local screen = caravan.screen()
+            if screen then drawResults(screen) end
+        end
+    end
     if resultIn then
         resultIn = resultIn - dt
         if resultIn <= 0 then
@@ -893,12 +931,33 @@ end
 
 -- ---- Keys and the pad ---------------------------------------------------------------------------------------------------------
 
+local function messageOpen()
+    return I.FalloutMessage ~= nil and I.FalloutMessage.isOpen()
+end
+
+-- The letters of the keys (the executable's key handler, 0x749360, reads them in both cases) and the button of the file that each
+-- clicks on the screen: the files name the same letters on their buttons (_PCButtonText)
+local KEYS = {
+    bet = { w = 'CBM_AutoMatchButton', a = 'CBM_RaiseButton', f = 'CBM_AcceptButton', r = 'CBM_ExitButton' },
+    deck = { w = 'CDM_AddButton', a = 'CDM_RemoveButton', f = 'CDM_PlayButton' },
+    game = { w = 'CGM_SelectCardButton', q = 'CGM_DiscardCardButton', e = 'CGM_DiscardTrackButton',
+        r = 'CGM_ForfeitGameButton' },
+}
+
+local function pressLetter(letter)
+    local name = KEYS[drawn] and KEYS[drawn][letter]
+    if name then shown:clickNamed(name) end
+end
+
+-- R leaves at once on the deck (and is the Exit button of the stake and the Cancel button of the match), a key on the result
+-- closes it
 local function press(code, symbol)
-    if not shown or I.UI.getMode() ~= 'Interface' then return end
+    if not shown or I.UI.getMode() ~= 'Interface' or messageOpen() then return end
     if quantity.isOpen() then
         quantity.press(code, symbol)
         return
     end
+    local letter = type(symbol) == 'string' and symbol:lower() or ''
     if drawn == 'deck' then
         if code == input.KEY.LeftArrow then
             moveCursor(-1)
@@ -911,34 +970,44 @@ local function press(code, symbol)
         elseif code == input.KEY.Enter then
             local _, card = currentCard()
             if card then addCard(not card.inDeck) end
-        elseif symbol == 'r' or symbol == 'R' then
+        elseif letter == 'r' then
+            leave()
+        elseif letter == 's' then
+            -- (the key table of the executable has an S that does something on this screen that was not read; it
+            -- makes a deck here, as the button does)
             randomize()
+        else
+            pressLetter(letter)
         end
     elseif drawn == 'bet' then
-        if code == input.KEY.Enter then shown:clickNamed('CBM_AcceptButton') end
+        if code == input.KEY.Enter then
+            shown:clickNamed('CBM_AcceptButton')
+        else
+            pressLetter(letter)
+        end
+    elseif drawn == 'game' then
+        pressLetter(letter)
     elseif drawn == 'results' then
-        if code == input.KEY.Enter then leave() end
+        leave()
     end
 end
 
--- On the pad the buttons are the ones the files name: the stake has A Auto-Match, X Raise, Y Accept and B Exit; the deck has
--- the shoulders for the two lists, Y Add, X Remove and A Play Caravan; the rest is the pointer's
+-- On the pad the buttons are the ones the files name, but A, which the engine clicks with where the pointer is (a second
+-- meaning would act twice): the stake has X Raise, Y Accept and B Exit; the deck has the right bumper for the button that
+-- makes a deck, X Remove and Y Play Caravan (Add is A); the match has the bumpers for the triggers (left Discard Card, right
+-- Discard Caravan) and B for Cancel (the engine leaves the screen with it, which is a forfeit); A closes the result
 local function onPad(button)
-    if not shown or I.UI.getMode() ~= 'Interface' or quantity.isOpen() then return end
+    if not shown or I.UI.getMode() ~= 'Interface' or quantity.isOpen() or messageOpen() then return end
     local B = input.CONTROLLER_BUTTON
     local names
     if drawn == 'bet' then
-        names = { [B.A] = 'CBM_AutoMatchButton', [B.X] = 'CBM_RaiseButton', [B.Y] = 'CBM_AcceptButton', [B.B] = 'CBM_ExitButton' }
+        names = { [B.X] = 'CBM_RaiseButton', [B.Y] = 'CBM_AcceptButton', [B.B] = 'CBM_ExitButton' }
     elseif drawn == 'deck' then
-        names = {
-            [B.RightShoulder] = 'CDM_CaravanDeckButton',
-            [B.LeftShoulder] = 'CDM_AllCardsButton',
-            [B.Y] = 'CDM_AddButton',
-            [B.X] = 'CDM_RemoveButton',
-            [B.A] = 'CDM_PlayButton',
-        }
+        names = { [B.RightShoulder] = 'CDM_CaravanDeckButton', [B.X] = 'CDM_RemoveButton', [B.Y] = 'CDM_PlayButton' }
         if button == B.DPadLeft then moveCursor(-1) return end
         if button == B.DPadRight then moveCursor(1) return end
+    elseif drawn == 'game' then
+        names = { [B.LeftShoulder] = 'CGM_DiscardCardButton', [B.RightShoulder] = 'CGM_DiscardTrackButton' }
     elseif drawn == 'results' and button == B.A then
         leave()
         return

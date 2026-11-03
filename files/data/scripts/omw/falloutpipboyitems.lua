@@ -20,7 +20,6 @@ local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
-local bookMenu = require('scripts.omw.falloutbook')
 
 local pipboy = core.pipboy
 
@@ -298,21 +297,9 @@ local function activate(row)
         if list.count() > 0 then list.select(1, true) end
         return
     end
-    if item.book and equippable(item) then
-        -- A book is read on its own screen, and what reading it gives (the points of a skill book, the book used up) is
-        -- given at once: the executable's function that puts an item on does it when the player reads it, and the screen is
-        -- only the words (Mac round 12AN B9)
-        local words = pipboy.book(item.id)
-        if words then
-            words.canTake = false
-            pipboy.use(item.id)
-            bookMenu.show(words, { onLeave = function()
-                if shown then fill() end
-            end })
-            fill()
-            return
-        end
-    end
+    -- A book is read like any other thing that is used: the points of a skill book, the book used up and the message
+    -- are given at once and the Pip-Boy stays as it is. The game has no screen of the book for it (Mac round 12AV S3:
+    -- the screen of a book is opened only by the console)
     if equippable(item) then
         pipboy.use(item.id)
     end
@@ -378,7 +365,6 @@ end
 
 function module.hide()
     quantity.close()
-    bookMenu.close()
     if shown then
         shown:close()
     end
@@ -394,7 +380,6 @@ function module.update()
     shown:checkSize()
     updateWheel()
     quantity.update()
-    bookMenu.update()
     updateCards()
 end
 
@@ -403,9 +388,6 @@ end
 -- the page of the Pip-Boy).
 function module.press(code, symbol)
     if not shown then return false end
-    if bookMenu.isOpen() then
-        return bookMenu.press(code, symbol)
-    end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
     end

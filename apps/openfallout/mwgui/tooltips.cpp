@@ -32,6 +32,8 @@
 
 namespace OFGui
 {
+    std::atomic<bool> ToolTips::sWorldTooltipShown{ true };
+
     ToolTips::ToolTips()
         : Layout("openmw_tooltips.layout")
         , mFocusToolTipX(0.0)
@@ -62,6 +64,11 @@ namespace OFGui
     void ToolTips::setEnabled(bool enabled)
     {
         mEnabled = enabled;
+    }
+
+    void ToolTips::setWorldTooltipShown(bool show)
+    {
+        sWorldTooltipShown = show;
     }
 
     void ToolTips::onFrame(float frameDuration)
@@ -305,7 +312,7 @@ namespace OFGui
         }
         else
         {
-            if (!mFocusObject.isEmpty())
+            if (!mFocusObject.isEmpty() && sWorldTooltipShown)
             {
                 MyGUI::IntSize tooltipSize = getToolTipViaPtr(mFocusObject.getCellRef().getCount(), true, checkOwned());
 

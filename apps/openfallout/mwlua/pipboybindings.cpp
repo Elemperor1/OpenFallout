@@ -1,7 +1,9 @@
 #include "pipboybindings.hpp"
 
+#include <charconv>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 
 #include <components/esm/refid.hpp>
 #include <components/falloutscript/chargen.hpp>
@@ -46,6 +48,40 @@ namespace OFLua
             return form->toUint32();
         }
 
+        /// The id of a row of a list. Copies of a weapon or armor that differ in condition are rows of their own, and
+        /// the row tells which: the form, then "~" and the condition in tenths of a percent of the health. Every
+        /// function that takes the id of a row takes either kind (a plain form names no copy: the best, or the one
+        /// that is on).
+        std::string rowId(const OFScript::FalloutScripts::PipboyItem& item)
+        {
+            std::string text = idText(item.mId);
+            if (item.mStack)
+                text += "~" + std::to_string(item.mCondition);
+            return text;
+        }
+
+        struct RowKey
+        {
+            FormId mItem = 0;
+            int mCondition = -1;
+        };
+
+        RowKey parseRowId(std::string_view text)
+        {
+            RowKey key;
+            const std::size_t tilde = text.find('~');
+            if (tilde != std::string_view::npos)
+            {
+                int condition = -1;
+                const std::string_view digits = text.substr(tilde + 1);
+                if (std::from_chars(digits.data(), digits.data() + digits.size(), condition).ec == std::errc())
+                    key.mCondition = condition;
+                text = text.substr(0, tilde);
+            }
+            key.mItem = parseId(text);
+            return key;
+        }
+
         /// A form id from Lua: the player when it is empty
         FormId holderOf(sol::optional<std::string_view> text)
         {
@@ -73,9 +109,14 @@ namespace OFLua
         sol::table itemRow(const sol::state_view& lua, const OFScript::FalloutScripts::PipboyItem& item)
         {
             sol::table row(lua, sol::create);
-            row["id"] = idText(item.mId);
+            row["id"] = rowId(item);
+            // The form alone, for what compares with a form and not with a row
+            row["form"] = idText(item.mId);
             row["name"] = item.mName;
             row["count"] = item.mCount;
+            // Weapons and armor: the condition in tenths of a percent of the health (1000 is full)
+            row["hasCondition"] = item.mHasCondition;
+            row["condition"] = item.mCondition;
             row["weight"] = item.mWeight;
             row["value"] = item.mValue;
             row["category"] = FalloutScript::Pipboy::categoryName(item.mCategory);
@@ -113,7 +154,10 @@ namespace OFLua
                 const sol::optional<std::string> id = pick["id"];
                 const sol::optional<int> count = pick["count"];
                 if (id && count)
-                    piles.emplace_back(parseId(*id), *count);
+                {
+                    const RowKey key = parseRowId(*id);
+                    piles.push_back({ key.mItem, *count, key.mCondition });
+                }
             }
             return piles;
         }
@@ -290,19 +334,9 @@ namespace OFLua
         };
         // The player puts on or takes off, eats or reads the item; what happened ("equipped", "unequipped", "used",
         // "read"), or "" when nothing did
-        api["use"] = [](std::string_view item) { return scripts().useItemFromList(parseId(item)); };
-        // What a book or a scroll the player carries says (the words, with the names of settings in them as `&sName;`):
-        // its name, text, whether it is a scroll and whether it may be taken; nothing for an item that is no book
-        api["book"] = [lua](std::string_view item) -> sol::object {
-            const auto book = scripts().bookText(parseId(item));
-            if (!book)
-                return sol::nil;
-            sol::table row(lua, sol::create);
-            row["name"] = book->mName;
-            row["text"] = book->mText;
-            row["scroll"] = book->mScroll;
-            row["canTake"] = book->mCanTake;
-            return row;
+        api["use"] = [](std::string_view item) {
+            const RowKey key = parseRowId(item);
+            return scripts().useItemFromList(key.mItem, key.mCondition);
         };
         // The pages of the help manual (the messages of the form list `HelpManual`, or `HelpManualXBox` for a pad):
         // a list of tables with the id of the message, its title and its words; empty when the data has none
@@ -335,11 +369,13 @@ namespace OFLua
         api["dropLimit"] = OFScript::FalloutScripts::sDropLimit;
         // The player drops items in front of it; how many
         api["drop"] = [](std::string_view item, sol::optional<int> count) {
-            return scripts().dropItem(parseId(item), count.value_or(1));
+            const RowKey key = parseRowId(item);
+            return scripts().dropItem(key.mItem, count.value_or(1), key.mCondition);
         };
         // Items go from one holder to another (a container to the player and back); how many moved
         api["transfer"] = [](std::string_view from, std::string_view to, std::string_view item, int count) {
-            return scripts().transferItems(parseId(from), parseId(to), parseId(item), count);
+            const RowKey key = parseRowId(item);
+            return scripts().transferItems(parseId(from), parseId(to), key.mItem, count, key.mCondition);
         };
         // The player opens or closes a container: its scripts hear of it
         api["containerOpened"]
@@ -477,7 +513,7 @@ namespace OFLua
         // The player puts an item on the key of a slot (counted from 0): "assigned", "ammo" (ammunition goes on no
         // key), "cannot" (a thing that is neither held, worn nor used up) or "slot" (the ammunition swap, or none)
         api["assignHotKey"]
-            = [](int slot, std::string_view item) { return scripts().assignHotKey(slot, parseId(item)); };
+            = [](int slot, std::string_view item) { return scripts().assignHotKey(slot, parseRowId(item).mItem); };
 
         // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
         // "ITMBottlecapsUp"), in 2D; false when the data has no such sound

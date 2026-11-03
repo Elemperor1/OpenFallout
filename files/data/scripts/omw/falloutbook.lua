@@ -5,8 +5,9 @@
 -- read it from the executable (round 12AM B4): the menu's own traits hold the words (`user2`), whether it is a book and
 -- not a scroll (`user0`) and whether it can be taken (`user3`), the words are laid out as marked up text (the menu engine
 -- does that: the marks, the pages, the number of pages) and the names of settings in them (`&sName;`) are the words of
--- the game's settings. It is a module of the screens that show a book (the Pip-Boy's items, and the interaction script
--- for a book that lies in the world), not a script.
+-- the game's settings. It is a module, not a script, and nothing in play opens the screen: the executable shows it only
+-- for the console (Mac round 12AV S3), so a book that is read from the Pip-Boy or picked up from the world has no screen
+-- (it is kept for a console command, and the help manual uses `filled`).
 --
 --   book.show({ name, text, scroll, canTake }, { onLeave = function() end, onTake = function() end })
 --   book.isOpen(); book.press(keyCode, typedLetter); book.update(); book.close()
@@ -68,24 +69,27 @@ local function take()
     if told then told() end
 end
 
--- Show a book or a scroll: `book` has what `core.pipboy.book` and `core.interact.book` give (the words, whether it is a
--- scroll, whether it can be taken). False when the menu file is not there or does not have what the screen needs.
+-- Show a book or a scroll: `book` has the words, whether it is a scroll and whether it can be taken. False when the menu
+-- file is not there or does not have what the screen needs.
 function module.show(book, options)
     module.close()
     local opened = menuModule.open(FILE)
     if not opened then
+        print('Book screen: the menu file did not open')
         return false
     end
     -- Setting a tile the file does not have is an error; a screen that cannot show the words is closed, not left open
-    local ready = pcall(opened.batch, opened, function()
+    local ready, failure = pcall(opened.batch, opened, function()
         opened:io('user0', book.scroll and 0 or 1)
         opened:io('user2', filled(book.text or ''))
         opened:io('user3', book.canTake and 1 or 0)
     end)
     if not ready then
+        print('Book screen: the words could not be set: ' .. tostring(failure))
         opened:close()
         return false
     end
+    print('Book screen: shown as ' .. (book.scroll and 'a scroll' or 'a book'))
     shown, isScroll = opened, book.scroll == true
     onLeave = options and options.onLeave
     onTake = options and options.onTake

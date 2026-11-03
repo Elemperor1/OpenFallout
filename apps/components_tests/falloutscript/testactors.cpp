@@ -171,6 +171,112 @@ namespace
         EXPECT_EQ(state.removeItem(player, caps, 1), 0);
     }
 
+    TEST(FalloutScriptActorStateTest, copies_are_at_full_condition_unless_they_were_given_less)
+    {
+        FakeRecords records;
+        records.mItems[guard] = { { stimpak, 2 } };
+        ActorState state(records);
+        EXPECT_THAT(state.conditions(guard, stimpak), ElementsAre(Field(&ActorState::ConditionStack::mCondition, 1000)));
+        state.addItem(guard, stimpak, 3, 400);
+        state.addItem(guard, stimpak, 1, 750);
+        EXPECT_EQ(state.itemCount(guard, stimpak), 6);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(guard, stimpak);
+        ASSERT_EQ(stacks.size(), 3u);
+        // The best first
+        EXPECT_EQ(stacks[0].mCondition, 1000);
+        EXPECT_EQ(stacks[0].mCount, 2);
+        EXPECT_EQ(stacks[1].mCondition, 750);
+        EXPECT_EQ(stacks[1].mCount, 1);
+        EXPECT_EQ(stacks[2].mCondition, 400);
+        EXPECT_EQ(stacks[2].mCount, 3);
+        // More than full is full
+        state.addItem(guard, stimpak, 1, 5000);
+        EXPECT_EQ(state.conditions(guard, stimpak).front().mCount, 3);
+    }
+
+    TEST(FalloutScriptActorStateTest, removing_without_a_condition_takes_the_full_copies_first_and_then_the_best)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 1);
+        state.addItem(player, stimpak, 2, 300);
+        state.addItem(player, stimpak, 1, 600);
+        EXPECT_EQ(state.removeItem(player, stimpak, 2), 2);
+        // The full copy and the one at 600 are gone
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(player, stimpak);
+        ASSERT_EQ(stacks.size(), 1u);
+        EXPECT_EQ(stacks[0].mCondition, 300);
+        EXPECT_EQ(stacks[0].mCount, 2);
+        EXPECT_EQ(state.removeItem(player, stimpak, 5), 2);
+        EXPECT_TRUE(state.conditions(player, stimpak).empty());
+    }
+
+    TEST(FalloutScriptActorStateTest, a_copy_is_taken_by_its_condition)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 2);
+        state.addItem(player, stimpak, 2, 300);
+        EXPECT_EQ(state.removeItem(player, stimpak, 5, 300), 2);
+        EXPECT_EQ(state.itemCount(player, stimpak), 2);
+        // None of that condition are left
+        EXPECT_EQ(state.removeItem(player, stimpak, 1, 300), 0);
+        EXPECT_EQ(state.removeItem(player, stimpak, 1, 1000), 1);
+        EXPECT_EQ(state.itemCount(player, stimpak), 1);
+        EXPECT_EQ(state.removeItem(player, stimpak, 1, 999), 0);
+    }
+
+    TEST(FalloutScriptActorStateTest, copies_wear_and_are_mended_without_changing_how_many_there_are)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 3);
+        EXPECT_EQ(state.setCondition(player, stimpak, 1000, 900), 1);
+        EXPECT_EQ(state.setCondition(player, stimpak, 900, 850), 1);
+        EXPECT_EQ(state.itemCount(player, stimpak), 3);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(player, stimpak);
+        ASSERT_EQ(stacks.size(), 2u);
+        EXPECT_EQ(stacks[0].mCount, 2);
+        EXPECT_EQ(stacks[1].mCondition, 850);
+        // A copy that is not there to wear, and one that is already at the condition, change nothing
+        EXPECT_EQ(state.setCondition(player, stimpak, 700, 600), 0);
+        EXPECT_EQ(state.setCondition(player, stimpak, 850, 850), 0);
+        // Mending takes it back to full, and more than there are is what there are
+        EXPECT_EQ(state.setCondition(player, stimpak, 850, 1000, 4), 1);
+        EXPECT_EQ(state.conditions(player, stimpak).size(), 1u);
+        EXPECT_EQ(state.setCondition(player, stimpak, 1000, 0, 9), 3);
+        EXPECT_EQ(state.conditions(player, stimpak).front().mCondition, 0);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_new_game_forgets_the_condition_of_the_copies)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 2, 100);
+        state.clear();
+        state.addItem(player, stimpak, 2);
+        EXPECT_EQ(state.conditions(player, stimpak).size(), 1u);
+        EXPECT_EQ(state.conditions(player, stimpak).front().mCondition, 1000);
+    }
+
+    TEST(FalloutScriptActorStateTest, worn_copies_a_holder_does_not_have_before_its_record_is_read_count_for_nothing)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(crate);
+        records.mItems[crate] = { { stimpak, 1 } };
+        ActorState state(records);
+        state.addItem(crate, stimpak, 2, 200);
+        EXPECT_EQ(state.itemCount(crate, stimpak), 2);
+        records.mUnknown.clear();
+        // The record adds its copy, at full condition
+        EXPECT_EQ(state.itemCount(crate, stimpak), 3);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(crate, stimpak);
+        ASSERT_EQ(stacks.size(), 2u);
+        EXPECT_EQ(stacks[0].mCount, 1);
+        EXPECT_EQ(stacks[1].mCondition, 200);
+        EXPECT_EQ(stacks[1].mCount, 2);
+    }
+
     TEST(FalloutScriptActorStateTest, taking_items_takes_all_of_them_or_none)
     {
         FakeRecords records;

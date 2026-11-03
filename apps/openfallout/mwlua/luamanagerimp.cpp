@@ -662,12 +662,6 @@ namespace OFLua
                 mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
                 return;
             }
-            // A book or a scroll that the player activates is read where it lies, and is taken from its screen
-            if (object.getType() == ESM4::Book::sRecordId && scripts->openBook(object, actor))
-            {
-                mEngineEvents.addToQueue(EngineEvents::OnActivate{ getId(actor), getId(object) });
-                return;
-            }
             if (object.getType() == ESM4::Furniture::sRecordId)
                 scripts->activateFurniture(actor, object);
             // A door of Fallout that is no teleport door opens, and closes when it is open

@@ -123,20 +123,138 @@ namespace FalloutScript
     void ActorState::addItem(FormId id, FormId item, int count)
     {
         const std::lock_guard lock(mMutex);
+        addCountLocked(id, item, count);
+    }
+
+    int ActorState::addCountLocked(FormId id, FormId item, int count)
+    {
         if (item == 0 || count <= 0)
-            return;
+            return 0;
         Holder& entry = holder(id);
         knowItems(id, entry);
         if (!entry.mItemsKnown)
         {
             entry.mItemEdits[item].add(count);
             noteChange(id, item, count);
-            return;
+            return count;
         }
         int& held = entry.mItems[item];
         const int before = held;
         held = static_cast<int>(std::min<std::int64_t>(std::int64_t(held) + count, mostItems));
         noteChange(id, item, held - before);
+        return held - before;
+    }
+
+    void ActorState::addItem(FormId id, FormId item, int count, int condition)
+    {
+        const std::lock_guard lock(mMutex);
+        const int added = addCountLocked(id, item, count);
+        if (added > 0 && condition < fullCondition)
+            holder(id).mWorn[item][std::max(condition, 0)] += added;
+    }
+
+    std::map<int, int> ActorState::wornLocked(FormId id, FormId item)
+    {
+        Holder& entry = holder(id);
+        const auto found = entry.mWorn.find(item);
+        if (found == entry.mWorn.end())
+            return {};
+        // The worn copies are some of the copies there are: when there are fewer, the best of the worn ones are the ones
+        // that are not there
+        std::int64_t excess = -std::int64_t(heldLocked(id, item));
+        for (const auto& [condition, number] : found->second)
+            excess += number;
+        for (auto it = found->second.end(); excess > 0 && it != found->second.begin();)
+        {
+            --it;
+            const int taken = static_cast<int>(std::min<std::int64_t>(excess, it->second));
+            it->second -= taken;
+            excess -= taken;
+            if (it->second <= 0)
+                it = found->second.erase(it);
+        }
+        if (found->second.empty())
+        {
+            entry.mWorn.erase(found);
+            return {};
+        }
+        return found->second;
+    }
+
+    int ActorState::availableLocked(FormId id, FormId item, int condition)
+    {
+        const std::map<int, int> worn = wornLocked(id, item);
+        if (condition >= fullCondition)
+        {
+            int total = 0;
+            for (const auto& [at, number] : worn)
+                total += number;
+            return std::max(0, heldLocked(id, item) - total);
+        }
+        const auto found = worn.find(std::max(condition, 0));
+        return found == worn.end() ? 0 : found->second;
+    }
+
+    void ActorState::takeWornLocked(FormId id, FormId item, int condition, int count)
+    {
+        if (condition >= fullCondition)
+            return;
+        Holder& entry = holder(id);
+        const auto stored = entry.mWorn.find(item);
+        if (stored == entry.mWorn.end())
+            return;
+        const auto stack = stored->second.find(std::max(condition, 0));
+        if (stack == stored->second.end())
+            return;
+        stack->second -= count;
+        if (stack->second <= 0)
+            stored->second.erase(stack);
+        if (stored->second.empty())
+            entry.mWorn.erase(stored);
+    }
+
+    std::vector<ActorState::ConditionStack> ActorState::conditions(FormId id, FormId item)
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<ConditionStack> stacks;
+        const int held = heldLocked(id, item);
+        const std::map<int, int> worn = wornLocked(id, item);
+        int total = 0;
+        for (const auto& [condition, number] : worn)
+            total += number;
+        if (held - total > 0)
+            stacks.push_back({ fullCondition, held - total });
+        for (auto it = worn.rbegin(); it != worn.rend(); ++it)
+            stacks.push_back({ it->first, it->second });
+        return stacks;
+    }
+
+    int ActorState::removeItem(FormId id, FormId item, int count, int condition)
+    {
+        const std::lock_guard lock(mMutex);
+        if (item == 0 || count <= 0)
+            return 0;
+        const int taken = std::min(count, availableLocked(id, item, condition));
+        if (taken <= 0)
+            return 0;
+        takeWornLocked(id, item, condition, taken);
+        return removeCountLocked(id, item, taken);
+    }
+
+    int ActorState::setCondition(FormId id, FormId item, int from, int to, int count)
+    {
+        const std::lock_guard lock(mMutex);
+        from = std::clamp(from, 0, fullCondition);
+        to = std::clamp(to, 0, fullCondition);
+        if (item == 0 || count <= 0 || from == to)
+            return 0;
+        const int changed = std::min(count, availableLocked(id, item, from));
+        if (changed <= 0)
+            return 0;
+        takeWornLocked(id, item, from, changed);
+        if (to < fullCondition)
+            holder(id).mWorn[item][to] += changed;
+        return changed;
     }
 
     int ActorState::removeItem(FormId id, FormId item, int count)
@@ -162,6 +280,27 @@ namespace FalloutScript
     }
 
     int ActorState::removeLocked(FormId id, FormId item, int count)
+    {
+        if (item == 0 || count <= 0)
+            return 0;
+        // Which copies go: those of full condition first, then the worn ones from the best to the worst
+        const std::map<int, int> worn = wornLocked(id, item);
+        int wornTotal = 0;
+        for (const auto& [condition, number] : worn)
+            wornTotal += number;
+        const int full = std::max(0, heldLocked(id, item) - wornTotal);
+        const int removed = removeCountLocked(id, item, count);
+        int fromWorn = std::max(0, removed - full);
+        for (auto it = worn.rbegin(); fromWorn > 0 && it != worn.rend(); ++it)
+        {
+            const int taken = std::min(fromWorn, it->second);
+            takeWornLocked(id, item, it->first, taken);
+            fromWorn -= taken;
+        }
+        return removed;
+    }
+
+    int ActorState::removeCountLocked(FormId id, FormId item, int count)
     {
         if (item == 0 || count <= 0)
             return 0;

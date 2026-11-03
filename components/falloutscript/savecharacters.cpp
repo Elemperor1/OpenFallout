@@ -858,6 +858,145 @@ namespace FalloutScript
         SaveAccess<Equipment>::read(equipment, in, version);
     }
 
+    /// Names the section of the condition of items, which holds a part of the state of two classes
+    struct ItemWearSection
+    {
+    };
+
+    template <>
+    struct SaveAccess<ItemWearSection>
+    {
+        static void write(ActorState& state, Equipment& equipment, ReferenceState& references, SaveWriter& out)
+        {
+            {
+                const std::lock_guard lock(state.mMutex);
+                std::size_t holders = 0;
+                for (const auto& [id, holder] : state.mHolders)
+                    if (!holder.mWorn.empty())
+                        ++holders;
+                out.count(holders);
+                for (const auto& [id, holder] : state.mHolders)
+                {
+                    if (holder.mWorn.empty())
+                        continue;
+                    out.form(id);
+                    out.count(holder.mWorn.size());
+                    for (const auto& [item, stacks] : holder.mWorn)
+                    {
+                        out.form(item);
+                        out.count(stacks.size());
+                        for (const auto& [condition, number] : stacks)
+                        {
+                            out.i32(condition);
+                            out.i32(number);
+                        }
+                    }
+                }
+            }
+            {
+                const std::lock_guard lock(equipment.mMutex);
+                out.count(equipment.mWorn.size());
+                for (const auto& [actor, worn] : equipment.mWorn)
+                {
+                    out.form(actor);
+                    out.i32(worn.mWeaponCondition);
+                    out.count(worn.mArmorConditions.size());
+                    for (const auto& [item, condition] : worn.mArmorConditions)
+                    {
+                        out.form(item);
+                        out.i32(condition);
+                    }
+                }
+            }
+            const std::lock_guard lock(references.mMutex);
+            out.count(references.mConditions.size());
+            for (const auto& [reference, condition] : references.mConditions)
+            {
+                out.form(reference);
+                out.i32(condition);
+            }
+        }
+
+        static void read(
+            ActorState& state, Equipment& equipment, ReferenceState& references, SaveReader& in, std::uint32_t)
+        {
+            std::map<FormId, std::map<FormId, std::map<int, int>>> worn;
+            const std::size_t holders = in.count(8);
+            for (std::size_t i = 0; i < holders; ++i)
+            {
+                const std::optional<FormId> id = in.form();
+                const std::size_t items = in.count(8);
+                for (std::size_t j = 0; j < items; ++j)
+                {
+                    const std::optional<FormId> item = in.form();
+                    const std::size_t stacks = in.count(8);
+                    for (std::size_t k = 0; k < stacks; ++k)
+                    {
+                        const int condition = in.i32();
+                        const int number = in.i32();
+                        if (id && item && condition >= 0 && condition < ActorState::fullCondition && number > 0)
+                            worn[*id][*item][condition] += number;
+                    }
+                }
+            }
+            std::map<FormId, std::pair<int, std::map<FormId, int>>> conditions;
+            const std::size_t actors = in.count(8);
+            for (std::size_t i = 0; i < actors; ++i)
+            {
+                const std::optional<FormId> actor = in.form();
+                const int weapon = in.i32();
+                std::map<FormId, int> armor;
+                const std::size_t pieces = in.count(8);
+                for (std::size_t j = 0; j < pieces; ++j)
+                {
+                    const std::optional<FormId> item = in.form();
+                    const int condition = in.i32();
+                    if (item && condition >= 0 && condition < ActorState::fullCondition)
+                        armor[*item] = condition;
+                }
+                if (actor)
+                    conditions[*actor] = { std::clamp(weapon, 0, int(ActorState::fullCondition)), std::move(armor) };
+            }
+
+            {
+                const std::lock_guard lock(state.mMutex);
+                for (auto& [id, items] : worn)
+                    state.mHolders[id].mWorn = std::move(items);
+            }
+            std::map<FormId, int> dropped;
+            const std::size_t placed = in.count(8);
+            for (std::size_t i = 0; i < placed; ++i)
+            {
+                const std::optional<FormId> reference = in.form();
+                const int condition = in.i32();
+                if (reference && condition >= 0 && condition < ActorState::fullCondition)
+                    dropped[*reference] = condition;
+            }
+            {
+                const std::lock_guard lock(references.mMutex);
+                references.mConditions = std::move(dropped);
+            }
+            const std::lock_guard lock(equipment.mMutex);
+            for (auto& [actor, saved] : conditions)
+            {
+                Equipment::Worn& entry = equipment.mWorn[actor];
+                entry.mWeaponCondition = saved.first;
+                entry.mArmorConditions = std::move(saved.second);
+            }
+        }
+    };
+
+    void writeItemWear(ActorState& state, Equipment& equipment, ReferenceState& references, SaveWriter& out)
+    {
+        SaveAccess<ItemWearSection>::write(state, equipment, references, out);
+    }
+
+    void readItemWear(
+        ActorState& state, Equipment& equipment, ReferenceState& references, SaveReader& in, std::uint32_t version)
+    {
+        SaveAccess<ItemWearSection>::read(state, equipment, references, in, version);
+    }
+
     void writeActorValues(ActorValues& values, SaveWriter& out)
     {
         SaveAccess<ActorValues>::write(values, out);

@@ -686,11 +686,49 @@ namespace
         }
     }
 
-    TEST(FalloutScriptItemUseTest, aBookToReadStaysWithItsOwner)
+    TEST(FalloutScriptItemUseTest, aBookWithNoSkillDoesNothingAndIsNotCounted)
     {
         Fixture f;
-        EXPECT_EQ(f.mUse.use(thePlayer, novel).mOutcome, ItemUse::Outcome::Read);
+        const ItemUse::Result result = f.mUse.use(thePlayer, novel);
+        EXPECT_EQ(result.mOutcome, ItemUse::Outcome::Read);
+        EXPECT_EQ(result.mSkill, -1);
+        EXPECT_EQ(result.mGained, 0);
         EXPECT_EQ(f.mState.itemCount(thePlayer, novel), 1);
+        // Books Read counts the skill books that were read, as the executable does (Mac round 12AV S3)
+        EXPECT_EQ(f.mProgress.miscStat(15), 0);
+    }
+
+    TEST(FalloutScriptItemUseTest, onlyThePlayerReadsABook)
+    {
+        Fixture f;
+        f.mState.addItem(victim, guns, 1);
+        f.mState.addItem(victim, novel, 1);
+        f.mValues.setBase(victim, smallGuns, 40);
+        EXPECT_EQ(f.mUse.use(victim, guns).mOutcome, ItemUse::Outcome::Nothing);
+        EXPECT_EQ(f.mUse.use(victim, novel).mOutcome, ItemUse::Outcome::Nothing);
+        EXPECT_EQ(f.mValues.base(victim, smallGuns), 40);
+        EXPECT_EQ(f.mState.itemCount(victim, guns), 1);
+        EXPECT_EQ(f.mProgress.miscStat(15), 0);
+    }
+
+    TEST(FalloutScriptItemUseTest, aSkillBookIsRefusedInAFightAndStays)
+    {
+        Fixture f;
+        bool fighting = true;
+        f.mUse.setFighting([&](FormId actor) { return actor == thePlayer && fighting; });
+        f.mValues.setBase(thePlayer, smallGuns, 40);
+        const ItemUse::Result refused = f.mUse.use(thePlayer, guns);
+        EXPECT_EQ(refused.mOutcome, ItemUse::Outcome::Refused);
+        EXPECT_EQ(refused.mGained, 0);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 40);
+        EXPECT_EQ(f.mState.itemCount(thePlayer, guns), 2);
+        EXPECT_EQ(f.mProgress.miscStat(15), 0);
+        // A book with no skill does nothing in a fight as well, with no refusal
+        EXPECT_EQ(f.mUse.use(thePlayer, novel).mOutcome, ItemUse::Outcome::Read);
+        fighting = false;
+        EXPECT_EQ(f.mUse.use(thePlayer, guns).mOutcome, ItemUse::Outcome::Read);
+        EXPECT_EQ(f.mValues.base(thePlayer, smallGuns), 41);
+        EXPECT_EQ(f.mProgress.miscStat(15), 1);
     }
 
     TEST(FalloutScriptItemUseTest, restoresTheLimbsOfAnArchetypeThatDoes)

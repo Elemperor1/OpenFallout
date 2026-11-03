@@ -8,6 +8,7 @@
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwgui/tooltips.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
@@ -130,15 +131,25 @@ namespace OFLua
             return rows;
         };
 
-        // The names of the regions the player came into since this was last called, oldest first (the display shows
-        // the last as the line over the compass). It looks when the player's cell is another one.
+        // What the line over the compass is told since this was last called, oldest first: the names of the regions the
+        // player came into, and the name of the cell the player came to after a door, a teleport or a load. It looks when
+        // the player's cell is another one.
         api["takeRegions"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
-            for (const std::string& name : scripts().takeRegionNames())
-                rows[index++] = name;
+            for (const OFScript::FalloutScripts::RegionEvent& event : scripts().takeRegionEvents())
+            {
+                sol::table row(lua, sol::create);
+                row["name"] = event.mName;
+                row["cell"] = event.mCell;
+                rows[index++] = row;
+            }
             return rows;
         };
+
+        // Whether the name box over the object that the player aims at (the old display's, drawn at the top of the
+        // screen) is shown: the display from the game's menu file has its own text for the object, and turns it off
+        api["setWorldTooltip"] = [](bool show) { OFGui::ToolTips::setWorldTooltipShown(show); };
 
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the
