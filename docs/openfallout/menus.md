@@ -275,10 +275,11 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   of either game's plugins has an `&` (none in 1567 New Vegas and 672 Fallout 3 messages, round 12AH), so the letters are for
   mods only.
   Space is taken by the box and does nothing there (`HandleClick(-1, ...)` is a no-op). Enter, the arrows and the pad do
-  not come from the box: they go to the interface manager's generic code, which steps along the neighbours of the selected
-  tile (the buttons have `repeatvertical`, so up and down walk the buttons, left and right nothing) and activates the
-  selected tile; which button is lit when the box opens, and what Enter does with none lit, was not traced (asked in 12AG,
-  A7). The port's own meanwhile: Enter and Space pick the lit button (the first when none is lit). The pad: the engine's
+  not come from the box: they go to the interface manager's generic code (round 12AH A4, `0x70f6e0`). No button is lit when
+  the box opens, and the file has no `xdefault`, `xup` or the like, so the arrow keys do nothing at all in the game's box; Enter
+  clicks the selected tile or, with none selected, the one under the pointer, and with neither nothing happens (the root is no
+  target). The script keeps the arrows as its own addition (they light a button, the pad's D-pad uses them), and Enter clicks
+  the button that is lit (a hover lights it) and does nothing otherwise; Space does nothing. The pad: the engine's
   pad handling steps aside while a box that the script draws is open, so the script takes the pad itself: D-pad up and
   down move the lit button, A picks it, B does nothing (as Escape; not seen in the running game yet).
   Fallout 3's `ShowMessage` (0x53dd40) and message menu (key handler 0x6694d0, creator 0x6698e0) are the same code with
@@ -295,13 +296,17 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own
   window too, which takes only the arrows, Enter and Space). The engine's own actions for the keys
   and buttons (Escape, which would close the screen under the box, the inventory key) are not carried out either while a
-  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys.
+  box that the script draws is open (`FalloutScripts::luaMessageOpen`); the script still gets the keys. A question that a
+  screen asks (`I.FalloutMessage.ask`, as barter does when it is left with things in its piles) has no box of the engine, so
+  the script says it to the engine every frame it is open (`core.messageBox.setQuestion`; a second without it and it is
+  gone), and the engine counts it as a box that the script draws: Escape and B do not close the screen under it.
 - A box is drawn only when it is the script's (`current().lua`): a box that opened before the script said it draws them, or
   after its claim ran out, has the window manager's own window and is left to it.
 
-Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the sound the box makes
-when it opens (`UIPopUpMessageWindow`) and the click sound (`UIMenuOK`), the message's own sound, and everything in this
-section is checked in the offline harness only (not in the running game). The text under `onlyif` of the file counts a
+Not done: the icon (the records that hold the pictures, `MICN`, are not in the engine's store), the message's own sound,
+and everything in this section is checked in the offline harness only (not in the running game). The sounds of the box
+that are done: `UIPopUpMessageWindow` when it opens, `UIMenuOK` when a button is clicked with the pointer, Enter or a
+letter, and `UIMenuFocus` when an arrow key lights another button. The text under `onlyif` of the file counts a
 text with characters as true (`onlyif` on the words' `string` keeps the buttons below the words).
 
 ### Terminals and the game of hacking
@@ -403,7 +408,8 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   game, round 12AB, drew the question over its play-time line). Not read yet, so estimated: which tile is lit first (the
   first row), and the format of the time
   played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
-  picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
+  picture there). The sounds are the file's: a tile's `clicksound` and `mouseoversound` (see "Sounds of the menu files"), played
+by the menu module; the game's own sounds for the back step were not found. Nothing was seen in the running game.
 
 ### The settings screens
 
@@ -444,6 +450,116 @@ once, when the screens are left (`menu.saveOptions`).
   position under the pointer), the pad's LB and RB (a fifth of a meter), whether the Hardcore row can be changed in a
   running game (the game disables it under conditions that were not decoded), and what the Fallout 3 screens differ in
   (not checked; the same file is drawn). Nothing was seen in the running game.
+
+### Sounds of the menu files (round 12AH A5)
+
+The games play a sound where a tile names one: the `clicksound` of a tile that is clicked (with the pointer, or by a key that
+clicks it) and the `mouseoversound` of a tile the pointer or a key comes to. The words are the editor ids of sound records
+(`UIMenuOK`, `UIMenuFocus`; the executable's own sounds like `ITMBottlecapsUp` and `UIPopUpMessageWindow` go the same way),
+looked up once among the sound records (`FalloutScripts::soundByEditorId`) and played in 2D (`core.pipboy.playSoundNamed`,
+the first file when the record names a folder). `falloutmenu.lua` plays them for every menu drawn from a file: on a click the
+tile that was hit or the first above it that names one, on the pointer's move to a tile (once for the tile that owns the
+sound, not for each box inside it). The list rows (`list_box_template.xml`) have `UIMenuOK` and `UIMenuFocus`, so every list
+of every screen makes them; `text_box.xml` has `UIMenuFocus`; the quantity menu has the focus sound only (its clicks are silent).
+A message box plays `UIPopUpMessageWindow` when it opens (the sound of the message when it has one is not read). Where a key
+lights or clicks a row the screen plays the names itself (barter and the message box do; the other lists are silent for keys
+so far). The Pip-Boy's own sounds (`UIPipBoyAccessUp`,
+`UIPipBoyAccessDown`, the hum `UIPipBoyHumLP`, the light) and the container's (`UIItemTakeAll`) are not played yet. The sound
+files were not heard in the running game.
+
+### Keys of the Pip-Boy (round 12AH A3, FalloutNV.exe; Fallout 3's control table and defaults only)
+
+- The key that opens and closes it is the control "Menu Mode" (Tab), the only one: a release before `fPlayerPipBoyLightTimer`
+  has run out opens it, holding it longer toggles the Pip-Boy's light instead (sounds `UIPipBoyLightOn` and `UIPipBoyLightOff`);
+  in the open Pip-Boy a Tab release closes it, unless a text field has the input. No control exists for the previous or next
+  page. F1, F2 and F3 (raw keys) go to Stats, Inventory and Data: closed they open the Pip-Boy on that page, open they switch
+  to it directly, and the key of the page that is up closes it. Escape does not close the Pip-Boy: it puts the pause menu on
+  top (the Pip-Boy stays under it), and with the pause menu open it closes only that.
+- The port's own differences, none changed yet: the engine's Tab binding opens and closes it at once (no light), Left and Right
+  change the page, F1 and F2 are the engine's quick keys and post-processing keys, and Escape closes the screen. The 28 numbered
+  controls and their defaults are in `mac-12ah-results.md` (Part A3).
+
+### Trading (barter)
+
+`barter_menu.xml` is drawn by `falloutbarter.lua`; the engine side is `core.pipboy.barter*` (`apps/openfallout/mwscript/falloutbarter.cpp`)
+and the prices and checks are `FalloutScript::Barter` (`components/falloutscript/barter.*`), all as the Mac read them from
+`FalloutNV.exe` in round 12AG (menu class `BarterMenu`, id 0x41d, `Create` 0x72d250, the deal 0x72fd10, the checks of the Accept
+button 0x72f6f0, the price of one 0x72ed00).
+
+- The only way in is the script command `ShowBarterMenu` (0x1173), which the response of a dialogue line calls (New Vegas: 90 lines in
+  58 topics; Fallout 3: 157 in 41). The reference it is called on is the vendor; its optional integer is a percent from -100 to
+  100. Nothing about the character's services (the AIDT bits) decides whether the line is there. The dialogue stays
+  open under the menu and is back when the menu closes (inferred; the dialogue's code was not read).
+- What the vendor sells is its own goods and those of its merchant container together, the counts added by form
+  (`FalloutNV.exe` 0x46f310, round 12AH A1). The container is not read from the faction (the factions of these games have no
+  vendor fields: no VEND, VENC or VENV in any plugin of either game): it is an extra data item of the vendor's reference
+  (type 0x3c, `ExtraMerchantContainer`), which the placed reference's `XMRC` fills (86 records in New Vegas, 51 in Fallout 3,
+  which the ESM4 loader reads now) and which the script commands `SetMerchantContainer` and `RemoveMerchantContainer` (0x11b7,
+  0x11b8) give and take away (a section `merchants` of the save keeps them). A vendor with no container sells what it carries.
+  The port leaves out what the vendor wears (the executable's loop over worn pieces at 0x46f4ad was not followed). The vendor's
+  caps are the caps of the container and of the vendor together; they are never made up, and a vendor that has none pays
+  nothing. Caps are not listed (they are the money), and neither is what is worth nothing. The player's side leaves out keys and
+  the armor the files keep from the player, as the Pip-Boy does. A buy is taken from the container first, then from the
+  vendor; what the player sells and pays goes to the container (the vendor without one).
+- The price of one is `value * Base + Mult * (1 - Base) * value * c^Exp` with the settings `fItemConditionValueBase`, `Mult` and
+  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing the port keeps no condition for, which makes the base
+  value the value. Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
+  (1.55 at skill 0, 1.10 at 100) and `fBarterSellBase + skill * fBarterSellMult / 100` for what it sells (0.45 to 0.90), from
+  the Barter skill read once when the menu opens. Then the percent of the script (a positive one is less to pay and more for
+  what is sold), the perk entry point 0x11 (`EntryPoint::buyPrice`, with the vendor and the item as its context), and the
+  rounding: above 1 up to a whole number, else up in tenths. What the player buys costs at least the base value and what it
+  sells brings at most the base value. The settings the executable has and nothing reads (`fBarterHaggle*`, `fBarterDisp*`,
+  `fBarterMin/Max`) are not used.
+- The two lists are the player's things (left) and the vendor's (right), each with the six tabs of the container
+  (everything, weapons, apparel, aid, misc, ammo; the aid tab holds books and ingredients too, the misc tab all the rest;
+  round 12AH A2). The arrows over a list (and a click on its title) go to the next tab, and a tab with nothing to list is passed
+  over in the same direction until one has something, or everything is back. The title over a list is the tab's word in
+  capitals (the executable writes them so when the language is English), and over the vendor's list, while it shows
+  everything, the vendor's own name. A click moves one thing into the pile of the deal; of a stack of more than
+  `iInventoryAskQuantityAt` (5) the quantity prompt asks how many. A thing in a pile shows in the list of the other side,
+  added after the rows of that side, with an empty square (`_IsBarterSelected`) and the count that is in the pile, at the price
+  of its new side, and a click on it takes it out again; a row of its own side shows what is left of a stack that is partly in
+  a pile; a worn thing has the filled square. Nothing changes hands until Accept.
+- A row reads the name, with the count in brackets above one, and the price of ONE thing, as the executable writes it: two
+  dashes for nothing, tenths below 1, a whole number from 1. The line total is not shown in the list. The caps of each side are
+  written over its list as "caps, three spaces, number". The order of the rows is the order of the inventory model in the
+  executable, which was not followed (no sort call was found), so the port lists them by name.
+- In the middle the caps that would move are shown on the arrow (`BM_CapsFlow`; `_ArrowDirection` is 2, the file's second
+  picture, when the player is paid and 1 when it pays; nothing is set before the first pick, when the flow is hidden), faint when the vendor has less than it owes or the player has too little to pay. Accept works only
+  with something in a pile and, when the player pays, only with the caps for it; when the vendor owes it always works and the
+  payout is cut at what the vendor has. Exit asks "sCancelBarter" first when a pile has something in it; Escape does nothing in
+  that box. The letters of the file work: A is Accept and X is Exit.
+- Accept moves the things (a worn one is taken off first), then the caps (the vendor's container gets what the player pays and
+  the player what the vendor pays), adds the caps to the statistic "Barter Amount Traded" (id 0x27), and leaves the menu open with
+  empty piles.
+- The first key: with nothing picked, the first of the arrows (up, down, left or right, the same for all four) picks the first
+  row of the first list that has rows, the player's (round 12AH A4: every list row has `xdefault` 1 and the player's list is
+  first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
+  on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
+  selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
+- Fallout 3 (round 12AH A6, `Fallout3.exe` partly compared): the same menu class with another layout of fields and other
+  click ids (Exit 14 and a row 18, where New Vegas has 19 and 23); the file is the same, drawn by tile names. The close and its
+  BarterExit line, the cancel box, the quantity prompt, the arrow counters and the caps sounds were found the same; the price
+  has the same shape with the same settings and perk entry point, though where the executable writes the factors from the skill
+  was not found. Not compared: the commit, the conditions of Accept. Fallout 3 has no branch for the two New Vegas casino and
+  caravan form types (they are not in the data the port reads).
+- Sounds (round 12AH A5): the menu's own code makes one, at the end of the deal: `ITMBottlecapsUp` when the player was paid and
+  `ITMBottlecapsDown` when it paid, none for 0 (the script plays them). The rows of the lists make the sounds of the shared list
+  template, `UIMenuFocus` when the pointer or a key comes to a row and `UIMenuOK` when one is clicked; the buttons Accept and
+  Exit, the arrows and the title have none, and there is no sound when the menu opens. The pointer's sounds are the menu
+  module's (it plays what a tile's `mouseoversound` and `clicksound` name, see "Sounds of the menu files" below); the keys
+  play the two names of the list template.
+- Leaving: after a deal was made the vendor says a line of the dialogue topic of subtype BarterExit (the table of the engine's own
+  topics, kind 5 index 4; the response whose conditions pass, said by the speaker, then the dialogue menu is refreshed); leaving
+  without a deal says nothing, and nothing is said without a conversation open. The port says it the way a script's `Say` does
+  (`closeBarter` finds the topic by the editor id "BarterExit" and has the vendor say it: voice and subtitle; the line is not put
+  in the dialogue's own text, which the executable refreshes). Not seen in the running game.
+- The picture: while a thing is picked `BM_ItemIcon` shows the record's inventory icon (the ICON of the weapon, armor, ammunition,
+  aid, miscellaneous item, book, ingredient or mod, as `core.pipboy.barterRows` gives it in `icon`; armor takes the male
+  one), as the executable sets the tile's `filename` from the form (0x4be200). The pictures of the items are not in the files the
+  offline harness reads, so it was not drawn offline.
+- Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
+  first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
 ## The words of the labels
 

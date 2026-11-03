@@ -70,6 +70,54 @@ namespace OFLua
             { "AVLuck", "Luck" },
         };
 
+        sol::table itemRow(const sol::state_view& lua, const OFScript::FalloutScripts::PipboyItem& item)
+        {
+            sol::table row(lua, sol::create);
+            row["id"] = idText(item.mId);
+            row["name"] = item.mName;
+            row["count"] = item.mCount;
+            row["weight"] = item.mWeight;
+            row["value"] = item.mValue;
+            row["category"] = FalloutScript::Pipboy::categoryName(item.mCategory);
+            row["equipped"] = item.mEquipped;
+            row["damage"] = item.mDamage;
+            row["rating"] = item.mRating;
+            row["threshold"] = item.mThreshold;
+            row["key"] = item.mKey;
+            row["book"] = item.mBook;
+            row["hidden"] = item.mHidden;
+            row["usable"] = item.mUsable;
+            row["cardWeight"] = item.mCardWeight;
+            row["cardDamage"] = item.mCardDamage;
+            row["pellets"] = item.mPellets;
+            row["hasAmmo"] = item.mHasAmmo;
+            row["ammoName"] = item.mAmmoName;
+            row["clip"] = item.mClip;
+            row["loaded"] = item.mLoaded;
+            row["reserve"] = item.mReserve;
+            row["icon"] = item.mIcon;
+            return row;
+        }
+
+        /// The things picked out for a deal, as a list of tables with the id of an item and how many of it
+        OFScript::FalloutScripts::BarterPiles pilesOf(const sol::optional<sol::table>& table)
+        {
+            OFScript::FalloutScripts::BarterPiles piles;
+            if (!table)
+                return piles;
+            for (const auto& entry : *table)
+            {
+                if (!entry.second.is<sol::table>())
+                    continue;
+                const sol::table pick = entry.second.as<sol::table>();
+                const sol::optional<std::string> id = pick["id"];
+                const sol::optional<int> count = pick["count"];
+                if (id && count)
+                    piles.emplace_back(parseId(*id), *count);
+            }
+            return piles;
+        }
+
         sol::table perkRows(const sol::state_view& lua, const std::vector<OFScript::FalloutScripts::PipboyPerk>& perks)
         {
             sol::table rows(lua, sol::create);
@@ -237,32 +285,7 @@ namespace OFLua
             sol::table rows(lua, sol::create);
             int index = 1;
             for (const OFScript::FalloutScripts::PipboyItem& item : scripts().pipboyItems(holderOf(holder)))
-            {
-                sol::table row(lua, sol::create);
-                row["id"] = idText(item.mId);
-                row["name"] = item.mName;
-                row["count"] = item.mCount;
-                row["weight"] = item.mWeight;
-                row["value"] = item.mValue;
-                row["category"] = FalloutScript::Pipboy::categoryName(item.mCategory);
-                row["equipped"] = item.mEquipped;
-                row["damage"] = item.mDamage;
-                row["rating"] = item.mRating;
-                row["threshold"] = item.mThreshold;
-                row["key"] = item.mKey;
-                row["book"] = item.mBook;
-                row["hidden"] = item.mHidden;
-                row["usable"] = item.mUsable;
-                row["cardWeight"] = item.mCardWeight;
-                row["cardDamage"] = item.mCardDamage;
-                row["pellets"] = item.mPellets;
-                row["hasAmmo"] = item.mHasAmmo;
-                row["ammoName"] = item.mAmmoName;
-                row["clip"] = item.mClip;
-                row["loaded"] = item.mLoaded;
-                row["reserve"] = item.mReserve;
-                rows[index++] = row;
-            }
+                rows[index++] = itemRow(lua, item);
             return rows;
         };
         // The player puts on or takes off, eats or reads the item; what happened ("equipped", "unequipped", "used",
@@ -295,6 +318,64 @@ namespace OFLua
             return row;
         };
         api["closeLoot"] = []() { scripts().closeLoot(); };
+
+        // The barter menu a script showed (a conversation that ends in ShowBarterMenu): the character that trades, the
+        // holder of what it sells, its name, the percent the script gave, and a number that is another for each time a
+        // menu opens; nothing when none is open
+        api["barter"] = [lua]() -> sol::object {
+            const auto menu = scripts().barterMenu();
+            if (!menu)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["vendor"] = idText(menu->mVendor);
+            row["holder"] = idText(scripts().barterHolder(menu->mVendor));
+            row["name"] = menu->mName;
+            row["percent"] = menu->mPercent;
+            row["serial"] = menu->mSerial;
+            return row;
+        };
+        // What the menu lists on one side, "vendor" or "player": the things as `items` gives them, with the price of
+        // one
+        api["barterRows"] = [lua](std::string_view side) {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::BarterRow& entry : scripts().barterRows(side == "vendor"))
+            {
+                sol::table row = itemRow(lua, entry.mItem);
+                row["price"] = entry.mPrice;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+        // What the two piles come to, each a list of {id, count} (what the player buys from the vendor, what it
+        // sells): whether the piles are valid and empty, whether Accept works, the balance (plus when the vendor pays),
+        // the caps that move, the caps of both sides
+        api["barterQuote"] = [lua](sol::optional<sol::table> buy, sol::optional<sol::table> sell) {
+            const OFScript::FalloutScripts::BarterQuote quote = scripts().barterQuote(pilesOf(buy), pilesOf(sell));
+            sol::table row(lua, sol::create);
+            row["valid"] = quote.mValid;
+            row["empty"] = quote.mPilesEmpty;
+            row["accept"] = quote.mAccept;
+            row["balance"] = quote.mBalance;
+            row["amount"] = quote.mAmount;
+            row["playerCaps"] = quote.mPlayerCaps;
+            row["vendorCaps"] = quote.mVendorCaps;
+            return row;
+        };
+        // The player accepts the deal: {status = "done" | "empty" | "items" | "caps" | "closed", amount, received}
+        api["barterDeal"] = [lua](sol::optional<sol::table> buy, sol::optional<sol::table> sell) {
+            const OFScript::FalloutScripts::BarterOutcome outcome = scripts().barterDeal(pilesOf(buy), pilesOf(sell));
+            sol::table row(lua, sol::create);
+            row["status"] = outcome.mStatus;
+            row["amount"] = outcome.mAmount;
+            row["received"] = outcome.mReceived;
+            return row;
+        };
+        api["closeBarter"] = []() { scripts().closeBarter(); };
+
+        // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
+        // "ITMBottlecapsUp"), in 2D; false when the data has no such sound
+        api["playSoundNamed"] = [](std::string_view name) { return scripts().playInterfaceSound(name); };
 
         // The menu of recipes a script showed (a workbench, a reloading bench, a campfire): the category, its name, a
         // number that is another for each time a menu opens, and the recipes the player may use with what each takes

@@ -38,6 +38,9 @@ local TITLE_EXTRA, BUTTON_EXTRA = 100, 80
 local BUTTON_ROOM = 60
 -- The most the file lets the list of buttons be high (<min> 420 on its height): the rows beyond that scroll
 local LIST_MOST = 420
+-- The sounds that the rows of the buttons' list name in the file (prefabs\list_box_template.xml), for the keys that light
+-- or click a row as the pointer does
+local ROW_FOCUS, ROW_CLICK = 'UIMenuFocus', 'UIMenuOK'
 -- The icon of a message is not shown yet: the records that hold the pictures (MICN) are not read by the engine
 
 local shown = nil
@@ -51,6 +54,16 @@ local blocker = nil
 local ownsMode = false
 -- The game's own window is back in charge of the boxes (the file is not there, or does not have what the box needs)
 local given = false
+-- A box that a screen asked for (a question with buttons, I.FalloutMessage.ask), not the engine's: the box and what is
+-- called with the number of the button that was picked. It is drawn as the engine's boxes are and has the keys as they do.
+local asked = nil
+local askedSerial = 0
+
+-- The engine is told whether a question of a screen is open, so that the keys and buttons of the game (Escape, B) are not
+-- carried out under it as they are not under a box of the game's (the screen under it would close and its offer with it)
+local function tellQuestion()
+    if messagebox.setQuestion then messagebox.setQuestion(asked ~= nil) end
+end
 
 local function closeMode()
     if ownsMode then
@@ -77,12 +90,28 @@ local function giveBack()
     given = true
     close()
     messagebox.claim(false)
+    -- A question cannot be shown: its asker is told that no button was picked
+    if asked then
+        local callback = asked.callback
+        asked = nil
+        tellQuestion()
+        if callback then callback(nil) end
+    end
 end
 
 -- The button `index` (from 1) is picked: said once, the engine closes the box in the next frame
 local function press(index)
     if answered or not current then return end
     answered = true
+    if asked and current == asked.box then
+        -- The question of a screen is answered at once
+        local callback = asked.callback
+        asked = nil
+        tellQuestion()
+        close()
+        if callback then callback(index) end
+        return
+    end
     messagebox.press(index)
 end
 
@@ -200,6 +229,8 @@ local function show(box)
         return
     end
     serial, current, openFor, answered = box.serial, box, 0, false
+    -- The sound of a box when it opens (the one of the message when it names none, FalloutNV.exe 0x7a92e0, round 12AH A5)
+    shown:playSound('UIPopUpMessageWindow')
     -- Over a screen that is open the box's background is almost opaque: the game's code writes the alpha of the file's
     -- background tile as the setting fPopUpBackgroundOpacity (0.87 in the INI of both games) when a menu is open under
     -- the box (FalloutNV.exe 0x7a8d10, round 12AG); over the plain world the file's own alpha stays
@@ -227,13 +258,25 @@ local function onKey(key)
             local at = list.selected()
             local step = code == KEY.UpArrow and -1 or 1
             if at == 0 then at = step > 0 and 0 or count + 1 end
-            list.select(math.max(1, math.min(count, at + step)), true)
+            local lit = list.selected()
+            local to = math.max(1, math.min(count, at + step))
+            list.select(to, true)
+            -- A key that lights another row makes the sound the row names (the list rows' mouseoversound, round 12AH A5)
+            if to ~= lit then shown:playSound(ROW_FOCUS) end
             return
         end
-        if code == KEY.Enter or code == KEY.Space then
-            -- The lit button, and the first one when none is lit
+        if code == KEY.Space then
+            -- The game's code takes the key and does nothing with it (Mac round 12AG A1)
+            return
+        end
+        if code == KEY.Enter then
+            -- The button that is lit (picked with the arrows, or the one under the pointer) is clicked; with none lit
+            -- nothing happens, as in the game, where no button is lit when the box opens (round 12AH A4)
             local at = list.selected()
-            press(at > 0 and at or 1)
+            if at > 0 then
+                shown:playSound(ROW_CLICK)
+                press(at)
+            end
             return
         end
     end
@@ -242,7 +285,10 @@ local function onKey(key)
     if symbol == '' then return end
     for index, letter in ipairs(hotkeysOf(current.buttons)) do
         if letter:upper() == symbol:upper() then
-            if index <= count then press(index) end
+            if index <= count then
+                shown:playSound(ROW_CLICK)
+                press(index)
+            end
             return
         end
     end
@@ -268,14 +314,25 @@ return {
         version = 1,
         -- Whether a message box is open, drawn here or in the window of the engine (which does not take every key): the
         -- screens under it leave the keys, the pad and the wheel to it
-        isOpen = function() return shown ~= nil or messagebox.current() ~= nil end,
+        isOpen = function() return shown ~= nil or asked ~= nil or messagebox.current() ~= nil end,
+        -- A screen asks the player a question in a box of the game's own look: `text` is the words, `buttons` the
+        -- labels (a '&' marks the letter that picks one), and `callback(index)` is called with the place of the button
+        -- that was picked (from 1), or with nothing when the box cannot be shown. False when it cannot be asked.
+        ask = function(text, buttons, callback)
+            if given or asked then return false end
+            askedSerial = askedSerial + 1
+            asked = { box = { serial = -askedSerial, lua = true, title = '', body = text, buttons = buttons }, callback = callback }
+            tellQuestion()
+            return true
+        end,
     },
     engineHandlers = {
         onFrame = function()
             if given then return end
             -- The script says every frame that it draws the boxes: a script that is gone stops being asked
             messagebox.claim(true)
-            local box = messagebox.current()
+            if asked then tellQuestion() end
+            local box = asked and asked.box or messagebox.current()
             -- A box that the window manager has made its own window for (it opened before the claim, or the claim ran
             -- out) is that window's: it is not drawn a second time
             if not box or not box.lua then

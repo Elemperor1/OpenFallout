@@ -277,6 +277,20 @@ namespace OFScript
         mInterpreter.setHandler("ShowRecipeMenu", [this](FalloutScript::CallContext& call) {
             return openRecipes(FalloutScript::formArgument(call, 0)) ? 1.0 : 0.0;
         });
+        // The barter menu of a conversation: the character the script is called on trades with the player, and the
+        // screen shows it. The argument is the percent the vendor gives (or asks for) on top of the prices.
+        mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
+            return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
+        });
+        // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
+        mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
+            setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));
+            return 0.0;
+        });
+        mInterpreter.setHandler("RemoveMerchantContainer", [this](FalloutScript::CallContext& call) {
+            setMerchantContainer(call.mReference, 0);
+            return 0.0;
+        });
         // V.A.T.S. is open while the screen of Lua says so
         mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
@@ -488,6 +502,12 @@ namespace OFScript
             mPendingMade.clear();
             mMadeBases.clear();
             mMadeCount = 0;
+        }
+        {
+            // What scripts gave a vendor to sell from, and the menu that was open, are not for the next game
+            const std::lock_guard merchants(mBarterMutex);
+            mMerchantContainers.clear();
+            mBarter.reset();
         }
         // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
         mFightTraits.clear();
@@ -1538,8 +1558,27 @@ namespace OFScript
 
     bool FalloutScripts::luaMessageOpen() const
     {
-        const std::lock_guard lock(mOpenMessageMutex);
-        return mOpenMessage && mOpenMessage->mLua;
+        {
+            const std::lock_guard lock(mOpenMessageMutex);
+            if (mOpenMessage && mOpenMessage->mLua)
+                return true;
+        }
+        const std::int64_t askedAt = mLuaQuestionAt.load();
+        if (askedAt == 0)
+            return false;
+        const std::int64_t since
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            - askedAt;
+        return since < 1000;
+    }
+
+    void FalloutScripts::setLuaQuestion(bool open)
+    {
+        mLuaQuestionAt = open
+            ? std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            : 0;
     }
 
     bool FalloutScripts::pressMessageButton(std::size_t button)
@@ -3434,6 +3473,49 @@ namespace OFScript
         const std::lock_guard lock(mSoundFilesMutex);
         mSoundFiles.emplace(id, files);
         return files;
+    }
+
+    FalloutScript::FormId FalloutScripts::soundByEditorId(std::string_view name)
+    {
+        const std::lock_guard lock(mSoundNamesMutex);
+        if (!mSoundNamesBuilt)
+        {
+            mSoundNamesBuilt = true;
+            for (const ESM4::Sound& sound : mStore.get<ESM4::Sound>())
+                if (!sound.mEditorId.empty())
+                    mSoundNames.emplace(Misc::StringUtils::lowerCase(sound.mEditorId), sound.mId.toUint32());
+        }
+        const auto found = mSoundNames.find(Misc::StringUtils::lowerCase(name));
+        return found != mSoundNames.end() ? found->second : 0;
+    }
+
+    bool FalloutScripts::playInterfaceSound(std::string_view name)
+    {
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (sound == nullptr)
+            return false;
+        const FalloutScript::FormId id = soundByEditorId(name);
+        const std::vector<std::string> files = id != 0 ? soundFilesOf(id) : std::vector<std::string>();
+        {
+            // Said once for each name: what the data gives, as the file that the interface plays
+            const std::lock_guard lock(mSoundNamesMutex);
+            if (mInterfaceSoundsLogged.emplace(Misc::StringUtils::lowerCase(name)).second)
+            {
+                if (id == 0)
+                    Log(Debug::Warning) << "Interface sound " << name << ": no sound record has this editor id";
+                else if (files.empty())
+                    Log(Debug::Warning) << "Interface sound " << name << ": the sound record has no file";
+                else
+                    Log(Debug::Info) << "Interface sound " << name << ": " << files.size() << " file(s), the first is "
+                                     << files[0];
+            }
+        }
+        if (files.empty())
+            return false;
+        // The interface's sounds are one file each; a sound that names a folder plays its first file
+        sound->playSound(
+            VFS::Path::Normalized(files[0]), 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::OverlapNoEnv);
+        return true;
     }
 
     std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)

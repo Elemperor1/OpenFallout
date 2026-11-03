@@ -120,6 +120,26 @@ end
 local Shown = {}
 Shown.__index = Shown
 
+-- The sound a tile names in its trait `clicksound` or `mouseoversound`, as an editor id of the games' sound records ("UIMenuOK"),
+-- and the tile that names it: the one hit (the box inside a button) or the first of those above it that does (the button; the
+-- hotrect of a list row). The games play it when the tile is clicked or the pointer comes to it (Mac round 12AH A5).
+local function soundOf(menu, tile, trait)
+    while tile do
+        local name = menu:getText(tile, trait)
+        if name and name ~= '' then
+            return name:match('^%s*(.-)%s*$'), tile
+        end
+        tile = menu:parent(tile)
+    end
+    return nil, nil
+end
+
+local function playNamed(name)
+    if name and name ~= '' and core.pipboy and core.pipboy.playSoundNamed then
+        core.pipboy.playSoundNamed(name)
+    end
+end
+
 -- Draw the menu again if anything it depends on changed
 function Shown:refresh()
     if not self.element or self.batching then return end
@@ -158,6 +178,7 @@ end
 
 -- Run what a script has asked for when a tile is clicked (by name, and by the name of the menu file's tile)
 function Shown:dispatch(tile)
+    playNamed((soundOf(self.menu, tile, 'clicksound')))
     -- The tile that was hit may be a box inside the button (the hotrect round it is what the script asked about)
     local target = tile
     while target do
@@ -364,6 +385,12 @@ function Shown:pcButton(symbol)
     return true
 end
 
+-- Play a sound of the games by its editor id, for what the keys do that the pointer does in the file (a key that lights a
+-- row or clicks one makes the sound the row's tile names)
+function Shown:playSound(name)
+    playNamed(name)
+end
+
 function Shown:close()
     if self.element then
         self.element:destroy()
@@ -398,7 +425,13 @@ function module.open(file, options)
             mouseMove = async:callback(function(e)
                 shown.pointer = { x = e.offset.x, y = e.offset.y, startX = shown.pointer and shown.pointer.startX,
                     startY = shown.pointer and shown.pointer.startY }
-                shown.menu:pointerMoved(e.offset.x, e.offset.y)
+                local over = shown.menu:pointerMoved(e.offset.x, e.offset.y)
+                -- The pointer comes to a tile that has a sound for it (not again for each box inside the same button)
+                local sound, owner = soundOf(shown.menu, over, 'mouseoversound')
+                if owner ~= shown.soundOwner then
+                    shown.soundOwner = owner
+                    playNamed(sound)
+                end
                 -- A tile the code moves with the drag follows the pointer
                 local hook = shown:dragHook()
                 if hook and hook.move then hook.move() end

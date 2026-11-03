@@ -88,4 +88,26 @@ namespace
         EXPECT_FALSE(references[0].mOpenByDefault);
         EXPECT_FALSE(references[1].mOpenByDefault);
     }
+
+    TEST(ESM4MerchantContainerTest, a_placed_character_names_the_container_it_sells_from)
+    {
+        const auto characters = loadRecords<ESM4::ActorCharacter>("ACHR",
+            record("ACHR", 0x806,
+                valueSubRecord<std::uint32_t>("XMRC", 0x00000813) + valueSubRecord<std::uint32_t>("XCNT", 1)));
+
+        ASSERT_EQ(characters.size(), 1u);
+        EXPECT_EQ(characters[0].mMerchantContainer.toUint32(), 0x813u);
+        EXPECT_EQ(characters[0].mCount, 1);
+    }
+
+    TEST(ESM4MerchantContainerTest, a_character_with_no_container_or_one_of_another_size_sells_from_none)
+    {
+        const auto characters = loadRecords<ESM4::ActorCharacter>("ACHR",
+            record("ACHR", 0x807, valueSubRecord<std::uint32_t>("XSCL", 0))
+                + record("ACHR", 0x808, subRecord("XMRC", bytePattern(6, 3))));
+
+        ASSERT_EQ(characters.size(), 2u);
+        EXPECT_TRUE(characters[0].mMerchantContainer.isZeroOrUnset());
+        EXPECT_TRUE(characters[1].mMerchantContainer.isZeroOrUnset());
+    }
 }

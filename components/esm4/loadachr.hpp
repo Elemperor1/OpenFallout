@@ -61,6 +61,8 @@ namespace ESM4
 
         std::int32_t mCount = 1;
 
+        ESM::FormId mMerchantContainer; // XMRC, the container whose things the actor sells when it trades
+
         std::vector<LinkedReference> mLinkedRefs;
 
         void load(ESM4::Reader& reader);
