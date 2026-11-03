@@ -33,6 +33,11 @@ these from the pointer, and the renderer sets them:
 - `mouseover` is 1 on the tile under the pointer. `clicked` and `wheelmoved` only go up (`wheelmoved` goes down for a turn
   of the wheel away from the player); scrollbars and arrows subtract the counters. `dragstartx/y` is -1 while nothing is
   dragged; `dragx/dragy` are the pointer's place in the parent while dragging.
+- A box or a text that the pointer is over also puts `mouseover` and `clicked` on the hotrects around it that have `target` (a
+  tab button is a hotrect with a text box in it, and the file reads the hotrect). An image or a hotrect that has `target`
+  is over alone: the arrows of a toggle or a meter show when exactly one of the row, an arrow and the value is over (the
+  file adds their `mouseover` and compares the sum with 1), so a row that stayed over under an arrow would hide both and
+  the click would fall on the value (found in the running game, round 12AC).
 - A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
   and so are its children.
 - A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).
@@ -226,7 +231,7 @@ Not done: the sounds, and everything on this page is checked in the offline harn
 ### Message boxes
 
 `falloutmessage.lua` draws the message boxes of the scripts (a `ShowMessage` with buttons, and the box that names a
-reputation) on `message_menu.xml`. The engine keeps the queue and the answer (`core.messagebox`: `current()` gives the
+reputation) on `message_menu.xml`. The engine keeps the queue and the answer (`core.messageBox`: `current()` gives the
 box that is open with its `title`, `body`, `buttons`, `timed` and `time`; `press(n)` is the button picked; `claim(true)`,
 said every frame, tells the engine that the script draws the boxes, so that it makes no window of its own, and
 `claim(false)` gives them back, which the script does when the file is not in the install). Read from `FalloutNV.exe`
@@ -246,10 +251,17 @@ said every frame, tells the engine that the script draws the boxes, so that it m
 - The buttons are the rows of `MM_ButtonTemplate`, in the order of the record, one click id for all (7); the list is as
   high as the rows are together, up to the file's 420, and scrolls beyond that. The file's own scrollbar rule counts every
   row as one step of 26 units, which shows the bar for a box that fits, so the script says when it is shown.
-- A message with no button closes itself when its display time (the record's `TNAM`) is over, and shows no button. Boxes
-  queue one after the other and a new one does not replace the open one.
-- Keys: Escape picks the last button; a letter picks the first button whose words start with it. Arrows, Enter and Space
-  (the lit button, or the first) are the port's own; the executable leaves them to the list.
+- A message with the box flag and no button has one button, "OK" (the literal of the executable, in capitals, not the
+  word of the setting `sOk`; the engine adds it), and stays until it is picked: the display time of a message (`TNAM`) is
+  the one of the notification in the corner of the screen (a message without the box flag), and the box of `ShowMessage`
+  is made with the time 0, which closes nothing (round 12AE). A button whose conditions fail keeps its place with empty
+  words in the game (the port leaves it out). Boxes queue one after the other and a new one does not replace the open one.
+- Keys: Space picks the lit button; a letter picks the button that has it marked with a `&` in its words (a plain "OK" has
+  none; the words are shown without the `&`: not read from the executable yet). Escape does nothing: the code picks the
+  last button with it except in a box of `ShowMessage`, which ignores it. Arrows and Enter (the lit button, or the first)
+  are the port's own. The pad: the engine's pad handling steps aside while a box that the script draws is open, so the
+  script takes the pad itself: D-pad up and down move the lit button, A picks it, B does nothing (as Escape; not seen in
+  the running game yet).
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
@@ -356,8 +368,13 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   the menu; while it does the engine's own buttons are not shown, and a script that fails (or an install without the file) gives the menu
   back within a second. In a screen below the list Escape and the B button are the script's (they go back one step); in the
   list the engine closes the menu with them. Settings opens the game's own settings screens (below).
-- Not read yet, so estimated: where the question's container is (the file leaves its place to the code: it is put at the
-  list's side, in the middle of the window's height), which tile is lit first (the first row), and the format of the time
+- Where the question's container is: the file says its `x`, `y` and `width` are "set in code", but round 12AC found no code
+  in `StartMenu` that sets a position or a size for the container or for the panel of the lit save (only the strings, the
+  fades, the user traits, and one `y` shift of a tile on a wide screen), so the port puts the container at the list's side, in
+  the middle of the window's height (an estimate, as the question's own tile sits 20 units to the left of it, right-aligned).
+  The panel of the lit save goes with the list of saves (it is hidden while the question is shown: the first run in the
+  game, round 12AB, drew the question over its play-time line). Not read yet, so estimated: which tile is lit first (the
+  first row), and the format of the time
   played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
   picture there). The sounds (hover, click, back) were not found. Nothing was seen in the running game.
 
@@ -407,9 +424,23 @@ The menu files take the words of their labels from game settings (`<string> &-sC
 those words in their executables, and the plugins only hold the settings that were changed from them, so reading the plugins
 gives nothing for OK, Cancel, Take All, the titles and the names of the cards: the first run on the real data showed those
 labels blank (the number of pieces of each menu with no words matched the count the engine gave exactly). `gameSettingText`
-now answers from the plugins when a record has the text, and otherwise from `components/falloutscript/settingtext.cpp`, a
-table of the port's own wording for the 120-odd labels the screens drawn from the files use (not a copy of the executables'
-table; a game in another language gets its words from its plugin). The card, caravan and roulette games' words are not in it.
+now answers in this order: a plugin that has a record with the text (a game in another language); the default text that
+the player's own executable holds; the port's own wording in `components/falloutscript/settingtext.cpp`, a table of about
+175 labels that the screens drawn from the files use (not a copy of the executables' table; it is only the answer for an
+install whose executable is not found, and for the offline tests).
+
+The executable is read once at start-up (`FalloutScripts::loadExecutableTexts`, `components/falloutscript/exesettings.*`): the
+file `FalloutNV.exe` or `Fallout3.exe` next to the `Data` directory (or in it), the one of the game that is played first.
+Every string setting is built by a static initialiser, and a plain scan of the image finds them without a disassembler,
+by two layouts that were read in round 12AC: the code `68 <text> 68 <name> B9 <object> E8` (or `... 8B C8+n E8`: push the
+address of the default text, push the address of the name, load `ecx`, call the constructor), and, in Fallout3.exe for most
+of the settings, a table in the data of records of three addresses (text, name, table of functions). Round 12AC counted
+1319 string settings in FalloutNV.exe and 1371 in Fallout3.exe this way, and every one of the 55 names the settings
+screens use was found in New Vegas (49 in Fallout 3). The texts are converted to UTF-8 from the code page that is set for the data of the game (`encoding`; Windows-1252 by default); nothing of them
+is kept in the repository or the user's files, and the line `Settings texts: N read from <path>` in the log says that it
+worked. Before that (round 12AB, first run of the settings screens) every label of them was drawn as the name of its
+setting, since the table had none of them and the plugins hold none. The card, caravan and roulette games' words are
+found the same way.
 
 ## What was read from the executable
 

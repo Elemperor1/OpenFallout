@@ -156,6 +156,17 @@ local function playTime(seconds)
     return string.format('%03d.%02d.%02d', days, hours, minutes)
 end
 
+local function hidePanel()
+    panelFor = nil
+    shown:batch(function()
+        -- (the version of the save, which New Vegas has a tile for, and the picture of the save are not shown)
+        for _, tile in ipairs({ 'saveload_playername', 'saveload_playerlevel', 'saveload_playtime',
+            'saveload_screenshot' }) do
+            shown:set(tile, 'visible', 0)
+        end
+    end)
+end
+
 local function showScreen(name)
     screen = name
     shown:batch(function()
@@ -167,17 +178,9 @@ local function showScreen(name)
         -- the question has its own way out (its last choice), so Back is only in the lists of saves and of the settings
         fade('main_back_button', name == 'save' or name == 'load' or name == 'settings' or name == 'options')
     end)
-end
-
-local function hidePanel()
-    panelFor = nil
-    shown:batch(function()
-        -- (the version of the save, which New Vegas has a tile for, and the picture of the save are not shown)
-        for _, tile in ipairs({ 'saveload_playername', 'saveload_playerlevel', 'saveload_playtime',
-            'saveload_screenshot' }) do
-            shown:set(tile, 'visible', 0)
-        end
-    end)
+    -- the panel of the save that is lit goes with the list of saves (the file shows it only while that is shown): the
+    -- question that comes after a pick is not drawn over it
+    if name ~= 'save' and name ~= 'load' then hidePanel() end
 end
 
 local showList, showSaves, ask, showSettings, showOptions

@@ -49,7 +49,15 @@ namespace OFInput
                 // Don't trust isprint for symbols outside the extended ASCII range
                 ((kc == MyGUI::KeyCode::None && arg.keysym.sym > 0xff)
                     || (arg.keysym.sym >= 0 && arg.keysym.sym <= 255 && std::isprint(arg.keysym.sym))));
-        if (kc != MyGUI::KeyCode::None && !mBindingsManager->isDetectingBindingState())
+        // Tab is the key of the Pip-Boy, which it closes as it opens it: while the Pip-Boy is the screen (the mode of
+        // the interface, in a game that has one: the inventory window of the engine keeps its key navigation) the key
+        // navigation of the windows would take it (it moves the key focus), so it is not given to them then; in any
+        // other window, with a text that is typed and with a window of the engine that has the keys it does what it did
+        const bool pipboyKey = kc == MyGUI::KeyCode::Tab && !taken && !SDL_IsTextInputActive()
+            && OFBase::Environment::get().hasFalloutScripts()
+            && OFBase::Environment::get().getWindowManager()->getMode() == OFGui::GM_Inventory
+            && mBindingsManager->getKeyBinding(A_Inventory) == arg.keysym.scancode;
+        if (kc != MyGUI::KeyCode::None && !mBindingsManager->isDetectingBindingState() && !pipboyKey)
         {
             if (OFBase::Environment::get().getWindowManager()->injectKeyPress(kc, 0, arg.repeat))
                 consumed = true;

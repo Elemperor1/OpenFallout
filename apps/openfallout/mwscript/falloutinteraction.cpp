@@ -14,6 +14,7 @@
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/interaction.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -803,23 +804,37 @@ namespace OFScript
             info.mOutside = inOpenWorld(mPlayer);
             info.mLocation = std::string(world.getCellName(player.getCell()));
             if (info.mOutside)
+            {
                 info.mWorldspace = worldspaceOf(mPlayer);
+                if (info.mWorldspace != 0)
+                    mLastOpenSpace = info.mWorldspace;
+            }
         }
-        // Inside a building the map is the one of the first place the player has found
+        // Inside a building the map is the one of the world outside: the last the player stood in, and the main world
+        // of the game when it has not been outside yet (the first place that the player had found was a world of an
+        // add-on in the first run)
         if (info.mWorldspace == 0)
         {
-            for (const PlacedMarker& marker : placedMarkers())
-            {
-                if (marker.mWorldspace != 0 && mMapMarkers.state(marker.mId) != 0)
-                {
-                    info.mWorldspace = marker.mWorldspace;
-                    break;
-                }
-            }
+            placedMarkers();
+            info.mWorldspace = mLastOpenSpace != 0 ? mLastOpenSpace : mMainSpace;
         }
         if (info.mWorldspace != 0)
         {
-            if (const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(info.mWorldspace)))
+            const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(info.mWorldspace));
+            // Said once for each world space the page asks about: a page with no picture and no markers is either a
+            // space the plugins do not hold or one whose record has no map
+            if (info.mWorldspace != mMapSpaceTold)
+            {
+                mMapSpaceTold = info.mWorldspace;
+                Log(Debug::Info) << "Map of the world space " << FalloutScript::hex(info.mWorldspace) << ": "
+                                 << (space == nullptr ? "no record" : "record found") << ", name of "
+                                 << (space != nullptr ? space->mFullName.size() : 0) << " characters, picture of "
+                                 << (space != nullptr ? space->mMapFile.size() : 0) << " characters, "
+                                 << (space != nullptr ? space->mMap.width : 0) << "x"
+                                 << (space != nullptr ? space->mMap.height : 0) << " units, outside "
+                                 << (info.mOutside ? "yes" : "no");
+            }
+            if (space != nullptr)
             {
                 info.mWorldName = space->mFullName;
                 info.mMapFile = space->mMapFile;
@@ -1019,6 +1034,8 @@ namespace OFScript
         if (player.isEmpty() || !player.isInCell() || !inOpenWorld(mPlayer))
             return;
         const FalloutScript::FormId space = worldspaceOf(mPlayer);
+        if (space != 0)
+            mLastOpenSpace = space;
         const osg::Vec3f here = player.getRefData().getPosition().asVec3();
         const double reach = gameSetting("iMapMarkerRevealDistance", 1000);
         for (const PlacedMarker& marker : placedMarkers())

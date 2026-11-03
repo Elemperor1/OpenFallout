@@ -20,9 +20,11 @@
 #include <components/esm4/loadqust.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/script.hpp>
+#include <components/falloutscript/exesettings.hpp>
 #include <components/falloutscript/levelling.hpp>
 #include <components/falloutscript/perks.hpp>
 #include <components/falloutscript/settingtext.hpp>
+#include <components/files/conversion.hpp>
 #include <components/misc/strings/lower.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -68,8 +70,38 @@ namespace OFScript
         if (found != mGameSettingTexts->end() && !found->second.empty())
             return found->second;
         // The words of the labels are in the executables of the games, not in the plugins (unless a plugin changed
-        // them)
+        // them): the executable of the player's own copy when it was found, else the port's own words
+        const auto executable = mExecutableTexts.find(Misc::StringUtils::lowerCase(name));
+        if (executable != mExecutableTexts.end() && !executable->second.empty())
+            return executable->second;
         return std::string(FalloutScript::SettingText::standIn(name));
+    }
+
+    void FalloutScripts::loadExecutableTexts(
+        const std::vector<std::filesystem::path>& dataDirs, const ToUTF8::StatelessUtf8Encoder* encoder)
+    {
+        // Tale of Two Wastelands has the data of both games: the executable of the one that is played comes first, and
+        // the other one gives what the first has not
+        const bool newVegas = mGame == FalloutScript::Game::NewVegas;
+        const std::array<std::string_view, 2> executables
+            = { newVegas ? "FalloutNV.exe" : "Fallout3.exe", newVegas ? "Fallout3.exe" : "FalloutNV.exe" };
+        FalloutScript::ExeSettings::Texts texts;
+        for (const std::string_view executable : executables)
+        {
+            const std::filesystem::path path = FalloutScript::ExeSettings::find(dataDirs, executable);
+            if (path.empty())
+                continue;
+            FalloutScript::ExeSettings::Texts found = FalloutScript::ExeSettings::read(path, encoder);
+            Log(Debug::Info) << "Settings texts: " << found.size() << " read from " << Files::pathToUnicodeString(path);
+            for (auto& [name, text] : found)
+                texts.emplace(name, std::move(text));
+        }
+        if (texts.empty())
+            Log(Debug::Info)
+                << "Settings texts: no executable of the game found next to its data, the port's own words "
+                   "are used for the labels";
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        mExecutableTexts = std::move(texts);
     }
 
     std::vector<FalloutScripts::PipboyItem> FalloutScripts::pipboyItems(FalloutScript::FormId holder)

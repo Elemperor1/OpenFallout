@@ -116,6 +116,9 @@ namespace OFBase
 
         /// The compiled scripts of Fallout 3 and New Vegas
         Misc::NotNullPtr<OFScript::FalloutScripts> getFalloutScripts() const { return mFalloutScripts; }
+        /// Whether the game has the scripts of the Fallout games yet (the getter above is not for a question: it
+        /// asserts while they are not there, as they are not before the engine has made them)
+        bool hasFalloutScripts() const { return mFalloutScripts != nullptr; }
 
         Misc::NotNullPtr<WindowManager> getWindowManager() const { return mWindowManager; }
 

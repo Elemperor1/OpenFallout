@@ -197,6 +197,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testqueries.cpp
     falloutscript/testreferencestate.cpp
     falloutscript/testsettingtext.cpp
+    falloutscript/testexesettings.cpp
     falloutscript/testswitches.cpp
     falloutscript/testreputation.cpp
     falloutscript/testsavecharacters.cpp

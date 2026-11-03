@@ -26,6 +26,53 @@ namespace
             EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
     }
 
+    TEST(FalloutSettingText, the_settings_screens_have_the_words_of_their_labels_and_values)
+    {
+        // The four submenus, the items of each, and the words a toggle goes through (the names are the ones rounds 12W
+        // and 12Y read from the executable). The offline harness answers every name with a word of its own, so a name
+        // that is missing here shows as the name itself in the running game (round 12AB)
+        for (const char* name :
+            { "sGameplay", "sDisplay", "sAudio", "sControls", "sKillCamMode", "sKillCamModeNone", "sKillCamModePlayer",
+                "sKillCamModeCinematic", "sHardcore", "sDifficulty", "sLockLevelNameVeryEasy", "sLockLevelNameEasy",
+                "sNormal", "sLockLevelNameHard", "sLockLevelNameVeryHard", "sSaveOnRest", "sSaveOnWait",
+                "sSaveOnTravel", "sTrueIronSights", "sOn", "sOff", "sBrightness", "sHUDOpacity", "sHUDColor",
+                "sPipboyColor", "sGreen", "sBlue", "sAmber", "sWhite", "sTextureSize", "sLarge", "sMedium", "sSmall",
+                "sActorFade", "sItemFade", "sObjectFade", "sGrassFade", "sShadowFade", "sLightFade", "sSpecularityFade",
+                "sObjectLODFade", "sTreeLODFade", "sCrosshair", "sDialogSubtitles", "sGeneralSubtitles",
+                "sMasterVolume", "sMusicVolume", "sFootstepsVolume", "sVoiceVolume", "sEffectsVolume", "sRadioVolume",
+                "sCameraPitch", "sMouseSensitivity", "sDisableXBoxController", "sRumble" })
+            EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
+    }
+
+    TEST(FalloutSettingText, the_words_of_the_settings_screens_have_the_lengths_the_executables_give_them)
+    {
+        // Read from the default texts of FalloutNV.exe (round 12AC; Fallout3.exe has the same lengths where it has the
+        // setting): the length of each word. 37 of the words are the executable's text, byte for byte; the others are
+        // words of that length in the executable's capitals
+        const std::pair<const char*, size_t> lengths[] = { { "sGameplay", 8 }, { "sDisplay", 7 }, { "sAudio", 5 },
+            { "sControls", 8 }, { "sKillCamMode", 13 }, { "sKillCamModeNone", 4 }, { "sKillCamModePlayer", 11 },
+            { "sKillCamModeCinematic", 9 }, { "sHardcore", 13 }, { "sDifficulty", 10 }, { "sLockLevelNameVeryEasy", 9 },
+            { "sLockLevelNameEasy", 4 }, { "sNormal", 6 }, { "sLockLevelNameHard", 4 }, { "sLockLevelNameVeryHard", 9 },
+            { "sSaveOnRest", 12 }, { "sSaveOnWait", 12 }, { "sSaveOnTravel", 14 }, { "sTrueIronSights", 16 },
+            { "sOn", 2 }, { "sOff", 3 }, { "sBrightness", 10 }, { "sHUDOpacity", 11 }, { "sHUDColor", 9 },
+            { "sPipboyColor", 13 }, { "sGreen", 5 }, { "sBlue", 4 }, { "sAmber", 5 }, { "sWhite", 5 },
+            { "sTextureSize", 12 }, { "sLarge", 5 }, { "sMedium", 6 }, { "sSmall", 5 }, { "sActorFade", 10 },
+            { "sItemFade", 9 }, { "sObjectFade", 11 }, { "sGrassFade", 10 }, { "sShadowFade", 11 },
+            { "sLightFade", 10 }, { "sSpecularityFade", 16 }, { "sObjectLODFade", 15 }, { "sTreeLODFade", 13 },
+            { "sCrosshair", 9 }, { "sDialogSubtitles", 16 }, { "sGeneralSubtitles", 17 }, { "sMasterVolume", 6 },
+            { "sMusicVolume", 5 }, { "sFootstepsVolume", 8 }, { "sVoiceVolume", 5 }, { "sEffectsVolume", 7 },
+            { "sRadioVolume", 5 }, { "sCameraPitch", 8 }, { "sMouseSensitivity", 17 }, { "sDisableXBoxController", 14 },
+            { "sRumble", 9 } };
+        for (const auto& [name, length] : lengths)
+            EXPECT_EQ(SettingText::standIn(name).size(), length) << name;
+        // the switch words and two of the colours are in capitals, the volumes are one word each
+        EXPECT_EQ(SettingText::standIn("sOn"), "ON");
+        EXPECT_EQ(SettingText::standIn("sOff"), "OFF");
+        EXPECT_EQ(SettingText::standIn("sAmber"), "AMBER");
+        EXPECT_EQ(SettingText::standIn("sWhite"), "WHITE");
+        EXPECT_EQ(SettingText::standIn("sSaveOnTravel"), "Save On Travel");
+    }
+
     TEST(FalloutSettingText, the_words_of_the_data_page_have_the_lengths_the_executables_give_them)
     {
         // Read from the default texts of FalloutNV.exe and Fallout3.exe (the same in both): the length of each, and

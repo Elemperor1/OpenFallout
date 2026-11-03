@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -97,6 +98,11 @@ namespace Loading
     class Listener;
 }
 
+namespace ToUTF8
+{
+    class StatelessUtf8Encoder;
+}
+
 namespace OFRender
 {
     class ObjectAnimation;
@@ -170,6 +176,15 @@ namespace OFScript
 
         /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
         void setContentFiles(std::vector<std::string> files);
+
+        /// Read the default texts of the game's string settings from its executable, which is next to the `Data`
+        /// directory of one of these directories (the plugins hold only the settings that were changed from their
+        /// defaults, and the labels of the screens, the texts of the terminals and the counters of the level-up screen
+        /// are defaults). The executable of the game that is played is read first, then the other one. A game without
+        /// its executable next to the data is left with the port's own words for the labels. The texts are made UTF-8
+        /// with `encoder`, the code page that is set for the data of the game (Windows-1252 when there is none).
+        void loadExecutableTexts(
+            const std::vector<std::filesystem::path>& dataDirs, const ToUTF8::StatelessUtf8Encoder* encoder = nullptr);
 
         /// A saved game holds what the games keep (the stages of the quests, the variables of scripts, what characters
         /// carry, who is dead ...) as sections, one record each (REC_FOSV), after those of the world. A save that has
@@ -611,6 +626,14 @@ namespace OFScript
             double mHour = 0;
         };
         MapInfo mapInfo();
+        /// The world space whose map was last said in the log (once for each, see `mapInfo`)
+        FalloutScript::FormId mMapSpaceTold = 0;
+        /// The world space the player last stood in outside (0 before): the map of a building is the one of the world
+        /// outside it
+        FalloutScript::FormId mLastOpenSpace = 0;
+        /// The world space that holds the most map markers (the main world of the game: the Mojave, the Capital
+        /// Wasteland), found once with the markers: the map of a building when the player has not been outside
+        FalloutScript::FormId mMainSpace = 0;
         /// The player goes to a marker at once: the text of why not, empty when it did
         std::string travelTo(FalloutScript::FormId marker);
 
@@ -1615,6 +1638,10 @@ namespace OFScript
         /// When Lua last said it draws them (milliseconds of the steady clock): a script that has stopped (the game
         /// was left, another was loaded) no longer draws, and the next box is the window manager's
         std::atomic<std::int64_t> mMessagesClaimedAt{ 0 };
+        /// How many times it said so since it last gave them back (1 is the claim of the script when it was loaded)
+        std::atomic<int> mMessageClaims{ 0 };
+        /// The script says it draws them and said it within `leaseMilliseconds` (any thread)
+        bool luaClaimIsFresh(std::int64_t leaseMilliseconds) const;
         std::atomic<int> mLuaPressed{ -1 };
         std::uint64_t mOpenBoxId
             = 0; // the box of the window manager that shows it, to tell it from one that replaced it
@@ -1730,6 +1757,9 @@ namespace OFScript
         std::optional<std::map<std::string, double>> mGameSettingValues;
         /// The settings that are texts, by name (under mDerivedSettingsMutex as well)
         std::optional<std::map<std::string, std::string>> mGameSettingTexts;
+        /// The default texts of the settings that the executables of the games build, by name in lower case (under
+        /// mDerivedSettingsMutex as well)
+        std::map<std::string, std::string> mExecutableTexts;
         /// What the player has open to take things from, under mLootMutex
         std::mutex mLootMutex;
         std::optional<Loot> mLoot;

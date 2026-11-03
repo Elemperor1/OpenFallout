@@ -424,10 +424,15 @@ namespace FalloutMenu
     namespace
     {
         // The hotrects around a tile that take the pointer: what is over a tile is over them too (the box of a button
-        // made by `super_text_box` is a tile in the hotrect, and the code reads the hotrect)
+        // made by `super_text_box` is a tile in the hotrect, and the code reads the hotrect). That holds for a box or a
+        // text, which are no buttons of their own; an image or a hotrect that takes the pointer is over alone, as the
+        // files count on it: the arrows of a toggle or a meter are shown when exactly one of the row, the arrow, the
+        // other arrow and the value is over, so a row that stayed over with the pointer on an arrow would hide both
         std::vector<Tile*> hotrectsAround(Menu& menu, Tile& tile)
         {
             std::vector<Tile*> around;
+            if (tile.type() != TileType::Rect && tile.type() != TileType::Text)
+                return around;
             for (Tile* up = tile.parent(); up != nullptr; up = up->parent())
                 if (up->type() == TileType::HotRect && menu.number(*up, "target") != 0)
                     around.push_back(up);
