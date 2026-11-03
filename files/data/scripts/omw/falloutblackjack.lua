@@ -387,6 +387,8 @@ end
 local function act(action)
     local before = casino.blackjack.state()
     if not before then return end
+    -- The table is closing by itself: only leaving is allowed
+    if closeIn ~= nil and action ~= 'exit' then return end
     if action == 'exit' then
         leave()
         return

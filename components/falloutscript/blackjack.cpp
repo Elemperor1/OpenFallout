@@ -377,7 +377,7 @@ namespace FalloutScript::Casino
             case Result::Win:
                 return bet;
             case Result::Blackjack:
-                return static_cast<int>(bet * mRules.mBlackjackPayout + (secondHand ? 0.5 : 0.51));
+                return static_cast<int>(static_cast<double>(bet) * mRules.mBlackjackPayout + (secondHand ? 0.5 : 0.51));
             case Result::Surrender:
                 return -static_cast<int>(bet / 2.0 + 0.51);
             case Result::Push:

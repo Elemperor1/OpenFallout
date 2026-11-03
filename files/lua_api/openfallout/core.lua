@@ -1814,6 +1814,7 @@
 -- @type Casino
 -- @field #Roulette roulette The roulette table.
 -- @field #Blackjack blackjack The blackjack table.
+-- @field #Slots slots The slot machine.
 -- @field #Caravan caravan The card game Caravan (a match that ShowCaravanMenu opened; it has no casino).
 
 ---
@@ -1920,7 +1921,9 @@
 -- The state of the table: the `amount` that the player bets with, what it has put on the table (`total` and `bets`, the
 -- number of places), the `chips` it has left, the `minBet`, the most it can put on the table in all (`maxTotal`), whether
 -- a spin can be made (`canSpin`), the `earnings` of the casino and the `stakes`, a table from the place of an area to
--- what is bet on it.
+-- what is bet on it, `broke` that the player has not the chips for the least bet any more and `closes` that the spin took
+-- the winnings to a new quarter of the casino's most (or left fewer chips than the least bet), so that the table closes
+-- after it.
 -- @function [parent=#Roulette] state
 -- @return #table Nil when no roulette game is open.
 
@@ -1952,6 +1955,40 @@
 -- @return #table `pocket` that came up, `spinType` (the turn of the wheel: 0 to 2), `payout` (what the bets that won are
 -- paid, stakes included), `net` (what the player has more or less than before), `lucky` and `unlucky` (which words to
 -- use: the Luck of the player is above or below 5). Nil when no bet is on the table.
+
+---
+-- @type Slots
+-- The slot machine: a bet, three reels and the arm.
+
+---
+-- The state of the machine: the `bet`, the `chips` the player has left, the `minBet` and `maxBet` of the machine, the
+-- `earnings` of the casino, the `stops` the three reels show (counted from 1; 0 to 13: the even numbers are the seven
+-- symbols, 12 the special one, the odd ones the blank after a symbol), whether it can be pulled (`canSpin`), whether the
+-- player has not the chips for the least bet any more (`broke`), whether the pull took the winnings to a new quarter of
+-- the casino's most so that the machine closes after it (`closes`), the model of the machine's screen (`scene`) and the pictures of the seven symbols (`symbols`, counted from 1), both
+-- files of the casino's record.
+-- @function [parent=#Slots] state
+-- @return #table Nil when no slot machine is open.
+
+---
+-- The bet goes up (or down) one step of the ladder of the casino, or to the highest the player can pay.
+-- @function [parent=#Slots] increase
+-- @return #boolean Whether the bet changed.
+
+---
+-- @function [parent=#Slots] decrease
+-- @return #boolean
+
+---
+-- @function [parent=#Slots] highest
+-- @return #boolean
+
+---
+-- Pulls the arm: the reels come to rest on new stops. The result has the `stops` (counted from 1), the `class` of the line
+-- (0 nothing, 1 a pair, 4 one special symbol, 5 two, 6 three alike), the `multiplier` it pays on top of the stake, the
+-- `net` (what the player has more or less than before) and whether Luck helped (`lucky`).
+-- @function [parent=#Slots] spin
+-- @return #table Nil when the machine cannot be pulled.
 
 ---
 -- @type Caravan

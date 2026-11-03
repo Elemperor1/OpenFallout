@@ -281,7 +281,8 @@ namespace OFScript
             view.mHands.push_back(std::move(shown));
         }
         view.mActive = table.activeHand();
-        view.mCanDeal = table.canDeal();
+        // A table that is to close after this round deals no more (the new round would be abandoned and lost)
+        view.mCanDeal = table.canDeal() && !mCasino->mNewLevel;
         view.mCanHit = table.canHit();
         view.mCanStay = table.canStay();
         view.mCanDouble = table.canDouble();
@@ -319,7 +320,7 @@ namespace OFScript
                 done = table.bet() != before;
                 break;
             case BlackjackMove::Deal:
-                done = table.deal();
+                done = !mCasino->mNewLevel && table.deal();
                 // A new round: its result is not in the winnings yet
                 if (done)
                     mCasino->mRoundSettled = false;

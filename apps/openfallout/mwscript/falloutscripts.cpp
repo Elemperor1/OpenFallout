@@ -686,6 +686,11 @@ namespace OFScript
             const std::lock_guard lock(mCasinoMutex);
             mCasino.reset();
         }
+        {
+            // A match of Caravan is not taken into the next game either, and is not settled: nothing was staked yet
+            const std::lock_guard lock(mCaravanMutex);
+            mCaravan.reset();
+        }
         mCasinoLedger.reset();
         mPerks.clear();
         mItemUse.clear();

@@ -840,10 +840,15 @@ local function sync()
     if not shown then return end
     shown:checkSize()
     local width = rectSize(RECTS[screen.stage])
-    if lastWidth and width ~= lastWidth then
-        -- The window changed: the tiles are laid out again
-        deckTiles, gameTiles, resultTiles = nil, nil, nil
-        enterStage(screen)
+    if lastWidth and width ~= lastWidth and drawn == screen.stage then
+        -- The window changed: the tiles of the stage on the screen are laid out again (they are not made twice)
+        if screen.stage == 'deck' then
+            drawDeck()
+        elseif screen.stage == 'game' then
+            drawGame()
+        elseif screen.stage == 'results' then
+            drawResults(screen)
+        end
     end
     lastWidth = width
     if screen.stage ~= drawn then
