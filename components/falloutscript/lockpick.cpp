@@ -89,11 +89,17 @@ namespace FalloutScript::Lockpick
         switch (mState)
         {
             case State::Intro:
+                // The exe says so on the first frame of the intro: the entering sound, or, with no pick, the message
+                // that there is none (and no sound)
+                if (!mAnnounced)
+                {
+                    mAnnounced = true;
+                    events.push_back(mPicks > 0 ? Event::Enter : Event::OutOfPicks);
+                }
                 mClock += seconds;
                 if (mClock >= lockForward)
                 {
                     mClock = 0;
-                    events.push_back(mPicks > 0 ? Event::Enter : Event::OutOfPicks);
                     mState = State::Idle;
                 }
                 break;

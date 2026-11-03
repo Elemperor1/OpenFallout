@@ -138,22 +138,27 @@ namespace
         }
     };
 
-    TEST_F(LockpickGameTest, flysTheLockAndThePinInThenSaysSo)
+    TEST_F(LockpickGameTest, flysTheLockAndThePinInAndSaysSoOnTheFirstFrame)
     {
         Game game = make(setup());
         EXPECT_EQ(game.state(), Game::State::Intro);
         EXPECT_EQ(game.view().mLockSequence, "Forward");
+        EXPECT_TRUE(has(run(game, 1.0 / 60, {}), Event::Enter));
         EXPECT_FALSE(has(run(game, 1.0, {}), Event::Enter));
-        EXPECT_TRUE(has(run(game, 0.5, {}), Event::Enter));
+        EXPECT_EQ(game.state(), Game::State::Intro);
+        EXPECT_FALSE(has(run(game, 0.5, {}), Event::Enter));
         EXPECT_EQ(game.state(), Game::State::Idle);
     }
 
     TEST_F(LockpickGameTest, saysThereAreNoPicksInsteadOfTheEnterSoundWhenThereAreNone)
     {
         Game game = make(setup(2, 15, 0));
-        const auto events = run(game, 1.5, {});
-        EXPECT_TRUE(has(events, Event::OutOfPicks));
-        EXPECT_FALSE(has(events, Event::Enter));
+        const auto first = run(game, 1.0 / 60, {});
+        EXPECT_TRUE(has(first, Event::OutOfPicks));
+        EXPECT_FALSE(has(first, Event::Enter));
+        const auto rest = run(game, 1.5, {});
+        EXPECT_FALSE(has(rest, Event::OutOfPicks));
+        EXPECT_FALSE(has(rest, Event::Enter));
     }
 
     TEST_F(LockpickGameTest, doesNotTurnTheCylinderWithoutAPick)

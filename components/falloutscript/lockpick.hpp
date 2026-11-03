@@ -190,6 +190,7 @@ namespace FalloutScript::Lockpick
         int mPicks = 0;
         bool mForcing = false;
         bool mMoving = false;
+        bool mAnnounced = false;
         double mStepBefore = 0;
         int mShake = 1;
     };
