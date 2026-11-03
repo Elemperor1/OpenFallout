@@ -1,6 +1,8 @@
 #include "falloutscripts.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cmath>
 #include <random>
 #include <sstream>
@@ -16,6 +18,7 @@
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/interaction.hpp>
+#include <components/falloutscript/lockpick.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/vfs/manager.hpp>
@@ -94,6 +97,13 @@ namespace OFScript
             return false;
         }
 
+        // A lock that forcing broke stays broken
+        if (mLockBroken.count(reference) > 0)
+        {
+            showNotice(wordOf("sLockBroken", "The lock is broken."), 2.0);
+            return true;
+        }
+
         const Interaction::Setting setting
             = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
         const bool leveled = record != nullptr && (record->mLockFlags & 0x04) != 0;
@@ -110,6 +120,30 @@ namespace OFScript
         screen.mPins = mActors.itemCount(mPlayer, masterForm(sBobbyPin));
         screen.mSkill = mActorValues.current(mPlayer, skillLockpick);
         screen.mChance = screen.mKeyOnly ? 0.0 : Interaction::pickChance(screen.mSkill, level, setting);
+        screen.mClass = static_cast<int>(lockClass);
+        const FalloutScript::Lockpick::Rules rules;
+        screen.mGate = rules.mSkillGate[static_cast<std::size_t>(std::clamp(screen.mClass, 0, 5))];
+        screen.mForce
+            = screen.mKeyOnly ? 0.0 : FalloutScript::Lockpick::forceChance(screen.mSkill, screen.mClass, rules);
+        // A character below the skill of the class does not get the screen of the lock, only a box that says so
+        if (!screen.mKeyOnly && !FalloutScript::Lockpick::mayTry(screen.mSkill, screen.mClass, rules))
+        {
+            std::string text = wordOf("sLockpickSkillTooLow", "You need a Lockpick skill of %.0f to try this lock.");
+            const std::string number = std::to_string(static_cast<int>(screen.mGate));
+            const std::size_t at = text.find('%');
+            if (at != std::string::npos)
+            {
+                std::size_t end = at + 1;
+                while (end < text.size() && (std::isdigit(static_cast<unsigned char>(text[end])) || text[end] == '.'))
+                    ++end;
+                if (end < text.size())
+                    text.replace(at, end - at + 1, number);
+            }
+            else
+                text += " " + number;
+            showNotice(text, 0);
+            return true;
+        }
         {
             const std::lock_guard lock(mInteractionMutex);
             screen.mSerial = ++mLockSerial;
@@ -164,16 +198,54 @@ namespace OFScript
             return "broke";
         }
 
+        lockOutcome("opened");
+        tellPlayer("Lock picked.");
+        return "opened";
+    }
+
+    std::string FalloutScripts::lockOutcome(const std::string& kind)
+    {
+        LockScreen screen;
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            if (!mLockScreen)
+                return std::string();
+            screen = *mLockScreen;
+        }
+        if (kind == "pickBroke")
+        {
+            // Playing the break takes one pin, whatever the lock
+            mActors.removeItem(mPlayer, masterForm(sBobbyPin), 1);
+            return std::to_string(mActors.itemCount(mPlayer, masterForm(sBobbyPin)));
+        }
+        if (kind == "forceFailed")
+        {
+            // Forcing a lock and failing breaks it for good, and the screen closes (no pin is used)
+            mLockBroken.insert(screen.mReference);
+            showNotice(wordOf("sLockBroken", "The lock is broken."), 2.0);
+            closeLockScreen();
+            return "broken";
+        }
+        if (kind != "opened")
+            return std::string();
+
         const Interaction::Setting setting
             = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
         mReferenceState.unlock(screen.mReference);
-        if (const char* experience = Interaction::lockClassExperience(Interaction::lockClass(screen.mLevel, setting)))
+        // The experience is given once for a lock; opening it again (it was locked anew) gives none
+        if (mLockExperienceGiven.insert(screen.mReference).second)
         {
-            const int reward = static_cast<int>(gameSetting(experience, 0));
-            if (reward > 0)
-                rewardExperience(reward);
+            if (const char* experience
+                = Interaction::lockClassExperience(Interaction::lockClass(screen.mLevel, setting)))
+            {
+                static constexpr std::array<int, 5> defaults{ 20, 30, 40, 50, 60 };
+                const int category = std::clamp(screen.mClass, 0, 4);
+                const int reward
+                    = static_cast<int>(gameSetting(experience, defaults[static_cast<std::size_t>(category)]));
+                if (reward > 0)
+                    rewardExperience(reward);
+            }
         }
-        tellPlayer("Lock picked.");
         {
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();

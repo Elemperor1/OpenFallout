@@ -48,8 +48,9 @@ namespace OFLua
 
         // The lock the player has in front of it (a locked door or container it activated): the form id of the object,
         // its name, the word for how hard the lock is, its level, whether only a key opens it, the bobby pins the
-        // player has, the Lockpick skill, the chance that a pin opens the lock (0 to 1) and a number that is another
-        // for each lock; nothing when no lock is open
+        // player has, the Lockpick skill, the chance that a pin opens the lock (0 to 1; the stand-in screen's rule), a
+        // number that is another for each lock, the class of the lock (0 very easy to 4 very hard, 5 only a key), the
+        // skill that the class needs and the chance in per cent to force it; nothing when no lock is open
         api["lock"] = [lua]() -> sol::object {
             const auto screen = scripts().lockScreen();
             if (!screen)
@@ -64,8 +65,15 @@ namespace OFLua
             row["skill"] = screen->mSkill;
             row["chance"] = screen->mChance;
             row["serial"] = screen->mSerial;
+            row["class"] = screen->mClass;
+            row["gate"] = screen->mGate;
+            row["force"] = screen->mForce;
             return row;
         };
+        // What happened on the lockpicking screen: "opened" (the lock is unlocked, the experience is given and the
+        // activation goes on), "pickBroke" (one bobby pin is gone; the result is how many are left) or "forceFailed"
+        // (the lock is broken for good and the screen closes)
+        api["lockOutcome"] = [](const std::string& kind) { return scripts().lockOutcome(kind); };
         // One bobby pin is tried: "opened", "broke", "nopins" or "keyonly" ("" when no lock is open)
         api["pick"] = []() { return scripts().pickLock(); };
         api["closeLock"] = []() { scripts().closeLockScreen(); };

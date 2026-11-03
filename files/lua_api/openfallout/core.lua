@@ -1682,6 +1682,185 @@
 -- @field #string name
 
 ---
+-- @{#Lockpick}: the game of picking one lock, as the lockpicking screen of Fallout 3 and New Vegas plays it (the pick
+-- moves along a meter and the lock turns as far as the place of the pick allows). The script gives the time and what
+-- the player does, plays the sounds of the events, and draws the lock and pick by the numbers it gets back. Not
+-- available in load scripts.
+-- @field [parent=#core] #Lockpick lockpick
+
+---
+-- @type Lockpick
+
+---
+-- A game for a lock.
+-- @function [parent=#Lockpick] new
+-- @param #table options `class` (0 very easy to 4 very hard), `skill`, `picks` (the bobby pins the player has) and
+-- `meter` (the width of the meter, in the units of the menu).
+-- @return #LockpickGame
+
+---
+-- @type LockpickGame
+
+---
+-- One step of the game.
+-- @function [parent=#LockpickGame] step
+-- @param self
+-- @param #table input `seconds` since the last step, `move` (how far the mouse went to the right, in the units of the
+-- meter) and `turn` (0 to 1, how hard the player turns the lock).
+-- @return #LockpickView
+
+---
+-- The player forces the lock.
+-- @function [parent=#LockpickGame] force
+-- @param self
+-- @return #LockpickView
+
+---
+-- @function [parent=#LockpickGame] view
+-- @param self
+-- @return #LockpickView
+
+---
+-- @type LockpickView
+-- @field #list<#string> events What happened in the step, in order: "enter", "outOfPicks", "move", "turn", "squeakA",
+-- "squeakB", "stop", "tensionStart", "tensionEnd", "break", "unlock" and "forceFailed".
+-- @field #number pick The place of the pick on the meter, with the shake it has under strain.
+-- @field #number pickAngle The turn of the pick in degrees: 90 at the left end of the meter, 0 in the middle, -90 at
+-- the right end.
+-- @field #number angle The turn of the cylinder in degrees, 0 to 90.
+-- @field #string lockSequence The sequence of the lock's model to put it at ("Forward" or "Backward").
+-- @field #number lockTime The seconds of that sequence.
+-- @field #string pinSequence The sequence of the pick's model ("Forward", "Backward" or "Left").
+-- @field #number pinTime The seconds of that sequence.
+-- @field #number health What is left of the pick (it breaks at 0).
+-- @field #string state "intro", "idle", "turning", "binding", "snapping", "waiting", "opened" or "failed".
+-- @field #number picks The bobby pins that are left.
+-- @field #number limit How far the lock may turn with the pick where it is, in degrees.
+
+---
+-- @{#MenuScene}: models of the game drawn to a texture that a menu shows (the lock and pick of the lockpicking screen).
+-- The calls are carried out in the frame, not at once: `ready` tells when a scene exists. Not available in load
+-- scripts.
+-- @field [parent=#core] #MenuScene menuScene
+
+---
+-- @type MenuScene
+
+---
+-- Makes the scene `name` with a texture of `width` by `height` pixels (a scene of that name that there is, is replaced).
+-- @function [parent=#MenuScene] create
+-- @param #string name
+-- @param #number width
+-- @param #number height
+
+---
+-- Takes the scene out of the game; its texture keeps the last picture.
+-- @function [parent=#MenuScene] destroy
+-- @param #string name
+
+---
+-- Whether the scene has been made (after `create`, in the frame that follows).
+-- @function [parent=#MenuScene] ready
+-- @param #string name
+-- @return #boolean
+
+---
+-- The path of the texture of the scene, for `ui.texture{ path = ... }`.
+-- @function [parent=#MenuScene] texture
+-- @param #string name
+-- @return #string
+
+---
+-- The planes of the frustum of the camera on its near plane, and its near and far distances.
+-- @function [parent=#MenuScene] setFrustum
+-- @param #string name
+-- @param #number left
+-- @param #number right
+-- @param #number bottom
+-- @param #number top
+-- @param #number near
+-- @param #number far
+
+---
+-- Where the camera stands, the way it looks and which way is up in the picture.
+-- @function [parent=#MenuScene] setCamera
+-- @param #string name
+-- @param openfallout.util#Vector3 eye
+-- @param openfallout.util#Vector3 forward
+-- @param openfallout.util#Vector3 up
+
+---
+-- The ambient light and the directional light (colours as vectors of red, green and blue from 0 to 1; the direction is
+-- the way the light travels).
+-- @function [parent=#MenuScene] setLight
+-- @param #string name
+-- @param openfallout.util#Vector3 ambient
+-- @param openfallout.util#Vector3 diffuse
+-- @param openfallout.util#Vector3 direction
+
+---
+-- The colour the picture is cleared to (the alpha 0 leaves what is behind it to be seen).
+-- @function [parent=#MenuScene] setClearColour
+-- @param #string name
+-- @param #number r
+-- @param #number g
+-- @param #number b
+-- @param #number a
+
+---
+-- Puts the model of the file `path` in the scene as `model`.
+-- @function [parent=#MenuScene] addModel
+-- @param #string name
+-- @param #string model
+-- @param #string path
+
+---
+-- @function [parent=#MenuScene] removeModel
+-- @param #string name
+-- @param #string model
+
+---
+-- The place of a model: a table with `position` (a vector), the turn as `euler` (the angles of the game's files in
+-- degrees: about X, then Y, then Z) or as `rows` (nine numbers, the rows of the 3 by 3 matrix that turns a column
+-- vector), and `scale`.
+-- @function [parent=#MenuScene] setPlace
+-- @param #string name
+-- @param #string model
+-- @param #table place
+
+---
+-- The place of all the models together (the game turns its scene so that the x of a model is to the right, its z up and
+-- its y away from the camera).
+-- @function [parent=#MenuScene] setScenePlace
+-- @param #string name
+-- @param #table place As for `setPlace`.
+
+---
+-- A light with no fall-off that is a child of the node `node` of the model, `offset` away from it.
+-- @function [parent=#MenuScene] addLight
+-- @param #string name
+-- @param #string model
+-- @param #string node
+-- @param openfallout.util#Vector3 offset
+-- @param openfallout.util#Vector3 diffuse
+-- @param #number radius
+
+---
+-- @function [parent=#MenuScene] setVisible
+-- @param #string name
+-- @param #string model
+-- @param #boolean visible
+
+---
+-- Puts the model at `time` seconds of its sequence ("Forward", "Backward", "Left"): the nodes the sequence moves are
+-- where it has them at that time.
+-- @function [parent=#MenuScene] setSequenceTime
+-- @param #string name
+-- @param #string model
+-- @param #string sequence
+-- @param #number time
+
+---
 -- @{#Interact}: the locks, the terminals, waiting and sleeping, and the map of Fallout 3 and New Vegas. The engine
 -- keeps what the player has open (a lock in front of it, a terminal, the screen of the hours) and the screens read it
 -- and give the choices of the player back. Not available in load scripts.
@@ -1704,15 +1883,28 @@
 -- @field #boolean keyOnly Whether only a key opens it.
 -- @field #number pins The bobby pins the player has.
 -- @field #number skill The Lockpick skill of the player.
--- @field #number chance The chance, from 0 to 1, that a bobby pin opens the lock. A stand-in: the minigame of the
--- games is not made.
+-- @field #number chance The chance, from 0 to 1, that a bobby pin opens the lock. The rule of the stand-in screen
+-- (`pick`); the lockpicking screen of the game plays the minigame (`core.lockpick`).
 -- @field #number serial Another for each lock that is opened.
+-- @field #number class How hard the lock is: 0 very easy to 4 very hard, 5 only a key opens it.
+-- @field #number gate The Lockpick skill that a lock of the class needs for the player to try it (a player below it is
+-- told so in a box and gets no lockpicking screen).
+-- @field #number force The chance, in per cent, to force the lock.
 
 ---
 -- The player tries a bobby pin on the lock. A pin that does not open it breaks. The lock opens, the player is given
 -- the experience of picking a lock of that kind, and the door or container is activated again.
 -- @function [parent=#Interact] pick
 -- @return #string "opened", "broke", "nopins" or "keyonly"; "" when no lock is open.
+
+---
+-- What happened on the lockpicking screen. "opened": the lock is unlocked, the player is given the experience of the
+-- lock (once for each lock) and the door or container is activated again. "pickBroke": a bobby pin is gone. "forceFailed":
+-- the lock is broken for good, the player is told and the screen closes.
+-- @function [parent=#Interact] lockOutcome
+-- @param #string kind "opened", "pickBroke" or "forceFailed".
+-- @return #string The number of bobby pins that are left for "pickBroke", "broken" for "forceFailed", "opened" for
+-- "opened"; "" when no lock is open.
 
 ---
 -- @function [parent=#Interact] closeLock

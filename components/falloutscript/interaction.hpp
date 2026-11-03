@@ -36,7 +36,9 @@ namespace FalloutScript::Interaction
     LockClass lockClass(int level, const Setting& setting);
 
     /// The name of the game setting that holds the word for the class (sLockLevelName*) and the one that holds the
-    /// experience for picking a lock of it (iXPLevelPickLock*, none for the class that can not be picked)
+    /// experience for picking a lock of it (iXPRewardPickLock*: 20, 30, 40, 50 and 60 in both games' files; the
+    /// iXPLevelPickLock* settings are the levels that the executable's reward function goes by; none for the class that
+    /// can not be picked)
     const char* lockClassWord(LockClass lockClass);
     const char* lockClassExperience(LockClass lockClass);
 

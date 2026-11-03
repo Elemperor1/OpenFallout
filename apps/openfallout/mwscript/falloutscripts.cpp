@@ -1371,6 +1371,26 @@ namespace OFScript
         });
     }
 
+    void FalloutScripts::showNotice(const std::string& text, double seconds)
+    {
+        if (text.empty())
+            return;
+        MessageBox box;
+        box.mPlainText = text;
+        box.mText = escapeTags(text);
+        box.mBody = text;
+        if (seconds > 0)
+        {
+            box.mTimed = true;
+            box.mTime = seconds;
+        }
+        ++mMessageBoxCount;
+        runOnMainThread([this, box = std::move(box)]() mutable {
+            mMessageQueue.push_back(std::move(box));
+            updateMessageBoxes();
+        });
+    }
+
     void FalloutScripts::reputationChanged(const FalloutScript::Reputation::Bump& bump)
     {
         // The line under the name of the reputation tells which side went up

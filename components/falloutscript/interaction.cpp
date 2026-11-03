@@ -65,15 +65,15 @@ namespace FalloutScript::Interaction
         switch (lockClass)
         {
             case LockClass::VeryEasy:
-                return "iXPLevelPickLockVeryEasy";
+                return "iXPRewardPickLockVeryEasy";
             case LockClass::Easy:
-                return "iXPLevelPickLockEasy";
+                return "iXPRewardPickLockEasy";
             case LockClass::Average:
-                return "iXPLevelPickLockAverage";
+                return "iXPRewardPickLockAverage";
             case LockClass::Hard:
-                return "iXPLevelPickLockHard";
+                return "iXPRewardPickLockHard";
             case LockClass::VeryHard:
-                return "iXPLevelPickLockVeryHard";
+                return "iXPRewardPickLockVeryHard";
             case LockClass::Impossible:
                 return nullptr;
         }
