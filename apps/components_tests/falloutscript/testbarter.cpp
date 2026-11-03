@@ -143,4 +143,15 @@ namespace
         EXPECT_FALSE(canAccept(false, -5, 4));
         EXPECT_TRUE(canAccept(false, -5, 5));
     }
+
+    TEST(FalloutScriptBarterTest, doesNotRefuseAPlayerWhoHasExactlyTheCapsBecauseOfRoundingOfTenths)
+    {
+        // Five things worth 1 at Barter 34 cost 1.4 each (1.4000000000000001 as a double) and 7 caps all told
+        const Factors factors34 = factors(pluginSettings(), 34);
+        const double price = unitPrice(1.0, true, factors34, 0, {});
+        const double sum = balance({ { price, 5, true } });
+        EXPECT_EQ(amount(sum, 0), 7);
+        EXPECT_TRUE(canAccept(false, sum, 7));
+        EXPECT_FALSE(canAccept(false, sum, 6));
+    }
 }

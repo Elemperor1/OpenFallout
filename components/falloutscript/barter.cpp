@@ -70,6 +70,7 @@ namespace FalloutScript::Barter
             return false;
         if (balance > 0)
             return true;
-        return -balance <= playerCaps;
+        // A sum of tenths can come out a hair over the whole number it is meant to be (5 * 1.4 is 7.0000000000000009)
+        return -balance <= playerCaps + tolerance;
     }
 }
