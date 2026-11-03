@@ -84,7 +84,8 @@ headline, and the cards of the thing the pointer is on in the file's `item_stats
 (puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
-yet: the picture of the thing (the games show its model), the hot keys, repair and mods (their buttons are hidden).
+yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). The number keys put the
+picked thing on a hot key (see the hot keys below).
 
 ### The stats page of the Pip-Boy
 
@@ -759,6 +760,34 @@ units lower: the pad does not care and the executable's pointer test was not fou
 executable calls a function that is not read), the fade the wheel closes with, the heal of a stimpak is what the item's effects
 give, and whether the player says the topic or the companion (the companion says it here: the conditions of the lines are
 about it).
+
+### The hot keys (Mac round 12AN B2, FalloutNV.exe)
+
+The number keys 1 to 8 are eight slots (`HotKeyWheel`, 0x701610; the control names are `sUActnHotKey1` and `3` to `8`), each
+holding an item that the player put there. The second slot is not one of them: the wheel shows the ammunition swap
+(`IM_AmmoSwap` of `prefabs/hotkeys.xml`) there, and the key changes the ammunition of the weapon in hand (not made). The
+head-up display handles them every frame (0x77DA60), not while a menu is open, a script holds the player or the Pip-Boy is
+switched off: a key that is let go before `fHotKeyDownTimer` (half a second) uses the item of the slot (a weapon or armor is put
+on or, when it is on, taken off; an aid item is used; a stimpak at full health is refused with the word `sFullHealth` and the
+sound `UIVATSInsufficientAP`); a key that is held longer shows the wheel of the eight slots with the held one lit
+(`HK_SelectionBox`), and the picture and the name of the item (`%s (%d)` with the count when there is more than one) are on the
+screen for `fHotKeyShowTimer` (a second and a half) after the key. All of it is in the file: the block `Hokeys` of
+`hud_main_menu.xml` (300 by 300, over the action points) holds `template_hotkey_selector` (which includes the wheel of
+`prefabs/hotkeys.xml`, with the big picture `hotkey_icon`) and a line of text for the name.
+
+`falloutmenuhotkeys.lua` keeps the timing of the keys (`I.FalloutHud` draws it through `falloutmenuhud.lua`; the keys are read
+with `input.isActionPressed` of `QuickKey1` to `QuickKey8`, and the engine's own quick keys of Morrowind do nothing for
+Fallout); `core.pipboy.hotKeys`, `assignHotKey` and `clearHotKey` are the engine's side (`mwscript/fallouthotkeys.cpp`, the class
+`HotKeys` of `components/falloutscript`, whose eight slots are saved in the section `hotkeys`). In the Pip-Boy a number key
+puts the picked thing on that key (the executable's check: ammunition goes on no key, nothing else that cannot be held, worn
+or used up does either, and a book is refused with `sCantHotkeyItem` and the sound `UIVATSInsufficientAP`); a thing has one key,
+so it leaves the one it was on, and the key it is on already takes it off (a way to clear a slot that was not read).
+
+Not read or not made: whether a weapon that is in hand is taken off by its key (it is, as the Pip-Boy's list does it), the exact default keys (the number row is taken), what the executable does with a thing that was
+assigned and has left the inventory (the slot keeps it here and uses nothing while the player has none), the condition of a
+thing (the games refuse one that is broken with `sCantHotkeyBrokenItem`; this engine has no condition yet), the wheel that the
+file has beside the Pip-Boy's list (`IM_HotKeyWheel`, with the Hot Key button that only a player with a pad sees) and the pad's
+way to hold the wheel. Seen only in the offline harness (`hotkeys.lua`), not in the running game.
 
 ## The words of the labels
 

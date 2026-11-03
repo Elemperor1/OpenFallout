@@ -177,6 +177,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testdamage.cpp
     falloutscript/testdetection.cpp
     falloutscript/testhacking.cpp
+    falloutscript/testhotkeys.cpp
     falloutscript/testinteraction.cpp
     falloutscript/testderivedstats.cpp
     falloutscript/testequipment.cpp

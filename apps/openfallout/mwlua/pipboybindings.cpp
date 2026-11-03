@@ -454,6 +454,32 @@ namespace OFLua
         api["companionTalk"] = []() { scripts().companionTalk(); };
         api["closeCompanion"] = []() { scripts().closeCompanionWheel(); };
 
+        // The eight slots of the hot key wheel, in order: each a table with the slot (counted from 0), whether it takes
+        // an item (the second is the ammunition swap), and what the player put there: the item's id, name, how many of
+        // it the player carries, its picture and whether it is equipped (id is "" for an empty slot)
+        api["hotKeys"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::HotKeySlot& slot : scripts().hotKeySlots())
+            {
+                sol::table row(lua, sol::create);
+                row["slot"] = slot.mSlot;
+                row["assignable"] = slot.mAssignable;
+                row["id"] = slot.mItem != 0 ? idText(slot.mItem) : std::string();
+                row["name"] = slot.mName;
+                row["count"] = slot.mCount;
+                row["icon"] = slot.mIcon;
+                row["equipped"] = slot.mEquipped;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+        // The player puts an item on the key of a slot (counted from 0): "assigned", "ammo" (ammunition goes on no
+        // key), "cannot" (a thing that is neither held, worn nor used up) or "slot" (the ammunition swap, or none)
+        api["assignHotKey"]
+            = [](int slot, std::string_view item) { return scripts().assignHotKey(slot, parseId(item)); };
+        api["clearHotKey"] = [](int slot) { scripts().clearHotKey(slot); };
+
         // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
         // "ITMBottlecapsUp"), in 2D; false when the data has no such sound
         api["playSoundNamed"] = [](std::string_view name) { return scripts().playInterfaceSound(name); };

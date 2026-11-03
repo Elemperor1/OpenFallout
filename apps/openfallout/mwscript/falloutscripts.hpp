@@ -44,6 +44,7 @@
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
+#include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemuse.hpp>
@@ -808,6 +809,31 @@ namespace OFScript
         void companionTalk();
         /// The player is done with the wheel
         void closeCompanionWheel();
+
+        // ---- The hot keys (M12) ----
+        /// One slot of the hot key wheel: what the player put on that number key (nothing when mItem is 0)
+        struct HotKeySlot
+        {
+            int mSlot = 0;
+            /// The second slot is the ammunition swap, which takes no item
+            bool mAssignable = true;
+            FalloutScript::FormId mItem = 0;
+            std::string mName;
+            /// How many of it the player carries now
+            int mCount = 0;
+            /// The picture of the item (the record's ICON)
+            std::string mIcon;
+            bool mEquipped = false;
+        };
+        /// The eight slots, in order
+        std::vector<HotKeySlot> hotKeySlots();
+        /// Puts an item the player carries on the key of the slot: "assigned", "ammo" (ammunition goes on no key),
+        /// "cannot" (a thing that is neither held, worn nor used up, or one the player does not carry) or "slot" (the
+        /// ammunition swap, or none)
+        std::string assignHotKey(int slot, FalloutScript::FormId item);
+        void clearHotKey(int slot);
+        /// The picture of an item (its record's ICON), empty for a form that has none
+        std::string itemIcon(FalloutScript::FormId item);
         /// The container that holds a vendor's goods: the one a script gave it (SetMerchantContainer; none after
         /// RemoveMerchantContainer), else the XMRC of its placed reference. 0 for none.
         FalloutScript::FormId merchantContainer(FalloutScript::FormId vendor);
@@ -1779,6 +1805,7 @@ namespace OFScript
         FalloutScript::Reputation mReputation;
         FalloutScript::ObjectState mObjectState;
         FalloutScript::MapMarkers mMapMarkers;
+        FalloutScript::HotKeys mHotKeys;
         FalloutScript::Presentation mPresentation;
         FalloutScript::Switches mSwitches;
         /// Which script forms have been told that the program was started or that a game was started or loaded

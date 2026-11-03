@@ -2472,6 +2472,27 @@
 -- @function [parent=#Pipboy] closeCompanion
 
 ---
+-- The eight slots of the hot key wheel, in order: each a table with the slot (counted from 0), whether it takes an item
+-- (the second is the ammunition swap), and what the player put there: the item's id, name, how many of it the player
+-- carries, its picture (the record's inventory icon) and whether it is equipped (`id` is "" for an empty slot).
+-- @function [parent=#Pipboy] hotKeys
+-- @return #list<#table>
+
+---
+-- The player puts an item on the key of a slot (counted from 0): "assigned", "ammo" (ammunition goes on no key),
+-- "cannot" (a thing that is neither held, worn nor used up, or one the player does not carry) or "slot" (the ammunition
+-- swap, or none). An item has one key: it leaves the one it was on.
+-- @function [parent=#Pipboy] assignHotKey
+-- @param #number slot
+-- @param #string item
+-- @return #string
+
+---
+-- Empties a slot of the hot key wheel.
+-- @function [parent=#Pipboy] clearHotKey
+-- @param #number slot
+
+---
 -- Play the sound that a menu file or the code of the game names by its editor id (the files' `clicksound` and
 -- `mouseoversound` and the games' own sounds: "UIMenuOK", "UIMenuFocus", "ITMBottlecapsUp"), in 2D.
 -- @function [parent=#Pipboy] playSoundNamed

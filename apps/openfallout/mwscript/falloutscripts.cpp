@@ -548,6 +548,7 @@ namespace OFScript
         mReputation.clear();
         mObjectState.clear();
         mMapMarkers.clear();
+        mHotKeys.reset();
         mPresentation.clear();
         mSwitches.clear();
         mMagic.clear();

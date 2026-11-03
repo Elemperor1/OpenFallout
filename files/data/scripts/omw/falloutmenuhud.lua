@@ -19,6 +19,7 @@
 -- threshold, the place's name, subtitles).
 local ui = require('openfallout.ui')
 local menuModule = require('scripts.omw.falloutmenu')
+local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 
 local module = {}
 
@@ -125,6 +126,23 @@ local function build(self)
     t.infoValue = make(t.info, 'template_justify_right_text', 'hud_info_value', { x = 290, y = 60 })
     t.xp = find('XPMeter')
     place(t.xp, width - 2 * sx - 390, height - 2 * sy - 280)
+    -- The hot keys: the block is 300 by 300, over the action points and 20 above the health's row. The code makes the
+    -- selector (the big picture of the item and, when a key is held, the wheel of the eight slots) and the line with the
+    -- item's name, which stay hidden until a key is pressed
+    t.hotkeys = find('Hokeys')
+    place(t.hotkeys, width - 2 * sx - 386 + 30 + 15, height - 2 * sy - 127 - 300 - 20)
+    t.hotSelector = make(t.hotkeys, 'template_hotkey_selector', 'hud_hotkey_selector', { visible = 0 })
+    t.hotText = make(t.hotkeys, 'template_justify_center_text', 'hud_hotkey_text', { x = 150, y = -50, visible = 0 })
+    t.hotSlots = {}
+    for slot = 0, 7 do
+        local tile = m:find('HK_Item_' .. slot)
+        if tile then
+            t.hotSlots[slot] = tile
+            m:set(tile, 'visible', 0)
+        end
+    end
+    t.hotAmmo = m:find('IM_AmmoSwap')
+    if t.hotAmmo then m:set(t.hotAmmo, 'visible', 0) end
     t.limbs = find('crippled_limb_indicator')
     place(t.limbs, width - 2 * sx - 200, 100 + 2 * sy)
     t.hitPoints, t.actionPoints = hitPoints, actionPoints
@@ -381,6 +399,46 @@ function Hud:showInfo(info)
         self:put(t.infoValueLabel, 'string', stats.valueLabel)
         self:put(t.infoValue, 'string', stats.value)
     end
+end
+
+-- The hot keys: `view` is what falloutmenuhotkeys.lua says (nothing when no key was pressed lately). The picture and the
+-- name of the item come up when a key is pressed; the wheel, with the eight slots, while one is held.
+function Hud:showHotKeys(view)
+    local t = self.tiles
+    local on = view ~= nil
+    self:put(t.hotkeys, 'visible', on and 1 or 0)
+    self:put(t.hotSelector, 'visible', on and 1 or 0)
+    if not on then
+        self:put(t.hotText, 'visible', 0)
+        return
+    end
+    local preview = view.selector
+    self:put(t.hotSelector, '_IconFilename', preview and preview.icon or '')
+    self:put(t.hotSelector, '_IconVisible', preview and preview.icon and 1 or 0)
+    self:put(t.hotText, 'visible', preview and 1 or 0)
+    self:put(t.hotText, 'string', preview and preview.text or '')
+    local wheel = view.wheel == true
+    self:put(t.hotSelector, '_SelectedHotkey', wheel and view.selected or -1)
+    if t.hotAmmo then self:put(t.hotAmmo, 'visible', wheel and 1 or 0) end
+    for slot, tile in pairs(t.hotSlots) do
+        self:put(tile, 'visible', wheel and 1 or 0)
+        local row = wheel and view.slots and view.slots[slot + 1] or nil
+        local assigned = row ~= nil and row.id ~= nil and row.id ~= ''
+        local icon = assigned and hotKeys.iconPath(row.icon) or nil
+        self:put(tile, '_HotKeyIcon', icon or '')
+        self:put(tile, '_HotKeyAssigned', icon and 1 or 0)
+    end
+    if wheel then
+        -- The name of the item of the lit slot is under the picture
+        local row = view.slots and view.slots[(view.selected or 0) + 1] or nil
+        local text = hotKeys.itemText(row)
+        self:put(t.hotText, 'visible', text ~= '' and 1 or 0)
+        self:put(t.hotText, 'string', text)
+    end
+end
+
+function Hud:updateHotKeys(view)
+    self.shown:batch(function() self:showHotKeys(view) end)
 end
 
 -- The bar of an enemy stays for a while after its target or its health changed, then goes

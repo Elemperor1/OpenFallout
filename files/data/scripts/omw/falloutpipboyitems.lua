@@ -14,8 +14,10 @@
 --   page.hide()
 local core = require('openfallout.core')
 local input = require('openfallout.input')
+local ui = require('openfallout.ui')
 
 local menuModule = require('scripts.omw.falloutmenu')
+local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
 local bookMenu = require('scripts.omw.falloutbook')
@@ -177,6 +179,28 @@ local function dropItem(item)
     fill()
 end
 
+-- ---- The hot keys ----
+-- A refusal: the words of the game's setting and the sound the executable makes (UIVATSInsufficientAP)
+local function refuse(setting, fallback)
+    local text = pipboy.text(setting)
+    ui.showMessage(text ~= '' and text or fallback)
+    pipboy.playSoundNamed('UIVATSInsufficientAP')
+end
+
+-- The thing goes on the key of the slot (counted from 0); on the key it is on already, it comes off
+local function assignSlot(item, slot)
+    if not item or item.keyring then return end
+    local rows = pipboy.hotKeys()
+    local row = rows[slot + 1]
+    if row and row.id == item.id then
+        pipboy.clearHotKey(slot)
+        return
+    end
+    if pipboy.assignHotKey(slot, item.id) == 'cannot' then
+        refuse('sCantHotkeyItem', 'This item cannot be assigned to a hotkey.')
+    end
+end
+
 local function pickTab(index)
     if index == tabIndex and not keyring then return end
     tabIndex = index
@@ -306,6 +330,14 @@ function module.press(code, symbol)
     end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
+    end
+    -- The number keys are the keys of the slots: one puts the thing that is picked on its key, or takes it off the key it is
+    -- on (the second key is the ammunition swap, which takes nothing)
+    for slot = 0, hotKeys.SLOTS - 1 do
+        if code == input.KEY['_' .. (slot + 1)] then
+            assignSlot(listed[list.selected()], slot)
+            return true
+        end
     end
     local count = list.count()
     local picked = list.selected()

@@ -21,6 +21,8 @@ local nearby = require('openfallout.nearby')
 local vfs = require('openfallout.vfs')
 local widgetModule = require('scripts.omw.falloutwidgets')
 local menuHudModule = require('scripts.omw.falloutmenuhud')
+local hotKeysModule = require('scripts.omw.falloutmenuhotkeys')
+local input = require('openfallout.input')
 
 local pipboy = core.pipboy
 local hud = core.hud
@@ -123,6 +125,8 @@ end
 -- The display drawn from the games' menu file once it was made, and whether making it failed (the stand-in is drawn then)
 local menuHud = nil
 local menuHudFailed = false
+-- The number keys: what the Pip-Boy put on them (falloutmenuhotkeys.lua keeps their timing)
+local hotKeys = nil
 
 local element = nil
 local compassElement = nil
@@ -552,6 +556,7 @@ local function current(dt)
         reticle = status.weaponDrawn,
         -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
         scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,
+        pipboyOff = status.controlsOff ~= nil and status.controlsOff.pipboy == true,
         rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
@@ -619,6 +624,28 @@ local function refresh(dt)
     end
 end
 
+-- The number keys are looked at every frame (a key that is let go quickly is another thing than one that is held), apart
+-- from the rest of the display
+local function refreshHotKeys(dt)
+    if menuHud == nil then return end
+    if hotKeys == nil then
+        hotKeys = hotKeysModule.new({
+            pressed = function(slot) return input.isActionPressed(input.ACTION['QuickKey' .. (slot + 1)]) end,
+            slots = pipboy.hotKeys,
+            use = pipboy.use,
+            sound = pipboy.playSoundNamed,
+            seconds = function(name, default)
+                local value = pipboy.setting(name)
+                return value ~= nil and value > 0 and value or default
+            end,
+        })
+    end
+    -- Not while a window is open, a script holds the player or the Pip-Boy is switched off, or a message waits for an answer
+    local allowed = shown ~= nil and shown.mode == 'game' and not shown.scripted and not shown.pipboyOff
+        and I.UI.getMode() == nil and not (I.FalloutMessage ~= nil and I.FalloutMessage.isOpen())
+    menuHud:updateHotKeys(hotKeys:step(dt, allowed))
+end
+
 -- The compass moves with every turn of the player, so it is drawn on its own and looked at more often
 local function refreshCompass()
     if menuHud then
@@ -673,6 +700,7 @@ return {
             sinceChecked = sinceChecked + dt
             sinceCompass = sinceCompass + dt
             clock = clock + dt
+            refreshHotKeys(dt)
             -- A change of a tenth of a second is not seen
             if sinceChecked >= 0.1 then
                 refresh(sinceChecked)
