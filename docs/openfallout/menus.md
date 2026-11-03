@@ -531,6 +531,12 @@ button 0x72f6f0, the price of one 0x72ed00).
   first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
   on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
   selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
+- Fallout 3 (round 12AH A6, `Fallout3.exe` partly compared): the same menu class with another layout of fields and other
+  click ids (Exit 14 and a row 18, where New Vegas has 19 and 23); the file is the same, drawn by tile names. The close and its
+  BarterExit line, the cancel box, the quantity prompt, the arrow counters and the caps sounds were found the same; the price
+  has the same shape with the same settings and perk entry point, though where the executable writes the factors from the skill
+  was not found. Not compared: the commit, the conditions of Accept. Fallout 3 has no branch for the two New Vegas casino and
+  caravan form types (they are not in the data the port reads).
 - Sounds (round 12AH A5): the menu's own code makes one, at the end of the deal: `ITMBottlecapsUp` when the player was paid and
   `ITMBottlecapsDown` when it paid, none for 0 (the script plays them). The rows of the lists make the sounds of the shared list
   template, `UIMenuFocus` when the pointer or a key comes to a row and `UIMenuOK` when one is clicked; the buttons Accept and
