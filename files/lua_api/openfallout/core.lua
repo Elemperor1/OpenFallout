@@ -2558,7 +2558,13 @@
 
 ---
 -- @type PipboyItem
--- @field #string id
+-- @field #string id The id of the row: the form, and for a row of the copies of a weapon or armor that have one condition
+-- when the item has copies of more than one, "~" and that condition. The functions that take the id of a row (`use`,
+-- `drop`, `transfer`, the piles of a barter) take either kind; the form alone names no copy (the one that is on, else the
+-- best).
+-- @field #string form The form alone.
+-- @field #boolean hasCondition Weapons and armor: they have a condition.
+-- @field #number condition Their condition in tenths of a percent of the health (1000 is full).
 -- @field #string name
 -- @field #number count
 -- @field #number weight What one weighs.

@@ -83,8 +83,11 @@ the file's), puts the weight, health, resistance (Fallout 3) or threshold (New V
 headline, and the cards of the thing the pointer is on in the file's `item_stats_display`. A click on a thing uses it
 (puts it on, takes it off, eats it, reads it); the keyring is a row at the end of the miscellaneous things and opens the
 keys, the Cancel button closes it. Keys: up and down and the pages move the pick, Enter uses it, D drops it (a stack of more
-than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. Not there
-yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
+than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. A weapon
+and a piece of armor have a condition (tenths of a percent of their health, 1000 is full): copies with another condition are
+rows of their own (the best first; the row id carries the condition after a `~`), the cards show the condition as the file's
+bar (`ConditionInfo`, its meter reads `user5`, 0 to 1), and use, drop, take and barter work on the copies of that row.
+Not there yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
 hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
 
 ### The stats page of the Pip-Boy
@@ -503,8 +506,9 @@ button 0x72f6f0, the price of one 0x72ed00).
   the armor the files keep from the player, as the Pip-Boy does. A buy is taken from the container first, then from the
   vendor; what the player sells and pays goes to the container (the vendor without one).
 - The price of one is `value * Base + Mult * (1 - Base) * value * c^Exp` with the settings `fItemConditionValueBase`, `Mult` and
-  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing the port keeps no condition for, which makes the base
-  value the value. Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
+  `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing at full health (and for everything that has no
+  condition), which makes the base value the value, less for a worn weapon or piece of armor (the rows of the lists are per
+  condition, each with the price of its own). Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
   (1.55 at skill 0, 1.10 at 100) and `fBarterSellBase + skill * fBarterSellMult / 100` for what it sells (0.45 to 0.90), from
   the Barter skill read once when the menu opens. Then the percent of the script (a positive one is less to pay and more for
   what is sold), the perk entry point 0x11 (`EntryPoint::buyPrice`, with the vendor and the item as its context), and the
