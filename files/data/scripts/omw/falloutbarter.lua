@@ -358,6 +358,17 @@ local function openMenu()
     return true
 end
 
+-- The picture of the thing the pointer (or the pick) is on, and its cards: the picture is the record's inventory icon, shown
+-- in the file's BM_ItemIcon while a thing is picked
+local function showItem(item)
+    cards.show(shown, item)
+    local icon = item and item.icon or ''
+    shown:batch(function()
+        shown:set('BM_ItemIcon', 'filename', icon)
+        shown:set('BM_ItemIcon', 'visible', icon ~= '' and 1 or 0)
+    end)
+end
+
 -- The cards of the thing the pointer (or the pick) is on: the list that was moved last
 local focusSide = nil
 local function updateCards()
@@ -387,14 +398,14 @@ local function updateCards()
     if row <= 0 then
         if cardRow ~= 0 then
             cardSide, cardRow = nil, 0
-            cards.show(shown, nil)
+            showItem(nil)
         end
         return
     end
     if cardSide ~= name or cardRow ~= row then
         cardSide, cardRow = name, row
         local entry = side.listed and side.listed[row]
-        cards.show(shown, entry and entry.item or nil)
+        showItem(entry and entry.item or nil)
     end
 end
 

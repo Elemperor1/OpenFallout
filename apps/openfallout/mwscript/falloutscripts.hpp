@@ -312,6 +312,8 @@ namespace OFScript
             int mClip = 0;
             int mLoaded = 0;
             int mReserve = 0;
+            /// The picture of the item in the inventory (the record's ICON), as the file names it; empty when it has none
+            std::string mIcon;
         };
         /// What a holder carries, the items the host knows by name, in the order the holder got them
         std::vector<PipboyItem> pipboyItems(FalloutScript::FormId holder);

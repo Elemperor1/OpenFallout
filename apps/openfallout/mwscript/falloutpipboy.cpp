@@ -128,6 +128,7 @@ namespace OFScript
             if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(record))
             {
                 row.mName = weapon->mFullName;
+                row.mIcon = weapon->mIcon;
                 row.mValue = static_cast<int>(weapon->mData.value);
                 row.mWeight = weapon->mData.weight;
                 row.mDamage = weapon->mData.damage;
@@ -154,6 +155,7 @@ namespace OFScript
             else if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(record))
             {
                 row.mName = armor->mFullName;
+                row.mIcon = !armor->mIconMale.empty() ? armor->mIconMale : armor->mIconFemale;
                 row.mValue = static_cast<int>(armor->mData.value);
                 row.mWeight = armor->mData.weight;
                 // A piece rates as the executables read it: the whole number of the rating
@@ -165,6 +167,7 @@ namespace OFScript
             else if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(record))
             {
                 row.mName = ammo->mFullName;
+                row.mIcon = ammo->mIcon;
                 row.mValue = static_cast<int>(ammo->mData.mValue);
                 row.mWeight = ammo->mData.mWeight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Ammo;
@@ -174,6 +177,7 @@ namespace OFScript
             else if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(record))
             {
                 row.mName = potion->mFullName;
+                row.mIcon = potion->mIcon;
                 row.mValue = potion->mItem.value;
                 row.mWeight = potion->mData.weight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
@@ -181,6 +185,7 @@ namespace OFScript
             else if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(record))
             {
                 row.mName = misc->mFullName;
+                row.mIcon = misc->mIcon;
                 row.mValue = static_cast<int>(misc->mData.value);
                 row.mWeight = misc->mData.weight;
                 row.mUsable = false;
@@ -189,6 +194,7 @@ namespace OFScript
             {
                 // A book is listed with the things to use
                 row.mName = book->mFullName;
+                row.mIcon = book->mIcon;
                 row.mValue = static_cast<int>(book->mData.value);
                 row.mWeight = book->mData.weight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
@@ -197,6 +203,7 @@ namespace OFScript
             else if (const ESM4::Ingredient* ingredient = mStore.get<ESM4::Ingredient>().search(record))
             {
                 row.mName = ingredient->mFullName;
+                row.mIcon = ingredient->mIcon;
                 row.mValue = static_cast<int>(ingredient->mData.value);
                 row.mWeight = ingredient->mData.weight;
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Aid;
@@ -206,6 +213,7 @@ namespace OFScript
             else if (const ESM4::ItemMod* mod = mStore.get<ESM4::ItemMod>().search(record))
             {
                 row.mName = mod->mFullName;
+                row.mIcon = mod->mIcon;
                 row.mValue = static_cast<int>(mod->mData.mValue);
                 row.mWeight = mod->mData.mWeight;
                 row.mUsable = false;
@@ -214,6 +222,7 @@ namespace OFScript
             {
                 // A key is on the keyring and not in the lists of the tabs
                 row.mName = key->mFullName;
+                row.mIcon = key->mIcon;
                 row.mValue = static_cast<int>(key->mData.value);
                 row.mWeight = key->mData.weight;
                 row.mKey = true;

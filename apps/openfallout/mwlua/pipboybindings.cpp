@@ -95,6 +95,7 @@ namespace OFLua
             row["clip"] = item.mClip;
             row["loaded"] = item.mLoaded;
             row["reserve"] = item.mReserve;
+            row["icon"] = item.mIcon;
             return row;
         }
 

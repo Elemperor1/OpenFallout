@@ -548,8 +548,11 @@ button 0x72f6f0, the price of one 0x72ed00).
   without a deal says nothing, and nothing is said without a conversation open. The port says it the way a script's `Say` does
   (`closeBarter` finds the topic by the editor id "BarterExit" and has the vendor say it: voice and subtitle; the line is not put
   in the dialogue's own text, which the executable refreshes). Not seen in the running game.
-- Not done: the item card's picture (BM_ItemIcon shows the form's inventory icon in the executable), the condition of things
-  (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
+- The picture: while a thing is picked `BM_ItemIcon` shows the record's inventory icon (the ICON of the weapon, armor, ammunition,
+  aid, miscellaneous item, book, ingredient or mod, as `core.pipboy.barterRows` gives it in `icon`; armor takes the male
+  one), as the executable sets the tile's `filename` from the form (0x4be200). The pictures of the items are not in the files the
+  offline harness reads, so it was not drawn offline.
+- Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
 ## The words of the labels
