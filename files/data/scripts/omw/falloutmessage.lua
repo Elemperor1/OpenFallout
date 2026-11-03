@@ -218,6 +218,8 @@ local function show(box)
         return
     end
     serial, current, openFor, answered = box.serial, box, 0, false
+    -- The sound of a box when it opens (the one of the message when it names none, FalloutNV.exe 0x7a92e0, round 12AH A5)
+    shown:playSound('UIPopUpMessageWindow')
     -- Over a screen that is open the box's background is almost opaque: the game's code writes the alpha of the file's
     -- background tile as the setting fPopUpBackgroundOpacity (0.87 in the INI of both games) when a menu is open under
     -- the box (FalloutNV.exe 0x7a8d10, round 12AG); over the plain world the file's own alpha stays

@@ -2145,6 +2145,13 @@
 -- @function [parent=#Pipboy] closeBarter
 
 ---
+-- Play the sound that a menu file or the code of the game names by its editor id (the files' `clicksound` and
+-- `mouseoversound` and the games' own sounds: "UIMenuOK", "UIMenuFocus", "ITMBottlecapsUp"), in 2D.
+-- @function [parent=#Pipboy] playSoundNamed
+-- @param #string name
+-- @return #boolean false when the data has no such sound record or it has no file
+
+---
 -- The level the player reached whose points have not been handed out to a screen yet, since this was last called.
 -- The games show one screen for each level, so there is one level at a time: the next is handed out after
 -- `levelUpDone`.

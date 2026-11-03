@@ -1293,6 +1293,16 @@ namespace OFScript
         /// The files that a sound record (SOUN) plays: its one file, or the files of the folder that it names (the game
         /// plays one of them); none when the data does not have it. Looked up once.
         std::vector<std::string> soundFilesOf(FalloutScript::FormId sound);
+        /// The sound record that has this editor id (not case sensitive), 0 when there is none: how the menu files and
+        /// the code of the games name their sounds
+        FalloutScript::FormId soundByEditorId(std::string_view name);
+
+    public:
+        /// Play the sound the interface names by its editor id ("UIMenuOK"), in 2D, as the games' interface does; false
+        /// when there is no such sound record or it has no file
+        bool playInterfaceSound(std::string_view name);
+
+    private:
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);
         const FalloutScript::VoiceIndex& voices();
@@ -1985,6 +1995,9 @@ namespace OFScript
         std::optional<std::vector<PlacedMarker>> mPlacedMarkers;
         std::mutex mSoundFilesMutex;
         std::map<FalloutScript::FormId, std::vector<std::string>> mSoundFiles;
+        std::mutex mSoundNamesMutex;
+        std::unordered_map<std::string, FalloutScript::FormId> mSoundNames;
+        bool mSoundNamesBuilt = false;
         /// The idle records by editor id (lower case), made when the first PlayIdle asks, and the idles that a PlayIdle
         /// could not play (told once in the log)
         std::mutex mIdleMutex;

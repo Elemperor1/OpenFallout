@@ -372,6 +372,10 @@ namespace OFLua
         };
         api["closeBarter"] = []() { scripts().closeBarter(); };
 
+        // Play the sound that a menu file or the code of the game names by its editor id ("UIMenuOK",
+        // "ITMBottlecapsUp"), in 2D; false when the data has no such sound
+        api["playSoundNamed"] = [](std::string_view name) { return scripts().playInterfaceSound(name); };
+
         // The menu of recipes a script showed (a workbench, a reloading bench, a campfire): the category, its name, a
         // number that is another for each time a menu opens, and the recipes the player may use with what each takes
         // and gives; nothing when no menu is open

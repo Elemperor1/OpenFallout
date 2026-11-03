@@ -446,6 +446,21 @@ once, when the screens are left (`menu.saveOptions`).
   running game (the game disables it under conditions that were not decoded), and what the Fallout 3 screens differ in
   (not checked; the same file is drawn). Nothing was seen in the running game.
 
+### Sounds of the menu files (round 12AH A5)
+
+The games play a sound where a tile names one: the `clicksound` of a tile that is clicked (with the pointer, or by a key that
+clicks it) and the `mouseoversound` of a tile the pointer or a key comes to. The words are the editor ids of sound records
+(`UIMenuOK`, `UIMenuFocus`; the executable's own sounds like `ITMBottlecapsUp` and `UIPopUpMessageWindow` go the same way),
+looked up once among the sound records (`FalloutScripts::soundByEditorId`) and played in 2D (`core.pipboy.playSoundNamed`,
+the first file when the record names a folder). `falloutmenu.lua` plays them for every menu drawn from a file: on a click the
+tile that was hit or the first above it that names one, on the pointer's move to a tile (once for the tile that owns the
+sound, not for each box inside it). The list rows (`list_box_template.xml`) have `UIMenuOK` and `UIMenuFocus`, so every list
+of every screen makes them; `text_box.xml` has `UIMenuFocus`; the quantity menu has the focus sound only (its clicks are silent).
+A message box plays `UIPopUpMessageWindow` when it opens (the sound of the message when it has one is not read). Where a key
+lights or clicks a row the screen plays the names itself (barter does). The Pip-Boy's own sounds (`UIPipBoyAccessUp`,
+`UIPipBoyAccessDown`, the hum `UIPipBoyHumLP`, the light) and the container's (`UIItemTakeAll`) are not played yet. The sound
+files were not heard in the running game.
+
 ### Keys of the Pip-Boy (round 12AH A3, FalloutNV.exe; Fallout 3's control table and defaults only)
 
 - The key that opens and closes it is the control "Menu Mode" (Tab), the only one: a release before `fPlayerPipBoyLightTimer`
@@ -516,11 +531,19 @@ button 0x72f6f0, the price of one 0x72ed00).
   first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
   on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
   selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
-- Not done: the sounds of the menu (the caps up and down, the clicks), the item card's picture (BM_ItemIcon shows the form's
-  inventory icon in the executable), the exit event the executable
-  raises after a deal (0x61a2d0 and 0x7640a0, not decoded), the condition of things (every thing is at full condition),
-  the keys of the first pick (no tile picked: the port picks the first row), and the pad's B, which the engine uses to leave
-  at once without the question. Nothing was seen in the running game.
+- Sounds (round 12AH A5): the menu's own code makes one, at the end of the deal: `ITMBottlecapsUp` when the player was paid and
+  `ITMBottlecapsDown` when it paid, none for 0 (the script plays them). The rows of the lists make the sounds of the shared list
+  template, `UIMenuFocus` when the pointer or a key comes to a row and `UIMenuOK` when one is clicked; the buttons Accept and
+  Exit, the arrows and the title have none, and there is no sound when the menu opens. The pointer's sounds are the menu
+  module's (it plays what a tile's `mouseoversound` and `clicksound` name, see "Sounds of the menu files" below); the keys
+  play the two names of the list template.
+- Leaving: after a deal was made the vendor says a line of the dialogue topic of subtype BarterExit (the table of the engine's own
+  topics, kind 5 index 4; the response whose conditions pass, said by the speaker, then the dialogue menu is refreshed); leaving
+  without a deal says nothing. Not done: the port does not say it (no hook to say a topic's line for the dialogue that is
+  open under the menu was written; `FalloutScripts::sayTopic` exists).
+- Not done: the item card's picture (BM_ItemIcon shows the form's inventory icon in the executable), the condition of things
+  (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
+  first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
 ## The words of the labels
 

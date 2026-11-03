@@ -3456,6 +3456,37 @@ namespace OFScript
         return files;
     }
 
+    FalloutScript::FormId FalloutScripts::soundByEditorId(std::string_view name)
+    {
+        const std::lock_guard lock(mSoundNamesMutex);
+        if (!mSoundNamesBuilt)
+        {
+            mSoundNamesBuilt = true;
+            for (const ESM4::Sound& sound : mStore.get<ESM4::Sound>())
+                if (!sound.mEditorId.empty())
+                    mSoundNames.emplace(Misc::StringUtils::lowerCase(sound.mEditorId), sound.mId.toUint32());
+        }
+        const auto found = mSoundNames.find(Misc::StringUtils::lowerCase(name));
+        return found != mSoundNames.end() ? found->second : 0;
+    }
+
+    bool FalloutScripts::playInterfaceSound(std::string_view name)
+    {
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (sound == nullptr)
+            return false;
+        const FalloutScript::FormId id = soundByEditorId(name);
+        if (id == 0)
+            return false;
+        const std::vector<std::string> files = soundFilesOf(id);
+        if (files.empty())
+            return false;
+        // The interface's sounds are one file each; a sound that names a folder plays its first file
+        sound->playSound(
+            VFS::Path::Normalized(files[0]), 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::OverlapNoEnv);
+        return true;
+    }
+
     std::string FalloutScripts::voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line)
     {
         // A response can name a sound record (TRDT) to be said in place of a voice file; when its file is there that is

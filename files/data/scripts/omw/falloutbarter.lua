@@ -20,6 +20,9 @@ if not (pipboy and pipboy.available() and pipboy.barter) then
 end
 
 local FILE = 'barter_menu.xml'
+-- The sounds the rows of a list make (the template of the file's lists names them: the pointer comes to a row, a row is clicked);
+-- the pointer's own are played by the menu module, a key plays them here
+local ROW_FOCUS, ROW_CLICK = 'UIMenuFocus', 'UIMenuOK'
 
 -- A message box drawn over the screen (falloutmessage.lua) has the keys, the pad and the wheel
 local function messageOpen()
@@ -291,9 +294,16 @@ end
 
 -- Accept: the things change hands
 local function accept()
+    local quote = pipboy.barterQuote(pileList(piles.buy), pileList(piles.sell))
     local result = pipboy.barterDeal(pileList(piles.buy), pileList(piles.sell))
     if result.status ~= 'done' then
         return
+    end
+    -- The only sound the menu's code makes: the caps that go up when the player is paid and those that go down when it pays
+    if quote.balance > 0 then
+        shown:playSound('ITMBottlecapsUp')
+    elseif quote.balance < 0 then
+        shown:playSound('ITMBottlecapsDown')
     end
     traded = true
     clearPiles()
@@ -405,6 +415,7 @@ local function press(code, symbol)
             if sides[name].list.count() > 0 then
                 active, focusSide = name, name
                 sides[name].list.select(1, true)
+                shown:playSound(ROW_FOCUS)
                 updateCards()
                 return
             end
@@ -420,22 +431,28 @@ local function press(code, symbol)
         local now = sides[active]
         if now.list.count() > 0 and now.list.selected() <= 0 then
             now.list.select(1, true)
+            shown:playSound(ROW_FOCUS)
         end
         updateCards()
     elseif code == input.KEY.DownArrow or code == input.KEY.PageDown then
         local by = code == input.KEY.DownArrow and 1 or 8
         if count > 0 then
             side.list.select(picked <= 0 and 1 or math.min(count, picked + by), true)
+            shown:playSound(ROW_FOCUS)
         end
         updateCards()
     elseif code == input.KEY.UpArrow or code == input.KEY.PageUp then
         local by = code == input.KEY.UpArrow and 1 or 8
         if count > 0 then
             side.list.select(picked <= 0 and count or math.max(1, picked - by), true)
+            shown:playSound(ROW_FOCUS)
         end
         updateCards()
     elseif code == input.KEY.Enter then
-        if picked > 0 then activateRow(side, picked) end
+        if picked > 0 then
+            shown:playSound(ROW_CLICK)
+            activateRow(side, picked)
+        end
     elseif symbol then
         shown:pcButton(symbol)
     end
