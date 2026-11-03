@@ -62,14 +62,16 @@ local function applyTag(tag, state, result, lineHeight)
     elseif letter == 'F' then
         state.font = number(tag:sub(3, 3)) >= 1 and number(tag:sub(3, 3)) or state.font
     elseif letter == 'C' then
-        state.color = { number(tag:sub(3, 6)), number(tag:sub(7, 10)), number(tag:sub(11, 14)), number(tag:sub(15, 18)) }
+        -- Four numbers at fixed offsets; each is read as far as its digits go, as the executable's atoi does
+        state.color = { number(tag:sub(3)), number(tag:sub(7)), number(tag:sub(11)), number(tag:sub(15)) }
     elseif letter == 'I' then
-        -- Three numbers in columns of five, five and four characters, then the name
-        local width, height = number(tag:sub(3, 7)), number(tag:sub(8, 12))
+        -- Three numbers at offsets 2, 7 and 12 (each read as far as its digits go), then the name at offset 16
+        local width, height = number(tag:sub(3)), number(tag:sub(8))
         local name = tag:sub(17):match('^%s*(.-)%s*$')
         local x = state.x
         if state.align == 2 then x = x - width / 2 elseif state.align == 4 then x = x - width end
         result.items[#result.items + 1] = { kind = 'image', name = name, x = x, y = state.y, width = width, height = height }
+        result.extent = math.max(result.extent, state.y + height)
         state.y = state.y + height
         result.height = result.height + height
     elseif letter == 'B' then
@@ -79,10 +81,11 @@ local function applyTag(tag, state, result, lineHeight)
 end
 
 -- The pieces of a credits file: `items` (texts and pictures, in order, each with its place in the block: x across from the
--- middle, y down from the top of the block), `backgrounds` (the files to show in turn) and `height`. `lineHeight(font)` is
--- the height of a line of the font.
+-- middle, y down from the top of the block), `backgrounds` (the files to show in turn), `height` (what the lines and the
+-- pictures add up to) and `extent` (how far down the block reaches: a <Y> mark can put a piece below the sum).
+-- `lineHeight(font)` is the height of a line of the font.
 function module.parse(text, lineHeight)
-    local result = { items = {}, backgrounds = {}, height = 0 }
+    local result = { items = {}, backgrounds = {}, height = 0, extent = 0 }
     local state = initial()
     local i, size = 1, #text
     local atLineStart = true
@@ -122,6 +125,7 @@ function module.parse(text, lineHeight)
             result.items[#result.items + 1] = { kind = 'text', text = piece, x = state.x, y = state.y, font = state.font,
                 align = state.align, color = { state.color[1], state.color[2], state.color[3], state.color[4] } }
             local height = lineHeight(state.font)
+            result.extent = math.max(result.extent, state.y + height)
             state.y = state.y + height
             result.height = result.height + height
             i = i + used
@@ -229,18 +233,13 @@ local function updatePieces()
     end
 end
 
--- The height of a line of a font, as a tile of that font says
-local function lineHeightOf(m, rect)
+-- The height of a line of a font in menu units (what the font says, not what the window shows of it)
+local function lineHeightOf(m)
     local heights = {}
     return function(font)
         if heights[font] then return heights[font] end
-        local tile = m:create(rect, 'text', 'credits_probe')
-        m:set(tile, 'font', font)
-        m:set(tile, 'wrapwidth', WIDTH)
-        m:set(tile, 'string', 'Ag')
-        local r = m:rect(tile)
-        local height = r and r.height or 0
-        m:remove(tile)
+        local measured = m:measure(font, 'Ag', WIDTH)
+        local height = measured and measured.height or 0
         heights[font] = height > 0 and height or 20
         return heights[font]
     end
@@ -262,7 +261,7 @@ function module.show(options)
     end
     shown = opened
     state = { onDone = options.onDone, rect = rect, tiles = {}, y = START_Y, seconds = 0, slide = nil }
-    state.parsed = module.parse(text, lineHeightOf(m, rect))
+    state.parsed = module.parse(text, lineHeightOf(m))
     m:set(m:root(), 'alpha', 255)
     updatePieces()
     shown:refresh()
@@ -281,7 +280,7 @@ function module.update(dt)
     local backgrounds = state.parsed.backgrounds
     if #backgrounds > 0 then
         -- Each background stays for the time the block takes to go its share of the way
-        local slide = math.max(1, (state.parsed.height / SPEED) / #backgrounds)
+        local slide = math.max(1, (math.max(state.parsed.height, state.parsed.extent) / SPEED) / #backgrounds)
         local index = math.min(#backgrounds, math.floor(state.seconds / slide) + 1)
         if index ~= state.slide then
             state.slide = index
@@ -289,7 +288,7 @@ function module.update(dt)
         end
     end
     shown:refresh()
-    if state.y + state.parsed.height < 0 then finish() end
+    if state.y + math.max(state.parsed.height, state.parsed.extent) < 0 then finish() end
 end
 
 function module.press(code)

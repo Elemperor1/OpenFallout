@@ -325,11 +325,17 @@ end
 
 -- Help: the manual (the game's tutorial menu) is shown over the menu; leaving it brings the list back
 showManual = function()
-    local opened = manual.show({
-        layer = LAYER,
-        pad = engine.controllerConnected(),
-        onLeave = function() screen = 'list' end,
-    })
+    local function open(pad)
+        return manual.show({
+            layer = LAYER,
+            pad = pad,
+            onLeave = function() screen = 'list' end,
+        })
+    end
+    -- The list shows Help when the PC manual exists; a pad whose manual is not in the data reads the PC one
+    local pad = engine.controllerConnected()
+    local opened = open(pad)
+    if not opened and pad then opened = open(false) end
     if opened then screen = 'help' end
 end
 

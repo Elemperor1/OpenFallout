@@ -347,7 +347,10 @@ return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            press(key.code)
+            -- Not under the pause menu, which the wheel survives (the pad has the same guard)
+            if isOpen() and I.UI.getMode() == 'Interface' then
+                press(key.code)
+            end
         end,
         onControllerButtonPress = onPad,
     },

@@ -197,6 +197,12 @@ namespace OFScript
         const FalloutScript::ItemUse::Result result = useItem(companion, stimpak);
         Log(Debug::Info) << "Companion wheel: a stimpak for " << std::hex << companion << std::dec << ", outcome "
                          << static_cast<int>(result.mOutcome);
+        if (result.mOutcome != FalloutScript::ItemUse::Outcome::Consumed)
+        {
+            // Nothing was used up: the player keeps the stimpak
+            transferItems(companion, mPlayer, stimpak, 1);
+            return false;
+        }
         return true;
     }
 
