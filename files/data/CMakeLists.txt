@@ -167,6 +167,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutchargen.lua
     scripts/omw/falloutcombat.lua
     scripts/omw/falloutcraft.lua
+    scripts/omw/falloutcredits.lua
     scripts/omw/falloutdeath.lua
     scripts/omw/falloutvats.lua
     scripts/omw/falloutitemcards.lua

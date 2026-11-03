@@ -818,6 +818,27 @@ pad's way to hold the wheel in the Pip-Boy (a direction held shows it, let go as
 there, which the page's pad handler gives to the page down key), and the tiles of the display that the executable hides while the
 wheel is up on a pad. Seen only in the offline harness (`hotkeys.lua`, `hotpad.lua`, `itemwheel.lua`), not in the running game.
 
+### The credits (Mac round 12AO B5, FalloutNV.exe 0x75FB90 and 0x75F9B8)
+
+`options/credits_menu.xml` (id 0x417) is a full-screen backdrop (`background`, dark blue, its picture changes in turn) and an empty
+tile `credits_rect` (at x 640, clipping) that holds the lines. The text is `DATA\<LANGUAGE>\CREDITS.TXT` (ENGLISH, GERMAN, FRENCH,
+SPANISH or ITALIAN, from `sLanguage`), else `DATA\CREDITS.TXT`; a `CREDITSPATCH.TXT` in the same place replaces it when it is there;
+the Wild Wasteland trait, a Ctrl key held or the global `PlayCredits` at 2 make it `CREDITSWACKY.TXT`. It is one buffer, not
+pages: a line that is only a line end is a blank line, a line that begins with `*` is a comment, and every run of characters up
+to a line end, `<`, `>` or `*` (255 at most) is a text tile of its own, put under the one before by the height of its font. The marks
+(`<X:n>` `<X:+n>` `<X:-n>` across, `<Y:n>` `<Y:+n>` `<Y:-n>` down with `+` moving down, `<J:C>` `<J:R>` `<J:L>`, `<F:n>` the font,
+`<C:r g b a>` in columns of four, `<I:wwwww hhhhh aaaa name>` a picture, `<B:name>` a background from `Interface\Credits`) set the
+state; the units are those of the 1280 wide menu. The block starts 1020 down and goes up by `fCreditsScrollSpeed:Menu` (55) a
+second; the backgrounds change with a slide time of the block's height over the speed over their number; it ends when the block
+has left (the executable's limit was not read: it uses the size of the tile), or with the key of the menu. `falloutcredits.lua`
+parses and shows it (`menu:create` makes the tiles, and only those near the window exist); it has no trigger yet. What starts the
+credits in the games (the global `PlayCredits`, which the executable makes itself and which no record of the data names; a
+command of that name is registered next to it) and the question that follows them (`sContinuePlayingAfterCredits`, Yes and No)
+are the game's and not made. Not read: the end limit, what reads the accumulated height, the third number of a picture, which
+`sFontFile_n` is which font slot, the order of the colour numbers (taken as red, green, blue, alpha), the control that speeds up
+or hides the layer (0x3E9), and the music (none is played by the screen; the main menu starts `EndCredits.mp3`).
+Seen only in the offline harness (`credits.lua`) with a made-up file, not in the running game.
+
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 
 A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at
