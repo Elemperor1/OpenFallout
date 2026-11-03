@@ -64,10 +64,12 @@ local function number(value)
     return string.format('%d', math.floor(value + 0.5))
 end
 
--- A price: whole above 1, in tenths below
+-- The price of one in the value column, as the code of the game writes it: two dashes for nothing, tenths below 1,
+-- whole numbers above
 local function priceText(value)
-    if value >= 1 or value == 0 then return number(value) end
-    return string.format('%.1f', value)
+    if value == 0 then return '--' end
+    if value < 1 then return string.format('%.1f', value) end
+    return number(value)
 end
 
 local function rowText(entry)
@@ -141,12 +143,18 @@ local function refreshStock()
     end)
 end
 
+local function byName(a, b)
+    local x, y = a.item.name:lower(), b.item.name:lower()
+    if x ~= y then return x < y end
+    return a.item.id < b.item.id
+end
+
 -- What a list shows: the things of its holder that are not in a pile (the rest of a stack that is partly in one), and
--- after them the things of the other holder that are in a pile, with a square. The tab above the list says which
--- kinds are listed.
-local function listedEntries(side)
+-- after them, added last as the code of the game does, the things of the other holder that are in a pile, with a
+-- square. The tab above the list says which kinds are listed (`filterIndex`, the side's own when none is given).
+local function listedEntries(side, filterIndex)
     local entries = {}
-    local filter = FILTERS[side.filter]
+    local filter = FILTERS[filterIndex or side.filter]
     local own, other = side.name, side.name == 'player' and 'vendor' or 'player'
     local ownPile, otherPile = own == 'player' and piles.sell or piles.buy, own == 'player' and piles.buy or piles.sell
     local function wanted(item)
@@ -158,18 +166,18 @@ local function listedEntries(side)
             entries[#entries + 1] = { item = item, count = left, marked = false, from = own }
         end
     end
+    table.sort(entries, byName)
+    local marked = {}
     for _, item in ipairs(stock[other]) do
         local count = otherPile[item.id] or 0
         if count > 0 and wanted(item) then
-            entries[#entries + 1] = { item = item, count = count, marked = true, from = other }
+            marked[#marked + 1] = { item = item, count = count, marked = true, from = other }
         end
     end
-    table.sort(entries, function(a, b)
-        local x, y = a.item.name:lower(), b.item.name:lower()
-        if x ~= y then return x < y end
-        if a.item.id ~= b.item.id then return a.item.id < b.item.id end
-        return (not a.marked) and b.marked
-    end)
+    table.sort(marked, byName)
+    for _, entry in ipairs(marked) do
+        entries[#entries + 1] = entry
+    end
     return entries
 end
 
@@ -203,7 +211,8 @@ local function showQuote()
         shown:set('BM_CapsFlow', 'visible', not quote.empty)
         shown:set('BM_CapsFlow', '_Value', number(quote.amount))
         shown:set('BM_CapsFlow', 'alpha', dim and DIM_ALPHA or FULL_ALPHA)
-        shown:io('_ArrowDirection', balance > 0 and ARROW_SELL or ARROW_BUY)
+        -- (not set before the first thing is picked, when the flow is hidden)
+        shown:io('_ArrowDirection', quote.empty and 0 or (balance > 0 and ARROW_SELL or ARROW_BUY))
         shown:set('BM_ButtonX', 'target', quote.accept)
         local caps = word('sInventoryCaps', 'Caps')
         shown:set('BM_Items_CapsLabel', 'string', caps .. '   ' .. number(quote.playerCaps))
@@ -211,14 +220,16 @@ local function showQuote()
     end)
 end
 
+-- The titles over the lists: the kind of thing the tab shows; over the vendor's list the vendor's own name while it shows
+-- everything. The code of the game writes them in capitals (in English).
 local function setTitles(menu)
     local items, container = sides.player, sides.vendor
     local itemsFilter, containerFilter = FILTERS[items.filter], FILTERS[container.filter]
     shown:batch(function()
-        shown:set('BM_ItemsTitle', 'string', word(itemsFilter.setting, itemsFilter.fallback))
+        shown:set('BM_ItemsTitle', 'string', word(itemsFilter.setting, itemsFilter.fallback):upper())
         shown:set('BM_ContainerTitle', 'string',
-            container.filter == 1 and (menu.name ~= '' and menu.name or 'Vendor')
-                or word(containerFilter.setting, containerFilter.fallback))
+            (container.filter == 1 and (menu.name ~= '' and menu.name or 'Vendor')
+                or word(containerFilter.setting, containerFilter.fallback)):upper())
     end)
 end
 
@@ -262,9 +273,15 @@ local function activateRow(side, row)
     moveEntry(entry, 1)
 end
 
--- The tab of a side goes to the next one (or the one before)
+-- The tab of a side goes to the next one (or the one before); a tab with nothing to list is passed over, in the same
+-- direction, until one has something or all of them are shown again
 local function cycleFilter(side, by)
-    side.filter = (side.filter - 1 + by) % #FILTERS + 1
+    local index = side.filter
+    for _ = 1, #FILTERS do
+        index = (index - 1 + by) % #FILTERS + 1
+        if index == 1 or #listedEntries(side, index) > 0 then break end
+    end
+    side.filter = index
     local menu = pipboy.barter()
     shown:batch(function()
         fillSide(side)

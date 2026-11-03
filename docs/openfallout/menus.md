@@ -477,19 +477,29 @@ button 0x72f6f0, the price of one 0x72ed00).
   sells brings at most the base value. The settings the executable has and nothing reads (`fBarterHaggle*`, `fBarterDisp*`,
   `fBarterMin/Max`) are not used.
 - The two lists are the player's things (left) and the vendor's (right), each with the six tabs of the container
-  (everything, weapons, apparel, aid, misc, ammo). A click moves one thing into the pile of the deal; of a stack of more
-  than `iInventoryAskQuantityAt` (5) the quantity prompt asks how many. A thing in a pile shows in the list of the other side
-  with an empty square (`_IsBarterSelected`), at the price of its new side, and a click on it takes it out again; a worn thing has
-  the filled square. Nothing changes hands until Accept.
-- In the middle the caps that would move are shown on the arrow (`BM_CapsFlow`; the file's two pictures are for what the player
-  pays and what it gets), faint when the vendor has less than it owes or the player has too little to pay. Accept works only
+  (everything, weapons, apparel, aid, misc, ammo; the aid tab holds books and ingredients too, the misc tab all the rest;
+  round 12AH A2). The arrows over a list (and a click on its title) go to the next tab, and a tab with nothing to list is passed
+  over in the same direction until one has something, or everything is back. The title over a list is the tab's word in
+  capitals (the executable writes them so when the language is English), and over the vendor's list, while it shows
+  everything, the vendor's own name. A click moves one thing into the pile of the deal; of a stack of more than
+  `iInventoryAskQuantityAt` (5) the quantity prompt asks how many. A thing in a pile shows in the list of the other side,
+  added after the rows of that side, with an empty square (`_IsBarterSelected`) and the count that is in the pile, at the price
+  of its new side, and a click on it takes it out again; a row of its own side shows what is left of a stack that is partly in
+  a pile; a worn thing has the filled square. Nothing changes hands until Accept.
+- A row reads the name, with the count in brackets above one, and the price of ONE thing, as the executable writes it: two
+  dashes for nothing, tenths below 1, a whole number from 1. The line total is not shown in the list. The caps of each side are
+  written over its list as "caps, three spaces, number". The order of the rows is the order of the inventory model in the
+  executable, which was not followed (no sort call was found), so the port lists them by name.
+- In the middle the caps that would move are shown on the arrow (`BM_CapsFlow`; `_ArrowDirection` is 2, the file's second
+  picture, when the player is paid and 1 when it pays; nothing is set before the first pick, when the flow is hidden), faint when the vendor has less than it owes or the player has too little to pay. Accept works only
   with something in a pile and, when the player pays, only with the caps for it; when the vendor owes it always works and the
   payout is cut at what the vendor has. Exit asks "sCancelBarter" first when a pile has something in it; Escape does nothing in
   that box. The letters of the file work: A is Accept and X is Exit.
 - Accept moves the things (a worn one is taken off first), then the caps (the vendor's container gets what the player pays and
   the player what the vendor pays), adds the caps to the statistic "Barter Amount Traded" (id 0x27), and leaves the menu open with
   empty piles.
-- Not done: the sounds of the menu (the caps up and down, the clicks), the item card's picture, the exit event the executable
+- Not done: the sounds of the menu (the caps up and down, the clicks), the item card's picture (BM_ItemIcon shows the form's
+  inventory icon in the executable), the exit event the executable
   raises after a deal (0x61a2d0 and 0x7640a0, not decoded), the condition of things (every thing is at full condition),
   the keys of the first pick (no tile picked: the port picks the first row), and the pad's B, which the engine uses to leave
   at once without the question. Nothing was seen in the running game.
