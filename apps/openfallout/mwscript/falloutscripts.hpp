@@ -39,6 +39,7 @@
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
+#include <components/falloutscript/repair.hpp>
 #include <components/falloutscript/wear.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/detection.hpp>
@@ -1028,6 +1029,94 @@ namespace OFScript
         /// The player is done with the menu
         void closeBarter();
 
+        // ---- Repair (M12) ----
+        /// What an item does at a condition, for the cards of the repair screens: the damage of a weapon and the rating and
+        /// the threshold of armor, as whole numbers
+        struct RepairStat
+        {
+            int mDamage = 0;
+            int mRating = 0;
+            int mThreshold = 0;
+        };
+        /// One thing that can repair an item and be used up by it
+        struct RepairDonor
+        {
+            FalloutScript::FormId mItem = 0;
+            int mCondition = FalloutScript::ActorState::fullCondition;
+            std::string mName;
+            bool mWorn = false;
+            /// The condition the item is in when this repairs it, and what it does then
+            int mResult = 0;
+            RepairStat mStat;
+        };
+        /// The repair screen of the Pip-Boy for one weapon or piece of armor of the player
+        struct RepairView
+        {
+            /// The Repair skill of the player now
+            int mSkill = 0;
+            FalloutScript::FormId mItem = 0;
+            std::string mName;
+            std::string mIcon;
+            /// The condition of the copy that is repaired, in tenths of a percent of its health
+            int mCondition = FalloutScript::ActorState::fullCondition;
+            bool mWorn = false;
+            RepairStat mStat;
+            /// One for each copy that can be used up, the weakest first (FalloutNV.exe 0x7B6AA0, 0x7B5950)
+            std::vector<RepairDonor> mDonors;
+        };
+        /// The screen for the copy of the item at that condition (a negative one: the copy that is on, else the best);
+        /// nothing for what is neither a weapon nor armor, or when the player has no such copy
+        std::optional<RepairView> repairView(FalloutScript::FormId item, int condition);
+        /// Whether the Pip-Boy offers to repair that copy: it is below full condition and something can repair it
+        bool canRepairItem(FalloutScript::FormId item, int condition);
+        /// The donor is used up and the copy is repaired with it; the condition it has now, -1 when nothing was done
+        int repairItem(FalloutScript::FormId item, int condition, FalloutScript::FormId donor, int donorCondition);
+
+        /// The repair services a script showed (ShowRepairMenu, on the character that repairs): the character, its name
+        /// and a number that is another for each time a menu is opened
+        struct RepairServices
+        {
+            FalloutScript::FormId mVendor = 0;
+            std::string mName;
+            int mSerial = 0;
+            /// The Repair skill of the vendor, read once when the menu opens (-1 until then)
+            int mSkill = -1;
+        };
+        bool openRepairServices(FalloutScript::FormId vendor);
+        std::optional<RepairServices> repairServices();
+        /// The player is done with the menu; the vendor says a line of the topic RepairExit when a conversation is open
+        void closeRepairServices();
+        /// A copy of a weapon or armor that the vendor can repair, and what it asks
+        struct ServiceRow
+        {
+            FalloutScript::FormId mItem = 0;
+            int mCondition = FalloutScript::ActorState::fullCondition;
+            std::string mName;
+            std::string mIcon;
+            bool mWorn = false;
+            int mCost = 0;
+            bool mCanPay = false;
+            /// The health of the copy in points (the sort of the executable goes by it, not by the percent)
+            double mHealth = 0.0;
+            /// What the copy does as it is, and what it does at the condition the vendor leaves it in
+            RepairStat mStat;
+            RepairStat mCapStat;
+        };
+        struct ServiceView
+        {
+            int mSkill = 0;
+            int mCaps = 0;
+            /// What all the rows ask together (the rows that cost nothing add none)
+            int mTotal = 0;
+            /// The condition the vendor leaves things in
+            int mCap = 0;
+            std::vector<ServiceRow> mRows;
+        };
+        std::optional<ServiceView> serviceView();
+        /// The vendor repairs the copy (a copy of the row, the worn one when `worn`), or every row that can be paid for
+        /// when `all`, and the player pays; how many copies were repaired
+        int repairService(FalloutScript::FormId item, int condition, bool worn, bool all);
+
         // ---- The companion wheel (M12) ----
         /// The wheel the player has open on a companion (companion_wheel_menu.xml, FalloutNV.exe 0x754DE0): the
         /// character, its name, a number that is another for each time a wheel opens and what the script of the
@@ -1836,6 +1925,14 @@ namespace OFScript
         double weaponCardDamage(FalloutScript::FormId weapon, int condition = FalloutScript::ActorState::fullCondition);
         /// What wears items out, from the game's settings
         const FalloutScript::Wear::Settings& wearSettings();
+        /// What repairs go by, from the game's settings
+        const FalloutScript::Repair::Settings& repairSettings();
+        /// What the copy of an item does at a condition (the damage of a weapon, the rating and threshold of armor)
+        RepairStat repairStatAt(FalloutScript::FormId item, int condition);
+        /// Whether an item can be used up to repair another (its form is on the repair list of the other, or the perk lets
+        /// weapons of one kind repair each other), and whether the record of the item is for the player
+        bool repairsWith(FalloutScript::FormId item, FalloutScript::FormId other);
+        bool isQuestItem(FalloutScript::FormId item);
         /// The effects of the ammunition of one kind (the kinds of AMEF: 0 damage, 1 resistance, 2 threshold, 3 spread, 4
         /// condition, 5 fatigue) applied to a number, in the order the ammunition lists them
         double applyAmmoEffects(FalloutScript::FormId ammo, std::uint32_t kind, double value);
@@ -2300,6 +2397,7 @@ namespace OFScript
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
         std::optional<FalloutScript::Wear::Settings> mWearSettings;
+        std::optional<FalloutScript::Repair::Settings> mRepairSettings;
         std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)
@@ -2477,6 +2575,10 @@ namespace OFScript
         std::mutex mBarterMutex;
         std::optional<BarterMenu> mBarter;
         int mBarterSerial = 0;
+        /// The repair services the player has open, under mRepairMutex
+        std::mutex mRepairMutex;
+        std::optional<RepairServices> mRepairServices;
+        int mRepairSerial = 0;
         /// The companion wheel the player has open, under mCompanionMutex
         std::mutex mCompanionMutex;
         std::optional<CompanionWheel> mCompanion;

@@ -16,6 +16,24 @@ namespace FalloutScript::Repair
         }
     }
 
+    Settings Settings::fromGameSettings(const Lookup& lookup)
+    {
+        Settings settings;
+        if (!lookup)
+            return settings;
+        const auto take = [&lookup](std::string_view name, double& setting) {
+            if (const std::optional<double> value = lookup(name))
+                setting = *value;
+        };
+        take("fRepairMin", settings.mMin);
+        take("fRepairMax", settings.mMax);
+        take("fRepairScavengeMult", settings.mScavengeMult);
+        take("fRepairSkillBase", settings.mSkillBase);
+        take("fRepairSkillMax", settings.mSkillMax);
+        take("fItemRepairCostMult", settings.mCostMult);
+        return settings;
+    }
+
     int repairedCondition(double skill, int brokenCondition, int spareCondition, const Settings& settings)
     {
         const double a = tenths(brokenCondition);
@@ -23,13 +41,13 @@ namespace FalloutScript::Repair
         const double c = std::max(a, b) + settings.mMin + (settings.mMax - settings.mMin) * skill / 100.0
             + std::min(a, b) * settings.mScavengeMult;
         // c is in tenths of the full health
-        return std::clamp(static_cast<int>(c * 100.0), 0, fullCondition);
+        return std::clamp(static_cast<int>(c * 100.0 + 1e-6), 0, fullCondition);
     }
 
     int serviceCondition(double vendorSkill, const Settings& settings)
     {
         const double factor = settings.mSkillBase + (settings.mSkillMax - settings.mSkillBase) * vendorSkill / 100.0;
-        return std::clamp(static_cast<int>(factor * 100.0), 0, fullCondition);
+        return std::clamp(static_cast<int>(factor * 100.0 + 1e-6), 0, fullCondition);
     }
 
     int serviceCost(double vendorSkill, int condition, int value, const Settings& settings)
@@ -38,6 +56,6 @@ namespace FalloutScript::Repair
         const double cost = settings.mCostMult * value * (factor - tenths(condition)) / 10.0;
         if (cost <= 0.5)
             return 0;
-        return std::max(1, static_cast<int>(cost));
+        return std::max(1, static_cast<int>(std::ceil(cost - 1e-9)));
     }
 }

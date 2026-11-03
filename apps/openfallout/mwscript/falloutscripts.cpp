@@ -281,6 +281,11 @@ namespace OFScript
         });
         // The barter menu of a conversation: the character the script is called on trades with the player, and the
         // screen shows it. The argument is the percent the vendor gives (or asks for) on top of the prices.
+        // The repair services of a conversation: the character the script is called on repairs for the player, and the
+        // screen shows what it asks (FalloutNV.exe 0x5D5200). The command takes no argument and returns nothing.
+        mInterpreter.setHandler("ShowRepairMenu", [this](FalloutScript::CallContext& call) {
+            return openRepairServices(call.mReference) ? 1.0 : 0.0;
+        });
         mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
             return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
         });
@@ -593,6 +598,10 @@ namespace OFScript
             const std::lock_guard merchants(mBarterMutex);
             mMerchantContainers.clear();
             mBarter.reset();
+        }
+        {
+            const std::lock_guard repair(mRepairMutex);
+            mRepairServices.reset();
         }
         // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
         mFightTraits.clear();

@@ -1,11 +1,28 @@
 #include <components/falloutscript/repair.hpp>
 
+#include <map>
+#include <optional>
+#include <string>
+
 #include <gtest/gtest.h>
 
 namespace
 {
     using namespace testing;
     using namespace FalloutScript::Repair;
+
+    TEST(FalloutScriptRepairTest, theSettingsComeFromTheGameData)
+    {
+        const std::map<std::string, double> data{ { "fRepairSkillMax", 10.0 }, { "fItemRepairCostMult", 3.0 } };
+        const Settings settings = Settings::fromGameSettings([&data](std::string_view name) -> std::optional<double> {
+            const auto found = data.find(std::string(name));
+            return found != data.end() ? std::optional<double>(found->second) : std::nullopt;
+        });
+        EXPECT_EQ(settings.mSkillMax, 10.0);
+        EXPECT_EQ(settings.mCostMult, 3.0);
+        EXPECT_EQ(settings.mMin, 0.5);
+        EXPECT_EQ(settings.mSkillBase, 4.0);
+    }
 
     TEST(FalloutScriptRepairTest, repairsToTheBetterOfTheTwoAndALittleMore)
     {
@@ -48,8 +65,9 @@ namespace
         // At the condition the vendor leaves things in there is nothing more to do
         EXPECT_EQ(serviceCost(50, 650, 100, settings), 0);
         EXPECT_EQ(serviceCost(50, 1000, 100, settings), 0);
-        // A tiny sum is not asked for, a small one is at least 1 cap
+        // A tiny sum is not asked for, a small one is rounded up (1.3 caps are 2)
         EXPECT_EQ(serviceCost(50, 600, 1, settings), 0);
-        EXPECT_EQ(serviceCost(50, 0, 1, settings), 1);
+        EXPECT_EQ(serviceCost(50, 0, 1, settings), 2);
+        EXPECT_EQ(serviceCost(50, 100, 100, settings), 110);
     }
 }

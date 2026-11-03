@@ -503,6 +503,18 @@ namespace
         EXPECT_EQ(record.totals().mBiggestAnte, 0);
     }
 
+    TEST(FalloutScriptCasinoTest, the_caravan_totals_do_not_wrap_around)
+    {
+        CaravanRecord record;
+        const int most = std::numeric_limits<int>::max();
+        record.add(true, most);
+        const CaravanTotals after = record.add(true, 1000);
+        EXPECT_EQ(after.mMoneyWon, most);
+        EXPECT_EQ(after.mGamesWon, 2);
+        record.add(false, most);
+        EXPECT_EQ(record.add(false, most).mMoneyLost, most);
+    }
+
     TEST(FalloutScriptCasinoTest, the_caravan_totals_go_through_a_saved_game)
     {
         CaravanRecord record;

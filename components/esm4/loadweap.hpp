@@ -222,6 +222,7 @@ namespace ESM4
         bool mHasVats = false;
         Vats mVats;
         ESM::FormId mAmmo; // NAM0, an ammunition record or a list of them
+        ESM::FormId mRepairList; // REPL, the list of the items that repair it (Fallout 3 and New Vegas)
         ESM::FormId mImpactDataSet; // INAM
         std::uint32_t mEquipType = 0xffffffffu; // ETYP
         std::uint32_t mSoundLevel = 0; // VNAM

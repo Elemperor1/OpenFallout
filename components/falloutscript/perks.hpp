@@ -43,6 +43,8 @@ namespace FalloutScript
         constexpr int enemyCriticalChance = 36;
         /// What a perk adds to the Science that hacking a terminal goes by
         constexpr int hackingModifier = 30;
+        /// More than 0 lets the player repair a weapon with another of the same kind (Mac round 12AW S12 F6, entry point 0x30)
+        constexpr int repairWithSimilar = 48;
         constexpr int actionPointRegen = 39;
         constexpr int actionPointCost = 40;
         constexpr int runSpeed = 42;

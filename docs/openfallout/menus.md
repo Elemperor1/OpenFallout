@@ -108,8 +108,44 @@ keeps the damage curve of its settings. Not done: the effects of the condition o
 reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
 `fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
 records (COED) and of the ones that are placed.
-Not there yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
-hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
+Not there yet: the picture of the thing (the games show its model) and mods (their button is hidden). The Repair button (key R) is
+there (the repair screen below). A number key held shows the wheel of the hot keys, and a click puts the picked thing on the lit
+slot (see the hot keys below).
+
+### Repair: the screen of the Pip-Boy and the repair services (Mac rounds 12AW S12 and 12AX R1 and R2, FalloutNV.exe 0x7B5400 to 0x7B8B30)
+
+The Repair button of the items page (key R, shown for a weapon or a piece of armor that is below full health and has something to
+repair it with) opens `repair_menu.xml` (`falloutpipboyrepair.lua`, in the box of the Pip-Boy). The list has the copy first, with
+the file's brackets round it, and under it each thing the player carries that can repair it: a thing the item's repair list
+(`REPL`) names (the lists of the games hold the item itself, so another copy of it repairs it), and, for a weapon, any playable
+weapon with the same skill and way of being held when the player has the perk of the entry point 48 (Jury Rigging in the games'
+words); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
+the weakest first. The pointer on a thing shows the health the copy would have
+(the cards of the right: the health bar, `+N%` and the gain of damage, threshold or resistance), the copy itself says to select
+an item (`sSelectItemToRepair`). A click repairs: the player's Repair skill (actor value 39) gives the new health of the copy
+as `max(A, B) + 10 * fRepairMin + 10 * (fRepairMax - fRepairMin) * skill / 100 + 0.05 * min(A, B)` percent, A and B being the
+health of the two, capped at the full health; the thing is used up, the statistic "items repaired" (0x22) goes up, the sound is
+`UIRepairWeapon`, and the screen returns to the items when no other thing is left or the copy has 99 percent. Keys: the arrows
+and the pages pick a row, Enter repairs, E is Cancel.
+
+The repair services (`falloutrepairservices.lua`, `repair_services_menu.xml`) are what a conversation opens with `ShowRepairMenu`
+(the result script of a topic): the list is the weapons and armor the player carries that the character can mend. The character
+repairs to `T = SkillBase + (SkillMax - SkillBase) * skill / 100` percent (the settings of the Repair Services; New Vegas
+`SkillMax` is 10 in the plugin) at most; a row asks `ceil(CostMult * value * (T - health) / 10)` caps when that is above a half
+(else it asks nothing and cannot be bought), and a copy that is already as good as the character can make it has the words of
+`sCantRepairPastMax` on its card. A quest item, a thing the player cannot use and armor with neither a rating nor a threshold are
+not listed; the rows that can be paid come first, the healthiest first, then the others, the weakest first. The button over the list
+repairs all rows, one payment, and is on only while the player can pay the whole sum; a row that the player cannot pay is dimmed
+and makes the sound of a refusal. When the screen is left the character says a line of the topic of subtype `RepairExit`. The skill is the character's own Repair, read
+once. The engine's rule that the menu keeps the count of the list's children makes the file's expression for an empty list show
+over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
+
+Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
+scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mark `+` of a thing with
+mods and the mods of the things that repair (no mods yet); the Jury Rigging rule for armor (the executable's class function 0x514410
+was not read); the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
+Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
+generic menu does; the item mod screen (`item_mod_menu.xml`, 0x425).
 
 ### The stats page of the Pip-Boy
 

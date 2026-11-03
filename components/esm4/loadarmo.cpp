@@ -225,7 +225,9 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("EAMT"):
             case ESM::fourCC("EITM"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("REPL"): // FO3
+            case ESM::fourCC("REPL"): // the list of the things that mend it
+                reader.getFormId(mRepairList);
+                break;
             case ESM::fourCC("BIPL"): // FO3
             case ESM::fourCC("MODD"): // FO3
             case ESM::fourCC("MOSD"): // FO3

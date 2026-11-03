@@ -395,6 +395,128 @@ namespace OFLua
         };
         api["closeLoot"] = []() { scripts().closeLoot(); };
 
+        // ---- Repair ----
+        // Whether the Pip-Boy offers to repair the copy the row names: a weapon or armor below full condition with
+        // something that can repair it
+        api["canRepair"] = [](std::string_view item) {
+            const RowKey key = parseRowId(item);
+            return scripts().canRepairItem(key.mItem, key.mCondition);
+        };
+        // The repair screen of one copy: the skill of the player, the copy (id, name, icon, condition, worn, what it
+        // does as `stat`) and the things that can repair it, one for each, the weakest first (id, name, condition, worn,
+        // the condition the copy has after it, and what the copy does then). Nothing for an item that is not repaired.
+        api["repairView"] = [lua](std::string_view item) -> sol::object {
+            const RowKey key = parseRowId(item);
+            const std::optional<OFScript::FalloutScripts::RepairView> view
+                = scripts().repairView(key.mItem, key.mCondition);
+            if (!view)
+                return sol::nil;
+            const auto statTable = [&lua](const OFScript::FalloutScripts::RepairStat& stat) {
+                sol::table table(lua, sol::create);
+                table["damage"] = stat.mDamage;
+                table["rating"] = stat.mRating;
+                table["threshold"] = stat.mThreshold;
+                return table;
+            };
+            const auto idOf = [](FormId form, int condition) {
+                return idText(form) + "~" + std::to_string(condition);
+            };
+            sol::table result(lua, sol::create);
+            result["skill"] = view->mSkill;
+            sol::table copy(lua, sol::create);
+            copy["id"] = idOf(view->mItem, view->mCondition);
+            copy["form"] = idText(view->mItem);
+            copy["name"] = view->mName;
+            copy["icon"] = view->mIcon;
+            copy["condition"] = view->mCondition;
+            copy["worn"] = view->mWorn;
+            copy["stat"] = statTable(view->mStat);
+            result["item"] = copy;
+            sol::table donors(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::RepairDonor& donor : view->mDonors)
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idOf(donor.mItem, donor.mCondition);
+                row["form"] = idText(donor.mItem);
+                row["name"] = donor.mName;
+                row["condition"] = donor.mCondition;
+                row["worn"] = donor.mWorn;
+                row["result"] = donor.mResult;
+                row["stat"] = statTable(donor.mStat);
+                donors[index++] = row;
+            }
+            result["donors"] = donors;
+            return result;
+        };
+        // The player repairs the copy of the first row with a thing of the second (used up); the condition the copy has
+        // now, -1 when nothing was done
+        api["repair"] = [](std::string_view item, std::string_view donor) {
+            const RowKey key = parseRowId(item);
+            const RowKey donorKey = parseRowId(donor);
+            return scripts().repairItem(key.mItem, key.mCondition, donorKey.mItem, donorKey.mCondition);
+        };
+
+        // The repair services a script showed (a conversation that ends in ShowRepairMenu): the character that repairs,
+        // its name, its Repair skill and a number that is another for each time a menu opens; nothing when none is open
+        api["repairServices"] = [lua]() -> sol::object {
+            const auto menu = scripts().repairServices();
+            if (!menu)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["vendor"] = idText(menu->mVendor);
+            row["name"] = menu->mName;
+            row["skill"] = menu->mSkill;
+            row["serial"] = menu->mSerial;
+            return row;
+        };
+        // What the vendor repairs and asks: the caps of the player, the sum of every row, the condition the vendor
+        // leaves things in (tenths of a percent) and the rows (id, name, condition, worn, cost, whether the player can
+        // pay it, in the order the menu lists them)
+        api["serviceRows"] = [lua]() -> sol::object {
+            const auto view = scripts().serviceView();
+            if (!view)
+                return sol::nil;
+            sol::table result(lua, sol::create);
+            result["skill"] = view->mSkill;
+            result["caps"] = view->mCaps;
+            result["total"] = view->mTotal;
+            result["cap"] = view->mCap;
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::ServiceRow& entry : view->mRows)
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idText(entry.mItem) + "~" + std::to_string(entry.mCondition);
+                row["name"] = entry.mName;
+                row["condition"] = entry.mCondition;
+                row["worn"] = entry.mWorn;
+                row["cost"] = entry.mCost;
+                row["canPay"] = entry.mCanPay;
+                row["icon"] = entry.mIcon;
+                sol::table now(lua, sol::create);
+                now["damage"] = entry.mStat.mDamage;
+                now["rating"] = entry.mStat.mRating;
+                now["threshold"] = entry.mStat.mThreshold;
+                row["stat"] = now;
+                sol::table atCap(lua, sol::create);
+                atCap["damage"] = entry.mCapStat.mDamage;
+                atCap["rating"] = entry.mCapStat.mRating;
+                atCap["threshold"] = entry.mCapStat.mThreshold;
+                row["capStat"] = atCap;
+                rows[index++] = row;
+            }
+            result["rows"] = rows;
+            return result;
+        };
+        // The vendor repairs the copy of the row (the worn one when `worn`) and the player pays, or every row that can be
+        // paid for (`all`); how many copies were repaired
+        api["serviceRepair"] = [](std::string_view item, sol::optional<bool> worn, sol::optional<bool> all) {
+            const RowKey key = parseRowId(item);
+            return scripts().repairService(key.mItem, key.mCondition, worn.value_or(false), all.value_or(false));
+        };
+        api["closeRepairServices"] = []() { scripts().closeRepairServices(); };
+
         // The barter menu a script showed (a conversation that ends in ShowBarterMenu): the character that trades, the
         // holder of what it sells, its name, the percent the script gave, and a number that is another for each time a
         // menu opens; nothing when none is open

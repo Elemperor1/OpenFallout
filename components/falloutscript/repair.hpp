@@ -1,6 +1,10 @@
 #ifndef OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_REPAIR_H
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_REPAIR_H
 
+#include <functional>
+#include <optional>
+#include <string_view>
+
 namespace FalloutScript::Repair
 {
     /// The rules of the repair screens of New Vegas, as FalloutNV.exe works them out (the repair menu 0x7B5520 with the
@@ -21,6 +25,10 @@ namespace FalloutScript::Repair
         double mSkillBase = 4.0; // fRepairSkillBase
         double mSkillMax = 9.0; // fRepairSkillMax
         double mCostMult = 2.0; // fItemRepairCostMult
+
+        using Lookup = std::function<std::optional<double>(std::string_view)>;
+        /// The settings the game's data gives (a setting it does not give keeps the default)
+        static Settings fromGameSettings(const Lookup& lookup);
     };
 
     /// The condition of the broken item after it is repaired with a spare copy of the same item (the spare is used up):
@@ -32,8 +40,9 @@ namespace FalloutScript::Repair
     /// `fRepairSkillBase` and `fRepairSkillMax`, as tenths of the full health, at most full
     int serviceCondition(double vendorSkill, const Settings& settings);
 
-    /// What a vendor asks to bring an item with that condition and base value to its best: nothing (0) when there is
-    /// nothing to repair, else at least 1
+    /// What a vendor asks to bring an item with that condition and base value to its best (the executable's 0x648230):
+    /// nothing (0) when there is nothing to repair (what would be asked is half a cap or less), else the sum rounded up
+    /// and at least 1
     int serviceCost(double vendorSkill, int condition, int value, const Settings& settings);
 }
 
