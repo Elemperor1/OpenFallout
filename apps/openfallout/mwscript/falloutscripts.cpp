@@ -282,6 +282,13 @@ namespace OFScript
         mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
             return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
         });
+        // The things a companion carries: the result of the wheel's trade topic calls this on the companion, and the
+        // screen of the containers shows them (what the player puts into the pack of a companion is not made yet)
+        mInterpreter.setHandler("OpenTeammateContainer", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId teammate = call.mReference;
+            runOnMainThread([this, teammate] { openTeammateContainer(teammate); });
+            return 0.0;
+        });
         // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
         mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
             setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));

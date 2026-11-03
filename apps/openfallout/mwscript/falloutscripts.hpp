@@ -420,6 +420,9 @@ namespace OFScript
         /// The player activates a container or a character that is dead: its things can be taken. False when the
         /// object has nothing to open (the player is told when it is locked, and that opens nothing either).
         bool openContainer(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// The things a companion carries are open for the player (the result of the wheel's trade topic calls the
+        /// command OpenTeammateContainer on the companion). Main thread.
+        bool openTeammateContainer(FalloutScript::FormId teammate);
         /// What the player has open to take things from: the holder, its name, and a number that is another for each
         /// time something is opened. Nothing when nothing is open.
         struct Loot

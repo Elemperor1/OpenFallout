@@ -611,9 +611,17 @@ local function refreshFromFile(dt)
         -- The size of the window changed (the places are worked out from it) or the player took the pad up or put it down
         -- (the key or the button next to the verb): the display is made again
         local pad = menuHud.wantsPad == true
+        if state.info ~= nil then pad = state.info.pad == true end
         menuHud:close()
         menuHud = menuHudModule.create(pad)
-        if menuHud == nil then menuHudFailed = true end
+        if menuHud == nil then
+            menuHudFailed = true
+            -- The stand-in draws the next frame, whatever it drew before
+            shown = nil
+        else
+            -- What this frame brought (the messages and subtitles that were taken out of the queues) goes into the new one
+            menuHud:update(state, dt)
+        end
     end
     return true
 end
