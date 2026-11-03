@@ -9,7 +9,9 @@
 --     tick (the bar of the action points is anchored at its right edge, the one of the enemy in its middle);
 --   * a message is shown alone, for the seconds it came with, with 0.35 s to fade in and out; a message that is the same as
 --     the one queued last is dropped;
---   * the compass is a strip of 360 degrees of the interface atlas that is shown 345 texels at a time from the heading on.
+--   * the compass is a strip of 360 degrees of the interface atlas that is shown 345 texels at a time, its texture shifted by
+--     the heading over 360 less 0.15 (Mac round 12AN B8); a marker is drawn when 1.45 times its bearing is within 70 degrees
+--     of the front, at x = (1.45 x bearing + 70) x 274 / 140, and fades near the two ends.
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
 -- threshold, the place's name, subtitles, the text under the crosshair).
 local ui = require('openfallout.ui')
@@ -23,11 +25,14 @@ local FADE_SECONDS = 0.35
 -- fEnemyHealthBarTimer in the executable)
 local LIMB_SECONDS = 5
 local ENEMY_SECONDS = 5.5
--- The strip of the compass: its texels all round, the window of it that is shown, and the degrees that stand for the width
--- of the strip
+-- The strip of the compass: its texels all round, the window of it that is shown, where the heading is in the texture (0.15
+-- of the way round) and how far across the strip the marks go (274 texels, from x 0)
 local STRIP_TEXELS = 1023
-local WINDOW = 345
-local FIELD = 120
+local STRIP_HEADING = 0.15
+local MARK_SPAN = 274
+-- Where a mark stands that is straight ahead, and how far from the ends the marks begin to fade
+local MARK_FRONT = 137
+local MARK_FADE = 55
 local SAFE = 15
 
 -- The limbs by the names that the engine gives them, and the tiles of the file they are
@@ -129,8 +134,8 @@ local function build(self)
     for index = 1, 8 do
         t.marks.tick[index] = make(t.groups[3], 'compass_npc_icon', 'hud_mark_tick' .. index, { visible = 0 })
     end
-    -- The mark of the player is in the middle of the window
-    t.player = make(t.groups[1], 'template_compass_icon_player', 'hud_mark_player', { _Heading = WINDOW / 2 - 20 })
+    -- The mark of the player is straight ahead (the x of it was not read: it is where a mark ahead stands)
+    t.player = make(t.groups[1], 'template_compass_icon_player', 'hud_mark_player', { _Heading = MARK_FRONT })
 
     -- Action points: the bracket, the bar (it grows to the left), the number and the rounds
     make(actionPoints, 'template_right_bracket', 'hud_ap_bracket', { x = -37, brightness = 255 })
@@ -356,7 +361,8 @@ end
 function Hud:showCompass(compass)
     local t = self.tiles
     if compass == nil then return end
-    local scroll = compass.heading / 360 * STRIP_TEXELS - WINDOW / 2
+    -- The texture of the strip is shifted by the heading's share of the way round, less 0.15, and wraps
+    local scroll = ((compass.heading / 360 - STRIP_HEADING) % 1) * STRIP_TEXELS
     self:put(t.compass, '_sourcex', scroll)
     local used = { quest = 0, landmark = 0, tick = 0 }
     for _, marker in ipairs(compass.markers or {}) do
@@ -365,10 +371,13 @@ function Hud:showCompass(compass)
         used[kind] = used[kind] + 1
         local tile = pool[used[kind]]
         if tile then
-            -- The strip is 1023 texels for 360 degrees, the engine's share is of the 120 degrees in front
-            local x = WINDOW / 2 + (marker.share - 0.5) * FIELD / 360 * STRIP_TEXELS
-            local half = kind == 'tick' and 16 or 20
-            self:put(tile, '_Heading', math.floor(x - half + 0.5))
+            -- The share is across the span the marks have (the engine gives it for the bearings that are shown)
+            local x = marker.share * MARK_SPAN
+            -- The marks are fully lit up to 1.6 x 137 and fade to nothing at the end (the edge on the left is the same,
+            -- which the executable's code was not read for)
+            local fade = math.min(1, x / MARK_FADE, (MARK_SPAN - x) / MARK_FADE)
+            self:put(tile, '_Heading', math.floor(x + 0.5))
+            self:put(tile, 'alpha', math.floor(255 * math.max(0, fade) + 0.5))
             self:put(tile, 'visible', 1)
         end
     end

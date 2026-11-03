@@ -27,9 +27,9 @@ namespace OFScript
     {
         constexpr double pi = 3.14159265358979323846;
 
-        /// How many degrees across the window of the compass shows. The games draw a strip of 345 units, and what the
-        /// executable does to put a marker on it is not read: this is a stand-in.
-        constexpr double compassField = 120.0;
+        /// How many degrees of bearing the icons of the compass stretch over: the executable draws a marker when its
+        /// bearing times 1.45 is within 70 of the front, and puts it across 274 texels of the strip (Mac round 12AN B8)
+        constexpr double compassField = 2.0 * 70.0 / 1.45;
 
         /// A character or creature of Fallout (their classes are not those of Morrowind's actors)
         bool isCharacterOrCreature(const OFWorld::Ptr& ptr)

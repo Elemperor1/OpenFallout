@@ -643,11 +643,18 @@ its older drawing for a data folder that lacks the file.
   steps of two ticks, so the halves are whole).
 - Messages are one at a time: a message is shown for the seconds it came with (2), fades in and out in 0.35 seconds, waits behind
   the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings.
-- The compass is a strip of 360 degrees of the interface atlas (1023 texels, `N` at both ends) of which 345 texels, about 121
-  degrees, are shown from the heading on. The menu engine scrolls a picture with the trait `_sourcex` (a window of the texture
-  at its natural size from that texel on, going on at the left edge when it runs past the right one). The marks of places
-  (quest, landmark, characters) are made from the templates and put by their `_Heading`. How the games scroll the strip was
-  not read; the scroll and the 120 degrees the engine marks places in are the port's.
+- The compass is a strip of 360 degrees of the interface atlas (1023 texels) of which 345 texels, about 121 degrees, are
+  shown. The executable shifts the texture of the strip by the heading over 360 less 0.15 (and adds 1 when that is below
+  0); the menu engine scrolls a picture with the trait `_sourcex` (a window of the texture at its natural size from that
+  texel on, going on at the left edge when it runs past the right one), and the script gives it the same number of texels
+  (Mac round 12AN B8). A mark is drawn when 1.45 times its bearing is within 70 degrees of the front (a bearing within
+  48.3 degrees), at x = (1.45 x bearing + 70) x 274 / 140 of the strip, so the marks stretch over 274 of its 345 texels and
+  the one straight ahead stands at 137 (the player's mark is put there: its x was not read). They fade out towards the
+  ends (read for the right end, where they are lit up to 1.6 x 137 and go dark at 274; the left end is taken to be the
+  same). The marks of places (quest, landmark, characters) are made from the templates and put by their `_Heading`. Not
+  there: the blink of the marks, the discovery of a place when the player comes within 1000 units, the north of the cell
+  that is added to the heading, and the rule that picks the characters that show as ticks (at most 10 within 1500 units,
+  3000 outside).
 - When a window is open only the messages are shown, and nothing while the player is dead. The executable picks what the
   display shows by a mode of 17 bits, and a script that holds the player still (`DisablePlayerControls` on movement, Mac round
   12AM B5) puts it in mode 0xC: only the radiation, the experience bar, the messages, the subtitles and the quest reminder
