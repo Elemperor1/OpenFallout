@@ -444,7 +444,7 @@ end
 -- What a key does while the screen is there: Up and Down light another row, Left and Right (or Space) give a point to the
 -- skill that is lit (take one back) or pick the perk, Enter is Continue or Done, Backspace is Back and R is Reset. False
 -- when the key is not the screen's.
-function module.press(code)
+function module.press(code, symbol)
     if not shown then return false end
     local row = litRow()
     local count = #infos[page + 1]
@@ -467,7 +467,8 @@ function module.press(code)
         if page > 0 then goTo(page - 1) end
     elseif code == input.KEY.R then
         reset()
-    else
+    elseif not shown:pcButton(symbol) then
+        -- (the file's own letters: A is Continue and E is Back)
         return false
     end
     return true

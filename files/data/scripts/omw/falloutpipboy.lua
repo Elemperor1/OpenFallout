@@ -851,13 +851,13 @@ end
 
 -- What a key (or a button of the pad that stands for one) does on the screen, while it is the top one (a menu opened
 -- over it takes the keys and the buttons)
-local function press(code)
+local function press(code, symbol)
     if not visible or I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     -- The screen of a level up takes the keys it uses (the stand-in widgets, when it is not the game's menu, take none)
     if view == 'levelup' then
-        if levelUpMenu.isOpen() then levelUpMenu.press(code) end
+        if levelUpMenu.isOpen() then levelUpMenu.press(code, symbol) end
         return
     end
     if view ~= 'pipboy' then
@@ -993,7 +993,7 @@ return {
             end
         end,
         onKeyPress = function(key)
-            press(key.code)
+            press(key.code, key.symbol)
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)

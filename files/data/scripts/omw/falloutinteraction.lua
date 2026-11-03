@@ -454,7 +454,7 @@ end
 
 -- What a key (or a button of the pad that stands for one) does: on the screen of the hours left and right change them
 -- and Enter begins the wait; on the screen of a lock Enter puts a bobby pin in
-local function press(code)
+local function press(code, symbol)
     -- (a menu opened over the screen takes the keys and the buttons)
     if I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
@@ -470,6 +470,9 @@ local function press(code)
             end
         elseif code == input.KEY.Enter then
             startRest()
+        elseif restMenu then
+            -- The letters the file gives to its buttons (W waits, E leaves)
+            restMenu:pcButton(symbol)
         end
     elseif screen == 'terminal' then
         if not terminalMenu.press(code) then
@@ -491,7 +494,7 @@ return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            press(key.code)
+            press(key.code, key.symbol)
         end,
         onControllerButtonPress = onPad,
     },

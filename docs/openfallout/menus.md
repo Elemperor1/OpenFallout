@@ -38,6 +38,12 @@ these from the pointer, and the renderer sets them:
   is over alone: the arrows of a toggle or a meter show when exactly one of the row, an arrow and the value is over (the
   file adds their `mouseover` and compares the sum with 1), so a row that stayed over under an arrow would hide both and
   the click would fall on the value (found in the running game, round 12AC).
+- A letter typed in a menu clicks the tile its file names for it: the root has `_PCButton_<letter>` traits whose value is a
+  tile name (`stats_menu.xml`: S stimpak, A Rad-Away, X Rad-X, R repair, E doctor's bag; `inventory_menu.xml`: R repair, E
+  cancel, X mod; `barter_menu.xml`: A Accept, X Exit; `trait_menu.xml`: R Reset, A Continue, E Back; `sleep_wait_menu.xml`: W
+  wait, E cancel; and so on). The game's interface manager (FalloutNV.exe 0x70e2b1-0x70e3d2, round 12AG) clicks the tile if it
+  is visible and takes the pointer. `Shown:pcButton(symbol)` does that; the rest, level-up and (to come) barter screens use
+  it. The other screens still have only the keys of the port.
 - A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
   and so are its children.
 - A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).
