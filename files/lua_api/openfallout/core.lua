@@ -1633,10 +1633,19 @@
 
 ---
 -- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
--- subtitles: each has `text` (the speaker's name and the words), `seconds` (how long it stays from the moment it was said),
--- `distance` (of the speaker from the player) and `forced` (a script asked for the text whatever the setting says).
+-- subtitles: each has `text` (the words), `seconds` (how long it stays from the moment it was said), `distance` (of the
+-- speaker from the player), `forced` (a script asked for the text whatever the setting says) and `kind` (0 the player's
+-- own line, 2 another character's).
 -- @function [parent=#Hud] takeSubtitles
 -- @return #list<#table>
+
+---
+-- The names of the regions the player came into since this was last called, oldest first, for the line over the compass. The
+-- player's region is looked for when the player's cell is another one (and once after a game was begun or loaded), as the
+-- games do it; a building, a place that no region covers and a region without a name give nothing, and neither does the region
+-- that was shown last.
+-- @function [parent=#Hud] takeRegions
+-- @return #list<#string>
 
 ---
 -- The text of a note of text, with the `&name;` tokens in it (the key an action is bound to, the name of the player)

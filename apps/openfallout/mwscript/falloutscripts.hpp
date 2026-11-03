@@ -65,6 +65,7 @@
 #include <components/falloutscript/queries.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
+#include <components/falloutscript/regionline.hpp>
 #include <components/falloutscript/reputation.hpp>
 #include <components/falloutscript/saveaccess.hpp>
 #include <components/falloutscript/switches.hpp>
@@ -1028,6 +1029,9 @@ namespace OFScript
         FalloutScript::Hud::MessageLine& hudMessages() { return mHudMessages; }
         /// What the characters say to the player outside of a conversation, for the subtitles of the display
         FalloutScript::Hud::SubtitleLine& hudSubtitles() { return mHudSubtitles; }
+        /// The names of the regions the player came into since this was last called, for the display (a name or none:
+        /// it is looked for when the player's cell is another one). Lua thread.
+        std::vector<std::string> takeRegionNames();
         /// What the meters of the display that are not the player's stats show
         struct HudStatus
         {
@@ -2169,6 +2173,11 @@ namespace OFScript
         /// (seconds of play) that the second is told by
         FalloutScript::Hud::MessageLine mHudMessages;
         FalloutScript::Hud::SubtitleLine mHudSubtitles;
+        /// The region line of the display: the cell the player was last looked for in, and the region it showed
+        std::mutex mRegionMutex;
+        FalloutScript::RegionLine::Announcer mRegionLine;
+        ESM::RefId mRegionCell;
+        bool mRegionCellKnown = false;
         FalloutScript::Hud::Watchers mWatchers;
         double mHudTime = 0;
         /// Whether the log last said that the player sneaks (it says when that changes)

@@ -1,12 +1,15 @@
 -- The subtitles of the head-up display of Fallout 3 and New Vegas, as the executable keeps them (FalloutNV.exe 0x774FD0,
 -- 0x7711F4 and 0x775230; Mac round 12AO B3): a line that a character says is an entry with the seconds it stays from the
 -- moment it was said; every 200 ms the display drops the entries that are over, and when none is on the screen it takes
--- the one of the speaker nearest to the player (a line a script forced comes before the others) and shows it until it is over.
+-- the one of the speaker nearest to the player within 500 units (a line a script forced comes before the others) and shows
+-- it until it is over. The text is the response alone: the executable puts no name before it (Mac round 12AQ B3).
 -- The tile `Subtitles` of hud_main_menu.xml is empty; the display makes a centred text in it (falloutmenuhud.lua).
 local module = {}
 
 -- The display looks at the entries this often (the executable's update of the display, 200 ms)
 module.CHECK_SECONDS = 0.2
+-- How far the speaker of a line that is not forced may be for it to be shown (the squared limit of the executable is 250000)
+module.REACH = 500
 
 local Subtitles = {}
 Subtitles.__index = Subtitles
@@ -15,7 +18,8 @@ function module.new()
     return setmetatable({ entries = {}, current = nil, since = 0 }, Subtitles)
 end
 
--- A line: `text`, `seconds` it stays, `distance` of the speaker from the player, `forced` when a script asked for it
+-- A line: `text`, `seconds` it stays, `distance` of the speaker from the player, `forced` when a script asked for it, `kind`
+-- (0 the player's own line, 1 nobody's, 2 another character's; 2 when it is not given)
 function Subtitles:add(line)
     if type(line.text) ~= 'string' or line.text == '' then return end
     self.entries[#self.entries + 1] = {
@@ -23,12 +27,25 @@ function Subtitles:add(line)
         left = tonumber(line.seconds) or 0,
         distance = tonumber(line.distance) or math.huge,
         forced = line.forced == true,
+        kind = tonumber(line.kind) or 2,
     }
 end
 
-local function before(a, b)
-    if a.forced ~= b.forced then return a.forced end
-    return a.distance < b.distance
+-- The entry that is shown when none is on the screen (FalloutNV.exe 0x775230): the entries are taken in the order they
+-- were said; a line a script forced takes over whatever was chosen; any other is chosen when its speaker is within 500
+-- units and nearer than the one chosen, unless it is the player's own line (kind 0) and the one chosen is another's
+local function choose(entries)
+    local best = nil
+    for _, entry in ipairs(entries) do
+        if entry.forced then
+            best = entry
+        elseif best == nil then
+            if entry.distance <= module.REACH then best = entry end
+        elseif not best.forced and entry.distance < best.distance and entry.kind >= best.kind then
+            best = entry
+        end
+    end
+    return best
 end
 
 -- A frame: the text that is on the screen now, nil for none
@@ -45,11 +62,7 @@ function Subtitles:step(dt)
     end
     self.entries = kept
     if self.current ~= nil and self.current.left <= 0 then self.current = nil end
-    if self.current == nil then
-        for _, entry in ipairs(kept) do
-            if self.current == nil or before(entry, self.current) then self.current = entry end
-        end
-    end
+    if self.current == nil then self.current = choose(kept) end
     return self.current and self.current.text or nil
 end
 

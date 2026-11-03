@@ -525,6 +525,12 @@ namespace OFScript
         mWeaponLoops.clear();
         mHudMessages.clear();
         mHudSubtitles.clear();
+        {
+            // The first look at the regions in the next game announces the one the player is in
+            const std::lock_guard lock(mRegionMutex);
+            mRegionLine.reset();
+            mRegionCellKnown = false;
+        }
         mWatchers.clear();
         mReferences.clear();
         mTriggerShapes.clear();
@@ -3724,14 +3730,15 @@ namespace OFScript
                 {
                     // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
                     // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from
-                    // the moment it is said, and of several said at once the nearest speaker's is shown
-                    const std::string name(speaker.getClass().getName(speaker));
+                    // the moment it is said, and of several said at once the nearest speaker's is shown. The text is
+                    // the response as it stands: the executable puts no name before it (Mac round 12AQ B3)
                     FalloutScript::Hud::Subtitle subtitle;
-                    subtitle.mText = name.empty() ? line.mText : name + ": " + line.mText;
+                    subtitle.mText = line.mText;
                     subtitle.mSeconds
                         = static_cast<float>(line.mText.size() * gameSetting("fNoticeTextTimePerCharacter", 0.06));
                     subtitle.mDistance = distance;
                     subtitle.mForced = line.mForceSubtitles;
+                    subtitle.mKind = speaker == player ? 0 : 2;
                     mHudSubtitles.push(std::move(subtitle));
                 }
             }

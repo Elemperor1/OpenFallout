@@ -54,10 +54,14 @@ namespace FalloutScript::Hud
         std::string mText;
         /// How long it stays from the moment it was said
         float mSeconds = 0;
-        /// How far the speaker is from the player: of several lines said at once the display shows the nearest
+        /// How far the speaker is from the player: the display shows the line of a speaker within 500 units, and of
+        /// several said at once the nearest
         float mDistance = 0;
         /// A script forced the text on whatever the setting says; such a line comes before the others
         bool mForced = false;
+        /// Whose line it is, as the executable keeps it (0x774FD0): 0 the player's own, 1 nobody's, 2 another
+        /// character's
+        int mKind = 2;
     };
 
     /// The lines that were said to the player since the display last took them, oldest first (FalloutNV.exe 0x774FD0

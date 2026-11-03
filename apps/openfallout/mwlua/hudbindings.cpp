@@ -78,7 +78,8 @@ namespace OFLua
         };
 
         // The lines that characters said to the player since this was last called, oldest first, for the subtitles: the
-        // text, how long it stays, how far the speaker is and whether a script forced it
+        // text, how long it stays, how far the speaker is, whether a script forced it and whose line it is (0 the
+        // player's own, 2 another character's)
         api["takeSubtitles"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
@@ -89,8 +90,19 @@ namespace OFLua
                 row["seconds"] = line.mSeconds;
                 row["distance"] = line.mDistance;
                 row["forced"] = line.mForced;
+                row["kind"] = line.mKind;
                 rows[index++] = row;
             }
+            return rows;
+        };
+
+        // The names of the regions the player came into since this was last called, oldest first (the display shows
+        // the last as the line over the compass). It looks when the player's cell is another one.
+        api["takeRegions"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const std::string& name : scripts().takeRegionNames())
+                rows[index++] = name;
             return rows;
         };
 

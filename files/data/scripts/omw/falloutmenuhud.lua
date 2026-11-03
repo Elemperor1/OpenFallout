@@ -15,8 +15,11 @@
 --   * the text under the crosshair (Info) is three lines in the middle of the bottom: the word of what the player does with
 --     the thing (with the key that does it, or the button of the pad) over its name, and a row of its weight and value
 --     (or, for a locked thing, what the lock is, in brackets) under it (Mac rounds 12AM B2 and 12AN B7).
+--   * the name of the region the player comes into is a line of text over the compass: it fades in over 2 s, stays until 4 s
+--     after it began and fades out over 2 s more (Mac rounds 12AO B3 and 12AQ B1); a second line for the name of a place
+--     is in the file, but the executable never shows it.
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
--- threshold, the place's name, subtitles).
+-- threshold, the quest lines).
 local ui = require('openfallout.ui')
 local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
@@ -39,6 +42,9 @@ local MARK_SPAN = 274
 local MARK_FRONT = 137
 local MARK_FADE = 55
 local SAFE = 15
+-- The line of the region name: seconds it takes to fade in and out, and from its start until it begins to fade out
+local REGION_FADE = 2
+local REGION_HOLD = 4
 
 -- The limbs by the names that the engine gives them, and the tiles of the file they are
 local LIMBS = {
@@ -144,11 +150,19 @@ local function build(self)
     end
     t.hotAmmo = m:find('IM_AmmoSwap')
     if t.hotAmmo then m:set(t.hotAmmo, 'visible', 0) end
-    -- The subtitles: the tile is 800 by 110 and empty in the file; the code makes a centred line of text in it, just above
-    -- the block of the text under the crosshair
+    -- The subtitles: the tile is 800 by 110 and empty in the file; the code makes a centred line of text in it, 50 above the
+    -- block of the text under the crosshair (Mac round 12AQ B3)
     t.subtitles = find('Subtitles')
-    place(t.subtitles, math.floor(width / 2) - 400, height - 2 * sy - 80 - 30 - 110)
+    place(t.subtitles, math.floor(width / 2) - 400, height - 2 * sy - 80 - 30 - 110 - 50)
     t.subtitleText = make(t.subtitles, 'template_justify_center_text', 'hud_subtitle_text', { x = 400, y = 0, wrapwidth = 800 })
+    -- The region name: the tile is 100 by 100, 5 to the right of the health block and 75 above its top; the code makes a
+    -- left-justified line of text in it, one line of the font down (Mac round 12AQ B1)
+    t.region = find('Region_Location')
+    place(t.region, 2 * sx + 15, hpY - 75)
+    local measured = m:measure(7, 'Ag', 2048)
+    local lineHeight = measured and measured.height or 0
+    t.regionText = make(t.region, 'template_justify_left_text', 'hud_region_text',
+        { x = 0, y = lineHeight > 0 and lineHeight or 24, wrapwidth = 2048, alpha = 0 })
     t.limbs = find('crippled_limb_indicator')
     place(t.limbs, width - 2 * sx - 200, 100 + 2 * sy)
     t.hitPoints, t.actionPoints = hitPoints, actionPoints
@@ -313,6 +327,43 @@ function Hud:showMessage(dt)
         self:put(t.messageIcon, 'filename', icon)
     end
     self:put(t.messageIcon, 'alpha', icon and alpha or 0)
+end
+
+-- How much of the region name shows `age` seconds after it began, as the alpha of its text (0 to 255)
+local function regionAlpha(age)
+    if age == nil then return 0 end
+    local share = 0
+    if age < REGION_FADE then
+        share = age / REGION_FADE
+    elseif age < REGION_HOLD then
+        share = 1
+    elseif age < REGION_HOLD + REGION_FADE then
+        share = 1 - (age - REGION_HOLD) / REGION_FADE
+    end
+    return math.floor(255 * share + 0.5)
+end
+
+-- The line with the name of the region the player came into (FalloutNV.exe 0x772C30 and the update at 0x770874): a name is
+-- written at once and waits for the tile to be on the screen, then it fades in; a name that is the one on the screen is
+-- not shown again
+function Hud:showRegion(names, full, dt)
+    local r = self.region
+    for _, name in ipairs(names) do
+        if name ~= '' and not (r.text == name and regionAlpha(r.age) > 0) then
+            r.text, r.waiting = name, true
+        end
+    end
+    if r.waiting and full then
+        r.age, r.waiting = 0, false
+    elseif r.age ~= nil then
+        r.age = r.age + dt
+        if r.age >= REGION_HOLD + REGION_FADE then r.age = nil end
+    end
+    local t = self.tiles
+    local alpha = full and regionAlpha(r.age) or 0
+    self:put(t.region, 'visible', alpha > 0 and 1 or 0)
+    self:put(t.regionText, 'string', r.text)
+    self:put(t.regionText, 'alpha', alpha)
 end
 
 -- The face and the limbs come up when the health changed, for a few seconds
@@ -519,6 +570,7 @@ function Hud:update(state, dt)
     local subtitle = self.subtitles:step(dt)
     self.shown:batch(function()
         self:showMessage(dt)
+        self:showRegion(state.regions or {}, full, dt)
         -- The subtitles are in the modes of the game (and of a script that holds the player), not under a window
         self:put(t.subtitles, 'visible', (full and subtitle ~= nil) and 1 or 0)
         if subtitle ~= nil then self:put(t.subtitleText, 'string', subtitle) end
@@ -588,7 +640,8 @@ function module.create(pad, previous)
     if not shown then return nil end
     local self = setmetatable({ shown = shown, size = size, cache = {}, queue = previous and previous.queue or {},
         leaving = previous and previous.leaving or nil, pad = pad == true,
-        subtitles = previous and previous.subtitles or subtitles.new() }, Hud)
+        subtitles = previous and previous.subtitles or subtitles.new(),
+        region = previous and previous.region or { text = '', waiting = false } }, Hud)
     local ok, problem = pcall(build, self)
     if not ok then
         print('The head-up display is not drawn from its file: ' .. tostring(problem))
