@@ -258,6 +258,8 @@ namespace OFInput
         // controls menu, read from the executable: Tab, F and R); a binding that was kept in a player's own
         // configuration is not changed
         defaultKeyBindings[A_ToggleWeapon] = SDL_SCANCODE_R;
+        // (the game has no spells to ready: the key is one that nothing else uses, for the content that has them)
+        defaultKeyBindings[A_ToggleSpell] = SDL_SCANCODE_G;
         defaultKeyBindings[A_CycleSpellLeft] = SDL_SCANCODE_MINUS;
         defaultKeyBindings[A_CycleSpellRight] = SDL_SCANCODE_EQUALS;
         defaultKeyBindings[A_CycleWeaponLeft] = SDL_SCANCODE_LEFTBRACKET;

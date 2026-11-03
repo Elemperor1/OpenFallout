@@ -1406,11 +1406,7 @@ namespace OFScript
                 {
                     // A script that gave the boxes back, or that has not said for five seconds that it draws them
                     // (it stopped), leaves the player with no window: the window manager makes one now
-                    const std::int64_t waited = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                    std::chrono::steady_clock::now().time_since_epoch())
-                                                    .count()
-                        - mMessagesClaimedAt.load();
-                    if (!mMessagesDrawnByLua || waited > 5000)
+                    if (!luaClaimIsFresh(5000))
                     {
                         mOpenByLua = false;
                         {
@@ -1454,21 +1450,22 @@ namespace OFScript
             return;
         MessageBox box = std::move(mMessageQueue.front());
         mMessageQueue.pop_front();
-        // A box with nothing to pick has the button that closes it, and that is the button 0
+        // A box with nothing to pick has the button that closes it, and that is the button 0. Its word is the game's
+        // own (sOk, in the executable; the plugins hold none, and the window manager's setting store gave an empty
+        // text, a square with no word in it). The game's own menu makes no such button for a message that has none
+        // (round 12AD): it is the port's, so that a box that has no display time can be closed
         if (box.mButtons.empty())
         {
-            box.mButtons.emplace_back(windows->getGameSettingString("sOK", "OK"));
-            box.mPlainButtons.push_back(box.mButtons.back());
+            std::string ok = gameSettingText("sOK");
+            box.mButtons.push_back(escapeTags(ok));
+            box.mPlainButtons.push_back(std::move(ok));
             box.mNumbers.push_back(0);
         }
         mOpenNumbers = box.mNumbers;
         mOpenOwner = box.mOwner;
-        const std::int64_t now
-            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
-                  .count();
         // A script that says it draws the boxes (and said it a moment ago) has this one; otherwise the window
         // manager's window is made for it, and a script that draws is told so (OpenMessage::mLua)
-        const bool byLua = mMessagesDrawnByLua && now - mMessagesClaimedAt.load() < 1000;
+        const bool byLua = luaClaimIsFresh(1000);
         {
             OpenMessage open;
             open.mSerial = ++mMessageSerial;
@@ -1501,11 +1498,31 @@ namespace OFScript
     void FalloutScripts::setMessagesDrawnByLua(bool drawn)
     {
         if (drawn)
+        {
             mMessagesClaimedAt = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now().time_since_epoch())
                                      .count();
+            ++mMessageClaims;
+        }
+        else
+            mMessageClaims = 0;
         // A box that Lua had open and gave back is made by the window manager in the next frame (updateMessageBoxes)
         mMessagesDrawnByLua = drawn;
+    }
+
+    bool FalloutScripts::luaClaimIsFresh(std::int64_t leaseMilliseconds) const
+    {
+        if (!mMessagesDrawnByLua)
+            return false;
+        const std::int64_t since
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            - mMessagesClaimedAt.load();
+        // A script says it every frame. The claim that it makes when it is loaded is the only one until its first
+        // frame, and a world that is loading can take longer than the lease to come to that frame: the boxes that the
+        // game opens in its first frames (the items of a pack that are added at the start) were the window manager's
+        // for that reason, and are the script's now
+        return since < leaseMilliseconds || (mMessageClaims.load() == 1 && since < 30000);
     }
 
     int FalloutScripts::takeButtonPressed(FalloutScript::FormId owner)
@@ -3969,8 +3986,11 @@ namespace OFScript
         const OFWorld::CellStore* cell = cellAt(place);
         if (cell == nullptr || !cell->isExterior())
             return 0;
-        // The cell of a building has the default worldspace, which no record is
-        const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
+        // The cell of a building has the default worldspace, which no record is. The cell gives a copy of it: the
+        // pointer into it needs the copy to stay alive (a pointer into the temporary read whatever the stack held next,
+        // a different number in each run, and no record was found for it)
+        const ESM::RefId space = cell->getCell()->getWorldSpace();
+        const ESM::FormId* worldspace = space.getIf<ESM::FormId>();
         return worldspace != nullptr ? numberOf(*worldspace) : 0;
     }
 
@@ -4690,7 +4710,8 @@ namespace OFScript
             || std::find(record->mRegions.begin(), record->mRegions.end(), wanted) == record->mRegions.end())
             return false;
         const ESM4::Region* area = mStore.get<ESM4::Region>().search(wanted);
-        const ESM::FormId* worldspace = cell->getCell()->getWorldSpace().getIf<ESM::FormId>();
+        const ESM::RefId space = cell->getCell()->getWorldSpace(); // a copy: the pointer into it needs it alive
+        const ESM::FormId* worldspace = space.getIf<ESM::FormId>();
         return area != nullptr && worldspace != nullptr
             && area->covers(*worldspace, place.mPosition.x(), place.mPosition.y());
     }

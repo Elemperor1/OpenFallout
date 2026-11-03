@@ -19,6 +19,9 @@ local messagebox = core.messagebox
 if not (core.pipboy and core.pipboy.available()) or not messagebox or not messagebox.claim then
     return {}
 end
+-- Said when the script is loaded, not only in its frames: the boxes that the game opens in its first frame (the items of
+-- a pack that are added when a game starts) come before the first frame of this script, and are drawn here too
+messagebox.claim(true)
 
 local FILE = 'message_menu.xml'
 -- Font 2 is the text of the box and the buttons, font 6 its title

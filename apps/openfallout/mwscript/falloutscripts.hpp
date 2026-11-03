@@ -1625,6 +1625,10 @@ namespace OFScript
         /// When Lua last said it draws them (milliseconds of the steady clock): a script that has stopped (the game
         /// was left, another was loaded) no longer draws, and the next box is the window manager's
         std::atomic<std::int64_t> mMessagesClaimedAt{ 0 };
+        /// How many times it said so since it last gave them back (1 is the claim of the script when it was loaded)
+        std::atomic<int> mMessageClaims{ 0 };
+        /// The script says it draws them and said it within `leaseMilliseconds` (any thread)
+        bool luaClaimIsFresh(std::int64_t leaseMilliseconds) const;
         std::atomic<int> mLuaPressed{ -1 };
         std::uint64_t mOpenBoxId
             = 0; // the box of the window manager that shows it, to tell it from one that replaced it
