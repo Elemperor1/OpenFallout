@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_EQUIPMENT_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -113,6 +114,23 @@ namespace FalloutScript
         /// it). False when the item is not on.
         bool setEquippedCondition(FormId actor, FormId item, int condition);
 
+        /// The copy of the weapon or armor that is on loses `points` of health (what is less than a tenth of a percent is
+        /// kept for the next time) and tells the listener when it did. Returns the condition after, -1 when the item is
+        /// not on or has no health to lose.
+        int wear(FormId actor, FormId item, double points);
+        /// Told after an item that is on lost health: the condition before and after
+        using WearListener = std::function<void(FormId actor, FormId item, int before, int after)>;
+        void setWearListener(WearListener listener);
+        /// Gives copies of an item with a share of its health (1 is whole); an item that does not wear out is whole
+        void addWithHealth(FormId actor, FormId item, int count, double fraction);
+        /// The health of the weapon in the hands in percent, 100 for the hands
+        double weaponPercent(FormId actor);
+        /// What SetWeaponHealthPerc and ModWeaponHealthPerc do to the weapon in the hands (0xA20..: the executable lowers
+        /// health through the code of wear, raises it by writing it, and a set never reaches the whole): false when there
+        /// is no weapon in the hands
+        bool setWeaponPercent(FormId actor, double percent);
+        bool modWeaponPercent(FormId actor, double percent);
+
         /// The weapon held (0 for none, hands only), the ammunition chosen, and the armor worn
         FormId weapon(FormId actor);
         FormId ammo(FormId actor);
@@ -186,6 +204,10 @@ namespace FalloutScript
         /// What a quantity of each piece of armor is, with the piece's condition in it, added up
         template <class Pick>
         double sumOfWornArmor(FormId actor, Pick pick);
+
+        /// How much of the next tenth of a percent a copy has lost, for the next time
+        std::map<std::pair<FormId, FormId>, double> mWearRemainders;
+        WearListener mWearListener;
 
         ItemRecords& mRecords;
         ActorState& mState;

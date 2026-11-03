@@ -1,6 +1,7 @@
 #include "equipment.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #include "actors.hpp"
 #include "arguments.hpp"
@@ -296,6 +297,97 @@ namespace FalloutScript
         return true;
     }
 
+    int Equipment::wear(FormId actor, FormId item, double points)
+    {
+        ItemInfo info;
+        if (actor == 0 || item == 0 || points <= 0 || !mRecords.itemInfo(item, info) || info.mHealth <= 0)
+            return -1;
+        const int before = equippedCondition(actor, item);
+        if (before < 0)
+            return -1;
+        if (before == 0)
+            return 0;
+        int lost = 0;
+        WearListener listener;
+        {
+            const std::lock_guard lock(mMutex);
+            lost = Wear::tenthsLost(points, info.mHealth, mWearRemainders[{ actor, item }]);
+            listener = mWearListener;
+        }
+        if (lost <= 0)
+            return before;
+        const int after = std::max(before - lost, 0);
+        if (!setEquippedCondition(actor, item, after))
+            return before;
+        if (listener)
+            listener(actor, item, before, after);
+        return after;
+    }
+
+    void Equipment::setWearListener(WearListener listener)
+    {
+        const std::lock_guard lock(mMutex);
+        mWearListener = std::move(listener);
+    }
+
+    void Equipment::addWithHealth(FormId actor, FormId item, int count, double fraction)
+    {
+        if (actor == 0 || item == 0 || count <= 0)
+            return;
+        ItemInfo info;
+        int condition = ActorState::fullCondition;
+        if (mRecords.itemInfo(item, info) && info.mHealth > 0 && fraction < 1.0)
+            condition = std::clamp(static_cast<int>(std::lround(fraction * ActorState::fullCondition)), 0,
+                static_cast<int>(ActorState::fullCondition));
+        mState.addItem(actor, item, count, condition);
+    }
+
+    double Equipment::weaponPercent(FormId actor)
+    {
+        const FormId held = weapon(actor);
+        const int condition = held != 0 ? equippedCondition(actor, held) : -1;
+        return condition >= 0 ? static_cast<double>(condition) * 100.0 / ActorState::fullCondition : 100.0;
+    }
+
+    bool Equipment::setWeaponPercent(FormId actor, double percent)
+    {
+        const FormId held = weapon(actor);
+        ItemInfo info;
+        if (held == 0 || !mRecords.itemInfo(held, info))
+            return false;
+        const int now = equippedCondition(actor, held);
+        if (now < 0)
+            return false;
+        const double target = std::max(percent, 0.0) / 100.0 * ActorState::fullCondition;
+        if (target <= now)
+            wear(actor, held, (now - target) / ActorState::fullCondition * info.mHealth);
+        else if (info.mHealth > 0)
+        {
+            // The executable stops a point short of the most the weapon has (the cap is the health less one)
+            const double cap = (info.mHealth - 1.0) / info.mHealth * ActorState::fullCondition;
+            setEquippedCondition(actor, held, static_cast<int>(std::min(target, cap)));
+        }
+        return true;
+    }
+
+    bool Equipment::modWeaponPercent(FormId actor, double percent)
+    {
+        const FormId held = weapon(actor);
+        const int now = held != 0 ? equippedCondition(actor, held) : -1;
+        if (now < 0)
+            return false;
+        const double wanted = std::max(static_cast<double>(now) * 100.0 / ActorState::fullCondition + percent, 0.0);
+        ItemInfo info;
+        if (!mRecords.itemInfo(held, info))
+            return false;
+        const double target = wanted / 100.0 * ActorState::fullCondition;
+        if (target <= now)
+            wear(actor, held, (now - target) / ActorState::fullCondition * info.mHealth);
+        else
+            setEquippedCondition(actor, held, static_cast<int>(std::min(target, double(ActorState::fullCondition))));
+        return true;
+    }
+
     bool Equipment::isEquipped(FormId actor, FormId item)
     {
         if (item == 0 || actor == 0)
@@ -427,6 +519,29 @@ namespace FalloutScript
         });
         interpreter.setHandler("UnequipItem", [&equipment](CallContext& call) {
             equipment.unequip(call.mReference, formArgument(call, 0));
+            return 0.0;
+        });
+        // The health that a command gives an item is a fraction of the most it has (the name says percent; the executable
+        // reads 0 to 1, Mac round 12AW S12). A copy that is not whole is a copy of its own.
+        interpreter.setHandler("AddItemHealthPercent", [&equipment](CallContext& call) {
+            const FormId item = formArgument(call, 0);
+            const double health = call.mArguments.size() > 2 ? argument(call, 2) : 1.0;
+            equipment.addWithHealth(call.mReference, item, intArgument(call, 1), std::isnan(health) ? 1.0 : health);
+            return 0.0;
+        });
+        interpreter.setHandler("GetWeaponHealthPerc", [&equipment](CallContext& call) {
+            return call.mReference != 0 ? equipment.weaponPercent(call.mReference) : 0.0;
+        });
+        interpreter.setHandler("SetWeaponHealthPerc", [&equipment](CallContext& call) {
+            const double percent = call.mArguments.empty() ? 1.0 : argument(call, 0);
+            if (call.mReference != 0 && !std::isnan(percent))
+                equipment.setWeaponPercent(call.mReference, percent);
+            return 0.0;
+        });
+        interpreter.setHandler("ModWeaponHealthPerc", [&equipment](CallContext& call) {
+            const double percent = call.mArguments.empty() ? 0.0 : argument(call, 0);
+            if (call.mReference != 0 && !std::isnan(percent))
+                equipment.modWeaponPercent(call.mReference, percent);
             return 0.0;
         });
         interpreter.setHandler("GetEquipped", [&equipment](CallContext& call) {

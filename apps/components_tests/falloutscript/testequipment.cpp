@@ -530,4 +530,110 @@ namespace
         EXPECT_EQ(setup.variable(4), 0);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
+
+    TEST(FalloutScriptEquipmentWearTest, an_item_that_is_on_loses_health_a_fraction_of_a_tenth_at_a_time)
+    {
+        Wardrobe setup;
+        setup.mRecords.mInfo[pistol].mHealth = 500;
+        ASSERT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+        std::vector<std::pair<int, int>> told;
+        setup.mEquipment.setWearListener([&told](FormId, FormId, int before, int after) { told.emplace_back(before, after); });
+
+        // 0.2 of 500 is 0.4 of a tenth of a percent: the third shot is the first that is felt
+        EXPECT_EQ(setup.mEquipment.wear(guard, pistol, 0.2), 1000);
+        EXPECT_EQ(setup.mEquipment.wear(guard, pistol, 0.2), 1000);
+        EXPECT_EQ(setup.mEquipment.wear(guard, pistol, 0.2), 999);
+        EXPECT_THAT(told, ElementsAre(std::make_pair(1000, 999)));
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, pistol), 999);
+        EXPECT_EQ(setup.mState.conditions(guard, pistol).front().mCondition, 999);
+
+        // What is not on, and what has no health, does not wear
+        EXPECT_EQ(setup.mEquipment.wear(guard, rifle, 5), -1);
+        setup.mRecords.mInfo[vest].mHealth = 0;
+        ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.wear(guard, vest, 5), -1);
+
+        // All of it goes: the weapon is at nothing and stays on until the host takes it off
+        EXPECT_EQ(setup.mEquipment.wear(guard, pistol, 1000), 0);
+        EXPECT_EQ(setup.mEquipment.wear(guard, pistol, 1), 0);
+        EXPECT_EQ(told.back(), std::make_pair(999, 0));
+    }
+
+    TEST(FalloutScriptEquipmentWearTest, an_item_with_no_health_left_does_not_go_on_but_one_that_is_on_stays)
+    {
+        Wardrobe setup;
+        setup.mRecords.mInfo[pistol].mHealth = 500;
+        setup.mRecords.mInfo[vest].mHealth = 400;
+        ASSERT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+        ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        setup.mEquipment.wear(guard, pistol, 500);
+        setup.mEquipment.wear(guard, vest, 400);
+        EXPECT_EQ(setup.mEquipment.equippedCondition(guard, vest), 0);
+        EXPECT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::AlreadyEquipped);
+
+        ASSERT_TRUE(setup.mEquipment.unequip(guard, pistol));
+        ASSERT_TRUE(setup.mEquipment.unequip(guard, vest));
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Broken);
+        EXPECT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Broken);
+        EXPECT_FALSE(setup.mEquipment.isEquipped(guard, pistol));
+        EXPECT_FALSE(setup.mEquipment.isEquipped(guard, vest));
+    }
+
+    TEST(FalloutScriptEquipmentWearTest, armor_below_half_its_health_gives_less_rating_and_threshold)
+    {
+        Wardrobe setup;
+        setup.mRecords.mInfo[vest].mHealth = 400;
+        ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 20);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.damageThreshold(guard), 2.5);
+
+        // 0.75 of the health: a quarter of it is gone, which armor does not feel
+        setup.mEquipment.wear(guard, vest, 100);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 20);
+        // a quarter left: three quarters of the rating
+        setup.mEquipment.wear(guard, vest, 200);
+        EXPECT_NEAR(setup.mEquipment.armorRating(guard), 15, 1e-9);
+        EXPECT_NEAR(setup.mEquipment.damageThreshold(guard), 1.875, 1e-9);
+        EXPECT_NEAR(setup.mEquipment.upperBodyRating(guard), 15, 1e-9);
+        EXPECT_EQ(setup.mEquipment.wornArmor(guard).front().mCondition, 250);
+    }
+
+    TEST(FalloutScriptEquipmentWearTest, items_are_given_with_a_share_of_their_health)
+    {
+        Wardrobe setup;
+        setup.mRecords.mInfo[pistol].mHealth = 500;
+        setup.mEquipment.addWithHealth(guard, pistol, 2, 0.25);
+        setup.mEquipment.addWithHealth(guard, stimpak, 1, 0.25); // no health to share: whole
+        setup.mEquipment.addWithHealth(guard, pistol, 1, 4.0); // more than whole is whole
+        const std::vector<ActorState::ConditionStack> stacks = setup.mState.conditions(guard, pistol);
+        ASSERT_EQ(stacks.size(), 2u);
+        EXPECT_EQ(stacks[0].mCondition, 1000);
+        EXPECT_EQ(stacks[0].mCount, 2);
+        EXPECT_EQ(stacks[1].mCondition, 250);
+        EXPECT_EQ(stacks[1].mCount, 2);
+        ASSERT_EQ(setup.mState.conditions(guard, stimpak).size(), 1u);
+        EXPECT_EQ(setup.mState.conditions(guard, stimpak).front().mCondition, 1000);
+    }
+
+    TEST(FalloutScriptEquipmentWearTest, the_commands_of_the_weapon_in_the_hands_follow_the_executable)
+    {
+        Wardrobe setup;
+        setup.mRecords.mInfo[pistol].mHealth = 500;
+        EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 100); // hands
+        EXPECT_FALSE(setup.mEquipment.setWeaponPercent(guard, 50));
+        ASSERT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+
+        EXPECT_TRUE(setup.mEquipment.setWeaponPercent(guard, 50));
+        EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 50);
+        // raising it never reaches the whole: it stops one point of health short (499 of 500)
+        EXPECT_TRUE(setup.mEquipment.setWeaponPercent(guard, 100));
+        EXPECT_NEAR(setup.mEquipment.weaponPercent(guard), 99.8, 1e-9);
+        // a mod does reach it
+        EXPECT_TRUE(setup.mEquipment.modWeaponPercent(guard, -60));
+        EXPECT_NEAR(setup.mEquipment.weaponPercent(guard), 39.8, 1e-9);
+        EXPECT_TRUE(setup.mEquipment.modWeaponPercent(guard, 80));
+        EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 100);
+        EXPECT_TRUE(setup.mEquipment.modWeaponPercent(guard, -500));
+        EXPECT_DOUBLE_EQ(setup.mEquipment.weaponPercent(guard), 0);
+    }
 }

@@ -233,8 +233,7 @@ namespace FalloutScript
         std::function<bool(FormId)> mFallHandler;
     };
 
-    /// Gives the commands about items, deaths and factions to the interpreter: AddItem, AddItemHealthPercent,
-    /// RemoveItem, RemoveAllItems, DuplicateAllItems, GetItemCount, GetDead, GetDeadCount, KillActor, AddToFaction,
+    /// Gives the commands about items, deaths and factions to the interpreter: AddItem, RemoveItem, RemoveAllItems, DuplicateAllItems, GetItemCount, GetDead, GetDeadCount, KillActor, AddToFaction,
     /// RemoveFromFaction, SetFactionRank, GetInFaction and GetFactionRank (the commands about the health of a
     /// character are with the actor values). Those that the command table does not have are left out.
     class Interpreter;

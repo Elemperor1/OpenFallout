@@ -86,7 +86,28 @@ keys, the Cancel button closes it. Keys: up and down and the pages move the pick
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. A weapon
 and a piece of armor have a condition (tenths of a percent of their health, 1000 is full): copies with another condition are
 rows of their own (the best first; the row id carries the condition after a `~`), the cards show the condition as the file's
-bar (`ConditionInfo`, its meter reads `user5`, 0 to 1), and use, drop, take and barter work on the copies of that row.
+bar (`ConditionInfo`, its meter reads `user5`, 0 to 1, under the word of `sInventoryCondition`, with no number: the executable
+sets none; the pip image on the bar is fixed by `user6`, 1 for a weapon at three quarters and 0 for armor at a half, the places
+where their effects start, Mac round 12AX R4), and use, drop, take and barter work on the copies of that row. The numbers of a
+card are those of the copy at its condition (a weapon's damage by the curve below, armor's rating and threshold).
+
+What condition does (Mac rounds 12AW S12 and 12AX R4, `FalloutNV.exe`; `components/falloutscript/wear.*`, `equipment.cpp`):
+only the player's things wear. A gun that is fired loses `fDamageToWeaponValue` points of its health (0.2) once for a shot,
+whether or not it hits, changed by the effects of its ammunition that are of the condition kind (the shot of a shotgun is one
+shot); a melee weapon or one of the hands loses the same when a swing reaches a victim; the hands with no weapon, a thrown
+weapon and a weapon that is not playable or embedded lose nothing. A blow at the player wears one piece of its armor by
+`fDamageToArmorPercentage` (0.35) of what it stopped (the head for a blow at a place 1 or 2, else the upper body). A weapon that
+is below three quarters of its health does the damage of its record times one less two thirds of what is missing from three
+quarters (a half: 0.8325, nothing: 0.4975); armor below a half gives a half and its condition of its rating and threshold. The
+player is told (`sWeaponLowCond`, `sArmorLowCond`, with the sound `WPNBreak` and four seconds) when an item goes below a quarter;
+a weapon that reaches nothing is put away with `sWeaponBreak`, armor stays on with no message, and a thing with no health does
+not go on (`sCantEquipBrokenItem`). The weapon commands `GetWeaponHealthPerc`, `SetWeaponHealthPerc` (lowering goes through the
+wear, raising stops a point short of the most) and `ModWeaponHealthPerc` work on the weapon in the hands, `AddItemHealthPercent`
+gives copies at a fraction of their health. Fallout 3 does not wear (its code is not read; it has no `fDamageToWeaponValue`) and
+keeps the damage curve of its settings. Not done: the effects of the condition of the weapon on jams (the exe's tables:
+reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
+`fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
+records (COED) and of the ones that are placed.
 Not there yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
 hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
 

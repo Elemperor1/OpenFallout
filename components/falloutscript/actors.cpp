@@ -585,13 +585,6 @@ namespace FalloutScript
                 state.addItem(target, item, count);
             return 0.0;
         });
-        interpreter.setHandler("AddItemHealthPercent", [&state](CallContext& call) {
-            // Nothing wears out yet: the health of the item is the same as for AddItem
-            const FormId item = formArgument(call, 0);
-            if (call.mReference != 0 && item != 0)
-                state.addItem(call.mReference, item, intArgument(call, 1));
-            return 0.0;
-        });
         interpreter.setHandler("GetDead",
             [&state](CallContext& call) { return call.mReference != 0 && state.isDead(call.mReference) ? 1.0 : 0.0; });
         interpreter.setHandler("GetDeadCount", [&state](CallContext& call) {

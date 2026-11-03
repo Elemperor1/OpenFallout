@@ -17,7 +17,6 @@ namespace FalloutScript::Wear
                 setting = *value;
         };
         take("fDamageToWeaponValue", settings.mWeaponShot);
-        take("fVATSDamageToWeaponMult", settings.mVatsMultiplier);
         take("fDamageToArmorPercentage", settings.mArmorShare);
         take("fMaxArmorRating", settings.mMaxRating);
         return settings;
@@ -54,10 +53,9 @@ namespace FalloutScript::Wear
         }
     }
 
-    double shotPoints(const Settings& settings, bool vats)
+    double shotPoints(const Settings& settings)
     {
-        const double points = std::max(settings.mWeaponShot, 0.0);
-        return vats ? points * std::max(settings.mVatsMultiplier, 0.0) : points;
+        return std::max(settings.mWeaponShot, 0.0);
     }
 
     double armorPoints(const Settings& settings, double damage, double resistance)
@@ -71,8 +69,8 @@ namespace FalloutScript::Wear
         if (points <= 0 || maxHealth <= 0)
             return 0;
         const double tenths = points / maxHealth * ActorState::fullCondition + remainder;
-        const double whole = std::floor(tenths);
-        remainder = tenths - whole;
+        const double whole = std::floor(tenths + 1e-9);
+        remainder = std::max(tenths - whole, 0.0);
         return static_cast<int>(whole);
     }
 

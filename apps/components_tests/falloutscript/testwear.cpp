@@ -32,14 +32,14 @@ namespace
         EXPECT_DOUBLE_EQ(Wear::applyAmmoEffect(0.5, 9, 4), 0.5);
     }
 
-    TEST(FalloutScriptWearTest, a_shot_takes_the_setting_and_a_shot_of_vats_takes_more)
+    TEST(FalloutScriptWearTest, a_shot_takes_the_setting)
     {
         Wear::Settings settings;
-        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, false), 0.2);
-        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, true), 0.2);
-        settings.mVatsMultiplier = 2.0;
-        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, true), 0.4);
-        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, false), 0.2);
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings), 0.2);
+        settings.mWeaponShot = 0.1;
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings), 0.1);
+        settings.mWeaponShot = -1;
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings), 0);
     }
 
     TEST(FalloutScriptWearTest, armor_takes_a_share_of_the_blow_that_it_stops_and_no_more_than_it_can_stop)
@@ -84,7 +84,6 @@ namespace
         });
         EXPECT_DOUBLE_EQ(settings.mWeaponShot, 0.1);
         EXPECT_DOUBLE_EQ(settings.mArmorShare, 0.5);
-        EXPECT_DOUBLE_EQ(settings.mVatsMultiplier, 1.0);
         EXPECT_DOUBLE_EQ(settings.mMaxRating, 85);
     }
 }

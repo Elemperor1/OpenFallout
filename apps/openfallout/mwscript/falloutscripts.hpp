@@ -1841,9 +1841,11 @@ namespace OFScript
         double applyAmmoEffects(FalloutScript::FormId ammo, std::uint32_t kind, double value);
         /// A weapon that the player fires loses health (a shot, a swing), an armor piece that is hit loses health; the
         /// copy that is on takes it, and the player is told when it is nearly gone and when it is
-        void wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats, bool vats);
+        void wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats);
         void wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance);
-        void wearItem(FalloutScript::FormId holder, FalloutScript::FormId item, double points, double maxHealth);
+        /// An item that is on lost health (the condition before and after, in tenths of a percent): the player is told when
+        /// it is below a quarter and when it is gone, and a weapon that broke is put away
+        void itemWorn(FalloutScript::FormId holder, FalloutScript::FormId item, int before, int after);
         /// Whether the weapon takes the ammunition (the one of its record, or one of its list of them)
         bool weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo);
         /// The ammunition a weapon in the hands of the holder shoots: the one chosen when the weapon takes it, else
@@ -2298,9 +2300,6 @@ namespace OFScript
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
         std::optional<FalloutScript::Wear::Settings> mWearSettings;
-        /// What is left of the tenth of a percent that an item lost, for the next time (holder, item)
-        std::mutex mWearMutex;
-        std::map<std::pair<FalloutScript::FormId, FalloutScript::FormId>, double> mWearRemainders;
         std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)

@@ -13,10 +13,9 @@ namespace FalloutScript::Wear
     /// keep it in tenths of a percent (`ActorState::fullCondition`).
     struct Settings
     {
-        /// The health points a shot takes off the weapon (fDamageToWeaponValue: 0.1 in the executable, 0.2 in the data of New
-        /// Vegas), and by how much a shot of V.A.T.S. takes more (fVATSDamageToWeaponMult: 2.0 in the executable, 1.0 in the data)
+        /// The health points a shot (or a swing that reaches) takes off the weapon (fDamageToWeaponValue: 0.1 in the
+        /// executable, 0.2 in the data of New Vegas)
         double mWeaponShot = 0.2;
-        double mVatsMultiplier = 1.0;
         /// The share of the damage that armor takes when it takes a part of a blow (fDamageToArmorPercentage: 0.5 in the
         /// executable, 0.35 in the data), and the most of a blow that armor can take away, in percent (fMaxArmorRating)
         double mArmorShare = 0.35;
@@ -42,7 +41,7 @@ namespace FalloutScript::Wear
     double applyAmmoEffect(double value, std::uint32_t operation, double amount);
 
     /// The health points that a shot takes off the weapon that fires it, before the effects of its ammunition
-    double shotPoints(const Settings& settings, bool vats);
+    double shotPoints(const Settings& settings);
 
     /// The health points that armor loses to a blow of `damage` points that the armor takes `resistance` percent of
     /// (the executable's 0x9B5A30: the share times the damage times what the armor takes, which is cut at the most that
