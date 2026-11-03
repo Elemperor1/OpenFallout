@@ -1803,6 +1803,156 @@
 -- @field #number limit How far the lock may turn with the pick where it is, in degrees.
 
 ---
+-- @{#Casino}: the table games of the casinos of New Vegas. A script of the game (ShowRouletteMenuParams and the like)
+-- opens a game for a casino of the files; the rules, the chips and the winnings of the casino are the engine's, the
+-- scripts of the menus draw what the calls below say. The chips of the game are counted apart from the pack until the
+-- player gets up from the table (`close`). Not available in load scripts or without the content of Fallout 3 and New
+-- Vegas (see `available`).
+-- @field [parent=#core] #Casino casino
+
+---
+-- @type Casino
+-- @field #Roulette roulette The roulette table.
+-- @field #Blackjack blackjack The blackjack table.
+
+---
+-- Whether the content of a Fallout game is loaded.
+-- @function [parent=#Casino] available
+-- @return #boolean
+
+---
+-- The game that is open.
+-- @function [parent=#Casino] screen
+-- @return #CasinoScreen The game, or nil when none is open.
+
+---
+-- The player gets up from the table: the chips it has more or less than when it sat down are added to or taken from its
+-- pack, and the game is closed.
+-- @function [parent=#Casino] close
+
+---
+-- @type CasinoScreen
+-- @field #string game "roulette", "blackjack" or "slots".
+-- @field #string name The name of the casino.
+-- @field #number minBet The least that can be bet.
+-- @field #number maxBet The most the table takes in one spin, in all.
+-- @field #number earnings What the player has won in the casino (the entry of the casino for the player).
+-- @field #number serial A number that is another for each game that is opened.
+
+---
+-- @type Blackjack
+
+---
+-- The table of the round. `state` is "betting" (before the deal), "playing" or "finished" (the cards of the round stay on
+-- the table until the next deal); `bet`, `chips`, `minBet`, `maxBet` and `earnings` are numbers; `dealer` is the dealer's cards
+-- and `holeHidden` says its second one is face down; `hands` are the player's hands (one, or two after a split), each with
+-- its `cards`, its `bet`, its `result` (0 none, 1 lose, 2 push, 3 win, 4 bust, 5 blackjack, 6 surrender), `doubled` and `done`;
+-- `active` is the hand that is played (from 1). A card is `rank` (0 to 8 the twos to the tens, 9 to 11 the court cards, 12 the
+-- ace) and `suit` (0 to 3). `canDeal`, `canHit`, `canStay`, `canDouble`, `canSplit`, `canSurrender` and `canSwitch` say what
+-- the rules allow now; `net` is what the last round came to, `dealerHelped` and `playerHelped` that Luck helped (they choose
+-- the words of the result), `broke` that the player has not the chips for the least bet any more and `closes` that the
+-- round took the winnings to a new quarter of the casino's most, so that the table closes after it.
+-- @function [parent=#Blackjack] state
+-- @return #table Nil when no blackjack game is open.
+
+---
+-- The bet goes up one step of the ladder (or down, or to the most that can be bet). Only before the deal.
+-- @function [parent=#Blackjack] increase
+-- @return #boolean Whether the bet changed.
+
+---
+-- @function [parent=#Blackjack] decrease
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] highest
+-- @return #boolean
+
+---
+-- The moves of a round; each is false when the rules do not allow it now. `deal` starts a round, and takes the cards of the
+-- last one off the table.
+-- @function [parent=#Blackjack] deal
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] hit
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] stay
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] double
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] split
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] surrender
+-- @return #boolean
+
+---
+-- @function [parent=#Blackjack] switch
+-- @return #boolean
+
+---
+-- @type Roulette
+
+---
+-- The bets of the table, in the order of the executable: each has a `kind` ("straight", "split", "street", "corner",
+-- "sixline", "five", "dozen", "column", "half", "even", "odd", "red" or "black"), the `numbers` it wins on (0 to 36, 37
+-- is the double zero; the bets on a dozen, column, half or colour have the numbers they cover) and the `multiplier`
+-- it pays on top of the stake. A place in the list (counted from 1) is the number of the area for the calls below.
+-- @function [parent=#Roulette] areas
+-- @return #list<#table>
+
+---
+-- The pockets in the order they are on the wheel, each with its `pocket` (0 to 36, 37 for the double zero) and whether
+-- it is `red` or `black`.
+-- @function [parent=#Roulette] wheel
+-- @return #list<#table>
+
+---
+-- The state of the table: the `amount` that the player bets with, what it has put on the table (`total` and `bets`, the
+-- number of places), the `chips` it has left, the `minBet`, the most it can put on the table in all (`maxTotal`), whether
+-- a spin can be made (`canSpin`), the `earnings` of the casino and the `stakes`, a table from the place of an area to
+-- what is bet on it.
+-- @function [parent=#Roulette] state
+-- @return #table Nil when no roulette game is open.
+
+---
+-- The bet amount goes up (or down) one step of the ladder of the casino.
+-- @function [parent=#Roulette] increase
+-- @return #boolean Whether the amount changed.
+
+---
+-- @function [parent=#Roulette] decrease
+-- @return #boolean
+
+---
+-- Puts the amount on an area.
+-- @function [parent=#Roulette] place
+-- @param #number area The place in the list of `areas`.
+-- @return #boolean False when the table does not take it (ten places already, nothing left under the most for one spin, not
+-- enough chips). An amount that would go over the most is cut down to what is left.
+
+---
+-- Takes the stake off an area.
+-- @function [parent=#Roulette] remove
+-- @param #number area
+-- @return #boolean False when there was nothing on it.
+
+---
+-- Spins the wheel for the bets on the table.
+-- @function [parent=#Roulette] spin
+-- @return #table `pocket` that came up, `spinType` (the turn of the wheel: 0 to 2), `payout` (what the bets that won are
+-- paid, stakes included), `net` (what the player has more or less than before), `lucky` and `unlucky` (which words to
+-- use: the Luck of the player is above or below 5). Nil when no bet is on the table.
+
+---
 -- @{#MenuScene}: models of the game drawn to a texture that a menu shows (the lock and pick of the lockpicking screen).
 -- The calls are carried out in the frame, not at once: `ready` tells when a scene exists. Not available in load
 -- scripts.
@@ -1917,6 +2067,16 @@
 -- @param #string name
 -- @param #string model
 -- @param #boolean visible
+
+---
+-- Puts the picture of the file `path` on the shape `shape` of the model (the name of its node in the model's file, like
+-- "Cylinder06:3") in place of the diffuse picture it has. Only that shape changes. It is for the faces of the reels of the
+-- slot machine; the model's file must not be one that the loader merges shapes of (the slot machine's are not).
+-- @function [parent=#MenuScene] setTexture
+-- @param #string name
+-- @param #string model
+-- @param #string shape
+-- @param #string path
 
 ---
 -- Puts the model at `time` seconds of its sequence ("Forward", "Backward", "Left"): the nodes the sequence moves are

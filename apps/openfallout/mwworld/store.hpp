@@ -22,6 +22,7 @@
 #include <components/esm3/loadskil.hpp>
 #include <components/esm4/loadachr.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadcsno.hpp>
 #include <components/esm4/loadland.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/misc/rng.hpp>

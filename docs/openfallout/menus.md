@@ -871,6 +871,103 @@ are the game's and not made. Not read: the end limit, what reads the accumulated
 or hides the layer (0x3E9), and the music (none is played by the screen; the main menu starts `EndCredits.mp3`).
 Seen only in the offline harness (`credits.lua`) with a made-up file, not in the running game.
 
+### The casinos: the roulette table (Mac round 12AO B6 and B7, FalloutNV.exe 0x7BBE20 and 0x7BF670; New Vegas only)
+
+The table games are opened by `ShowBlackJackMenuParams`, `ShowRouletteMenuParams` and `ShowSlotMachineMenuParams` (a casino record, the
+least bet, the most, and what the player must have won before it may sit down; the scripts of the game give `1 200 0` and the
+like). They look the casino (`CSNO`, now in the record store) up, make the player's entry for it the first time
+(`components/falloutscript/casino.cpp`: the earnings of the player in each casino, saved in the section `casinos`) and say no with a
+notice when the player has won what the casino will lose (`sGamblingBannedText`), has fewer chips than the least bet
+(`sGamblingBrokeText`) or has not won the number asked for (`sGamblingMinWinText`). The chips are the casino's currency item; the
+table counts them apart from the pack and they move only when the player gets up (`core.casino.close`, with the notice of what was
+added or taken). The command returns 1 whether or not it is shown.
+
+`roulette.cpp` holds the rules: the American wheel in the order of the executable (the colour of a pocket is the parity of its place
+on the wheel), the bets (the 147 inside bets of the executable's table, 0x7B9C40: 38 numbers, 60 pairs, 15 threes, 22 squares, 11 lines of
+six and the five numbers, and 12 outside: the three dozens, the two halves, even, odd, red, black and the three columns), the ladder of the amount (1 up to 10, 5 up to 40, 10 up to 100, 25 up to 500, then 100, the same steps down), at
+most ten bets and the most for one spin (`maxTotal`, which is the maximum bet of the command), the pocket (uniform from 0 to 37, 37
+being 00) and the pay (the stake and the multiplier on top for each bet that wins). Luck changes no number; above 5 it makes the
+words of a win `sLuckyWinText`, below `sUnluckyLoseText`. The random numbers come from one engine for all casino games, seeded
+once; the rules take the draw as a function so the tests choose the pocket.
+
+`falloutroulette.lua` draws `roulette_menu.xml` (the info block and the five buttons, named as the file names them) and puts a
+betting cloth in the middle of it. The game's own table is a 3D scene that the pointer picks bets from (`NV_Roulette-Points.NIF`);
+that scene is not drawn, the cloth stands for it: the zeroes, the 36 numbers in three columns, the dozens, the even-money bets
+and the columns bets, with the places on the lines (a split, a corner, a street, a six line, the five-number bet) found by how near
+the pointer is to a line. A click, Place Bet (W) or A puts the amount on the place under the pointer, Remove Bet (F) takes the bet
+of the place off, Finish Bets (S) spins, Increase and Decrease Bet are Q and E (the shoulders on the pad), Exit is R or B. Chips are
+drawn on the places with their stakes, and the pocket that came up is written beside the cloth. The wheel is not drawn; the sounds are
+the game's (`GAMERouletteValidBet`, `InvalidBet`, `IncreaseBet`, `DecreaseBet`, `Spin`, `Win`). `falloutroulettetable.lua`
+is the cloth (cells, no screen).
+
+`blackjack.cpp` holds the rules of a round (Mac rounds 12AO B6 and 12AQ B6, the state machine 0x734DB0): a shoe of the record's decks
+(cards drawn at random; it starts again under five cards and, after a round, when the share of the record is left); the bet steps
+(1 to 10, 5 to 40, 10 to 100, 25 to 400, 100 to 1500, then 500). The deal is the dealer's card, the player's, the dealer's second
+(face down) and the player's second, Luck helping only with the two second cards; a 21 of the player or of the dealer on the first two
+cards decides the round at once (both: a push) and the hole card is turned at once. Hit goes to the hand that is played; a hand that
+reaches 21 or more (more than 21 is a bust) or its seventh card is finished. A Hit takes away Double Down, Split and Surrender.
+Double Down is offered on any two cards when the chips cover a second bet (and, after a split, the second hand's bet too); it takes
+one card and ends the hand, and it always works on the first hand, even when the second one is the one in play, as the executable has
+it. Split (a pair of the same rank, once, needs the chips) gives each hand a second card without Luck's help, a hand that comes to 21
+is a blackjack and finished (both: the round is paid at once, the dealer does not draw). The turn never moves to the other hand by
+itself, not even after a bust: Switch Hands does it. Stay ends the player's turn for both hands at once (a second hand that was never
+played counts with its two cards). Surrender (before any other move) gives up half the bet: int(bet / 2 + 0.51). The dealer draws
+below 17, and on a 17 that holds an ace (any ace card, so a hard 17 with an ace too) unless the casino's flag says it stands, and not
+at all when every hand is lost or given up; at most seven cards. A blackjack pays int(bet x ratio + 0.51) (hand two: + 0.5). Luck
+above 5 helps the player's hits and doubles, below 5 the dealer's draws: as many cards are drawn as Luck is away from 5 and the one
+that brings the hand nearest to 21 without going over is taken; which of them was used chooses the lucky and unlucky words of the
+result. `falloutblackjack.lua` draws `black_jack_menu.xml` (the bet, the chips, the casino, the six buttons and the status text, named
+as the file names them) and plain cards made of tiles in the middle of it in place of the 3D table: the dealer's above (the second
+face down until the round is over), the player's hand or two hands below with their bets and a gold ground behind the hand that is
+played. Before the deal the buttons are Deal (W), Increase Bet (E), Decrease Bet (Q), Max Bet (S) and Exit (R); in a round Hit (F),
+Double Down (W), Split (E), Switch Hands (Q), Surrender (S) and Stay (R), each only when it is allowed. Leaving in the middle of a round
+(Escape, or B on the pad, which the engine takes as leaving) loses what is on the table. Not read: the suit order of the cards (the
+executable's suit number is the card's place divided by 13), the Luck rig's rules for low totals, and what the split code sums for
+the second hand's 21 (it reads as the first hand's cards twice; this port tests each hand's own).
+
+The winnings level (Mac round 12AQ B9): the entry of a casino also holds a level word. `GetCasinoWinningsLevel` and the condition
+`GetCasinoWinningStage` (`0x262`) work out the highest of 1 to 4 for which the winnings are at least that quarter of the casino's
+most (the record's `mMaxWinnings`, no rounding), 0 for a casino with no entry; `SetCasinoWinningsLevel` writes the level word and
+the winnings that make it (level x a quarter of the most) for 0 to 4 and an entry that exists, and starts nothing. After a round of
+blackjack the level word is raised to the highest quarter reached; when it went up the table closes (the result stays on the screen
+for a moment) and, when the table closes, the casino's quest is started. A casino whose most is 0 keeps no limit here (the
+executable would put it on level 4). When the table closes, chips that were won are added in every case; with the winnings at or over
+the most the notice of the casino that will not play any more comes with them.
+
+### The slot machine (Mac rounds 12AO B7, 12AQ B7, 12AR and 12AS E1, FalloutNV.exe 0x7C0A40 to 0x7C58F0; New Vegas only)
+
+`components/falloutscript/slots.cpp` holds the rules: a strip of 28 stops made from the casino record's seven reel counts, a stop
+drawn for each of the three reels (0 to 12 uniform with the full record; 13 only from the Luck rig), the class of the three stops
+(three alike on a symbol pays the bet times 10, 20, 30, 40, 60 or 100 by symbol and 10 for the special one; two special symbols
+five times, one special twice; a pair or nothing loses the bet) and the bet steps (+1 below 10, then 5, 10, 25 and 100 steps).
+A pull adds one to the Pip-Boy statistic 0x2A ("Slots Games Played") and its net goes into the casino's winnings at once; the level
+is looked at only after a pull that won, and a machine that has no chips left closes after saying so.
+
+`falloutslots.lua` draws `slot_machine_menu.xml` (the bet, the chips, the casino and the buttons, named as the file names them) over
+the machine that the executable draws behind the tiles: the model of the casino record's eighth `MODL` and three reel models, in a
+`core.menuScene` made as the executable makes its scene (a root 175 units in front of the camera and 18 below its axis, the
+executable's camera and frustum, the four point lights of the machine's file). The reels are not turned to a stop: each pull plays
+the same `Forward` sequences of the reel files (the arm is pulled in 0.83 s, the reels start turning at 0.5 s and stop at 2.4, 3.3
+and 4.2 s, each ending in the pose it started in), and the stop is made visible by putting the record's seven symbol pictures
+(`ICON`, the order of the record) and the blank between them on the faces of the reel by their names (`Cylinder06:0` to `:13` for
+the first reel, `Cylinder05` and `Cylinder04` for the others; `core.menuScene.setTexture`): the six faces in front when the arm is
+back, the other eight when the last reel has stopped, and a reel is changed only when its stop is not the one it had. A pull that
+wins plays the machine's `Backward` sequence (the coins fall, 3.2 s) with the sound of its class (`GAMESlotsWinSmall`, `Med`,
+`Jackpot`); the payout list is the `Payout_In` and `Payout_Out` sequences of the machine (the board slides in over 0.67 s and waits
+for any button, then slides out). The chips, the bet and the words of the result (`sYouWin` or `sLuckyWinText`, `sYouLose`) are shown
+when the reels have stopped and the words go after a second; while the machine is turning no button does anything. The files of the
+machine (`meshes/terminals/nv_slotmachine/` and the Dead Money one) are not run through the loader's optimizer, which would merge the
+faces that share a picture and take their names away. Seen only in the offline harness with a made-up engine (`slots.lua`: the
+calls to the scene and the menu over a pull that loses, one that wins and the payout list), not in the running game. Not read: what
+the Luck rig does below Luck 5 (the unlucky words and the lose sound are not made), the lights of the Dead Money machine's file
+(the four of the New Vegas files are used), and whether the earnings number belongs in the casino tile (it is hidden as on the
+other tables).
+
+Not read from the executable and made as stated: the number of places on the roulette cloth is 159 as in the executable. Not made:
+the 3D table and wheel, the setting of what the executable keeps at +0x4010, the closing of the roulette table after a spin that
+crosses a quarter (its closer was not read in detail). Seen only in the offline harness with a made-up engine (`roulette.lua`,
+`roulettehit.lua`: every one of the 159 areas is reachable from some place on the cloth, `blackjack.lua`), not in the running game.
+
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 
 A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at
