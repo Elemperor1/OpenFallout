@@ -123,6 +123,37 @@ namespace FalloutScript
             }
         }
 
+        /// The containers that scripts gave to vendors to sell from, or took away from them
+        static void writeMerchants(OFScript::FalloutScripts& host, SaveWriter& out)
+        {
+            const std::lock_guard lock(host.mBarterMutex);
+            out.count(host.mMerchantContainers.size());
+            for (const auto& [vendor, container] : host.mMerchantContainers)
+            {
+                out.form(vendor);
+                out.boolean(container != 0);
+                if (container != 0)
+                    out.form(container);
+            }
+        }
+
+        static void readMerchants(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
+        {
+            std::map<FormId, FormId> merchants;
+            const std::size_t count = in.count(5);
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                const std::optional<FormId> vendor = in.form();
+                const bool has = in.boolean();
+                const std::optional<FormId> container = has ? in.form() : std::optional<FormId>(0);
+                // A vendor or a container of a plugin that is not loaded now is left out
+                if (vendor && container)
+                    merchants[*vendor] = *container;
+            }
+            const std::lock_guard lock(host.mBarterMutex);
+            host.mMerchantContainers = std::move(merchants);
+        }
+
         static void writePackages(OFScript::FalloutScripts& host, SaveWriter& out)
         {
             out.count(host.mScriptPackages.size());
@@ -824,6 +855,11 @@ namespace OFScript
         sections.push_back({ "talking", 1, [this](FalloutScript::SaveWriter& out) { Access::writeTalking(*this, out); },
             [this](
                 FalloutScript::SaveReader& in, std::uint32_t version) { Access::readTalking(*this, in, version); } });
+        sections.push_back(
+            { "merchants", 1, [this](FalloutScript::SaveWriter& out) { Access::writeMerchants(*this, out); },
+                [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                    Access::readMerchants(*this, in, version);
+                } });
         sections.push_back(
             { "packages", 1, [this](FalloutScript::SaveWriter& out) { Access::writePackages(*this, out); },
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {

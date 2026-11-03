@@ -282,6 +282,15 @@ namespace OFScript
         mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
             return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
         });
+        // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
+        mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
+            setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));
+            return 0.0;
+        });
+        mInterpreter.setHandler("RemoveMerchantContainer", [this](FalloutScript::CallContext& call) {
+            setMerchantContainer(call.mReference, 0);
+            return 0.0;
+        });
         // V.A.T.S. is open while the screen of Lua says so
         mInterpreter.setHandler("GetVATSMode", [this](FalloutScript::CallContext&) { return mVatsOpen ? 1.0 : 0.0; });
         FalloutScript::addActorValueCommands(mInterpreter, mActorValues, mActors, mProgress);
@@ -493,6 +502,12 @@ namespace OFScript
             mPendingMade.clear();
             mMadeBases.clear();
             mMadeCount = 0;
+        }
+        {
+            // What scripts gave a vendor to sell from, and the menu that was open, are not for the next game
+            const std::lock_guard merchants(mBarterMutex);
+            mMerchantContainers.clear();
+            mBarter.reset();
         }
         // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
         mFightTraits.clear();

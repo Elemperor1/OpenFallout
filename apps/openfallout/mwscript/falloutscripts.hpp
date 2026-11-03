@@ -700,7 +700,11 @@ namespace OFScript
         std::optional<BarterMenu> barterMenu();
         /// The player is done with the menu
         void closeBarter();
-        /// Where a vendor keeps what it sells: the container of its placed reference (XMRC), else the vendor itself
+        /// The container that holds a vendor's goods: the one a script gave it (SetMerchantContainer; none after
+        /// RemoveMerchantContainer), else the XMRC of its placed reference. 0 for none.
+        FalloutScript::FormId merchantContainer(FalloutScript::FormId vendor);
+        void setMerchantContainer(FalloutScript::FormId vendor, FalloutScript::FormId container);
+        /// Where the things and caps that the vendor gets go: its container, else the vendor itself
         FalloutScript::FormId barterHolder(FalloutScript::FormId vendor);
         /// A row of a list of the menu: the item as the Pip-Boy lists it and the price of one of it
         struct BarterRow
@@ -1922,6 +1926,14 @@ namespace OFScript
         std::mutex mBarterMutex;
         std::optional<BarterMenu> mBarter;
         int mBarterSerial = 0;
+        /// The merchant containers that scripts gave to vendors (0: taken away), under mBarterMutex
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mMerchantContainers;
+        /// Where a vendor's goods are, in the order they are taken from: its container, then the vendor itself
+        std::vector<FalloutScript::FormId> barterSources(FalloutScript::FormId vendor);
+        /// How many of an item the vendor sells (its container's and its own, not what it wears), and the move of
+        /// that many to a holder, taken from the container first; the number that moved
+        int barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item);
+        int barterMove(FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count);
         /// The value of an item record (0 for a form that is no item), the settings the prices go by and the price of
         /// one of an item for the player buying (or selling)
         int itemValue(FalloutScript::FormId item);

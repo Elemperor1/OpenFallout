@@ -85,17 +85,76 @@ namespace OFScript
         mBarter.reset();
     }
 
+    FalloutScript::FormId FalloutScripts::merchantContainer(FalloutScript::FormId vendor)
+    {
+        // What a script gave (SetMerchantContainer, or none with RemoveMerchantContainer) wins over the record
+        {
+            const std::lock_guard lock(mBarterMutex);
+            if (const auto given = mMerchantContainers.find(vendor); given != mMerchantContainers.end())
+                return given->second;
+        }
+        // The XMRC of the placed reference (FalloutNV.exe 0x421400 reads the extra data of the reference that the
+        // loader fills from it)
+        const ESM::FormId form = ESM::FormId::fromUint32(vendor);
+        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
+            return numberOf(character->mMerchantContainer);
+        if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
+            return numberOf(creature->mMerchantContainer);
+        return 0;
+    }
+
+    void FalloutScripts::setMerchantContainer(FalloutScript::FormId vendor, FalloutScript::FormId container)
+    {
+        if (vendor == 0)
+            return;
+        const std::lock_guard lock(mBarterMutex);
+        mMerchantContainers[vendor] = container;
+    }
+
     FalloutScript::FormId FalloutScripts::barterHolder(FalloutScript::FormId vendor)
     {
-        // A character that trades sells what a container says (the XMRC of its placed reference); with none it sells
-        // what it carries itself
-        const ESM::FormId form = ESM::FormId::fromUint32(vendor);
-        FalloutScript::FormId container = 0;
-        if (const ESM4::ActorCharacter* character = mStore.get<ESM4::ActorCharacter>().search(form))
-            container = numberOf(character->mMerchantContainer);
-        else if (const ESM4::ActorCreature* creature = mStore.get<ESM4::ActorCreature>().search(form))
-            container = numberOf(creature->mMerchantContainer);
+        // What the player sells and pays goes to the container of the vendor, or to the vendor without one
+        const FalloutScript::FormId container = merchantContainer(vendor);
         return container != 0 ? container : vendor;
+    }
+
+    std::vector<FalloutScript::FormId> FalloutScripts::barterSources(FalloutScript::FormId vendor)
+    {
+        // What the vendor sells is its own goods and those of the container together, the counts added by form
+        // (FalloutNV.exe 0x46f310, round 12AH A1)
+        const FalloutScript::FormId container = merchantContainer(vendor);
+        if (container != 0)
+            return { container, vendor };
+        return { vendor };
+    }
+
+    int FalloutScripts::barterStock(FalloutScript::FormId vendor, FalloutScript::FormId item)
+    {
+        int total = 0;
+        for (const FalloutScript::FormId holder : barterSources(vendor))
+        {
+            // A trader does not sell what it wears
+            if (holder == vendor && mEquipment.isEquipped(vendor, item))
+                continue;
+            total += mActors.itemCount(holder, item);
+        }
+        return total;
+    }
+
+    int FalloutScripts::barterMove(
+        FalloutScript::FormId vendor, FalloutScript::FormId to, FalloutScript::FormId item, int count)
+    {
+        // Taken from the container first, then from what the vendor carries
+        int moved = 0;
+        for (const FalloutScript::FormId holder : barterSources(vendor))
+        {
+            if (moved >= count)
+                break;
+            if (holder == vendor && mEquipment.isEquipped(vendor, item))
+                continue;
+            moved += transferItems(holder, to, item, count - moved);
+        }
+        return moved;
     }
 
     int FalloutScripts::itemValue(FalloutScript::FormId item)
@@ -161,9 +220,27 @@ namespace OFScript
         const std::optional<BarterMenu> menu = barterMenu();
         if (!menu)
             return rows;
-        const FalloutScript::FormId holder = vendorSide ? barterHolder(menu->mVendor) : mPlayer;
         const FalloutScript::FormId caps = masterForm(capsNumber);
-        for (PipboyItem& item : pipboyItems(holder))
+        // The things of the holders in one list: the vendor's two holders are one, the counts added
+        std::vector<PipboyItem> items;
+        const std::vector<FalloutScript::FormId> holders
+            = vendorSide ? barterSources(menu->mVendor) : std::vector<FalloutScript::FormId>{ mPlayer };
+        for (const FalloutScript::FormId holder : holders)
+        {
+            for (PipboyItem& item : pipboyItems(holder))
+            {
+                // A trader does not sell what it wears
+                if (vendorSide && holder == menu->mVendor && item.mEquipped)
+                    continue;
+                const auto same = std::find_if(
+                    items.begin(), items.end(), [&item](const PipboyItem& listed) { return listed.mId == item.mId; });
+                if (same != items.end())
+                    same->mCount += item.mCount;
+                else
+                    items.push_back(std::move(item));
+            }
+        }
+        for (PipboyItem& item : items)
         {
             // What has no worth is not traded, nor the caps (they are the money), nor what the player does not see
             // in its own things
@@ -183,17 +260,20 @@ namespace OFScript
         const std::optional<BarterMenu> menu = barterMenu();
         if (!menu)
             return quote;
-        const FalloutScript::FormId holder = barterHolder(menu->mVendor);
+        const FalloutScript::FormId vendor = menu->mVendor;
         const FalloutScript::FormId caps = masterForm(capsNumber);
-        quote.mHolder = holder;
+        quote.mHolder = barterHolder(vendor);
         quote.mPlayerCaps = mActors.itemCount(mPlayer, caps);
-        quote.mVendorCaps = mActors.itemCount(holder, caps);
+        // The vendor's money is the caps of its container and of itself
+        for (const FalloutScript::FormId holder : barterSources(vendor))
+            quote.mVendorCaps += mActors.itemCount(holder, caps);
         std::vector<FalloutScript::Barter::Line> lines;
         // A pile that asks for more than the holder has, or for a thing without a worth, is no deal
-        const auto add = [&](const BarterPiles& pile, FalloutScript::FormId from, bool buying) {
+        const auto add = [&](const BarterPiles& pile, bool buying) {
             for (const auto& [item, count] : pile)
             {
-                if (count <= 0 || itemValue(item) <= 0 || mActors.itemCount(from, item) < count)
+                const int have = buying ? barterStock(vendor, item) : mActors.itemCount(mPlayer, item);
+                if (count <= 0 || itemValue(item) <= 0 || have < count)
                 {
                     quote.mValid = false;
                     continue;
@@ -202,8 +282,8 @@ namespace OFScript
             }
         };
         quote.mValid = true;
-        add(buy, holder, true);
-        add(sell, mPlayer, false);
+        add(buy, true);
+        add(sell, false);
         quote.mPilesEmpty = buy.empty() && sell.empty();
         quote.mBalance = FalloutScript::Barter::balance(lines);
         quote.mAmount = FalloutScript::Barter::amount(quote.mBalance, quote.mVendorCaps);
@@ -237,19 +317,20 @@ namespace OFScript
             outcome.mStatus = "caps";
             return outcome;
         }
+        const FalloutScript::FormId vendor = menu->mVendor;
         const FalloutScript::FormId holder = quote.mHolder;
         const FalloutScript::FormId caps = masterForm(capsNumber);
         // What the player buys goes from the vendor to the player and what it sells the other way (each is taken off
         // first when it is worn)
         for (const auto& [item, count] : buy)
-            transferItems(holder, mPlayer, item, count);
+            barterMove(vendor, mPlayer, item, count);
         for (const auto& [item, count] : sell)
             transferItems(mPlayer, holder, item, count);
         // The caps: the vendor pays no more than it has, the player pays all of what is asked
         if (quote.mAmount > 0)
         {
             if (quote.mBalance > 0)
-                transferItems(holder, mPlayer, caps, quote.mAmount);
+                barterMove(vendor, mPlayer, caps, quote.mAmount);
             else
                 transferItems(mPlayer, holder, caps, quote.mAmount);
             mProgress.modifyMiscStat(barterAmountStat, quote.mAmount);

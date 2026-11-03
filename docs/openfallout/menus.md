@@ -456,10 +456,17 @@ button 0x72f6f0, the price of one 0x72ed00).
   58 topics; Fallout 3: 157 in 41). The reference it is called on is the vendor; its optional integer is a percent from -100 to
   100. Nothing about the character's services (the AIDT bits) decides whether the line is there. The dialogue stays
   open under the menu and is back when the menu closes (inferred; the dialogue's code was not read).
-- What the vendor sells is the container of its placed reference (the `XMRC` of its ACHR or ACRE record, which the ESM4 loader now
-  reads), else what the character itself carries. The vendor's caps are the caps in that container; they are never made
-  up, and a vendor that has none pays nothing. Caps are not listed (they are the money), and neither is what is worth nothing.
-  The player's side leaves out keys and the armor the files keep from the player, as the Pip-Boy does.
+- What the vendor sells is its own goods and those of its merchant container together, the counts added by form
+  (`FalloutNV.exe` 0x46f310, round 12AH A1). The container is not read from the faction (the factions of these games have no
+  vendor fields: no VEND, VENC or VENV in any plugin of either game): it is an extra data item of the vendor's reference
+  (type 0x3c, `ExtraMerchantContainer`), which the placed reference's `XMRC` fills (86 records in New Vegas, 51 in Fallout 3,
+  which the ESM4 loader reads now) and which the script commands `SetMerchantContainer` and `RemoveMerchantContainer` (0x11b7,
+  0x11b8) give and take away (a section `merchants` of the save keeps them). A vendor with no container sells what it carries.
+  The port leaves out what the vendor wears (the executable's loop over worn pieces at 0x46f4ad was not followed). The vendor's
+  caps are the caps of the container and of the vendor together; they are never made up, and a vendor that has none pays
+  nothing. Caps are not listed (they are the money), and neither is what is worth nothing. The player's side leaves out keys and
+  the armor the files keep from the player, as the Pip-Boy does. A buy is taken from the container first, then from the
+  vendor; what the player sells and pays goes to the container (the vendor without one).
 - The price of one is `value * Base + Mult * (1 - Base) * value * c^Exp` with the settings `fItemConditionValueBase`, `Mult` and
   `Exp` (0, 0.0316 and 1.5) and c the condition over ten: 10 for a thing the port keeps no condition for, which makes the base
   value the value. Then the factor of the side: `fBarterBuyBase + skill * fBarterBuyMult / 100` for what the player buys
