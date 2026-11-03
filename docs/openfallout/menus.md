@@ -273,6 +273,9 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   A7). The port's own meanwhile: Enter and Space pick the lit button (the first when none is lit). The pad: the engine's
   pad handling steps aside while a box that the script draws is open, so the script takes the pad itself: D-pad up and
   down move the lit button, A picks it, B does nothing (as Escape; not seen in the running game yet).
+  Fallout 3's `ShowMessage` (0x53dd40) and message menu (key handler 0x6694d0, creator 0x6698e0) are the same code with
+  other addresses (round 12AG, A2): the same flag bit, 10 slots, one-space blank for a failed button, 'OK' when none passes,
+  kind 0x17, the same three key rules and `&` handling; the only difference is five button tiles instead of six.
 - `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
