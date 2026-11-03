@@ -402,7 +402,8 @@ end
 -- Open a menu file for the whole window. `options`: layer (default 'Windows'), pad (a pad is in use), box (the box the
 -- file is laid out in, like PIPBOY_BOX, which is then drawn in the middle of the window and as large as it can be),
 -- region (a function of the size of the window that gives the size of the part of it the file draws in, which is then
--- put in the middle: the menu is told the size of the window, as the file computes its own size from it)
+-- put in the middle: the menu is told the size of the window, as the file computes its own size from it), passive (the
+-- menu only shows: it takes no pointer, the head-up display is one)
 function module.open(file, options)
     options = options or {}
     local size = ui.screenSize()
@@ -418,6 +419,14 @@ function module.open(file, options)
         dragHooks = {},
     }, Shown)
     shown.version = menu:version()
+    if options.passive then
+        shown.element = ui.create {
+            layer = options.layer or 'Windows',
+            props = { position = place.position, size = place.size, ignorePointerEvents = true },
+            content = contentOf(menu:pieces()),
+        }
+        return shown
+    end
     shown.element = ui.create {
         layer = options.layer or 'Windows',
         props = { position = place.position, size = place.size },

@@ -88,6 +88,11 @@ namespace FalloutMenu
         bool mRepeatY = false;
         float mCropX = 0;
         float mCropY = 0;
+        /// A picture that scrolls (a tile with `_sourcex`): it shows a window of its texture at the natural size, from
+        /// this many texels of the left edge on, and goes on from the left edge when it runs past the right one (the
+        /// strip of the compass of the head-up display)
+        bool mScrolls = false;
+        float mScrollX = 0;
         /// A text: the string, the font and how it is placed on `mX` (1 left, 2 center, 4 right)
         std::string mText;
         int mFont = 1;

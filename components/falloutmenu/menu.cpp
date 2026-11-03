@@ -634,6 +634,8 @@ namespace FalloutMenu
                 item.mRepeatY = number(tile, "repeatvertical") != 0 || get(tile, "tile").number() > 0;
                 item.mCropX = number(tile, "cropx");
                 item.mCropY = number(tile, "cropy");
+                item.mScrolls = defines(tile, "_sourcex");
+                item.mScrollX = number(tile, "_sourcex");
             }
             else if (isFill)
             {

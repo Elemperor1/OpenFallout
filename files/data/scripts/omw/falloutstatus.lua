@@ -7,6 +7,10 @@
 -- experience bar, the radiation, the limbs, the enemy bar) and the field of the compass are stand-ins, and where a
 -- picture is missing a plain bar is drawn. The numbers are the engine's (core.pipboy.stats, core.combat.weapon,
 -- core.hud). `I.FalloutHud.state()` is what the display shows now, for tests and probes.
+--
+-- The display is drawn from the games' own menu file (main/hud_main_menu.xml) by scripts/omw/falloutmenuhud.lua, in the
+-- places and with the parts that the executable gives it; the drawing in this file is what is shown when that file is not
+-- in the data (it is the older stand-in).
 local core = require('openfallout.core')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
@@ -16,6 +20,7 @@ local camera = require('openfallout.camera')
 local nearby = require('openfallout.nearby')
 local vfs = require('openfallout.vfs')
 local widgetModule = require('scripts.omw.falloutwidgets')
+local menuHudModule = require('scripts.omw.falloutmenuhud')
 
 local pipboy = core.pipboy
 local hud = core.hud
@@ -114,6 +119,10 @@ local function looseTexture(path)
     end
     return found or nil
 end
+
+-- The display drawn from the games' menu file once it was made, and whether making it failed (the stand-in is drawn then)
+local menuHud = nil
+local menuHudFailed = false
 
 local element = nil
 local compassElement = nil
@@ -444,13 +453,24 @@ end
 
 -- What the display shows now, nothing while a window is open or the player is dead
 local function current(dt)
-    if I.UI.getMode() ~= nil or pipboy.playerDead() then
-        return nil
+    if pipboy.playerDead() then
+        return menuHud and { mode = 'off' } or nil
+    end
+    if I.UI.getMode() ~= nil then
+        -- While a window is open the display from the file shows the messages that come, and the stand-in nothing
+        if not menuHud then return nil end
+        return { mode = 'messages', messages = hud.takeMessages() }
     end
     local stats = pipboy.stats()
     local weapon = core.combat.weapon()
     local status = hud.status()
-    updateLines(dt)
+    -- The display from the file queues the messages itself
+    local incoming = nil
+    if menuHud then
+        incoming = hud.takeMessages()
+    else
+        updateLines(dt)
+    end
     local experience = experienceState(stats, dt)
     local target = nil
     if status.weaponDrawn then
@@ -488,6 +508,8 @@ local function current(dt)
         target = target,
         lines = lit,
         screen = ui.screenSize(),
+        mode = 'game',
+        messages = incoming,
     }
 end
 
@@ -505,7 +527,31 @@ local function same(a, b)
     return true
 end
 
+-- The display from the file: made when the game is first on screen, made again when the window changes its size
+local function refreshFromFile(dt)
+    if menuHud == nil and not menuHudFailed and not pipboy.playerDead() and I.UI.getMode() == nil then
+        menuHud = menuHudModule.create()
+        if menuHud == nil then menuHudFailed = true end
+    end
+    if menuHud == nil then return false end
+    local state = current(dt)
+    -- What the stand-in showed is gone
+    if element then
+        element:destroy()
+        element = nil
+    end
+    shown = state and state.mode == 'game' and state or nil
+    if state and not menuHud:update(state, dt) then
+        -- The size of the window changed: the places are worked out from it, so the display is made again
+        menuHud:close()
+        menuHud = menuHudModule.create()
+        if menuHud == nil then menuHudFailed = true end
+    end
+    return true
+end
+
 local function refresh(dt)
+    if refreshFromFile(dt) then return end
     local state = current(dt)
     if same(state, shown) then
         return
@@ -523,6 +569,20 @@ end
 
 -- The compass moves with every turn of the player, so it is drawn on its own and looked at more often
 local function refreshCompass()
+    if menuHud then
+        if compassElement then
+            compassElement:destroy()
+            compassElement = nil
+        end
+        local compass = nil
+        if shown ~= nil then
+            compass = hud.compass()
+            compass.heading = math.floor(compass.heading * 10) / 10
+        end
+        shownCompass = compass
+        menuHud:updateCompass(compass, shown ~= nil)
+        return
+    end
     local compass = nil
     if shown ~= nil then
         compass = hud.compass()
