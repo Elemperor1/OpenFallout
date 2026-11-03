@@ -605,12 +605,13 @@ namespace FalloutMenu
         const bool isImage
             = tile.mType == TileType::Image || (tile.mType == TileType::HotRect && !text(tile, "filename").empty());
         const bool isText = tile.mType == TileType::Text;
-        // A box (box.xml: the file's `_fill_alpha` is the alpha of its own fill) is a plain colour: the bar that is lit
-        // behind a row of a list, or the band behind a button. It is a picture of the file `solid.dds` of the shared
-        // atlas (the colour is the tile's, the alpha its own). Only a tile that has a `_fill_alpha` is a box: a
-        // rectangle that only passes its alpha down to what is in it is not.
-        const bool isFill = !isImage && !isText && (tile.mType == TileType::HotRect || tile.mType == TileType::Rect)
-            && defines(tile, "_fill_alpha") && width > 0 && height > 0 && number(tile, "alpha") > 0;
+        // A hot rectangle with no file is a plain colour of its own alpha, as the executable draws it (round 12AG): the
+        // bar behind the lit row of a list (`list_box.xml`), the band behind a button. The game gives every hotrect and
+        // picture a quad, with a texture when it names a file; the files that do not want one say `alpha 0`, and the
+        // port draws the ones that say an alpha. A rectangle draws nothing, and one that only passes its alpha down to
+        // what is in it (`alpha 255` on a container) is not a fill. It is a picture of `solid.dds` of the shared atlas.
+        const bool isFill = !isImage && !isText && tile.mType == TileType::HotRect && defines(tile, "alpha")
+            && width > 0 && height > 0 && number(tile, "alpha") > 0;
         if (isImage || isText || isFill)
         {
             DrawItem item;

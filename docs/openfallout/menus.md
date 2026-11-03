@@ -472,13 +472,19 @@ found the same way.
   centre or right end).
 - A hot rectangle that names a file (`filename`) is a picture that takes the pointer: the picture of the world map, the
   cursor of the hacking menu (seen in the files, not yet in the running game).
-- A box is a plain colour: a hotrect or rectangle that has a `_fill_alpha` (`box.xml` gives every box one, 0 unless the file
-  sets it; the box's alpha is that) and a size is drawn as the 7 by 7 pixel `solid.dds` of the shared atlas, stretched, in the
-  tile's colour times its brightness. The bar behind the lit row of a list is one (`list_box.xml`: alpha 40, and the
-  terminals set 224 with the row's text turned dark, which made the lit row of a terminal vanish in the running game, round
-  12AG, before boxes were drawn). A rectangle that has no `_fill_alpha` is not drawn whatever its alpha: the files give
-  alphas to rectangles only to pass them down. Not read from the executable yet (asked in round 12AG, A6): which tile types
-  draw a quad when they have no file, and what their alpha is by default.
+- A hotrect with no file is a plain colour of its own alpha: the executable gives every picture and hotrect a quad (a
+  texture on it when a file is named) and none to a rectangle, menu or window (FalloutNV.exe tile factory 0xa00c20, round
+  12AG, A6); each tile draws with its OWN alpha, never multiplied by its parent's (a rectangle's alpha is only a value
+  that the tiles in it copy). The port draws a hotrect that says an `alpha` above 0 and has a size, as the 7 by 7 pixel
+  `solid.dds` of the shared atlas stretched, in the tile's colour times its brightness; the files turn a hotrect off with
+  `alpha 0`. The bar behind the lit row of a list is one (`list_box.xml`: its alpha is the list's `_fill_alpha`, 40, and the
+  terminals set 224 and turn the row's text dark, which made the lit row of a terminal vanish in the running game before
+  the bars were drawn); so are the fill of a lit tab of the Pip-Boy and the band behind a lit button of the start menu.
+  Not as the executable has it: it reads a hotrect with no alpha as fully opaque (default 255), which cannot be so for the
+  containers of the files (`SWM_MainRect` of the wait menu is 860 by 400 and says none), so the port draws only the ones
+  that say one. Colour in the executable: brightness 0 or more gives the system colour (the nearest tile above that names
+  one, else 1) times brightness/255 and ignores the tile's red, green and blue; a negative brightness (`uselocalcolor`)
+  gives red, green and blue. The port's `colorOf` still uses the tile's red, green and blue when no system colour is named.
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
 

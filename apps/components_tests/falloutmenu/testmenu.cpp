@@ -393,24 +393,23 @@ namespace
         EXPECT_FLOAT_EQ(items[0].mWidth, 200.f);
     }
 
-    TEST(FalloutMenuDrawTest,
-        a_box_with_a_fill_alpha_is_a_plain_colour_and_a_rectangle_that_only_passes_its_alpha_is_not)
+    TEST(FalloutMenuDrawTest, a_hot_rectangle_with_an_alpha_and_no_file_is_a_plain_colour_and_a_rectangle_never_is)
     {
         Fixture f;
         Menu& menu = f.open(
             "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
-            // A box (box.xml gives `_fill_alpha`, and the alpha of the tile is that): the bar behind the lit row of a
-            // list
+            // The bar behind the lit row of a list: a box, whose alpha is the `_fill_alpha` of its file
             "<hotrect name=\"Lit\"><_fill_alpha> 51 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
             "</alpha><brightness> 128 </brightness><width> 300 </width><height> 30 </height></hotrect>"
-            // A box with no fill, and a box that has no size (nothing is lit): no bar
-            "<hotrect name=\"Empty\"><_fill_alpha> 0 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
-            "</alpha><width> 300 </width><height> 30 </height></hotrect>"
-            "<hotrect name=\"NoSize\"><_fill_alpha> 90 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
-            "</alpha></hotrect>"
-            // No `_fill_alpha`: the alpha is only for what is in the tile (it is 255 by default)
-            "<rect name=\"Container\"><alpha> 255 </alpha><width> 300 </width><height> 30 </height></rect>"
+            // No alpha, an alpha of 0, no size: nothing is drawn (the files turn a hotrect off with `alpha 0`)
             "<hotrect name=\"Plain\"><width> 300 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"Off\"><alpha> 0 </alpha><width> 300 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"NoSize\"><alpha> 90 </alpha></hotrect>"
+            // A rectangle draws nothing whatever its alpha: it gives the alpha to what is in it
+            "<rect name=\"Container\"><alpha> 255 </alpha><width> 300 </width><height> 30 </height></rect>"
+            "<rect name=\"Box\"><_fill_alpha> 90 </_fill_alpha><alpha><copy src=\"me()\" "
+            "trait=\"_fill_alpha\"/></alpha>"
+            "<width> 300 </width><height> 30 </height></rect>"
             "</menu>");
         const std::vector<DrawItem> items = menu.draw();
         ASSERT_EQ(items.size(), 1u);
