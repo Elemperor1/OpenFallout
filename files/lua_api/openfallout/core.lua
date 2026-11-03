@@ -1913,6 +1913,29 @@
 -- @function [parent=#Interact] closeLock
 
 ---
+-- The book or scroll the player activated where it lies (the screen of a book, with its Take button).
+-- @function [parent=#Interact] book
+-- @return #InteractBook Nothing when none is open.
+
+---
+-- @type InteractBook
+-- @field #string reference The form id of the book's reference.
+-- @field #string name
+-- @field #string text The words of the book, with marks (`<BR>`, `<FONT>`, `<IMG>`...) and names of settings (`&sName;`).
+-- @field #boolean scroll Whether it is a scroll and not a book.
+-- @field #boolean canTake Whether the player may take it from where it lies.
+-- @field #number serial Another for each time one is opened.
+
+---
+-- Closes the screen of the book that lies in the world.
+-- @function [parent=#Interact] closeBook
+
+---
+-- The player takes the book that is open from where it lies: it goes to the inventory and the screen closes.
+-- @function [parent=#Interact] takeBook
+-- @return #boolean False when none is open or it may not be taken.
+
+---
 -- The number of the terminal that is open, 0 for none. It changes with everything the screen of the terminal shows.
 -- @function [parent=#Interact] terminalSerial
 -- @return #number

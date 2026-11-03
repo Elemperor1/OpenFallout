@@ -18,6 +18,7 @@ local input = require('openfallout.input')
 local menuModule = require('scripts.omw.falloutmenu')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
+local bookMenu = require('scripts.omw.falloutbook')
 
 local pipboy = core.pipboy
 
@@ -197,6 +198,21 @@ local function activate(row)
         if list.count() > 0 then list.select(1, true) end
         return
     end
+    if item.book and equippable(item) then
+        -- A book is read on its own screen, and what reading it gives (the points of a skill book, the book used up) is
+        -- done when the player leaves the screen
+        local words = pipboy.book(item.id)
+        local id = item.id
+        if words then
+            words.canTake = false
+            if bookMenu.show(words, { onLeave = function()
+                pipboy.use(id)
+                if shown then fill() end
+            end }) then
+                return
+            end
+        end
+    end
     if equippable(item) then
         pipboy.use(item.id)
     end
@@ -262,6 +278,7 @@ end
 
 function module.hide()
     quantity.close()
+    bookMenu.close()
     if shown then
         shown:close()
     end
@@ -275,6 +292,7 @@ function module.update()
     if not shown then return end
     shown:checkSize()
     quantity.update()
+    bookMenu.update()
     updateCards()
 end
 
@@ -283,6 +301,9 @@ end
 -- the page of the Pip-Boy).
 function module.press(code, symbol)
     if not shown then return false end
+    if bookMenu.isOpen() then
+        return bookMenu.press(code, symbol)
+    end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
     end

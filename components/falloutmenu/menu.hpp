@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "menufile.hpp"
+#include "richtext.hpp"
 #include "value.hpp"
 
 namespace FalloutMenu
@@ -28,6 +29,9 @@ namespace FalloutMenu
         std::function<std::optional<TextSize>(const std::string& file, const std::string& atlas)> mImageSize;
         /// The size a text takes in a font (1 to 9): `wrapWidth` is zero when the text is not to be broken into lines
         std::function<TextSize(int font, const std::string& text, float wrapWidth)> mTextSize;
+        /// The distance from one line to the next in a font (1 to 9); a text with marks (`ishtml`) needs it, and
+        /// `mTextSize` for the width of a line
+        std::function<float(int font)> mLineHeight;
         /// The colour of a system colour: red, green and blue from 0 to 255
         std::function<std::optional<std::array<float, 3>>(int id)> mSystemColor;
     };
@@ -178,6 +182,12 @@ namespace FalloutMenu
         Value evaluateOperand(const Tile& tile, const Operand& operand, const Value& running);
         void collect(Tile& tile, float originX, float originY, const std::optional<std::array<float, 4>>& clip,
             bool clipped, std::vector<DrawItem>& out);
+        /// A text with marks (the tile says `ishtml`): its pages are laid out here, and the page that `pagenum` names
+        /// is drawn
+        bool isRich(const Tile& tile);
+        const std::vector<RichPage>& richPages(const Tile& tile);
+        void collectRich(Tile& tile, float x, float y, const std::optional<std::array<float, 4>>& clip, bool clipped,
+            std::vector<DrawItem>& out);
         std::array<float, 4> colorOf(const Tile& tile);
         bool visible(const Tile& tile);
         /// A hotrect whose position is its child's (the buttons that `super_text_box` makes): the child already stands
@@ -198,6 +208,13 @@ namespace FalloutMenu
         unsigned mGeneration = 1;
         int mNextId = 1;
         std::unordered_map<int, Tile*> mById;
+        /// The pages of the texts with marks, by tile, with what they were laid out from
+        struct RichCache
+        {
+            std::string mKey;
+            std::vector<RichPage> mPages;
+        };
+        std::unordered_map<int, RichCache> mRich;
         float mDesignWidth = 1280;
         float mDesignHeight = 960;
         std::vector<std::string> mProblems;

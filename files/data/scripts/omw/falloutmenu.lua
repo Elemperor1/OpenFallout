@@ -374,6 +374,12 @@ function Shown:pcButton(symbol)
     if type(symbol) ~= 'string' or #symbol ~= 1 then return false end
     local name = self.menu:getText(self.menu:root(), '_PCButton_' .. symbol:upper())
     if not name or name == '' then return false end
+    return self:clickNamed(name)
+end
+
+-- Click the tile of this name as the pointer would: when it is there, visible (as every tile it is in is) and takes the
+-- pointer. True when a tile was clicked.
+function Shown:clickNamed(name)
     local tile = self.menu:find(name)
     if not tile then return false end
     local up = tile

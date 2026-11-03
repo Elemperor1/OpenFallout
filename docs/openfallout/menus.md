@@ -654,6 +654,36 @@ its older drawing for a data folder that lacks the file.
   rounds show the rounds carried, as the engine has no clip. Mac round 12AM B2 read the text under the crosshair (name, verb,
   weight and value): it is the next piece.
 
+### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
+
+`book_menu.xml` is the screen of a book (two pages, the page numbers, the arrows, Take and Exit) and of a scroll (a
+roll with a scrollbar). The file turns the pages itself: the number of the left page counts the clicks of the arrows
+(`_pagenum`), and the text tiles ask for `pagenum`. What the code puts in the menu is three traits of the menu itself:
+`user0` (a book, not a scroll), `user2` (the words) and `user3` (it can be taken); the page width (`user4`) and the font
+(`user5`) the file has. `falloutbook.lua` does that and wires the buttons; the words come from the record of the book
+(`core.pipboy.book` for what the player carries, `core.interact.book` for one that lies in the world, which has the
+Take button: the activation of a book in the world opens this screen in place of picking it up).
+
+The words are laid out by the menu engine (`components/falloutmenu/richtext.cpp`) for a text tile that says `ishtml`;
+the executable's text engine is shared with the notes of the terminals:
+
+- It is marked up text only when the string begins with `<`; else it is plain (broken at the new lines).
+- The marks are `IMG` (`SRC`, `WIDTH`, `HEIGHT`), `DIV ALIGN=LEFT|CENTER|RIGHT`, `FONT FACE=<number>` and
+  `COLOR=RRGGBB` with `/FONT`, `BR` (the text goes on one line down), `P` (two lines down) and `HR`: a new page when the
+  tile has a `wraplimit`, two lines down when it has none. Other marks are left out. The default colour of the letters is
+  (117, 59, 33). A setting name between `&` and `;` stands for the words of that game setting (the Lua side fills them).
+- `wrapwidth` is the width the lines are broken at (at the last space; a word wider than that is broken where it fills
+  the line), `wraplimit` the height of a page: a line stays on the page while the height used, the line and the
+  `linegap` (added to the height of every line) fit in it. `pagenum` (from 0) says which page the tile draws, a number
+  that is no page draws nothing, and the tile's `pagecount` trait says how many pages there are. The width and height of
+  the tile are those of the page it shows.
+
+Not known yet, asked of the next Mac round (12AN B9): what the text engine does with line feeds and runs of spaces in the
+marked text (here: one space), where a picture stands in a line, which names `FACE` takes (here: numbers only, and the
+number is the font of the tile traits), the colour of plain text, the keys of the screen on the PC (here: the arrows,
+the pages and the wheel; Escape or Backspace leave; T takes), and whether a skill book gives its points when its screen
+opens or when it is left (here: when it is left).
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of

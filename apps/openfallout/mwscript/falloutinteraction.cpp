@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loaddoor.hpp>
@@ -164,6 +165,71 @@ namespace OFScript
     {
         const std::lock_guard lock(mInteractionMutex);
         mLockScreen.reset();
+    }
+
+    // ---- Books ----
+
+    std::optional<FalloutScripts::BookText> FalloutScripts::bookText(FalloutScript::FormId item)
+    {
+        const ESM4::Book* book = mStore.get<ESM4::Book>().search(refIdOf(item));
+        if (book == nullptr)
+            return std::nullopt;
+        BookText text;
+        text.mName = book->mFullName;
+        text.mText = book->mText;
+        text.mScroll = (book->mData.flags & ESM4::Book::Flag_Scroll) != 0;
+        text.mCanTake = (book->mData.flags & ESM4::Book::Flag_NoTake) == 0;
+        return text;
+    }
+
+    bool FalloutScripts::openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
+    {
+        if (object.isEmpty() || actor.isEmpty() || object.getType() != ESM4::Book::sRecordId
+            || actor != OFBase::Environment::get().getWorld()->getPlayerPtr())
+            return false;
+        const FalloutScript::FormId reference = referenceOf(object);
+        ESM::FormId base;
+        if (reference == 0 || !baseOf(reference, base) || base.isZeroOrUnset() || !base.hasContentFile()
+            || base.mContentFile > 0xfe)
+            return false;
+        std::optional<BookText> text = bookText(base.toUint32());
+        if (!text)
+            return false;
+        const std::lock_guard lock(mInteractionMutex);
+        BookScreen screen;
+        screen.mReference = reference;
+        screen.mBook = std::move(*text);
+        screen.mSerial = ++mBookSerial;
+        mBookScreen = std::move(screen);
+        return true;
+    }
+
+    std::optional<FalloutScripts::BookScreen> FalloutScripts::bookScreen()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        return mBookScreen;
+    }
+
+    void FalloutScripts::closeBookScreen()
+    {
+        const std::lock_guard lock(mInteractionMutex);
+        mBookScreen.reset();
+    }
+
+    bool FalloutScripts::takeBookScreen()
+    {
+        FalloutScript::FormId reference = 0;
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            if (!mBookScreen || !mBookScreen->mBook.mCanTake)
+                return false;
+            reference = mBookScreen->mReference;
+            mBookScreen.reset();
+        }
+        const OFWorld::Ptr object = findReference(reference);
+        if (object.isEmpty())
+            return false;
+        return pickUp(object, OFBase::Environment::get().getWorld()->getPlayerPtr());
     }
 
     std::string FalloutScripts::pickLock()

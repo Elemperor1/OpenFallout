@@ -26,6 +26,7 @@ namespace
             mEnvironment.mTextSize = [](int, const std::string& text, float) {
                 return TextSize{ 10.f * static_cast<float>(text.size()), text.empty() ? 0.f : 20.f };
             };
+            mEnvironment.mLineHeight = [](int) { return 20.f; };
             mEnvironment.mImageSize = [](const std::string& file, const std::string&) -> std::optional<TextSize> {
                 if (file.find("missing") != std::string::npos)
                     return std::nullopt;
@@ -646,5 +647,59 @@ namespace
         // Either answer will do; what matters is that this comes back
         (void)numberOf(menu, "A", "x");
         SUCCEED();
+    }
+
+    TEST(FalloutMenuLayoutTest, a_text_with_marks_has_pages_and_draws_the_one_that_pagenum_names)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><rect name=\"R\"><x> 100 </x><y> 200 </y>"
+            "<text name=\"T\"><ishtml> &true; </ishtml><x> 5 </x><y> 7 </y>"
+            "<wrapwidth> 100 </wrapwidth><wraplimit> 50 </wraplimit><pagenum> 1 </pagenum></text>"
+            "</rect></menu>");
+        Tile& text = *menu.find("T");
+        menu.set(text, "string", Value::fromText("<font color=00FF00>one</font><br>two<br>three<br>four<br>five"));
+        // Five lines of 20 are three pages of at most 50
+        EXPECT_FLOAT_EQ(menu.number(text, "pagecount"), 3.f);
+        // The size of the text is that of the page that is shown: two lines, the widest has five letters
+        EXPECT_FLOAT_EQ(menu.number(text, "width"), 50.f);
+        EXPECT_FLOAT_EQ(menu.number(text, "height"), 40.f);
+        std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mText, "three");
+        EXPECT_FLOAT_EQ(items[0].mX, 105.f);
+        EXPECT_FLOAT_EQ(items[0].mY, 207.f);
+        EXPECT_EQ(items[1].mText, "four");
+        EXPECT_FLOAT_EQ(items[1].mY, 227.f);
+        // The letters have the colour of the book where the text does not give one
+        EXPECT_NEAR(items[0].mColor[0], 117.f / 255.f, 1e-4f);
+
+        menu.set(text, "pagenum", Value(0.f));
+        items = menu.draw();
+        ASSERT_EQ(items.size(), 2u);
+        EXPECT_EQ(items[0].mText, "one");
+        EXPECT_FLOAT_EQ(items[0].mColor[0], 0.f);
+        EXPECT_FLOAT_EQ(items[0].mColor[1], 1.f);
+
+        // A number that is no page shows nothing, and so does the pages' end
+        menu.set(text, "pagenum", Value(3.f));
+        EXPECT_TRUE(menu.draw().empty());
+        menu.set(text, "pagenum", Value(-1.f));
+        EXPECT_TRUE(menu.draw().empty());
+
+        // Another text makes other pages
+        menu.set(text, "pagenum", Value(0.f));
+        menu.set(text, "string", Value::fromText("<b>short"));
+        EXPECT_FLOAT_EQ(menu.number(text, "pagecount"), 1.f);
+    }
+
+    TEST(FalloutMenuLayoutTest, a_text_without_ishtml_is_drawn_as_one_text)
+    {
+        Fixture f;
+        Menu& menu = f.open("<menu name=\"M\"><text name=\"T\"><string> hello </string></text></menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        EXPECT_EQ(items[0].mText, "hello");
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("T"), "pagecount"), 0.f);
     }
 }

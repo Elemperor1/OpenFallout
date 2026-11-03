@@ -472,6 +472,35 @@ namespace OFScript
         std::string pickLock();
         void closeLockScreen();
 
+        /// What a book or a scroll says, for the screen that shows it: its name and its words (the setting names in
+        /// them, `&sName;`, are for the screen to fill in), whether it is a scroll and not a book, and whether the
+        /// player may take it from where it lies. Nothing for an item that is no book.
+        struct BookText
+        {
+            std::string mName;
+            std::string mText;
+            bool mScroll = false;
+            bool mCanTake = true;
+        };
+        std::optional<BookText> bookText(FalloutScript::FormId item);
+        /// The player activates a book or a scroll that lies in the world: its screen opens, and the activation stops
+        /// there until the player takes it or puts it down. False for an object that is no book, or an actor that is
+        /// not the player (a character takes it as any item).
+        bool openBook(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
+        /// The book that the player has open from the world: where it lies, what it says, and a number that is another
+        /// for each time one opens
+        struct BookScreen
+        {
+            FalloutScript::FormId mReference = 0;
+            BookText mBook;
+            int mSerial = 0;
+        };
+        std::optional<BookScreen> bookScreen();
+        void closeBookScreen();
+        /// The player takes the book that is open from where it lies (it goes to the inventory, and the screen closes);
+        /// false when none is open or it may not be taken
+        bool takeBookScreen();
+
         /// The player activates a terminal: it opens, or the game of hacking starts when it is closed and the player
         /// has not got its password. False for an object that is no terminal.
         bool openTerminal(const OFWorld::Ptr& object, const OFWorld::Ptr& actor);
@@ -1859,6 +1888,8 @@ namespace OFScript
         std::mutex mInteractionMutex;
         std::optional<LockScreen> mLockScreen;
         int mLockSerial = 0;
+        std::optional<BookScreen> mBookScreen;
+        int mBookSerial = 0;
         /// The locks that gave their experience, and those that forcing broke (kept for the run, not in saves)
         std::set<FalloutScript::FormId> mLockExperienceGiven;
         std::set<FalloutScript::FormId> mLockBroken;

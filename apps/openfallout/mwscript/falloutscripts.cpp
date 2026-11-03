@@ -571,6 +571,7 @@ namespace OFScript
             // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
+            mBookScreen.reset();
             mLockExperienceGiven.clear();
             mLockBroken.clear();
             mTerminal.reset();

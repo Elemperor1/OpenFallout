@@ -191,6 +191,10 @@ namespace FalloutMenu
             const Font::Layout layout = font->layout(text, wrapWidth, 1);
             return { layout.mWidth, layout.mHeight };
         };
+        environment.mLineHeight = [shared](int number) -> float {
+            const Font* font = shared->fonts().get(number);
+            return font != nullptr ? font->lineHeight() : 0.f;
+        };
         environment.mSystemColor = [shared](int id) { return shared->systemColor(id); };
 
         result->mMenu = std::make_unique<Menu>(definition, globals, result->mLoader->templates(), environment);

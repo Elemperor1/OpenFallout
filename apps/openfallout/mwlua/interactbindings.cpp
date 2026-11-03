@@ -78,6 +78,26 @@ namespace OFLua
         api["pick"] = []() { return scripts().pickLock(); };
         api["closeLock"] = []() { scripts().closeLockScreen(); };
 
+        // The book or scroll the player activated where it lies: where it lies, its name and words, whether it is a
+        // scroll and whether it may be taken, and a number that is another for each time one opens; nothing when none
+        // is open
+        api["book"] = [lua]() -> sol::object {
+            const auto screen = scripts().bookScreen();
+            if (!screen)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["reference"] = idText(screen->mReference);
+            row["name"] = screen->mBook.mName;
+            row["text"] = screen->mBook.mText;
+            row["scroll"] = screen->mBook.mScroll;
+            row["canTake"] = screen->mBook.mCanTake;
+            row["serial"] = screen->mSerial;
+            return row;
+        };
+        api["closeBook"] = []() { scripts().closeBookScreen(); };
+        // The player takes the book that is open from where it lies; false when none is open or it may not be taken
+        api["takeBook"] = []() { return scripts().takeBookScreen(); };
+
         // The number of the terminal that is open (0 for none); it changes with everything the screen shows
         api["terminalSerial"] = []() { return scripts().terminalSerial(); };
         // The seconds that are left before a board of the game of hacking can be laid out again

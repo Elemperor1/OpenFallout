@@ -365,7 +365,7 @@ add_component_dir (esm4
 )
 
 add_component_dir (falloutmenu
-    atlas font listbox menu menufile openmenu value xml
+    atlas font listbox menu menufile openmenu richtext value xml
     )
 
 add_component_dir (falloutscript
