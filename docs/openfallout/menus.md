@@ -667,12 +667,14 @@ its older drawing for a data folder that lacks the file.
   number in brackets for a stack), a row of weight and value for something that can be taken (a number of nothing is two
   dashes, a value under 1 has a decimal), and a line for its lock. The words are the game's settings: `sTargetTypeTake`
   (also for a book that lies in the world), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
-  `sTargetTypeTalk` (a character that does not fight the player), `sSearch` (a body); a character that fights, and a
+  `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
+  the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
+  not fight the player), `sSearch` (a body); a character that fights, and a
   creature that is alive, have no word. The lock line is, as the executable writes it, `sBroken` for a lock that forcing
   broke, else for a locked thing `[sHUDUseKey - sLocked]` when the player carries the key, `[<class word>]` when only a key
   opens it, and `[<class word> - sLocked]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
-  object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there: the
-  words for sitting and sleeping (the port does not tell a bed from a chair), pickpocket, steal and pick (the port has no
+  object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
+  pickpocket, steal and pick (the port has no
   such actions yet), disarming a mine, the key hint on the PC (the hint tile of the file stays hidden: the file's rule for
   it is a text trait taken as true, which the menu engine does not do; asked of the Mac in round 12AO), the weight and value
   row for containers, doors and characters (whether the executable shows it for them is not clear), and the colour that

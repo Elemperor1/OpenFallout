@@ -241,11 +241,31 @@ namespace OFScript
         else if (type == ESM4::Door::sRecordId)
             verb = "sTargetTypeOpenDoor";
         else if (type == ESM4::Activator::sRecordId || type == ESM4::TalkingActivator::sRecordId
-            || type == ESM4::Terminal::sRecordId || type == ESM4::Furniture::sRecordId)
-        {
-            // Sitting and sleeping are words for furniture too, and which one it is comes from the markers of the
-            // furniture, which are not read: the plain word
+            || type == ESM4::Terminal::sRecordId)
             verb = "sTargetTypeActivate";
+        else if (type == ESM4::Furniture::sRecordId)
+        {
+            // Sitting and sleeping are the words for furniture whose markers say so (the activation types 3 and 5 of
+            // the executable's table, FalloutNV.exe 0x11D5160; that they follow the kind of the marker is a reading of
+            // the port's, the executable's function that tells was not read): a marker that the record has switched on
+            // and that is of a sleeping kind makes it a bed, of a sitting kind a seat
+            verb = "sTargetTypeActivate";
+            const std::uint32_t flags = target.get<ESM4::Furniture>()->mBase->mActiveMarkerFlags;
+            const std::vector<FalloutScript::FurnitureEntry> entries = furnitureEntries(target);
+            bool sleeps = false;
+            bool sits = false;
+            for (std::size_t i = 0; i < entries.size(); ++i)
+            {
+                if (!FalloutScript::furnitureEntryEnabled(flags, i))
+                    continue;
+                const std::uint8_t kind = entries[i].mRef;
+                sleeps = sleeps || (kind >= 1 && kind <= 6);
+                sits = sits || (kind >= 10 && kind <= 20);
+            }
+            if (sleeps)
+                verb = "sTargetTypeSleep";
+            else if (sits)
+                verb = "sTargetTypeSit";
         }
         else if (type == ESM4::Npc::sRecordId || type == ESM4::Creature::sRecordId)
         {
