@@ -591,6 +591,8 @@ namespace OFScript
         mOpenNumbers.clear();
         mOpenOwner = 0;
         mMessageBoxCount = 0;
+        mLastOpenSpace = 0;
+        mMapSpaceTold = 0;
         // The script of the next game is the first to say that it draws the boxes again (its first claim has the long
         // lease, see luaClaimIsFresh)
         mMessageClaims = 0;

@@ -4,7 +4,7 @@
 -- buttons in the order of the record, the width of the box from the widest of the title, the words and the buttons (kept
 -- between the file's least and most), the words and the title both centred when the words are one line and both to the
 -- left when they are more, and a message with no button that closes itself once its display time is over. Which message
--- is open and which button was picked is the engine's (core.messagebox); this script shows the box and presses the
+-- is open and which button was picked is the engine's (core.messageBox); this script shows the box and presses the
 -- button. A game whose data lacks the file keeps the window of the engine's own: the script gives the boxes back to it.
 local core = require('openfallout.core')
 local async = require('openfallout.async')
@@ -15,7 +15,7 @@ local util = require('openfallout.util')
 
 local menuModule = require('scripts.omw.falloutmenu')
 
-local messagebox = core.messagebox
+local messagebox = core.messageBox
 if not (core.pipboy and core.pipboy.available()) or not messagebox or not messagebox.claim then
     return {}
 end

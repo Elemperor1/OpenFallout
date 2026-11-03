@@ -804,19 +804,19 @@ namespace OFScript
             info.mOutside = inOpenWorld(mPlayer);
             info.mLocation = std::string(world.getCellName(player.getCell()));
             if (info.mOutside)
+            {
                 info.mWorldspace = worldspaceOf(mPlayer);
+                if (info.mWorldspace != 0)
+                    mLastOpenSpace = info.mWorldspace;
+            }
         }
-        // Inside a building the map is the one of the first place the player has found
+        // Inside a building the map is the one of the world outside: the last the player stood in, and the main world
+        // of the game when it has not been outside yet (the first place that the player had found was a world of an
+        // add-on in the first run)
         if (info.mWorldspace == 0)
         {
-            for (const PlacedMarker& marker : placedMarkers())
-            {
-                if (marker.mWorldspace != 0 && mMapMarkers.state(marker.mId) != 0)
-                {
-                    info.mWorldspace = marker.mWorldspace;
-                    break;
-                }
-            }
+            placedMarkers();
+            info.mWorldspace = mLastOpenSpace != 0 ? mLastOpenSpace : mMainSpace;
         }
         if (info.mWorldspace != 0)
         {
@@ -1034,6 +1034,8 @@ namespace OFScript
         if (player.isEmpty() || !player.isInCell() || !inOpenWorld(mPlayer))
             return;
         const FalloutScript::FormId space = worldspaceOf(mPlayer);
+        if (space != 0)
+            mLastOpenSpace = space;
         const osg::Vec3f here = player.getRefData().getPosition().asVec3();
         const double reach = gameSetting("iMapMarkerRevealDistance", 1000);
         for (const PlacedMarker& marker : placedMarkers())

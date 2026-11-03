@@ -621,6 +621,12 @@ namespace OFScript
         MapInfo mapInfo();
         /// The world space whose map was last said in the log (once for each, see `mapInfo`)
         FalloutScript::FormId mMapSpaceTold = 0;
+        /// The world space the player last stood in outside (0 before): the map of a building is the one of the world
+        /// outside it
+        FalloutScript::FormId mLastOpenSpace = 0;
+        /// The world space that holds the most map markers (the main world of the game: the Mojave, the Capital
+        /// Wasteland), found once with the markers: the map of a building when the player has not been outside
+        FalloutScript::FormId mMainSpace = 0;
         /// The player goes to a marker at once: the text of why not, empty when it did
         std::string travelTo(FalloutScript::FormId marker);
 

@@ -231,7 +231,7 @@ Not done: the sounds, and everything on this page is checked in the offline harn
 ### Message boxes
 
 `falloutmessage.lua` draws the message boxes of the scripts (a `ShowMessage` with buttons, and the box that names a
-reputation) on `message_menu.xml`. The engine keeps the queue and the answer (`core.messagebox`: `current()` gives the
+reputation) on `message_menu.xml`. The engine keeps the queue and the answer (`core.messageBox`: `current()` gives the
 box that is open with its `title`, `body`, `buttons`, `timed` and `time`; `press(n)` is the button picked; `claim(true)`,
 said every frame, tells the engine that the script draws the boxes, so that it makes no window of its own, and
 `claim(false)` gives them back, which the script does when the file is not in the install). Read from `FalloutNV.exe`

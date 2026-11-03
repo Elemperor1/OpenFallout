@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <set>
 
 #include <components/esm4/loadcrea.hpp>
@@ -164,6 +165,17 @@ namespace OFScript
             });
             for (PlacedMarker& marker : markers)
                 marker.mWorldspace = worldspaceOf(marker.mId);
+            std::map<FalloutScript::FormId, std::size_t> perSpace;
+            for (const PlacedMarker& marker : markers)
+                if (marker.mWorldspace != 0)
+                    ++perSpace[marker.mWorldspace];
+            std::size_t most = 0;
+            for (const auto& [space, count] : perSpace)
+                if (count > most)
+                {
+                    most = count;
+                    mMainSpace = space;
+                }
             std::sort(markers.begin(), markers.end(),
                 [](const PlacedMarker& a, const PlacedMarker& b) { return a.mId < b.mId; });
             mPlacedMarkers = std::move(markers);
