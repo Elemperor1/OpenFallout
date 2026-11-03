@@ -1,6 +1,8 @@
 #ifndef MWGUI_TOOLTIPS_H
 #define MWGUI_TOOLTIPS_H
 
+#include <atomic>
+
 #include "../mwworld/ptr.hpp"
 #include "layout.hpp"
 
@@ -58,6 +60,10 @@ namespace OFGui
 
         void setEnabled(bool enabled);
 
+        /// Whether the name box over the object that the player aims at (outside the windows) is drawn. The display
+        /// from the games' own menu file has its own text for it and turns this off.
+        static void setWorldTooltipShown(bool show);
+
         bool toggleFullHelp(); ///< show extra info in item tooltips (owner, script)
         bool getFullHelp() const;
 
@@ -107,6 +113,7 @@ namespace OFGui
         MyGUI::Widget* mDynamicToolTipBox;
 
         OFWorld::Ptr mFocusObject;
+        static std::atomic<bool> sWorldTooltipShown;
 
         MyGUI::IntSize getToolTipViaPtr(int count, bool image = true, bool isOwned = false);
         ///< @return requested tooltip size

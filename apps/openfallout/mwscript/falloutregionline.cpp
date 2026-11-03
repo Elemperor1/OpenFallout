@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadregn.hpp>
 
@@ -57,7 +58,12 @@ namespace OFScript
                 }
         }
         if (std::optional<std::string> name = mRegionLine.enter(exterior, covering))
+        {
+            // A line for the log, so that a run can tell that the name was found whoever takes it
+            Log(Debug::Info) << "Region line: the player came into a region whose name has " << name->size()
+                             << " characters";
             names.push_back(std::move(*name));
+        }
         return names;
     }
 }

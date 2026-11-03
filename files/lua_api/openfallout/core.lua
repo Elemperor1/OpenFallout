@@ -1640,6 +1640,13 @@
 -- @return #list<#table>
 
 ---
+-- Whether the name box over the object that the player aims at (the old display's, drawn at the top of the screen when
+-- no window is open) is shown. The display that is drawn from the game's own menu file has its own text for the object
+-- (the `Info` tile) and turns the box off; it is on again for the stand-in display.
+-- @function [parent=#Hud] setWorldTooltip
+-- @param #boolean show
+
+---
 -- The names of the regions the player came into since this was last called, oldest first, for the line over the compass. The
 -- player's region is looked for when the player's cell is another one (and once after a game was begun or loaded), as the
 -- games do it; a building, a place that no region covers and a region without a name give nothing, and neither does the region

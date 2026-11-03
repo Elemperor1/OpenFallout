@@ -8,6 +8,7 @@
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwgui/tooltips.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
@@ -139,6 +140,10 @@ namespace OFLua
                 rows[index++] = name;
             return rows;
         };
+
+        // Whether the name box over the object that the player aims at (the old display's, drawn at the top of the
+        // screen) is shown: the display from the game's menu file has its own text for the object, and turns it off
+        api["setWorldTooltip"] = [](bool show) { OFGui::ToolTips::setWorldTooltipShown(show); };
 
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the

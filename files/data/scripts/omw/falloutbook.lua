@@ -74,18 +74,21 @@ function module.show(book, options)
     module.close()
     local opened = menuModule.open(FILE)
     if not opened then
+        print('Book screen: the menu file did not open')
         return false
     end
     -- Setting a tile the file does not have is an error; a screen that cannot show the words is closed, not left open
-    local ready = pcall(opened.batch, opened, function()
+    local ready, failure = pcall(opened.batch, opened, function()
         opened:io('user0', book.scroll and 0 or 1)
         opened:io('user2', filled(book.text or ''))
         opened:io('user3', book.canTake and 1 or 0)
     end)
     if not ready then
+        print('Book screen: the words could not be set: ' .. tostring(failure))
         opened:close()
         return false
     end
+    print('Book screen: shown as ' .. (book.scroll and 'a scroll' or 'a book'))
     shown, isScroll = opened, book.scroll == true
     onLeave = options and options.onLeave
     onTake = options and options.onTake
