@@ -393,8 +393,17 @@ function Hud:update(state, dt)
             if not full then self:put(tile, 'visible', 0) end
         end
         if not full then return end
-        self:put(t.hitPoints, 'visible', 1)
-        self:put(t.actionPoints, 'visible', 1)
+        -- While a script holds the player still the display is the executable's mode 0xC: the radiation, the experience and
+        -- the messages (Mac round 12AM B5; the other tiles of that mode are not made yet)
+        local scripted = state.scripted == true
+        self:put(t.hitPoints, 'visible', scripted and 0 or 1)
+        self:put(t.actionPoints, 'visible', scripted and 0 or 1)
+        if scripted then
+            for _, tile in ipairs({ t.reticle, t.sneak, t.limbs, t.enemy }) do self:put(tile, 'visible', 0) end
+            self:showExperience(state)
+            self:showRadiation(state)
+            return
+        end
         -- Health
         self:put(t.hpMeter, 'width', barWidth(t.total.hp, t.tick.hp, share(state.health, state.maxHealth), 1,
             state.health > 0 and 1 or 0))

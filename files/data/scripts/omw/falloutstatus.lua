@@ -504,6 +504,9 @@ local function current(dt)
         sneakText = status.sneakText ~= '' and status.sneakText or status.sneak:upper(),
         crippled = status.crippled,
         reticle = status.weaponDrawn,
+        -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
+        scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,
+        rolloverOff = status.controlsOff ~= nil and status.controlsOff.rollover == true,
         targetHostile = target ~= nil and target.hostile,
         target = target,
         lines = lit,

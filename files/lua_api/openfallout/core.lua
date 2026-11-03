@@ -1648,6 +1648,8 @@
 -- @field #string sneak What the characters around make of the player: "hidden", "caution", "detected" or "danger".
 -- @field #string sneakText The word the games print for it.
 -- @field #boolean weaponDrawn
+-- @field #table controlsOff The controls that DisablePlayerControls took away, true for each that is off: `movement`,
+-- `pipboy`, `fighting`, `pointOfView`, `looking`, `rollover` and `sneaking`.
 -- @field #list<#string> crippled The textures (names under Interface\Stats) of the limbs that are crippled.
 
 ---

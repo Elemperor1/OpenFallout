@@ -78,7 +78,8 @@ namespace OFLua
 
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the
-        // textures (names under Interface\Stats) of the limbs that are crippled, and whether the weapon is drawn
+        // textures (names under Interface\Stats) of the limbs that are crippled, whether the weapon is drawn and the
+        // controls that are off
         api["status"] = [lua]() {
             const OFScript::FalloutScripts::HudStatus status = scripts().hudStatus();
             sol::table row(lua, sol::create);
@@ -88,6 +89,15 @@ namespace OFLua
             row["sneak"] = sneakName(status.mSneak);
             row["sneakText"] = status.mSneakText;
             row["weaponDrawn"] = status.mWeaponDrawn;
+            // The controls a script took away (DisablePlayerControls): the display shows less while the player cannot
+            // move (the executable's mode 0xC: only the radiation, the experience and the messages), and no text under
+            // the crosshair while the rollover is off
+            sol::table controls(lua, sol::create);
+            static constexpr const char* controlNames[]
+                = { "movement", "pipboy", "fighting", "pointOfView", "looking", "rollover", "sneaking" };
+            for (std::size_t control = 0; control < FalloutScript::playerControlCount; ++control)
+                controls[controlNames[control]] = (status.mControlsOff & (1u << control)) != 0;
+            row["controlsOff"] = controls;
             sol::table limbs(lua, sol::create);
             int index = 1;
             for (const std::string& limb : status.mCrippled)

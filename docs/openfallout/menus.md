@@ -648,7 +648,12 @@ its older drawing for a data folder that lacks the file.
   at its natural size from that texel on, going on at the left edge when it runs past the right one). The marks of places
   (quest, landmark, characters) are made from the templates and put by their `_Heading`. How the games scroll the strip was
   not read; the scroll and the 120 degrees the engine marks places in are the port's.
-- When a window is open only the messages are shown, and nothing while the player is dead.
+- When a window is open only the messages are shown, and nothing while the player is dead. The executable picks what the
+  display shows by a mode of 17 bits, and a script that holds the player still (`DisablePlayerControls` on movement, Mac round
+  12AM B5) puts it in mode 0xC: only the radiation, the experience bar, the messages, the subtitles and the quest reminder
+  stay, and the health, the action points, the crosshair, the sneak meter, the limbs and the enemy bar are hidden. A
+  script that disables rollover hides the text under the crosshair. `core.hud.status` has the disabled controls
+  (`controlsOff`); `falloutstatus.lua` turns them into `scripted` and `rolloverOff`.
 - Not drawn: the text under the crosshair (`Info`), the armour icons, the weapon's name and condition, the place's name that
   shows on entering, subtitles, the hot keys, the needs of hardcore mode, the breath meter and the quest reminder; the weapon's
   rounds show the rounds carried, as the engine has no clip. Mac round 12AM B2 read the text under the crosshair (name, verb,

@@ -85,6 +85,7 @@ namespace OFScript
         HudStatus status;
         status.mRads = mActorValues.current(mPlayer, 54);
         status.mRadsMax = gameSetting("fRadiationMax", 1000);
+        status.mControlsOff = mControlsOff.load();
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         status.mSneaking = !player.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(player);
         if (status.mSneaking != mSneakingLogged)

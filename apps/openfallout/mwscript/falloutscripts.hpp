@@ -944,6 +944,9 @@ namespace OFScript
             /// The names of the textures of the limbs that are crippled (under Interface\Stats)
             std::vector<std::string> mCrippled;
             bool mWeaponDrawn = false;
+            /// The controls that DisablePlayerControls took away, one bit for each in the order of
+            /// FalloutScript::PlayerControl
+            unsigned mControlsOff = 0;
         };
         HudStatus hudStatus();
         /// The character or creature that the crosshair is on: its name, health and whether it fights the player. False
