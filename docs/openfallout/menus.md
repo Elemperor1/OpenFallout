@@ -282,7 +282,10 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   Fallout 3's `ShowMessage` (0x53dd40) and message menu (key handler 0x6694d0, creator 0x6698e0) are the same code with
   other addresses (round 12AG, A2): the same flag bit, 10 slots, one-space blank for a failed button, 'OK' when none passes,
   kind 0x17, the same three key rules and `&` handling; the only difference is five button tiles instead of six.
-- `_background_fill_alpha` is 32 in `globals.xml`; there is no setting for it.
+- The background of the box is the file's `solid_black.dds` tile with the alpha `_background_fill_alpha` (32 in `globals.xml`),
+  and when a menu is already open under the box (the Pip-Boy, the dialogue, a container, barter...) the code writes its
+  alpha as the setting `fPopUpBackgroundOpacity` times 255 (the INI of both games has 0.87, the executable's own default is
+  1.0; FalloutNV.exe 0x7a8d10, round 12AG); the brightness is never written. The script does the same over an open screen.
 - The box is modal, as the games' (`stackingtype` is `no_click_past`): a widget the size of the screen under it takes the
   pointer, and the Pip-Boy, level-up, dialogue, container, crafting, VATS, lock and character-making screens leave the
   keys, the pad and the wheel to the box while it is up (`I.FalloutMessage.isOpen()`, true for a box in the engine's own

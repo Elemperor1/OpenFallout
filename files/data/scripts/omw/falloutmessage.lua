@@ -25,6 +25,8 @@ end
 messagebox.claim(true)
 
 local FILE = 'message_menu.xml'
+-- The opacity of the background of a box over another menu when no setting says (the INI of both games)
+local POPUP_OPACITY = 0.87
 -- Font 2 is the text of the box and the buttons, font 6 its title
 local TEXT_FONT, TITLE_FONT = 2, 6
 -- What the code adds to the width of the widest title and to that of the widest button
@@ -196,6 +198,12 @@ local function show(box)
         return
     end
     serial, current, openFor, answered = box.serial, box, 0, false
+    -- Over a screen that is open the box's background is almost opaque: the game's code writes the alpha of the file's
+    -- background tile as the setting fPopUpBackgroundOpacity (0.87 in the INI of both games) when a menu is open under
+    -- the box (FalloutNV.exe 0x7a8d10, round 12AG); over the plain world the file's own alpha stays
+    if I.UI.getMode() ~= nil then
+        shown:set('MM_Background', 'alpha', (core.pipboy.setting('fPopUpBackgroundOpacity') or POPUP_OPACITY) * 255)
+    end
     -- With nothing open the world stops and the pointer shows; over a screen that is open the box is just on top
     if I.UI.getMode() == nil then
         I.UI.addMode('Interface', { windows = {} })
