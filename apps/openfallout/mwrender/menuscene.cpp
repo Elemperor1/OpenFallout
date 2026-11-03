@@ -359,6 +359,10 @@ namespace OFRender
         auto model = std::make_unique<Model>();
         model->mRoot = new osg::MatrixTransform;
         model->mRoot->setName(name);
+        // The point lights that a script adds (addLight) reach a model through the light list that this callback makes for
+        // its subgraph, as the objects of the world have it; without it only the sunlight (ambient and directional) lights
+        // the model (the lock was black in the first run, Mac round 12AK)
+        model->mRoot->addCullCallback(new SceneUtil::LightListCallback);
         model->mRoot->addChild(instance);
         model->mInstance = instance;
 

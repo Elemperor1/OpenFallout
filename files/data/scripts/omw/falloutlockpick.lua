@@ -182,8 +182,10 @@ end
 -- The sounds of the events, and what the events change outside the screen
 local function handle(report)
     for _, event in ipairs(report.events) do
-        trace(string.format('event %s (pick %.1f, angle %.1f, state %s, picks %d)', event, report.pick, report.angle,
-            report.state, report.picks))
+        if event ~= 'move' then
+            trace(string.format('event %s (pick %.1f, angle %.1f, state %s, picks %d)', event, report.pick, report.angle,
+                report.state, report.picks))
+        end
         local sound = SOUNDS[event]
         if sound then
             shown:playSound(sound)

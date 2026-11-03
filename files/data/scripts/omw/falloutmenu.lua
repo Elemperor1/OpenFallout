@@ -427,7 +427,6 @@ function module.open(file, options)
                 shown.pointer = { x = e.offset.x, y = e.offset.y, startX = shown.pointer and shown.pointer.startX,
                     startY = shown.pointer and shown.pointer.startY }
                 local over = shown.menu:pointerMoved(e.offset.x, e.offset.y)
-                shown.over = over
                 -- The pointer comes to a tile that has a sound for it (not again for each box inside the same button)
                 local sound, owner = soundOf(shown.menu, over, 'mouseoversound')
                 if owner ~= shown.soundOwner then
