@@ -4,6 +4,7 @@
 
 #include "actors.hpp"
 #include "arguments.hpp"
+#include "wear.hpp"
 
 namespace FalloutScript
 {
@@ -174,6 +175,10 @@ namespace FalloutScript
         const int copy = chooseCopy(actor, item, condition >= 0 ? condition : (on ? conditionOn(worn, item) : -1));
         if (condition >= 0 && copy != condition)
             return Outcome::NotCarried;
+        // A weapon or a piece of armor with no health left does not go on (one that is on and breaks stays on)
+        if ((info.mKind == ItemKind::Weapon || info.mKind == ItemKind::Armor) && copy <= 0
+            && !(on && conditionOn(worn, item) == copy))
+            return Outcome::Broken;
         switch (info.mKind)
         {
             case ItemKind::Weapon:
@@ -339,36 +344,46 @@ namespace FalloutScript
         return held != 0 && mRecords.itemInfo(held, info) ? info.mAnimationType : 0;
     }
 
-    namespace
+    std::vector<Equipment::WornPiece> Equipment::wornArmor(FormId actor)
     {
-        template <class Pick>
-        double sumOfWornArmor(ItemRecords& records, const std::vector<FormId>& armor, Pick pick)
+        std::vector<WornPiece> pieces;
+        if (actor == 0)
+            return pieces;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        for (const FormId item : worn.mArmor)
+            pieces.push_back({ item, conditionOn(worn, item) });
+        return pieces;
+    }
+
+    template <class Pick>
+    double Equipment::sumOfWornArmor(FormId actor, Pick pick)
+    {
+        double total = 0;
+        for (const WornPiece& piece : wornArmor(actor))
         {
-            double total = 0;
-            for (const FormId item : armor)
-            {
-                ItemInfo info;
-                if (records.itemInfo(item, info))
-                    total += pick(info);
-            }
-            return total;
+            ItemInfo info;
+            if (mRecords.itemInfo(piece.mItem, info))
+                total += pick(info) * Wear::armorFactor(static_cast<double>(piece.mCondition) / ActorState::fullCondition);
         }
+        return total;
     }
 
     double Equipment::armorRating(FormId actor)
     {
-        return sumOfWornArmor(mRecords, armor(actor), [](const ItemInfo& info) { return info.mRating; });
+        return sumOfWornArmor(actor, [](const ItemInfo& info) { return info.mRating; });
     }
 
     double Equipment::damageThreshold(FormId actor)
     {
-        return sumOfWornArmor(mRecords, armor(actor), [](const ItemInfo& info) { return info.mThreshold; });
+        return sumOfWornArmor(actor, [](const ItemInfo& info) { return info.mThreshold; });
     }
 
     double Equipment::upperBodyRating(FormId actor)
     {
-        return sumOfWornArmor(mRecords, armor(actor),
-            [](const ItemInfo& info) { return (info.mSlots & BipedSlot::upperBody) != 0 ? info.mRating : 0.0; });
+        return sumOfWornArmor(
+            actor, [](const ItemInfo& info) { return (info.mSlots & BipedSlot::upperBody) != 0 ? info.mRating : 0.0; });
     }
 
     bool Equipment::inventoryWeight(FormId actor, double& weight)

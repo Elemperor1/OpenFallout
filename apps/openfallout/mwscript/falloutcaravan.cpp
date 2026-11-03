@@ -268,7 +268,8 @@ namespace OFScript
         if (!mCaravan || mCaravan->mStage != CaravanStage::Deck)
             return false;
         // As many cards as the least deck for a player that has no more than that, else a number from that to the
-        // number of cards it has (the game picks it as 0x944460(30, count), the top excluded; 0x748A5B)
+        // number of cards it has less one (the game picks it as 0x944460(30, count), the top excluded, 0x748B60; Mac round
+        // 12AX R6), and no cap of the most a deck takes: that is checked only when a card is added
         std::vector<CaravanSession::Owned>& owned = mCaravan->mOwned;
         const int count = static_cast<int>(owned.size());
         const int take
@@ -278,7 +279,7 @@ namespace OFScript
         std::shuffle(order.begin(), order.end(), mCaravanRandom);
         for (CaravanSession::Owned& card : owned)
             card.mInDeck = false;
-        for (int pick = 0; pick < take && pick < count && pick < mostDeck; ++pick)
+        for (int pick = 0; pick < take && pick < count; ++pick)
             owned[static_cast<std::size_t>(order[static_cast<std::size_t>(pick)])].mInDeck = true;
         return true;
     }

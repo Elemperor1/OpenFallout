@@ -38,6 +38,8 @@ namespace FalloutScript
         double mThreshold = 0;
         /// What one of the item weighs
         double mWeight = 0;
+        /// Weapons and armor: the most health a copy has (the record's health; 0 for an item that does not wear out)
+        double mHealth = 0;
     };
 
     /// The biped flags that armor covers a body part with that the rest of this component has to know by name
@@ -92,6 +94,7 @@ namespace FalloutScript
             AlreadyEquipped,
             NotCarried, // the character does not have the item
             NotEquippable, // no weapon, armor or ammunition
+            Broken, // the copy has no health left (the executable's EquipItem refuses it: sCantEquipBrokenItem)
         };
 
         /// Puts the item on. A weapon takes the place of the weapon held, armor the place of the armor that covers
@@ -115,10 +118,19 @@ namespace FalloutScript
         FormId ammo(FormId actor);
         std::vector<FormId> armor(FormId actor);
 
+        /// The armor worn with the condition of the copy that is on, in the order it was put on
+        struct WornPiece
+        {
+            FormId mItem = 0;
+            int mCondition = 1000;
+        };
+        std::vector<WornPiece> wornArmor(FormId actor);
+
         /// The animation type of the weapon held (0, hands, for none)
         std::uint32_t weaponAnimationType(FormId actor);
 
-        /// The rating and damage threshold of all that is worn, and of what covers the upper body
+        /// The rating and damage threshold of all that is worn, and of what covers the upper body. A piece that is worn
+        /// below half its health gives less (`Wear::armorFactor`).
         double armorRating(FormId actor);
         double damageThreshold(FormId actor);
         double upperBodyRating(FormId actor);
@@ -170,6 +182,10 @@ namespace FalloutScript
         int chooseCopy(FormId actor, FormId item, int asked);
 
         void noteChange(FormId actor, FormId item, bool worn);
+
+        /// What a quantity of each piece of armor is, with the piece's condition in it, added up
+        template <class Pick>
+        double sumOfWornArmor(FormId actor, Pick pick);
 
         ItemRecords& mRecords;
         ActorState& mState;

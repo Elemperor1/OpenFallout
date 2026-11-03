@@ -39,6 +39,7 @@
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
+#include <components/falloutscript/wear.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/detection.hpp>
 #include <components/falloutscript/dialogue.hpp>
@@ -1825,11 +1826,24 @@ namespace OFScript
         bool essentialByRecord(FalloutScript::FormId actor) override;
         std::optional<FalloutScript::CombatState::Relation> recordedRelation(
             FalloutScript::FormId first, FalloutScript::FormId second) override;
-        /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none
-        FalloutScript::WeaponDamage describeWeapon(FalloutScript::FormId weapon, FalloutScript::FormId attacker);
+        /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
+        /// condition of the weapon is the one of the copy in the hands (`condition`, in tenths of a percent, names another)
+        FalloutScript::WeaponDamage describeWeapon(
+            FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition = -1);
         /// The damage of one shot (one pellet of a shotgun) of the weapon in the hands of the player as the card of
-        /// the item tells it: the damage of the record with the skill, the condition and the perks of the player
-        double weaponCardDamage(FalloutScript::FormId weapon);
+        /// the item tells it: the damage of the record with the skill, the condition (of the copy named, in tenths of a
+        /// percent) and the perks of the player
+        double weaponCardDamage(FalloutScript::FormId weapon, int condition = FalloutScript::ActorState::fullCondition);
+        /// What wears items out, from the game's settings
+        const FalloutScript::Wear::Settings& wearSettings();
+        /// The effects of the ammunition of one kind (the kinds of AMEF: 0 damage, 1 resistance, 2 threshold, 3 spread, 4
+        /// condition, 5 fatigue) applied to a number, in the order the ammunition lists them
+        double applyAmmoEffects(FalloutScript::FormId ammo, std::uint32_t kind, double value);
+        /// A weapon that the player fires loses health (a shot, a swing), an armor piece that is hit loses health; the
+        /// copy that is on takes it, and the player is told when it is nearly gone and when it is
+        void wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats, bool vats);
+        void wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance);
+        void wearItem(FalloutScript::FormId holder, FalloutScript::FormId item, double points, double maxHealth);
         /// Whether the weapon takes the ammunition (the one of its record, or one of its list of them)
         bool weaponTakesAmmo(const ESM4::Weapon& weapon, FalloutScript::FormId ammo);
         /// The ammunition a weapon in the hands of the holder shoots: the one chosen when the weapon takes it, else
@@ -2283,6 +2297,10 @@ namespace OFScript
         std::mutex mDerivedSettingsMutex;
         std::optional<FalloutScript::DerivedStatSettings> mDerivedSettings;
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
+        std::optional<FalloutScript::Wear::Settings> mWearSettings;
+        /// What is left of the tenth of a percent that an item lost, for the next time (holder, item)
+        std::mutex mWearMutex;
+        std::map<std::pair<FalloutScript::FormId, FalloutScript::FormId>, double> mWearRemainders;
         std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)

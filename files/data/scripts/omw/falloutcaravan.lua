@@ -38,9 +38,7 @@ local RECTS = { bet = 'CBM_MainRect', deck = 'CDM_MainRect', game = 'CDG_MainRec
 local FONT = 7
 local CARD_W, CARD_H = 72, 100
 local ROWS, TRACKS = 7, 6
--- Seconds between the end of the match and its result (the table plays its 2.0 s sequence, and a key does nothing; the
--- executable's state 3 at 0x741F8C), and between the player's move and the opponent's
-local RESULT_DELAY = 2.0
+-- Seconds between the player's move and the opponent's
 local OPPONENT_DELAY = 1.0
 local MARK_TIME = 1.6
 
@@ -83,8 +81,7 @@ local opponentWait = 0
 local lastMove = nil
 local markLeft = 0
 local statusText = ''
--- The seconds left before the result is shown, and the seconds the result has been shown
-local resultIn = nil
+-- The seconds the result has been shown
 local resultAge = nil
 
 local function word(setting, fallback)
@@ -114,7 +111,7 @@ local function destroyMenu()
     shown, drawn, lastWidth = nil, nil, nil
     deckTiles, gameTiles = nil, nil
     activeList, cursor, firstShown = 'all', { deck = 1, all = 1 }, { deck = 1, all = 1 }
-    pickedHand, discarding, lastMove, resultIn, resultAge = nil, false, nil, nil, nil
+    pickedHand, discarding, lastMove, resultAge = nil, false, nil, nil
     opponentWait, markLeft, statusText = 0, 0, ''
 end
 
@@ -615,8 +612,7 @@ local function afterMove()
     opponentWait = 0
     local board = caravan.board()
     if board and board.over then
-        -- (the words of the result are the ones the executable writes when the match ends, 0x740980)
-        setStatus(board.won and word('sCaravanYouWinText', 'You win') or word('sCaravanYouLoseText', 'You lose'))
+        setStatus(board.won and 'You won the match.' or 'You lost the match.')
     elseif board and board.playersTurn then
         setStatus(board.phase == 'start' and 'Put a number card on each of your caravans.' or 'Your move.')
     else
@@ -751,10 +747,11 @@ end
 -- ---- The result -------------------------------------------------------------------------------------------------------------
 
 -- The result is the file's: the money won and lost and the matches won over lost in all, the biggest ante, and under them the
--- words that ask for a key. The executable shows the screen only when the table's sequence of 2.0 s is over, and writes those
--- words then (0x7420B2); from then on any key closes it, while a click or the pad's B waits for another second (the busy flag
--- of the menu clears when the screen has been up for 1.0 s, 0x749360)
-local CLICK_AFTER = 1.0
+-- words of the result. The executable shows the screen at once when the match ends (0x740980) with "You win" or "You lose",
+-- while the table plays a sequence of 2.0 s, and writes the words that ask for a key over them when it is over (0x7420B2).
+-- Keys before that do nothing; from then on any key closes it (0x749360). A click on the screen does nothing, ever; the
+-- pad's B closes it a second later (the busy flag of the menu), which the engine's own B does at once.
+local PRESS_KEY_AFTER = 2.0
 
 local function drawResults(screen)
     shown:batch(function()
@@ -764,7 +761,15 @@ local function drawResults(screen)
         setDisplay('CRM_LargestWinning', nil, screen.biggestAnte)
         local info = shown:find('CRM_Info')
         if info then
-            shown:set(info, 'string', word('sCaravanPressAnyKeyText', 'Press any key to continue'))
+            local text
+            if resultAge ~= nil and resultAge >= PRESS_KEY_AFTER then
+                text = word('sCaravanPressAnyKeyText', 'Press any key to continue')
+            elseif screen.won then
+                text = word('sCaravanYouWinText', 'You win')
+            else
+                text = word('sCaravanYouLoseText', 'You lose')
+            end
+            shown:set(info, 'string', text)
         end
     end)
 end
@@ -882,12 +887,8 @@ local function sync()
     end
     lastWidth = width
     if screen.stage ~= drawn then
-        -- The match is over: the board stays a moment, then the result
-        if screen.stage == 'results' and drawn == 'game' then
-            resultIn = resultIn or RESULT_DELAY
-        else
-            enterStage(screen)
-        end
+        -- (the match is over: the result is shown at once, as the executable does)
+        enterStage(screen)
     end
 end
 
@@ -897,16 +898,12 @@ local function stepFrame(dt)
         if markLeft <= 0 and drawn == 'game' then drawGame() end
     end
     if resultAge ~= nil and drawn == 'results' then
+        local before = resultAge
         resultAge = resultAge + dt
-    end
-    if resultIn then
-        resultIn = resultIn - dt
-        if resultIn <= 0 then
-            resultIn = nil
+        if before < PRESS_KEY_AFTER and resultAge >= PRESS_KEY_AFTER then
             local screen = caravan.screen()
-            if screen then enterStage(screen) end
+            if screen then drawResults(screen) end
         end
-        return
     end
     if drawn == 'game' then
         local board = caravan.board()
@@ -941,11 +938,9 @@ local function pressLetter(letter)
 end
 
 -- R leaves at once on the deck (and is the Exit button of the stake and the Cancel button of the match), any key on the result
--- closes it (the executable's key handler, 0x749360, takes every key there, at once when the words that ask for a key are up;
--- before that, while the table plays its sequence after the match, the keys do nothing)
+-- closes it once the words that ask for a key are up
 local function press(code, symbol)
     if not shown or I.UI.getMode() ~= 'Interface' or messageOpen() then return end
-    if resultIn then return end
     if quantity.isOpen() then
         quantity.press(code, symbol)
         return
@@ -981,17 +976,16 @@ local function press(code, symbol)
     elseif drawn == 'game' then
         pressLetter(letter)
     elseif drawn == 'results' then
-        leave()
+        if resultAge ~= nil and resultAge >= PRESS_KEY_AFTER then leave() end
     end
 end
 
 -- On the pad the buttons are the ones the files name, but A, which the engine clicks with where the pointer is (a second
 -- meaning would act twice): the stake has X Raise, Y Accept and B Exit; the deck has the right bumper for the button that
 -- makes a deck, X Remove and Y Play Caravan (Add is A); the match has the bumpers for the triggers (left Discard Card, right
--- Discard Caravan); A closes the result a second after it came up (the executable's click, 0x749360). B is the engine's: it
--- leaves the screen, which on the deck and the result is what the executable does with it too, and on the match is a forfeit
--- (the executable cancels the picked card, or asks sQuitCaravanText; the engine has no way yet for a screen of a script to
--- keep the button)
+-- Discard Caravan). B is the engine's: it leaves the screen, which on the deck and the result is what the executable does
+-- with it too, and on the match is a forfeit (the executable cancels the picked card, or asks sQuitCaravanText; the engine
+-- has no way yet for a screen of a script to keep the button)
 local function onPad(button)
     if not shown or I.UI.getMode() ~= 'Interface' or quantity.isOpen() or messageOpen() then return end
     local B = input.CONTROLLER_BUTTON
@@ -1004,9 +998,6 @@ local function onPad(button)
         if button == B.DPadRight then moveCursor(1) return end
     elseif drawn == 'game' then
         names = { [B.LeftShoulder] = 'CGM_DiscardCardButton', [B.RightShoulder] = 'CGM_DiscardTrackButton' }
-    elseif drawn == 'results' and button == B.A then
-        if resultAge ~= nil and resultAge >= CLICK_AFTER then leave() end
-        return
     end
     local name = names and names[button]
     if name then
