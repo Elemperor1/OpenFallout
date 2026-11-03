@@ -72,6 +72,16 @@ local MENU_HEIGHT = 960
 -- How long the game waits for the picture before it runs without it
 local SCENE_WAIT = 2.0
 
+-- The screen has not been seen in the running game: what it does is written to the log, the events and the changes of
+-- the state of the game, and the first seconds of what the mouse and the keys gave it
+local traced, traceLimit = 0, 300
+local function trace(text)
+    if traced < traceLimit then
+        traced = traced + 1
+        print('Lockpick: ' .. text .. (traced == traceLimit and ' (further events are not logged)' or ''))
+    end
+end
+
 local shown, scene, game, options = nil, nil, nil, nil
 local serial = nil
 -- The width of the meter, the pin that was drawn last, the cursor, the wait for the key that opened the lock
@@ -172,6 +182,8 @@ end
 -- The sounds of the events, and what the events change outside the screen
 local function handle(report)
     for _, event in ipairs(report.events) do
+        trace(string.format('event %s (pick %.1f, angle %.1f, state %s, picks %d)', event, report.pick, report.angle,
+            report.state, report.picks))
         local sound = SOUNDS[event]
         if sound then
             shown:playSound(sound)
@@ -250,10 +262,16 @@ local function activateHeld()
     return input.ACTION ~= nil and input.isActionPressed(input.ACTION.Activate)
 end
 
+local lastState, frames = nil, 0
 local function frame(seconds)
     shown:checkSize()
     local pictured = scene:update()
     updateCursor()
+    frames = frames + 1
+    if pictured and not drawn.pictured then
+        drawn.pictured = true
+        trace(string.format('the picture is on the screen after %d frames', frames))
+    end
     if not pictured and waitedForScene < SCENE_WAIT then
         -- The picture is not on the screen yet: the lock has not flown in
         waitedForScene = waitedForScene + seconds
@@ -268,6 +286,12 @@ local function frame(seconds)
         move = waitRelease and 0 or moveInput(seconds),
         turn = waitRelease and 0 or turnInput(),
     }
+    if report.state ~= lastState then
+        lastState = report.state
+        trace(string.format('state %s (pick %.1f of %.0f, mouse %.2f, turn %.1f, lock %s %.2f, pin %s %.2f)', report.state,
+            report.pick, meter, waitRelease and 0 or moveInput(0), waitRelease and 0 or turnInput(), report.lockSequence,
+            report.lockTime, report.pinSequence, report.pinTime))
+    end
     draw(report)
     handle(report)
 end
@@ -317,6 +341,9 @@ function module.start(lock, opts)
 
     shown, scene, options, serial, meter = opened, made, opts or {}, lock.serial, width
     drawn, waitedForScene, waitRelease = {}, 0, true
+    lastState, frames = nil, 0
+    trace(string.format('opened for class %s, skill %.0f, %d pins, meter %.0f units, window %dx%d', tostring(lock.class),
+        lock.skill, lock.pins, width, ui.screenSize().x, ui.screenSize().y))
     setUpScene(ui.screenSize())
     game = core.lockpick.new { class = lock.class, skill = lock.skill, picks = lock.pins, meter = meter }
 

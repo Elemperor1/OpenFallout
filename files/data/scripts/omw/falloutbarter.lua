@@ -379,10 +379,34 @@ local focusSide = nil
 -- code sets it). Two hotrects, each over one half of the menu (alpha 0, on top of the lists), are targets only for the half
 -- that is not selected, and "mousing over them switches the focus": until the pointer has come to the half it is on, the
 -- list below cannot be hovered or clicked. The keys that go to the other list switch it too (Mac round 12AI B8).
+-- What the focus does is written to the log for the first events, to find out why the player's list took no pointer in
+-- the running game while the offline run of the same code (the real menu code under a mock of the engine) did (Mac round
+-- 12AJ C): the value the file reads, the targets of the two rects and what the two lists answer
+local traced, traceLimit = 0, 120
+local function trace(text)
+    if traced < traceLimit then
+        traced = traced + 1
+        print('Barter focus: ' .. text .. (traced == traceLimit and ' (further events are not logged)' or ''))
+    end
+end
+
+local function readTrait(tile, trait)
+    local ok, value = pcall(shown.get, shown, tile, trait)
+    return ok and tostring(value) or 'error'
+end
+
+local function traceState(text)
+    trace(string.format('%s: io=%s, items rect target=%s, container rect target=%s, items list enabled=%s, container list enabled=%s',
+        text, tostring(shown.menu:getNumber(shown.menu:root(), '_IsContainerListSelected')),
+        readTrait('BM_Items_FocusRect', 'target'), readTrait('BM_Container_FocusRect', 'target'),
+        readTrait('BM_Items_InventoryList', '_enabled'), readTrait('BM_Container_InventoryList', '_enabled')))
+end
+
 local function setListFocus(name)
     if not shown or listFocus == name then return end
     listFocus = name
     shown:io('_IsContainerListSelected', name == 'vendor' and 1 or 0)
+    traceState('focus ' .. name)
     -- The pointer is over the list now, not over the rect that was in the way
     local at = shown:pointerAt()
     if at then
@@ -391,8 +415,19 @@ local function setListFocus(name)
     end
 end
 
+local lastOverName = nil
 local function followPointer()
     if not shown then return end
+    if shown.over ~= nil then
+        local ok, name = pcall(shown.menu.name, shown.menu, shown.over)
+        name = ok and name or '?'
+        if name ~= lastOverName and (name:find('^BM_Items') or name:find('^BM_Container') or name:find('FocusRect')) then
+            lastOverName = name
+            traceState('pointer over ' .. name .. ' (list focus ' .. tostring(listFocus) .. ', items rect mouseover '
+                .. readTrait('BM_Items_FocusRect', 'mouseover') .. ', container rect mouseover '
+                .. readTrait('BM_Container_FocusRect', 'mouseover') .. ')')
+        end
+    end
     if shown:get('BM_Items_FocusRect', 'mouseover') == 1 then
         setListFocus('player')
     elseif shown:get('BM_Container_FocusRect', 'mouseover') == 1 then
