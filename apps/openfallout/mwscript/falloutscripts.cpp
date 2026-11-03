@@ -571,6 +571,8 @@ namespace OFScript
             // the game that is gone. The numbers go on, so that a screen of that game is not taken for one of the next.
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
+            mLockExperienceGiven.clear();
+            mLockBroken.clear();
             mTerminal.reset();
             mTerminalLockouts.clear();
             mHackGate = 0;
@@ -1364,6 +1366,26 @@ namespace OFScript
         // closing by time follows: a box with no button has the button "OK" and stays until it is picked
         // The count is up at once, so that MenuMode tells of the box also when this runs on another thread and the box
         // is queued in the next frame
+        ++mMessageBoxCount;
+        runOnMainThread([this, box = std::move(box)]() mutable {
+            mMessageQueue.push_back(std::move(box));
+            updateMessageBoxes();
+        });
+    }
+
+    void FalloutScripts::showNotice(const std::string& text, double seconds)
+    {
+        if (text.empty())
+            return;
+        MessageBox box;
+        box.mPlainText = text;
+        box.mText = escapeTags(text);
+        box.mBody = text;
+        if (seconds > 0)
+        {
+            box.mTimed = true;
+            box.mTime = seconds;
+        }
         ++mMessageBoxCount;
         runOnMainThread([this, box = std::move(box)]() mutable {
             mMessageQueue.push_back(std::move(box));
@@ -3483,7 +3505,8 @@ namespace OFScript
             mSoundNamesBuilt = true;
             for (const ESM4::Sound& sound : mStore.get<ESM4::Sound>())
                 if (!sound.mEditorId.empty())
-                    mSoundNames.emplace(Misc::StringUtils::lowerCase(sound.mEditorId), sound.mId.toUint32());
+                    // The executable's table of editor ids keeps the last form put in under a name (Mac round 12AI A4)
+                    mSoundNames[Misc::StringUtils::lowerCase(sound.mEditorId)] = sound.mId.toUint32();
         }
         const auto found = mSoundNames.find(Misc::StringUtils::lowerCase(name));
         return found != mSoundNames.end() ? found->second : 0;

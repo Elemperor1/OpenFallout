@@ -30,9 +30,11 @@
 #include "hudbindings.hpp"
 #include "interactbindings.hpp"
 #include "landbindings.hpp"
+#include "lockpickbindings.hpp"
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
 #include "menubindings.hpp"
+#include "menuscenebindings.hpp"
 #include "messagebindings.hpp"
 #include "pipboybindings.hpp"
 #include "regionbindings.hpp"
@@ -133,6 +135,10 @@ namespace OFLua
                 "openfallout_core_chargen", [context]() { return initCoreChargenBindings(context); });
             api["messageBox"] = context.cachePackage(
                 "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
+            api["lockpick"] = context.cachePackage(
+                "openfallout_core_lockpick", [context]() { return initCoreLockpickBindings(context); });
+            api["menuScene"] = context.cachePackage(
+                "openfallout_core_menuscene", [context]() { return initCoreMenuSceneBindings(context); });
             api["combat"] = context.cachePackage(
                 "openfallout_core_combat", [context]() { return initCoreCombatBindings(context); });
             api["hud"]

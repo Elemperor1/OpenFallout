@@ -45,6 +45,8 @@ local ARROW_BUY, ARROW_SELL = 1, 2
 local DIM_ALPHA, FULL_ALPHA = 64, 255
 
 local shown, sides = nil, nil
+-- The list that has the focus, 'player' or 'vendor' (see setListFocus)
+local listFocus = nil
 local modeOpen = false
 local shownSerial = nil
 local active = 'player'
@@ -115,6 +117,7 @@ end
 
 local function destroyMenu()
     quantity.close()
+    listFocus = nil
     if shown then
         shown:close()
         shown, sides, cardSide, cardRow = nil, nil, nil, nil
@@ -371,6 +374,31 @@ end
 
 -- The cards of the thing the pointer (or the pick) is on: the list that was moved last
 local focusSide = nil
+
+-- Which list has the pointer: the file's `_IsContainerListSelected` is 0 for the player's list and 1 for the vendor's (the
+-- code sets it). Two hotrects, each over one half of the menu (alpha 0, on top of the lists), are targets only for the half
+-- that is not selected, and "mousing over them switches the focus": until the pointer has come to the half it is on, the
+-- list below cannot be hovered or clicked. The keys that go to the other list switch it too (Mac round 12AI B8).
+local function setListFocus(name)
+    if not shown or listFocus == name then return end
+    listFocus = name
+    shown:io('_IsContainerListSelected', name == 'vendor' and 1 or 0)
+    -- The pointer is over the list now, not over the rect that was in the way
+    local at = shown:pointerAt()
+    if at then
+        shown.menu:pointerMoved(at.x, at.y)
+        shown:refresh()
+    end
+end
+
+local function followPointer()
+    if not shown then return end
+    if shown:get('BM_Items_FocusRect', 'mouseover') == 1 then
+        setListFocus('player')
+    elseif shown:get('BM_Container_FocusRect', 'mouseover') == 1 then
+        setListFocus('vendor')
+    end
+end
 local function updateCards()
     if not shown then return end
     for name, side in pairs(sides) do
@@ -414,7 +442,7 @@ end
 local function press(code, symbol)
     if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then return end
     if quantity.isOpen() then
-        quantity.press(code)
+        quantity.press(code, symbol)
         return
     end
     local arrow = code == input.KEY.UpArrow or code == input.KEY.DownArrow or code == input.KEY.LeftArrow
@@ -425,6 +453,7 @@ local function press(code, symbol)
         for _, name in ipairs({ 'player', 'vendor' }) do
             if sides[name].list.count() > 0 then
                 active, focusSide = name, name
+                setListFocus(name)
                 sides[name].list.select(1, true)
                 shown:playSound(ROW_FOCUS)
                 updateCards()
@@ -439,6 +468,7 @@ local function press(code, symbol)
     if code == input.KEY.LeftArrow or code == input.KEY.RightArrow then
         active = active == 'vendor' and 'player' or 'vendor'
         focusSide = active
+        setListFocus(active)
         local now = sides[active]
         if now.list.count() > 0 and now.list.selected() <= 0 then
             now.list.select(1, true)
@@ -513,10 +543,14 @@ local function sync()
             return
         end
         fillAll()
+        -- The player's list is the one with the focus to begin with (the first arrow key picks its first row)
+        listFocus = nil
+        setListFocus('player')
     end
     if shown then
         shown:checkSize()
         quantity.update()
+        followPointer()
         updateCards()
     end
 end

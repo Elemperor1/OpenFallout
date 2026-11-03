@@ -54,8 +54,8 @@ namespace
     {
         EXPECT_STREQ(lockClassWord(LockClass::VeryEasy), "sLockLevelNameVeryEasy");
         EXPECT_STREQ(lockClassWord(LockClass::Impossible), "sLockLevelNameImpossible");
-        EXPECT_STREQ(lockClassExperience(LockClass::Average), "iXPLevelPickLockAverage");
-        EXPECT_STREQ(lockClassExperience(LockClass::VeryHard), "iXPLevelPickLockVeryHard");
+        EXPECT_STREQ(lockClassExperience(LockClass::Average), "iXPRewardPickLockAverage");
+        EXPECT_STREQ(lockClassExperience(LockClass::VeryHard), "iXPRewardPickLockVeryHard");
         EXPECT_EQ(lockClassExperience(LockClass::Impossible), nullptr);
     }
 

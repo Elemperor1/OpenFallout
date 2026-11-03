@@ -51,6 +51,12 @@ namespace MyGUIPlatform
     {
     }
 
+    OSGTexture::OSGTexture(const std::string& name, osg::Texture2D* texture, osg::StateSet* injectState)
+        : OSGTexture(texture, injectState)
+    {
+        mName = name;
+    }
+
     OSGTexture::~OSGTexture() {}
 
     void OSGTexture::createManual(int width, int height, MyGUI::TextureUsage usage, MyGUI::PixelFormat format)

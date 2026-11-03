@@ -455,8 +455,18 @@ namespace OFScript
             double mSkill = 0;
             double mChance = 0;
             int mSerial = 0;
+            /// The class of the lock (0 very easy to 4 very hard, 5 only a key), the Lockpick skill that is needed to
+            /// try it and the chance, in per cent, to force it
+            int mClass = 0;
+            double mGate = 0;
+            double mForce = 0;
         };
         std::optional<LockScreen> lockScreen();
+        /// What happened on the screen of the lock: "opened" (a pick turned it, or forcing did: the lock is unlocked,
+        /// the experience is given once for the lock and the activation goes on), "pickBroke" (a bobby pin is gone) or
+        /// "forceFailed" (the lock is broken for good and the screen closes). The number of pins the player has left,
+        /// after it, is the result for a broken pin; "" when no lock is open.
+        std::string lockOutcome(const std::string& kind);
         /// The player tries a bobby pin on the lock: "opened", "broke", "nopins" or "keyonly"; empty when no lock is
         /// open. The player is told by the line of messages, and the activation goes on when the lock opens.
         std::string pickLock();
@@ -1603,6 +1613,8 @@ namespace OFScript
         /// Who has whom for an enable parent, read from the records the first time it is asked for
         const FalloutScript::EnableParents& enableParents();
         void tellPlayer(const std::string& text);
+        /// A box with the text and no button of its own: it shows for `seconds` (0 until the player closes it)
+        void showNotice(const std::string& text, double seconds);
 
         /// A message with buttons that waits to be shown, or is on the screen. The buttons are the ones whose
         /// conditions hold, with the number each has in the record.
@@ -1847,6 +1859,9 @@ namespace OFScript
         std::mutex mInteractionMutex;
         std::optional<LockScreen> mLockScreen;
         int mLockSerial = 0;
+        /// The locks that gave their experience, and those that forcing broke (kept for the run, not in saves)
+        std::set<FalloutScript::FormId> mLockExperienceGiven;
+        std::set<FalloutScript::FormId> mLockBroken;
         struct TerminalState
         {
             FalloutScript::FormId mReference = 0;

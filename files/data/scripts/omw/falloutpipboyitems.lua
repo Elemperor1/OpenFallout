@@ -281,10 +281,10 @@ end
 -- What a key does while the page is there: the arrows and pages pick a thing, Enter uses it, D drops it, [ and ] go to
 -- the tab before and after, Backspace closes the keyring. False when the key is not the page's (Left and Right change
 -- the page of the Pip-Boy).
-function module.press(code)
+function module.press(code, symbol)
     if not shown then return false end
     if quantity.isOpen() then
-        return quantity.press(code)
+        return quantity.press(code, symbol)
     end
     local count = list.count()
     local picked = list.selected()

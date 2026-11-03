@@ -3,7 +3,7 @@
 -- what was chosen. It is a module of the screens that ask (the container, the barter, the Pip-Boy), not a script.
 --
 --   quantity.ask(12, function(count) ... end)
---   quantity.isOpen(); quantity.press(keyCode); quantity.update(); quantity.close()
+--   quantity.isOpen(); quantity.press(keyCode, typedLetter); quantity.update(); quantity.close()
 local input = require('openfallout.input')
 
 local menuModule = require('scripts.omw.falloutmenu')
@@ -13,6 +13,9 @@ local module = {}
 local shown = nil
 -- The amount that is chosen, the most there is, and what is done with the amount when it is accepted
 local amount, most, accepted = 1, 1, nil
+-- The step and the jump of the file's comments (user3 and user4), as the code of the game sizes them when the prompt
+-- opens (FalloutNV.exe 0x7ABB00 to 0x7ABC4F, Mac round 12AJ B2): a twentieth of the most, in tens above ten, and a quarter
+local stepSize, jumpSize = 1, 1
 
 function module.isOpen()
     return shown ~= nil
@@ -57,6 +60,11 @@ end
 function module.ask(max, onChosen)
     module.close()
     most = math.max(1, math.floor(max))
+    stepSize = math.max(math.floor(most / 20), 1)
+    if stepSize > 10 then
+        stepSize = stepSize - stepSize % 10
+    end
+    jumpSize = math.max(math.floor(most / 4), 1)
     local opened = menuModule.open('quantity_menu.xml')
     if not opened then
         return false
@@ -65,6 +73,8 @@ function module.ask(max, onChosen)
     -- Setting a tile the file does not have is an error; a menu that cannot show the amount is closed, not left open
     local ready = pcall(opened.batch, opened, function()
         opened:set('QM_AmountMeter', 'user0', most)
+        opened:set('QM_AmountMeter', 'user3', stepSize)
+        opened:set('QM_AmountMeter', 'user4', jumpSize)
         show()
     end)
     if not ready then
@@ -86,19 +96,24 @@ function module.ask(max, onChosen)
     return true
 end
 
--- The keys while the menu is there: the arrows change the amount (the pages by more), Enter says OK
-function module.press(code)
+-- The keys while the menu is there: the arrows change the amount by one (the pages, which are the shoulder buttons of
+-- the pad, by the jump), Enter says OK. The letters the file gives its buttons (A for OK, E for Cancel) click them; the
+-- games take no digits.
+function module.press(code, symbol)
     if not shown then
         return false
+    end
+    if symbol ~= nil and symbol ~= '' and shown:pcButton(symbol) then
+        return true
     end
     if code == input.KEY.LeftArrow then
         change(-1)
     elseif code == input.KEY.RightArrow then
         change(1)
     elseif code == input.KEY.PageUp then
-        change(-5)
+        change(-jumpSize)
     elseif code == input.KEY.PageDown then
-        change(5)
+        change(jumpSize)
     elseif code == input.KEY.Enter then
         accept()
     elseif code == input.KEY.Escape then

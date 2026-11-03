@@ -71,6 +71,7 @@ namespace OFGui
     class ScrollWindow;
     class BookWindow;
     class InventoryWindow;
+    class MenuScenes;
     class ContainerWindow;
     class DialogueWindow;
     class WindowModal;
@@ -159,6 +160,8 @@ namespace OFBase
 
         /// \todo investigate, if we really need to expose every single lousy UI element to the outside world
         virtual OFGui::InventoryWindow* getInventoryWindow() = 0;
+        /// The scenes that menus show (models drawn to a texture)
+        virtual OFGui::MenuScenes* getMenuScenes() = 0;
         virtual OFGui::CountDialog* getCountDialog() = 0;
         virtual OFGui::ConfirmationDialog* getConfirmationDialog() = 0;
         virtual OFGui::TradeWindow* getTradeWindow() = 0;

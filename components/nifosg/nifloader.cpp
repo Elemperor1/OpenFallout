@@ -434,6 +434,38 @@ namespace NifOsg
             }
         }
 
+        /// The nodes that the sequences of the managers move are marked as changing, so that the optimizer keeps them
+        /// as nodes of their own: a node that only a sequence moves (the controller that lists it, a
+        /// NiMultiTargetTransformController, is not run by the engine) would be folded into its parent or its geometry
+        /// as if it never moved, and the sequence would have nothing to drive (the disc of the lock of the lockpicking
+        /// screen did not turn, Mac round 12AM).
+        void keepNodesOfSequences(osg::Node& root) const
+        {
+            struct KeepNodes : osg::NodeVisitor
+            {
+                std::set<std::string> mNames;
+
+                KeepNodes()
+                    : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+                {
+                }
+
+                void apply(osg::Transform& node) override
+                {
+                    if (!node.getName().empty() && mNames.contains(Misc::StringUtils::lowerCase(node.getName())))
+                        node.setDataVariance(osg::Object::DYNAMIC);
+                    traverse(node);
+                }
+            } visitor;
+
+            for (const Nif::NiControllerSequence* seq : mEmbeddedSequences)
+                for (const Nif::ControlledBlock& block : seq->mControlledBlocks)
+                    if (!block.mInterpolator.empty() && !block.mNodeName.empty())
+                        visitor.mNames.insert(Misc::StringUtils::lowerCase(block.mNodeName));
+            if (!visitor.mNames.empty())
+                root.accept(visitor);
+        }
+
         /// The sequences that the managers of the file list, each as a group of its own named after it (the file
         /// plays them one at a time, as the game does when a script plays a group: Open, Close, Forward). A sequence
         /// that moves no node is kept for its length and its text keys.
@@ -619,7 +651,10 @@ namespace NifOsg
             {
                 SceneUtil::EmbeddedSequences sequences = loadEmbeddedSequences(nif);
                 if (!sequences.empty())
+                {
+                    keepNodesOfSequences(*created);
                     SceneUtil::addUserData(*created, std::move(sequences));
+                }
             }
 
             created->setUserValue(Misc::OsgUserValues::sFileHash, nif.getHash());

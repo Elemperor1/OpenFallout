@@ -542,6 +542,13 @@ namespace MyGUIPlatform
         return &item->second;
     }
 
+    MyGUI::ITexture* RenderManager::registerTexture(
+        const std::string& name, osg::Texture2D* texture, osg::StateSet* injectState)
+    {
+        const auto it = mTextures.insert_or_assign(name, OSGTexture(name, texture, injectState)).first;
+        return &it->second;
+    }
+
     bool RenderManager::checkTexture(MyGUI::ITexture* /*texture*/)
     {
         // We support external textures that aren't registered via this manager, so can't implement this method

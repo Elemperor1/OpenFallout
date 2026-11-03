@@ -33,6 +33,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwrender/testfalloutanimation.cpp
     mwrender/testfalloutface.cpp
     mwrender/testfogmanager.cpp
+    mwrender/testmenuscene.cpp
     mwrender/testskyfallback.cpp
     mwrender/testwaterlook.cpp
 

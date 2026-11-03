@@ -537,6 +537,15 @@ button 0x72f6f0, the price of one 0x72ed00).
   first in the file; the barter file has no other `xdefault`); nothing else happens with that key. Enter on a picked row (or
   on the row under the pointer) is a click on it. The pad's pick of the vendor's list when the menu opens (the code
   selects its first row when a pad is in use) is not done, the port does not know whether a pad is in use.
+- Which list has the pointer (round 12AI B8): the file's `_IsContainerListSelected` (default -1) is 0 for the player's list and 1
+  for the vendor's. Two hotrects over a half of the menu each (`BM_Items_FocusRect` id 0 and `BM_Container_FocusRect` id 1, alpha 0,
+  depth 5) are targets only while their list is not the selected one, and the file says "mousing over them switches the focus":
+  the list below is under a rect that takes the pointer, so it cannot be hovered or clicked until the focus is switched. The
+  port sets the trait to 0 when the menu opens, to the side the pointer has come to (the rect it is over; `mouseover` is read
+  every frame) and to the side a key goes to (left or right, the first arrow). That the executable sets it the same way, and
+  to 0 at the start, is inferred from the file and the keys; the code that does it was not read. The wrapping of names
+  of 22 or more characters to a second line is the file's own (`wrapwidth` 300 on `ListItemText`); the prompt for a number
+  of things takes no digit keys in the port (not known for the game).
 - Fallout 3 (round 12AH A6, `Fallout3.exe` partly compared): the same menu class with another layout of fields and other
   click ids (Exit 14 and a row 18, where New Vegas has 19 and 23); the file is the same, drawn by tile names. The close and its
   BarterExit line, the cancel box, the quantity prompt, the arrow counters and the caps sounds were found the same; the price
@@ -560,6 +569,60 @@ button 0x72f6f0, the price of one 0x72ed00).
   offline harness reads, so it was not drawn offline.
 - Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.
+
+### Models in a menu, and the lockpicking screen
+
+Three screens of the games draw a model of their own inside the menu: the lock and the bobby pin of `lockpick_menu.xml`
+(`Meshes\Terminals\LockInterface01.NIF` and `BobbyPin01.NIF`), the model behind the pause menu and the item of the
+Pip-Boy. The code of the games has no picture for them in the files: it draws a scene straight into the back buffer after
+the world and before the 2D tiles (Mac round 12AJ A2, `FalloutNV.exe` 0x78E1C0 to 0x790F40). OpenFallout draws the scene
+to a texture and shows it in a layer under the windows, so the tiles of the menu file are over it.
+
+| Part | What it does |
+| --- | --- |
+| `apps/openfallout/mwrender/menuscene.*` | One scene: a render texture, a camera (frustum, place, direction), one ambient and one directional light, models by name with a place each, point lights that are children of a node of a model, and, for a model with sequences, `setSequenceTime` that puts it at a time of one of its `NiControllerSequence`s (the games set the time by hand for the lock and the pin). `placement` and `placementFromRows` turn the numbers of the games' files (angles about X, Y, Z in degrees, or the rows of a matrix) into the matrix of a node. |
+| `apps/openfallout/mwgui/menuscenes.*` | The scenes by name; each texture is registered with MyGUI as `scene:<name>` (`RenderManager::registerTexture`) and stays registered, because a widget may still point at it. |
+| `apps/openfallout/mwlua/menuscenebindings.cpp` | `core.menuScene`. Every call is queued (`LuaManager::addAction`) because the scripts run beside the frame; the calls are done in the order they were made, so a script can make a scene and fill it at once, and `ready(name)` says when the picture can be shown. |
+| `files/data/scripts/omw/falloutscene.lua` | Makes a scene and, once it is ready, a widget in the layer `MenuScenes` (after the HUD, not hit by the pointer) that shows its texture. |
+
+The rules of the lockpicking screen are `FalloutScript::Lockpick` (`components/falloutscript/lockpick.*`, tested in
+`apps/components_tests/falloutscript/testlockpick.cpp`); `core.lockpick.new{class, skill, picks, meter}` gives the Lua side a game
+to `step{seconds, move, turn}` and `force()`, with the events of each step ("enter", "move", "turn", "squeakA", "squeakB", "stop",
+"tensionStart", "tensionEnd", "break", "unlock", "forceFailed", "outOfPicks") and what to draw (the sequence and time of the
+lock and of the pin, the turn of the pin). Round 12AI A1 has the numbers: five lock classes (very easy to very hard) with a
+sweet spot of 400, 200, 100, 50 and 25 menu units on a meter as wide as the safe area, six nested bands around its centre that let the
+cylinder turn 90, 75, 60, 45, 30 and 15 degrees, a pin that lasts `1 + 0.01 * skill` seconds of strain, forcing at
+`skill - gate + 10` per cent, one experience reward per lock, the skill that each class needs (0, 25, 50, 75, 100, and a key
+only). The skill does not change the size of the sweet spot in either game's data.
+
+`falloutlockpick.lua` is the screen: it opens `lockpick_menu.xml`, writes the rows the file leaves to the code (the skill, the pins,
+the level word, the Force button's text with the chance), puts the scene together with the numbers of the code (the scene root 125
+units ahead and turned so that the x of a model is to the right, its z up and its y away; the camera at the origin looking
+along +X; a frustum of `tan(75 degrees * 0.15) * 0.75` at distance 1 and as high as the window is; the pin turned about the
+depth axis by where it is on the meter), and each frame feeds the game with the mouse's movement along X in menu units (1:1 with
+the cursor) and with the four movement keys. F and E are the letters the file ties to its buttons (Force and Exit), X on a pad forces,
+B leaves; the pointer is hidden over the area the pin moves in. What happens outside the screen is the engine's
+(`core.interact.lockOutcome`): the lock is opened with its experience, a pin is taken, the player is told that none is left, a
+failed force breaks the lock for good. `falloutinteraction.lua` shows the older widgets (a chance per pin) when the screen cannot be
+shown (no menu file, no scenes).
+
+Seen in the running game (Mac rounds 12AK and 12AL, New Vegas, 1920 by 1080): the screen opens with the picture on the
+screen after one frame; the intro lasts 1.32 seconds and the entering sound comes on its first frame, as the code of the game
+does it (with no pin the player is told so at that frame and no sound plays); the pointer moves the pin one to one with
+the menu units and reaches both ends of the meter; the cylinder turns, binds (the stop sound and the strain sound), breaks
+the pin after `1 + 0.01 * skill` seconds of strain, a new pin comes in a second later and can be used two seconds after
+that; the force button turns the cylinder 90 degrees in 0.98 seconds with the two squeaks at 30 and 60 degrees and the unlock
+sound, closes the screen and opens the container (experience 30 for an easy lock); a failed force closes the screen and the lock
+stays shut for good (every later try shows a box); E leaves; all the sounds resolve. The lock file's own `shadow` mesh darkens
+the world round the disc (0.58 at its edge, none beyond 1.7 radii): that is the games' picture, not a dimming by the port.
+The first two runs drew the disc and the pin black: the nodes of the lock's file that held the point lights are not kept by
+the model loader, so the lights were put at the root of the model, behind the disc; the lights are now made under the nodes
+that are kept, at the places the file gives them (the scene logs its nodes and where each light went).
+
+Not seen yet: the lit lock and pin (after the fix above), the pointer at the edge of the screen (the games read relative
+movement, the port the moves of the window's pointer), the pad's axes (inferred), the sound of strain (a loop in the games,
+played once here), and the karma that a stolen lock costs. The pause menu's model (three flat quads, no motion) and the
+Pip-Boy's item are not drawn yet.
 
 ## The words of the labels
 

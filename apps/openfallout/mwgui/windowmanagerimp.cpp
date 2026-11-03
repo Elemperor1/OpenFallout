@@ -107,6 +107,7 @@
 #include "levelupdialog.hpp"
 #include "loadingscreen.hpp"
 #include "mainmenu.hpp"
+#include "menuscenes.hpp"
 #include "merchantrepair.hpp"
 #include "postprocessorhud.hpp"
 #include "quickkeysmenu.hpp"
@@ -332,6 +333,8 @@ namespace OFGui
         mWindows.push_back(std::move(menu));
 
         mLocalMapRender = std::make_unique<OFRender::LocalMap>(mViewer->getSceneData()->asGroup());
+        mMenuScenes = std::make_unique<MenuScenes>(
+            mViewer->getSceneData()->asGroup(), mResourceSystem, mGuiPlatform->getRenderManagerPtr());
         auto map = std::make_unique<MapWindow>(mCustomMarkers, mDragAndDrop.get(), mLocalMapRender.get(), mWorkQueue);
         mMap = map.get();
         mWindows.push_back(std::move(map));
@@ -586,6 +589,7 @@ namespace OFGui
             mMessageBoxManager.reset();
             mToolTips.reset();
             mCharGen.reset();
+            mMenuScenes.reset();
 
             mKeyboardNavigation.reset();
 

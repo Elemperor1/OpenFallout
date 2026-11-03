@@ -183,6 +183,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testformlists.cpp
     falloutscript/testitemuse.cpp
     falloutscript/testlevelling.cpp
+    falloutscript/testlockpick.cpp
     falloutscript/testlimbs.cpp
     falloutscript/testpipboy.cpp
     falloutscript/testperks.cpp

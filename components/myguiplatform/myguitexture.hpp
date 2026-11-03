@@ -38,6 +38,8 @@ namespace MyGUIPlatform
     public:
         OSGTexture(const std::string& name, Resource::ImageManager* imageManager);
         OSGTexture(osg::Texture2D* texture, osg::StateSet* injectState = nullptr);
+        /// A texture that is made elsewhere (a scene drawn to a texture) and that menus find by `name`
+        OSGTexture(const std::string& name, osg::Texture2D* texture, osg::StateSet* injectState);
         ~OSGTexture() override;
 
         osg::StateSet* getInjectState() { return mInjectState; }

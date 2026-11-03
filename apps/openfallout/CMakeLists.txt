@@ -20,7 +20,7 @@ source_group(apps/openfallout FILES main.cpp androidmain.cpp ${OPENFALLOUT_SOURC
 add_openfallout_dir (mwrender
     actors objects renderingmanager animation rotatecontroller sky skyutil skyfallback npcanimation esm4npcanimation esm4creatureanimation falloutactoranimation falloutanimation falloutface vismask
     creatureanimation effectmanager util renderinginterface pathgrid rendermode weaponanimation screenshotmanager
-    bulletdebugdraw globalmap characterpreview camera localmap water waterframes waterlook terrainstorage ripplesimulation
+    bulletdebugdraw globalmap characterpreview menuscene camera localmap water waterframes waterlook terrainstorage ripplesimulation
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging falloutlod groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass opaqueblit waterawaretransparentbin precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
@@ -36,7 +36,7 @@ add_openfallout_dir (mwgui
     windowbase statswindow messagebox journalwindow charactercreation
     mapwindow windowpinnablebase tooltips scrollwindow bookwindow resourceskin
     formatting inventorywindow container hud countdialog tradewindow settingswindow
-    confirmationdialog alchemywindow referenceinterface spellwindow mainmenu quickkeysmenu
+    confirmationdialog alchemywindow referenceinterface spellwindow mainmenu quickkeysmenu menuscenes
     itemselection spellbuyingwindow loadingscreen levelupdialog waitdialog spellcreationdialog
     enchantingdialog trainingwindow travelwindow exposedwindow cursor spellicons
     merchantrepair repair soulgemdialog companionwindow bookpage journalviewmodel journalbooks
@@ -61,7 +61,7 @@ add_openfallout_dir (mwscript
 add_openfallout_dir (mwlua
     objectcache luamanagerimp object objectlists userdataserializer luaevents engineevents objectvariant loadscripts contentbindings
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
-    mwscriptbindings questbindings conversationbindings chargenbindings messagebindings combatbindings hudbindings menubindings interactbindings pipboybindings vatsbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
+    mwscriptbindings questbindings conversationbindings chargenbindings messagebindings menuscenebindings lockpickbindings combatbindings hudbindings menubindings interactbindings pipboybindings vatsbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
     postprocessingbindings stats recordstore debugbindings corebindings worldbindings worker landbindings magicbindings factionbindings
     classbindings itemdata inputprocessor animationbindings birthsignbindings racebindings markupbindings weatherbindings regionbindings
     types/types types/door types/item types/actor types/container types/lockable types/weapon types/npc types/bodypart

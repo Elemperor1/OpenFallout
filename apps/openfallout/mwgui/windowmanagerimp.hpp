@@ -96,6 +96,7 @@ namespace OFGui
     class MainMenu;
     class StatsWindow;
     class InventoryWindow;
+    class MenuScenes;
     struct JournalWindow;
     class TextInputDialog;
     class InfoBoxDialog;
@@ -185,6 +186,7 @@ namespace OFGui
 
         /// \todo investigate, if we really need to expose every single lousy UI element to the outside world
         OFGui::InventoryWindow* getInventoryWindow() override;
+        OFGui::MenuScenes* getMenuScenes() override { return mMenuScenes.get(); }
         OFGui::CountDialog* getCountDialog() override;
         OFGui::ConfirmationDialog* getConfirmationDialog() override;
         OFGui::TradeWindow* getTradeWindow() override;
@@ -459,6 +461,7 @@ namespace OFGui
         HUD* mHud;
         MapWindow* mMap;
         std::unique_ptr<OFRender::LocalMap> mLocalMapRender;
+        std::unique_ptr<MenuScenes> mMenuScenes;
         std::unique_ptr<ToolTips> mToolTips;
         StatsWindow* mStatsWindow;
         std::unique_ptr<MessageBoxManager> mMessageBoxManager;

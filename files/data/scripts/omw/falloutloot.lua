@@ -443,9 +443,9 @@ end
 
 -- The keys while the menu of the file is there: Left and Right go to the other list, the arrows and pages pick a
 -- thing, Enter moves it and R takes everything
-local function pressMenu(code)
+local function pressMenu(code, symbol)
     if quantity.isOpen() then
-        quantity.press(code)
+        quantity.press(code, symbol)
         return
     end
     local side = sides[activeSide]
@@ -482,13 +482,13 @@ end
 
 -- What a key (or a button of the pad that stands for one) does while the screen is there: the arrows and pages pick a
 -- thing, Enter takes it and R takes everything
-local function press(code)
+local function press(code, symbol)
     -- (a menu opened over the screen takes the keys and the buttons)
     if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then
         return
     end
     if shown then
-        pressMenu(code)
+        pressMenu(code, symbol)
         return
     end
     if code == input.KEY.DownArrow then
@@ -540,7 +540,7 @@ return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
-            press(key.code)
+            press(key.code, key.symbol)
         end,
         onControllerButtonPress = onPad,
         onMouseWheel = function(vertical)

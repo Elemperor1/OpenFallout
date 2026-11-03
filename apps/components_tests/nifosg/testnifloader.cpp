@@ -613,4 +613,31 @@ osg::Group {
         ASSERT_NE(gear, nullptr);
         EXPECT_EQ(gear->getDataVariance(), osg::Object::DYNAMIC);
     }
+
+    // The lock of the lockpicking screen: the node carries no controller of its own (a NiMultiTargetTransformController
+    // on the root lists it, and the engine does not run that one), only the sequence names it.
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, keepsTheNodeThatOnlyTheSequenceNames)
+    {
+        addSequenceToManager("Open", 5.f);
+        mGear.mController = Nif::NiTimeControllerPtr(nullptr);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const osg::Node* gear = find(*result, "Gear");
+        ASSERT_NE(gear, nullptr);
+        EXPECT_EQ(gear->getDataVariance(), osg::Object::DYNAMIC);
+    }
+
+    TEST_F(NifOsgLoaderEmbeddedSequencesTest, leavesANodeThatNoSequenceNamesToTheOptimizer)
+    {
+        addSequenceToManager("Open", 5.f);
+        mGear.mController = Nif::NiTimeControllerPtr(nullptr);
+        mGear.mName = "Other";
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(mFile, &mImageManager, &mMaterialManager);
+
+        const osg::Node* other = find(*result, "Other");
+        ASSERT_NE(other, nullptr);
+        EXPECT_NE(other->getDataVariance(), osg::Object::DYNAMIC);
+    }
 }
