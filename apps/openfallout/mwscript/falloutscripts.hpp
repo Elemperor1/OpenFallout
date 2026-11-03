@@ -758,6 +758,56 @@ namespace OFScript
         std::optional<BarterMenu> barterMenu();
         /// The player is done with the menu
         void closeBarter();
+
+        // ---- The companion wheel (M12) ----
+        /// The wheel the player has open on a companion (companion_wheel_menu.xml, FalloutNV.exe 0x754DE0): the
+        /// character, its name, a number that is another for each time a wheel opens and what the script of the
+        /// companion says when the wheel opens: its variables FollowerSwitchAggressive (1: aggressive), IsFollowingLong
+        /// (1: keeps far), CombatStyleRanged (1: ranged) and Waiting (0: following; a variable the script has not
+        /// counts as -1, so it is not any of them)
+        struct CompanionWheel
+        {
+            FalloutScript::FormId mActor = 0;
+            std::string mName;
+            int mSerial = 0;
+            bool mAggressive = false;
+            bool mStaysFar = false;
+            bool mRanged = false;
+            bool mFollowing = false;
+            bool mWaiting = false;
+            /// A pad was the last thing the player used when the wheel opened
+            bool mPad = false;
+        };
+        /// What the wheel tells under the slice the pointer is on: the stimpaks of the player, the health of the
+        /// companion, what it carries of what it can carry, and the weapon in its hands
+        struct CompanionStatus
+        {
+            int mStimpaks = 0;
+            double mHealth = 0;
+            double mMaxHealth = 0;
+            double mCarried = 0;
+            double mCapacity = 0;
+            std::string mWeapon;
+        };
+        /// A character that follows the player and is alive: the player gets the wheel when it activates it, and not a
+        /// conversation (Activate on a companion, FalloutNV.exe 0x5FA330 and 0x754D90)
+        bool isCompanion(const OFWorld::Ptr& actor);
+        /// The player activated the companion. The thread of the frame: the variables of its script are read here.
+        bool openCompanionWheel(const OFWorld::Ptr& actor);
+        std::optional<CompanionWheel> companionWheel();
+        CompanionStatus companionStatus();
+        /// The companion says a topic of the commands (FollowersWait, FollowersLetsGo, FollowersTacticsCombatAggressive
+        /// ...) found by its editor id: the result of the response is what changes the companion. False when there
+        /// is no such topic or nothing to say.
+        bool companionSay(std::string_view topic);
+        /// The wheel writes FollowerSwitchAggressive itself when the player toggles it (0x755260)
+        void companionSetAggressive(bool aggressive);
+        /// A stimpak of the player's goes to the companion and is used on it; false when the player has none
+        bool companionStimpak();
+        /// The wheel is closed and the conversation with the companion begins
+        void companionTalk();
+        /// The player is done with the wheel
+        void closeCompanionWheel();
         /// The container that holds a vendor's goods: the one a script gave it (SetMerchantContainer; none after
         /// RemoveMerchantContainer), else the XMRC of its placed reference. 0 for none.
         FalloutScript::FormId merchantContainer(FalloutScript::FormId vendor);
@@ -2040,6 +2090,10 @@ namespace OFScript
         std::mutex mBarterMutex;
         std::optional<BarterMenu> mBarter;
         int mBarterSerial = 0;
+        /// The companion wheel the player has open, under mCompanionMutex
+        std::mutex mCompanionMutex;
+        std::optional<CompanionWheel> mCompanion;
+        int mCompanionSerial = 0;
         /// The merchant containers that scripts gave to vendors (0: taken away), under mBarterMutex
         std::map<FalloutScript::FormId, FalloutScript::FormId> mMerchantContainers;
         /// Where a vendor's goods are, in the order they are taken from: its container, then the vendor itself

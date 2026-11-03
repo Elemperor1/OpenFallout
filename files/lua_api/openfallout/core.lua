@@ -2416,6 +2416,53 @@
 -- @function [parent=#Pipboy] closeBarter
 
 ---
+-- The wheel of commands of a companion: the player activated a character that follows it.
+-- @function [parent=#Pipboy] companion
+-- @return #PipboyCompanion nothing when no wheel is open
+
+---
+-- @type PipboyCompanion
+-- @field #string actor The id of the companion.
+-- @field #string name
+-- @field #number serial Another number for each time a wheel opens.
+-- @field #boolean aggressive The companion's variable FollowerSwitchAggressive is 1 (as the wheel read it when it opened).
+-- @field #boolean staysFar IsFollowingLong is 1.
+-- @field #boolean ranged CombatStyleRanged is 1.
+-- @field #boolean following Waiting is 0.
+-- @field #boolean waiting Waiting is not 0.
+-- @field #boolean pad A pad was the last thing the player used when the wheel opened.
+
+---
+-- What the wheel tells about the companion and the player's stimpaks.
+-- @function [parent=#Pipboy] companionStatus
+-- @return #table `{stimpaks, health, maxHealth, carried, capacity, weapon}`
+
+---
+-- The companion says a topic of the commands (found by its editor id): the results of its response change the
+-- companion's variables.
+-- @function [parent=#Pipboy] companionSay
+-- @param #string topic
+-- @return #boolean false when there is no such topic or nothing to say
+
+---
+-- The wheel writes the variable FollowerSwitchAggressive of the companion itself when the player toggles it.
+-- @function [parent=#Pipboy] companionSetAggressive
+-- @param #boolean aggressive
+
+---
+-- A stimpak of the player's is used on the companion.
+-- @function [parent=#Pipboy] companionStimpak
+-- @return #boolean false when the player has no stimpak
+
+---
+-- The wheel is over and the conversation with the companion begins.
+-- @function [parent=#Pipboy] companionTalk
+
+---
+-- The player is done with the wheel.
+-- @function [parent=#Pipboy] closeCompanion
+
+---
 -- Play the sound that a menu file or the code of the game names by its editor id (the files' `clicksound` and
 -- `mouseoversound` and the games' own sounds: "UIMenuOK", "UIMenuFocus", "ITMBottlecapsUp"), in 2D.
 -- @function [parent=#Pipboy] playSoundNamed

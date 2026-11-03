@@ -735,6 +735,29 @@ arrows and the pages (the sides of the pad) turn the pages, and the letters of t
 Not there yet: the help hints that the game queues while the player plays (the first time a thing is met), and the keys of
 the screen on the PC, which were not read (the arrows are a choice of the port).
 
+### The companion wheel (Mac round 12AN B3, FalloutNV.exe; New Vegas only)
+
+`companion_wheel_menu.xml` is the wheel of eight slices the player gets when it activates a companion (a character that
+follows it as a teammate), where it would otherwise talk. The slices (angles clockwise from the top, 30 degrees each, rings
+76 to 332 of a picture of 760 units): 0 be aggressive or passive, 1 use a stimpak, 2 wait here or follow me, 3 talk to, 4 back
+up, 5 stay close or keep a distance, 6 open its inventory, 7 use ranged or melee weapons. The wheel keeps nothing of its
+own: it reads four variables of the companion's script when it opens (`FollowerSwitchAggressive` is 1, `IsFollowingLong` is
+1, `CombatStyleRanged` is 1, `Waiting` is 0), each click flips the flag it shows and makes the companion say a topic
+(`FollowersTacticsCombatAggressive` or `...Passive`, `FollowersLetsGo` or `FollowersWait`, `FollowersTacticsDistanceLong` or
+`...Default`, `FollowersTacticsCombatRanged` or `...Melee`, `FollowersTrade`), and the results of those responses (the plugin's
+scripts) are what changes the companion. Slice 0 writes `FollowerSwitchAggressive` itself as well. A stimpak of the player is
+used on the companion. The label of the slice under the pointer is the word of the setting (`sCWheelBeAggressive` and its
+neighbours), and under the wheel the stimpaks and the companion's health, what it carries of what it can, or the weapon in its
+hands. The sounds are `UIPopUpMessageGeneral` (open), `UIPipBoyScroll` (another slice) and `UIMenuOK` (a click).
+
+`falloutcompanion.lua` draws it and lights the slice under the pointer (the left stick moves the pointer; the arrows and the
+sides of the pad turn the lit slice, Enter and Y use it); the engine side is `core.pipboy.companion*`
+(`mwscript/falloutcompanion.cpp`). The middle of the rings is taken as the middle of the picture, not as the file has it (55
+units lower: the pad does not care and the executable's pointer test was not found). Not there yet: what Back Up does (the
+executable calls a function that is not read), the fade the wheel closes with, the heal of a stimpak is what the item's effects
+give, and whether the player says the topic or the companion (the companion says it here: the conditions of the lines are
+about it).
+
 ## The words of the labels
 
 The menu files take the words of their labels from game settings (`<string> &-sCancel; </string>`). The games keep most of
