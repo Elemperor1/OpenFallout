@@ -605,11 +605,17 @@ namespace FalloutMenu
         const bool isImage
             = tile.mType == TileType::Image || (tile.mType == TileType::HotRect && !text(tile, "filename").empty());
         const bool isText = tile.mType == TileType::Text;
-        if (isImage || isText)
+        // A box (box.xml: the file's `_fill_alpha` is the alpha of its own fill) is a plain colour: the bar that is lit
+        // behind a row of a list, or the band behind a button. It is a picture of the file `solid.dds` of the shared
+        // atlas (the colour is the tile's, the alpha its own). Only a tile that has a `_fill_alpha` is a box: a
+        // rectangle that only passes its alpha down to what is in it is not.
+        const bool isFill = !isImage && !isText && (tile.mType == TileType::HotRect || tile.mType == TileType::Rect)
+            && defines(tile, "_fill_alpha") && width > 0 && height > 0 && number(tile, "alpha") > 0;
+        if (isImage || isText || isFill)
         {
             DrawItem item;
             item.mTile = &tile;
-            item.mType = isImage ? TileType::Image : tile.mType;
+            item.mType = isImage || isFill ? TileType::Image : tile.mType;
             item.mX = x;
             item.mY = y;
             item.mWidth = width;
@@ -623,6 +629,11 @@ namespace FalloutMenu
                 item.mRepeatY = number(tile, "repeatvertical") != 0 || get(tile, "tile").number() > 0;
                 item.mCropX = number(tile, "cropx");
                 item.mCropY = number(tile, "cropy");
+            }
+            else if (isFill)
+            {
+                item.mFile = "solid.dds";
+                item.mAtlas = "Interface\\InterfaceShared.tai";
             }
             else
             {
@@ -639,7 +650,7 @@ namespace FalloutMenu
                 item.mClipWidth = (*clip)[2];
                 item.mClipHeight = (*clip)[3];
             }
-            const bool empty = isImage ? item.mFile.empty() : item.mText.empty();
+            const bool empty = isImage || isFill ? item.mFile.empty() : item.mText.empty();
             if (!empty)
                 out.push_back(std::move(item));
         }

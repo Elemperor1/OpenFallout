@@ -452,6 +452,13 @@ found the same way.
   centre or right end).
 - A hot rectangle that names a file (`filename`) is a picture that takes the pointer: the picture of the world map, the
   cursor of the hacking menu (seen in the files, not yet in the running game).
+- A box is a plain colour: a hotrect or rectangle that has a `_fill_alpha` (`box.xml` gives every box one, 0 unless the file
+  sets it; the box's alpha is that) and a size is drawn as the 7 by 7 pixel `solid.dds` of the shared atlas, stretched, in the
+  tile's colour times its brightness. The bar behind the lit row of a list is one (`list_box.xml`: alpha 40, and the
+  terminals set 224 with the row's text turned dark, which made the lit row of a terminal vanish in the running game, round
+  12AG, before boxes were drawn). A rectangle that has no `_fill_alpha` is not drawn whatever its alpha: the files give
+  alphas to rectangles only to pass them down. Not read from the executable yet (asked in round 12AG, A6): which tile types
+  draw a quad when they have no file, and what their alpha is by default.
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
 

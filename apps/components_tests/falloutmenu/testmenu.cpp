@@ -393,6 +393,36 @@ namespace
         EXPECT_FLOAT_EQ(items[0].mWidth, 200.f);
     }
 
+    TEST(FalloutMenuDrawTest,
+        a_box_with_a_fill_alpha_is_a_plain_colour_and_a_rectangle_that_only_passes_its_alpha_is_not)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
+            // A box (box.xml gives `_fill_alpha`, and the alpha of the tile is that): the bar behind the lit row of a
+            // list
+            "<hotrect name=\"Lit\"><_fill_alpha> 51 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
+            "</alpha><brightness> 128 </brightness><width> 300 </width><height> 30 </height></hotrect>"
+            // A box with no fill, and a box that has no size (nothing is lit): no bar
+            "<hotrect name=\"Empty\"><_fill_alpha> 0 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
+            "</alpha><width> 300 </width><height> 30 </height></hotrect>"
+            "<hotrect name=\"NoSize\"><_fill_alpha> 90 </_fill_alpha><alpha><copy src=\"me()\" trait=\"_fill_alpha\"/>"
+            "</alpha></hotrect>"
+            // No `_fill_alpha`: the alpha is only for what is in the tile (it is 255 by default)
+            "<rect name=\"Container\"><alpha> 255 </alpha><width> 300 </width><height> 30 </height></rect>"
+            "<hotrect name=\"Plain\"><width> 300 </width><height> 30 </height></hotrect>"
+            "</menu>");
+        const std::vector<DrawItem> items = menu.draw();
+        ASSERT_EQ(items.size(), 1u);
+        EXPECT_EQ(items[0].mTile->name(), "Lit");
+        EXPECT_EQ(items[0].mType, TileType::Image);
+        EXPECT_EQ(items[0].mFile, "solid.dds");
+        EXPECT_EQ(items[0].mAtlas, "Interface\\InterfaceShared.tai");
+        EXPECT_FLOAT_EQ(items[0].mWidth, 300.f);
+        EXPECT_FLOAT_EQ(items[0].mHeight, 30.f);
+        EXPECT_NEAR(items[0].mColor[3], 0.2f, 1e-4);
+    }
+
     TEST(FalloutMenuDrawTest, positions_add_up_through_the_tiles_a_tile_is_in)
     {
         Fixture f;
