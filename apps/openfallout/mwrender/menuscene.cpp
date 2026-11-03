@@ -445,7 +445,8 @@ namespace OFRender
         place->addChild(source);
 
         osg::Group* parent = model->mRoot;
-        const auto found = model->mNodes.find(Misc::StringUtils::lowerCase(node));
+        // An empty name is the root of the model: the map has the unnamed transforms of the file under that name too
+        const auto found = node.empty() ? model->mNodes.end() : model->mNodes.find(Misc::StringUtils::lowerCase(node));
         if (found != model->mNodes.end())
             parent = found->second;
         Log(Debug::Info) << "Menu scene: light of the model " << name << " under "
