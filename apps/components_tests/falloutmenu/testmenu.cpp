@@ -359,6 +359,26 @@ namespace
         EXPECT_TRUE(list->children().empty());
     }
 
+    TEST(FalloutMenuEvaluationTest, a_tile_made_by_the_code_has_the_traits_the_screen_gives_it)
+    {
+        Fixture f;
+        Menu& menu = f.open("<menu name=\"M\"><rect name=\"Lines\"><x> 640 </x></rect></menu>");
+        Tile* lines = menu.find("Lines");
+        ASSERT_NE(lines, nullptr);
+        Tile* line = menu.create(*lines, TileType::Text, "Line1");
+        ASSERT_NE(line, nullptr);
+        EXPECT_EQ(line->name(), "Line1");
+        EXPECT_EQ(line->type(), TileType::Text);
+        EXPECT_EQ(menu.find("Line1"), line);
+        menu.set(*line, "string", Value::fromText("words"));
+        menu.set(*line, "y", Value(30.f));
+        EXPECT_EQ(menu.text(*line, "string"), "words");
+        EXPECT_FLOAT_EQ(menu.number(*line, "y"), 30.f);
+        EXPECT_EQ(lines->children().size(), 1u);
+        menu.removeChildren(*lines);
+        EXPECT_TRUE(lines->children().empty());
+    }
+
     TEST(FalloutMenuDrawTest, tiles_are_drawn_back_to_front_by_depth_and_what_is_not_visible_is_left_out)
     {
         Fixture f;

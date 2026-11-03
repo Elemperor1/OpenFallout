@@ -1558,6 +1558,15 @@
 -- @return #number
 
 ---
+-- A tile with no traits under another tile (kind "text", "image", "rect" or "hotrect"), which the script gives its traits
+-- with `set`: the lines of the credits are made so. `remove` and `removeChildren` take it out. Nothing for another kind.
+-- @function [parent=#FalloutMenu] create
+-- @param parent name or number of the tile it goes under
+-- @param #string kind
+-- @param #string name
+-- @return #number
+
+---
 -- The tile and trait that a trait stands for when the menu file writes it as a reference to another
 -- (`<xbuttona><ref src="OK" trait="clicked"/></xbuttona>`): the number of the tile and the name of the trait.
 -- @function [parent=#FalloutMenu] reference

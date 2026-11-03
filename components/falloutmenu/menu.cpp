@@ -561,6 +561,18 @@ namespace FalloutMenu
         return result;
     }
 
+    Tile* Menu::create(Tile& parent, TileType type, std::string_view name)
+    {
+        auto definition = std::make_shared<TileDef>();
+        definition->mType = type;
+        definition->mName = std::string(name);
+        std::unique_ptr<Tile> tile = build(definition, &parent, true);
+        Tile* result = tile.get();
+        parent.mChildren.push_back(std::move(tile));
+        ++mGeneration;
+        return result;
+    }
+
     void Menu::remove(Tile& tile)
     {
         if (tile.mParent == nullptr)

@@ -150,6 +150,9 @@ namespace FalloutMenu
         bool hasTemplate(std::string_view name) const;
         /// A new tile under `parent` from a template of the menu, named `name` (the template's name if empty)
         Tile* instantiate(Tile& parent, std::string_view templateName, std::string_view name = {});
+        /// A new tile of a kind with no traits of its own under `parent`, which a screen gives its traits with `set`: a
+        /// screen whose pieces come from the code and not from the file (the lines of the credits)
+        Tile* create(Tile& parent, TileType type, std::string_view name);
         /// Take a tile that was made with `instantiate` out of the tree
         void remove(Tile& tile);
         void removeChildren(Tile& tile);
