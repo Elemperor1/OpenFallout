@@ -231,9 +231,16 @@ namespace OFScript
             return -1;
         const int result = donor->mResult;
         // The donor is used up, one copy of it; the copy of another kind that is on comes off with its last copy
-        if (donorItem != item && mEquipment.isEquipped(mPlayer, donorItem, donorCondition)
-            && mActors.itemCount(mPlayer, donorItem) <= 1)
-            mEquipment.unequip(mPlayer, donorItem);
+        // (only the copies that are alike count: another copy of the donor with its own condition stays in the pack)
+        if (donorItem != item && mEquipment.isEquipped(mPlayer, donorItem, donorCondition))
+        {
+            int alike = 0;
+            for (const FalloutScript::ActorState::ConditionStack& held : mActors.conditions(mPlayer, donorItem))
+                if (held.mCondition == donorCondition)
+                    alike = held.mCount;
+            if (alike <= 1)
+                mEquipment.unequip(mPlayer, donorItem);
+        }
         if (mActors.removeItem(mPlayer, donorItem, 1, donorCondition) <= 0)
             return -1;
         // The copy that is repaired stays on if it was on (the executable changes its list in place, and a list that is

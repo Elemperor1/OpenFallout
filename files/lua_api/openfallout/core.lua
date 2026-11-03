@@ -2739,7 +2739,8 @@
 
 ---
 -- What the repair services list: the caps of the player, the sum of every row, the condition the character leaves things
--- in (`cap`, tenths of a percent) and the rows in the order of the menu (the worn ones first, the worst health first).
+-- in (`cap`, tenths of a percent) and the rows in the order of the menu: the rows the player can pay for first (the
+-- healthiest first, the worn copy before an alike one), then the others (the weakest first, the worn copy last).
 -- @function [parent=#Pipboy] serviceRows
 -- @return #table `{skill, caps, total, cap, rows}`; each row has `id`, `name`, `icon`, `condition`, `worn`, `cost`,
 --   `canPay` and the stats `stat` (now) and `capStat` (after the repair), as #PipboyRepairStat. Nil when no menu is open.

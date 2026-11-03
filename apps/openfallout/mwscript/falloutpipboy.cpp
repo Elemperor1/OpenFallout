@@ -258,7 +258,9 @@ namespace OFScript
                             const double factor = FalloutScript::Wear::armorFactor(
                                 static_cast<double>(stack.mCondition) / FalloutScript::ActorState::fullCondition);
                             copy.mRating = std::trunc(row.mRating * factor);
-                            copy.mThreshold = row.mThreshold * factor;
+                            // The executable cuts the threshold of the record to a whole number and the product again (0x646360), as the
+                            // repair screen does
+                            copy.mThreshold = std::trunc(std::trunc(row.mThreshold) * factor);
                         }
                         copy.mEquipped = mEquipment.isEquipped(holder, id, stack.mCondition);
                         rows.push_back(std::move(copy));

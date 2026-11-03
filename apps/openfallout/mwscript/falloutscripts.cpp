@@ -2466,7 +2466,7 @@ namespace OFScript
     }
 
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-        FalloutScript::FormId weapon, int limb, double roll)
+        FalloutScript::FormId weapon, int limb, double roll, int condition)
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
@@ -2480,7 +2480,7 @@ namespace OFScript
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
-        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker);
+        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker, condition);
         if (roll < 0)
         {
             const std::lock_guard lock(mCombatRandomMutex);
@@ -2793,6 +2793,9 @@ namespace OFScript
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
         }
+        // The copy in the hands as it is before this shot: the blow works out with it, also when the shot is the one that
+        // breaks the weapon (a weapon that is used up comes out of the hands at once)
+        const int conditionBefore = mEquipment.equippedCondition(attacker, stats.mWeapon);
         // A gun loses health with a shot, whether or not it hits (once for a shot, whatever the number of pellets)
         if (!stats.mMelee)
             wearWeaponOfShot(attacker, stats);
@@ -2825,7 +2828,7 @@ namespace OFScript
             wearWeaponOfShot(attacker, stats);
         if (victim == mPlayer || isCharacterOrCreature(target))
         {
-            result.mStrike = strike(attacker, victim, stats.mWeapon, limb);
+            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore);
             return result;
         }
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
@@ -3439,7 +3442,9 @@ namespace OFScript
             if (text.empty())
                 return;
             mHudMessages.push(text, {}, warningSeconds);
-            playInterfaceSound("WPNBreak");
+            // A script can change the health of an item from a thread that is not the frame's, and the sound manager is the
+            // frame's
+            runOnMainThread([this] { playInterfaceSound("WPNBreak"); });
         };
         if (FalloutScript::Wear::crossedLow(before, after))
             say(gameSettingText(weapon ? "sWeaponLowCond" : "sArmorLowCond"));

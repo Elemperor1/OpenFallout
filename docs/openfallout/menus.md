@@ -629,7 +629,7 @@ button 0x72f6f0, the price of one 0x72ed00).
   aid, miscellaneous item, book, ingredient or mod, as `core.pipboy.barterRows` gives it in `icon`; armor takes the male
   one), as the executable sets the tile's `filename` from the form (0x4be200). The pictures of the items are not in the files the
   offline harness reads, so it was not drawn offline.
-- Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
+- Not done: the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
 ### Models in a menu, and the lockpicking screen

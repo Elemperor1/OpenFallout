@@ -204,6 +204,9 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("ZNAM"):
                 reader.getFormId(mDropSound);
                 break;
+            case ESM::fourCC("REPL"): // the list of the things that mend it
+                reader.getFormId(mRepairList);
+                break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("MO2B"):
             case ESM::fourCC("MO3B"):
@@ -225,9 +228,6 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("EAMT"):
             case ESM::fourCC("EITM"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("REPL"): // the list of the things that mend it
-                reader.getFormId(mRepairList);
-                break;
             case ESM::fourCC("BIPL"): // FO3
             case ESM::fourCC("MODD"): // FO3
             case ESM::fourCC("MOSD"): // FO3
