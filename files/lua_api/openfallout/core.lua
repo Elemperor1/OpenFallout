@@ -1814,6 +1814,7 @@
 -- @type Casino
 -- @field #Roulette roulette The roulette table.
 -- @field #Blackjack blackjack The blackjack table.
+-- @field #Caravan caravan The card game Caravan (a match that ShowCaravanMenu opened; it has no casino).
 
 ---
 -- Whether the content of a Fallout game is loaded.
@@ -1951,6 +1952,108 @@
 -- @return #table `pocket` that came up, `spinType` (the turn of the wheel: 0 to 2), `payout` (what the bets that won are
 -- paid, stakes included), `net` (what the player has more or less than before), `lucky` and `unlucky` (which words to
 -- use: the Luck of the player is above or below 5). Nil when no bet is on the table.
+
+---
+-- @type Caravan
+-- The match of Caravan of New Vegas: the stake, the deck the player builds from its cards, the match and its result are
+-- the four stages of a match. The money moves when the match is over. Everything counts from 1: the caravans (the player's
+-- are 1 to 3, the opponent's 4 to 6, and the player's n faces 7 - n), their rows (up to 7), the cards of the hand (up to 8)
+-- and the cards the player owns. A card is its `value` (1 to 10, 12 Jack, 13 Queen, 14 King, 15 Joker) and its `suit`
+-- (1 to 4, 5 for the Joker).
+
+---
+-- Where the match is: the `stage` ("bet", "deck", "game" or "results"), the `opponent`'s name, the stake (`funds` the
+-- player has, the `ante` the opponent asks, the `bet` the player puts up, the `ceiling` the opponent follows a raise to,
+-- `mostRaise`, the `pot`, `canMatch` and `canAccept`), the deck (`inDeck`, `owned` and `canPlay`: 30 cards or more) and,
+-- when the match is over, `won` and `forfeited`. `serial` is another for each match.
+-- @function [parent=#Caravan] screen
+-- @return #table Nil when no match is open.
+
+---
+-- The stake: take what the opponent asks (or all the player has), raise by an amount (up to `mostRaise`), accept (the
+-- pot is the smaller of the two bets and the deck stage begins).
+-- @function [parent=#Caravan] match
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] raise
+-- @param #number amount
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] accept
+-- @return #boolean
+
+---
+-- The cards the player owns, one entry for each card, each with its `value`, `suit`, `name` and whether it is `inDeck`.
+-- @function [parent=#Caravan] cards
+-- @return #table
+
+---
+-- The deck: a card in or out, a random choice of 30 or more cards, and the start of the match (30 cards are needed).
+-- @function [parent=#Caravan] setInDeck
+-- @param #number index
+-- @param #boolean inDeck
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] randomize
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] play
+-- @return #boolean
+
+---
+-- The match: `tracks`, six caravans each with its `rows` (the cards of a row, the number card first), `total`, `direction`
+-- (1 up, -1 down, 0 for fewer than two rows) and `suit` (5 for none); the player's `hand`; the cards in the opponent's
+-- hand (`opponentHand`) and the two piles (`pile`, `opponentPile`); the `phase` ("start", "play" or "over"), whether it is
+-- the player's turn (`playersTurn`), `over` and `won`.
+-- @function [parent=#Caravan] board
+-- @return #table Nil when no match is on.
+
+---
+-- Whether the card of the hand can go on the row of the caravan, and putting it there (it ends the turn).
+-- @function [parent=#Caravan] canPlace
+-- @param #number track
+-- @param #number row
+-- @param #number hand
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] place
+-- @param #number track
+-- @param #number row
+-- @param #number hand
+-- @return #boolean
+
+---
+-- Throws a card of the hand away for good (it costs the turn, except in the start), or empties a caravan of the player's
+-- (it costs the turn).
+-- @function [parent=#Caravan] discardCard
+-- @param #number hand
+-- @return #boolean
+
+---
+-- @function [parent=#Caravan] discardTrack
+-- @param #number track
+-- @return #boolean
+
+---
+-- The player gives the match up, which is a loss.
+-- @function [parent=#Caravan] forfeit
+-- @return #boolean
+
+---
+-- The opponent makes its move when it is its turn. `type` is 0 a number card or a King, 1 a Queen, 2 a Jack on its own
+-- caravan, 3 a Joker, 4 a card of the start, 5 a caravan thrown away, 6 a card thrown away, 7 a face card on a caravan of
+-- the player's; `track` and `row` are where, `value` and `suit` the card.
+-- @function [parent=#Caravan] opponentMove
+-- @return #table Nil when it is not the opponent's turn.
+
+---
+-- The player gets up from the table: a match that is not over is lost.
+-- @function [parent=#Caravan] close
 
 ---
 -- @{#MenuScene}: models of the game drawn to a texture that a menu shows (the lock and pick of the lockpicking screen).

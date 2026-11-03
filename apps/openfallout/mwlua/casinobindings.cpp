@@ -298,6 +298,140 @@ namespace OFLua
         blackjack["surrender"] = []() { return scripts().blackjackMove(Move::Surrender); };
         blackjack["switch"] = []() { return scripts().blackjackMove(Move::Switch); };
         api["blackjack"] = LuaUtil::makeReadOnly(blackjack);
+
+        // The card game Caravan (ShowCaravanMenu). Everything counts from 1: the caravans (the player's are 1 to 3, the
+        // opponent's 4 to 6, and the player's n faces 7 - n), their rows, the cards of the hand and the cards the
+        // player owns
+        sol::table caravan(lua, sol::create);
+        // Where the match is: the stage ("bet", "deck", "game" or "results"), the opponent's name, the stake (what the
+        // player has, what the opponent asks, what the player puts up, the most the opponent follows a raise to, the
+        // most the player may raise by, the pot), the deck (the cards in it, the cards owned, whether it can be played)
+        // and, when it is over, whether the player won and whether it gave up. Nothing when no match is open.
+        caravan["screen"] = [lua]() -> sol::object {
+            const auto screen = scripts().caravanScreen();
+            if (!screen)
+                return sol::nil;
+            using Stage = OFScript::FalloutScripts::CaravanStage;
+            sol::table row(lua, sol::create);
+            row["stage"] = screen->mStage == Stage::Bet ? "bet"
+                : screen->mStage == Stage::Deck         ? "deck"
+                : screen->mStage == Stage::Game         ? "game"
+                                                        : "results";
+            row["serial"] = screen->mSerial;
+            row["opponent"] = screen->mOpponent;
+            row["funds"] = screen->mFunds;
+            row["ante"] = screen->mAnte;
+            row["bet"] = screen->mBet;
+            row["ceiling"] = screen->mCeiling;
+            row["mostRaise"] = screen->mMostRaise;
+            row["pot"] = screen->mPot;
+            row["canMatch"] = screen->mCanMatch;
+            row["canAccept"] = screen->mCanAccept;
+            row["inDeck"] = screen->mInDeck;
+            row["owned"] = screen->mOwned;
+            row["canPlay"] = screen->mCanPlay;
+            row["won"] = screen->mWon;
+            row["forfeited"] = screen->mForfeited;
+            return row;
+        };
+        caravan["match"] = []() { return scripts().caravanMatch(); };
+        caravan["raise"] = [](int amount) { return scripts().caravanRaise(amount); };
+        caravan["accept"] = []() { return scripts().caravanAccept(); };
+        // The cards the player owns, one entry for each card: its value (1 to 10, 12 Jack, 13 Queen, 14 King, 15
+        // Joker), its suit (1 to 4, 5 for the Joker), its name and whether it is in the deck
+        caravan["cards"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const auto& card : scripts().caravanCards())
+            {
+                sol::table row(lua, sol::create);
+                row["value"] = card.mValue;
+                row["suit"] = card.mSuit;
+                row["name"] = card.mName;
+                row["inDeck"] = card.mInDeck;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+        caravan["setInDeck"] = [](int index, bool inDeck) { return scripts().caravanSetInDeck(index - 1, inDeck); };
+        caravan["randomize"] = []() { return scripts().caravanRandomize(); };
+        caravan["play"] = []() { return scripts().caravanPlay(); };
+        // The match: for each of the six caravans its rows (a list of the cards of a row, the number card first),
+        // total, direction (1 up, -1 down, 0 for fewer than two rows) and suit (5 for none); the hand; how many cards
+        // the opponent's hand and the two piles have; the phase ("start", "play", "over"); whose turn it is; and who
+        // won
+        caravan["board"] = [lua]() -> sol::object {
+            const auto board = scripts().caravanBoard();
+            if (!board)
+                return sol::nil;
+            const auto cardRow = [&lua](const OFScript::FalloutScripts::CaravanBoardCard& card) {
+                sol::table row(lua, sol::create);
+                row["value"] = card.mValue;
+                row["suit"] = card.mSuit;
+                return row;
+            };
+            sol::table row(lua, sol::create);
+            sol::table tracks(lua, sol::create);
+            int trackIndex = 1;
+            for (const auto& track : board->mTracks)
+            {
+                sol::table shown(lua, sol::create);
+                sol::table rows(lua, sol::create);
+                int rowIndex = 1;
+                for (const auto& cards : track.mRows)
+                {
+                    sol::table cardsShown(lua, sol::create);
+                    int cardIndex = 1;
+                    for (const auto& card : cards)
+                        cardsShown[cardIndex++] = cardRow(card);
+                    rows[rowIndex++] = cardsShown;
+                }
+                shown["rows"] = rows;
+                shown["total"] = track.mTotal;
+                shown["direction"] = track.mDirection;
+                shown["suit"] = track.mSuit;
+                tracks[trackIndex++] = shown;
+            }
+            row["tracks"] = tracks;
+            sol::table hand(lua, sol::create);
+            int handIndex = 1;
+            for (const auto& card : board->mHand)
+                hand[handIndex++] = cardRow(card);
+            row["hand"] = hand;
+            row["opponentHand"] = board->mOpponentHand;
+            row["pile"] = board->mPile;
+            row["opponentPile"] = board->mOpponentPile;
+            row["phase"] = board->mPhase;
+            row["playersTurn"] = board->mPlayersTurn;
+            row["over"] = board->mOver;
+            row["won"] = board->mWon;
+            return row;
+        };
+        caravan["canPlace"]
+            = [](int track, int row, int hand) { return scripts().caravanCanPlace(track - 1, row - 1, hand - 1); };
+        caravan["place"]
+            = [](int track, int row, int hand) { return scripts().caravanPlace(track - 1, row - 1, hand - 1); };
+        caravan["discardCard"] = [](int hand) { return scripts().caravanDiscardCard(hand - 1); };
+        caravan["discardTrack"] = [](int track) { return scripts().caravanDiscardTrack(track - 1); };
+        caravan["forfeit"] = []() { return scripts().caravanForfeit(); };
+        // The opponent makes its move when it is its turn: the kind (0 a number card or a King, 1 a Queen, 2 a Jack on
+        // its own caravan, 3 a Joker, 4 a card of the start, 5 a caravan thrown away, 6 a card thrown away, 7 a face
+        // card on one of the player's caravans), where, and the card (value and suit). Nothing when it is not its turn.
+        caravan["opponentMove"] = [lua]() -> sol::object {
+            const auto made = scripts().caravanOpponentMove();
+            if (!made.mMade)
+                return sol::nil;
+            sol::table row(lua, sol::create);
+            row["type"] = made.mType;
+            row["track"] = made.mTrack + 1;
+            row["row"] = made.mRow + 1;
+            row["value"] = made.mCard.mValue;
+            row["suit"] = made.mCard.mSuit;
+            return row;
+        };
+        // The player gets up: a match that is not over is lost
+        caravan["close"] = []() { scripts().closeCaravan(); };
+        api["caravan"] = LuaUtil::makeReadOnly(caravan);
         return LuaUtil::makeReadOnly(api);
     }
 }

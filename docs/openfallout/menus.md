@@ -968,6 +968,44 @@ the 3D table and wheel, the setting of what the executable keeps at +0x4010, the
 crosses a quarter (its closer was not read in detail). Seen only in the offline harness with a made-up engine (`roulette.lua`,
 `roulettehit.lua`: every one of the 159 areas is reachable from some place on the cloth, `blackjack.lua`), not in the running game.
 
+### Caravan (Mac round 12AS E3 and E4, FalloutNV.exe 0x73D650 to 0x752E20; New Vegas only)
+
+`ShowCaravanMenu` (the reference it is called on is the opponent; the arguments are a `CDCK` deck record, the kind of opponent
+0 or 1 and the share of its money the opponent opens with) opens a match: `openCaravan` in `falloutcaravan.cpp`. The records of the
+game (`CCRD` cards, `CDCK` decks and `CMNY` caravan money) are in the record store now; the two numbers of a card's `INTV` are its
+suit and its value (1 to 10, 12 Jack, 13 Queen, 14 King, 15 Joker; the files have no 11). The player's cards are the card items in
+its pack, each card of a stack by itself, and the menu does not open for fewer than 30 (the executable's own message was not read,
+so the notice is worded here). The opponent plays the cards of the deck record, not of its pack.
+
+`components/falloutscript/caravan.cpp` holds the rules as the executable has them: three caravans of up to seven rows for each side (a
+row is a number card with up to three face cards on it), the total of a caravan (a King doubles its row, the Queen of the last row
+sets the suit and turns the direction), the placement test (0x74F6C0: in the start a number card on the first row of an own caravan
+that has none; later a number card on the next row going the way of the caravan, against it only in the caravan's suit, never the
+value of the row below; a face card on any row that has a number card; a Queen only on the last row), the Jack (removes its row and
+what is on it), the Joker (removes every other row of the same value, of the same suit when it is on an Ace) and the end of the match
+(0x752E20: a caravan is sold at 21 to 26; the player's caravan i faces the opponent's 5 - i, counting from 0; a side wins with two of the three pairs
+decided in its favour and all three decided; a side with no cards left loses, the player's tested first). The opponent is one chooser
+(0x74FDC0): each use of a card in the hand is given a number and the highest is made, the first of equal ones; the types 0 and 1 of
+the game differ only in the start, the Joker and the price of throwing a caravan away. The Joker scoring of the type 3 and above, and
+what the executable does with the Jack of the opponent's own second generator, are not read. `CaravanStake` and `settleCaravan` hold the
+money: the opponent opens with the share of what it has, the player matches, may raise and the pot is the smaller bet; a side's money
+is its caps and its caravan money (form type 0x74, read as the kind of `CMNY`) and what the loser pays is its caravan money item by
+item in the order of the pack (here: of the forms) and then the rest in caps. Nothing moves until the match is over, and a match
+that the player leaves is a forfeit, which is a loss.
+
+`falloutcaravan.lua` draws the four screens. The stake is the game's `caravan_bet_menu.xml` (the two antes, the funds, Auto-Match, Raise
+with the quantity prompt, Accept, Exit); the deck is `caravan_builddeck_menu.xml` (the counts, the two lists, Add, Remove, Play
+Caravan) with plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
+move, the wheel to scroll, Enter to add or remove, R for a random deck of the executable's size, the pad's shoulders for the lists).
+The files of the match and of the result have no controls ("all controls will be handled in code"), so the match is tiles too: the
+caravans as columns (the opponent's above the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card
+picked up by a click and put on a caravan by a click on it, the totals coloured by sold, over or not yet, Discard Card, Discard
+Caravan and Forfeit (asked twice). The opponent moves after a second, its card lights the row it went on, and the result comes two
+seconds after the match ends. Seen only in the offline harness with a made-up engine (`caravan.lua`), not in the running game. Not
+made: the 3D table, deck strips and hands (the scenes catalogued in 12AS E2), the pictures of the cards, the sounds, the Pip-Boy
+statistics of the matches (their numbers were not read), the executable's words for the match tiles, the card suits' letters (the
+order of the suits was not read) and the confirmation the game asks before a forfeit by Escape.
+
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 
 A trait that holds a text is the number 0 in a number (no parse, no length). `and`, `or`, `not`, `onlyif` and `onlyifnot` look at

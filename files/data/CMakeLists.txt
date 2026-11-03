@@ -195,6 +195,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutstart.lua
     scripts/omw/falloutsettingsitems.lua
     scripts/omw/falloutslots.lua
+    scripts/omw/falloutcaravan.lua
     scripts/omw/falloutterminal.lua
     scripts/omw/falloutterminalhack.lua
     scripts/omw/falloutwidgets.lua

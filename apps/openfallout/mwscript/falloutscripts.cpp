@@ -309,6 +309,15 @@ namespace OFScript
                 FalloutScript::intArgument(call, 2), 0);
             return 1.0;
         });
+        // The card game Caravan (FalloutNV.exe 0x741060): the character the script is called on plays the player with
+        // the cards of the deck record, as the kind of opponent that the integer says (0, or 1 for the four of the
+        // tournament), and asks for the share of its money that the float is
+        mInterpreter.setHandler("ShowCaravanMenu", [this](FalloutScript::CallContext& call) {
+            return openCaravan(call.mReference, FalloutScript::formArgument(call, 0),
+                       FalloutScript::intArgument(call, 1), static_cast<float>(FalloutScript::argument(call, 2)))
+                ? 1.0
+                : 0.0;
+        });
         // The container a vendor sells from (FalloutNV.exe 0x56a9b0): given, or taken away
         mInterpreter.setHandler("SetMerchantContainer", [this](FalloutScript::CallContext& call) {
             setMerchantContainer(call.mReference, FalloutScript::formArgument(call, 0));
