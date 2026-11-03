@@ -168,6 +168,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutvats.lua
     scripts/omw/falloutitemcards.lua
     scripts/omw/falloutlevelup.lua
+    scripts/omw/falloutlockpick.lua
     scripts/omw/falloutloot.lua
     scripts/omw/falloutmenu.lua
     scripts/omw/falloutmessage.lua
@@ -178,6 +179,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutpipboyitems.lua
     scripts/omw/falloutpipboystats.lua
     scripts/omw/falloutquantity.lua
+    scripts/omw/falloutscene.lua
     scripts/omw/falloutstatus.lua
     scripts/omw/falloutstart.lua
     scripts/omw/falloutsettingsitems.lua

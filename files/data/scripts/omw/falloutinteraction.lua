@@ -17,6 +17,7 @@ local widgetModule = require('scripts.omw.falloutwidgets')
 local menuModule = require('scripts.omw.falloutmenu')
 local terminalMenu = require('scripts.omw.falloutterminal')
 local hackMenu = require('scripts.omw.falloutterminalhack')
+local lockpickMenu = require('scripts.omw.falloutlockpick')
 
 local interact = core.interact
 local pipboy = core.pipboy
@@ -102,6 +103,7 @@ end
 -- when the event that tells of it comes
 local function leave()
     release()
+    lockpickMenu.close()
     destroyElement()
     closeTerminalMenus()
     screen = nil
@@ -147,6 +149,11 @@ end
 local function renderLock()
     local lock = interact.lock()
     if not lock then
+        return
+    end
+    -- The lock and the bobby pin are drawn from the game's own menu file and models; the widgets below stand in for an
+    -- install that lacks them
+    if lockpickMenu.start(lock, { leave = leave }) then
         return
     end
     widgets = widgetModule.new(update)
@@ -406,6 +413,9 @@ local function sync()
         local lock = interact.lock()
         if not lock then
             leave()
+        elseif lockpickMenu.isOpen() then
+            -- (the pins change as they break; the screen of the game keeps its own count)
+            lockpickMenu.update(core.getRealFrameDuration())
         elseif lock.serial ~= shownSerial or lock.pins ~= shownPins then
             shownSerial = lock.serial
             shownPins = lock.pins
@@ -478,17 +488,22 @@ local function press(code, symbol)
         if not terminalMenu.press(code) then
             hackMenu.press(code)
         end
-    elseif screen == 'lock' and code == input.KEY.Enter then
-        local lock = interact.lock()
-        if lock and not lock.keyOnly and lock.pins > 0 then
-            pickLock()
+    elseif screen == 'lock' then
+        if lockpickMenu.isOpen() then
+            lockpickMenu.press(code, symbol)
+        elseif code == input.KEY.Enter then
+            local lock = interact.lock()
+            if lock and not lock.keyOnly and lock.pins > 0 then
+                pickLock()
+            end
         end
     end
 end
 
+-- X forces the lock on the lockpicking screen (B leaves, which the engine does for every screen)
 local onPad = pad.handler('interaction',
     function() return (screen == 'rest' or screen == 'lock') and I.UI.getMode() == 'Interface' and not messageOpen() end,
-    press)
+    press, { [input.CONTROLLER_BUTTON.X] = input.KEY.F })
 
 return {
     engineHandlers = {
@@ -508,6 +523,7 @@ return {
             if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then
                 modeOpen = false
                 release()
+                lockpickMenu.close()
                 destroyElement()
                 closeTerminalMenus()
                 screen = nil

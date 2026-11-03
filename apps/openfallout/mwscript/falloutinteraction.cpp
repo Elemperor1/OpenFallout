@@ -212,6 +212,12 @@ namespace OFScript
                 return std::string();
             screen = *mLockScreen;
         }
+        if (kind == "outOfPicks")
+        {
+            // The player has no pick (to begin with, or the last has broken): the screen stays, the pin cannot be used
+            showNotice(wordOf("sOutOfLockpicks", "You are out of lockpicks."), 2.0);
+            return std::string();
+        }
         if (kind == "pickBroke")
         {
             // Playing the break takes one pin, whatever the lock

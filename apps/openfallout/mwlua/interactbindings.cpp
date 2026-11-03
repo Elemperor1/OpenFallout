@@ -71,8 +71,8 @@ namespace OFLua
             return row;
         };
         // What happened on the lockpicking screen: "opened" (the lock is unlocked, the experience is given and the
-        // activation goes on), "pickBroke" (one bobby pin is gone; the result is how many are left) or "forceFailed"
-        // (the lock is broken for good and the screen closes)
+        // activation goes on), "pickBroke" (one bobby pin is gone; the result is how many are left), "outOfPicks" (the
+        // player has none: the player is told) or "forceFailed" (the lock is broken for good and the screen closes)
         api["lockOutcome"] = [](const std::string& kind) { return scripts().lockOutcome(kind); };
         // One bobby pin is tried: "opened", "broke", "nopins" or "keyonly" ("" when no lock is open)
         api["pick"] = []() { return scripts().pickLock(); };

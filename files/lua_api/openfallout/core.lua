@@ -1899,12 +1899,13 @@
 
 ---
 -- What happened on the lockpicking screen. "opened": the lock is unlocked, the player is given the experience of the
--- lock (once for each lock) and the door or container is activated again. "pickBroke": a bobby pin is gone. "forceFailed":
--- the lock is broken for good, the player is told and the screen closes.
+-- lock (once for each lock) and the door or container is activated again. "pickBroke": a bobby pin is gone.
+-- "outOfPicks": the player has no bobby pin (to begin with, or the last has broken) and is told. "forceFailed": the lock
+-- is broken for good, the player is told and the screen closes.
 -- @function [parent=#Interact] lockOutcome
--- @param #string kind "opened", "pickBroke" or "forceFailed".
+-- @param #string kind "opened", "pickBroke", "outOfPicks" or "forceFailed".
 -- @return #string The number of bobby pins that are left for "pickBroke", "broken" for "forceFailed", "opened" for
--- "opened"; "" when no lock is open.
+-- "opened"; "" for "outOfPicks" and when no lock is open.
 
 ---
 -- @function [parent=#Interact] closeLock
