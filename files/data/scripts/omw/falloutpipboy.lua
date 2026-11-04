@@ -932,6 +932,34 @@ local function press(code, symbol)
     end
 end
 
+-- F1, F2 and F3 are the games' own keys for the Pip-Boy's pages (FalloutNV.exe, Mac round 12AH A3): with the Pip-Boy shut
+-- they open it on the page, open they switch to it, and the key of the page that is up shuts it. (The engine's own uses of
+-- F1 and F2, the quick keys and the post-processing, are unbound by default.) True when the key was one of them.
+local PAGE_KEYS = { [input.KEY.F1] = 'stat', [input.KEY.F2] = 'inv', [input.KEY.F3] = 'data' }
+
+local function pageKey(code)
+    local page = PAGE_KEYS[code]
+    if not page or messageOpen() then
+        return false
+    end
+    if visible then
+        if I.UI.getMode() ~= 'Interface' or view ~= 'pipboy' or dropPrompt then
+            return true
+        end
+        if tab == page then
+            closeWindow()
+        else
+            pickPage(page)
+        end
+        return true
+    end
+    if I.UI.getMode() == nil and not pipboy.playerDead() then
+        tab = page
+        openWindow()
+    end
+    return true
+end
+
 -- X drops the item; the other buttons stand for the keys of every screen
 local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
     { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
@@ -1001,6 +1029,9 @@ return {
             end
         end,
         onKeyPress = function(key)
+            if pageKey(key.code) then
+                return
+            end
             press(key.code, key.symbol)
         end,
         onControllerButtonPress = onPad,

@@ -265,7 +265,8 @@ namespace OFInput
         defaultKeyBindings[A_CycleWeaponLeft] = SDL_SCANCODE_LEFTBRACKET;
         defaultKeyBindings[A_CycleWeaponRight] = SDL_SCANCODE_RIGHTBRACKET;
 
-        defaultKeyBindings[A_QuickKeysMenu] = SDL_SCANCODE_F1;
+        // (F1, F2 and F3 are the games' keys for the pages of the Pip-Boy: the quick keys menu and the post-processing
+        // HUD are unbound by default; a player's own binding of them is kept)
         defaultKeyBindings[A_Console] = SDL_SCANCODE_GRAVE;
         defaultKeyBindings[A_Run] = SDL_SCANCODE_LSHIFT;
         defaultKeyBindings[A_Sneak] = SDL_SCANCODE_LCTRL;
@@ -292,7 +293,6 @@ namespace OFInput
         defaultKeyBindings[A_AlwaysRun] = SDL_SCANCODE_CAPSLOCK;
         defaultKeyBindings[A_QuickSave] = SDL_SCANCODE_F5;
         defaultKeyBindings[A_QuickLoad] = SDL_SCANCODE_F9;
-        defaultKeyBindings[A_TogglePostProcessorHUD] = SDL_SCANCODE_F2;
 
         std::map<int, int> defaultMouseButtonBindings;
         defaultMouseButtonBindings[A_Inventory] = SDL_BUTTON_RIGHT;

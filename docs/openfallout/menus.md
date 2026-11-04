@@ -609,9 +609,11 @@ files were not heard in the running game.
   page. F1, F2 and F3 (raw keys) go to Stats, Inventory and Data: closed they open the Pip-Boy on that page, open they switch
   to it directly, and the key of the page that is up closes it. Escape does not close the Pip-Boy: it puts the pause menu on
   top (the Pip-Boy stays under it), and with the pause menu open it closes only that.
-- The port's own differences, none changed yet: the engine's Tab binding opens and closes it at once (no light), Left and Right
-  change the page, F1 and F2 are the engine's quick keys and post-processing keys, and Escape closes the screen. The 28 numbered
-  controls and their defaults are in `mac-12ah-results.md` (Part A3).
+- The port's own differences: the engine's Tab binding opens and closes it at once (no light), Left and Right change the page, and
+  Escape closes the screen (the game puts the pause menu over it; seen in play, Mac round 12AZ B6). F1, F2 and F3 are the game's:
+  they open the Pip-Boy on Stats, Items and Data, switch to the page when it is open and shut it from the page that is up (the
+  engine's own F1 and F2, the quick keys and the post-processing, are no longer bound by default: F2 showed a message box about the
+  post-processor in play, Mac round 12AZ B). The 28 numbered controls and their defaults are in `mac-12ah-results.md` (Part A3).
 
 ### Trading (barter)
 
