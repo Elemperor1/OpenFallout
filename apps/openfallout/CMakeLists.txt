@@ -20,7 +20,7 @@ source_group(apps/openfallout FILES main.cpp androidmain.cpp ${OPENFALLOUT_SOURC
 add_openfallout_dir (mwrender
     actors objects renderingmanager animation rotatecontroller sky skyutil skyfallback npcanimation esm4npcanimation esm4creatureanimation falloutactoranimation falloutanimation falloutface vismask
     creatureanimation effectmanager util renderinginterface pathgrid rendermode weaponanimation screenshotmanager
-    bulletdebugdraw globalmap characterpreview menuscene camera localmap water waterframes waterlook terrainstorage ripplesimulation
+    bulletdebugdraw globalmap characterpreview menuscene facepreview camera localmap water waterframes waterlook terrainstorage ripplesimulation
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging falloutlod groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass opaqueblit waterawaretransparentbin precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller

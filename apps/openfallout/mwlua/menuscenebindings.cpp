@@ -18,7 +18,9 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwgui/menuscenes.hpp"
+#include "../mwrender/facepreview.hpp"
 #include "../mwrender/menuscene.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
 #include "luamanagerimp.hpp"
@@ -126,6 +128,33 @@ namespace OFLua
         };
         // The path of the texture of the scene, for ui.texture
         api["texture"] = [](const std::string& name) { return OFGui::MenuScenes::textureName(name); };
+
+        // The head of the player in the scene (the screen of the face): a character with the look the player has now,
+        // made again each time `updateHead` is said
+        api["updateHead"] = [context](const std::string& name) {
+            context.mLuaManager->addAction([name] {
+                OFGui::MenuScenes* scenes = OFBase::Environment::get().getWindowManager()->getMenuScenes();
+                if (scenes == nullptr)
+                    return;
+                OFRender::FacePreview* head = scenes->head(name);
+                OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts();
+                if (head == nullptr || host == nullptr)
+                    return;
+                OFScript::FalloutScripts::LookPreview preview;
+                if (host->lookPreview(preview))
+                    head->set(preview.mTemplate, preview.mRecord);
+            });
+        };
+        // The camera looks at the head from `distance` units, turned `yaw` radians about the vertical
+        api["setHeadView"] = [context](const std::string& name, float yaw, float distance) {
+            context.mLuaManager->addAction([name, yaw, distance] {
+                OFGui::MenuScenes* scenes = OFBase::Environment::get().getWindowManager()->getMenuScenes();
+                if (scenes == nullptr)
+                    return;
+                if (OFRender::FacePreview* head = scenes->head(name))
+                    head->view(yaw, distance);
+            });
+        };
 
         // The planes of the frustum of the camera on its near plane, and its near and far distances
         api["setFrustum"] = [context](const std::string& name, float left, float right, float bottom, float top,

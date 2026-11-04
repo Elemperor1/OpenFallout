@@ -332,6 +332,20 @@ namespace OFClass
         return getCustomData(ptr).mIsFemale;
     }
 
+    void ESM4Npc::setLook(const OFWorld::Ptr& ptr, const ESM4::Npc& traits)
+    {
+        ESM4NpcCustomData& data = getCustomData(ptr);
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        data.mTraits = &traits;
+        if (const ESM4::Race* race = store->get<ESM4::Race>().search(traits.mRace))
+            data.mRace = race;
+        data.mIsFemale = traits.mIsFONV ? (traits.mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0
+                                        : (traits.mBaseConfig.tes5.flags & ESM4::Npc::TES5_Female) != 0;
+        // The screen shows the head and the body of the race, not what the character was dressed in
+        data.mEquippedArmor.clear();
+        data.mEquippedClothing.clear();
+    }
+
     VFS::Path::NormalizedView ESM4Npc::getModel(const OFWorld::ConstPtr& ptr) const
     {
         const ESM4NpcCustomData& data = getCustomData(ptr);

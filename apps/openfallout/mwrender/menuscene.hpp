@@ -90,6 +90,9 @@ namespace OFRender
         /// `keepShapes` keeps the optimizer from merging the shapes of the file or folding its nodes into one another, so
         /// that a script can name each of them (the model is cached apart from the ordinary one of the file).
         bool addModel(const std::string& name, VFS::Path::NormalizedView path, bool keepShapes = false);
+        /// Puts a node that the caller made (an actor with its own animation, for one) in the scene under `name`, as a
+        /// model without sequences (a name that is taken is replaced). The caller keeps what the node needs to live.
+        bool addNode(const std::string& name, osg::ref_ptr<osg::Node> node);
         void removeModel(const std::string& name);
         bool hasModel(const std::string& name) const;
 

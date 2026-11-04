@@ -2452,6 +2452,21 @@
 -- @return #string, #number
 
 ---
+-- The head of the player in the scene (the screen of the sex, race and face): a character with the sex, race, hair, eyes
+-- and face the player has now, in the middle of the scene. The first call makes it; each call makes the character again
+-- from the look as it is then.
+-- @function [parent=#MenuScene] updateHead
+-- @param #string name
+
+---
+-- Where the camera stands to see the head of `updateHead`: `distance` units from the head, turned `yaw` radians about
+-- the vertical (0 looks at the face), looking at the head.
+-- @function [parent=#MenuScene] setHeadView
+-- @param #string name
+-- @param #number yaw
+-- @param #number distance
+
+---
 -- Puts the model at `time` seconds of its sequence ("Forward", "Backward", "Left"): the nodes the sequence moves are
 -- where it has them at that time.
 -- @function [parent=#MenuScene] setSequenceTime

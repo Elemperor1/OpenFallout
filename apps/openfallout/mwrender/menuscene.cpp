@@ -429,6 +429,23 @@ namespace OFRender
         return true;
     }
 
+    bool MenuScene::addNode(const std::string& name, osg::ref_ptr<osg::Node> node)
+    {
+        removeModel(name);
+        if (node == nullptr)
+            return false;
+
+        auto model = std::make_unique<Model>();
+        model->mRoot = new osg::MatrixTransform;
+        model->mRoot->setName(name);
+        model->mRoot->addCullCallback(new SceneUtil::LightListCallback);
+        model->mRoot->addChild(node);
+        model->mInstance = node;
+        mModels->addChild(model->mRoot);
+        mModelsByName[name] = std::move(model);
+        return true;
+    }
+
     void MenuScene::removeModel(const std::string& name)
     {
         const auto it = mModelsByName.find(name);

@@ -20,6 +20,7 @@ namespace Resource
 
 namespace OFRender
 {
+    class FacePreview;
     class MenuScene;
 }
 
@@ -40,6 +41,8 @@ namespace OFGui
         /// Makes the scene (the scene of the same name that there is, is replaced)
         OFRender::MenuScene* create(const std::string& name, int width, int height);
         OFRender::MenuScene* find(const std::string& name);
+        /// The head of the screen of the face in the scene (made if the scene has none yet); null when there is no scene
+        OFRender::FacePreview* head(const std::string& name);
         /// Takes the scene out of the game's graph; the texture stays, with the last picture
         void destroy(const std::string& name);
         void clear();
@@ -49,6 +52,8 @@ namespace OFGui
         Resource::ResourceSystem* mResourceSystem;
         MyGUIPlatform::RenderManager* mRenderManager;
         std::map<std::string, std::unique_ptr<OFRender::MenuScene>> mScenes;
+        // Each head is taken down before the scene it is in
+        std::map<std::string, std::unique_ptr<OFRender::FacePreview>> mHeads;
     };
 }
 

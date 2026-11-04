@@ -22,6 +22,7 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm4/effectlist.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
@@ -1799,6 +1800,15 @@ namespace OFScript
         void lookSetSlider(FalloutScript::FaceKind kind, int control, int value);
         /// How many controls of facegen\si.ctl the screen has (none when the file was not read)
         int lookControlCount(FalloutScript::FaceKind kind);
+        /// A character that has the look of the player, for the head the screen shows: the record of a character of the
+        /// data that has the sex and race (the first preset, which has a skeleton and a body the way a character of the
+        /// world does) with the look written over it. `mTemplate` is that record's id.
+        struct LookPreview
+        {
+            ESM::RefId mTemplate;
+            ESM4::Npc mRecord;
+        };
+        bool lookPreview(LookPreview& preview);
         /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
         /// the executable shows beside the description
         struct ChargenTrait

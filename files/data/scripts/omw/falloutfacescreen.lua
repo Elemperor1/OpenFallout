@@ -8,17 +8,21 @@
 --   face.start(page, state, { done = function() ... end })   -- true when the screen is up
 --   face.update(seconds); face.press(code, symbol, shift); face.escape(); face.close()
 --
--- The head that the player turns (the device, the lights and the head of the character) is not drawn here: the window
--- has the panel only.
+-- The head that the player turns is a scene of the menus (falloutscene.lua, core.menuScene) under the panel: the engine
+-- makes the character again from the look each time it changes (core.menuScene.updateHead), the camera goes round the
+-- head when the pointer drags the hotrect RSM_Face_Grab and in and out with the wheel over it.
 
 local core = require('openfallout.core')
 local input = require('openfallout.input')
 local I = require('openfallout.interfaces')
 local ui = require('openfallout.ui')
+local util = require('openfallout.util')
 local menuModule = require('scripts.omw.falloutmenu')
+local sceneModule = require('scripts.omw.falloutscene')
 
 local chargen = core.chargen
 local pipboy = core.pipboy
+local v3 = util.vector3
 
 local module = {}
 
@@ -75,6 +79,36 @@ local colourPreset = 0
 local custom = false
 -- The list a click asked for, which is shown at the next frame
 local pending = nil
+
+-- The head: the scene it is in, how far the camera has gone round it and in (zoom 0 is the nearest), and whether the
+-- look changed since the head was made
+local SCENE = 'face'
+local FACE_GRAB = 'RSM_Face_Grab'
+local scene = nil
+local view = { yaw = 0, zoom = 0.35 }
+local headDirty = false
+local headWait = 0
+local viewFor = nil
+local lastDragX = nil
+-- How much longer the camera is said again after the head was made (the bone it aims at is found when the head is up)
+local cameraWait = 0
+local cameraAsked = false
+-- How the camera sees the head (a guess: the executable's camera is not read): the distances from the head to the
+-- camera at the two ends of the zoom, the half of the angle it sees upwards (a quarter of the 45 degrees of the
+-- games' field of view, as the lock's scene has it), the planes of the frustum, and the turn the pointer makes per
+-- unit of the menu that it moves
+local NEAREST, FARTHEST = 55, 135
+local HALF_ANGLE = 0.19635
+local NEAR_PLANE, FAR_PLANE = 5.0, 2000.0
+local YAW_PER_UNIT = 0.012
+local MAX_YAW = 1.6
+local ZOOM_PER_NOTCH = 0.1
+-- At most so often the head is made again while sliders are moved (seconds), and how long after that the camera is
+-- said again
+local HEAD_EVERY = 0.12
+local CAMERA_AFTER = 0.6
+local AMBIENT = v3(0.42, 0.42, 0.44)
+local DIFFUSE = v3(0.78, 0.74, 0.70)
 
 local function word(setting, fallback)
     local text = pipboy.text(setting)
@@ -412,6 +446,7 @@ end
 local function changed()
     refreshLook()
     sync()
+    headDirty = true
 end
 
 -- The row's click, by its place in the list
@@ -536,6 +571,111 @@ local function drag()
     moveSlider(row, math.floor(row.low + (row.high - row.low) * fraction + 0.5))
 end
 
+-- ---- The head ----
+
+-- The camera and the lights follow the view (the light stays on the side the camera is, a little above and to the left)
+local function placeCamera()
+    cameraAsked = true
+    local sine, cosine = math.sin(view.yaw), math.cos(view.yaw)
+    local distance = NEAREST + (FARTHEST - NEAREST) * view.zoom
+    core.menuScene.setHeadView(SCENE, view.yaw, distance)
+    local forward = v3(-sine, -cosine, 0)
+    local right = v3(-cosine, sine, 0)
+    core.menuScene.setLight(SCENE, AMBIENT, DIFFUSE,
+        v3(forward.x + right.x * 0.35, forward.y + right.y * 0.35, -0.45))
+end
+
+-- The frustum puts the head in the middle of the hotrect that is made for turning it (the file's RSM_Face_Grab), at the
+-- scale of the window's height
+local function placeFrustum()
+    local size = ui.screenSize()
+    if viewFor and viewFor.x == size.x and viewFor.y == size.y then return end
+    viewFor = size
+    local across, down = 0.4, 0.45
+    local grab = opened:find(FACE_GRAB)
+    local rect = grab and opened:rect(grab)
+    if rect and size.x > 0 and size.y > 0 then
+        across = (rect.x + rect.width / 2) / size.x
+        down = (rect.y + rect.height / 2) / size.y
+    end
+    local halfY = math.tan(HALF_ANGLE) * NEAR_PLANE
+    local halfX = halfY * size.x / size.y
+    core.menuScene.setFrustum(SCENE, -2 * halfX * across, 2 * halfX * (1 - across), -2 * halfY * (1 - down),
+        2 * halfY * down, NEAR_PLANE, FAR_PLANE)
+end
+
+local function openScene()
+    scene = sceneModule.open(SCENE)
+    if not scene or core.menuScene.updateHead == nil then
+        if scene then scene:close() end
+        scene = nil
+        return
+    end
+    core.menuScene.setClearColour(SCENE, 0, 0, 0, 0)
+    viewFor = nil
+    headDirty = true
+    headWait = 0
+    cameraWait = CAMERA_AFTER
+    view = { yaw = 0, zoom = 0.35 }
+    lastDragX = nil
+    placeFrustum()
+    placeCamera()
+end
+
+local function updateScene(seconds)
+    if not scene then return end
+    scene:update()
+    placeFrustum()
+    headWait = headWait - seconds
+    if headDirty and headWait <= 0 then
+        headDirty = false
+        headWait = HEAD_EVERY
+        core.menuScene.updateHead(SCENE)
+        cameraWait = CAMERA_AFTER
+    end
+    -- The head's bone is where the camera aims: it is looked up again while the head is being made, and when the view
+    -- was moved
+    if cameraWait > 0 then
+        cameraWait = cameraWait - seconds
+        cameraAsked = false
+        placeCamera()
+    elseif cameraAsked then
+        cameraAsked = false
+        placeCamera()
+    end
+end
+
+-- The head turns with the pointer that holds the hotrect, and zooms with the wheel over it
+local function turn()
+    local at = opened:pointerAt()
+    if not at then return end
+    if lastDragX ~= nil then
+        local units = (at.x - lastDragX) * 960 / math.max(1, ui.screenSize().y)
+        view.yaw = clamp(view.yaw + units * YAW_PER_UNIT, -MAX_YAW, MAX_YAW)
+        cameraAsked = true
+    end
+    lastDragX = at.x
+end
+
+local function turnEnds()
+    lastDragX = nil
+end
+
+local function zoom(notches)
+    view.zoom = clamp(view.zoom + notches * ZOOM_PER_NOTCH, 0, 1)
+    cameraAsked = true
+end
+
+-- Whether the pointer is over the hotrect of the head (the tile the wheel names is only the one with a scrollbar's traits)
+local function overHead(tile)
+    if tile and opened.menu:name(tile) == FACE_GRAB then return true end
+    local grab = opened:find(FACE_GRAB)
+    local rect = grab and opened:rect(grab)
+    local at = opened:pointerAt()
+    return rect ~= nil and at ~= nil and at.x >= rect.x and at.x < rect.x + rect.width and at.y >= rect.y
+        and at.y < rect.y + rect.height
+end
+
 -- ---- Opening and closing ----
 
 -- The file puts the panel where the executable's device has its screen (the 2D menu is drawn into the screen of the
@@ -560,6 +700,11 @@ function module.isOpen()
 end
 
 function module.close()
+    if scene then
+        scene:close()
+        scene = nil
+    end
+    headDirty = false
     if opened then
         opened:close()
         opened = nil
@@ -596,6 +741,10 @@ function module.start(page, state, options)
     refreshLook()
     local start = mode == 2 and 3 or mode == 3 and 2 or 0
     show(start)
+    openScene()
+    local grab = opened:find(FACE_GRAB)
+    if grab then opened:set(grab, 'draggable', 1) end
+    opened:onDrag(FACE_GRAB, function() return nil end, turnEnds, turn)
     for _, name in ipairs { 'RSM_slider_arrow_left', 'RSM_slider_arrow_right', 'RSM_slider_bar_left',
         'RSM_slider_bar_right' } do
         local delta = name:find('arrow') and 1 or nil
@@ -613,17 +762,21 @@ function module.start(page, state, options)
     opened:onClick('RSM_scroll_up_target', function() scroll(-1) end)
     opened:onClick('RSM_scroll_down_target', function() scroll(1) end)
     opened:onWheel(function(notches, tile)
-        -- The wheel over the head zooms it (the head is not drawn here); over the rest it scrolls the list
-        if tile and opened.menu:name(tile) == 'RSM_Face_Grab' then return end
+        -- The wheel over the head zooms it (up is -1: in); over the rest it scrolls the list
+        if overHead(tile) then
+            zoom(notches)
+            return
+        end
         scroll(notches)
     end)
     return true
 end
 
-function module.update()
+function module.update(seconds)
     if not opened then return end
     opened:checkSize()
     placePanel()
+    updateScene(seconds or 0)
     if pending ~= nil then
         local list = pending
         pending = nil

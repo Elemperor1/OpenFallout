@@ -342,6 +342,45 @@ namespace OFScript
         mChargen.setLook(FalloutScript::randomFace(look, variation, gauss));
     }
 
+    bool FalloutScripts::lookPreview(LookPreview& preview)
+    {
+        const FaceLook look = playerLook();
+        ESM::FormId playerBase;
+        baseOf(mPlayer, playerBase);
+        const ESM4::Npc* base = nullptr;
+        // A character of the data that has the sex and the race: its skeleton and body are what the games draw
+        const std::vector<const ESM4::Npc*> presets = presetsOf(mStore, look.mRace, look.mFemale, playerBase);
+        if (!presets.empty())
+            base = presets.front();
+        else if (!playerBase.isZeroOrUnset())
+            base = mStore.get<ESM4::Npc>().search(playerBase);
+        if (base == nullptr)
+            return false;
+        preview.mTemplate = ESM::RefId(base->mId);
+        preview.mRecord = *base;
+        ESM4::Npc& record = preview.mRecord;
+        record.mRace = ESM::FormId::fromUint32(look.mRace);
+        // The record takes no traits from a template: it says what the player looks like
+        record.mBaseTemplate = ESM::FormId();
+        std::uint32_t& flags = record.mIsFONV ? record.mBaseConfig.fo3.flags : record.mBaseConfig.tes5.flags;
+        const std::uint32_t female = record.mIsFONV ? static_cast<std::uint32_t>(ESM4::Npc::FO3_Female)
+                                                    : static_cast<std::uint32_t>(ESM4::Npc::TES5_Female);
+        flags = look.mFemale ? (flags | female) : (flags & ~female);
+        record.mHair = ESM::FormId::fromUint32(look.mHair);
+        record.mHairLength = look.mHairLength;
+        record.mEyes = ESM::FormId::fromUint32(look.mEyes);
+        record.mHairColour.red = look.mHairColour[0];
+        record.mHairColour.green = look.mHairColour[1];
+        record.mHairColour.blue = look.mHairColour[2];
+        record.mHeadParts.clear();
+        for (const FormId part : look.mHeadParts)
+            record.mHeadParts.push_back(ESM::FormId::fromUint32(part));
+        record.mSymShapeModeCoefficients = look.mShape;
+        record.mAsymShapeModeCoefficients = look.mAsymmetric;
+        record.mSymTextureModeCoefficients = look.mTone;
+        return true;
+    }
+
     const FalloutScript::FaceControls& FalloutScripts::faceControls()
     {
         const std::lock_guard lock(mFaceControlsMutex);
