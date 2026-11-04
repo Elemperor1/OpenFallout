@@ -399,10 +399,12 @@ on. The presets are sorted by name byte by byte (capitals first). A hair that th
 race's own for the sex, and only when the race has none by the first of its hairs that fits (Mac round 12BB C1 and C2).
 
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
-12BB F). Not done: the keys of the pad, the Start menu that Escape opens over the screen (Escape goes up one list here, as the
-Back button does, and the Pip-Boy has the same difference: the port has no way yet to open the pause menu over a screen it
-draws), the hair's length (a vertex morph of the hair model by the record's length) and the head's size by the executable's
-formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
+12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
+it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
+of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the Pip-Boy still has no pause
+menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
+by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
+executable's loading code).
 
 ### The level-up screen
 

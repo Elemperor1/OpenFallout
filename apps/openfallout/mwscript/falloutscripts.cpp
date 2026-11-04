@@ -1728,6 +1728,26 @@ namespace OFScript
             : 0;
     }
 
+    void FalloutScripts::setLuaEscapeClaim(bool claimed)
+    {
+        mLuaEscapeAt = claimed
+            ? std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            : 0;
+    }
+
+    bool FalloutScripts::luaEscapeClaimed() const
+    {
+        const std::int64_t claimedAt = mLuaEscapeAt.load();
+        if (claimedAt == 0)
+            return false;
+        const std::int64_t since
+            = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+                  .count()
+            - claimedAt;
+        return since < 1000;
+    }
+
     bool FalloutScripts::pressMessageButton(std::size_t button)
     {
         std::uint32_t serial = 0;

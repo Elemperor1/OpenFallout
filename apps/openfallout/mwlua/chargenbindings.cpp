@@ -293,6 +293,9 @@ namespace OFLua
         // has none
         api["hasAge"] = []() { return scripts().lookHasAge(); };
         api["setAge"] = [](int value) { return scripts().lookSetAge(value); };
+        // The screen that is open says (every frame) that Escape opens the pause menu over it, as it does in the game;
+        // without the claim Escape leaves the mode of the screen
+        api["claimEscape"] = [](bool claimed) { scripts().setLuaEscapeClaim(claimed); };
         // The player is done with the screen: what it picked becomes the character and the next screen opens
         api["finish"] = []() { scripts().finishChargenPage(); };
         return LuaUtil::makeReadOnly(api);

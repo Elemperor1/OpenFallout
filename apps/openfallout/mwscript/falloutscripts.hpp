@@ -1721,6 +1721,11 @@ namespace OFScript
         /// open, and a question that has not been said for a second is gone (a script that stopped must not leave the
         /// keys dead). Any thread.
         void setLuaQuestion(bool open);
+        /// A screen that Lua draws (the Vigor Tester, the screen of the face) says every frame that Escape opens the pause menu
+        /// over it, as the executables' menus do, instead of leaving the screen; a script that stopped saying it for a second
+        /// no longer claims it
+        void setLuaEscapeClaim(bool claimed);
+        bool luaEscapeClaimed() const;
         /// A script of Lua draws the message boxes (message_menu.xml) when `drawn` is true: the box of the window
         /// manager is not made then, and the button that Lua picks (pressMessageButton) is the answer. When it is
         /// false again (the file is not there, or the script cannot show a box) a box that is open is made as the
@@ -2412,6 +2417,8 @@ namespace OFScript
         std::atomic<int> mLuaPressed{ -1 };
         /// When a script of Lua last said it has a question open (milliseconds of the steady clock), 0 for none
         std::atomic<std::int64_t> mLuaQuestionAt{ 0 };
+        /// When Lua last said that Escape opens the pause menu over its screen (milliseconds of the steady clock), 0 for none
+        std::atomic<std::int64_t> mLuaEscapeAt{ 0 };
         std::uint64_t mOpenBoxId
             = 0; // the box of the window manager that shows it, to tell it from one that replaced it
         std::vector<int> mOpenNumbers;
