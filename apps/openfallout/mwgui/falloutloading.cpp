@@ -138,8 +138,11 @@ namespace OFGui
             mSlides = mRoot->createWidgetReal<MyGUI::Widget>(
                 "Widget", MyGUI::FloatCoord(0, 0, 1, 1), MyGUI::Align::Stretch);
             mSlides->setNeedMouseFocus(false);
-            mTurning = mRoot->createWidgetReal<MyGUI::Widget>(
-                "Widget", MyGUI::FloatCoord(0, 0, 1, 1), MyGUI::Align::Stretch);
+            // The wheel is an overlapped widget: it has its own layer node, which MyGUI draws after the one of the
+            // pictures whatever the order in which the images of each were made (images of one node are drawn in the
+            // order they were made, and a picture with more pieces than the one before makes new ones later)
+            mTurning = mRoot->createWidget<MyGUI::Widget>(MyGUI::WidgetStyle::Overlapped, "Widget",
+                MyGUI::IntCoord(0, 0, mRoot->getWidth(), mRoot->getHeight()), MyGUI::Align::Stretch);
             mTurning->setNeedMouseFocus(false);
         }
         mRoot->setVisible(true);

@@ -636,11 +636,14 @@ local function refreshFromFile(dt)
             -- The stand-in draws the next frame, whatever it drew before, and says what waited for its turn and what this
             -- frame brought
             shown = nil
+            -- (a message comes on with its sound, which the display from the file had not played yet for the ones that waited)
             for _, message in ipairs(previous.queue or {}) do
                 lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds - (message.age or 0) }
+                if message.sound and message.sound ~= '' and not message.played then pipboy.playSoundNamed(message.sound) end
             end
             for _, message in ipairs(state.messages or {}) do
                 lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds }
+                if message.sound and message.sound ~= '' then pipboy.playSoundNamed(message.sound) end
             end
             for _, said in ipairs(state.subtitles or {}) do
                 lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }

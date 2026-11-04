@@ -2437,10 +2437,11 @@ namespace OFScript
         if (mGame != FalloutScript::Game::NewVegas)
         {
             // The card of Fallout 3 shows the damage of the weapon at its condition (the settings of the guns and of the
-            // melee weapons, as in a fight), which the perks change when the weapon is built, as in a fight, and not the
-            // skill of the player
-            const double worn = std::max(blow.mDamage, 0.0) * FalloutScript::Damage::conditionFactor(damageSettings(), blow);
-            return std::max(mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, worn, context), 0.0);
+            // melee weapons, as in a fight), and not the skill of the player. The perks change the damage of the weapon
+            // when the blow is built, before the condition takes its share, as in strike()
+            const double built = mPerks.apply(FalloutScript::EntryPoint::weaponDamage, mPlayer, blow.mDamage, context);
+            return std::max(
+                std::max(built, 0.0) * FalloutScript::Damage::conditionFactor(damageSettings(), blow), 0.0);
         }
         const double dealt
             = FalloutScript::Damage::resolve(damageSettings(), blow, 0.0, 0.0, FalloutScript::Defense(), 100.0).mDamage;
