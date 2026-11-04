@@ -5,9 +5,10 @@
 -- click does is the engine's (core.pipboy); this module lists it and gives the choices of the player back. It is a module
 -- of falloutpipboy.lua, not a script.
 --
--- Repair opens the game's own repair screen (falloutpipboyrepair.lua) for the weapon or armor under the pointer.
+-- Repair opens the game's own repair screen (falloutpipboyrepair.lua) for the weapon or armor under the pointer, and Mod
+-- (New Vegas, the weapons tab) the item mod screen (falloutpipboymods.lua) for the weapon under the pointer.
 --
--- Not there yet: the picture of the thing (the games show the model of it) and mods.
+-- Not there yet: the picture of the thing (the games show the model of it).
 --
 --   local page = require('scripts.omw.falloutpipboyitems')
 --   page.show()            -- true when the page is on the screen, false when the menu file is not there
@@ -23,6 +24,7 @@ local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
 local repair = require('scripts.omw.falloutpipboyrepair')
+local mods = require('scripts.omw.falloutpipboymods')
 
 local pipboy = core.pipboy
 
@@ -88,9 +90,10 @@ local function sortedItems(category)
     return items
 end
 
--- What a row of the list says: the name, and how many there are of it
+-- What a row of the list says: the name, a plus when mods are installed in it, and how many there are of it (the games'
+-- formats "%s+" and "%s+ (%d)", FalloutNV.exe 0x7830D0 and 0x782850)
 local function rowText(item)
-    return item.name .. (item.count > 1 and (' (' .. item.count .. ')') or '')
+    return item.name .. ((item.mods or 0) ~= 0 and '+' or '') .. (item.count > 1 and (' (' .. item.count .. ')') or '')
 end
 
 -- Whether the thing can be used or put on: the cards show a mark beside it if it can
@@ -167,6 +170,20 @@ local function updateRepairButton(item)
     end
 end
 
+-- The button of the mods is there on the weapons tab (the executable shows it for that tab alone and keeps it as it was on
+-- the ammunition one) and is lit when a weapon is picked (0x780140, 0x781680). Fallout 3 has no mods.
+local function updateModButton(item)
+    if not shown:find('IM_ModButton') then return end
+    local on = pipboy.modOpen ~= nil and pipboy.stats().newVegas == true
+    local tab = TABS[tabIndex].key
+    if tab == 'weapons' then
+        shown:set('IM_ModButton', 'visible', on and not keyring)
+    elseif tab ~= 'ammo' then
+        shown:set('IM_ModButton', 'visible', false)
+    end
+    shown:set('IM_ModButton', 'target', on and item ~= nil and not item.keyring and item.category == 'weapons')
+end
+
 -- The cards, and the mark beside a thing that can be used, for the row that is picked or under the pointer; a list with
 -- no row to pick (an empty category) shows no card and nothing to use
 local function updateCards()
@@ -178,6 +195,7 @@ local function updateCards()
         cards.show(shown, item and not item.keyring and item or nil)
         shown:io('_EquippableItem', equippable(item))
         updateRepairButton(item)
+        updateModButton(item)
     end)
 end
 
@@ -334,23 +352,20 @@ local function closeKeyring()
     end
 end
 
--- The screen of the repair is for the copy that is picked; when the player is done the page of the items comes back with
--- that copy picked (its row is the one it has now)
+-- The screen of the repair (or of the mods) is for the copy that is picked; when the player is done the page of the items comes
+-- back with that copy picked (its row is the one it has now)
 local function backFromRepair(id)
     if not module.show() then return end
     local text = tostring(id or '')
-    local form, condition = text:match('^(.-)~(%d+)$')
-    form = form or text
+    local form = text:match('^(.-)~') or text
     -- The copy as it is now if the list has it, else the first copy of the item
     local found
     for index, item in ipairs(listed) do
-        if item.form == form then
-            if tostring(item.condition) == condition then
-                found = index
-                break
-            end
-            found = found or index
+        if item.id == text then
+            found = index
+            break
         end
+        if item.form == form then found = found or index end
     end
     if found then list.select(found, true) end
     cardRow = nil
@@ -366,6 +381,21 @@ local function openRepair()
     shown, list, tabs = nil, nil, nil
     cardRow = nil
     if not repair.show(item.id, { close = backFromRepair }) then
+        module.show()
+    end
+end
+
+local function openMods()
+    if keyring or not shown or pipboy.modOpen == nil then return end
+    local item = listed[list.selected()]
+    if not item or item.keyring or item.category ~= 'weapons' then return end
+    pipboy.playSoundNamed('UIMenuMode')
+    quantity.close()
+    local id = item.id
+    shown:close()
+    shown, list, tabs = nil, nil, nil
+    cardRow = nil
+    if not mods.show(id, { close = backFromRepair }) then
         module.show()
     end
 end
@@ -395,24 +425,21 @@ local function open()
     tabs = result
     list.onClick(function(row) activate(row) end)
     opened:onClick('IM_CancelButton', closeKeyring)
-    -- Repair is the game's repair screen; mods are not there yet, so that button is not shown. No cards until a thing is
-    -- picked.
+    -- Repair and Mod are the game's own screens. No cards until a thing is picked.
     opened:onClick('IM_RepairButton', openRepair)
+    opened:onClick('IM_ModButton', openMods)
     cards.show(opened, nil)
-    opened:batch(function()
-        if opened:find('IM_ModButton') then opened:set('IM_ModButton', 'visible', false) end
-    end)
     return true
 end
 
 function module.isOpen()
-    return shown ~= nil or repair.isOpen()
+    return shown ~= nil or repair.isOpen() or mods.isOpen()
 end
 
 -- Show the page (open the menu if it is not open) with what the player carries now; false when it cannot be shown
 function module.show()
-    -- The repair screen is the page while it is up
-    if repair.isOpen() then return true end
+    -- The repair screen and the mod screen are the page while they are up
+    if repair.isOpen() or mods.isOpen() then return true end
     if not shown and not open() then
         return false
     end
@@ -423,6 +450,7 @@ end
 
 function module.hide()
     repair.hide()
+    mods.hide()
     quantity.close()
     if shown then
         shown:close()
@@ -439,6 +467,10 @@ function module.update()
         repair.update()
         return
     end
+    if mods.isOpen() then
+        mods.update()
+        return
+    end
     if not shown then return end
     shown:checkSize()
     updateWheel()
@@ -451,6 +483,7 @@ end
 -- the page of the Pip-Boy).
 function module.press(code, symbol)
     if repair.isOpen() then return repair.press(code, symbol) end
+    if mods.isOpen() then return mods.press(code, symbol) end
     if not shown then return false end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
@@ -468,6 +501,11 @@ function module.press(code, symbol)
     -- R is the repair button: it acts when it is lit, and makes the sound of a refusal when it is not
     if symbol == 'r' and not keyring then
         if not shown:pcButton('r') then pipboy.playSoundNamed('UIMenuCancel') end
+        return true
+    end
+    -- X is the button of the mods, there on the weapons tab of New Vegas
+    if symbol == 'x' and not keyring and pipboy.modOpen ~= nil and TABS[tabIndex].key == 'weapons' then
+        if not shown:pcButton('x') then pipboy.playSoundNamed('UIMenuCancel') end
         return true
     end
     local count = list.count()

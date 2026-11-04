@@ -57,7 +57,7 @@ namespace OFScript
         return *mRepairSettings;
     }
 
-    FalloutScripts::RepairStat FalloutScripts::repairStatAt(FalloutScript::FormId item, int condition)
+    FalloutScripts::RepairStat FalloutScripts::repairStatAt(FalloutScript::FormId item, int condition, int mods)
     {
         RepairStat stat;
         FalloutScript::ItemInfo info;
@@ -65,7 +65,7 @@ namespace OFScript
             return stat;
         if (info.mKind == FalloutScript::ItemKind::Weapon)
         {
-            stat.mDamage = static_cast<int>(std::ceil(weaponCardDamage(item, condition) - 1e-9));
+            stat.mDamage = static_cast<int>(std::ceil(weaponCardDamage(item, condition, mods) - 1e-9));
         }
         else if (info.mKind == FalloutScript::ItemKind::Armor)
         {
@@ -129,22 +129,26 @@ namespace OFScript
         // No copy named: the one that is on, else the best
         if (condition < 0)
         {
-            condition = mEquipment.equippedCondition(mPlayer, item);
+            condition = mEquipment.equippedCopy(mPlayer, item);
             if (condition < 0)
-                condition = stacks.front().mCondition;
+                condition = stacks.front().copy();
         }
         if (std::none_of(stacks.begin(), stacks.end(),
                 [condition](const FalloutScript::ActorState::ConditionStack& stack) {
-                    return stack.mCondition == condition;
+                    return stack.copy() == condition;
                 }))
             return std::nullopt;
+        // From here the number names the copy; the condition and the mods are what it is made of
+        const int mods = FalloutScript::copyMods(condition);
+        condition = FalloutScript::copyCondition(condition);
 
         RepairView view;
         view.mItem = item;
         view.mCondition = condition;
-        view.mWorn = mEquipment.isEquipped(mPlayer, item, condition);
+        view.mMods = mods;
+        view.mWorn = mEquipment.isEquipped(mPlayer, item, condition, mods);
         view.mSkill = static_cast<int>(mActorValues.current(mPlayer, AV::repair));
-        view.mStat = repairStatAt(item, condition);
+        view.mStat = repairStatAt(item, condition, mods);
         const FalloutScript::Repair::Settings settings = repairSettings();
 
         // What the copy does at each condition a donor could leave it in (a stack of alike donors asks once)
@@ -173,7 +177,7 @@ namespace OFScript
                 // donor, and the copy that is on is not used up
                 if (nearlyWhole(row.mCondition))
                     continue;
-                if (row.mCondition == condition)
+                if (row.mCondition == condition && row.mMods == mods)
                 {
                     units -= 1;
                     wornUnit = false;
@@ -194,12 +198,13 @@ namespace OFScript
                 RepairDonor donor;
                 donor.mItem = row.mId;
                 donor.mCondition = row.mCondition;
+                donor.mMods = row.mMods;
                 donor.mName = row.mName;
                 donor.mWorn = wornUnit && unit == 0;
                 donor.mResult = FalloutScript::Repair::repairedCondition(view.mSkill, condition, row.mCondition, settings);
                 const auto known = statsAt.find(donor.mResult);
                 donor.mStat = known != statsAt.end() ? known->second
-                                                     : statsAt.emplace(donor.mResult, repairStatAt(item, donor.mResult))
+                                                     : statsAt.emplace(donor.mResult, repairStatAt(item, donor.mResult, mods))
                                                            .first->second;
                 view.mDonors.push_back(std::move(donor));
             }
@@ -227,32 +232,32 @@ namespace OFScript
         if (!view || nearlyWhole(view->mCondition))
             return -1;
         const auto donor = std::find_if(view->mDonors.begin(), view->mDonors.end(), [&](const RepairDonor& candidate) {
-            return candidate.mItem == donorItem && candidate.mCondition == donorCondition;
+            return candidate.mItem == donorItem && FalloutScript::copyOf(candidate.mCondition, candidate.mMods) == donorCondition;
         });
         if (donor == view->mDonors.end())
             return -1;
         const int result = donor->mResult;
         // The donor is used up, one copy of it; the copy of another kind that is on comes off with its last copy
         // (only the copies that are alike count: another copy of the donor with its own condition stays in the pack)
-        if (donorItem != item && mEquipment.isEquipped(mPlayer, donorItem, donorCondition))
+        if (donorItem != item && mEquipment.isEquippedCopy(mPlayer, donorItem, donorCondition))
         {
             int alike = 0;
             for (const FalloutScript::ActorState::ConditionStack& held : mActors.conditions(mPlayer, donorItem))
-                if (held.mCondition == donorCondition)
+                if (held.copy() == donorCondition)
                     alike = held.mCount;
             if (alike <= 1)
                 mEquipment.unequip(mPlayer, donorItem);
         }
-        if (mActors.removeItem(mPlayer, donorItem, 1, donorCondition) <= 0)
+        if (mActors.removeCopy(mPlayer, donorItem, 1, donorCondition) <= 0)
             return -1;
         // The copy that is repaired stays on if it was on (the executable changes its list in place, and a list that is
-        // worn is not merged with another)
-        if (view->mWorn && mEquipment.isEquipped(mPlayer, item, view->mCondition))
+        // worn is not merged with another), and keeps its mods
+        if (view->mWorn && mEquipment.isEquipped(mPlayer, item, view->mCondition, view->mMods))
             mEquipment.setEquippedCondition(mPlayer, item, result);
         else
-            mActors.setCondition(mPlayer, item, view->mCondition, result, 1);
+            mActors.setCondition(mPlayer, item, view->mCondition, result, 1, view->mMods);
         mProgress.modifyMiscStat(itemsRepairedStat, 1);
-        return result;
+        return FalloutScript::copyOf(result, view->mMods);
     }
 
     // ---- The repair services of a vendor ----
@@ -350,13 +355,14 @@ namespace OFScript
                     && (weapon->mGame.mFlags1 & ESM4::Weapon::GameData::NonPlayable) != 0)
                     continue;
             const int cost = FalloutScript::Repair::serviceCost(menu->mSkill, row.mCondition, itemValue(row.mId), settings);
-            const RepairStat stat = repairStatAt(row.mId, row.mCondition);
-            const RepairStat capStat = repairStatAt(row.mId, view.mCap);
+            const RepairStat stat = repairStatAt(row.mId, row.mCondition, row.mMods);
+            const RepairStat capStat = repairStatAt(row.mId, view.mCap, row.mMods);
             for (int unit = 0; unit < row.mCount; ++unit)
             {
                 ServiceRow listed;
                 listed.mItem = row.mId;
                 listed.mCondition = row.mCondition;
+                listed.mMods = row.mMods;
                 listed.mName = row.mName;
                 listed.mIcon = row.mIcon;
                 listed.mWorn = row.mEquipped && unit == 0;
@@ -403,12 +409,14 @@ namespace OFScript
         else
         {
             const auto row = std::find_if(view->mRows.begin(), view->mRows.end(), [&](const ServiceRow& candidate) {
-                return candidate.mItem == item && candidate.mCondition == condition && candidate.mWorn == worn;
+                return candidate.mItem == item && FalloutScript::copyOf(candidate.mCondition, candidate.mMods) == condition
+                    && candidate.mWorn == worn;
             });
             const auto any = row != view->mRows.end() ? row
                                                       : std::find_if(view->mRows.begin(), view->mRows.end(),
                                                           [&](const ServiceRow& candidate) {
-                                                              return candidate.mItem == item && candidate.mCondition == condition;
+                                                              return candidate.mItem == item
+                                                                  && FalloutScript::copyOf(candidate.mCondition, candidate.mMods) == condition;
                                                           });
             if (any == view->mRows.end() || !any->mCanPay)
                 return 0;
@@ -419,10 +427,10 @@ namespace OFScript
         for (const ServiceRow* row : chosen)
         {
             // The copy goes to the condition the vendor leaves things in, and stays on if it was on
-            if (row->mWorn && mEquipment.isEquipped(mPlayer, row->mItem, row->mCondition))
+            if (row->mWorn && mEquipment.isEquipped(mPlayer, row->mItem, row->mCondition, row->mMods))
                 mEquipment.setEquippedCondition(mPlayer, row->mItem, view->mCap);
             else
-                mActors.setCondition(mPlayer, row->mItem, row->mCondition, view->mCap, 1);
+                mActors.setCondition(mPlayer, row->mItem, row->mCondition, view->mCap, 1, row->mMods);
             ++done;
         }
         // One payment: the caps go from the player to the vendor

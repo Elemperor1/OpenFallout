@@ -899,7 +899,8 @@ namespace FalloutScript
                 for (const auto& [actor, worn] : equipment.mWorn)
                 {
                     out.form(actor);
-                    out.i32(worn.mWeaponCondition);
+                    // The condition of the weapon in the hands with its mods over the ten low bits
+                    out.i32(worn.mWeaponCondition | (worn.mWeaponMods << 10));
                     out.count(worn.mArmorConditions.size());
                     for (const auto& [item, condition] : worn.mArmorConditions)
                     {
@@ -934,12 +935,15 @@ namespace FalloutScript
                     {
                         const int condition = in.i32();
                         const int number = in.i32();
-                        if (id && item && condition >= 0 && condition < ActorState::fullCondition && number > 0)
+                        // A stack is kept under its condition and the mods over it (a save of before the mods has none)
+                        if (id && item && condition >= 0 && ActorState::keyCondition(condition) <= ActorState::fullCondition
+                            && ActorState::keyMods(condition) <= ActorState::allMods && condition != ActorState::fullCondition
+                            && number > 0)
                             worn[*id][*item][condition] += number;
                     }
                 }
             }
-            std::map<FormId, std::pair<int, std::map<FormId, int>>> conditions;
+            std::map<FormId, std::pair<int, std::map<FormId, int>>> conditions; // the weapon's condition with mods over it
             const std::size_t actors = in.count(8);
             for (std::size_t i = 0; i < actors; ++i)
             {
@@ -955,7 +959,10 @@ namespace FalloutScript
                         armor[*item] = condition;
                 }
                 if (actor)
-                    conditions[*actor] = { std::clamp(weapon, 0, int(ActorState::fullCondition)), std::move(armor) };
+                    conditions[*actor]
+                        = { std::clamp(weapon & 1023, 0, int(ActorState::fullCondition))
+                                | (std::clamp(weapon >> 10, 0, int(ActorState::allMods)) << 10),
+                            std::move(armor) };
             }
 
             {
@@ -969,7 +976,8 @@ namespace FalloutScript
             {
                 const std::optional<FormId> reference = in.form();
                 const int condition = in.i32();
-                if (reference && condition >= 0 && condition < ActorState::fullCondition)
+                if (reference && condition >= 0 && ActorState::keyCondition(condition) <= ActorState::fullCondition
+                    && ActorState::keyMods(condition) <= ActorState::allMods && condition != ActorState::fullCondition)
                     dropped[*reference] = condition;
             }
             {
@@ -980,7 +988,8 @@ namespace FalloutScript
             for (auto& [actor, saved] : conditions)
             {
                 Equipment::Worn& entry = equipment.mWorn[actor];
-                entry.mWeaponCondition = saved.first;
+                entry.mWeaponCondition = saved.first & 1023;
+                entry.mWeaponMods = saved.first >> 10;
                 entry.mArmorConditions = std::move(saved.second);
             }
         }

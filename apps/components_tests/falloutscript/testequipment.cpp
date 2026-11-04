@@ -147,6 +147,32 @@ namespace
         EXPECT_THAT(setup.mEquipment.takeChanges(), SizeIs(1));
     }
 
+    TEST(FalloutScriptEquipmentTest, a_weapon_with_mods_is_a_copy_of_its_own)
+    {
+        Wardrobe setup;
+        setup.mState.addItem(guard, pistol, 1, 1000, 2);
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+        // The best copy of one condition is the one with fewer mods
+        EXPECT_EQ(setup.mEquipment.equippedMods(guard, pistol), 0);
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 1000, 2), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.equippedMods(guard, pistol), 2);
+        EXPECT_EQ(setup.mEquipment.equippedCopy(guard, pistol), FalloutScript::copyOf(1000, 2));
+        EXPECT_TRUE(setup.mEquipment.isEquipped(guard, pistol, 1000, 2));
+        EXPECT_FALSE(setup.mEquipment.isEquipped(guard, pistol, 1000, 0));
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 1000, 2), Equipment::Outcome::AlreadyEquipped);
+        // A copy with other mods than the character has is not put on
+        EXPECT_EQ(setup.mEquipment.equip(guard, pistol, 1000, 4), Equipment::Outcome::NotCarried);
+        // The copy that is on keeps its mods when it wears out
+        EXPECT_TRUE(setup.mEquipment.setEquippedCondition(guard, pistol, 900));
+        EXPECT_EQ(setup.mEquipment.equippedMods(guard, pistol), 2);
+        bool found = false;
+        for (const ActorState::ConditionStack& stack : setup.mState.conditions(guard, pistol))
+            found = found || (stack.mCondition == 900 && stack.mMods == 2);
+        EXPECT_TRUE(found);
+        EXPECT_TRUE(setup.mEquipment.unequip(guard, pistol));
+        EXPECT_EQ(setup.mEquipment.equippedMods(guard, pistol), 0);
+    }
+
     TEST(FalloutScriptEquipmentTest, the_copy_that_is_on_wears_out_and_is_mended_in_its_holder_too)
     {
         Wardrobe setup;

@@ -52,7 +52,9 @@ namespace FalloutScript
         /// The condition of the item that a reference of the world is, in tenths of a percent (1000 is full health): a
         /// weapon or a piece of armor that was dropped keeps it, to be picked up again with it
         int condition(FormId reference) const;
-        void setCondition(FormId reference, int condition);
+        /// The mods installed in a weapon that was dropped (a mask of its slots; 0 for none)
+        int mods(FormId reference) const;
+        void setCondition(FormId reference, int condition, int mods = 0);
 
     private:
         /// What scripts made of the lock, as far as they said
@@ -69,7 +71,8 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::map<FormId, LockEdit> mLocks;
         std::set<FormId> mDestroyed;
-        /// The references whose item is below full condition
+        /// The references whose item is below full condition or has mods: the condition (0 to 1000) with the mods over its
+        /// ten low bits
         std::map<FormId, int> mConditions;
     };
 

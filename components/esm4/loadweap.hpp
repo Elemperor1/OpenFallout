@@ -160,6 +160,13 @@ namespace ESM4
             float mSightUsage = 0.f;
             float mSemiAutomaticDelayMin = 0.f;
             float mSemiAutomaticDelayMax = 0.f;
+            /// New Vegas, the bytes from 140 on: what each of the three mods of the weapon does (the mods are the
+            /// records of WMI1 to WMI3): the kind of effect (a number of the executable's table: 1 damage, 2 clip size, 3
+            /// spread, 4 weight, 8 rate, 10 maximum condition ...) and its two values; 0 and 0.0 when the record
+            /// does not have them
+            std::uint32_t mModEffect[3] = { 0, 0, 0 };
+            float mModValue1[3] = { 0.f, 0.f, 0.f };
+            float mModValue2[3] = { 0.f, 0.f, 0.f };
         };
 
         /// CRDT: what a critical hit does
@@ -223,6 +230,8 @@ namespace ESM4
         Vats mVats;
         ESM::FormId mAmmo; // NAM0, an ammunition record or a list of them
         ESM::FormId mRepairList; // REPL, the list of the items that repair it (Fallout 3 and New Vegas)
+        /// WMI1 to WMI3 (New Vegas): the item mods (IMOD) that the weapon takes in its three slots, 0 where it has none
+        ESM::FormId mModForm[3];
         ESM::FormId mImpactDataSet; // INAM
         std::uint32_t mEquipType = 0xffffffffu; // ETYP
         std::uint32_t mSoundLevel = 0; // VNAM

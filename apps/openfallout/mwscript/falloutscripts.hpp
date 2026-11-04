@@ -39,6 +39,7 @@
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
+#include <components/falloutscript/itemmods.hpp>
 #include <components/falloutscript/repair.hpp>
 #include <components/falloutscript/wear.hpp>
 #include <components/falloutscript/derivedstats.hpp>
@@ -305,6 +306,8 @@ namespace OFScript
             bool mHasCondition = false;
             bool mStack = false;
             int mCondition = 1000;
+            /// The mods installed in the weapon (a mask of its slots); a copy with other mods is a row of its own
+            int mMods = 0;
             /// A weapon: the damage of a blow of the record; armor: its rating and damage threshold
             double mDamage = 0;
             double mRating = 0;
@@ -1043,6 +1046,7 @@ namespace OFScript
         {
             FalloutScript::FormId mItem = 0;
             int mCondition = FalloutScript::ActorState::fullCondition;
+            int mMods = 0;
             std::string mName;
             bool mWorn = false;
             /// The condition the item is in when this repairs it, and what it does then
@@ -1059,17 +1063,21 @@ namespace OFScript
             std::string mIcon;
             /// The condition of the copy that is repaired, in tenths of a percent of its health
             int mCondition = FalloutScript::ActorState::fullCondition;
+            /// The mods installed in the copy (a mask of the slots of a weapon)
+            int mMods = 0;
             bool mWorn = false;
             RepairStat mStat;
             /// One for each copy that can be used up, the weakest first (FalloutNV.exe 0x7B6AA0, 0x7B5950)
             std::vector<RepairDonor> mDonors;
         };
-        /// The screen for the copy of the item at that condition (a negative one: the copy that is on, else the best);
+        /// The screen for the copy of the item that the number names (condition with mods over it, see copyOf; a negative
+        /// one: the copy that is on, else the best);
         /// nothing for what is neither a weapon nor armor, or when the player has no such copy
         std::optional<RepairView> repairView(FalloutScript::FormId item, int condition);
         /// Whether the Pip-Boy offers to repair that copy: it is below full condition and something can repair it
         bool canRepairItem(FalloutScript::FormId item, int condition);
-        /// The donor is used up and the copy is repaired with it; the condition it has now, -1 when nothing was done
+        /// The donor is used up and the copy is repaired with it; the number of the copy as it is now (it keeps its mods),
+        /// -1 when nothing was done
         int repairItem(FalloutScript::FormId item, int condition, FalloutScript::FormId donor, int donorCondition);
 
         /// The repair services a script showed (ShowRepairMenu, on the character that repairs): the character, its name
@@ -1091,6 +1099,7 @@ namespace OFScript
         {
             FalloutScript::FormId mItem = 0;
             int mCondition = FalloutScript::ActorState::fullCondition;
+            int mMods = 0;
             std::string mName;
             std::string mIcon;
             bool mWorn = false;
@@ -1116,6 +1125,48 @@ namespace OFScript
         /// The vendor repairs the copy (a copy of the row, the worn one when `worn`), or every row that can be paid for
         /// when `all`, and the player pays; how many copies were repaired
         int repairService(FalloutScript::FormId item, int condition, bool worn, bool all);
+
+        // ---- Item mods (M12, New Vegas) ----
+        /// What a weapon's record says about its three mod slots; false when the weapon has none (the record has no game
+        /// data, or it is not a weapon)
+        bool modSlotsOf(FalloutScript::FormId weapon, FalloutScript::ItemMods::Slots& slots);
+        /// What the mods installed in a copy add to its worth
+        int modsValue(FalloutScript::FormId weapon, int mods);
+        /// One line of the item mod screen: a mod the weapon takes (installed in it, or in the player's pack)
+        struct ModRow
+        {
+            FalloutScript::FormId mMod = 0;
+            std::string mName;
+            std::string mIcon;
+            std::string mDescription;
+            bool mInstalled = false;
+        };
+        /// The item mod screen of the Pip-Boy for one weapon of the player
+        struct ModView
+        {
+            FalloutScript::FormId mItem = 0;
+            std::string mName;
+            std::string mIcon;
+            /// The condition of the copy (tenths of a percent of the health it has at most) and the mods installed
+            int mCondition = FalloutScript::ActorState::fullCondition;
+            int mMods = 0;
+            /// What a shot of the copy does as it is now
+            int mDamage = 0;
+            std::vector<ModRow> mRows;
+        };
+        /// The copy a number names; a negative number names the copy that is on, else the best (-1 when there is none)
+        int copyToUse(FalloutScript::FormId item, int copy);
+        /// The player opens the screen for the copy that the number names (condition with mods over it, see copyOf): the
+        /// weapon is taken off when it was on (the screen puts it back when it closes); nothing when the copy is not a
+        /// weapon of the player
+        std::optional<ModView> openItemMods(FalloutScript::FormId item, int copy);
+        /// The screen for the copy as it is now (after a change)
+        std::optional<ModView> modView(FalloutScript::FormId item, int copy);
+        /// The mod is installed in the copy and one copy of the mod item is used up; the number of the copy as it is now,
+        /// -1 when nothing was done
+        int installMod(FalloutScript::FormId item, int copy, FalloutScript::FormId mod);
+        /// The player is done: the weapon that was taken off when the screen opened is on again
+        void closeItemMods(FalloutScript::FormId item, int copy);
 
         // ---- The companion wheel (M12) ----
         /// The wheel the player has open on a companion (companion_wheel_menu.xml, FalloutNV.exe 0x754DE0): the
@@ -1264,10 +1315,10 @@ namespace OFScript
         /// fights back if it was at peace. The OnHit, OnHitWith and OnDeath blocks of the victim run in the next
         /// frame. `limb` is the part of the body that was hit, -1 when not known; `roll` (0 to 100) decides whether the
         /// blow is critical, a negative one is drawn at random. The copy that strikes is the one in the hands of the
-        /// attacker unless `condition` (tenths of a percent, 0 or more) names it: a weapon that breaks with the blow is
-        /// out of the hands by then. Any thread.
+        /// attacker unless `condition` (tenths of a percent, 0 or more) and `mods` name it: a weapon that breaks with the
+        /// blow is out of the hands by then. Any thread.
         StrikeResult strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-            FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1, int condition = -1);
+            FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1, int condition = -1, int mods = 0);
 
         /// What the weapon that a character holds allows
         struct WeaponStats
@@ -1920,17 +1971,21 @@ namespace OFScript
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
         /// condition of the weapon is the one of the copy in the hands (`condition`, in tenths of a percent, names another)
         FalloutScript::WeaponDamage describeWeapon(
-            FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition = -1);
+            FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition = -1, int mods = 0);
         /// The damage of one shot (one pellet of a shotgun) of the weapon in the hands of the player as the card of
         /// the item tells it: the damage of the record with the skill, the condition (of the copy named, in tenths of a
         /// percent) and the perks of the player
-        double weaponCardDamage(FalloutScript::FormId weapon, int condition = FalloutScript::ActorState::fullCondition);
+        double weaponCardDamage(
+            FalloutScript::FormId weapon, int condition = FalloutScript::ActorState::fullCondition, int mods = 0);
         /// What wears items out, from the game's settings
         const FalloutScript::Wear::Settings& wearSettings();
         /// What repairs go by, from the game's settings
         const FalloutScript::Repair::Settings& repairSettings();
+        /// Whether the weapon in the hands of the screen was on when it opened, to be on again when it closes (under
+        /// mRepairMutex)
+        bool mModsWeaponWasOn = false;
         /// What the copy of an item does at a condition (the damage of a weapon, the rating and threshold of armor)
-        RepairStat repairStatAt(FalloutScript::FormId item, int condition);
+        RepairStat repairStatAt(FalloutScript::FormId item, int condition, int mods = 0);
         /// Whether an item can be used up to repair another (its form is on the repair list of the other, or the perk lets
         /// weapons of one kind repair each other), and whether the record of the item is for the player
         bool repairsWith(FalloutScript::FormId item, FalloutScript::FormId other);

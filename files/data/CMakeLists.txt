@@ -163,6 +163,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutbarter.lua
     scripts/omw/falloutrepairservices.lua
     scripts/omw/falloutpipboyrepair.lua
+    scripts/omw/falloutpipboymods.lua
     scripts/omw/falloutblackjack.lua
     scripts/omw/falloutcompanion.lua
     scripts/omw/falloutbook.lua

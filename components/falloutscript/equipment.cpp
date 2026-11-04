@@ -83,6 +83,7 @@ namespace FalloutScript
         {
             noteChange(actor, worn.mWeapon, false);
             worn.mWeapon = 0;
+            worn.mWeaponMods = 0;
             worn.mDrawn = false;
         }
         if (worn.mAmmo != 0 && mState.itemCount(actor, worn.mAmmo) <= 0)
@@ -102,11 +103,14 @@ namespace FalloutScript
         // The copy that is on is gone when the character has no copy like it (a script took it away and left others):
         // another copy of the item is on then
         if (worn.mWeapon != 0)
-            worn.mWeaponCondition = chooseCopy(actor, worn.mWeapon, worn.mWeaponCondition);
+            worn.mWeaponCondition
+                = chooseCopy(actor, worn.mWeapon, worn.mWeaponCondition, worn.mWeaponMods, worn.mWeaponMods);
         for (const FormId item : worn.mArmor)
         {
             const auto set = worn.mArmorConditions.find(item);
-            const int condition = chooseCopy(actor, item, set == worn.mArmorConditions.end() ? ActorState::fullCondition : set->second);
+            int noMods = 0;
+            const int condition = chooseCopy(
+                actor, item, set == worn.mArmorConditions.end() ? ActorState::fullCondition : set->second, 0, noMods);
             if (condition >= ActorState::fullCondition)
                 worn.mArmorConditions.erase(item);
             else
@@ -114,15 +118,22 @@ namespace FalloutScript
         }
     }
 
-    int Equipment::chooseCopy(FormId actor, FormId item, int asked)
+    int Equipment::chooseCopy(FormId actor, FormId item, int asked, int askedMods, int& mods)
     {
         const std::vector<ActorState::ConditionStack> stacks = mState.conditions(actor, item);
         if (stacks.empty())
+        {
+            mods = 0;
             return ActorState::fullCondition;
+        }
         if (asked >= 0)
             for (const ActorState::ConditionStack& stack : stacks)
-                if (stack.mCondition == asked)
+                if (stack.mCondition == asked && stack.mMods == askedMods)
+                {
+                    mods = askedMods;
                     return asked;
+                }
+        mods = stacks.front().mMods;
         return stacks.front().mCondition;
     }
 
@@ -156,7 +167,7 @@ namespace FalloutScript
             worn.mArmorConditions.erase(item);
     }
 
-    Equipment::Outcome Equipment::equip(FormId actor, FormId item, int condition)
+    Equipment::Outcome Equipment::equip(FormId actor, FormId item, int condition, int mods)
     {
         ItemInfo info;
         if (actor == 0 || item == 0 || !mRecords.itemInfo(item, info))
@@ -173,8 +184,11 @@ namespace FalloutScript
         const bool on = (info.mKind == ItemKind::Weapon && worn.mWeapon == item)
             || (info.mKind == ItemKind::Armor
                 && std::find(worn.mArmor.begin(), worn.mArmor.end(), item) != worn.mArmor.end());
-        const int copy = chooseCopy(actor, item, condition >= 0 ? condition : (on ? conditionOn(worn, item) : -1));
-        if (condition >= 0 && copy != condition)
+        const bool weaponOn = info.mKind == ItemKind::Weapon && worn.mWeapon == item;
+        int copyMods = 0;
+        const int copy = chooseCopy(actor, item, condition >= 0 ? condition : (on ? conditionOn(worn, item) : -1),
+            condition >= 0 ? mods : (weaponOn ? worn.mWeaponMods : 0), copyMods);
+        if (condition >= 0 && (copy != condition || copyMods != mods))
             return Outcome::NotCarried;
         // A weapon or a piece of armor with no health left does not go on (one that is on and breaks stays on)
         if ((info.mKind == ItemKind::Weapon || info.mKind == ItemKind::Armor) && copy <= 0
@@ -185,16 +199,18 @@ namespace FalloutScript
             case ItemKind::Weapon:
                 if (worn.mWeapon == item)
                 {
-                    if (copy == worn.mWeaponCondition)
+                    if (copy == worn.mWeaponCondition && copyMods == worn.mWeaponMods)
                         return Outcome::AlreadyEquipped;
                     // Another copy of the weapon in the hands: nothing is put on or taken off
                     worn.mWeaponCondition = copy;
+                    worn.mWeaponMods = copyMods;
                     return Outcome::Equipped;
                 }
                 if (worn.mWeapon != 0)
                     noteChange(actor, worn.mWeapon, false);
                 worn.mWeapon = item;
                 worn.mWeaponCondition = copy;
+                worn.mWeaponMods = copyMods;
                 break;
             case ItemKind::Ammo:
                 if (worn.mAmmo == item)
@@ -233,6 +249,7 @@ namespace FalloutScript
         if (worn.mWeapon == item)
         {
             worn.mWeapon = 0;
+            worn.mWeaponMods = 0;
             worn.mDrawn = false;
             noteChange(actor, item, false);
             return true;
@@ -252,9 +269,20 @@ namespace FalloutScript
         return true;
     }
 
-    bool Equipment::isEquipped(FormId actor, FormId item, int condition)
+    bool Equipment::isEquipped(FormId actor, FormId item, int condition, int mods)
     {
-        return equippedCondition(actor, item) == std::clamp(condition, 0, int(ActorState::fullCondition));
+        return equippedCondition(actor, item) == std::clamp(condition, 0, int(ActorState::fullCondition))
+            && equippedMods(actor, item) == mods;
+    }
+
+    int Equipment::equippedMods(FormId actor, FormId item)
+    {
+        if (item == 0 || actor == 0)
+            return 0;
+        const std::lock_guard lock(mMutex);
+        Worn& worn = wornOf(actor);
+        tidy(actor, worn);
+        return worn.mWeapon == item ? worn.mWeaponMods : 0;
     }
 
     int Equipment::equippedCondition(FormId actor, FormId item)
@@ -286,7 +314,7 @@ namespace FalloutScript
         if (before == condition)
             return true;
         // The copy that is on is the one that changes
-        if (mState.setCondition(actor, item, before, condition) < 1)
+        if (mState.setCondition(actor, item, before, condition, 1, weapon ? worn.mWeaponMods : 0) < 1)
             return false;
         if (weapon)
             worn.mWeaponCondition = condition;

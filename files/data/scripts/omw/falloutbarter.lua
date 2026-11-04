@@ -78,7 +78,8 @@ local function priceText(value)
 end
 
 local function rowText(entry)
-    return entry.item.name .. (entry.count > 1 and (' (' .. entry.count .. ')') or '')
+    return entry.item.name .. ((entry.item.mods or 0) ~= 0 and '+' or '')
+        .. (entry.count > 1 and (' (' .. entry.count .. ')') or '')
 end
 
 local function pileList(pile)

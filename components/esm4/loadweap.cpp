@@ -83,6 +83,14 @@ ESM4::Weapon::GameData ESM4::Weapon::decodeGameData(const std::vector<std::uint8
     data.mSightUsage = field<float>(bytes, 124);
     data.mSemiAutomaticDelayMin = field<float>(bytes, 128);
     data.mSemiAutomaticDelayMax = field<float>(bytes, 132);
+    // The mods of a New Vegas weapon (FalloutNV.exe 0x51FFEF copies the record to the form at 0xF4, where the effect kinds
+    // are at 0x180 to 0x188 and the values at 0x18C and 0x1AC; Mac round 12AX R3)
+    for (std::size_t slot = 0; slot < 3; ++slot)
+    {
+        data.mModEffect[slot] = field<std::uint32_t>(bytes, 0x8C + 4 * slot);
+        data.mModValue1[slot] = field<float>(bytes, 0x98 + 4 * slot);
+        data.mModValue2[slot] = field<float>(bytes, 0xB8 + 4 * slot);
+    }
     return data;
 }
 
@@ -217,6 +225,19 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
                 mHasGameData = true;
                 break;
             }
+            case ESM::fourCC("WMI1"): // FONV: the item mods of the three slots
+            case ESM::fourCC("WMI2"):
+            case ESM::fourCC("WMI3"):
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                {
+                    ESM::FormId& slot = mModForm[subHdr.typeId == ESM::fourCC("WMI1") ? 0
+                            : subHdr.typeId == ESM::fourCC("WMI2")                    ? 1
+                                                                                      : 2];
+                    reader.getFormId(slot);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("CRDT"):
                 if (subHdr.dataSize == 16)
                 {
@@ -329,9 +350,6 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("MWD5"): // FONV
             case ESM::fourCC("MWD6"): // FONV
             case ESM::fourCC("MWD7"): // FONV
-            case ESM::fourCC("WMI1"): // FONV
-            case ESM::fourCC("WMI2"): // FONV
-            case ESM::fourCC("WMI3"): // FONV
             case ESM::fourCC("WMS1"): // FONV
             case ESM::fourCC("WMS2"): // FONV
             case ESM::fourCC("WNM1"): // FONV

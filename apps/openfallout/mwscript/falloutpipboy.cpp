@@ -242,17 +242,20 @@ namespace OFScript
                 // Copies with another condition are a row of their own (the best first)
                 const std::vector<FalloutScript::ActorState::ConditionStack> stacks = mActors.conditions(holder, id);
                 if (stacks.size() > 1
-                    || (stacks.size() == 1 && stacks.front().mCondition != FalloutScript::ActorState::fullCondition))
+                    || (stacks.size() == 1
+                        && (stacks.front().mCondition != FalloutScript::ActorState::fullCondition
+                            || stacks.front().mMods != 0)))
                 {
                     for (const FalloutScript::ActorState::ConditionStack& stack : stacks)
                     {
                         PipboyItem copy = row;
                         copy.mCount = stack.mCount;
                         copy.mCondition = stack.mCondition;
+                        copy.mMods = stack.mMods;
                         copy.mStack = true;
-                        // What the card says is what the copy does at its condition
+                        // What the card says is what the copy does at its condition and with its mods
                         if (copy.mCategory == FalloutScript::Pipboy::ItemCategory::Weapons && player)
-                            copy.mCardDamage = weaponCardDamage(id, stack.mCondition);
+                            copy.mCardDamage = weaponCardDamage(id, stack.mCondition, stack.mMods);
                         else if (copy.mCategory == FalloutScript::Pipboy::ItemCategory::Apparel)
                         {
                             const double factor = FalloutScript::Wear::armorFactor(
@@ -262,7 +265,29 @@ namespace OFScript
                             // repair screen does
                             copy.mThreshold = std::trunc(std::trunc(row.mThreshold) * factor);
                         }
-                        copy.mEquipped = mEquipment.isEquipped(holder, id, stack.mCondition);
+                        // What the mods installed in a weapon do to what its card tells (FalloutNV.exe 0x4BE380, 0x4FE160)
+                        if (stack.mMods != 0 && copy.mCategory == FalloutScript::Pipboy::ItemCategory::Weapons)
+                        {
+                            FalloutScript::ItemMods::Slots slots;
+                            if (modSlotsOf(id, slots))
+                            {
+                                if (const std::optional<double> less = FalloutScript::ItemMods::installedValue(
+                                        stack.mMods, slots, FalloutScript::ItemMods::Weight))
+                                {
+                                    copy.mWeight = std::max(row.mWeight - *less, 0.0);
+                                    copy.mCardWeight = carriedWeight(copy.mWeight, packRat);
+                                }
+                                if (const std::optional<double> more = FalloutScript::ItemMods::installedValue(
+                                        stack.mMods, slots, FalloutScript::ItemMods::ClipSize))
+                                {
+                                    copy.mClip = row.mClip + static_cast<int>(*more);
+                                    const int have = row.mLoaded + row.mReserve;
+                                    copy.mLoaded = std::min(copy.mClip, have);
+                                    copy.mReserve = have - copy.mLoaded;
+                                }
+                            }
+                        }
+                        copy.mEquipped = mEquipment.isEquippedCopy(holder, id, stack.copy());
                         rows.push_back(std::move(copy));
                     }
                     continue;
@@ -301,7 +326,23 @@ namespace OFScript
             {
                 FalloutScript::ItemInfo info;
                 if (itemInfo(item, info))
+                {
                     stats.mWeight += carriedWeight(info.mWeight, packRat) * count;
+                    // A mod of the effect 4 makes the weapon it is installed in lighter
+                    if (info.mKind == FalloutScript::ItemKind::Weapon)
+                    {
+                        FalloutScript::ItemMods::Slots slots;
+                        if (modSlotsOf(item, slots))
+                            for (const FalloutScript::ActorState::ConditionStack& stack : mActors.conditions(mPlayer, item))
+                                if (const std::optional<double> less = stack.mMods != 0
+                                        ? FalloutScript::ItemMods::installedValue(
+                                            stack.mMods, slots, FalloutScript::ItemMods::Weight)
+                                        : std::nullopt)
+                                    stats.mWeight -= (carriedWeight(info.mWeight, packRat)
+                                                         - carriedWeight(std::max(info.mWeight - *less, 0.0), packRat))
+                                        * stack.mCount;
+                    }
+                }
             }
         }
         stats.mMaxWeight = mActorValues.permanent(mPlayer, AV::carryWeight);
@@ -522,15 +563,15 @@ namespace OFScript
             // No condition asked (a hot key names the form): the copy that is on, else the best one
             if (condition < 0)
             {
-                condition = mEquipment.equippedCondition(mPlayer, item);
+                condition = mEquipment.equippedCopy(mPlayer, item);
                 if (condition < 0)
                 {
                     const std::vector<FalloutScript::ActorState::ConditionStack> stacks
                         = mActors.conditions(mPlayer, item);
-                    condition = stacks.empty() ? int(FalloutScript::ActorState::fullCondition) : stacks.front().mCondition;
+                    condition = stacks.empty() ? int(FalloutScript::ActorState::fullCondition) : stacks.front().copy();
                 }
             }
-            if (mEquipment.isEquipped(mPlayer, item, condition))
+            if (mEquipment.isEquippedCopy(mPlayer, item, condition))
             {
                 mEquipment.unequip(mPlayer, item);
                 return "unequipped";
@@ -543,7 +584,7 @@ namespace OFScript
                 if (held == nullptr || !weaponTakesAmmo(*held, item))
                     return std::string();
             }
-            const FalloutScript::Equipment::Outcome outcome = mEquipment.equip(mPlayer, item, condition);
+            const FalloutScript::Equipment::Outcome outcome = mEquipment.equipCopy(mPlayer, item, condition);
             if (outcome == FalloutScript::Equipment::Outcome::Broken)
             {
                 // A weapon or armor with no health left does not go on
@@ -578,26 +619,26 @@ namespace OFScript
         if (stacks.empty())
             return 0;
         // No condition asked: the best copies go
-        condition = condition < 0 ? stacks.front().mCondition
-                                  : std::clamp(condition, 0, int(FalloutScript::ActorState::fullCondition));
+        condition = condition < 0 ? stacks.front().copy() : condition;
         int have = 0;
         for (const FalloutScript::ActorState::ConditionStack& stack : stacks)
-            if (stack.mCondition == condition)
+            if (stack.copy() == condition)
                 have = stack.mCount;
         count = std::min({ count, sDropLimit, have });
         if (count <= 0)
             return 0;
         // The copy that is on goes off when the last copy like it leaves
-        if (mEquipment.isEquipped(mPlayer, item, condition) && have <= count)
+        if (mEquipment.isEquippedCopy(mPlayer, item, condition) && have <= count)
             mEquipment.unequip(mPlayer, item);
-        const int removed = mActors.removeItem(mPlayer, item, count, condition);
+        const int removed = mActors.removeCopy(mPlayer, item, count, condition);
         if (removed > 0)
         {
             // Each copy is an object of its own in the world and keeps how worn it is
             const FalloutScript::FormId first = placeAtMe(mPlayer, item, removed, dropDistance, 0);
-            if (first != 0 && condition < FalloutScript::ActorState::fullCondition)
+            if (first != 0 && condition != FalloutScript::ActorState::fullCondition)
                 for (int i = 0; i < removed; ++i)
-                    mReferenceState.setCondition(first + i, condition);
+                    mReferenceState.setCondition(
+                        first + i, FalloutScript::copyCondition(condition), FalloutScript::copyMods(condition));
         }
         return removed;
     }
@@ -614,29 +655,29 @@ namespace OFScript
         {
             if (left <= 0)
                 break;
-            if (condition >= 0 && stack.mCondition != std::clamp(condition, 0, int(FalloutScript::ActorState::fullCondition)))
+            if (condition >= 0 && stack.copy() != condition)
                 continue;
             const int taking = std::min(left, stack.mCount);
-            going.push_back({ stack.mCondition, taking });
+            going.push_back({ stack.mCondition, taking, stack.mMods });
             left -= taking;
         }
         int moved = 0;
         for (const FalloutScript::ActorState::ConditionStack& stack : going)
         {
             // The copy that is on goes off when the last copy like it leaves
-            if (mEquipment.isEquipped(from, item, stack.mCondition))
+            if (mEquipment.isEquippedCopy(from, item, stack.copy()))
             {
                 int here = 0;
                 for (const FalloutScript::ActorState::ConditionStack& held : mActors.conditions(from, item))
-                    if (held.mCondition == stack.mCondition)
+                    if (held.copy() == stack.copy())
                         here = held.mCount;
                 if (here <= stack.mCount)
                     mEquipment.unequip(from, item);
             }
-            const int taken = mActors.removeItem(from, item, stack.mCount, stack.mCondition);
+            const int taken = mActors.removeCopy(from, item, stack.mCount, stack.copy());
             if (taken > 0)
             {
-                mActors.addItem(to, item, taken, stack.mCondition);
+                mActors.addCopy(to, item, taken, stack.copy());
                 moved += taken;
             }
         }

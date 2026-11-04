@@ -127,6 +127,15 @@ namespace OFScript
         result.mAnimationType = game.mAnimationType;
         // V.A.T.S. reads the smaller spread of the record (DNAM at 16, "Min Spread"), not the one after it
         result.mSpread = game.mMinSpread;
+        // A mod of the effect 3 takes away from it, and no more than it has (FalloutNV.exe 0x524B80)
+        if (const int mods = mEquipment.equippedMods(attacker, weapon); mods != 0)
+        {
+            FalloutScript::ItemMods::Slots slots;
+            if (modSlotsOf(weapon, slots))
+                if (const std::optional<double> less
+                    = FalloutScript::ItemMods::installedValue(mods, slots, FalloutScript::ItemMods::Spread))
+                    result.mSpread = std::max(result.mSpread - *less, 0.0);
+        }
         result.mRangeFixed = (game.mFlags2 & ESM4::Weapon::GameData::RangeFixed) != 0;
         result.mRange = FalloutScript::Vats::isMelee(game.mAnimationType) ? 0.0 : weaponStats(attacker).mRange;
         if ((game.mFlags2 & ESM4::Weapon::GameData::OverrideActionPoints) != 0)
