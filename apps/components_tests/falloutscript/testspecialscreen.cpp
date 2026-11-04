@@ -382,7 +382,7 @@ namespace
         Screen screen(Kind::Book, 40, fives);
         auto shapes = screen.shapes();
         EXPECT_EQ(shapeOf(shapes, "P3_PointVal:0")->mTexture, "textures/terminals/bbnumber5.dds");
-        EXPECT_EQ(shapeOf(shapes, "P3_Message:0")->mTexture, "textures/terminals/english/bbmessage03.dds");
+        EXPECT_EQ(shapeOf(shapes, "P3_Message:0")->mTexture, "textures/terminals/english/bbmessage02.dds");
         settle(screen);
         screen.next();
         screen.increase();
@@ -390,10 +390,10 @@ namespace
         screen.increase();
         screen.increase();
         shapes = screen.shapes();
-        EXPECT_EQ(shapeOf(shapes, "P1_Message:0")->mTexture, "textures/terminals/english/bbmessage04.dds");
+        EXPECT_EQ(shapeOf(shapes, "P1_Message:0")->mTexture, "textures/terminals/english/bbmessage03.dds");
         screen.increase();
         shapes = screen.shapes();
-        EXPECT_EQ(shapeOf(shapes, "Index_Message:0")->mTexture, "textures/terminals/english/bbmessage02.dds");
+        EXPECT_EQ(shapeOf(shapes, "Index_Message:0")->mTexture, "textures/terminals/english/bbmessage04.dds");
         EXPECT_EQ(shapeOf(shapes, "P1_PointVal:0")->mTexture, "textures/terminals/bbnumber10.dds");
     }
 

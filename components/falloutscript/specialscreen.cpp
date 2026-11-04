@@ -38,15 +38,17 @@ namespace FalloutScript::SpecialScreen
         }
 
         /// The picture of the book's message by the points that are left (the executable takes the folder of the language
-        /// in use, English here)
+        /// in use, English here): more than one point is the second picture, one the third, none the fourth; below none
+        /// nothing is assigned and the strip of the model stays (FalloutNV.exe 0x7CA530 and the loader 0x7CADD0, Mac round
+        /// 12BB G2: the first picture is the model's own and no code assigns it)
         std::string messageTexture(int left)
         {
             if (left > 1)
-                return "textures/terminals/english/bbmessage03.dds";
-            if (left == 1)
-                return "textures/terminals/english/bbmessage04.dds";
-            if (left == 0)
                 return "textures/terminals/english/bbmessage02.dds";
+            if (left == 1)
+                return "textures/terminals/english/bbmessage03.dds";
+            if (left == 0)
+                return "textures/terminals/english/bbmessage04.dds";
             return {};
         }
 
