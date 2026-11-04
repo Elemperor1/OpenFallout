@@ -1237,14 +1237,66 @@
 -- @return #string The name that was kept.
 
 ---
--- Picks the sex.
+-- Picks the sex. As the screen of the face has it, the head parts (the beard) come off, the first face of the sex
+-- and race is put on (its hair, eyes, colour and face numbers) and a hair or eyes that the kind does not have are changed.
 -- @function [parent=#Chargen] setFemale
 -- @param #boolean female
 
 ---
--- Picks the race.
+-- Picks the race, with the same changes as `setFemale`.
 -- @function [parent=#Chargen] setRace
 -- @param #string race The `id` of one of `ChargenState.races`
+
+---
+-- How the player looks now (what the screen picked, and else what the record of the player says), with the lists of
+-- the screen of the face for the sex and race it has.
+-- @function [parent=#Chargen] look
+-- @return #ChargenLook
+
+---
+-- Picks the hair.
+-- @function [parent=#Chargen] setHair
+-- @param #string hair The `id` of one of `ChargenLook.lists.hairs`
+
+---
+-- Picks the eyes.
+-- @function [parent=#Chargen] setEyes
+-- @param #string eyes The `id` of one of `ChargenLook.lists.eyes`
+
+---
+-- Sets the colour of the hair.
+-- @function [parent=#Chargen] setHairColour
+-- @param #number red 0 to 255
+-- @param #number green 0 to 255
+-- @param #number blue 0 to 255
+
+---
+-- Puts a head part of `ChargenLook.lists.facialHair` on, or takes it off when it is on.
+-- @function [parent=#Chargen] toggleFacialHair
+-- @param #string part
+
+---
+-- Puts the preset face of that number on (its hair, eyes, colour, head parts and face numbers).
+-- @function [parent=#Chargen] setPreset
+-- @param #number number 1 to the number of `ChargenLook.lists.presets`
+-- @return #boolean Whether there is a preset of that number.
+
+---
+-- New random numbers for the shape and tone of the face. The hair, eyes and colour stay.
+-- @function [parent=#Chargen] randomize
+
+---
+-- The sliders of the lists of the face (the shape and the tone), in the order the screen shows them.
+-- @function [parent=#Chargen] sliders
+-- @return #list<#ChargenSlider>
+
+---
+-- Moves a slider of the face to a whole number (the value of the control times ten). The number is kept within the
+-- slider's `minimum` and `maximum`; nothing happens when the data has no such control.
+-- @function [parent=#Chargen] setSlider
+-- @param #string kind `"shape"` or `"tone"`
+-- @param #number control The `control` of one of the sliders
+-- @param #number value
 
 ---
 -- Gives points to an attribute, or with a negative amount takes them back. Nothing changes when the points are not
@@ -1326,6 +1378,37 @@
 -- @field #string id Form id of the race.
 -- @field #string name
 -- @field #boolean selected
+
+---
+-- How the player looks.
+-- @type ChargenLook
+-- @field #boolean female
+-- @field #string race Form id of the race (empty when there is none).
+-- @field #string hair Form id of the hair (empty when there is none).
+-- @field #number hairLength
+-- @field #string eyes Form id of the eyes (empty when there are none).
+-- @field #table hairColour `red`, `green` and `blue`, each 0 to 255.
+-- @field #list<#string> headParts Form ids of the head parts the player wears.
+-- @field #ChargenLookLists lists
+
+---
+-- The rows of the lists of the screen of the face.
+-- @type ChargenLookLists
+-- @field #list<#ChargenRace> races
+-- @field #list<#ChargenRace> hairs The hairs of the race and sex.
+-- @field #list<#ChargenRace> eyes The eyes of the race.
+-- @field #list<#ChargenRace> facialHair The head parts a man can wear.
+-- @field #list<#ChargenRace> presets The characters of the data that have the sex and race, the faces to start from.
+
+---
+-- @type ChargenSlider
+-- @field #string kind `"shape"` or `"tone"`.
+-- @field #number control The control of the face file that the slider moves.
+-- @field #number list The number of the list of the screen the slider is in.
+-- @field #string setting The setting that names the slider.
+-- @field #number minimum
+-- @field #number maximum
+-- @field #number value The whole number the slider shows now.
 
 ---
 -- @{#MessageBox}: the message box that a script of Fallout 3 or New Vegas has put on the screen (`ShowMessage` of a

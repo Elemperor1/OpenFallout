@@ -367,6 +367,19 @@ namespace OFScript
 
     void FalloutScripts::lookSetSlider(FaceKind kind, int control, int value)
     {
+        // The slider keeps to its own range (the list of sliders has it; a control it does not name has the usual one)
+        int minimum = -50;
+        int maximum = 50;
+        for (const FalloutScript::FaceSlider& slider : FalloutScript::faceSliders())
+        {
+            if (slider.mKind == kind && slider.mControl == control)
+            {
+                minimum = slider.mMinimum;
+                maximum = slider.mMaximum;
+                break;
+            }
+        }
+        value = std::clamp(value, minimum, maximum);
         FaceLook look = playerLook();
         std::vector<float>& coefficients = kind == FaceKind::Shape ? look.mShape : look.mTone;
         if (!faceControls().move(kind, control, FalloutScript::faceSliderValue(value), coefficients))
