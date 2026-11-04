@@ -23,6 +23,7 @@ end
 local menuModule = require('scripts.omw.falloutmenu')
 -- The screens of SPECIAL that are a model whose pages the player turns (the Vigor Tester, the SPECIAL book)
 local special = require('scripts.omw.falloutspecialscreen')
+local face = require('scripts.omw.falloutfacescreen')
 
 local chargen = core.chargen
 local pipboy = core.pipboy
@@ -73,6 +74,7 @@ end
 
 local function destroyElement()
     special.close()
+    face.close()
     if element then
         element:destroy()
         element = nil
@@ -746,6 +748,13 @@ function render()
     if page.page == 'special' and special.start(page, state) then
         return
     end
+    -- The screen of the sex, race and face is the menu file's panel with the lists the code makes
+    if page.page == 'race' then
+        local ok, drawn = pcall(face.start, page, state, { done = finishPage })
+        if ok and drawn then return end
+        if not ok then print('chargen face screen: ' .. tostring(drawn)) end
+        face.close()
+    end
     if menuPages[page.page] then
         local ok, drawn = pcall(menuPages[page.page], state)
         if ok and drawn then return end
@@ -789,6 +798,9 @@ local function sync()
     local seconds = core.getRealFrameDuration()
     if special.isOpen() then
         special.update(seconds)
+    end
+    if face.isOpen() then
+        face.update(seconds or 0)
     end
     -- A menu drawn from a file keeps the window size it was opened with until it is told the window changed
     if shown then
@@ -839,6 +851,10 @@ return {
                 end
                 return
             end
+            if face.isOpen() then
+                face.press(key.code, key.symbol, key.withShift)
+                return
+            end
             if not shownPage or not (element or shown) then
                 return
             end
@@ -876,6 +892,13 @@ return {
                     -- Escape does not leave the Vigor Tester or the book (it opens the pause menu over them): the mode stays
                     modeOpen = false
                     openMode()
+                    return
+                end
+                if face.isOpen() then
+                    -- Escape goes up one list of the screen of the face, and the screen cannot be left that way
+                    modeOpen = false
+                    openMode()
+                    face.escape()
                     return
                 end
                 modeOpen = false
