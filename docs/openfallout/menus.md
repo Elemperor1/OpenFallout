@@ -264,9 +264,9 @@ counter is hidden when none are left; the number is the same whatever `flagA` of
 top of the values the character has) does, since the screen counts what is left. The picture of the selection (the file hides
 it) is the `ICON` string of the actor value's own record (`SPECIAL_Strength.dds` and the others under
 `Interface\Icons\PipboyImages\S.P.E.C.I.A.L`, `Skills_*.dds` under `Interface\Icons\Stats`; New Vegas's record for
-Throwing names `skills_survival.dds`), taken with its description and name from the same record. The sex and race screen
-(`chargen/race_sex_menu.xml`) is a rendered head with sliders and has nothing to show here, and keeps the stand-in widgets,
-as does any screen whose file the install lacks.
+Throwing names `skills_survival.dds`), taken with its description and name from the same record. The sex, race and face screen
+(`chargen/race_sex_menu.xml`) is drawn from its file too (see the section after the Vigor Tester), and a screen whose file
+the install lacks keeps the stand-in widgets.
 
 *The traits (New Vegas).* New Vegas opens `trait_menu.xml` for them (the only script of `FalloutNV.esm` that shows a trait
 menu, `VCG04ActivatorScript`, calls `ShowTraitMenu` after `ShowRaceMenu`; `trait_select_menu.xml` is the one that no script
@@ -320,6 +320,47 @@ with the attribute in full is a guess), which shapes the book's messages and dig
 a point light at the scene's origin; a light from the camera stands for it), the book's turn about X, the faces of the buttons
 (`BBRTOn`, `BBLTOff` and the others are left as the model has them), and the mode of the pad's index cursor (not wired). A game
 that lacks the model files or the menu file keeps the stand-in of the points of SPECIAL.
+
+### The sex, race and face screen (Mac rounds 12AW S7 and 12AY R2, FalloutNV.exe 0x7AC730; `falloutfacescreen.lua`)
+
+`ShowRaceMenu` (menu 1036; `VCG01` stage 36 and `VCG04ActivatorScript` in New Vegas, `CG00` and `Vault101ExitScript` in Fallout 3)
+opens the screen of the sex, race, hair and face; `ShowBarberMenu` (mode 2) and `ShowPlasticSurgeonMenu` (mode 3) open it
+again for the hair and the face with the sex and race fixed (the mode is the one value of the screen's page, `page.values[1]`;
+a new character has none). The executable edits the live record of the player in place and nothing is copied back at the end;
+here `core.chargen` keeps what the player picked (`FalloutScripts::playerLook` is that, and else what the record of the player
+says) and puts it in the save (the section `chargen`: the sex, the race and the look).
+
+The file holds the panel (340 by 500 units, its title and rows above the `_top_bound` 80 and below the `_bot_bound` 336 are
+hidden by the file's own `_position` traits), the Back and Next buttons, two scroll arrows and the two templates the code makes
+the rows from: `RSM_list_item_template` (a row of 36 units: a name and a mark for the one that is picked) and
+`RSM_slider_option_template` (64 units: a label, a bar between two arrows, a marker, the number beside the label). The rows
+of the lists are children of the panel; the menu's own `user0` is the number of the list that shows, and each row's `user0` is
+the list it is in. The lists (twenty, in the executable's order): 0 sex (two rows), 1 race (a row for each playable race),
+2 face (the preset slider, the link `Customize`, the row `Randomize`, the age slider), 3 hair (links: hair style, hair colour,
+facial hair for a man), 4 customize (links: shape, tone, eye colour), 5 hair style (a row for each hair of the race and sex),
+6 hair colour (a preset slider 0 to 15 and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
+10 to 18 the shape sliders (general, forehead, brow, eyes, nose, mouth, cheeks, jaw, chin) and 19 the tone sliders. A link row
+is its list's name followed by ` >`. The first four lists are the tabs (`1. Sex`, `2. Race`, `3. Face`, `4. Hair`, numbered only
+for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` in a box; Back and
+Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten (-50 to
+50; the controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -50 to 30) and writes nothing beside its
+label; moving the slider by its arrows is one step, by the halves of its bar a jump of a quarter of its range (an eighth for
+the colours). The sliders are the controls of `facegen\si.ctl`: one slider moves all fifty coefficients along its direction
+(`FaceControls`), and the tone sliders do the same for the skin. Randomize (after the box `sRSMConfirmRandomize`) gives each
+shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times 1.5 and zeroes the asymmetric ones; the hair,
+eyes and colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
+race when none has it), by name; choosing one puts its hair, eyes, colour, head parts and face on. A click on the sex or race
+takes the head parts off, puts the first preset on and changes a hair or eyes the new kind does not have.
+
+The file puts the panel where the executable's device has its screen (x 930, y 550 of a texture larger than the window); here the
+panel is at the right edge of the window and in its middle (the window is 960 units high). Rows are made again whenever a list
+is shown (a click on a link waits for the next frame, the row it is on is in the click's way) and their values are written to
+the existing tiles after every change, so a drag of the marker (the file's `draggable` is set on it) keeps its tile.
+
+Not done: the head the player turns (the device, the lights and the head of the character, drag and wheel on `RSM_Face_Grab`),
+the age slider (it is in the list, dim: the age is a fan control of `facegen\si.ctl` and the file is not read yet, so the shape
+and tone sliders have no controls either), the keys of the pad, and the glyphs on the ends of a slider's bar (guess: `<` and
+`>`).
 
 ### The level-up screen
 
