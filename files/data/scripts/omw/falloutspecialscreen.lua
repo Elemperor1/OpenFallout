@@ -183,6 +183,9 @@ local function usePad(on)
     if open and open.padMode ~= on then
         open.padMode = on
         open.screen:setPad(on)
+        -- The index page shows the buttons of the cursor's row only while the pad is in use: the shapes come back for the
+        -- pointer (or go for the pad) at once, before a pick is asked of the scene
+        if open.started then drawShapes(false) end
     end
 end
 

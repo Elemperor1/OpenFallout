@@ -726,7 +726,8 @@ function Hud:update(state, dt)
     for _, event in ipairs(state.questTexts or {}) do self.quests:addEvent(event) end
     for _, line in ipairs(state.objectives or {}) do self.quests:addObjective(line) end
     self.shown:batch(function()
-        self:showMessage(dt)
+        -- A message waits (its sound too) while the display is off, as it is not on the screen
+        if not off then self:showMessage(dt) end
         self:showRegion(state.regions or {}, full, dt)
         self:showQuests(full, dt)
         -- The subtitles are in the modes of the game (and of a script that holds the player), not under a window

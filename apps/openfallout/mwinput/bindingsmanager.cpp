@@ -85,8 +85,10 @@ namespace OFInput
                 return;
             }
 
-            // Disallow binding reserved keys
-            if (key == SDL_SCANCODE_F3 || key == SDL_SCANCODE_F4 || key == SDL_SCANCODE_F10)
+            // Disallow binding reserved keys (F1 to F3 are the pages of the Pip-Boy, and a key bound here is answered
+            // before a script sees it)
+            if (key == SDL_SCANCODE_F1 || key == SDL_SCANCODE_F2 || key == SDL_SCANCODE_F3 || key == SDL_SCANCODE_F4
+                || key == SDL_SCANCODE_F10)
                 return;
 
 #ifndef __APPLE__
@@ -180,7 +182,8 @@ namespace OFInput
         // F1 and F2 were the defaults of the quick keys menu and the post-processing HUD of the engine this one comes
         // from, and a configuration saved by an earlier version has them. They are the games' keys for the pages of the
         // Pip-Boy now (falloutpipboy.lua), and a key bound here is answered before a script sees it: the old two are
-        // let go, so that a key does one thing
+        // let go, so that a key does one thing (the window of the bindings takes neither key any more, so what is let
+        // go is only what an earlier version saved)
         const auto letGo = [this](int action, SDL_Scancode key) {
             if (mInputBinder->getChannel(action)->getControlsCount() == 0)
                 return;
