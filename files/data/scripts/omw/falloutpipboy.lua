@@ -953,7 +953,9 @@ local function pageKey(code)
         end
         return true
     end
-    if I.UI.getMode() == nil and not pipboy.playerDead() then
+    -- (a script that has taken the controls of the screens, or switched them off, is not interrupted by the key)
+    local allowed = I.Controls == nil or I.Controls.uiControlsAllowed == nil or I.Controls.uiControlsAllowed()
+    if allowed and I.UI.getMode() == nil and not pipboy.playerDead() then
         tab = page
         openWindow()
     end

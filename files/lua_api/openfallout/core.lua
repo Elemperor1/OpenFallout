@@ -2285,7 +2285,8 @@
 ---
 -- Puts the model of the file `path` in the scene as `model`. With `keepShapes` the engine keeps the nodes of the
 -- file apart (it does not merge shapes or fold nodes into one another), so that each shape can be named by
--- `setTexture`, `setShapeVisible` and `pick`; the file must not have been loaded without it before.
+-- `setTexture`, `setShapeVisible` and `pick` (the model is cached apart from the ordinary one of the file, so it
+-- does not matter if the file was loaded before).
 -- @function [parent=#MenuScene] addModel
 -- @param #string name
 -- @param #string model

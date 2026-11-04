@@ -372,9 +372,8 @@ namespace OFRender
         osg::ref_ptr<osg::Node> instance;
         try
         {
-            if (keepShapes)
-                mResourceSystem->getSceneManager()->keepShapes(path);
-            instance = mResourceSystem->getSceneManager()->getInstance(path);
+            instance = keepShapes ? mResourceSystem->getSceneManager()->getInstanceKeepingShapes(path)
+                                  : mResourceSystem->getSceneManager()->getInstance(path);
         }
         catch (const std::exception& e)
         {

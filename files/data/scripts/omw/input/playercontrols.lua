@@ -286,5 +286,12 @@ return {
         -- @function [parent=#Controls] overrideUiControls
         -- @param #boolean value
         overrideUiControls = function(v) uiControlsOverridden = v end,
+
+        --- Whether the controls "open inventory", "open journal" and so on are processed now: the player's control switch
+        -- for the controls is on and no script has taken them with `overrideUiControls`. For the keys that a script of
+        -- the games reads itself (the F1 to F3 of the Pip-Boy).
+        -- @function [parent=#Controls] uiControlsAllowed
+        -- @return #boolean
+        uiControlsAllowed = function() return Player.getControlSwitch(self, Player.CONTROL_SWITCH.Controls) and not uiControlsOverridden end,
     }
 }

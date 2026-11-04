@@ -167,7 +167,11 @@ namespace OFGui
     {
         // Early-out if already on
         if (mNestedLoadingCount++ > 0 && mMainWidget->getVisible())
+        {
+            // (a load inside a load goes where the outer one goes: a destination it told is not for the next load)
+            mDestination = Destination();
             return;
+        }
 
         mLoadingOnTime = mTimer.time_m();
 

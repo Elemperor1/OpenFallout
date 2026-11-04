@@ -1011,7 +1011,8 @@ local function onFrame()
     sync()
     if shown then
         quantity.update()
-        stepFrame(core.getRealFrameDuration())
+        -- A box that is up (the forfeit) stops the match until it is answered
+        if not messageOpen() then stepFrame(core.getRealFrameDuration()) end
     end
 end
 

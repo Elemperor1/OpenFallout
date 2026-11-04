@@ -177,6 +177,20 @@ namespace OFInput
         mListener = std::make_unique<BindingsListener>(mInputBinder.get(), this);
         mInputBinder->setDetectingBindingListener(mListener.get());
 
+        // F1 and F2 were the defaults of the quick keys menu and the post-processing HUD of the engine this one comes
+        // from, and a configuration saved by an earlier version has them. They are the games' keys for the pages of the
+        // Pip-Boy now (falloutpipboy.lua), and a key bound here is answered before a script sees it: the old two are
+        // let go, so that a key does one thing
+        const auto letGo = [this](int action, SDL_Scancode key) {
+            if (mInputBinder->getChannel(action)->getControlsCount() == 0)
+                return;
+            ICS::Control* control = mInputBinder->getChannel(action)->getAttachedControls().front().control;
+            if (mInputBinder->getKeyBinding(control, ICS::Control::INCREASE) == key)
+                mInputBinder->removeKeyBinding(key);
+        };
+        letGo(A_QuickKeysMenu, SDL_SCANCODE_F1);
+        letGo(A_TogglePostProcessorHUD, SDL_SCANCODE_F2);
+
         loadKeyDefaults();
         loadControllerDefaults();
 

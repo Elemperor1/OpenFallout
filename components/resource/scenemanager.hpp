@@ -128,7 +128,8 @@ namespace Resource
         /// @note If the given filename does not exist or fails to load, an error marker mesh will be used instead.
         ///  If even the error marker mesh can not be found, an exception is thrown.
         /// @note Thread safe.
-        osg::ref_ptr<const osg::Node> getTemplate(VFS::Path::NormalizedView path, bool compile = true);
+        osg::ref_ptr<const osg::Node> getTemplate(
+            VFS::Path::NormalizedView path, bool compile = true, bool keepShapes = false);
 
         /// Clone osg::Node safely.
         /// @note Thread safe.
@@ -207,15 +208,13 @@ namespace Resource
         /// drawn. To be called before they are first loaded.
         void setLodDebug(const SceneUtil::LodDebug& debug) { mLodDebug = debug; }
 
-        /// Keeps the optimizer from merging the shapes of the model in the file or folding its nodes into one another,
-        /// so that each shape stays a node of its own with its name (a menu scene changes one shape of a model by its
-        /// name: the digits and buttons of the Vigor Tester). To be called before the file is first loaded.
-        /// @note Thread safe.
-        void keepShapes(VFS::Path::NormalizedView path);
+        /// An instance of the model in the file with the optimizer kept from merging its shapes or folding its nodes
+        /// into one another, so that each shape stays a node of its own with its name (a menu scene changes one shape of
+        /// a model by its name: the digits and buttons of the Vigor Tester). The template is cached apart from the one
+        /// that getInstance and getTemplate give, so it does not matter whether the file was loaded before.
+        osg::ref_ptr<osg::Node> getInstanceKeepingShapes(VFS::Path::NormalizedView path);
 
     private:
-        bool keepsShapes(VFS::Path::NormalizedView path) const;
-
         osg::ref_ptr<osg::Node> loadSpeedTree(VFS::Path::NormalizedView path);
         osg::ref_ptr<Shader::ShaderVisitor> createShaderVisitor(const std::string& shaderPrefix = "objects");
         osg::ref_ptr<osg::Node> loadErrorMarker();
@@ -243,9 +242,6 @@ namespace Resource
 
         mutable std::mutex mSpeedTreeMutex;
         std::map<std::string, SpeedTreeStandIn, std::less<>> mSpeedTrees;
-
-        mutable std::mutex mKeepShapesMutex;
-        std::set<std::string, std::less<>> mKeepShapes;
 
         osg::Texture::FilterMode mMinFilter;
         osg::Texture::FilterMode mMagFilter;

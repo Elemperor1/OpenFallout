@@ -88,7 +88,7 @@ namespace OFRender
 
         /// Loads the model under `name` (a name that is taken is replaced). False when the model cannot be loaded.
         /// `keepShapes` keeps the optimizer from merging the shapes of the file or folding its nodes into one another, so
-        /// that a script can name each of them (the file must not have been loaded before).
+        /// that a script can name each of them (the model is cached apart from the ordinary one of the file).
         bool addModel(const std::string& name, VFS::Path::NormalizedView path, bool keepShapes = false);
         void removeModel(const std::string& name);
         bool hasModel(const std::string& name) const;
