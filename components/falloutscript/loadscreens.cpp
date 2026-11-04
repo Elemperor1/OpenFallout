@@ -84,6 +84,10 @@ namespace FalloutScript::LoadScreens
         {
             if (destination.mObject != 0 && place.mObject == destination.mObject)
                 return true;
+            // A record that names an interior cell in the indirect field (a world or a cell) is for that cell too
+            if (!destination.mExterior && destination.mObject != 0 && place.mObject == 0
+                && place.mWorld == destination.mObject)
+                return true;
             if (destination.mExterior && place.mObject == 0 && place.mWorld == destination.mWorld
                 && place.mGridX == destination.mGridX && place.mGridY == destination.mGridY)
                 return true;
