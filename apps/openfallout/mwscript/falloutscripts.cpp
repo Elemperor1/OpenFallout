@@ -3975,9 +3975,9 @@ namespace OFScript
                     voiced = sound->sayActive(speaker);
                 }
                 saying->mWait = voiced ? 0.f : line.mSeconds;
-                // What is said can be read when it is far enough to hear it, if subtitles are on, when there is no
-                // voice to hear or when the script that said it forced them
-                constexpr float hearingDistance = 1500.f;
+                // What is said is taken when subtitles are on, when there is no voice to hear or when the script that said
+                // it forced them. The executable tests no distance here: the display tests the speaker's place when it
+                // chooses what to show (Mac round 12BB G4)
                 // The cells of an exterior worldspace are one place, an interior is the cell
                 const auto sameplace = [&] {
                     const auto* at = speaker.getCell();
@@ -3991,8 +3991,7 @@ namespace OFScript
                     ? std::numeric_limits<float>::max()
                     : (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
                           .length();
-                const bool near = distance <= hearingDistance;
-                if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
+                if (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles)
                 {
                     // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
                     // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from
