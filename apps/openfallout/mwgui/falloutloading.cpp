@@ -271,10 +271,54 @@ namespace OFGui
         // The wheel turns once in 5.3333 seconds: it goes clockwise at 67.5 degrees a second, the ball against it at 135
         constexpr float wheelDegrees = 67.5f;
         constexpr float ballDegrees = -135.f;
+
+        // What the model of Fallout 3 holds (Mac round 12BA D, in the units of the model): one picture, `main_timer.dds`,
+        // 128 by 128, of which the wheel is the part u 0.0358 to 0.8466, v 0.0337 to 0.8783 and the needle the part
+        // u 0.9039 to 0.9483, v 0.5215 to 0.9703. The needle turns about a point near its foot in sixteen steps of 22.5
+        // degrees in the 5.3333 seconds of the loop (0.3 seconds of movement, eased, then a hold of a thirtieth of a
+        // second), the same way round as the ball of New Vegas; the wheel stands still
+        constexpr float needleWheelCenterX = -80.228f;
+        constexpr float needleWheelCenterY = 74.622f;
+        constexpr float needleWheelHalfWidth = 28.122f;
+        constexpr float needleWheelHalfHeight = 29.296f;
+        constexpr float needleLeft = -82.059f;
+        constexpr float needleTop = 45.746f;
+        constexpr float needleWidth = 2.675f;
+        constexpr float needleHeight = 27.016f;
+        constexpr float needlePivotX = -81.123f;
+        constexpr float needlePivotY = 72.164f;
+        constexpr float needleStepSeconds = 5.3333f / 16;
+        constexpr float needleMoveSeconds = 0.3f;
+    }
+
+    void FalloutLoading::drawNeedleWheel(
+        double seconds, float alpha, float x, float y, float s, double unitsX, double unitsY)
+    {
+        const float loop = static_cast<float>(std::fmod(seconds, 5.3333));
+        const int step = std::min(15, static_cast<int>(loop / needleStepSeconds));
+        const float moved = std::clamp((loop - step * needleStepSeconds) / needleMoveSeconds, 0.f, 1.f);
+        // (the movement is eased: slow at its ends)
+        const float eased = moved * moved * (3.f - 2.f * moved);
+        turn(mWheel[2], "main_timer.dds", x + (needleWheelCenterX - needleWheelHalfWidth) * s,
+            y + (needleWheelCenterY - needleWheelHalfHeight) * s, 2 * needleWheelHalfWidth * s,
+            2 * needleWheelHalfHeight * s, needleWheelHalfWidth * s, needleWheelHalfHeight * s, 0.f, alpha, unitsX,
+            unitsY, { 0.0358f, 0.0337f, 0.8466f, 0.8783f });
+        turn(mWheel[3], "main_timer.dds", x + needleLeft * s, y + needleTop * s, needleWidth * s, needleHeight * s,
+            (needlePivotX - needleLeft) * s, (needlePivotY - needleTop) * s, -22.5f * (step + eased), alpha, unitsX,
+            unitsY, { 0.9039f, 0.5215f, 0.9483f, 0.9703f });
+    }
+
+    bool FalloutLoading::hasWheelFile(const char* file)
+    {
+        for (const char* const* directory = wheelFolders; *directory != nullptr; ++directory)
+            if (mResources->data().mReadStart(std::string(*directory) + file, 32))
+                return true;
+        return false;
     }
 
     void FalloutLoading::turn(Turning& piece, const char* file, float left, float top, float width, float height,
-        float pivotX, float pivotY, float degrees, float alpha, double unitsX, double unitsY)
+        float pivotX, float pivotY, float degrees, float alpha, double unitsX, double unitsY,
+        const std::array<float, 4>& part)
     {
         if (piece.mBox == nullptr)
         {
@@ -295,9 +339,14 @@ namespace OFGui
                         piece.mTexture = path;
                         piece.mWidth = static_cast<int>(size->mWidth);
                         piece.mHeight = static_cast<int>(size->mHeight);
+                        const int partLeft = static_cast<int>(std::lround(part[0] * piece.mWidth));
+                        const int partTop = static_cast<int>(std::lround(part[1] * piece.mHeight));
+                        const int partWidth = std::max(1, static_cast<int>(std::lround(part[2] * piece.mWidth)) - partLeft);
+                        const int partHeight
+                            = std::max(1, static_cast<int>(std::lround(part[3] * piece.mHeight)) - partTop);
                         piece.mBox->setImageTexture(path);
-                        piece.mBox->setImageTile(MyGUI::IntSize(piece.mWidth, piece.mHeight));
-                        piece.mBox->setImageCoord(MyGUI::IntCoord(0, 0, piece.mWidth, piece.mHeight));
+                        piece.mBox->setImageTile(MyGUI::IntSize(partWidth, partHeight));
+                        piece.mBox->setImageCoord(MyGUI::IntCoord(partLeft, partTop, partWidth, partHeight));
                         break;
                     }
             }
@@ -330,6 +379,15 @@ namespace OFGui
         const double unitsX = mMenu->designWidth() > 0 ? mMenu->pixelWidth() / mMenu->designWidth() : 1.0;
         const double unitsY = mMenu->designHeight() > 0 ? mMenu->pixelHeight() / mMenu->designHeight() : 1.0;
         const float s = wheel.mScale;
+        if (mWheelKind == 0)
+            mWheelKind = hasWheelFile("load_roulette_wheel.dds") ? 1 : hasWheelFile("main_timer.dds") ? 2 : 3;
+        if (mWheelKind == 3)
+            return;
+        if (mWheelKind == 2)
+        {
+            drawNeedleWheel(seconds, alpha, wheel.mX, wheel.mY, s, unitsX, unitsY);
+            return;
+        }
         const float turned = static_cast<float>(std::fmod(seconds, 360.0 / wheelDegrees));
         // A piece is a rectangle round the middle of its node, turned about its middle; the model's origin is the tile's x
         // and y and a unit of the model is s units of the menu. Everything here is in units of the menu.

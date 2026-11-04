@@ -81,8 +81,16 @@ namespace OFGui
         /// Puts a picture of the wheel (the file `file`, found in the folders of the game's textures) at `left`, `top` of the
         /// menu, `width` by `height` units, turned by `degrees` about the point `pivotX`, `pivotY` of it (all in units of
         /// the menu; `unitsX` and `unitsY` are the pixels in one unit)
+        /// (`part` is the part of the picture that is shown, as fractions of its width and height from the left and the top:
+        /// left, top, right, bottom)
         void turn(Turning& piece, const char* file, float left, float top, float width, float height, float pivotX,
-            float pivotY, float degrees, float alpha, double unitsX, double unitsY);
+            float pivotY, float degrees, float alpha, double unitsX, double unitsY,
+            const std::array<float, 4>& part = { 0.f, 0.f, 1.f, 1.f });
+        /// The wheel of Fallout 3: one picture, the wheel with its sixteen ticks and a needle that goes round in sixteen
+        /// steps (the other pieces are not drawn)
+        void drawNeedleWheel(double seconds, float alpha, float x, float y, float s, double unitsX, double unitsY);
+        /// Whether the data has the picture of the wheel `file` in one of the folders of the game's textures
+        bool hasWheelFile(const char* file);
 
         const OFWorld::ESMStore* mStore = nullptr;
         std::shared_ptr<FalloutMenu::Resources> mResources;
@@ -108,6 +116,8 @@ namespace OFGui
         std::vector<Shape> mShapes;
         // The bars on the left and the right, the wheel and the ball
         std::array<Turning, 4> mWheel;
+        /// Which wheel the data has: 0 not asked yet, 1 the one of New Vegas, 2 the one of Fallout 3 (one picture), 3 none
+        int mWheelKind = 0;
     };
 }
 
