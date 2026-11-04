@@ -152,6 +152,39 @@ namespace
         EXPECT_NEAR(file->mAge.value(0, FaceKind::Tone, tone), 65.f, 1e-4f);
     }
 
+    TEST(FalloutScriptFaceControlFileTest, randomizeKeepsTheDrawnAgeAndDrawsTheSecondNumberAgain)
+    {
+        const std::optional<FaceControlFile> file = readFaceControlFile(makeFile());
+        ASSERT_TRUE(file.has_value());
+        // The face from before: the shape 35 and the tone 43 (8 older), the second numbers 1 and 1.5
+        std::vector<float> oldShape(50, 0.f);
+        std::vector<float> oldTone(50, 0.f);
+        oldShape[0] = 5.f;
+        oldTone[1] = 10.f;
+        oldShape[2] = 1.f;
+        oldTone[2] = 1.5f;
+        // The draw: the shape is 30 (kept), the tone is anywhere (it follows the shape)
+        std::vector<float> shape(50, 0.f);
+        std::vector<float> tone(50, 0.f);
+        tone[1] = -4.f;
+        EXPECT_TRUE(file->mAge.settleRandom(oldShape, oldTone, shape, tone, 0.75));
+        EXPECT_NEAR(file->mAge.value(0, FaceKind::Shape, shape), 30.f, 1e-4f);
+        EXPECT_NEAR(file->mAge.value(0, FaceKind::Tone, tone), 38.f, 1e-4f);
+        // 0.75 * 4 - 2 = 1 for the shape, and the tone is 0.5 above it
+        EXPECT_NEAR(file->mAge.value(1, FaceKind::Shape, shape), 1.f, 1e-4f);
+        EXPECT_NEAR(file->mAge.value(1, FaceKind::Tone, tone), 1.5f, 1e-4f);
+        // A tone that would be out of -2 to 2 is kept to it, and an age out of 15 to 65 too
+        oldTone[2] = 3.9f;
+        oldShape[2] = 0.f;
+        shape.assign(50, 0.f);
+        shape[0] = 50.f;
+        tone.assign(50, 0.f);
+        EXPECT_TRUE(file->mAge.settleRandom(oldShape, oldTone, shape, tone, 0.875));
+        EXPECT_NEAR(file->mAge.value(0, FaceKind::Shape, shape), 65.f, 1e-4f);
+        EXPECT_NEAR(file->mAge.value(1, FaceKind::Shape, shape), 1.5f, 1e-4f);
+        EXPECT_NEAR(file->mAge.value(1, FaceKind::Tone, tone), 2.f, 1e-4f);
+    }
+
     TEST(FalloutScriptFaceControlFileTest, noAgeWithoutTheDirections)
     {
         FaceAge age;
@@ -159,6 +192,7 @@ namespace
         std::vector<float> tone(50, 0.f);
         EXPECT_FALSE(age.loaded());
         EXPECT_FALSE(age.setAge(40.f, shape, tone));
+        EXPECT_FALSE(age.settleRandom(shape, tone, shape, tone, 0.5));
         EXPECT_FLOAT_EQ(age.value(0, FaceKind::Shape, shape), 0.f);
     }
 }

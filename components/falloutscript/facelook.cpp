@@ -176,6 +176,25 @@ namespace FalloutScript
         return true;
     }
 
+    bool FaceAge::settleRandom(const std::vector<float>& oldShape, const std::vector<float>& oldTone,
+        std::vector<float>& shape, std::vector<float>& tone, double uniform) const
+    {
+        if (!mLoaded)
+            return false;
+        const auto kept = [](float number, float low, float high) { return std::min(std::max(number, low), high); };
+        // The age pair: the shape keeps the age the draw gave it, the tone keeps its distance from the shape
+        const float shapeYears = value(0, FaceKind::Shape, shape);
+        const float toneYears = value(0, FaceKind::Tone, oldTone) - value(0, FaceKind::Shape, oldShape) + shapeYears;
+        move(0, FaceKind::Shape, kept(shapeYears, minimumYears, maximumYears), shape);
+        move(0, FaceKind::Tone, kept(toneYears, minimumYears, maximumYears), tone);
+        // The second pair is drawn again in -2 to 2 for the shape
+        const float second = static_cast<float>(uniform * 4.0 - 2.0);
+        const float toneSecond = value(1, FaceKind::Tone, oldTone) - value(1, FaceKind::Shape, oldShape) + second;
+        move(1, FaceKind::Shape, kept(second, -2.f, 2.f), shape);
+        move(1, FaceKind::Tone, kept(toneSecond, -2.f, 2.f), tone);
+        return true;
+    }
+
     int faceAgeYears(int slider)
     {
         // ftol(slider * 5.55f + 9.45f) with the two floats widened: 1 to 10 gives 15, 20, 26, 31, 37, 42, 48, 53, 59,

@@ -77,7 +77,12 @@ local sliderValues = {}
 local held = nil
 -- What the sliders that the host does not keep show: the number of the preset and the age
 local presetValue = 1
-local ageValue = 5
+-- Both sliders open at 1 whatever the face is (FalloutNV.exe makes them with the lowest number as their start and does not
+-- read the NPC back)
+local ageValue = 1
+-- Whether the face on the screen came from Randomize or the age and nothing was picked since (the executable's dirty bit
+-- 7): the next Randomize then runs at once, without the question
+local fresh = false
 -- The colour preset of the hair colour list, and whether a colour was set by hand since (the list then says custom)
 local colourPreset = 0
 local custom = false
@@ -211,14 +216,14 @@ local function listRows(list)
     local made = {}
     if list == 0 then
         made[#made + 1] = choice(word('sMale', 'Male'), function() return not look.female end,
-            function() chargen.setFemale(false); presetValue = 1 end)
+            function() chargen.setFemale(false); presetValue = 1; fresh = false end)
         made[#made + 1] = choice(word('sFemale', 'Female'), function() return look.female end,
-            function() chargen.setFemale(true); presetValue = 1 end)
+            function() chargen.setFemale(true); presetValue = 1; fresh = false end)
     elseif list == 1 then
         for _, race in ipairs(look.lists.races) do
             local id = race.id
             made[#made + 1] = choice(race.name, function() return look.race == id end,
-                function() chargen.setRace(id); presetValue = 1 end)
+                function() chargen.setRace(id); presetValue = 1; fresh = false end)
         end
     elseif list == 2 then
         local count = #look.lists.presets
@@ -226,6 +231,7 @@ local function listRows(list)
             function() return presetValue end,
             function(value)
                 presetValue = value
+                fresh = false
                 chargen.setPreset(value)
             end,
             function() return tostring(presetValue) end, count > 0)
@@ -234,10 +240,13 @@ local function listRows(list)
             local ask = I.FalloutMessage and I.FalloutMessage.ask
             local function randomize()
                 chargen.randomize()
+                fresh = true
                 done()
             end
-            if ask and ask(word('sRSMConfirmRandomize', 'Randomize the face?'), { word('sYes', 'Yes'), word('sNo', 'No') },
-                function(button) if button == 1 then randomize() end end) then
+            -- A face that Randomize or the age just made is not asked about again (FalloutNV.exe skips the box when its
+            -- dirty bit 7 is set). The box lists No first and Yes second (the stored answer is the place of the button)
+            if not fresh and ask and ask(word('sRSMConfirmRandomize', 'Randomize the face?'),
+                { word('sNo', 'No'), word('sYes', 'Yes') }, function(button) if button == 2 then randomize() end end) then
                 return
             end
             randomize()
@@ -247,6 +256,7 @@ local function listRows(list)
         made[#made + 1] = slider(word('sRSMAge', 'Age'), 1, 10, 0.25, function() return ageValue end,
             function(value)
                 ageValue = value
+                fresh = true
                 chargen.setAge(value)
             end, nil, chargen.hasAge())
     elseif list == 3 then
@@ -260,7 +270,8 @@ local function listRows(list)
     elseif list == 5 then
         for _, hair in ipairs(look.lists.hairs) do
             local id = hair.id
-            made[#made + 1] = choice(hair.name, function() return look.hair == id end, function() chargen.setHair(id) end)
+            made[#made + 1] = choice(hair.name, function() return look.hair == id end,
+                function() chargen.setHair(id); fresh = false end)
         end
     elseif list == 6 then
         made[#made + 1] = slider(word('sRSMHairColor', 'Hair Color'), 0, 15, 0.25,
@@ -285,12 +296,13 @@ local function listRows(list)
                     if worn == id then return true end
                 end
                 return false
-            end, function() chargen.toggleFacialHair(id) end)
+            end, function() chargen.toggleFacialHair(id); fresh = false end)
         end
     elseif list == 8 then
         for _, eyes in ipairs(look.lists.eyes) do
             local id = eyes.id
-            made[#made + 1] = choice(eyes.name, function() return look.eyes == id end, function() chargen.setEyes(id) end)
+            made[#made + 1] = choice(eyes.name, function() return look.eyes == id end,
+                function() chargen.setEyes(id); fresh = false end)
         end
     elseif list == 9 then
         for index = 10, 18 do made[#made + 1] = link(index) end
@@ -497,13 +509,22 @@ local function sliderOf(tile)
     return nil
 end
 
--- The next tab, or the box that asks whether the player is done on the last one
+-- The word the box names what the player is done with: by the mode of the screen, not the tab (FalloutNV.exe builds the
+-- question once when the menu opens, from the format "%s %s?" with sRSMConfirmDone first and this word second, round 12BB F
+-- reading of the argument order): the character for a new one, the hair at the barber, the face at the surgeon
+local function doneTitle()
+    if mode == 2 then return word('sRSMHair', 'Hair') end
+    if mode == 3 then return word('sRSMFace', 'Face') end
+    return word('sRSMCharacter', 'character')
+end
+
+-- The next tab, or the box that asks whether the player is done on the last one: the box lists No first and Yes second
 local function confirmDone()
     local done = callbacks and callbacks.done
     local ask = I.FalloutMessage and I.FalloutMessage.ask
-    local text = titleOf(lastTab()) .. ' ' .. word('sRSMConfirmDone', 'Are you done?')
-    if ask and ask(text, { word('sYes', 'Yes'), word('sNo', 'No') }, function(button)
-        if button == 1 and done then done() end
+    local text = word('sRSMConfirmDone', 'Are you done with your') .. ' ' .. doneTitle() .. '?'
+    if ask and ask(text, { word('sNo', 'No'), word('sYes', 'Yes') }, function(button)
+        if button == 2 and done then done() end
     end) then
         return
     end
@@ -753,8 +774,8 @@ function module.start(page, state, options)
     placedFor = nil
     placePanel()
     setTop()
-    presetValue, colourPreset, custom = 1, 0, false
-    -- The glyphs on the ends of a slider's bar (the menu's `user1` and `user2`: guess, the executable's are not read)
+    presetValue, ageValue, colourPreset, custom, fresh = 1, 1, 0, false, false
+    -- The glyphs on the ends of a slider's bar (the menu's `user1` and `user2`: "<" and ">" in the executable, round 12BB F)
     opened:io('user1', '<')
     opened:io('user2', '>')
     refreshLook()

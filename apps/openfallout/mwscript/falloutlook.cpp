@@ -368,16 +368,6 @@ namespace OFScript
         mChargen.setLook(look);
     }
 
-    void FalloutScripts::lookRandomize()
-    {
-        FaceLook look = playerLook();
-        const double variation = gameSetting("fNPCGeneticVariation", 0.5);
-        FalloutScript::Gauss gauss([this]() {
-            return std::uniform_real_distribution<double>(0.0, 1.0)(mLookRandom);
-        });
-        mChargen.setLook(FalloutScript::randomFace(look, variation, gauss));
-    }
-
     bool FalloutScripts::lookPreview(LookPreview& preview)
     {
         const FaceLook look = playerLook();
@@ -555,5 +545,34 @@ namespace OFScript
         look.mTone = difference(tone, baseTone, FaceLook::toneCount);
         mChargen.setLook(look);
         return true;
+    }
+
+    void FalloutScripts::lookRandomize()
+    {
+        FaceLook look = playerLook();
+        const double variation = gameSetting("fNPCGeneticVariation", 0.5);
+        FalloutScript::Gauss gauss([this]() { return std::uniform_real_distribution<double>(0.0, 1.0)(mLookRandom); });
+        FaceLook random = FalloutScript::randomFace(look, variation, gauss);
+        // The age and the second number of the face file are settled after the draw (0x601830): the shape keeps the age
+        // that the draw gave it, the tone stays as much older or younger as it was, and the second number is drawn
+        // again. They are worked in the numbers of the whole face, and the record keeps what is left of them without
+        // the race's.
+        const FalloutScript::FaceAge& age = faceControls().mAge;
+        if (age.loaded())
+        {
+            const std::vector<float>& baseShape = raceNumbers(mStore, look, FaceKind::Shape);
+            const std::vector<float>& baseTone = raceNumbers(mStore, look, FaceKind::Tone);
+            const std::vector<float> oldShape = sum(baseShape, look.mShape, FaceLook::shapeCount);
+            const std::vector<float> oldTone = sum(baseTone, look.mTone, FaceLook::toneCount);
+            std::vector<float> shape = sum(baseShape, random.mShape, FaceLook::shapeCount);
+            std::vector<float> tone = sum(baseTone, random.mTone, FaceLook::toneCount);
+            if (age.settleRandom(
+                    oldShape, oldTone, shape, tone, std::uniform_real_distribution<double>(0.0, 1.0)(mLookRandom)))
+            {
+                random.mShape = difference(shape, baseShape, FaceLook::shapeCount);
+                random.mTone = difference(tone, baseTone, FaceLook::toneCount);
+            }
+        }
+        mChargen.setLook(random);
     }
 }

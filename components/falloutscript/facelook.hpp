@@ -114,6 +114,13 @@ namespace FalloutScript
         /// The age slider (0x7B4B50): the age in years for the shape, the same age moved by what the tone is older or
         /// younger than the shape for the tone, both kept to 15 to 65. Nothing when the directions are not there.
         bool setAge(float years, std::vector<float>& shape, std::vector<float>& tone) const;
+        /// What Randomize (0x601830) does after it has put the new numbers in: `shape` and `tone` hold the new face and
+        /// the `old` ones the face from before. The age of the new shape is kept (kept to 15 to 65) and the tone stays
+        /// as much older or younger than it as the old tone was; the second number is drawn again, `uniform` (0 to 1)
+        /// times four less two for the shape, and the tone keeps its distance from the shape as before, both kept to -2
+        /// to 2. Nothing when the directions are not there.
+        bool settleRandom(const std::vector<float>& oldShape, const std::vector<float>& oldTone,
+            std::vector<float>& shape, std::vector<float>& tone, double uniform) const;
 
     private:
         struct Fan

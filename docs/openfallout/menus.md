@@ -348,8 +348,9 @@ facial hair for a man), 4 customize (links: shape, tone, eye colour), 5 hair sty
 6 hair colour (a preset slider 0 to 15 and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
 10 to 18 the shape sliders (general, forehead, brow, eyes, nose, mouth, cheeks, jaw, chin) and 19 the tone sliders. A link row
 is its list's name followed by ` >`. The first four lists are the tabs (`1. Sex`, `2. Race`, `3. Face`, `4. Hair`, numbered only
-for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` in a box; Back and
-Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten, cut towards zero (-35 to 35, the INI value of both games, 3.5; the
+for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` followed by the word for what is being done (`sRSMCharacter` for a new
+character, `sRSMHair` at the barber, `sRSMFace` at the surgeon: by the mode, not the tab) and a question mark in a box that
+lists No first and Yes second; Back and Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten, cut towards zero (-35 to 35, the INI value of both games, 3.5; the
 controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -35 to 30) and writes nothing beside its
 label; moving the slider by its arrows is one step, by the halves of its bar a jump of a quarter of its range (an eighth for
 the colours). The sliders are the controls of `facegen\si.ctl` (read by `readFaceControlFile`, which takes only the exact layout
@@ -361,9 +362,12 @@ was moved keeps its number and the others read the face again (the executable le
 a step nearer zero). The age slider (1 to 10) stands for 15, 20, 26, 31, 37, 42, 48, 53, 59 and 64 years and moves the face along
 the two age directions of the file (`FaceAge`): the age in years for the shape, and for the tone the same shift, so that the tone
 stays as much older or younger than the shape as it was; the second number of the age directions only the random face redraws.
-Randomize (after the box `sRSMConfirmRandomize`) gives each
-shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times 1.5 and zeroes the asymmetric ones; the hair,
-eyes and colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
+The age slider and the preset slider both open at 1 whatever the face is. Randomize (after the box `sRSMConfirmRandomize`, with
+No first and Yes second; a face that Randomize or the age slider just made is not asked about again, until a sex, race, hair,
+eyes, facial hair or preset click) gives each shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times
+1.5 and zeroes the asymmetric ones, then settles the fan controls (`FaceAge::settleRandom`: the shape keeps the age the draw gave
+it, the tone stays as much older or younger as before, the second number is drawn again between -2 and 2); the hair, eyes and
+colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
 race when none has it), by name; choosing one puts its hair, eyes, colour, head parts and face on. A click on the sex or race
 takes the head parts off, puts the first preset on and changes a hair or eyes the new kind does not have.
 
@@ -389,9 +393,10 @@ names; a click on it takes it off and a click on another takes all the character
 on. The presets are sorted by name byte by byte (capitals first). A hair that the new sex or race cannot have is replaced by the
 race's own for the sex, and only when the race has none by the first of its hairs that fits (Mac round 12BB C1 and C2).
 
-Not done: the keys of the pad, the glyphs on the ends of a slider's bar (guess: `<` and `>`), the scrolling of the long lists by
-the executable's rules (one row's height a click, rows cut by the window hidden), the colour presets of the hair, the second age
-number in the random face, and the real-game check of the rows' order (it is read from the executable's loading code).
+The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
+12BB F). Not done: the keys of the pad, the scrolling of the long lists by the executable's rules (one row's height a click, rows
+cut by the window hidden), the colour presets of the hair, the hair's tint and length and the head's size by the executable's
+formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
 
 ### The level-up screen
 
