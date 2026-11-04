@@ -26,8 +26,11 @@ namespace FalloutScript
         /// fDamageSkillMult)
         double mSkillBase = 0.5;
         double mSkillMult = 0.5;
-        /// What the condition of the weapon makes of a blow: base + mult * condition, for guns and for melee weapons
-        /// (fDamageGunWeapCondBase, fDamageGunWeapCondMult, fDamageMeleeWeapCondBase, fDamageMeleeWeapCondMult)
+        /// What the condition of the weapon makes of a blow. New Vegas has one curve in its code (`Wear::weaponDamageFactor`, Mac
+        /// round 12AW S12: the settings fDamageGunWeapCondBase and the like are not read for it); Fallout 3's code is not read
+        /// and keeps what the settings say: base + mult * condition, for guns and for melee weapons (fDamageGunWeapCondBase,
+        /// fDamageGunWeapCondMult, fDamageMeleeWeapCondBase, fDamageMeleeWeapCondMult)
+        bool mExeConditionCurve = true;
         double mGunConditionBase = 0.66;
         double mGunConditionMult = 0.34;
         double mMeleeConditionBase = 0.5;
@@ -78,6 +81,8 @@ namespace FalloutScript
         /// What the character loses: the blow and the bonus of a critical hit, after the armor
         double mDamage = 0;
         bool mCritical = false;
+        /// The blow as it met the armor (with the bonus of a critical hit): what armor that is worn out by it works on
+        double mEntering = 0;
     };
 
     namespace Damage

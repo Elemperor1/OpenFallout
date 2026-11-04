@@ -378,7 +378,5 @@ namespace FalloutScript
             const std::optional<int> level = values.levelOf(call.mReference, progress.level());
             return level ? static_cast<double>(*level) : 0.0;
         });
-        // Nothing wears a weapon out yet, so the weapon a character holds is as good as new
-        interpreter.setHandler("GetWeaponHealthPerc", [](CallContext&) { return 100.0; });
     }
 }

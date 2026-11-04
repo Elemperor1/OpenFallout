@@ -2559,9 +2559,10 @@
 ---
 -- @type PipboyItem
 -- @field #string id The id of the row: the form, and for a row of the copies of a weapon or armor that have one condition
--- when the item has copies of more than one, "~" and that condition. The functions that take the id of a row (`use`,
--- `drop`, `transfer`, the piles of a barter) take either kind; the form alone names no copy (the one that is on, else the
--- best).
+-- "~" and that condition, when the item has copies of more than one condition or a single stack that is not whole (a lone
+-- damaged stack has the suffix too). The functions that take the id of a row (`use`, `drop`, `transfer`, the piles of a
+-- barter) take either kind. The form alone names no copy: `use` takes the copy that is on, else the best; `drop` and
+-- `transfer` take the best copy; a barter pile takes the best copies first.
 -- @field #string form The form alone.
 -- @field #boolean hasCondition Weapons and armor: they have a condition.
 -- @field #number condition Their condition in tenths of a percent of the health (1000 is full).
@@ -2685,6 +2686,77 @@
 ---
 -- The player is done with the menu of recipes.
 -- @function [parent=#Pipboy] closeRecipes
+
+---
+-- Whether the Pip-Boy offers to repair a copy of a weapon or of armor (a row id of `items`): it is below full
+-- condition and the player has something to repair it with.
+-- @function [parent=#Pipboy] canRepair
+-- @param #string item
+-- @return #boolean
+
+---
+-- The repair screen for one copy: the Repair skill of the player, the copy and the things that can repair it (another copy
+-- of the item that is not worn, or what the item's repair list names), the weakest first.
+-- @function [parent=#Pipboy] repairView
+-- @param #string item A row id of `items`.
+-- @return #PipboyRepairView Nil for an item that is not repaired.
+
+---
+-- @type PipboyRepairView
+-- @field #number skill The Repair skill of the player.
+-- @field #PipboyRepairEntry item The copy that is repaired.
+-- @field #list<#PipboyRepairEntry> donors What can repair it, each with `result` set.
+
+---
+-- @type PipboyRepairEntry
+-- @field #string id Row id (`form~condition`).
+-- @field #string form
+-- @field #string name
+-- @field #string icon Path of the inventory icon.
+-- @field #number condition In tenths of a percent (1000 is full).
+-- @field #boolean worn
+-- @field #number result Only for a thing that repairs: the condition the copy would have after it.
+-- @field #PipboyRepairStat stat What the entry does at its condition.
+
+---
+-- @type PipboyRepairStat
+-- @field #number damage Weapon damage (0 when it has none).
+-- @field #number threshold Damage threshold of armor.
+-- @field #number rating Damage resistance of armor.
+
+---
+-- The player repairs a copy with a thing of the list (the thing is used up).
+-- @function [parent=#Pipboy] repair
+-- @param #string item Row id of the copy.
+-- @param #string donor Row id of the thing that repairs it.
+-- @return #number The condition the copy has now, -1 when nothing was done.
+
+---
+-- The repair services a conversation opened (a topic whose result calls `ShowRepairMenu`): who repairs, its name, its Repair
+-- skill and a number that is another for each time a menu opens.
+-- @function [parent=#Pipboy] repairServices
+-- @return #table `{vendor, name, skill, serial}`; nil when no menu is open.
+
+---
+-- What the repair services list: the caps of the player, the sum of every row, the condition the character leaves things
+-- in (`cap`, tenths of a percent) and the rows in the order of the menu: the rows the player can pay for first (the
+-- healthiest first, the worn copy before an alike one), then the others (the weakest first, the worn copy last).
+-- @function [parent=#Pipboy] serviceRows
+-- @return #table `{skill, caps, total, cap, rows}`; each row has `id`, `name`, `icon`, `condition`, `worn`, `cost`,
+--   `canPay` and the stats `stat` (now) and `capStat` (after the repair), as #PipboyRepairStat. Nil when no menu is open.
+
+---
+-- The character repairs a copy (the worn one when `worn`), or every row that the player can pay for when `all`; the
+-- caps are taken once.
+-- @function [parent=#Pipboy] serviceRepair
+-- @param #string item Row id; empty with `all`.
+-- @param #boolean worn
+-- @param #boolean all
+-- @return #number How many copies were repaired.
+
+---
+-- The player is done with the repair services.
+-- @function [parent=#Pipboy] closeRepairServices
 
 ---
 -- The barter menu that a conversation opened (the response of a dialogue line that calls `ShowBarterMenu`): who trades,

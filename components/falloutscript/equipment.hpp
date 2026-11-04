@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_EQUIPMENT_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -38,6 +39,8 @@ namespace FalloutScript
         double mThreshold = 0;
         /// What one of the item weighs
         double mWeight = 0;
+        /// Weapons and armor: the most health a copy has (the record's health; 0 for an item that does not wear out)
+        double mHealth = 0;
     };
 
     /// The biped flags that armor covers a body part with that the rest of this component has to know by name
@@ -92,6 +95,7 @@ namespace FalloutScript
             AlreadyEquipped,
             NotCarried, // the character does not have the item
             NotEquippable, // no weapon, armor or ammunition
+            Broken, // the copy has no health left (the executable's EquipItem refuses it: sCantEquipBrokenItem)
         };
 
         /// Puts the item on. A weapon takes the place of the weapon held, armor the place of the armor that covers
@@ -110,15 +114,41 @@ namespace FalloutScript
         /// it). False when the item is not on.
         bool setEquippedCondition(FormId actor, FormId item, int condition);
 
+        /// The copy of the weapon or armor that is on loses `points` of health (what is less than a tenth of a percent is
+        /// kept for the next time) and tells the listener when it did. Returns the condition after, -1 when the item is
+        /// not on or has no health to lose.
+        int wear(FormId actor, FormId item, double points);
+        /// Told after an item that is on lost health: the condition before and after
+        using WearListener = std::function<void(FormId actor, FormId item, int before, int after)>;
+        void setWearListener(WearListener listener);
+        /// Gives copies of an item with a share of its health (1 is whole); an item that does not wear out is whole
+        void addWithHealth(FormId actor, FormId item, int count, double fraction);
+        /// The health of the weapon in the hands in percent, 100 for the hands
+        double weaponPercent(FormId actor);
+        /// What SetWeaponHealthPerc and ModWeaponHealthPerc do to the weapon in the hands (0xA20..: the executable lowers
+        /// health through the code of wear, raises it by writing it, and a set never reaches the whole): false when there
+        /// is no weapon in the hands
+        bool setWeaponPercent(FormId actor, double percent);
+        bool modWeaponPercent(FormId actor, double percent);
+
         /// The weapon held (0 for none, hands only), the ammunition chosen, and the armor worn
         FormId weapon(FormId actor);
         FormId ammo(FormId actor);
         std::vector<FormId> armor(FormId actor);
 
+        /// The armor worn with the condition of the copy that is on, in the order it was put on
+        struct WornPiece
+        {
+            FormId mItem = 0;
+            int mCondition = 1000;
+        };
+        std::vector<WornPiece> wornArmor(FormId actor);
+
         /// The animation type of the weapon held (0, hands, for none)
         std::uint32_t weaponAnimationType(FormId actor);
 
-        /// The rating and damage threshold of all that is worn, and of what covers the upper body
+        /// The rating and damage threshold of all that is worn, and of what covers the upper body. A piece that is worn
+        /// below half its health gives less (`Wear::armorFactor`).
         double armorRating(FormId actor);
         double damageThreshold(FormId actor);
         double upperBodyRating(FormId actor);
@@ -170,6 +200,14 @@ namespace FalloutScript
         int chooseCopy(FormId actor, FormId item, int asked);
 
         void noteChange(FormId actor, FormId item, bool worn);
+
+        /// What a quantity of each piece of armor is, with the piece's condition in it, added up
+        template <class Pick>
+        double sumOfWornArmor(FormId actor, Pick pick);
+
+        /// How much of the next tenth of a percent a copy has lost, for the next time
+        std::map<std::pair<FormId, FormId>, double> mWearRemainders;
+        WearListener mWearListener;
 
         ItemRecords& mRecords;
         ActorState& mState;

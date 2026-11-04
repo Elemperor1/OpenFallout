@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "wear.hpp"
+
 namespace FalloutScript
 {
     DamageSettings DamageSettings::fromGameSettings(const Lookup& lookup)
@@ -48,7 +50,9 @@ namespace FalloutScript
         double blow = std::max(weapon.mDamage, 0.0);
         const double condition = std::clamp(weapon.mCondition, 0.0, 1.0);
         const double skill = std::clamp(weapon.mSkill, 0.0, 100.0) / 100.0;
-        if (weapon.mMelee)
+        if (settings.mExeConditionCurve)
+            blow *= Wear::weaponDamageFactor(condition);
+        else if (weapon.mMelee)
             blow *= settings.mMeleeConditionBase + settings.mMeleeConditionMult * condition;
         else
             blow *= settings.mGunConditionBase + settings.mGunConditionMult * condition;
@@ -64,6 +68,7 @@ namespace FalloutScript
         // can), the threshold takes points, and the blow does not fall below a share of what it was when it met the
         // armor (New Vegas; Fallout 3 has no such floor)
         const double entering = blow;
+        result.mEntering = entering;
         const double resisted = std::clamp(defense.mResistance, 0.0, settings.mMaxResistance) / 100.0;
         blow *= 1.0 - resisted;
         blow -= std::max(defense.mThreshold, 0.0);

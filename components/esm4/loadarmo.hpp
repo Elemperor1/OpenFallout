@@ -175,6 +175,7 @@ namespace ESM4
         std::uint32_t mArmorFlags;
         std::uint32_t mGeneralFlags;
         ESM::FormId mScriptId;
+        ESM::FormId mRepairList; // REPL, the list of the items that repair it (Fallout 3 and New Vegas)
         std::uint16_t mEnchantmentPoints;
         ESM::FormId mEnchantment;
 

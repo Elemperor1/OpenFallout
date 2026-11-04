@@ -21,6 +21,7 @@
 #include <components/esm3/loadpgrd.hpp>
 #include <components/esm3/loadskil.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadamef.hpp>
 #include <components/esm4/loadccrd.hpp>
 #include <components/esm4/loadcdck.hpp>
 #include <components/esm4/loadcell.hpp>

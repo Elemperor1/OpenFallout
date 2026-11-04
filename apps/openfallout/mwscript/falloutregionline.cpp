@@ -34,7 +34,9 @@ namespace OFScript
 
         const bool exterior = cell->isExterior();
         // The executable tells the name of the world space at the end of a door, a teleport or a load (0x93CC9A), and does not
-        // when the player walks over to the next cell of the outside: that is a step of one cell in the same world space
+        // when the player walks over to the next cell of the outside: that is a step of one cell in the same world space.
+        // A script that moves the player into the next cell is not told from a step (the port has no hook at the placing of
+        // the player), so the name of the world space is not shown for that one move.
         const ESM::RefId world = cell->getCell()->getWorldSpace();
         const int gridX = cell->getCell()->getGridX();
         const int gridY = cell->getCell()->getGridY();

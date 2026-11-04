@@ -160,6 +160,9 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("DESC"):
                 reader.getLocalizedString(mText);
                 break;
+            case ESM::fourCC("REPL"): // the list of the things that mend it
+                reader.getFormId(mRepairList);
+                break;
             case ESM::fourCC("YNAM"):
                 reader.getFormId(mPickUpSound);
                 break;
@@ -294,7 +297,6 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("UNAM"):
             case ESM::fourCC("VMAD"):
             case ESM::fourCC("NNAM"):
-            case ESM::fourCC("REPL"): // FO3
             case ESM::fourCC("MOD2"): // FO3
             case ESM::fourCC("MO2T"): // FO3
             case ESM::fourCC("MO2S"): // FO3

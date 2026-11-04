@@ -5,7 +5,9 @@
 -- click does is the engine's (core.pipboy); this module lists it and gives the choices of the player back. It is a module
 -- of falloutpipboy.lua, not a script.
 --
--- Not there yet: the picture of the thing (the games show the model of it), repair and mods.
+-- Repair opens the game's own repair screen (falloutpipboyrepair.lua) for the weapon or armor under the pointer.
+--
+-- Not there yet: the picture of the thing (the games show the model of it) and mods.
 --
 --   local page = require('scripts.omw.falloutpipboyitems')
 --   page.show()            -- true when the page is on the screen, false when the menu file is not there
@@ -20,6 +22,7 @@ local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local cards = require('scripts.omw.falloutitemcards')
 local quantity = require('scripts.omw.falloutquantity')
+local repair = require('scripts.omw.falloutpipboyrepair')
 
 local pipboy = core.pipboy
 
@@ -148,6 +151,22 @@ local function fill()
     cardRow = nil
 end
 
+-- The button that repairs is lit for a weapon or armor that something can repair, and says what the executable says for the
+-- thing under the pointer: "maintain" when its health is three quarters (armor: a half) or better, else "repair" (FalloutNV.exe
+-- 0x780FF0 and 0x781860)
+local function updateRepairButton(item)
+    if not shown:find('IM_RepairButton') then return end
+    local thing = item ~= nil and not item.keyring and not keyring
+    local can = thing and item.hasCondition == true and pipboy.canRepair(item.id) or false
+    local health = (thing and item.hasCondition) and (item.condition or 1000) / 10 or 100
+    local limit = (thing and item.category == 'apparel') and 50 or 75
+    shown:set('IM_RepairButton', 'target', can)
+    if thing then
+        shown:set('IM_RepairButton', 'string',
+            health >= limit and word('sMaintainItem', 'MAINTAIN') or word('sRepairItem', 'REPAIR'))
+    end
+end
+
 -- The cards, and the mark beside a thing that can be used, for the row that is picked or under the pointer; a list with
 -- no row to pick (an empty category) shows no card and nothing to use
 local function updateCards()
@@ -158,6 +177,7 @@ local function updateCards()
     shown:batch(function()
         cards.show(shown, item and not item.keyring and item or nil)
         shown:io('_EquippableItem', equippable(item))
+        updateRepairButton(item)
     end)
 end
 
@@ -314,6 +334,42 @@ local function closeKeyring()
     end
 end
 
+-- The screen of the repair is for the copy that is picked; when the player is done the page of the items comes back with
+-- that copy picked (its row is the one it has now)
+local function backFromRepair(id)
+    if not module.show() then return end
+    local text = tostring(id or '')
+    local form, condition = text:match('^(.-)~(%d+)$')
+    form = form or text
+    -- The copy as it is now if the list has it, else the first copy of the item
+    local found
+    for index, item in ipairs(listed) do
+        if item.form == form then
+            if tostring(item.condition) == condition then
+                found = index
+                break
+            end
+            found = found or index
+        end
+    end
+    if found then list.select(found, true) end
+    cardRow = nil
+end
+
+local function openRepair()
+    if keyring or not shown then return end
+    local item = listed[list.selected()]
+    if not item or item.keyring or not item.hasCondition or not pipboy.canRepair(item.id) then return end
+    pipboy.playSoundNamed('UIMenuMode')
+    quantity.close()
+    shown:close()
+    shown, list, tabs = nil, nil, nil
+    cardRow = nil
+    if not repair.show(item.id, { close = backFromRepair }) then
+        module.show()
+    end
+end
+
 local function open()
     local opened = menuModule.open(MENU_FILE, { box = menuModule.PIPBOY_BOX })
     if not opened then return false end
@@ -339,22 +395,24 @@ local function open()
     tabs = result
     list.onClick(function(row) activate(row) end)
     opened:onClick('IM_CancelButton', closeKeyring)
-    -- Repair and mods are not there yet: the buttons are not shown; no cards until a thing is picked
+    -- Repair is the game's repair screen; mods are not there yet, so that button is not shown. No cards until a thing is
+    -- picked.
+    opened:onClick('IM_RepairButton', openRepair)
     cards.show(opened, nil)
     opened:batch(function()
-        for _, name in ipairs({ 'IM_RepairButton', 'IM_ModButton' }) do
-            if opened:find(name) then opened:set(name, 'visible', false) end
-        end
+        if opened:find('IM_ModButton') then opened:set('IM_ModButton', 'visible', false) end
     end)
     return true
 end
 
 function module.isOpen()
-    return shown ~= nil
+    return shown ~= nil or repair.isOpen()
 end
 
 -- Show the page (open the menu if it is not open) with what the player carries now; false when it cannot be shown
 function module.show()
+    -- The repair screen is the page while it is up
+    if repair.isOpen() then return true end
     if not shown and not open() then
         return false
     end
@@ -364,6 +422,7 @@ function module.show()
 end
 
 function module.hide()
+    repair.hide()
     quantity.close()
     if shown then
         shown:close()
@@ -376,6 +435,10 @@ end
 
 -- Each frame the page is shown: the window size, the wheel of the hot keys, and the cards of what the pointer is on
 function module.update()
+    if repair.isOpen() then
+        repair.update()
+        return
+    end
     if not shown then return end
     shown:checkSize()
     updateWheel()
@@ -387,6 +450,7 @@ end
 -- the tab before and after, Backspace closes the keyring. False when the key is not the page's (Left and Right change
 -- the page of the Pip-Boy).
 function module.press(code, symbol)
+    if repair.isOpen() then return repair.press(code, symbol) end
     if not shown then return false end
     if quantity.isOpen() then
         return quantity.press(code, symbol)
@@ -399,6 +463,11 @@ function module.press(code, symbol)
             wheelGrace = 1
             if wheelSlot ~= slot then setWheel(slot) end
         end
+        return true
+    end
+    -- R is the repair button: it acts when it is lit, and makes the sound of a refusal when it is not
+    if symbol == 'r' and not keyring then
+        if not shown:pcButton('r') then pipboy.playSoundNamed('UIMenuCancel') end
         return true
     end
     local count = list.count()

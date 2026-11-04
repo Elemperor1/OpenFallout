@@ -568,11 +568,16 @@ namespace FalloutScript
             if (call.mReference == 0 || !state.items(call.mReference, held))
                 return 0.0;
             const FormId target = formArgument(call, 0);
-            for (const auto& [item, count] : held)
+            for (const auto& entry : held)
             {
-                const int removed = state.removeItem(call.mReference, item, count);
-                if (target != 0 && target != call.mReference)
-                    state.addItem(target, item, removed);
+                const FormId item = entry.first;
+                // Each stack of copies goes with the condition it has
+                for (const ActorState::ConditionStack& stack : state.conditions(call.mReference, item))
+                {
+                    const int removed = state.removeItem(call.mReference, item, stack.mCount, stack.mCondition);
+                    if (target != 0 && target != call.mReference)
+                        state.addItem(target, item, removed, stack.mCondition);
+                }
             }
             return 0.0;
         });
@@ -581,15 +586,9 @@ namespace FalloutScript
             const FormId target = formArgument(call, 0);
             if (call.mReference == 0 || target == 0 || target == call.mReference || !state.items(call.mReference, held))
                 return 0.0;
-            for (const auto& [item, count] : held)
-                state.addItem(target, item, count);
-            return 0.0;
-        });
-        interpreter.setHandler("AddItemHealthPercent", [&state](CallContext& call) {
-            // Nothing wears out yet: the health of the item is the same as for AddItem
-            const FormId item = formArgument(call, 0);
-            if (call.mReference != 0 && item != 0)
-                state.addItem(call.mReference, item, intArgument(call, 1));
+            for (const auto& entry : held)
+                for (const ActorState::ConditionStack& stack : state.conditions(call.mReference, entry.first))
+                    state.addItem(target, entry.first, stack.mCount, stack.mCondition);
             return 0.0;
         });
         interpreter.setHandler("GetDead",

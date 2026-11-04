@@ -250,6 +250,18 @@ namespace OFScript
                         copy.mCount = stack.mCount;
                         copy.mCondition = stack.mCondition;
                         copy.mStack = true;
+                        // What the card says is what the copy does at its condition
+                        if (copy.mCategory == FalloutScript::Pipboy::ItemCategory::Weapons && player)
+                            copy.mCardDamage = weaponCardDamage(id, stack.mCondition);
+                        else if (copy.mCategory == FalloutScript::Pipboy::ItemCategory::Apparel)
+                        {
+                            const double factor = FalloutScript::Wear::armorFactor(
+                                static_cast<double>(stack.mCondition) / FalloutScript::ActorState::fullCondition);
+                            copy.mRating = std::trunc(row.mRating * factor);
+                            // The executable cuts the threshold of the record to a whole number and the product again (0x646360), as the
+                            // repair screen does
+                            copy.mThreshold = std::trunc(std::trunc(row.mThreshold) * factor);
+                        }
                         copy.mEquipped = mEquipment.isEquipped(holder, id, stack.mCondition);
                         rows.push_back(std::move(copy));
                     }
@@ -531,9 +543,15 @@ namespace OFScript
                 if (held == nullptr || !weaponTakesAmmo(*held, item))
                     return std::string();
             }
-            return mEquipment.equip(mPlayer, item, condition) == FalloutScript::Equipment::Outcome::Equipped
-                ? "equipped"
-                : std::string();
+            const FalloutScript::Equipment::Outcome outcome = mEquipment.equip(mPlayer, item, condition);
+            if (outcome == FalloutScript::Equipment::Outcome::Broken)
+            {
+                // A weapon or armor with no health left does not go on
+                const std::string text = gameSettingText("sCantEquipBrokenItem");
+                if (!text.empty())
+                    tellPlayer(text);
+            }
+            return outcome == FalloutScript::Equipment::Outcome::Equipped ? "equipped" : std::string();
         }
         if (known && info.mKind == FalloutScript::ItemKind::Aid && atFullHealthFor(item))
         {

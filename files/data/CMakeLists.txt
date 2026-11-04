@@ -161,6 +161,8 @@ set(BUILTIN_DATA_FILES
     scripts/omw/skillhandlers.lua
     scripts/omw/crimes.lua
     scripts/omw/falloutbarter.lua
+    scripts/omw/falloutrepairservices.lua
+    scripts/omw/falloutpipboyrepair.lua
     scripts/omw/falloutblackjack.lua
     scripts/omw/falloutcompanion.lua
     scripts/omw/falloutbook.lua

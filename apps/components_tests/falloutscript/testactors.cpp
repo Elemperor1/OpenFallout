@@ -701,6 +701,34 @@ namespace
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
+    TEST(FalloutScriptActorCommandsTest, moving_and_copying_all_items_keeps_the_condition_of_each_copy)
+    {
+        Runner setup;
+        setup.mRecords.mItems[guard] = { { stimpak, 3 } };
+        // One of the three is worn down to 400 (a tenth of a percent), the others are whole
+        setup.mState.setCondition(guard, stimpak, 1000, 400, 1);
+        ScriptBuilder builder;
+        const std::uint16_t other = builder.form(player);
+        const std::uint16_t chest = builder.form(crate);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDuplicateAllItems, arguments(1).add(refArg(chest)))
+            + command(OpRemoveAllItems, arguments(1).add(refArg(other))) + end());
+
+        setup.run(builder);
+
+        const auto stacks = [&](FormId holder) {
+            std::vector<std::pair<int, int>> result;
+            for (const ActorState::ConditionStack& stack : setup.mState.conditions(holder, stimpak))
+                result.emplace_back(stack.mCondition, stack.mCount);
+            return result;
+        };
+        const std::vector<std::pair<int, int>> expected = { { 1000, 2 }, { 400, 1 } };
+        EXPECT_EQ(stacks(crate), expected);
+        EXPECT_EQ(stacks(player), expected);
+        EXPECT_TRUE(stacks(guard).empty());
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
     TEST(FalloutScriptActorCommandsTest, a_script_kills_and_brings_back_an_actor)
     {
         Runner setup;

@@ -28,6 +28,8 @@ namespace OFScript
         /// The least number of cards a deck has: the menu does not open for a player with fewer cards, and the deck
         /// is not accepted with fewer (FalloutNV.exe 0x741060 and the menu's Play)
         constexpr int leastDeck = 30;
+        /// The most cards the deck takes: with this many in it the executable blocks adding another (0x749740)
+        constexpr int mostDeck = 108;
         /// The miscellaneous statistics that a match of Caravan adds one to when it is won and when it is lost
         constexpr int caravanGamesWonStat = 0x25;
         constexpr int caravanGamesLostStat = 0x26;
@@ -131,6 +133,12 @@ namespace OFScript
             for (int copy = 0; copy < count; ++copy)
                 session.mOwned.push_back({ cardOf(*card, form), card->mFullName, false });
         }
+        // The cards of the screen go by the card's value, the smallest first, and by nothing else (the executable sorts its one
+        // list that way, 0x73CED0; cards of one value stay in the order the pack has them)
+        std::stable_sort(session.mOwned.begin(), session.mOwned.end(),
+            [](const CaravanSession::Owned& left, const CaravanSession::Owned& right) {
+                return left.mCard.mValue < right.mCard.mValue;
+            });
         if (static_cast<int>(session.mOwned.size()) < leastDeck)
         {
             showNotice("You need at least " + std::to_string(leastDeck) + " Caravan cards to play.", 0);
@@ -243,7 +251,14 @@ namespace OFScript
         if (!mCaravan || mCaravan->mStage != CaravanStage::Deck || index < 0
             || index >= static_cast<int>(mCaravan->mOwned.size()))
             return false;
-        mCaravan->mOwned[static_cast<std::size_t>(index)].mInDeck = inDeck;
+        CaravanSession::Owned& owned = mCaravan->mOwned[static_cast<std::size_t>(index)];
+        if (owned.mInDeck == inDeck)
+            return false;
+        if (inDeck
+            && std::count_if(mCaravan->mOwned.begin(), mCaravan->mOwned.end(), [](const auto& card) { return card.mInDeck; })
+                >= mostDeck)
+            return false;
+        owned.mInDeck = inDeck;
         return true;
     }
 
@@ -253,7 +268,8 @@ namespace OFScript
         if (!mCaravan || mCaravan->mStage != CaravanStage::Deck)
             return false;
         // As many cards as the least deck for a player that has no more than that, else a number from that to the
-        // number of cards it has (the game picks it as 0x944460(30, count), the top excluded; 0x748A5B)
+        // number of cards it has less one (the game picks it as 0x944460(30, count), the top excluded, 0x748B60; Mac round
+        // 12AX R6), and no cap of the most a deck takes: that is checked only when a card is added
         std::vector<CaravanSession::Owned>& owned = mCaravan->mOwned;
         const int count = static_cast<int>(owned.size());
         const int take

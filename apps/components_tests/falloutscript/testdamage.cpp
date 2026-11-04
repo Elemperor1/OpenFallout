@@ -40,19 +40,33 @@ namespace
         EXPECT_DOUBLE_EQ(hit(weapon, {}, noCritical, 10, 5, none).mDamage, 10);
     }
 
-    TEST(FalloutScriptDamageTest, a_worn_weapon_does_less_by_the_settings_for_guns_and_for_melee_weapons)
+    TEST(FalloutScriptDamageTest, a_worn_weapon_does_less_by_the_curve_of_the_executable_in_new_vegas)
     {
         WeaponDamage weapon;
         weapon.mDamage = 20;
         weapon.mCondition = 0.5;
-        EXPECT_NEAR(hit(weapon).mDamage, 20 * (0.66 + 0.34 * 0.5), 1e-9);
+        EXPECT_NEAR(hit(weapon).mDamage, 20 * 0.8325, 1e-9);
         weapon.mMelee = true;
-        EXPECT_NEAR(hit(weapon).mDamage, 20 * (0.5 + 0.5 * 0.5), 1e-9);
+        EXPECT_NEAR(hit(weapon).mDamage, 20 * 0.8325, 1e-9);
+        weapon.mCondition = 0.8; // above three quarters it does all
+        EXPECT_DOUBLE_EQ(hit(weapon).mDamage, 20);
 
         weapon.mCondition = 3; // more than all is no more than all
         EXPECT_DOUBLE_EQ(hit(weapon).mDamage, 20);
         weapon.mMelee = false;
         EXPECT_DOUBLE_EQ(hit(weapon).mDamage, 20);
+    }
+
+    TEST(FalloutScriptDamageTest, a_worn_weapon_does_less_by_the_settings_for_guns_and_for_melee_weapons_in_fallout_3)
+    {
+        DamageSettings settings;
+        settings.mExeConditionCurve = false;
+        WeaponDamage weapon;
+        weapon.mDamage = 20;
+        weapon.mCondition = 0.5;
+        EXPECT_NEAR(hit(weapon, {}, 100, 0, 0, settings).mDamage, 20 * (0.66 + 0.34 * 0.5), 1e-9);
+        weapon.mMelee = true;
+        EXPECT_NEAR(hit(weapon, {}, 100, 0, 0, settings).mDamage, 20 * (0.5 + 0.5 * 0.5), 1e-9);
     }
 
     TEST(FalloutScriptDamageTest, the_skill_with_the_weapon_changes_the_blow)

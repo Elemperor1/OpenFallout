@@ -142,6 +142,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testrecordreader.cpp
     esm4/testreferencecensus.cpp
     esm4/testregion.cpp
+    esm4/testrepairlist.cpp
     esm4/testreputation.cpp
     esm4/testscript.cpp
     esm4/testscriptargs.cpp
@@ -170,6 +171,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testactorvalues.cpp
     falloutscript/testanimationcommands.cpp
     falloutscript/testbarter.cpp
+    falloutscript/testrepair.cpp
+    falloutscript/testwear.cpp
     falloutscript/testchargen.cpp
     falloutscript/testcombatcommands.cpp
     falloutscript/testcombatstate.cpp

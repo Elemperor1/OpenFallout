@@ -182,16 +182,20 @@ namespace FalloutScript::Casino
     {
         const std::lock_guard lock(mMutex);
         pot = std::max(pot, 0);
+        // The totals do not wrap around, as the winnings of a casino do not (Ledger::add)
+        const auto sum = [](int total, int more) {
+            return static_cast<int>(std::min<long long>(static_cast<long long>(total) + more, std::numeric_limits<int>::max()));
+        };
         if (won)
         {
-            mTotals.mMoneyWon += pot;
-            mTotals.mGamesWon += 1;
+            mTotals.mMoneyWon = sum(mTotals.mMoneyWon, pot);
+            mTotals.mGamesWon = sum(mTotals.mGamesWon, 1);
             mTotals.mBiggestAnte = std::max(mTotals.mBiggestAnte, pot);
         }
         else
         {
-            mTotals.mMoneyLost += pot;
-            mTotals.mGamesLost += 1;
+            mTotals.mMoneyLost = sum(mTotals.mMoneyLost, pot);
+            mTotals.mGamesLost = sum(mTotals.mGamesLost, 1);
         }
         return mTotals;
     }

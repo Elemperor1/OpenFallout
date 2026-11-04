@@ -12,6 +12,7 @@
 #include <components/esm/luascripts.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm3/loadgmst.hpp>
+#include <components/esm4/loadamef.hpp>
 #include <components/esm4/loadccrd.hpp>
 #include <components/esm4/loadcdck.hpp>
 #include <components/esm4/loadcmny.hpp>
@@ -186,7 +187,7 @@ namespace OFWorld
             Store<ESM::Attribute>,
 
             Store<ESM4::Activator>, Store<ESM4::ActorCharacter>, Store<ESM4::ActorCreature>,
-            Store<ESM4::ActorValueInfo>, Store<ESM4::AIPackage>, Store<ESM4::Ammunition>, Store<ESM4::Armor>,
+            Store<ESM4::ActorValueInfo>, Store<ESM4::AIPackage>, Store<ESM4::AmmoEffect>, Store<ESM4::Ammunition>, Store<ESM4::Armor>,
             Store<ESM4::ArmorAddon>, Store<ESM4::BodyPartData>, Store<ESM4::Book>, Store<ESM4::Casino>,
             Store<ESM4::CaravanCard>, Store<ESM4::CaravanDeck>, Store<ESM4::CaravanMoney>, Store<ESM4::Cell>,
             Store<ESM4::Climate>, Store<ESM4::Clothing>, Store<ESM4::Container>, Store<ESM4::Creature>,

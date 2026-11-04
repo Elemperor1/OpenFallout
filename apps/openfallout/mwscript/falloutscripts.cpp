@@ -227,6 +227,8 @@ namespace OFScript
         FalloutScript::addPlayerControlCommands(mInterpreter, *this);
         FalloutScript::addActorCommands(mInterpreter, mActors);
         FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
+        mEquipment.setWearListener([this](FalloutScript::FormId holder, FalloutScript::FormId item, int before,
+                                       int after) { itemWorn(holder, item, before, after); });
         FalloutScript::addCombatCommands(mInterpreter, mCombat, mActors, *this);
         FalloutScript::addAnimationCommands(mInterpreter, mOpenStates, *this, game);
         // The container of an item is the holder its script was last run for
@@ -279,6 +281,11 @@ namespace OFScript
         });
         // The barter menu of a conversation: the character the script is called on trades with the player, and the
         // screen shows it. The argument is the percent the vendor gives (or asks for) on top of the prices.
+        // The repair services of a conversation: the character the script is called on repairs for the player, and the
+        // screen shows what it asks (FalloutNV.exe 0x5D5200). The command takes no argument and returns nothing.
+        mInterpreter.setHandler("ShowRepairMenu", [this](FalloutScript::CallContext& call) {
+            return openRepairServices(call.mReference) ? 1.0 : 0.0;
+        });
         mInterpreter.setHandler("ShowBarterMenu", [this](FalloutScript::CallContext& call) {
             return openBarter(call.mReference, FalloutScript::intArgument(call, 0)) ? 1.0 : 0.0;
         });
@@ -591,6 +598,10 @@ namespace OFScript
             const std::lock_guard merchants(mBarterMutex);
             mMerchantContainers.clear();
             mBarter.reset();
+        }
+        {
+            const std::lock_guard repair(mRepairMutex);
+            mRepairServices.reset();
         }
         // Made characters get the same numbers again in the next game: what was kept for a number is not theirs
         mFightTraits.clear();
@@ -2092,6 +2103,7 @@ namespace OFScript
             info.mKind = FalloutScript::ItemKind::Weapon;
             info.mAnimationType = weapon->mHasGameData ? weapon->mGame.mAnimationType : 0;
             info.mWeight = weapon->mData.weight;
+            info.mHealth = weapon->mData.health;
             return true;
         }
         if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(id))
@@ -2102,6 +2114,7 @@ namespace OFScript
             info.mRating = armor->mHasRating ? std::trunc(armor->mRating) : 0.0;
             info.mThreshold = armor->mDamageThreshold;
             info.mWeight = armor->mData.weight;
+            info.mHealth = armor->mData.health;
             return true;
         }
         if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
@@ -2339,10 +2352,15 @@ namespace OFScript
     }
 
     FalloutScript::WeaponDamage FalloutScripts::describeWeapon(
-        FalloutScript::FormId weapon, FalloutScript::FormId attacker)
+        FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition)
     {
         namespace AV = FalloutScript::ActorValue;
         FalloutScript::WeaponDamage damage;
+        // The copy in the hands does as much as its condition lets it (a weapon that is not in the hands is whole)
+        if (condition < 0 && weapon != 0 && attacker != 0)
+            condition = mEquipment.equippedCondition(attacker, weapon);
+        if (condition >= 0)
+            damage.mCondition = static_cast<double>(condition) / FalloutScript::ActorState::fullCondition;
         const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr;
         // The skill of the hands is unarmed
         int skill = AV::lastSkill;
@@ -2390,10 +2408,10 @@ namespace OFScript
         return damage;
     }
 
-    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon)
+    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon, int condition)
     {
         // A shot with no armor in the way and no critical hit; the perks of the player work on it as they do in a fight
-        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer);
+        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer, condition);
         const FalloutScript::PerkEngine::Context context{ 0, weapon };
         if (mGame != FalloutScript::Game::NewVegas)
         {
@@ -2448,7 +2466,7 @@ namespace OFScript
     }
 
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-        FalloutScript::FormId weapon, int limb, double roll)
+        FalloutScript::FormId weapon, int limb, double roll, int condition)
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
@@ -2462,7 +2480,7 @@ namespace OFScript
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
-        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker);
+        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker, condition);
         if (roll < 0)
         {
             const std::lock_guard lock(mCombatRandomMutex);
@@ -2538,6 +2556,9 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
+        // The armor that the player wears is worn out by what it stopped
+        if (victim == mPlayer)
+            wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance);
         // The blow that hurts the player flashes the screen red, as the fall and the drowning of the engine do
         if (victim == mPlayer && dealt > 0)
         {
@@ -2772,6 +2793,12 @@ namespace OFScript
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
         }
+        // The copy in the hands as it is before this shot: the blow works out with it, also when the shot is the one that
+        // breaks the weapon (a weapon that is used up comes out of the hands at once)
+        const int conditionBefore = mEquipment.equippedCondition(attacker, stats.mWeapon);
+        // A gun loses health with a shot, whether or not it hits (once for a shot, whatever the number of pellets)
+        if (!stats.mMelee)
+            wearWeaponOfShot(attacker, stats);
         // A weapon with a sound for its loop (a minigun, a flamer) plays that for as long as it fires
         if (!keepWeaponLoop(attacker, stats.mWeapon, stats.mInterval))
             playWeaponSound(attacker, stats.mWeapon, false);
@@ -2796,9 +2823,12 @@ namespace OFScript
             }
         }
         result.mHit = true;
+        // A swing loses health when it reaches something
+        if (stats.mMelee)
+            wearWeaponOfShot(attacker, stats);
         if (victim == mPlayer || isCharacterOrCreature(target))
         {
-            result.mStrike = strike(attacker, victim, stats.mWeapon, limb);
+            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore);
             return result;
         }
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
@@ -3366,8 +3396,116 @@ namespace OFScript
             mCombat.setFriendHitRules(mDamageSettings->mFriendHitSeconds, mDamageSettings->mFriendHitSpacingSeconds);
             // The armor of Fallout 3 has no floor that keeps a share of the blow
             mDamageSettings->mMinimumDamage = mGame == FalloutScript::Game::NewVegas;
+            // The condition curve of the executable is read for New Vegas only
+            mDamageSettings->mExeConditionCurve = mGame == FalloutScript::Game::NewVegas;
         }
         return *mDamageSettings;
+    }
+
+    const FalloutScript::Wear::Settings& FalloutScripts::wearSettings()
+    {
+        const std::lock_guard lock(mDerivedSettingsMutex);
+        if (!mWearSettings)
+        {
+            const std::map<std::string, double>& settings = gameSettingValues();
+            mWearSettings = FalloutScript::Wear::Settings::fromGameSettings(
+                [&settings](std::string_view name) -> std::optional<double> {
+                    const auto found = settings.find(Misc::StringUtils::lowerCase(name));
+                    return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
+                });
+        }
+        return *mWearSettings;
+    }
+
+    double FalloutScripts::applyAmmoEffects(FalloutScript::FormId ammo, std::uint32_t kind, double value)
+    {
+        const ESM4::Ammunition* record = ammo != 0 ? mStore.get<ESM4::Ammunition>().search(refId(ammo)) : nullptr;
+        if (record == nullptr)
+            return value;
+        for (const ESM::FormId& id : record->mAmmoEffects)
+            if (const ESM4::AmmoEffect* effect = mStore.get<ESM4::AmmoEffect>().search(id))
+                if (effect->mData.mType == kind)
+                    value = FalloutScript::Wear::applyAmmoEffect(value, effect->mData.mOperation, effect->mData.mValue);
+        return value;
+    }
+
+    void FalloutScripts::itemWorn(FalloutScript::FormId holder, FalloutScript::FormId item, int before, int after)
+    {
+        if (holder != mPlayer)
+            return;
+        // The player is told when the item goes below a quarter of its health and when it breaks (the sound is the one of
+        // the executable's warning, 0x891360)
+        FalloutScript::ItemInfo info;
+        const bool weapon = itemInfo(item, info) && info.mKind == FalloutScript::ItemKind::Weapon;
+        constexpr float warningSeconds = 4.f;
+        const auto say = [&](const std::string& text) {
+            if (text.empty())
+                return;
+            mHudMessages.push(text, {}, warningSeconds);
+            // A script can change the health of an item from a thread that is not the frame's, and the sound manager is the
+            // frame's
+            runOnMainThread([this] { playInterfaceSound("WPNBreak"); });
+        };
+        if (FalloutScript::Wear::crossedLow(before, after))
+            say(gameSettingText(weapon ? "sWeaponLowCond" : "sArmorLowCond"));
+        // Armor that is gone stays on, with no message
+        if (after == 0 && weapon)
+            say(gameSettingText("sWeaponBreak"));
+        // A weapon that broke is put away (it stays in the pack with no health)
+        if (weapon && after == 0)
+            mEquipment.unequip(holder, item);
+    }
+
+    void FalloutScripts::wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats)
+    {
+        // Only the player's weapon wears, and only in New Vegas (Fallout 3 wears its weapons by the kind of weapon, which is
+        // not read). The hands with no weapon do not wear, a weapon that is not playable or is embedded does not, and a
+        // thing that is thrown goes instead (FalloutNV.exe 0x524A24 for a gun and 0x9B55CF for a swing)
+        if (attacker != mPlayer || mGame != FalloutScript::Game::NewVegas || stats.mWeapon == 0)
+            return;
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon));
+        if (record == nullptr || record->mData.health == 0 || !record->mHasGameData || isUsedUp(record->mGame))
+            return;
+        if ((record->mGame.mFlags1 & (ESM4::Weapon::GameData::NonPlayable | ESM4::Weapon::GameData::EmbeddedWeapon)) != 0)
+            return;
+        double points = FalloutScript::Wear::shotPoints(wearSettings());
+        // The effects of the ammunition of the condition kind change a shot of a gun (a swing has no ammunition)
+        if (!stats.mMelee && stats.mAmmo != 0)
+            points = applyAmmoEffects(stats.mAmmo, 4, points);
+        mEquipment.wear(attacker, stats.mWeapon, points);
+    }
+
+    void FalloutScripts::wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance)
+    {
+        // Only the armor of the player wears, one piece for a blow: the head for a blow at the head (the parts 1 and 2), the
+        // upper body for any other (Mac round 12AW S12)
+        if (victim != mPlayer || mGame != FalloutScript::Game::NewVegas)
+            return;
+        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance);
+        if (points <= 0)
+            return;
+        const bool head = limb == 1 || limb == 2;
+        FalloutScript::FormId chosen = 0;
+        const auto pick = [&](std::uint32_t slot) {
+            for (const FalloutScript::Equipment::WornPiece& piece : mEquipment.wornArmor(victim))
+            {
+                FalloutScript::ItemInfo info;
+                if (chosen == 0 && itemInfo(piece.mItem, info) && (info.mSlots & slot) != 0)
+                {
+                    chosen = piece.mItem;
+                }
+            }
+        };
+        if (head)
+        {
+            pick(FalloutScript::BipedSlot::head);
+            if (chosen == 0)
+                pick(FalloutScript::BipedSlot::hair);
+        }
+        else
+            pick(FalloutScript::BipedSlot::upperBody);
+        if (chosen != 0)
+            mEquipment.wear(victim, chosen, points);
     }
 
     std::optional<double> FalloutScripts::derivedValue(

@@ -86,9 +86,66 @@ keys, the Cancel button closes it. Keys: up and down and the pages move the pick
 than `iInventoryAskQuantityAt` asks how many on `quantity_menu.xml`), `[` and `]` go to the tab before and after. A weapon
 and a piece of armor have a condition (tenths of a percent of their health, 1000 is full): copies with another condition are
 rows of their own (the best first; the row id carries the condition after a `~`), the cards show the condition as the file's
-bar (`ConditionInfo`, its meter reads `user5`, 0 to 1), and use, drop, take and barter work on the copies of that row.
-Not there yet: the picture of the thing (the games show its model), repair and mods (their buttons are hidden). A number key held shows the wheel of the
-hot keys, and a click puts the picked thing on the lit slot (see the hot keys below).
+bar (`ConditionInfo`, its meter reads `user5`, 0 to 1, under the word of `sInventoryCondition`, with no number: the executable
+sets none; the pip image on the bar is fixed by `user6`, 1 for a weapon at three quarters and 0 for armor at a half, the places
+where their effects start, Mac round 12AX R4), and use, drop, take and barter work on the copies of that row. The numbers of a
+card are those of the copy at its condition (a weapon's damage by the curve below, armor's rating and threshold).
+
+What condition does (Mac rounds 12AW S12 and 12AX R4, `FalloutNV.exe`; `components/falloutscript/wear.*`, `equipment.cpp`):
+only the player's things wear. A gun that is fired loses `fDamageToWeaponValue` points of its health (0.2) once for a shot,
+whether or not it hits, changed by the effects of its ammunition that are of the condition kind (the shot of a shotgun is one
+shot); a melee weapon or one of the hands loses the same when a swing reaches a victim; the hands with no weapon, a thrown
+weapon and a weapon that is not playable or embedded lose nothing. A blow at the player wears one piece of its armor by
+`fDamageToArmorPercentage` (0.35) of what it stopped (the head for a blow at a place 1 or 2, else the upper body). A weapon that
+is below three quarters of its health does the damage of its record times one less two thirds of what is missing from three
+quarters (a half: 0.8325, nothing: 0.4975); armor below a half gives a half and its condition of its rating and threshold. The
+player is told (`sWeaponLowCond`, `sArmorLowCond`, with the sound `WPNBreak` and four seconds) when an item goes below a quarter;
+a weapon that reaches nothing is put away with `sWeaponBreak`, armor stays on with no message, and a thing with no health does
+not go on (`sCantEquipBrokenItem`). The weapon commands `GetWeaponHealthPerc`, `SetWeaponHealthPerc` (lowering goes through the
+wear, raising stops a point short of the most) and `ModWeaponHealthPerc` work on the weapon in the hands, `AddItemHealthPercent`
+gives copies at a fraction of their health. Fallout 3 does not wear (its code is not read; it has no `fDamageToWeaponValue`) and
+keeps the damage curve of its settings. Not done: the effects of the condition of the weapon on jams (the exe's tables:
+reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
+`fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
+records (COED) and of the ones that are placed.
+Not there yet: the picture of the thing (the games show its model) and mods (their button is hidden). The Repair button (key R) is
+there (the repair screen below). A number key held shows the wheel of the hot keys, and a click puts the picked thing on the lit
+slot (see the hot keys below).
+
+### Repair: the screen of the Pip-Boy and the repair services (Mac rounds 12AW S12 and 12AX R1 and R2, FalloutNV.exe 0x7B5400 to 0x7B8B30)
+
+The Repair button of the items page (key R, shown for a weapon or a piece of armor that is below full health and has something to
+repair it with) opens `repair_menu.xml` (`falloutpipboyrepair.lua`, in the box of the Pip-Boy). The list has the copy first, with
+the file's brackets round it, and under it each thing the player carries that can repair it: a thing the item's repair list
+(`REPL`) names (the lists of the games hold the item itself, so another copy of it repairs it), and, for a weapon, any playable
+weapon with the same skill and way of being held when the player has the perk of the entry point 48 (Jury Rigging in the games'
+words); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
+the weakest first. The pointer on a thing shows the health the copy would have
+(the cards of the right: the health bar, `+N%` and the gain of damage, threshold or resistance), the copy itself says to select
+an item (`sSelectItemToRepair`). A click repairs: the player's Repair skill (actor value 39) gives the new health of the copy
+as `max(A, B) + 10 * fRepairMin + 10 * (fRepairMax - fRepairMin) * skill / 100 + 0.05 * min(A, B)` percent, A and B being the
+health of the two, capped at the full health; the thing is used up, the statistic "items repaired" (0x22) goes up, the sound is
+`UIRepairWeapon`, and the screen returns to the items when no other thing is left or the copy has 99 percent. Keys: the arrows
+and the pages pick a row, Enter repairs, E is Cancel.
+
+The repair services (`falloutrepairservices.lua`, `repair_services_menu.xml`) are what a conversation opens with `ShowRepairMenu`
+(the result script of a topic): the list is the weapons and armor the player carries that the character can mend. The character
+repairs to `T = SkillBase + (SkillMax - SkillBase) * skill / 100` percent (the settings of the Repair Services; New Vegas
+`SkillMax` is 10 in the plugin) at most; a row asks `ceil(CostMult * value * (T - health) / 10)` caps when that is above a half
+(else it asks nothing and cannot be bought), and a copy that is already as good as the character can make it has the words of
+`sCantRepairPastMax` on its card. A quest item, a thing the player cannot use and armor with neither a rating nor a threshold are
+not listed; the rows that can be paid come first, the healthiest first, then the others, the weakest first. The button over the list
+repairs all rows, one payment, and is on only while the player can pay the whole sum; a row that the player cannot pay is dimmed
+and makes the sound of a refusal. When the screen is left the character says a line of the topic of subtype `RepairExit`. The skill is the character's own Repair, read
+once. The engine's rule that the menu keeps the count of the list's children makes the file's expression for an empty list show
+over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
+
+Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
+scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mark `+` of a thing with
+mods and the mods of the things that repair (no mods yet); the Jury Rigging rule for armor (the executable's class function 0x514410
+was not read); the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
+Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
+generic menu does; the item mod screen (`item_mod_menu.xml`, 0x425).
 
 ### The stats page of the Pip-Boy
 
@@ -572,7 +629,7 @@ button 0x72f6f0, the price of one 0x72ed00).
   aid, miscellaneous item, book, ingredient or mod, as `core.pipboy.barterRows` gives it in `icon`; armor takes the male
   one), as the executable sets the tile's `filename` from the form (0x4be200). The pictures of the items are not in the files the
   offline harness reads, so it was not drawn offline.
-- Not done: the condition of things (every thing is at full condition), and the pad's B, which the engine uses to leave at once without the question. The pad's
+- Not done: the pad's B, which the engine uses to leave at once without the question. The pad's
   first pick (the vendor's list) was not made. Nothing was seen in the running game.
 
 ### Models in a menu, and the lockpicking screen
@@ -1030,18 +1087,26 @@ with a space; match `sSelectCardText`, `sDiscardCardText`, `sDiscardTrackText`, 
 `sCaravanWinLossText`, `sCaravanBiggestAnteText`; the question `sQuitCaravanText` with `sYes` and `sNo`. The keys (the executable's key
 handler, 0x749360, reads the letters in both cases; the files name the same letters on their buttons): stake W Auto-Match, A Raise,
 F Accept, R Exit; deck W Add, A Remove, F Play Caravan, R leaves at once; match W Select Card, Q Discard Card, E Discard Caravan, R
-Cancel; any key on the result closes it. Escape is not handled by the Caravan code. R on the match puts a picked card back and asks
+Cancel; any key on the result closes it from the moment the words that ask for a key are up (Mac rounds 12AW S9 and 12AX R6:
+the result screen is shown at once when the match ends, with "You win" or "You lose" and the rows, while the table plays a
+sequence of 2.0 s; the words that ask for a key then take the place of those; keys before that do nothing, and a click on the
+screen does nothing at any time, the executable has no tile there that takes one; the pad's B closes it a second after the
+words are up). Escape is not handled by the Caravan code (the executable's menu never sees it; the pause menu opens on top, a
+static reading). R on the match puts a picked card back and asks
 nothing; with nothing picked it asks the one question, and Yes is a loss with the pot paid. The pad (the files' buttons, but A, which
 the engine clicks with): the stake X Raise, Y Accept, B Exit; the deck the right bumper for the button of the deck, X Remove, Y Play
 Caravan, the D-pad for the cursor (Add is A on the file); the match the bumpers for the triggers (Discard Card, Discard Caravan).
 The deck has plain card tiles for the 3D strips of the game (the caravan deck above, all the cards below; click or the arrows to
-move, the wheel to scroll, Enter to add or remove). The button of the deck is a button that says "Randomize" and the word of the
-deck; it makes a deck of the executable's size, which is read from its label (what the executable does with it, and what the S key
-does on the deck screen, were not read). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
+move, the wheel to scroll, Enter to add or remove). The executable keeps one list of every card the player has, sorted by the
+card's value, smallest first, and by nothing else (12AW S9; the screen's list is sorted so too), takes at most 108 cards into the
+deck (adding is blocked at 108) and lets Play Caravan work from 30. The button of the deck, which says "Randomize" and the word of
+the deck (key S, the right bumper), empties the deck and fills it with random cards without a repeat: the count is 30 for a
+player with no more than 30 cards, else a number from 30 to the number of cards less one (12AX R6 settled it, the call
+0x944460(30, count) with the top excluded; the executable does not cap it at 108, only adding a card is blocked there). The match is plain tiles for the 3D scene: the caravans as columns (the opponent's above
 the player's, the player's n under the opponent's 7 - n), the hand of eight below, a card picked up by a click (or W) and put on a
 caravan by a click on it, the totals coloured by sold, over or not yet; the file's counts of the corner show the pot, the net
-caps won at Caravan in all and the matches won over lost (what the last two hold is guessed from their names and the result
-screen: the code was not read), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
+caps won at Caravan in all and the matches won over lost (12AW S9: the pot of the corner is twice the stake of each side, the net
+is the player's caps won less lost at Caravan, the matches won over lost as "%i/%i"; written once when the match starts), and the file's tiles for the totals over the caravans and the numbers of cards stay hidden. The
 opponent moves after a second, its card lights the row it went on, and the result comes two seconds after the match ends. The
 suit numbers of the card records are 1 hearts, 2 spades, 3 diamonds, 4 clubs and 5 the Joker, the values 1 to 10, 12 Jack, 13
 Queen, 14 King and 15 Joker (no 11); the face of a card is the record's `TX00` texture
@@ -1055,8 +1120,9 @@ screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). 
 engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
 E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
 `Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, the text the executable writes into the title of the
-opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B, which leave at once and
-forfeit without the question.
+opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B on the match, which leave
+at once and forfeit without the question (the engine has no way yet for a screen of a script to keep them; the executable's B
+puts a picked card back, else asks sQuitCaravanText, and its Escape opens the pause menu), and the pad's B a second after the result is up (the engine's B leaves at once).
 
 ### The loading screen (Mac round 12AR C2, FalloutNV.exe 0x788CC0 and the functions around it)
 
