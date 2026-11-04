@@ -126,7 +126,7 @@ namespace OFRender
                     const osg::Vec3d at = toWorld.getTrans();
                     // The bone is the base of the skull; the camera looks at the middle of the head with its hair, which is
                     // about this far above it (units of the game), so that the head is in the middle of its window
-                    constexpr float headCentreAboveBone = 8.f;
+                    constexpr float headCentreAboveBone = 6.5f;
                     if (at.length2() > 1.0)
                         return osg::Vec3f(at) + osg::Vec3f(0.f, 0.f, headCentreAboveBone);
                 }

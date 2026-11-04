@@ -212,7 +212,11 @@ namespace FalloutScript
 
     int faceSliderInteger(float value)
     {
-        return static_cast<int>(static_cast<double>(value) * 10.0);
+        // Cut towards zero. A control that was set to a whole number of tenths is a float a little below or above it
+        // (1.3f is 1.29999995), so that 13 would read back as 12 and the arrows of a slider skip a step: the sum is
+        // given the thousandth that the floats are off by, away from zero
+        const double tenths = static_cast<double>(value) * 10.0;
+        return static_cast<int>(tenths + (tenths < 0.0 ? -1e-3 : 1e-3));
     }
 
     float faceSliderValue(int integer)

@@ -386,8 +386,13 @@ reads `Done`. The head was seen in the running game in Mac round 12BC: it is mad
 of 200 pixels turned it by a quarter of a turn, and a wheel event is one step of the zoom. That round showed the first view
 too close (the camera aimed at the bone `Bip01 Head`, the base of the skull, so the top of the hair was cut by the window):
 the head now starts thirty degrees short of facing the viewer (the executable's start, Mac round 12BB D and E), turns all the way
-round, is seen from 120 units (the zoom runs from 60 to 180) and the camera aims eight units above that bone. Those numbers are
-guesses, to be checked against the picture.
+round, and is seen from 120 units (the zoom runs from 70 to 170). Round 12BD found three things: the head started seen from the
+back (the camera at yaw 0 looks at the head's right side and the face is seen a quarter of a turn before that, at -pi/2, not
+after it; a drag to the right now turns the face towards the panel, one full turn is about 650 pixels at 1080 lines), the head
+sat 39 pixels below the middle of the file's `RSM_Face_Grab` (the camera now aims 6.5 units above the bone, from 8) and at the
+nearest zoom it was taller than that hotrect (800 pixels against 698; the nearest is now 70 units). The tone sliders change their
+number and marker but not the picture: the port has no texture morph (the `.egt` file of the head, see the gap audit), so the
+tone of a face made on the screen shows only in its saved numbers.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
@@ -401,7 +406,7 @@ race's own for the sex, and only when the race has none by the first of its hair
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
 12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
 it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
-of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the Pip-Boy still has no pause
+of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the face as a picture (the `.egt` texture morph), the Pip-Boy still has no pause
 menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
 by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
 executable's loading code).

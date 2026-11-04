@@ -106,15 +106,18 @@ local cameraAsked = false
 -- camera at the two ends of the zoom, the half of the angle it sees upwards (a quarter of the 45 degrees of the
 -- games' field of view, as the lock's scene has it), the planes of the frustum, and the turn the pointer makes per
 -- unit of the menu that it moves
-local NEAREST, FARTHEST = 60, 180
+local NEAREST, FARTHEST = 70, 170
 local HALF_ANGLE = 0.19635
 local NEAR_PLANE, FAR_PLANE = 5.0, 2000.0
 local YAW_PER_UNIT = 0.012
 local ZOOM_PER_NOTCH = 0.1
--- Where the head starts, as the executable has it (12BB): the camera at 0 looks at the right side of the head, and a quarter
--- of a turn more faces it, so the head starts a half-radian-and-a-bit (0.5236, thirty degrees) short of facing the viewer.
--- The head turns all the way round (the executable keeps no limit on it)
-local START_YAW = math.pi / 2 - 0.5236
+-- Where the head starts, as the executable has it (12BB): thirty degrees (0.5236) short of facing the viewer, on the side
+-- the head turns towards (to the panel on the right). The camera at 0 looks at the right side of the head and the face
+-- is seen from the front a quarter of a turn BEFORE that (Mac round 12BD: with the quarter turn after it the head showed
+-- its back, and a drag to the right went back, left side, front), so the head starts at a quarter of a turn less
+-- thirty degrees, and a drag to the right turns it towards the panel. The head turns all the way round (the executable
+-- keeps no limit on it)
+local START_YAW = -(math.pi / 2 - 0.5236)
 local START_ZOOM = 0.5
 local TURN = 2 * math.pi
 -- At most so often the head is made again while sliders are moved (seconds), and how long after that the camera is

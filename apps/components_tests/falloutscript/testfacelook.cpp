@@ -94,6 +94,22 @@ namespace
         EXPECT_FLOAT_EQ(faceSliderValue(35), 3.5f);
     }
 
+    TEST(FalloutScriptFaceLookTest, aSliderSetToANumberReadsBackAsThatNumber)
+    {
+        // 1.3f is 1.29999995: cut towards zero it would read 12, and an arrow of the slider would skip a step (Mac round 12BD)
+        for (int number = -50; number <= 50; ++number)
+        {
+            EXPECT_EQ(faceSliderInteger(faceSliderValue(number)), number) << number;
+            // The floats of the sum of a move are off by a little more than the one of the value
+            const float off = 3e-6f;
+            EXPECT_EQ(faceSliderInteger(faceSliderValue(number) + off), number) << number;
+            EXPECT_EQ(faceSliderInteger(faceSliderValue(number) - off), number) << number;
+        }
+        // A control that is really between two numbers still reads the one towards zero
+        EXPECT_EQ(faceSliderInteger(1.2985f), 12);
+        EXPECT_EQ(faceSliderInteger(-1.2985f), -12);
+    }
+
     TEST(FalloutScriptFaceLookTest, theAgeSliderStandsForYearsThatAreTruncated)
     {
         const int expected[] = { 15, 20, 26, 31, 37, 42, 48, 53, 59, 64 };
