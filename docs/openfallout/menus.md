@@ -904,7 +904,8 @@ its older drawing for a data folder that lacks the file.
   Pip-Boy's prompt), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
   `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
   the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
-  not fight the player), `sPickpocket` (the same character while the player sneaks), `sSearch` (a body), `sSteal` (a thing
+  not fight the player), `sPickpocket` (the same character while the player sneaks: the word is shown, but activating the
+  character still talks to them, the pickpocket screen is not built), `sSearch` (a body), `sSteal` (a thing
   to take whose reference is owned by a character that is not the player, or by a faction the player is not in; the
   executable's test, 0x579690, is longer and was not read to its end, and the port does not ask the owner of the cell),
   `sPick` (a door that is locked when the player has no key for it) and `sCloseButton` (a door that stands open); a
