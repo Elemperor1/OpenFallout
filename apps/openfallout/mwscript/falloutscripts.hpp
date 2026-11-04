@@ -33,6 +33,7 @@
 #include <components/falloutscript/caravan.hpp>
 #include <components/falloutscript/casino.hpp>
 #include <components/falloutscript/chargen.hpp>
+#include <components/falloutscript/facelook.hpp>
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/combatstate.hpp>
 #include <components/falloutscript/commandtable.hpp>
@@ -1755,6 +1756,49 @@ namespace OFScript
             std::string mName;
         };
         std::vector<ChargenRace> playableRaces() const;
+
+        // ---- The look of the player, which the screen of the sex, race and face (RaceSexMenu) edits ----
+        /// A row of a list of that screen
+        struct LookChoice
+        {
+            FalloutScript::FormId mId = 0;
+            std::string mName;
+            bool mSelected = false;
+        };
+        /// What the lists of the screen hold for the sex and race the player has now
+        struct LookCatalog
+        {
+            std::vector<LookChoice> mRaces;
+            std::vector<LookChoice> mHairs;
+            std::vector<LookChoice> mEyes;
+            /// The head parts a man can wear (the beards)
+            std::vector<LookChoice> mFacialHair;
+            /// The characters of the data that the sex and race have as faces to start from (the preset slider's range)
+            std::vector<LookChoice> mPresets;
+        };
+        /// How the player looks now: what the screen picked, and else what the record of the player says
+        FalloutScript::FaceLook playerLook();
+        /// What the record of the player says it looks like, with the sex and race a script or a screen set
+        FalloutScript::FaceLook recordLook();
+        LookCatalog lookCatalog();
+        /// The sex or race clicked: the head parts go, the first face of the new kind is put on and a hair or eyes that
+        /// the kind does not have are changed (FalloutNV.exe 0x7B5180)
+        void lookSetSex(bool female);
+        void lookSetRace(FalloutScript::FormId race);
+        void lookSetHair(FalloutScript::FormId hair);
+        void lookSetEyes(FalloutScript::FormId eyes);
+        void lookSetHairColour(int red, int green, int blue);
+        /// A head part clicked: it goes on, or comes off when it was on
+        void lookToggleFacialHair(FalloutScript::FormId part);
+        /// The preset face of that number (1 on): its hair, eyes, colour, head parts and face numbers
+        bool lookSetPreset(int number);
+        /// New random numbers for the shape and tone of the face
+        void lookRandomize();
+        /// The whole number a slider shows for the control, and moving the slider to one
+        int lookSlider(FalloutScript::FaceKind kind, int control);
+        void lookSetSlider(FalloutScript::FaceKind kind, int control, int value);
+        /// How many controls of facegen\si.ctl the screen has (none when the file was not read)
+        int lookControlCount(FalloutScript::FaceKind kind);
         /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
         /// the executable shows beside the description
         struct ChargenTrait
@@ -2455,6 +2499,12 @@ namespace OFScript
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
         std::optional<FalloutScript::Wear::Settings> mWearSettings;
         std::optional<FalloutScript::Repair::Settings> mRepairSettings;
+        /// The controls of facegen\si.ctl, read when the face screen first needs them
+        const FalloutScript::FaceControls& faceControls();
+        std::mutex mFaceControlsMutex;
+        std::optional<FalloutScript::FaceControls> mFaceControls;
+        /// The numbers of the generator of the random faces
+        std::mt19937 mLookRandom{ std::random_device{}() };
         std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;
         /// The settings of the files by their names in lower case, read when the first of them is asked for (the
         /// caller holds mDerivedSettingsMutex)
