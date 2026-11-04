@@ -145,9 +145,17 @@ namespace OFScript
     {
         if (std::optional<FaceLook> picked = mChargen.look())
         {
-            // A race of a plugin that is not loaded now reads as none: the record's own race stands then
-            if (picked->mRace == 0)
-                picked->mRace = recordLook().mRace;
+            // A race, hair or eyes of a plugin that is not loaded now read as none: the record's own stand then
+            if (picked->mRace == 0 || picked->mHair == 0 || picked->mEyes == 0)
+            {
+                const FaceLook record = recordLook();
+                if (picked->mRace == 0)
+                    picked->mRace = record.mRace;
+                if (picked->mHair == 0)
+                    picked->mHair = record.mHair;
+                if (picked->mEyes == 0)
+                    picked->mEyes = record.mEyes;
+            }
             return *picked;
         }
         return recordLook();
