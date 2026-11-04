@@ -83,11 +83,14 @@ namespace OFGui
             Log(Debug::Warning) << "Warning: no splash screens found!";
     }
 
+    void LoadingScreen::setDestination(std::uint32_t object, std::uint32_t world, bool exterior, int gridX, int gridY)
+    {
+        mDestination = { true, object, world, exterior, gridX, gridY };
+    }
+
     void LoadingScreen::setLabel(const std::string& label, bool important)
     {
         mImportantLabel = important;
-        // (an interior cell sets its label before the load begins, an exterior one after)
-        mInteriorLabel = label == "#{OFEngine:LoadingInterior}";
 
         mLoadingText->setCaptionWithReplacing(label);
         int padding = mLoadingBox->getWidth() - mLoadingText->getWidth();
@@ -175,9 +178,16 @@ namespace OFGui
         mShowWallpaper = OFBase::Environment::get().getStateManager()->getState() == OFBase::StateManager::State_NoGame;
 
         // Where the data has the load screens of the game, their pictures and tips are what shows
+        FalloutScript::LoadScreens::Destination destination;
+        destination.mSet = mDestination.mSet;
+        destination.mObject = mDestination.mObject;
+        destination.mWorld = mDestination.mWorld;
+        destination.mExterior = mDestination.mExterior;
+        destination.mGridX = mDestination.mGridX;
+        destination.mGridY = mDestination.mGridY;
         mFalloutActive
-            = mFalloutLoading && mFalloutLoading->begin(mShowWallpaper, mInteriorLabel, mTimer.time_m() / 1000.0);
-        mInteriorLabel = false;
+            = mFalloutLoading && mFalloutLoading->begin(mShowWallpaper, destination, mTimer.time_m() / 1000.0);
+        mDestination = Destination();
         mSceneImage->setAlpha(1.f);
 
         if (mShowWallpaper)

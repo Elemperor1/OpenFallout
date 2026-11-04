@@ -144,6 +144,46 @@ namespace
         return layout;
     }
 
+    // The wheel's tile as the game's file places it (loading_menu.xml): centred across the screen and 90 percent down the
+    // display zone, from the scale the code writes into user0
+    std::string menuWithPinwheel()
+    {
+        std::string xml = loadingMenu();
+        const std::string wheel = R"xml(
+<nif name="loading_pinwheel"><id>11</id><filename>Interface\Circular Loading\loading01.nif</filename>
+<x><copy src="me()" trait="_x_offset"/><mult src="me()" trait="user0"/>
+<add><copy src="screen()" trait="width"/><sub><copy src="me()" trait="width"/><mult src="me()" trait="user0"/></sub><div> 2 </div></add></x>
+<y><copy src="me()" trait="_y_offset"/><mult src="me()" trait="user0"/>
+<add><copy src="parent()" trait="_y_buffer"/><add><copy src="parent()" trait="_display_zone"/><mult> 0.9 </mult></add>
+<sub><copy src="me()" trait="height"/><div> 2 </div></sub></add>
+<sub><copy src="me()" trait="height"/><mult src="me()" trait="user0"/></sub></y>
+<width> 54 </width><height> 54 </height><_x_offset> 107 </_x_offset><_y_offset> -46 </_y_offset><user0></user0></nif>)xml";
+        xml.insert(xml.rfind("</menu>"), wheel);
+        xml.insert(xml.find("<alpha>0</alpha>") + 16, "<_y_buffer>30</_y_buffer><_display_zone>900</_display_zone>");
+        return xml;
+    }
+
+    TEST(FalloutLoadingMenuTest, the_wheel_stands_where_the_file_puts_it_at_the_scale_the_code_gives)
+    {
+        Fixture f(menuWithPinwheel());
+        ASSERT_TRUE(f.mMenu) << f.mError;
+        const LoadingMenu::Pinwheel wheel = f.mMenu->pinwheel();
+        ASSERT_TRUE(wheel.mPresent);
+        EXPECT_FLOAT_EQ(wheel.mScale, 2.f);
+        // x = 107 * 2 + (1280 - 54 * 2) / 2 = 800: the model's origin is 80.2 units (at scale 2) to the right of the
+        // wheel's middle, which is the middle of the screen
+        EXPECT_FLOAT_EQ(wheel.mX, 800.f);
+        // y = -46 * 2 + (30 + 900 * 0.9 - 54 / 2) - 54 * 2 = 613
+        EXPECT_FLOAT_EQ(wheel.mY, 613.f);
+    }
+
+    TEST(FalloutLoadingMenuTest, a_file_without_a_wheel_has_none)
+    {
+        Fixture f;
+        ASSERT_TRUE(f.mMenu) << f.mError;
+        EXPECT_FALSE(f.mMenu->pinwheel().mPresent);
+    }
+
     TEST(FalloutLoadingMenuTest, a_file_without_the_tiles_of_a_slide_does_not_open)
     {
         Fixture f("<menu name=\"LoadingMenu\"/>");

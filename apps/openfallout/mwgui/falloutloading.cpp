@@ -6,6 +6,7 @@
 #include <MyGUI_Gui.h>
 #include <MyGUI_ImageBox.h>
 #include <MyGUI_RenderManager.h>
+#include <MyGUI_RotatingSkin.h>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/records.hpp>
@@ -85,7 +86,9 @@ namespace OFGui
             picture.mIcon = record.mIcon;
             picture.mText = record.mDescription;
             picture.mMainMenu = (record.mFlags & mainMenuFlag) != 0;
-            picture.mLocal = !record.mLocations.empty();
+            for (const ESM4::LoadScreen::Location& location : record.mLocations)
+                picture.mPlaces.push_back({ static_cast<std::uint32_t>(location.mDirect),
+                    static_cast<std::uint32_t>(location.mIndirect), location.mGridX, location.mGridY });
             mPool.push_back(std::move(picture));
             mRecords.push_back(&record);
         }
@@ -113,25 +116,19 @@ namespace OFGui
         return true;
     }
 
-    bool FalloutLoading::begin(bool mainMenu, bool interior, double now)
+    bool FalloutLoading::begin(bool mainMenu, const LS::Destination& destination, double now)
     {
         mActive = false;
         mWorldAlpha = 1.f;
         if (mStore == nullptr)
             return false;
         readPool();
-        mChosen.clear();
-        if (!interior)
-        {
-            mChosen = LS::choosePictures(mPool, mainMenu, mainMenu ? mostMainMenuPictures : LS::mostPictures,
-                [](int low, int high) { return low + Misc::Rng::rollDice(high - low + 1); });
-            if (mChosen.empty())
-                return false;
-        }
-        else if (mPool.empty())
-        {
+        // The pictures of the place the load goes to come first (iNumLocationSpecificScreens), then general ones up to
+        // iMaxScreens (4; 20 from the main menu): an interior has pictures too (Mac round 12AY R3)
+        mChosen = LS::choosePictures(mPool, mainMenu, destination, mainMenu ? mostMainMenuPictures : LS::mostPictures,
+            LS::mostPlacePictures, [](int low, int high) { return low + Misc::Rng::rollDice(high - low + 1); });
+        if (mChosen.empty())
             return false;
-        }
         if (!makeMenu())
             return false;
         if (mRoot == nullptr)
@@ -186,6 +183,7 @@ namespace OFGui
 
         const float shown = static_cast<float>(std::clamp((now - mStart) / menuFade, 0.0, 1.0));
         mMenu->setAlphas(mShow.alphas(now), shown);
+        drawWheel(now - mStart, shown);
         // The last frame of the world goes as the menu comes (the executable gives it the inverse of the fade)
         mWorldAlpha = 1.f - shown;
         draw();
@@ -235,6 +233,114 @@ namespace OFGui
             mShapes[index].mBox->setVisible(false);
     }
 
+    namespace
+    {
+        // Where the textures of the wheel are in the data of the game (the model names them by their file; the folders
+        // are tried in this order and the first that has the file is the one)
+        constexpr const char* wheelFolders[] = { "textures/interface/loading/", "textures/interface/circular loading/",
+            "textures/interface/main/", "textures/interface/", nullptr };
+
+        // What `loading01.nif` of New Vegas holds, in the units of the model (Mac round 12AY R3 A1). The model's origin
+        // is the tile's x and y; a model unit is `scale` units of the menu; the picture stands upright with x to the right
+        // and y down. Each piece is a rectangle round the middle of its node.
+        constexpr float wheelCenterX = -80.2141f;
+        constexpr float wheelCenterY = 74.6074f;
+        constexpr float wheelHalfWidth = 43.01f;
+        constexpr float wheelHalfHeight = 43.095f;
+        constexpr float ballPivotX = -80.4623f;
+        constexpr float ballPivotY = 74.6507f;
+        // The ball: its texture seen from the pivot (x and y from the left and the top, in model units)
+        constexpr float ballLeft = -2.72f;
+        constexpr float ballTop = -42.79f;
+        constexpr float ballWidth = 5.59f;
+        constexpr float ballHeight = 42.63f;
+        constexpr float barsRightX = -6.5167f;
+        constexpr float barsLeftX = -154.0758f;
+        constexpr float barsY = 74.6315f;
+        constexpr float barsHalfWidth = 42.81f;
+        constexpr float barsHalfHeight = 43.04f;
+        // The wheel turns once in 5.3333 seconds: it goes clockwise at 67.5 degrees a second, the ball against it at 135
+        constexpr float wheelDegrees = 67.5f;
+        constexpr float ballDegrees = -135.f;
+    }
+
+    void FalloutLoading::turn(Turning& piece, const char* file, float left, float top, float width, float height,
+        float pivotX, float pivotY, float degrees, float alpha, double unitsX, double unitsY)
+    {
+        if (piece.mBox == nullptr)
+        {
+            piece.mBox = mRoot->createWidget<MyGUI::ImageBox>(
+                "RotatingSkin", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default);
+            piece.mBox->setNeedMouseFocus(false);
+            piece.mBox->setVisible(false);
+        }
+        if (piece.mTexture.empty())
+        {
+            for (const char* const* directory = wheelFolders; *directory != nullptr; ++directory)
+            {
+                const std::string path = std::string(*directory) + file;
+                // (the data is asked for the first bytes of the file: a size says it is there)
+                if (const std::optional<std::string> start = mResources->data().mReadStart(path, 32))
+                    if (const std::optional<FalloutMenu::TextSize> size = mResources->textureSize(path))
+                    {
+                        piece.mTexture = path;
+                        piece.mWidth = static_cast<int>(size->mWidth);
+                        piece.mHeight = static_cast<int>(size->mHeight);
+                        piece.mBox->setImageTexture(path);
+                        piece.mBox->setImageTile(MyGUI::IntSize(piece.mWidth, piece.mHeight));
+                        piece.mBox->setImageCoord(MyGUI::IntCoord(0, 0, piece.mWidth, piece.mHeight));
+                        break;
+                    }
+            }
+            if (piece.mTexture.empty())
+                piece.mTexture = "-";
+        }
+        if (piece.mTexture == "-")
+            return;
+        const int x = static_cast<int>(std::lround(left * unitsX));
+        const int y = static_cast<int>(std::lround(top * unitsY));
+        const int w = std::max(1, static_cast<int>(std::lround(width * unitsX)));
+        const int h = std::max(1, static_cast<int>(std::lround(height * unitsY)));
+        piece.mBox->setCoord(x, y, w, h);
+        if (MyGUI::RotatingSkin* skin = piece.mBox->getSubWidgetMain()->castType<MyGUI::RotatingSkin>(false))
+        {
+            skin->setCenter(MyGUI::IntPoint(
+                static_cast<int>(std::lround(pivotX * unitsX)), static_cast<int>(std::lround(pivotY * unitsY))));
+            skin->setAngle(degrees * 3.14159265f / 180.f);
+        }
+        piece.mBox->setAlpha(alpha);
+        piece.mBox->setVisible(alpha > 0.f);
+    }
+
+    void FalloutLoading::drawWheel(double seconds, float alpha)
+    {
+        const FalloutScript::LoadScreens::LoadingMenu::Pinwheel wheel = mMenu->pinwheel();
+        if (!wheel.mPresent || mRoot == nullptr)
+            return;
+        // Menu units to pixels
+        const double unitsX = mMenu->designWidth() > 0 ? mMenu->pixelWidth() / mMenu->designWidth() : 1.0;
+        const double unitsY = mMenu->designHeight() > 0 ? mMenu->pixelHeight() / mMenu->designHeight() : 1.0;
+        const float s = wheel.mScale;
+        const float turned = static_cast<float>(std::fmod(seconds, 360.0 / wheelDegrees));
+        // A piece is a rectangle round the middle of its node, turned about its middle; the model's origin is the tile's x
+        // and y and a unit of the model is s units of the menu. Everything here is in units of the menu.
+        const auto place = [&](Turning& piece, const char* file, float centerX, float centerY, float halfWidth,
+                               float halfHeight, float degrees) {
+            turn(piece, file, wheel.mX + (centerX - halfWidth) * s, wheel.mY + (centerY - halfHeight) * s,
+                2 * halfWidth * s, 2 * halfHeight * s, halfWidth * s, halfHeight * s, degrees, alpha, unitsX, unitsY);
+        };
+        // Back to front: the bars on both sides (the left ones are the same picture turned half round), the wheel, the ball
+        place(mWheel[0], "load_roulette_bars.dds", barsLeftX, barsY, barsHalfWidth, barsHalfHeight, 180.f);
+        place(mWheel[1], "load_roulette_bars.dds", barsRightX, barsY, barsHalfWidth, barsHalfHeight, 0.f);
+        place(mWheel[2], "load_roulette_wheel.dds", wheelCenterX, wheelCenterY, wheelHalfWidth, wheelHalfHeight,
+            wheelDegrees * turned);
+        // The ball hangs from its pivot: its picture stands above the pivot, which is a little below its foot, and the
+        // widget turns about the pivot
+        turn(mWheel[3], "load_roulette_ball.dds", wheel.mX + (ballPivotX + ballLeft) * s,
+            wheel.mY + (ballPivotY + ballTop) * s, ballWidth * s, ballHeight * s, -ballLeft * s, -ballTop * s,
+            ballDegrees * turned, alpha, unitsX, unitsY);
+    }
+
     void FalloutLoading::end()
     {
         mActive = false;
@@ -243,6 +349,9 @@ namespace OFGui
             mRoot->setVisible(false);
         for (Shape& slot : mShapes)
             slot.mBox->setVisible(false);
+        for (Turning& piece : mWheel)
+            if (piece.mBox != nullptr)
+                piece.mBox->setVisible(false);
         if (mMenu)
             mMenu->clear();
     }

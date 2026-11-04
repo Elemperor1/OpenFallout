@@ -76,31 +76,76 @@ namespace FalloutScript::LoadScreens
         }
     }
 
+    bool isForPlace(const Picture& picture, const Destination& destination)
+    {
+        if (!destination.mSet)
+            return false;
+        for (const Place& place : picture.mPlaces)
+        {
+            if (destination.mObject != 0 && place.mObject == destination.mObject)
+                return true;
+            if (destination.mExterior && place.mObject == 0 && place.mWorld == destination.mWorld
+                && place.mGridX == destination.mGridX && place.mGridY == destination.mGridY)
+                return true;
+        }
+        return false;
+    }
+
+    namespace
+    {
+        // Each pick takes one of the candidates at random; a picture whose file is in the list already is dropped when it
+        // comes (0x78ADC0, 0x78AB20)
+        void pick(const std::vector<Picture>& pool, std::vector<std::size_t> candidates, std::size_t wanted,
+            const Random& random, std::vector<std::size_t>& chosen)
+        {
+            std::set<std::string> taken;
+            for (const std::size_t index : chosen)
+                taken.insert(lower(pool[index].mIcon));
+            while (!candidates.empty() && chosen.size() < wanted)
+            {
+                const int last = static_cast<int>(candidates.size()) - 1;
+                const std::size_t at = static_cast<std::size_t>(last > 0 ? std::clamp(random(0, last), 0, last) : 0);
+                const std::size_t index = candidates[at];
+                candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(at));
+                if (taken.insert(lower(pool[index].mIcon)).second)
+                    chosen.push_back(index);
+            }
+        }
+    }
+
+    std::vector<std::size_t> choosePictures(const std::vector<Picture>& pool, bool mainMenu,
+        const Destination& destination, std::size_t most, std::size_t mostForPlace, const Random& random)
+    {
+        std::vector<std::size_t> chosen;
+        std::vector<std::size_t> candidates;
+        if (mainMenu)
+        {
+            for (std::size_t i = 0; i < pool.size(); ++i)
+                if (!pool[i].mIcon.empty() && pool[i].mMainMenu)
+                    candidates.push_back(i);
+            pick(pool, std::move(candidates), most, random, chosen);
+            return chosen;
+        }
+        if (destination.mSet)
+        {
+            for (std::size_t i = 0; i < pool.size(); ++i)
+                if (!pool[i].mIcon.empty() && isForPlace(pool[i], destination))
+                    candidates.push_back(i);
+            pick(pool, std::move(candidates), std::min(most, mostForPlace), random, chosen);
+            candidates.clear();
+        }
+        // What is left up to the most is general pictures (those with no places)
+        for (std::size_t i = 0; i < pool.size(); ++i)
+            if (!pool[i].mIcon.empty() && !pool[i].local())
+                candidates.push_back(i);
+        pick(pool, std::move(candidates), most, random, chosen);
+        return chosen;
+    }
+
     std::vector<std::size_t> choosePictures(
         const std::vector<Picture>& pool, bool mainMenu, std::size_t most, const Random& random)
     {
-        std::vector<std::size_t> candidates;
-        for (std::size_t i = 0; i < pool.size(); ++i)
-        {
-            const Picture& picture = pool[i];
-            if (picture.mIcon.empty())
-                continue;
-            if (mainMenu ? picture.mMainMenu : !picture.mLocal)
-                candidates.push_back(i);
-        }
-        std::vector<std::size_t> chosen;
-        std::set<std::string> taken;
-        // Each pick takes one of what is left; a picture whose file was taken is dropped when it comes
-        while (!candidates.empty() && chosen.size() < most)
-        {
-            const int last = static_cast<int>(candidates.size()) - 1;
-            const std::size_t at = static_cast<std::size_t>(last > 0 ? std::clamp(random(0, last), 0, last) : 0);
-            const std::size_t index = candidates[at];
-            candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(at));
-            if (taken.insert(lower(pool[index].mIcon)).second)
-                chosen.push_back(index);
-        }
-        return chosen;
+        return choosePictures(pool, mainMenu, Destination(), most, mostPlacePictures, random);
     }
 
     void SlideShow::start(double now)

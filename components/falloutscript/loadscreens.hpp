@@ -11,16 +11,43 @@
 
 namespace FalloutScript::LoadScreens
 {
+    /// A place a load screen is for (an LNAM entry, FalloutNV.exe 0x5A68D0): a cell or a world as `mObject`, or no object
+    /// and the grid cell `mGridX`, `mGridY` of the world `mWorld`
+    struct Place
+    {
+        std::uint32_t mObject = 0;
+        std::uint32_t mWorld = 0;
+        int mGridX = 0;
+        int mGridY = 0;
+    };
+
     /// A picture of the loading screen and the tip that goes with it (a LSCR record of New Vegas): the path of the
-    /// picture, the words of the tip, whether the picture is for the main menu (record flag 0x400) and whether it is
-    /// for a place in particular (it has locations)
+    /// picture, the words of the tip, whether the picture is for the main menu (record flag 0x400) and the places it is
+    /// for (none for a general picture)
     struct Picture
     {
         std::string mIcon;
         std::string mText;
         bool mMainMenu = false;
-        bool mLocal = false;
+        std::vector<Place> mPlaces;
+        bool local() const { return !mPlaces.empty(); }
     };
+
+    /// Where the load goes, as the executable keys it (0x457D70 and 0x5A6EC0): an interior cell is its own record, and
+    /// an exterior cell is its world (a door that leads outside is the grid cell the player arrives in)
+    struct Destination
+    {
+        bool mSet = false;
+        /// The cell of an interior, or the world of an exterior
+        std::uint32_t mObject = 0;
+        std::uint32_t mWorld = 0;
+        bool mExterior = false;
+        int mGridX = 0;
+        int mGridY = 0;
+    };
+
+    /// Whether a picture is for the place the load goes to
+    bool isForPlace(const Picture& picture, const Destination& destination);
 
     /// How a load screen type (LSCT, FalloutNV.exe 0x78B9B0 and 0x78C770, Mac round 12AR C2) places the tip: the box on
     /// a canvas of 1280 by 960, the font and colour of the text and how it is justified
@@ -68,8 +95,10 @@ namespace FalloutScript::LoadScreens
     constexpr double crossFadeSeconds = 1.0 / 0.45;
     /// The time the menu takes to fade in over the last picture of the world, in seconds (menufade)
     constexpr double menuFadeSeconds = 0.75;
-    /// How many pictures one loading screen holds (iMaxScreens:Loading)
+    /// How many pictures one loading screen holds (iMaxScreens:Loading), and how many of them are for the place the
+    /// load goes to (iNumLocationSpecificScreens:Loading)
     constexpr std::size_t mostPictures = 4;
+    constexpr std::size_t mostPlacePictures = 1;
 
     using Random = std::function<int(int low, int high)>;
 
@@ -78,6 +107,12 @@ namespace FalloutScript::LoadScreens
     /// indexes into `pool`)
     std::vector<std::size_t> choosePictures(
         const std::vector<Picture>& pool, bool mainMenu, std::size_t most, const Random& random);
+
+    /// The same for a load that goes to a place (FalloutNV.exe 0x78A5A0, Mac round 12AY R3): the pictures that are for the
+    /// place come first, at most `mostForPlace` of them, and then general pictures up to `most` in all. A load that goes
+    /// nowhere in particular (a saved game, the main menu) takes general pictures only.
+    std::vector<std::size_t> choosePictures(const std::vector<Picture>& pool, bool mainMenu,
+        const Destination& destination, std::size_t most, std::size_t mostForPlace, const Random& random);
 
     /// The pictures take the screen turn by turn: the first is shown at once, and each after it fades in over the one
     /// before while the tip of that picture does the same (the tiles go by the number of the picture: an even one is

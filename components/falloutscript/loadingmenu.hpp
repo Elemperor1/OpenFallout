@@ -19,6 +19,9 @@ namespace FalloutScript::LoadScreens
     class LoadingMenu
     {
     public:
+        /// The scale of the wheel (fLoadingWheelScale: 2 in the executable)
+        static constexpr float wheelScale = 2.f;
+
         /// Nothing if the file is not in the data, with the reason in `error`
         static std::unique_ptr<LoadingMenu> open(
             std::shared_ptr<FalloutMenu::Resources> resources, float pixelWidth, float pixelHeight, std::string* error);
@@ -46,6 +49,18 @@ namespace FalloutScript::LoadScreens
         float designWidth() { return mMenu->menu().designWidth(); }
         float designHeight() { return mMenu->menu().designHeight(); }
 
+        /// The wheel of the loading screen: a model (`loading01.nif`) that the file places by its tile `loading_pinwheel`.
+        /// The tile's x and y are where the model's origin stands, in the units of the menu, and the scale is the tile's
+        /// `user0` (the executable's fLoadingWheelScale, 2), which the code writes.
+        struct Pinwheel
+        {
+            bool mPresent = false;
+            float mX = 0;
+            float mY = 0;
+            float mScale = 2;
+        };
+        Pinwheel pinwheel();
+
         /// The safe zone of the screen: what the tips keep clear at the edges, in units of the menu
         static constexpr float crop = 15.f;
 
@@ -64,6 +79,7 @@ namespace FalloutScript::LoadScreens
 
         std::unique_ptr<FalloutMenu::OpenMenu> mMenu;
         std::array<SlideTiles, 2> mSlides;
+        FalloutMenu::Tile* mPinwheel = nullptr;
     };
 }
 

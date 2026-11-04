@@ -1174,10 +1174,14 @@ The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use th
 
 - The menu fades in over `menufade` (0.75 s) over the last frame of the world, which fades out as the menu comes (every tile's
   alpha is `p * 255`, the world image's `(1 - p) * 255`).
-- It picks the pictures when the load begins: from the `LSCR` whose picture is for the main menu (record flag 0x400) when the load
-  is from the main menu, else from those that are not for one place only (no `LNAM` locations), `iMaxScreens:Loading` (4) of
-  them (20 from the main menu), at random, none twice (the same file is the same picture). A load of an interior cell shows the
-  pinwheel and no picture.
+- It picks the pictures when the load begins (Mac round 12AY R3, 0x78A5A0): from the `LSCR` whose picture is for the main menu
+  (record flag 0x400) when the load is from the main menu (20 of them), else `iMaxScreens:Loading` (4) in all, of which at most
+  `iNumLocationSpecificScreens:Loading` (1) are for the place the load goes to and the rest are general ones (no `LNAM`
+  locations), at random, none twice (the same file is the same picture). A picture is for a place when one of its `LNAM`
+  entries is the cell (an interior), the world (an exterior), or a grid cell of the world that is the one the player arrives in.
+  A load that goes nowhere in particular (a saved game, the main menu) takes general pictures only; when the pictures of the
+  place and the general ones do not fill the four, the pass over the general ones takes what is left. An interior has pictures like
+  an exterior has (the pictures of its cell, then general ones).
 - The first picture is on the screen at once, on slide 1; every ten seconds (four from the main menu) the next picture is put on
   the other slide and cross-fades over the one before in 2.2 s (`p = clamp((now - stamp) * 0.00045)`; its tip and matte fade
   with it). The picture is `Textures\<ICON>` of the record and the tip its `DESC`.
@@ -1191,10 +1195,19 @@ The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use th
 `components/falloutscript/loadscreens` has these rules (the window, the choice, the slide show; tested) and `loadingmenu` puts
 them on the menu file; `mwgui/falloutloading` draws the pieces of the menu as widgets under the loading box of the engine, over
 the frame the engine keeps of the world, and takes the pictures from the `LoadScreen` and `LoadScreenType` stores. A game
-without load screens or without the menu file keeps the screens of the engine. Not done: the pinwheel (a 3D scene; its NIF
-and what the code moves in it were not read) and the pictures of a place in particular (the executable's choice of those whose
-locations match the destination was not read; they are left out), so the box of the engine (the label and the progress bar)
-stays at the bottom as a stand-in. Seen only in the offline harness and in tests, not in the running game.
+without load screens or without the menu file keeps the screens of the engine.
+
+The pinwheel (Mac round 12AY R3): the model is `Meshes\Interface\Circular Loading\loading01.nif` (tile `loading_pinwheel`, id 11;
+not `LoadingAnim01.NIF`, whose tile 0 is static and only gives the duration and the sounds `UILoadScreenInitial` and
+`MicroFiche01`). The tile's x and y are where the model's origin stands, in the units of the menu, and the scale is
+`fLoadingWheelScale` (2); the centre of the wheel is the origin plus the scale times (-80.2141, +74.6074). The wheel turns
+clockwise at 67.5 degrees a second and the ball counter-clockwise at 135, a loop of 5.3333 s. We draw it as three textures
+(`load_roulette_bars`, `load_roulette_wheel`, `load_roulette_ball`) turned by widgets, with the numbers read from the model, not
+the model itself. Not verified in the game: the folder of the textures (the code tries `Textures\Interface\Loading\`,
+`\Circular Loading\`, `\Main\` and `\Interface\`), the layering (bars at the back, the wheel, the ball on top) and the
+direction of the turn. Not done: the mode of a new game, which shows the wheel and no picture; the pictures of the other
+kinds of load screen (objective, level progress, stats, plate). The box of the engine (the label and the progress bar) stays at
+the bottom. Seen only in the offline harness and in tests, not in the running game.
 
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 

@@ -751,6 +751,10 @@ namespace OFWorld
         });
 
         Loading::Listener* loadingListener = OFBase::Environment::get().getWindowManager()->getLoadingScreen();
+        // (the load screen of the games picks its pictures by where the load goes: an exterior is its world)
+        if (const ESM::FormId* world = playerCellIndex.mWorldspace.getIf<ESM::FormId>())
+            loadingListener->setDestination(
+                world->toUint32(), world->toUint32(), true, playerCellIndex.mX, playerCellIndex.mY);
         Loading::ScopedLoad load(loadingListener);
         loadingListener->setLabel("#{OFEngine:LoadingExterior}");
         loadingListener->setProgressRange(refsToLoad);
@@ -1018,6 +1022,9 @@ namespace OFWorld
 
         Loading::Listener* loadingListener = OFBase::Environment::get().getWindowManager()->getLoadingScreen();
         loadingListener->setLabel("#{OFEngine:LoadingInterior}");
+        // (an interior is its own record for the load screen)
+        if (const ESM::FormId* form = cell.getCell()->getId().getIf<ESM::FormId>())
+            loadingListener->setDestination(form->toUint32(), 0, false, 0, 0);
         Loading::ScopedLoad load(loadingListener);
 
         if (mCurrentCell == &cell)

@@ -52,6 +52,10 @@ namespace FalloutScript::LoadScreens
                 return nullptr;
             }
         }
+        // The wheel is placed by the file once the code gives its scale
+        result->mPinwheel = named(file, "loading_pinwheel");
+        if (result->mPinwheel != nullptr)
+            put(file, *result->mPinwheel, "user0", wheelScale);
         // The world image is the last frame of the world, which the engine draws under the menu; the groups of text for
         // the other types of load screen (the objective, the level, the stats, the plate) are built hidden and the tips
         // are all that the data of the games asks for
@@ -130,6 +134,21 @@ namespace FalloutScript::LoadScreens
             put(file, *slide.mTip, "alpha", alpha);
             put(file, *slide.mMatte, "alpha", alpha);
         }
+    }
+
+    LoadingMenu::Pinwheel LoadingMenu::pinwheel()
+    {
+        Pinwheel result;
+        if (mPinwheel == nullptr)
+            return result;
+        if (const std::optional<std::array<float, 4>> rectangle = mMenu->menu().rectangle(*mPinwheel))
+        {
+            result.mPresent = true;
+            result.mX = (*rectangle)[0];
+            result.mY = (*rectangle)[1];
+            result.mScale = mMenu->menu().number(*mPinwheel, "user0");
+        }
+        return result;
     }
 
     void LoadingMenu::resize(float pixelWidth, float pixelHeight)
