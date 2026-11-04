@@ -966,6 +966,10 @@ namespace OFScript
                 FalloutScript::Casino::readCaravanRecord(mCaravanRecord, in, version);
             });
         section(
+            "chargen", FalloutScript::chargenSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { mChargen.write(out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) { mChargen.read(in, version); });
+        section(
             "hotkeys", FalloutScript::hotKeysSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeHotKeys(mHotKeys, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {

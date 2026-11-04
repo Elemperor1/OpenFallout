@@ -577,7 +577,8 @@ end
 function module.start(page, state, options)
     module.close()
     callbacks = options
-    mode = page and page.mode or 0
+    -- The mode is the one value the command gave: 2 for the barber and 3 for the plastic surgeon, none for a new character
+    mode = page and page.values and page.values[1] or 0
     opened = menuModule.open(MENU_FILE)
     if not opened then return false end
     background = opened:find(BACKGROUND)
