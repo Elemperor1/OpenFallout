@@ -103,8 +103,15 @@ player is told (`sWeaponLowCond`, `sArmorLowCond`, with the sound `WPNBreak` and
 a weapon that reaches nothing is put away with `sWeaponBreak`, armor stays on with no message, and a thing with no health does
 not go on (`sCantEquipBrokenItem`). The weapon commands `GetWeaponHealthPerc`, `SetWeaponHealthPerc` (lowering goes through the
 wear, raising stops a point short of the most) and `ModWeaponHealthPerc` work on the weapon in the hands, `AddItemHealthPercent`
-gives copies at a fraction of their health. Fallout 3 does not wear (its code is not read; it has no `fDamageToWeaponValue`) and
-keeps the damage curve of its settings. Not done: the effects of the condition of the weapon on jams (the exe's tables:
+gives copies at a fraction of their health. Fallout 3 wears the same way with other numbers (Mac round 12AY R4, `Fallout3.exe` 0x582640, 0x583A40, 0x582720): a shot
+(or a swing that reaches) takes the damage of the weapon's record times a number by the kind of weapon (`fDamageToWeaponGunMult`
+0.03 for types 3, 5 and 6, `...EnergyMult` 0.04 for 4 and 7, `...LauncherMult` 0.06 for 8 and 9, `...MeleeMult` 0.05 for 0 to 2;
+a weapon whose flags2 has bit 7 uses its own number, DNAM byte 84; a thing that is thrown or laid, 1.0), the ammunition has no
+effect on it, a weapon does `fDamageGunWeapCondBase + Mult * condition` of its damage (0.66 + 0.34 c, melee 0.5 + 0.5 c, from the
+settings, with no knee), armor gives `fArmorRatingBase + (fArmorRatingMax - fArmorRatingBase) * c` of its rating (0.2 + 0.8 c; a
+broken piece still gives a fifth), the rating of a piece is rounded, there is no threshold, and the player gets no message at a
+quarter (only `sWeaponBreak` with `WPNBreak` when a weapon breaks). Armor wears as in New Vegas (the same formula with
+`fDamageToArmorPercentage` 0.35 and the player as the only victim). Not done: the effects of the condition of the weapon on jams (the exe's tables:
 reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
 `fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
 records (COED) and of the ones that are placed.
@@ -118,8 +125,9 @@ The Repair button of the items page (key R, shown for a weapon or a piece of arm
 repair it with) opens `repair_menu.xml` (`falloutpipboyrepair.lua`, in the box of the Pip-Boy). The list has the copy first, with
 the file's brackets round it, and under it each thing the player carries that can repair it: a thing the item's repair list
 (`REPL`) names (the lists of the games hold the item itself, so another copy of it repairs it), and, for a weapon, any playable
-weapon with the same skill and way of being held when the player has the perk of the entry point 48 (Jury Rigging in the games'
-words); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
+weapon with the same skill and way of being held, and for armor any playable piece of the same weight class (the general flag 0x80
+heavy, 0x08 medium, else light) and the same equipment type (`ETYP`: body or head wear), when the player has the perk of the entry
+point 48 (Jury Rigging in the games' words; `FalloutNV.exe` 0x47BB50, Mac round 12AY R4); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
 the weakest first. The pointer on a thing shows the health the copy would have
 (the cards of the right: the health bar, `+N%` and the gain of damage, threshold or resistance), the copy itself says to select
 an item (`sSelectItemToRepair`). A click repairs: the player's Repair skill (actor value 39) gives the new health of the copy
@@ -141,8 +149,7 @@ once. The engine's rule that the menu keeps the count of the list's children mak
 over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
 
 Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
-scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the Jury Rigging rule for armor (the executable's class function 0x514410
-was not read); the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
+scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
 Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
 generic menu does.
 

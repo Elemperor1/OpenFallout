@@ -258,12 +258,13 @@ namespace OFScript
                             copy.mCardDamage = weaponCardDamage(id, stack.mCondition, stack.mMods);
                         else if (copy.mCategory == FalloutScript::Pipboy::ItemCategory::Apparel)
                         {
-                            const double factor = FalloutScript::Wear::armorFactor(
-                                static_cast<double>(stack.mCondition) / FalloutScript::ActorState::fullCondition);
-                            copy.mRating = std::trunc(row.mRating * factor);
+                            const FalloutScript::Wear::Settings& wear = wearSettings();
+                            const double condition = static_cast<double>(stack.mCondition)
+                                / FalloutScript::ActorState::fullCondition;
+                            copy.mRating = FalloutScript::Wear::armorShown(wear, row.mRating, condition);
                             // The executable cuts the threshold of the record to a whole number and the product again (0x646360), as the
                             // repair screen does
-                            copy.mThreshold = std::trunc(std::trunc(row.mThreshold) * factor);
+                            copy.mThreshold = FalloutScript::Wear::armorShown(wear, std::trunc(row.mThreshold), condition);
                         }
                         // What the mods installed in a weapon do to what its card tells (FalloutNV.exe 0x4BE380, 0x4FE160)
                         if (stack.mMods != 0 && copy.mCategory == FalloutScript::Pipboy::ItemCategory::Weapons)

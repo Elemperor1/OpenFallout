@@ -11,6 +11,7 @@
 #include "itemcopy.hpp"
 #include "saveaccess.hpp"
 #include "script.hpp"
+#include "wear.hpp"
 
 namespace FalloutScript
 {
@@ -139,6 +140,10 @@ namespace FalloutScript
         /// Told after an item that is on lost health: the condition before and after
         using WearListener = std::function<void(FormId actor, FormId item, int before, int after)>;
         void setWearListener(WearListener listener);
+        /// What wears and rates things in the game that runs (New Vegas when this is not set). The host gives it when the
+        /// game data is ready; it is asked for every time armor is rated, from a thread that holds no lock of this.
+        using WearSettings = std::function<const Wear::Settings&()>;
+        void setWearSettings(WearSettings settings);
         /// Gives copies of an item with a share of its health (1 is whole); an item that does not wear out is whole
         void addWithHealth(FormId actor, FormId item, int count, double fraction);
         /// The health of the weapon in the hands in percent, 100 for the hands
@@ -166,7 +171,7 @@ namespace FalloutScript
         std::uint32_t weaponAnimationType(FormId actor);
 
         /// The rating and damage threshold of all that is worn, and of what covers the upper body. A piece that is worn
-        /// below half its health gives less (`Wear::armorFactor`).
+        /// below half its health gives less in New Vegas, below its whole in Fallout 3 (`Wear::armorFactor`).
         double armorRating(FormId actor);
         double damageThreshold(FormId actor);
         double upperBodyRating(FormId actor);
@@ -228,6 +233,7 @@ namespace FalloutScript
         /// How much of the next tenth of a percent a copy has lost, for the next time
         std::map<std::pair<FormId, FormId>, double> mWearRemainders;
         WearListener mWearListener;
+        WearSettings mWearSettings;
 
         ItemRecords& mRecords;
         ActorState& mState;

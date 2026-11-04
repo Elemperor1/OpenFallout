@@ -71,10 +71,10 @@ namespace OFScript
         {
             // The executable works the whole number of the threshold and of the rating with the factor of the condition,
             // and shows the whole number of that (0x646360)
-            const double factor = FalloutScript::Wear::armorFactor(
-                static_cast<double>(condition) / FalloutScript::ActorState::fullCondition);
-            stat.mThreshold = static_cast<int>(std::trunc(std::trunc(info.mThreshold) * factor));
-            stat.mRating = static_cast<int>(std::trunc(info.mRating * factor));
+            const FalloutScript::Wear::Settings& wear = wearSettings();
+            const double fraction = static_cast<double>(condition) / FalloutScript::ActorState::fullCondition;
+            stat.mThreshold = static_cast<int>(FalloutScript::Wear::armorShown(wear, std::trunc(info.mThreshold), fraction));
+            stat.mRating = static_cast<int>(FalloutScript::Wear::armorShown(wear, info.mRating, fraction));
         }
         return stat;
     }

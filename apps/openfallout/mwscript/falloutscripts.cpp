@@ -229,6 +229,7 @@ namespace OFScript
         FalloutScript::addEquipmentCommands(mInterpreter, mEquipment);
         mEquipment.setWearListener([this](FalloutScript::FormId holder, FalloutScript::FormId item, int before,
                                        int after) { itemWorn(holder, item, before, after); });
+        mEquipment.setWearSettings([this]() -> const FalloutScript::Wear::Settings& { return wearSettings(); });
         FalloutScript::addCombatCommands(mInterpreter, mCombat, mActors, *this);
         FalloutScript::addAnimationCommands(mInterpreter, mOpenStates, *this, game);
         // The container of an item is the holder its script was last run for
@@ -3433,6 +3434,8 @@ namespace OFScript
                     const auto found = settings.find(Misc::StringUtils::lowerCase(name));
                     return found != settings.end() ? std::optional<double>(found->second) : std::nullopt;
                 });
+            // Fallout 3 wears weapons by their kind, rates worn armor on a line and has no low-condition message
+            mWearSettings->mFallout3 = mGame == FalloutScript::Game::Fallout3;
         }
         return *mWearSettings;
     }
@@ -3466,7 +3469,8 @@ namespace OFScript
             // frame's
             runOnMainThread([this] { playInterfaceSound("WPNBreak"); });
         };
-        if (FalloutScript::Wear::crossedLow(before, after))
+        // (Fallout 3 only tells that a weapon broke, Mac round 12AY R4)
+        if (mGame == FalloutScript::Game::NewVegas && FalloutScript::Wear::crossedLow(before, after))
             say(gameSettingText(weapon ? "sWeaponLowCond" : "sArmorLowCond"));
         // Armor that is gone stays on, with no message
         if (after == 0 && weapon)
@@ -3478,19 +3482,24 @@ namespace OFScript
 
     void FalloutScripts::wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats)
     {
-        // Only the player's weapon wears, and only in New Vegas (Fallout 3 wears its weapons by the kind of weapon, which is
-        // not read). The hands with no weapon do not wear, a weapon that is not playable or is embedded does not, and a
-        // thing that is thrown goes instead (FalloutNV.exe 0x524A24 for a gun and 0x9B55CF for a swing)
-        if (attacker != mPlayer || mGame != FalloutScript::Game::NewVegas || stats.mWeapon == 0)
+        // Only the player's weapon wears. The hands with no weapon do not wear, a weapon that is not playable or is
+        // embedded does not, and a thing that is thrown goes instead (FalloutNV.exe 0x524A24 for a gun and 0x9B55CF for a
+        // swing; Fallout3.exe 0x4BF1ED and 0x71E714)
+        if (attacker != mPlayer || stats.mWeapon == 0)
             return;
         const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon));
         if (record == nullptr || record->mData.health == 0 || !record->mHasGameData || isUsedUp(record->mGame))
             return;
         if ((record->mGame.mFlags1 & (ESM4::Weapon::GameData::NonPlayable | ESM4::Weapon::GameData::EmbeddedWeapon)) != 0)
             return;
-        double points = FalloutScript::Wear::shotPoints(wearSettings());
-        // The effects of the ammunition of the condition kind change a shot of a gun (a swing has no ammunition)
-        if (!stats.mMelee && stats.mAmmo != 0)
+        const FalloutScript::Wear::Settings& settings = wearSettings();
+        double points = FalloutScript::Wear::shotPoints(settings,
+            { record->mData.damage, record->mGame.mAnimationType,
+                (record->mGame.mFlags2 & ESM4::Weapon::GameData::OverrideDamageToWeaponMult) != 0,
+                record->mGame.mOverrideDamageToWeaponMult });
+        // The effects of the ammunition of the condition kind change a shot of a gun of New Vegas (a swing has no
+        // ammunition; Fallout 3 has no such effect)
+        if (!settings.mFallout3 && !stats.mMelee && stats.mAmmo != 0)
             points = applyAmmoEffects(stats.mAmmo, 4, points);
         mEquipment.wear(attacker, stats.mWeapon, points);
     }
@@ -3499,7 +3508,7 @@ namespace OFScript
     {
         // Only the armor of the player wears, one piece for a blow: the head for a blow at the head (the parts 1 and 2), the
         // upper body for any other (Mac round 12AW S12)
-        if (victim != mPlayer || mGame != FalloutScript::Game::NewVegas)
+        if (victim != mPlayer)
             return;
         const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance);
         if (points <= 0)
