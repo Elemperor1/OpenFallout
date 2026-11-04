@@ -382,8 +382,12 @@ from the look that is picked (`core.menuScene.updateHead`, again a short time af
 that the head stands in the middle of the file's hotrect `RSM_Face_Grab` (an off-centre frustum: the middle of the picture is
 not the camera's axis), a drag over the hotrect turns the head about its vertical axis and the wheel moves the camera nearer
 or farther (`setHeadView`). The barber and the plastic surgeon have the one tab they start at (the hair, the face), where Next
-reads `Done`. The head has not been seen in the running game yet: the bone it is aimed at, the lights and the alignment of the
-drag and the wheel with the picture are checked in the offline harness only.
+reads `Done`. The head was seen in the running game in Mac round 12BC: it is made again 0.17 seconds after each change, a drag
+of 200 pixels turned it by a quarter of a turn, and a wheel event is one step of the zoom. That round showed the first view
+too close (the camera aimed at the bone `Bip01 Head`, the base of the skull, so the top of the hair was cut by the window):
+the head now starts thirty degrees short of facing the viewer (the executable's start, Mac round 12BB D and E), turns all the way
+round, is seen from 120 units (the zoom runs from 60 to 180) and the camera aims eight units above that bone. Those numbers are
+guesses, to be checked against the picture.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
@@ -395,9 +399,10 @@ on. The presets are sorted by name byte by byte (capitals first). A hair that th
 race's own for the sex, and only when the race has none by the first of its hairs that fits (Mac round 12BB C1 and C2).
 
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
-12BB F). Not done: the keys of the pad, the scrolling of the long lists by the executable's rules (one row's height a click, rows
-cut by the window hidden), the hair's length (a vertex morph of the hair model by the record's length) and the head's size by the
-executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
+12BB F). Not done: the keys of the pad, the Start menu that Escape opens over the screen (Escape goes up one list here, as the
+Back button does, and the Pip-Boy has the same difference: the port has no way yet to open the pause menu over a screen it
+draws), the hair's length (a vertex morph of the hair model by the record's length) and the head's size by the executable's
+formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
 
 ### The level-up screen
 
