@@ -79,6 +79,20 @@ namespace OFScript
         return stat;
     }
 
+    namespace
+    {
+        /// The weight class of an armor: 1 heavy, 2 medium, 0 light (clothing too), by the general flags of the record
+        /// (FalloutNV.exe 0x514410)
+        int armorClass(const ESM4::Armor& armor)
+        {
+            if ((armor.mGeneralFlags & ESM4::Armor::FO3_HeavyArmor) != 0)
+                return 1;
+            if ((armor.mGeneralFlags & 0x08) != 0)
+                return 2;
+            return 0;
+        }
+    }
+
     bool FalloutScripts::isQuestItem(FalloutScript::FormId item)
     {
         const ESM::RefId record = refId(item);
@@ -113,7 +127,17 @@ namespace OFScript
                 && candidate->mGame.mAnimationType == weapon->mGame.mAnimationType;
         }
         if (const ESM4::Armor* armor = mStore.get<ESM4::Armor>().search(record))
-            return listHas(armor->mRepairList);
+        {
+            if (listHas(armor->mRepairList))
+                return true;
+            // The same perk lets one armor repair another of the same weight class (light, medium or heavy by the
+            // general flags of the record) that is worn as the same kind of thing (body or head), when the other
+            // is playable (FalloutNV.exe 0x47BB50 with 0x514410, Mac round 12AY R4 B4)
+            const ESM4::Armor* candidate = mStore.get<ESM4::Armor>().search(otherRecord);
+            return candidate != nullptr && mPerks.apply(FalloutScript::EntryPoint::repairWithSimilar, mPlayer, 0.0) > 0
+                && (candidate->mGeneralFlags & ESM4::Armor::FO3_NonPlayable) == 0
+                && armorClass(*candidate) == armorClass(*armor) && candidate->mEquipmentType == armor->mEquipmentType;
+        }
         return false;
     }
 
