@@ -1502,6 +1502,8 @@ namespace OFScript
             double mValue = 0;
             /// Its lock is broken (forcing it failed)
             bool mBroken = false;
+            /// It is a door that the reference marks as inaccessible (after the broken lock in the order of the text)
+            bool mInaccessible = false;
             /// It is locked, whether the player carries its key, the setting that holds the word for how hard the lock
             /// is, and whether only the key opens it
             bool mLocked = false;
@@ -2050,7 +2052,8 @@ namespace OFScript
         /// A weapon that the player fires loses health (a shot, a swing), an armor piece that is hit loses health; the
         /// copy that is on takes it, and the player is told when it is nearly gone and when it is
         void wearWeaponOfShot(FalloutScript::FormId attacker, const WeaponStats& stats);
-        void wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance);
+        void wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance, double threshold,
+            double remaining, double scale);
         /// An item that is on lost health (the condition before and after, in tenths of a percent): the player is told when
         /// it is below a quarter and when it is gone, and a weapon that broke is put away
         void itemWorn(FalloutScript::FormId holder, FalloutScript::FormId item, int before, int after);
@@ -2279,7 +2282,9 @@ namespace OFScript
         void applyDisabledAlone(FalloutScript::FormId reference, bool disabled);
         /// Who has whom for an enable parent, read from the records the first time it is asked for
         const FalloutScript::EnableParents& enableParents();
-        void tellPlayer(const std::string& text);
+        /// (`kind` is the face a message without a picture gets: 0 neutral, 1 very happy, 2 sad; the executable's
+        /// callers choose it, Mac round 12BA E)
+        void tellPlayer(const std::string& text, int kind = 0);
         /// A box with the text and no button of its own: it shows for `seconds` (0 until the player closes it)
         void showNotice(const std::string& text, double seconds);
 

@@ -89,7 +89,7 @@ namespace
             mInfo[rifle] = { ItemKind::Weapon, 0, 8, 0, 0 };
             mInfo[cartridge] = { ItemKind::Ammo, 0, 0, 0, 0 };
             mInfo[buckshot] = { ItemKind::Ammo, 0, 0, 0, 0 };
-            mInfo[vest] = { ItemKind::Armor, upperBody, 0, 20, 2.5 };
+            mInfo[vest] = { ItemKind::Armor, upperBody, 0, 20, 3 };
             mInfo[helmet] = { ItemKind::Armor, BipedSlot::head | BipedSlot::hair, 0, 5, 1 };
             mInfo[jumpsuit] = { ItemKind::Armor, upperBody, 0, 3, 0 };
             mInfo[armoredSuit] = { ItemKind::Armor, upperBody | BipedSlot::head, 0, 40, 5 };
@@ -255,7 +255,7 @@ namespace
         setup.mEquipment.equip(guard, helmet);
 
         EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 25);
-        EXPECT_DOUBLE_EQ(setup.mEquipment.damageThreshold(guard), 3.5);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.damageThreshold(guard), 4);
         EXPECT_DOUBLE_EQ(setup.mEquipment.upperBodyRating(guard), 20);
 
         setup.mEquipment.unequip(guard, vest);
@@ -614,7 +614,7 @@ namespace
         setup.mRecords.mInfo[vest].mHealth = 400;
         ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
         EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 20);
-        EXPECT_DOUBLE_EQ(setup.mEquipment.damageThreshold(guard), 2.5);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.damageThreshold(guard), 3);
 
         // 0.75 of the health: a quarter of it is gone, which armor does not feel
         setup.mEquipment.wear(guard, vest, 100);
@@ -622,7 +622,7 @@ namespace
         // a quarter left: three quarters of the rating
         setup.mEquipment.wear(guard, vest, 200);
         EXPECT_NEAR(setup.mEquipment.armorRating(guard), 15, 1e-9);
-        EXPECT_NEAR(setup.mEquipment.damageThreshold(guard), 1.875, 1e-9);
+        EXPECT_NEAR(setup.mEquipment.damageThreshold(guard), 3, 1e-9); // 3 * 0.75 = 2.25: the next whole number up
         EXPECT_NEAR(setup.mEquipment.upperBodyRating(guard), 15, 1e-9);
         EXPECT_EQ(setup.mEquipment.wornArmor(guard).front().mCondition, 250);
     }

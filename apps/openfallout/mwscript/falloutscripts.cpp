@@ -1271,12 +1271,12 @@ namespace OFScript
         return mEnableParents;
     }
 
-    void FalloutScripts::tellPlayer(const std::string& text)
+    void FalloutScripts::tellPlayer(const std::string& text, int kind)
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
         // notes during a conversation of Morrowind is hidden
         // The head-up display prints it in the corner (the display of Fallout takes what is said from the line)
-        mHudMessages.push(text);
+        mHudMessages.push(text, {}, 0, kind);
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -1525,7 +1525,10 @@ namespace OFScript
         if (!text.empty())
         {
             Log(Debug::Info) << "Reputation: " << text;
-            tellPlayer(escapeTags(text));
+            // The picture is the setting's (sRepPositiveGainIcon, sRepNegativeGainIcon: the plugins have none, and the
+            // executable's default faces are very happy for the positive side and sad for the negative, Mac round
+            // 12BA E)
+            tellPlayer(escapeTags(text), bump.mSide == 1 ? 1 : 2);
         }
         if (!bump.mLevelChanged)
             return;
@@ -2580,9 +2583,11 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
-        // The armor that the player wears is worn out by what it stopped
+        // The armor that the player wears is worn out by what it stopped (the resistance by the share of the blow it took,
+        // the threshold by what it took of the rest), by less in V.A.T.S. as the blow is
         if (victim == mPlayer)
-            wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance);
+            wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance, defense.mThreshold, hit.mAfterThreshold,
+                mVatsOpen ? std::max(gameSetting("fVATSPlayerDamageMult", 1.0), 0.0) : 1.0);
         // The blow that hurts the player flashes the screen red, as the fall and the drowning of the engine do
         if (victim == mPlayer && dealt > 0)
         {
@@ -3507,13 +3512,18 @@ namespace OFScript
         mEquipment.wear(attacker, stats.mWeapon, points);
     }
 
-    void FalloutScripts::wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance)
+    void FalloutScripts::wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance,
+        double threshold, double remaining, double scale)
     {
         // Only the armor of the player wears, one piece for a blow: the head for a blow at the head (the parts 1 and 2), the
         // upper body for any other (Mac round 12AW S12)
         if (victim != mPlayer)
             return;
-        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance);
+        // New Vegas wears armor by its threshold too, so armor that only has a threshold wears (FalloutNV.exe 0x9B5A30, Mac
+        // round 12BA A); Fallout 3's armor has the resistance only
+        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance, threshold, remaining,
+                                  damageSettings().mMinimumThroughThreshold)
+            * scale;
         if (points <= 0)
             return;
         const bool head = limb == 1 || limb == 2;
@@ -3968,9 +3978,9 @@ namespace OFScript
                     voiced = sound->sayActive(speaker);
                 }
                 saying->mWait = voiced ? 0.f : line.mSeconds;
-                // What is said can be read when it is far enough to hear it, if subtitles are on, when there is no
-                // voice to hear or when the script that said it forced them
-                constexpr float hearingDistance = 1500.f;
+                // What is said is taken when subtitles are on, when there is no voice to hear or when the script that said
+                // it forced them. The executable tests no distance here: the display tests the speaker's place when it
+                // chooses what to show (Mac round 12BB G4)
                 // The cells of an exterior worldspace are one place, an interior is the cell
                 const auto sameplace = [&] {
                     const auto* at = speaker.getCell();
@@ -3984,8 +3994,7 @@ namespace OFScript
                     ? std::numeric_limits<float>::max()
                     : (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
                           .length();
-                const bool near = distance <= hearingDistance;
-                if (near && (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles))
+                if (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles)
                 {
                     // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
                     // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from

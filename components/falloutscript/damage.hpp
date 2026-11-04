@@ -83,6 +83,9 @@ namespace FalloutScript
         bool mCritical = false;
         /// The blow as it met the armor (with the bonus of a critical hit): what armor that is worn out by it works on
         double mEntering = 0;
+        /// What was left of the blow after the resistance and the threshold, before the floor of New Vegas lifted it (it
+        /// can be below nothing); the threshold wears armor by it
+        double mAfterThreshold = 0;
     };
 
     namespace Damage

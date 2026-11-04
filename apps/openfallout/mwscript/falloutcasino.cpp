@@ -463,7 +463,8 @@ namespace OFScript
         std::string word = gameSettingText("sAddItemtoInventory");
         if (word.empty())
             word = "added";
-        tellPlayer(chipsText(difference, chip, plural) + " " + word);
+        // (a payout has the very happy face, FalloutNV.exe census of the message calls, Mac round 12BA E)
+        tellPlayer(chipsText(difference, chip, plural) + " " + word, 1);
     }
 
     int FalloutScripts::casinoWinningsLevel(FalloutScript::FormId casino)

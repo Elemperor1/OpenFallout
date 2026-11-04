@@ -434,18 +434,21 @@ local function infoState()
         keyText = info.keyText,
         pad = info.pad,
     }
-    -- What the lock says, as the executable does: broken first, then the key (the word for using it), the class of the
-    -- lock and "locked" (a lock that only a key opens says its class alone)
+    -- What the lock says, as the executable does (FalloutNV.exe 0x775A00, Mac rounds 12BA G1, 12BB G1 and 12BB H): broken
+    -- first and then inaccessible (both settings are whole lines), then "locked" and after it the word for using the key,
+    -- or the class of the lock; a lock that only a key opens says its class alone, in brackets
     if info.broken then
-        result.status = word('sBroken', 'Broken')
+        result.status = word('sBroken', '[Broken]')
+    elseif info.inaccessible then
+        result.status = word('sInaccessible', '[Inaccessible]')
     elseif info.locked then
         local locked = word('sLocked', 'Locked')
         if info.hasKey then
-            result.status = string.format('[%s - %s]', word('sHUDUseKey', 'Use Key'), locked)
+            result.status = string.format('[%s - %s]', locked, word('sHUDUseKey', 'Use Key'))
         elseif info.keyOnly then
             result.status = string.format('[%s]', word(info.lockWord, 'Requires Key'))
         else
-            result.status = string.format('[%s - %s]', word(info.lockWord, ''), locked)
+            result.status = string.format('[%s - %s]', locked, word(info.lockWord, ''))
         end
     end
     if info.stats then
@@ -471,8 +474,11 @@ local function updateLines(dt)
         if message.sound and message.sound ~= '' then pipboy.playSoundNamed(message.sound) end
     end
     -- The stand-in has no tile for the subtitles: a line that is said is a message
+    -- (the display chooses by the speaker's place, within 500 units unless a script forced the line)
     for _, said in ipairs(hud.takeSubtitles()) do
-        lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
+        if said.forced or said.distance <= 500 then
+            lines[#lines + 1] = { text = said.text, left = math.max(said.seconds, 2) }
+        end
     end
     -- Nor for the quest text: what a quest was told and its objectives are messages too
     for _, event in ipairs(hud.takeQuestText()) do

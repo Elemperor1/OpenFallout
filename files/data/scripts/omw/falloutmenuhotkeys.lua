@@ -1,8 +1,9 @@
 -- The hot keys of Fallout 3 and New Vegas, as the head-up display of the executables handles them (FalloutNV.exe, the update
 -- 0x77DA60 and the class HotKeyWheel 0x701610; Mac rounds 12AN B2 and 12AO B2): the number keys 1 to 8 are eight slots,
--- each holding an item the player put there in the Pip-Boy. A key that is let go quickly uses its item; a key that is held
--- longer than fHotKeyDownTimer (half a second) shows the wheel of the eight slots, with the held one lit. The picture and the
--- name of the item stay on the screen for fHotKeyShowTimer (a second and a half) after a key.
+-- each holding an item the player put there in the Pip-Boy. A key that is let go quickly uses its item and shows nothing
+-- (Mac round 12BA G3: a press loads the name and the picture but shows neither); a key that is held longer than
+-- fHotKeyDownTimer (half a second) shows the wheel of the eight slots, with the held one lit, the picture and the name. They
+-- stay on the screen for fHotKeyShowTimer (a second and a half) after the key is let go.
 -- With a pad (FalloutNV.exe 0x701BD0, 0x77DA60; Mac round 12AO B2) the four directions of the D-pad choose the slot, eight ways
 -- round the wheel: down, down and left, down and right, up and left, up and right, left and right alone are the slots 7, 6, 8,
 -- 1, 3, 4 and 5 (up alone would be the slot of the ammunition swap, which is no slot). A new combination has to stay for more
@@ -64,7 +65,7 @@ Keys.__index = Keys
 -- `core.pipboy.hotKeys()`; use(id) uses the item and tells what happened ("" when nothing did); sound(name) plays a sound
 -- of the game; seconds(name, default) is the value of a setting of the game
 function module.new(env)
-    local self = setmetatable({ env = env, held = nil, heldFor = 0, wheel = false, showLeft = 0, padMode = false,
+    local self = setmetatable({ env = env, held = nil, lit = nil, heldFor = 0, wheel = false, showLeft = 0, padMode = false,
         padSelected = nil, padCandidate = nil, padFor = 0 }, Keys)
     self.down = tonumber(env.seconds and env.seconds('fHotKeyDownTimer', module.DOWN_SECONDS)) or module.DOWN_SECONDS
     self.show = tonumber(env.seconds and env.seconds('fHotKeyShowTimer', module.SHOW_SECONDS)) or module.SHOW_SECONDS
@@ -78,7 +79,7 @@ function Keys:view()
     return {
         selector = self.preview,
         wheel = self.wheel,
-        selected = self.wheel and self.held or nil,
+        selected = self.wheel and (self.held or self.lit) or nil,
         slots = self.wheel and self.rows or nil,
     }
 end
@@ -156,7 +157,11 @@ function Keys:step(dt, allowed)
         self.heldFor, self.padMode, self.padSelected, self.padCandidate, self.padFor = 0, false, nil, nil, 0
         return nil
     end
-    if self.showLeft > 0 then self.showLeft = self.showLeft - dt end
+    if self.showLeft > 0 then
+        self.showLeft = self.showLeft - dt
+        -- The wheel goes with the picture, a second and a half after the last frame of a hold or the let-go
+        if self.showLeft <= 0 and self.held == nil and not self.padMode then self.wheel, self.lit = false, nil end
+    end
     local directions = self.env.direction and self.env.direction() or nil
     if self.padMode or (directions ~= nil and (directions.up or directions.down or directions.left or directions.right)) then
         self:stepPad(dt, directions)
@@ -167,33 +172,43 @@ function Keys:step(dt, allowed)
             self.heldFor = self.heldFor + dt
             if not self.wheel and self.heldFor > self.down then
                 self.wheel = true
+            end
+            -- While the wheel is up the time of the picture is made new every frame, and its rows are what the slots hold
+            -- now (a script can put another item in a slot while the key is held)
+            if self.wheel then
                 self.rows = self.env.slots()
+                self.showLeft = self.show
             end
         else
             -- Let go: the item of the key is used, quickly or from the wheel
             local slot = self.held
             self.held, self.heldFor = nil, 0
-            local rows = self.wheel and self.rows or self.env.slots()
-            local row = rows[slot + 1]
-            self.wheel = false
-            if row ~= nil and row.id ~= '' then
+            local wasUp = self.wheel
+            local row = self.env.slots()[slot + 1]
+            local used = row ~= nil and row.id ~= ''
+            if used then
                 local outcome = self.env.use(row.id)
                 if outcome == '' and self.env.sound then self.env.sound('UIVATSInsufficientAP') end
-                -- The picture stays for a while after the item was used, with the count it has now
-                self:loadPreview(slot)
+            end
+            if wasUp then
+                -- The wheel stays, with the slot lit and the item as it is now, until the time of the picture is over
+                self.rows = self.env.slots()
+                self.lit = slot
+                if used then self:loadPreview(slot) else self.preview = nil end
                 self.showLeft = self.show
             else
-                self.preview = nil
-                self.showLeft = 0
+                -- A quick tap showed nothing and shows nothing
+                self.wheel, self.lit, self.preview, self.showLeft = false, nil, nil, 0
             end
         end
     else
         for slot = 0, module.SLOTS - 1 do
             if slot ~= module.AMMO_SWAP and self.env.pressed(slot) then
-                self.held, self.heldFor, self.wheel = slot, 0, false
-                -- The picture and name of the item come up at once, the item is used when the key is let go
+                -- (a wheel that is up from a hold before stays up, with this slot lit)
+                self.held, self.heldFor, self.lit = slot, 0, nil
+                -- The name and the picture of the item are loaded, but they come up only if the key is held (the item is
+                -- used when it is let go)
                 self:loadPreview(slot)
-                self.showLeft = self.show
                 break
             end
         end

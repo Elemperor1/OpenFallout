@@ -206,10 +206,10 @@ namespace OFLua
 
         // What the text under the crosshair says of an object (the one the crosshair is on): its name and how many
         // there are, the setting that holds the word of what the player does with it (`verb`, nothing for no word),
-        // whether the weight and value row is there and what they are, whether its lock is broken, whether it is locked
-        // (with whether the player has the key, the setting that holds the word of how hard the lock is, and whether
-        // only the key opens it) and the name of the key or button that activates. Nothing for an object it says
-        // nothing of.
+        // whether the weight and value row is there and what they are, whether its lock is broken, whether it is a door
+        // nobody can reach, whether it is locked (with whether the player has the key, the setting that holds the word
+        // of how hard the lock is, and whether only the key opens it) and the name of the key or button that activates.
+        // Nothing for an object it says nothing of.
         api["info"] = [lua](sol::optional<LObject> object) -> sol::object {
             if (!object)
                 return sol::nil;
@@ -225,6 +225,7 @@ namespace OFLua
             row["weight"] = info.mWeight;
             row["value"] = info.mValue;
             row["broken"] = info.mBroken;
+            row["inaccessible"] = info.mInaccessible;
             row["locked"] = info.mLocked;
             row["hasKey"] = info.mHasKey;
             row["lockWord"] = info.mLockWord;

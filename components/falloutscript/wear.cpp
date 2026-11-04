@@ -54,14 +54,17 @@ namespace FalloutScript::Wear
 
     double armorValue(const Settings& settings, double value, double condition)
     {
-        const double worn = value * armorFactor(settings, condition);
-        return settings.mFallout3 ? std::round(worn) : worn;
+        if (settings.mFallout3)
+            return std::round(value * armorFactor(settings, condition));
+        // New Vegas: a piece gives its whole number times the factor, to the next whole number up (0x4BDF90 and 0x4BE0B0,
+        // Mac round 12BA A; the small step keeps 17.000000000000004 from becoming 18)
+        return std::ceil(std::trunc(value) * armorFactor(settings, condition) - 1e-9);
     }
 
     double armorShown(const Settings& settings, double value, double condition)
     {
-        const double worn = value * armorFactor(settings, condition);
-        return settings.mFallout3 ? std::round(worn) : std::trunc(worn);
+        // What a card prints is what the piece gives (the card writes the next whole number up of the product, 0x70896B)
+        return armorValue(settings, value, condition);
     }
 
     double applyAmmoEffect(double value, std::uint32_t operation, double amount)
@@ -122,6 +125,19 @@ namespace FalloutScript::Wear
     {
         const double taken = std::clamp(resistance, 0.0, std::max(settings.mMaxRating, 0.0)) / 100.0;
         return std::max(settings.mArmorShare, 0.0) * std::max(damage, 0.0) * taken;
+    }
+
+    double armorPoints(const Settings& settings, double damage, double resistance, double threshold, double remaining,
+        double floorShare)
+    {
+        const double fromResistance = armorPoints(settings, damage, resistance);
+        // Fallout 3 has no threshold, and so no second term
+        if (settings.mFallout3)
+            return fromResistance;
+        // The threshold wears armor by the share of the smaller of itself and what is left of the blow above the floor
+        // under which a blow cannot fall (0x9B62CD: the term can be negative, and then it takes from the first)
+        const double floor = std::max(floorShare, 0.0) * std::max(damage, 0.0);
+        return fromResistance + std::max(settings.mArmorShare, 0.0) * std::min(std::max(threshold, 0.0), remaining - floor);
     }
 
     int tenthsLost(double points, double maxHealth, double& remainder)

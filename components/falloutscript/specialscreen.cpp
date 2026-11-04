@@ -31,16 +31,24 @@ namespace FalloutScript::SpecialScreen
             return "textures/terminals/bbnumber" + std::to_string(std::clamp(number, 0, 10)) + ".dds";
         }
 
-        /// The picture of the book's message by the points that are left (the language folder is English in the
-        /// executable)
+        /// A face of a button, from the folder of the device the screen was opened for (Mac round 12BA C2)
+        std::string faceTexture(bool pad, const char* name)
+        {
+            return std::string("textures/terminals/") + (pad ? "xbox" : "pc") + "/" + name + ".dds";
+        }
+
+        /// The picture of the book's message by the points that are left (the executable takes the folder of the language
+        /// in use, English here): more than one point is the second picture, one the third, none the fourth; below none
+        /// nothing is assigned and the strip of the model stays (FalloutNV.exe 0x7CA530 and the loader 0x7CADD0, Mac round
+        /// 12BB G2: the first picture is the model's own and no code assigns it)
         std::string messageTexture(int left)
         {
             if (left > 1)
-                return "textures/terminals/english/bbmessage03.dds";
-            if (left == 1)
-                return "textures/terminals/english/bbmessage04.dds";
-            if (left == 0)
                 return "textures/terminals/english/bbmessage02.dds";
+            if (left == 1)
+                return "textures/terminals/english/bbmessage03.dds";
+            if (left == 0)
+                return "textures/terminals/english/bbmessage04.dds";
             return {};
         }
 
@@ -84,6 +92,7 @@ namespace FalloutScript::SpecialScreen
         , mLimit(limit)
         , mValues(values)
         , mPad(pad)
+        , mFacePad(pad)
     {
         // The Vigor Tester opens on its first attribute with the turn that leads to it playing (the cover is reached
         // only by going back); the book opens on its cover with its own clip
@@ -337,24 +346,37 @@ namespace FalloutScript::SpecialScreen
             result.push_back({ std::move(shape), visible, std::move(texture) });
         };
 
+        // What the refresh of the executable does and nothing more (FalloutNV.exe 0x795E20 for the tester, 0x7CACD0 for the
+        // book; Mac round 12BA C2): a shape it never touches is not in the list
+        const bool spend = sum < mLimit;
         if (mKind == Kind::Tester)
         {
-            const int attribute = pageAttribute();
-            add("P1_Decrease_Btn:0", attribute >= 0 && canLower(attribute));
-            add("P1_Increase_Btn:0", attribute >= 0 && canRaise(attribute));
+            // The buttons that raise and lower the attribute of the panel have none to look at (-1): they are never
+            // touched, and show the picture of the file whatever the value is
             add("P1_PointsRemainDigit1:0", true, numberTexture(tens));
             add("P1_PointsRemainDigit2:0", true, numberTexture(ones));
-            // The lamps of the cabinet: the glow of a lamp is cut when the attribute is below its number
-            const int lit = mPage >= 1 && mPage <= attributeCount ? mValues[mPage - 1] : 0;
+            // The lamps of the cabinet: the glow of a lamp is cut when the attribute is below its number. The index has
+            // the attribute under the cursor of a pad (none without one).
+            const int shown = mPage >= 1 && mPage <= attributeCount ? mPage - 1 : (mPage == 8 && mPad ? mCursor : -1);
+            const int lit = shown >= 0 ? mValues[shown] : 0;
             for (int lamp = 1; lamp <= maximum; ++lamp)
             {
                 const std::string number = lamp < 10 ? "0" + std::to_string(lamp) : std::to_string(lamp);
                 for (const char* variant : { ":4", ":5" })
                     add("P1_PointVal_" + number + "_GLOW" + variant, lit >= lamp);
             }
+            // The faces: the right trigger is lit on the index while there are points to spend, and so is the button that
+            // leaves; the left one and the one that opens the cover never
+            add("P1_RT_Btn:0", true, faceTexture(mFacePad, mPage == 8 && spend ? "bbrton" : "bbrtoff"));
+            add("P1_LT_Btn:0", true, faceTexture(mFacePad, "bbltoff"));
+            add("LookInside_Btn:0", true, faceTexture(mFacePad, "bbrtoff"));
+            add("AllDone_Btn:0", true, faceTexture(mFacePad, spend ? "bbrton" : "bbrtoff"));
         }
         else
         {
+            // The digits of the points left: none when there are none, and the tens only from ten
+            const bool tensShown = left >= 10;
+            const bool onesShown = left > 0;
             for (int panel = 1; panel <= attributeCount; ++panel)
             {
                 const int attribute = panel - 1;
@@ -362,13 +384,19 @@ namespace FalloutScript::SpecialScreen
                 add(prefix + "_Decrease_Btn:0", canLower(attribute));
                 add(prefix + "_Increase_Btn:0", canRaise(attribute));
                 add(prefix + "_PointVal:0", true, numberTexture(mValues[attribute]));
-                add(prefix + "_PointsRemainDigit1:0", true, numberTexture(tens));
-                add(prefix + "_PointsRemainDigit2:0", true, numberTexture(ones));
+                add(prefix + "_PointsRemainDigit1:0", tensShown, numberTexture(tens));
+                add(prefix + "_PointsRemainDigit2:0", onesShown, numberTexture(ones));
                 add(prefix + "_Message:0", true, messageTexture(left));
+                add(prefix + "_RT_Btn:0", true, faceTexture(mFacePad, "bbrtoff"));
+                add(prefix + "_LT_Btn:0", true, faceTexture(mFacePad, "bbltoff"));
             }
-            add("Index_PointsRemainDigit1:0", true, numberTexture(tens));
-            add("Index_PointsRemainDigit2:0", true, numberTexture(ones));
+            add("LookInside_Btn:0", true, faceTexture(mFacePad, "bbrtoff"));
+            add("Index_PointsRemainDigit1:0", tensShown, numberTexture(tens));
+            add("Index_PointsRemainDigit2:0", onesShown, numberTexture(ones));
             add("Index_Message:0", true, messageTexture(left));
+            add("Index_LT_Btn:0", true, faceTexture(mFacePad, "bbltoff"));
+            // The button that leaves is lit while there are points to spend
+            add("AllDone_Btn:0", true, faceTexture(mFacePad, spend ? "bbxon" : "bbxoff"));
         }
 
         for (int attribute = 0; attribute < attributeCount; ++attribute)

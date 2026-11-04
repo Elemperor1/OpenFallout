@@ -167,6 +167,12 @@ namespace
         EXPECT_FALSE(LoadScreens::isForPlace(pictures[4], exterior));
         // A destination that was not set is no place
         EXPECT_FALSE(LoadScreens::isForPlace(pictures[2], LoadScreens::Destination()));
+        // A picture whose record names the interior cell in the indirect field is for it as well
+        Picture indirect;
+        indirect.mPlaces = { { 0, 0x500, 0, 0 } };
+        EXPECT_TRUE(LoadScreens::isForPlace(indirect, interior));
+        interior.mObject = 0x501;
+        EXPECT_FALSE(LoadScreens::isForPlace(indirect, interior));
         // A grid does not match in an interior
         LoadScreens::Destination other;
         other.mSet = true;

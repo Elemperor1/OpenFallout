@@ -17,6 +17,7 @@
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loaddoor.hpp>
+#include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
 #include <components/esm4/loadimod.hpp>
@@ -43,6 +44,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
+#include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -286,7 +288,15 @@ namespace OFScript
             if (mActors.isDead(actor))
                 verb = "sSearch";
             else if (type == ESM4::Npc::sRecordId && mCombat.target(actor) != mPlayer)
-                verb = "sTargetTypeTalk";
+            {
+                // A character that does not fight the player is talked to, or picked from when the player sneaks (the
+                // executable's activation type 1 for a living character while the player sneaks, FalloutNV.exe
+                // 0x579280 and 0x7772AC, Mac round 12BA G1)
+                const OFWorld::Ptr body = OFBase::Environment::get().getWorld()->getPlayerPtr();
+                const bool sneaking
+                    = !body.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(body);
+                verb = sneaking ? "sPickpocket" : "sTargetTypeTalk";
+            }
         }
         else
             return false;
@@ -298,7 +308,20 @@ namespace OFScript
         result.mVerb = verb;
         result.mStats = row;
         if (item)
+        {
             result.mCount = std::max(1, std::abs(target.getCellRef().getCount()));
+            // What belongs to someone else is stolen, not taken: the owner of the reference is a character that is not
+            // the player, or a faction the player is not in. The executable's test (FalloutNV.exe 0x579690) is longer
+            // and was not read to its end: the owner of the cell is not asked here
+            const FalloutScript::FormId reference = referenceOf(target);
+            const FalloutScript::FormId owner = reference != 0 ? mObjectState.owner(reference) : 0;
+            if (owner != 0 && owner != playerBase())
+            {
+                const bool faction = mStore.get<ESM4::Faction>().search(ESM::FormId::fromUint32(owner)) != nullptr;
+                if (!faction || mActors.factionRank(mPlayer, owner) < 0)
+                    result.mVerb = "sSteal";
+            }
+        }
 
         if (type == ESM4::Door::sRecordId || type == ESM4::Container::sRecordId)
         {
@@ -306,11 +329,18 @@ namespace OFScript
             if (reference != 0)
             {
                 result.mBroken = mLockBroken.count(reference) > 0;
+                const ESM4::Reference* record
+                    = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+                // A door the reference marks as inaccessible says so, and has no verb (FalloutNV.exe 0x57B460, Mac
+                // round 12AN B7: the flag 0x100 of the reference of a door)
+                if (type == ESM4::Door::sRecordId && record != nullptr && (record->mFlags & ESM4::Rec_NoAccess) != 0)
+                {
+                    result.mInaccessible = true;
+                    result.mVerb.clear();
+                }
                 if (mReferenceState.isLocked(reference))
                 {
                     result.mLocked = true;
-                    const ESM4::Reference* record
-                        = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
                     result.mHasKey = record != nullptr && !record->mKey.isZeroOrUnset()
                         && mActors.itemCount(mPlayer, record->mKey.toUint32()) > 0;
                     const Interaction::Setting setting
@@ -321,6 +351,18 @@ namespace OFScript
                     const Interaction::LockClass lockClass = Interaction::lockClass(level, setting);
                     result.mLockWord = Interaction::lockClassWord(lockClass);
                     result.mKeyOnly = lockClass == Interaction::LockClass::Impossible;
+                }
+                if (type == ESM4::Door::sRecordId)
+                {
+                    // A door the player cannot open is picked; one that stands open is closed (FalloutNV.exe
+                    // 0x7772AC, Mac round 12BA G1)
+                    settleDoor(target, reference);
+                    if (result.mInaccessible)
+                        result.mVerb.clear();
+                    else if (result.mLocked && !result.mHasKey)
+                        result.mVerb = "sPick";
+                    else if (!result.mLocked && mOpenStates.restsOpen(reference))
+                        result.mVerb = "sCloseButton";
                 }
             }
         }
@@ -958,7 +1000,7 @@ namespace OFScript
         const std::string refusal = restRefusalText(sleeping, bed);
         if (!refusal.empty())
         {
-            tellPlayer(refusal);
+            tellPlayer(refusal, 2);
             return;
         }
         const std::lock_guard lock(mInteractionMutex);
@@ -996,7 +1038,7 @@ namespace OFScript
         const std::string refusal = restRefusalText(sleeping, bed);
         if (!refusal.empty())
         {
-            tellPlayer(refusal);
+            tellPlayer(refusal, 2);
             return refusal;
         }
         if (sleeping && bed != 0)

@@ -53,12 +53,14 @@ namespace
         EXPECT_EQ(records[0].mIconMale, "a.dds");
     }
 
-    TEST(ESM4RepairListTest, armorWithoutEtypHasNoEquipmentType)
+    // The executable's record starts with the type 0 and the repair rule compares the two integers, so two pieces that
+    // both lack the field are of the same type (FalloutNV.exe 0x5129F0 and 0x47BB50, Mac round 12BB G3)
+    TEST(ESM4RepairListTest, armorWithoutEtypHasTheEquipmentTypeZero)
     {
         const std::string data = zString("EDID", "TestArmor") + zString("ICON", "a.dds");
         const std::vector<ESM4::Armor> records = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 5, data));
         ASSERT_EQ(records.size(), 1u);
-        EXPECT_EQ(records[0].mEquipmentType, -1);
+        EXPECT_EQ(records[0].mEquipmentType, 0);
     }
 
     TEST(ESM4RepairListTest, weaponReadsItsRepairList)

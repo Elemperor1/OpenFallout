@@ -326,7 +326,9 @@ local function specialPage(state, add, width)
             end, { onFocus = text, enabled = attribute.value < state.maximum and state.pointsLeft > 0 }), 28)))
     end
     add(descriptionBox(width, ''))
-    add(doneButton(finishPage))
+    -- The page is done with when every point is spent, as the file's screen has it (this page is also what a failed
+    -- screen of the model falls back to)
+    add(doneButton(finishPage, state.pointsLeft <= 0))
 end
 
 local function skillsPage(state, add, width)
@@ -796,8 +798,9 @@ local function sync()
     -- The game stands still while a screen is up and the engine hands onFrame a step of 0 then: the time of the frame is
     -- the real one (Mac round 12AZ E)
     local seconds = core.getRealFrameDuration()
-    if special.isOpen() then
-        special.update(seconds)
+    if special.isOpen() and special.update(seconds) then
+        -- The screen of the model failed: the page is shown by the stand-in
+        render()
     end
     if face.isOpen() then
         face.update(seconds or 0)
@@ -832,6 +835,7 @@ return {
         onFrame = sync,
         -- The buttons of a pad on the model screens of SPECIAL
         onControllerButtonPress = function(button)
+            special.noteDevice(true)
             -- A box over the screen has the pad, as it has the keys; so has the pause menu (Escape opens it over the
             -- Vigor Tester and the book, and the mode is the main menu then)
             if messageOpen() then
@@ -841,7 +845,11 @@ return {
                 special.pad(button)
             end
         end,
+        onMouseButtonPress = function()
+            special.noteDevice(false)
+        end,
         onKeyPress = function(key)
+            special.noteDevice(false)
             if messageOpen() then
                 return
             end
@@ -873,8 +881,9 @@ return {
             if key.code == input.KEY.Enter then
                 if shownPage == 'name' then
                     if chargen.setName(typed or '') ~= '' then finishPage() end
-                elseif shown and not doneReady() then
-                    -- The Done button of the file is dim until the points are spent or the tags are put: so is Enter
+                elseif (shown or shownPage == 'special') and not doneReady() then
+                    -- The Done button of the file is dim until the points are spent or the tags are put: so is Enter (and
+                    -- on the stand-in of the SPECIAL page)
                     return
                 else
                     finishPage()

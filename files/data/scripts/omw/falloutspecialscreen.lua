@@ -178,6 +178,13 @@ end
 
 -- The click of the player: which button of the model is under the pointer is asked of the scene, and the answer comes in
 -- a later frame
+-- The device the player used last, told by the script that sees every key and button (also while no screen is open)
+local lastPad = false
+
+function module.noteDevice(pad)
+    lastPad = pad
+end
+
 -- The device in use: a button of the pad puts the cursor on the index page, a key or the pointer takes it away again
 local function usePad(on)
     if open and open.padMode ~= on then
@@ -234,21 +241,25 @@ local function frame(seconds)
     answer()
 end
 
+-- A frame of the screen. True when the screen failed and was closed: the page is then to be shown again by the stand-in
+-- (ending the character here would leave the points unspent)
 function module.update(seconds)
-    if not open then return end
+    if not open then return false end
     local ok, problem = pcall(frame, seconds)
     if not ok then
-        -- A screen that fails is left with the character as it is, not kept
         print('The SPECIAL screen failed: ' .. tostring(problem))
         module.close()
-        chargen.finish()
+        module.failed = true
+        return true
     end
+    return false
 end
 
 -- Shows the screen for the page of core.chargen (`page.menu` says which of the two) with the character as it is now
 -- (`state`). False when this install cannot: the menu file or the scenes are not there, and the stand-in is to be shown.
 function module.start(page, state)
     if open then return true end
+    if module.failed then return false end
     local kind = page.menu == MENU_TESTER and 'tester' or (page.menu == MENU_BOOK and 'book' or nil)
     if not kind or core.specialScreen == nil or not sceneModule.available() then
         return false
@@ -267,9 +278,11 @@ function module.start(page, state)
     for i, attribute in ipairs(state.attributes) do
         values[i] = attribute.value
     end
+    -- The pictures of the buttons are chosen once, when the screen opens, by the device the player used last (the pad's
+    -- or the keyboard's)
     open = {
-        kind = kind, shown = shown, scene = scene, values = values, applied = {},
-        screen = core.specialScreen.new { kind = kind, limit = page.limit, values = values, pad = false },
+        kind = kind, shown = shown, scene = scene, values = values, applied = {}, padMode = lastPad,
+        screen = core.specialScreen.new { kind = kind, limit = page.limit, values = values, pad = lastPad },
     }
     trace(string.format('%s opened with %d points and the attributes %s, window %dx%d', kind, page.limit,
         table.concat(values, ' '), ui.screenSize().x, ui.screenSize().y))

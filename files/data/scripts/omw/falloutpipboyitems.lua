@@ -114,9 +114,8 @@ local function fillHeadline()
     setCard('IM_Headline_PlayerWGInfo', pairText(stats.weight, stats.maxWeight))
     setCard('IM_Headline_PlayerHPInfo', pairText(stats.health, stats.maxHealth))
     setCard('IM_Headline_PlayerDRInfo', number(math.floor(stats.armorRating)))
-    local threshold = stats.threshold or 0
-    setCard('IM_Headline_PlayerDTInfo',
-        threshold == math.floor(threshold) and string.format('%d', threshold) or string.format('%.1f', threshold))
+    -- (the threshold is written with one decimal whatever it is: FalloutNV.exe 0x782B73, "%1.1f")
+    setCard('IM_Headline_PlayerDTInfo', string.format('%.1f', stats.threshold or 0))
     setCard('IM_Headline_PlayerCapsInfo', stats.caps > limit and (string.format('%d', limit) .. '+') or number(stats.caps))
     -- The games have one of the two: resistance in Fallout 3, the threshold in New Vegas
     if shown:find('IM_Headline_PlayerDRInfo') then
