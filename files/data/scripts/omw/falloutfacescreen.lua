@@ -192,8 +192,15 @@ local function faceSliders(list)
     return made
 end
 
+-- The colours of the sixteen hair colour presets when no data has the settings iHairColor00 to iHairColor15 (neither game's
+-- data does: these are the executable's own, 0x00BBGGRR, the same in both games, round 12BB C1)
+local DEFAULT_COLOURS = {
+    [0] = 0x7E7E7E, 0x373739, 0x1F1F21, 0x41727A, 0x476C85, 0x36495C, 0x33474D, 0x2B2F4D, 0x2D3E66, 0x416A81, 0x0F436A,
+    0x1E1F40, 0x2D2322, 0x222C31, 0x6E6E6E, 0x52667C,
+}
+
 local function colourOf(preset)
-    local packed = pipboy.setting(string.format('iHairColor%02d', preset))
+    local packed = pipboy.setting(string.format('iHairColor%02d', preset)) or DEFAULT_COLOURS[preset]
     if packed == nil then return nil end
     packed = math.floor(packed)
     return packed % 256, math.floor(packed / 256) % 256, math.floor(packed / 65536) % 256

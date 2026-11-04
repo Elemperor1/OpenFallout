@@ -345,7 +345,8 @@ of the lists are children of the panel; the menu's own `user0` is the number of 
 the list it is in. The lists (twenty, in the executable's order): 0 sex (two rows), 1 race (a row for each playable race),
 2 face (the preset slider, the link `Customize`, the row `Randomize`, the age slider), 3 hair (links: hair style, hair colour,
 facial hair for a man), 4 customize (links: shape, tone, eye colour), 5 hair style (a row for each hair of the race and sex),
-6 hair colour (a preset slider 0 to 15 and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
+6 hair colour (a preset slider 0 to 15, whose colours are the settings `iHairColor00` to `iHairColor15` and else the
+executable's own, and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
 10 to 18 the shape sliders (general, forehead, brow, eyes, nose, mouth, cheeks, jaw, chin) and 19 the tone sliders. A link row
 is its list's name followed by ` >`. The first four lists are the tabs (`1. Sex`, `2. Race`, `3. Face`, `4. Hair`, numbered only
 for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` followed by the word for what is being done (`sRSMCharacter` for a new
@@ -395,8 +396,8 @@ race's own for the sex, and only when the race has none by the first of its hair
 
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
 12BB F). Not done: the keys of the pad, the scrolling of the long lists by the executable's rules (one row's height a click, rows
-cut by the window hidden), the colour presets of the hair, the hair's tint and length and the head's size by the executable's
-formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
+cut by the window hidden), the hair's length (a vertex morph of the hair model by the record's length) and the head's size by the
+executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the executable's loading code).
 
 ### The level-up screen
 
