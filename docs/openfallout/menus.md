@@ -280,6 +280,47 @@ counter is never hidden. The executable's own limit is `iTraitMenuMaxNumTraits` 
 two) and its list is every perk with the trait flag in the order the data handler has them (the engine lists them by name),
 with the conditions of the perk checked for the player (the engine does not check them).
 
+*The Vigor Tester and the SPECIAL book (Mac rounds 12AW S5 and S6 and 12AY R1, FalloutNV.exe 0x7915F0 and 0x7C5FC0).* When a
+script asks for SPECIAL with `ShowLoveTesterMenu` (menu 1074; `VCG01VigorTesterSCRIPT`, 40 points, at Doc Mitchell's) or
+`ShowSPECIALBookMenu` (menu 1060; Fallout 3's `CG01SpecialBookSCRIPT`, 40 points), the screen is not a menu file: the files
+`love_tester_menu.xml` and `specialbookmenu.xml` hold a hot rectangle over the whole window (id 5, which takes every click) and a
+few images the pad is tied to, and everything that is seen is a model that the executable turns page by page with its sequences:
+`Meshes\architecture\Goodsprings\NV_VitoMaticVigorTester_Activate.NIF` with its `_Cabinet.NIF`, or `Meshes\Terminals\Babybook02.NIF`.
+`falloutspecialscreen.lua` draws them on the scene of `core.menuScene` (`keepShapes`: the loader keeps the nodes of these files
+apart, so that each button and digit can be named), with the camera `Surgery3DCamera` at (0, 0, 1) looking along -Z and a frustum
+1.810 wide on its near plane (the tester) or 0.2925 (the book, a narrow lens) and as high as the window is; the tester's two
+models are turned by the matrix of rows (-1, 0, 0), (0, -0.12533, 0.99212), (0, 0.99212, 0.12533) and put at (0, -85, -85) (-75 in a
+window 640 wide or less), the book's at (0, 0, -60) at scale 0.05 with a quarter turn about X and the light of its file at
+(-7.7, -139.9, 92.1). The rules are `components/falloutscript/specialscreen` (`core.specialScreen`, tested):
+
+- The pages: 0 the cover (a button), 1 to 7 one attribute each, 8 the index of all seven with its Done button, and the book has a
+  ninth with nothing on it. The tester opens on page 1 (its clip `Forward` plays and the page-turn sound comes with it; the cover is
+  reached only by going back); the book opens on its cover. A turn plays the clip of the page it goes to (forward: Forward, Backward,
+  Left, Right, FastForward, FastBackward, FastLeft, FastRight, and TurnLeft for the book's ninth; back: AimUp, Aim, Holster,
+  JumpLand, JumpLoop, JumpStart, TurnRight, TurnLeft, and Attack2 and Attack1 first for the book) from its start, 1.3 s for the
+  tester's Forward and 1.2667 for the others, 0.5 and 0.4667 for the book's. A page turns only when the clip has reached its end
+  (the cover is always ready). The right trigger on the tester's last page is its exit.
+- The points: the attributes come to the script's limit, each between 1 and 10; the screen writes the attribute of the player at
+  once on each change (no cancel). A button to raise one gives the sound of a rise (`OBJBookSpecialNumber`) in the tester whenever
+  the attribute is below 10, even with no point to give, and a key gives nothing then; the book sounds only when something
+  changed, and with the same sound for lowering (the tester's is `OBJBookSpecialNumberDown`). Done is allowed when the total is
+  the limit exactly (the tester then plays `OBJBookSpecialNumberFinished`, the book is silent); else `UIActivateNothing` and the
+  screen stays. Nothing else closes it: Escape opens the pause menu over it, Tab does nothing, a click that misses does nothing.
+- The pictures are textures put on named shapes: the points left as two digits (`Textures\terminals\BBNumber0..10.dds`, the first
+  digit the tens, 9 at most, 0 when the points are over), the value of each attribute on the index and (book) on its page, the
+  book's message by the points left (`english\BBMessage03` for more than one, `04` for one, `02` for none), and the lamps of the
+  tester's cabinet (`P1_PointVal_NN_GLOW:4/:5` shown while the value reaches NN). The buttons to lower and raise show only while
+  they can act. Keys: Left and Right turn the pages, Up and Down raise and lower (the tester also takes + = and - _), A leaves; a
+  pad's right and left raise and lower, up and down move the index cursor, the shoulders turn pages, X leaves.
+- A click casts a ray from the camera through the pointer (`core.menuScene.pick`) at the buttons of the page; the first it meets
+  does what its button does.
+
+Not verified in the running game (written from the executables only): the names of the shapes of the index (`Index_<Attribute>`
+with the attribute in full is a guess), which shapes the book's messages and digits sit on, the light of the tester (the games' is
+a point light at the scene's origin; a light from the camera stands for it), the book's turn about X, the faces of the buttons
+(`BBRTOn`, `BBLTOff` and the others are left as the model has them), and the mode of the pad's index cursor (not wired). A game
+that lacks the model files or the menu file keeps the stand-in of the points of SPECIAL.
+
 ### The level-up screen
 
 `falloutlevelup.lua` fills `levelup_menu.xml` (a module of `falloutpipboy.lua`, which opens it when the engine hands out a

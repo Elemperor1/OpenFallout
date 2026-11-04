@@ -32,6 +32,7 @@
 #include "interactbindings.hpp"
 #include "landbindings.hpp"
 #include "lockpickbindings.hpp"
+#include "specialscreenbindings.hpp"
 #include "luaevents.hpp"
 #include "magicbindings.hpp"
 #include "menubindings.hpp"
@@ -138,6 +139,8 @@ namespace OFLua
                 "openfallout_core_messagebox", [context]() { return initCoreMessageBoxBindings(context); });
             api["lockpick"] = context.cachePackage(
                 "openfallout_core_lockpick", [context]() { return initCoreLockpickBindings(context); });
+            api["specialScreen"] = context.cachePackage("openfallout_core_specialscreen",
+                [context]() { return initCoreSpecialScreenBindings(context); });
             api["menuScene"] = context.cachePackage(
                 "openfallout_core_menuscene", [context]() { return initCoreMenuSceneBindings(context); });
             api["combat"] = context.cachePackage(

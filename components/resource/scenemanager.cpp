@@ -1077,7 +1077,12 @@ namespace Resource
                 optimizer.setSharedStateManager(mSharedStateManager, &mSharedStateMutex);
                 optimizer.setIsOperationPermissibleForObjectCallback(new CanOptimizeCallback);
 
-                optimizer.optimize(loaded, getMeshOptimizationOptions(*mVFS, path));
+                unsigned int options = getMeshOptimizationOptions(*mVFS, path);
+                if (keepsShapes(path))
+                    options &= ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
+                        | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES
+                        | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
+                optimizer.optimize(loaded, options);
             }
             else
                 shareState(loaded);
@@ -1090,6 +1095,18 @@ namespace Resource
             mCache->addEntryToObjectCache(path.value(), loaded);
             return loaded;
         }
+    }
+
+    void SceneManager::keepShapes(VFS::Path::NormalizedView path)
+    {
+        const std::lock_guard lock(mKeepShapesMutex);
+        mKeepShapes.emplace(path.value());
+    }
+
+    bool SceneManager::keepsShapes(VFS::Path::NormalizedView path) const
+    {
+        const std::lock_guard lock(mKeepShapesMutex);
+        return mKeepShapes.find(path.value()) != mKeepShapes.end();
     }
 
     void SceneManager::setSpeedTree(VFS::Path::NormalizedView model, SpeedTreeStandIn tree)

@@ -1759,6 +1759,105 @@
 -- @field #string name
 
 ---
+-- @{#SpecialScreen}: the rules of the two screens on which the player sets the seven attributes by turning the pages of a
+-- model, the Vigor Tester of New Vegas and the SPECIAL book (FalloutNV.exe 0x7915F0 and 0x7C5FC0). The script draws the
+-- model (`core.menuScene`), gives the time and what the player does, plays the sounds and writes the attributes it gets
+-- back. The attributes are numbered 1 to 7 in the order of SPECIAL. Not available in load scripts.
+-- @field [parent=#core] #SpecialScreen specialScreen
+
+---
+-- @type SpecialScreen
+
+---
+-- A screen.
+-- @function [parent=#SpecialScreen] new
+-- @param #table options `kind` ("tester" or "book"), `limit` (the points that the attributes come to; 35 by default), `values`
+-- (a list of the seven attributes when it opens) and `pad` (a pad is the device in use).
+-- @return #SpecialScreenObject
+
+---
+-- @type SpecialScreenObject
+
+---
+-- The clip of the model advances.
+-- @function [parent=#SpecialScreenObject] update
+-- @param self
+-- @param #number seconds
+
+---
+-- Where the model is: `page` (0 the cover, 1 to 7 an attribute each, 8 the index, 9 the book's last), `sequence` and
+-- `time` in it, `ready` (a page can be turned), `total`, `left`, `limit` and `cursor` (the row of the index the pad is on).
+-- @function [parent=#SpecialScreenObject] view
+-- @param self
+-- @return #table
+
+---
+-- The sound that comes with the opening ("" for none), and the value of an attribute.
+-- @function [parent=#SpecialScreenObject] opening
+-- @param self
+-- @return #string
+
+---
+-- @function [parent=#SpecialScreenObject] value
+-- @param self
+-- @param #number attribute
+-- @return #number
+
+---
+-- The names of the shapes of the model that a pointer can find on this page.
+-- @function [parent=#SpecialScreenObject] buttons
+-- @param self
+-- @return #list<#string>
+
+---
+-- Every shape the screen decides for: a list of `shape`, `visible` and `texture` ("" for the model's own).
+-- @function [parent=#SpecialScreenObject] shapes
+-- @param self
+-- @return #list<#table>
+
+---
+-- What the player does. Each answers a table with `sound` (an editor id) when one is played, `attribute` and `value` when an
+-- attribute changed (write it), and `close` when the player is done. `increase` and `decrease` are for a button, or with
+-- `fromKey` for a key (which does nothing when the attribute cannot move); `press` is a shape the pointer found.
+-- @function [parent=#SpecialScreenObject] next
+-- @param self
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] previous
+-- @param self
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] increase
+-- @param self
+-- @param #boolean fromKey
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] decrease
+-- @param self
+-- @param #boolean fromKey
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] exit
+-- @param self
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] moveCursor
+-- @param self
+-- @param #number delta
+-- @return #table
+
+---
+-- @function [parent=#SpecialScreenObject] press
+-- @param self
+-- @param #string shape
+-- @return #table
+
+---
 -- @{#Lockpick}: the game of picking one lock, as the lockpicking screen of Fallout 3 and New Vegas plays it (the pick
 -- moves along a meter and the lock turns as far as the place of the pick allows). The script gives the time and what
 -- the player does, plays the sounds of the events, and draws the lock and pick by the numbers it gets back. Not
@@ -2177,11 +2276,14 @@
 -- @param #number a
 
 ---
--- Puts the model of the file `path` in the scene as `model`.
+-- Puts the model of the file `path` in the scene as `model`. With `keepShapes` the engine keeps the nodes of the
+-- file apart (it does not merge shapes or fold nodes into one another), so that each shape can be named by
+-- `setTexture`, `setShapeVisible` and `pick`; the file must not have been loaded without it before.
 -- @function [parent=#MenuScene] addModel
 -- @param #string name
 -- @param #string model
 -- @param #string path
+-- @param #boolean keepShapes
 
 ---
 -- @function [parent=#MenuScene] removeModel
@@ -2231,6 +2333,32 @@
 -- @param #string model
 -- @param #string shape
 -- @param #string path
+
+---
+-- Shows or hides one shape of the model (the node of its file, by name; what is under it goes with it).
+-- @function [parent=#MenuScene] setShapeVisible
+-- @param #string name
+-- @param #string model
+-- @param #string shape
+-- @param #boolean visible
+
+---
+-- Asks which of the shapes the picture shows at a point: `x` across and `y` down, each from 0 to 1 over the whole picture.
+-- The shapes are a list of names; the ray from the camera through the point is cast and the first of them that it
+-- meets, nearest first, is the answer (shapes that are hidden are not met). The answer comes in the frame that follows:
+-- read it with `picked`.
+-- @function [parent=#MenuScene] pick
+-- @param #string name
+-- @param #number x
+-- @param #number y
+-- @param #list<#string> shapes
+
+---
+-- The answer of the last `pick` of the scene: the name of the shape it met ("" when none) and how many picks of the scene
+-- have been answered (a script that asked for one waits until the number grows).
+-- @function [parent=#MenuScene] picked
+-- @param #string name
+-- @return #string, #number
 
 ---
 -- Puts the model at `time` seconds of its sequence ("Forward", "Backward", "Left"): the nodes the sequence moves are

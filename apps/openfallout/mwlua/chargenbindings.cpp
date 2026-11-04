@@ -174,6 +174,10 @@ namespace OFLua
             sol::table result(lua, sol::create);
             result["page"] = pageName(*page);
             result["serial"] = chargen.serial();
+            // The number of the menu the screen stands for (1060 the SPECIAL book, 1074 the Vigor Tester, 1048 the screen
+            // of points and skills) and the points the attributes have to come to
+            result["menu"] = chargen.menu();
+            result["limit"] = chargen.pointTotal();
             sol::table values(lua, sol::create);
             int index = 1;
             for (const double value : chargen.values())
