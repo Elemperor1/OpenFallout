@@ -5,6 +5,7 @@
 
 #include <components/myguiplatform/myguirendermanager.hpp>
 
+#include "../mwrender/facepreview.hpp"
 #include "../mwrender/menuscene.hpp"
 
 namespace OFGui
@@ -37,8 +38,20 @@ namespace OFGui
         return it == mScenes.end() ? nullptr : it->second.get();
     }
 
+    OFRender::FacePreview* MenuScenes::head(const std::string& name)
+    {
+        OFRender::MenuScene* scene = find(name);
+        if (scene == nullptr)
+            return nullptr;
+        std::unique_ptr<OFRender::FacePreview>& head = mHeads[name];
+        if (head == nullptr)
+            head = std::make_unique<OFRender::FacePreview>(*scene, "head", mResourceSystem);
+        return head.get();
+    }
+
     void MenuScenes::destroy(const std::string& name)
     {
+        mHeads.erase(name);
         const auto it = mScenes.find(name);
         if (it == mScenes.end())
             return;
@@ -48,6 +61,7 @@ namespace OFGui
 
     void MenuScenes::clear()
     {
+        mHeads.clear();
         for (auto& [name, scene] : mScenes)
             scene->stop();
         mScenes.clear();

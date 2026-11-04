@@ -174,12 +174,15 @@ namespace OFRender
         {
             mNear = nearPlane;
             mFar = farPlane;
-            // The picture is centred on the camera's axis in all of the game's menu scenes that matter; an off-centre
-            // frustum is made centred by its height and width
             const float frustumHeight = top - bottom;
             const float widthOnNear = right - left;
             mFovYDegrees = osg::RadiansToDegrees(2.f * std::atan(0.5f * frustumHeight / nearPlane));
             mAspectRatio = widthOnNear / frustumHeight;
+            // An off-centre frustum puts the camera's axis away from the middle of the picture: the third row of the
+            // matrix carries the shift of the window on the near plane, as that of a frustum of OpenGL does (the
+            // face screen puts the head in the middle of its hotrect with it)
+            mShiftX = widthOnNear != 0.f ? (right + left) / widthOnNear : 0.f;
+            mShiftY = frustumHeight != 0.f ? (top + bottom) / frustumHeight : 0.f;
             updateProjection();
         }
 
@@ -201,12 +204,16 @@ namespace OFRender
                     SceneUtil::getReversedZProjectionMatrixAsPerspective(mFovYDegrees, mAspectRatio, mNear, mFar));
             else
                 mProjection = osg::Matrixf::perspective(mFovYDegrees, mAspectRatio, mNear, mFar);
+            mProjection(2, 0) = mShiftX;
+            mProjection(2, 1) = mShiftY;
             mProjection = upsideDown(mProjection);
             mProjectionUniform->set(mProjection);
         }
 
         float mFovYDegrees = 45.f;
         float mAspectRatio = 1.f;
+        float mShiftX = 0.f;
+        float mShiftY = 0.f;
         float mNear = 1.f;
         float mFar = 10000.f;
         osg::Matrixf mProjection;
@@ -424,6 +431,26 @@ namespace OFRender
         SetUpBlendVisitor blend;
         instance->accept(blend);
 
+        mModels->addChild(model->mRoot);
+        mModelsByName[name] = std::move(model);
+        return true;
+    }
+
+    bool MenuScene::addNode(const std::string& name, osg::ref_ptr<osg::Node> node)
+    {
+        removeModel(name);
+        if (node == nullptr)
+            return false;
+
+        auto model = std::make_unique<Model>();
+        model->mRoot = new osg::MatrixTransform;
+        model->mRoot->setName(name);
+        model->mRoot->addCullCallback(new SceneUtil::LightListCallback);
+        // The shader of the models works with premultiplied alpha, as addModel makes it for a model
+        SetUpBlendVisitor blend;
+        node->accept(blend);
+        model->mRoot->addChild(node);
+        model->mInstance = node;
         mModels->addChild(model->mRoot);
         mModelsByName[name] = std::move(model);
         return true;

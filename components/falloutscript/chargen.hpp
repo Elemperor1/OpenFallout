@@ -11,11 +11,18 @@
 #include <string_view>
 #include <vector>
 
+#include "facelook.hpp"
 #include "script.hpp"
 #include "vanillacommands.hpp"
 
 namespace FalloutScript
 {
+    class SaveWriter;
+    class SaveReader;
+
+    /// The version of the section of a save that holds the sex, race and look of the player
+    constexpr std::uint32_t chargenSectionVersion = 1;
+
     class Interpreter;
 
     /// The screens that making a character goes through
@@ -33,6 +40,10 @@ namespace FalloutScript
     namespace ChargenMenu
     {
         constexpr int raceSexMenu = 1036;
+        /// The modes of the menu of the sex, race and face that its commands give as the screen's value (a new
+        /// character has no value: the first mode)
+        constexpr double raceSexBarber = 2.0;
+        constexpr double raceSexSurgeon = 3.0;
         constexpr int chargenMenu = 1048;
         constexpr int textEditMenu = 1051;
         constexpr int specialBookMenu = 1060;
@@ -144,6 +155,11 @@ namespace FalloutScript
         void setRace(FormId race);
         FormId race() const;
 
+        /// The whole look the player picked (the screen of the sex, race and face), none until the screen has set it.
+        /// The sex and race of it are the ones above.
+        void setLook(const FaceLook& look);
+        std::optional<FaceLook> look() const;
+
         /// The attributes by their numbers as actor values (5 to 11); a number that is none gives 0
         int attribute(int number) const;
         /// Starts the attributes from the ones the player has now (each is kept within the limits)
@@ -184,6 +200,11 @@ namespace FalloutScript
         std::vector<FormId> givenTraits() const;
         void setGivenTraits(std::vector<FormId> traits);
 
+        /// What the player picked of its sex, race and look, for a save (the name, the points and the tags are kept
+        /// elsewhere: in the actor values, the perks and the record of the player)
+        void write(SaveWriter& out) const;
+        void read(SaveReader& in, std::uint32_t version);
+
     private:
         /// The screen at the front has just become the one the player is on: it sets what it gives out
         void activate();
@@ -218,6 +239,7 @@ namespace FalloutScript
         std::string mName;
         std::optional<bool> mFemale;
         FormId mRace = 0;
+        std::optional<FaceLook> mLook;
         std::array<int, attributeCount> mAttributes;
         std::vector<int> mTagSlots; // the tagged skills in their places, 0 for a place with none
         std::vector<FormId> mTraits;
@@ -227,7 +249,7 @@ namespace FalloutScript
     /// Gives the commands that open the screens of the making of a character to the interpreter: ShowRaceMenu,
     /// GetPlayerName (which asks for the name, as ShowNameMenu does), SexChange, SetSPECIALPoints, AddSPECIALPoints,
     /// SetTagSkills, AddTagSkills, SetPlayerTagSkill, IsPlayerTagSkill, ShowNameMenu, ShowSPECIALBookMenu and
-    /// ShowLoveTesterMenu (and their Params), ShowChargenMenu (and its Params and ModValues), ShowTraitMenu and
+    /// ShowBarberMenu, ShowPlasticSurgeonMenu, ShowLoveTesterMenu (and their Params), ShowChargenMenu (and its Params and ModValues), ShowTraitMenu and
     /// ShowTraitSelectMenu, and SetInChargen and GetInCharGen. The screens of a menu that the game does not have are
     /// left out (traits in Fallout 3). `opened` is called after a menu is asked for, so that the host can start the
     /// screens from the state of the game. Those commands that the command table does not have are left out.

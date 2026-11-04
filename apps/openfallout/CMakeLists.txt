@@ -20,7 +20,7 @@ source_group(apps/openfallout FILES main.cpp androidmain.cpp ${OPENFALLOUT_SOURC
 add_openfallout_dir (mwrender
     actors objects renderingmanager animation rotatecontroller sky skyutil skyfallback npcanimation esm4npcanimation esm4creatureanimation falloutactoranimation falloutanimation falloutface vismask
     creatureanimation effectmanager util renderinginterface pathgrid rendermode weaponanimation screenshotmanager
-    bulletdebugdraw globalmap characterpreview menuscene camera localmap water waterframes waterlook terrainstorage ripplesimulation
+    bulletdebugdraw globalmap characterpreview menuscene facepreview camera localmap water waterframes waterlook terrainstorage ripplesimulation
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging falloutlod groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass opaqueblit waterawaretransparentbin precipitationocclusion ripples
     actorutil distortion animationpriority bonegroup blendmask animblendcontroller
@@ -55,7 +55,7 @@ add_openfallout_dir (mwscript
     locals scriptmanagerimp compilercontext interpretercontext cellextensions miscextensions
     guiextensions soundextensions skyextensions statsextensions containerextensions
     aiextensions controlextensions extensions globalscripts ref dialogueextensions
-    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutcrafting falloutbarter falloutrepair falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave
+    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutcrafting falloutbarter falloutrepair falloutlook falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave
     )
 
 add_openfallout_dir (mwlua

@@ -3,6 +3,7 @@
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/extendercommands.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/savestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -214,6 +215,30 @@ namespace
         EXPECT_EQ(chargen.race(), 0u);
     }
 
+    TEST(FalloutScriptChargenTest, the_look_the_player_picked_keeps_step_with_the_sex_and_race)
+    {
+        Chargen chargen;
+        EXPECT_FALSE(chargen.look().has_value());
+        FalloutScript::FaceLook look;
+        look.mRace = 0x19;
+        look.mFemale = true;
+        look.mHair = 0x44;
+        look.mShape[3] = 0.5f;
+        chargen.setLook(look);
+        EXPECT_EQ(chargen.female(), std::optional<bool>(true));
+        EXPECT_EQ(chargen.race(), 0x19u);
+        ASSERT_TRUE(chargen.look().has_value());
+        EXPECT_EQ(chargen.look()->mHair, 0x44u);
+        EXPECT_FLOAT_EQ(chargen.look()->mShape[3], 0.5f);
+        // The sex and race that a script sets are in the look too
+        chargen.setFemale(false);
+        chargen.setRace(0x20);
+        EXPECT_FALSE(chargen.look()->mFemale);
+        EXPECT_EQ(chargen.look()->mRace, 0x20u);
+        chargen.clear();
+        EXPECT_FALSE(chargen.look().has_value());
+    }
+
     TEST(FalloutScriptChargenTest, the_screens_of_a_menu_come_one_after_the_other)
     {
         Chargen chargen;
@@ -407,6 +432,8 @@ namespace
     constexpr FormId crate = 0x01000100;
     constexpr FormId scriptOfCrates = 0x01002000;
     constexpr std::uint16_t OpShowRaceMenu = 0x10DA;
+    constexpr std::uint16_t OpShowBarberMenu = 0x11F1;
+    constexpr std::uint16_t OpShowPlasticSurgeonMenu = 0x11F2;
     constexpr std::uint16_t OpTtwShowGeneProjector = 0x3800;
     constexpr std::uint16_t OpShowNameMenu = 0x10DC;
     constexpr std::uint16_t OpGetPlayerName = 0x11E1;
@@ -504,6 +531,28 @@ namespace
 
         EXPECT_FALSE(setup.mChargen.menuOpen());
         EXPECT_EQ(setup.mInterpreter.takeMissingSummary(), "0x3800 (script extender) 1");
+    }
+
+    TEST(FalloutScriptChargenCommandsTest, the_barber_and_the_surgeon_open_the_face_menu_in_their_own_modes)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpShowBarberMenu, arguments(0))
+            + command(OpShowPlasticSurgeonMenu, arguments(0)) + command(OpShowRaceMenu, arguments(0)) + end());
+        setup.run(builder);
+
+        EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Race));
+        EXPECT_EQ(setup.mChargen.menu(), 1036);
+        EXPECT_EQ(setup.mChargen.values(), std::vector<double>{ 2.0 });
+        setup.mChargen.finishPage();
+        EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Race));
+        EXPECT_EQ(setup.mChargen.values(), std::vector<double>{ 3.0 });
+        setup.mChargen.finishPage();
+        EXPECT_EQ(setup.mChargen.page(), std::optional<ChargenPage>(ChargenPage::Race));
+        EXPECT_TRUE(setup.mChargen.values().empty());
+        setup.mChargen.finishPage();
+        EXPECT_FALSE(setup.mChargen.menuOpen());
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
     }
 
     TEST(FalloutScriptChargenCommandsTest, the_name_is_asked_for_after_the_race_as_the_scripts_of_the_games_do)
@@ -757,5 +806,48 @@ namespace
         EXPECT_EQ(setup.mObjects.instance(crate)->variable(2), 1);
         EXPECT_EQ(setup.mObjects.instance(crate)->variable(3), 0);
         EXPECT_FALSE(setup.mChargen.inChargen());
+    }
+
+    TEST(FalloutScriptChargenTest, the_sex_race_and_look_are_saved_and_come_back)
+    {
+        Chargen chargen(Game::NewVegas);
+        FalloutScript::FaceLook look;
+        look.mRace = 0x19;
+        look.mFemale = true;
+        look.mHair = 0x44;
+        look.mHairLength = 0.25f;
+        look.mEyes = 0x55;
+        look.mHairColour = { 10, 20, 30 };
+        look.mHeadParts = { 7, 9 };
+        look.mShape[3] = 1.5f;
+        look.mAsymmetric[29] = -0.5f;
+        look.mTone[49] = 2.f;
+        chargen.setLook(look);
+
+        FalloutScript::SaveWriter out;
+        chargen.write(out);
+        Chargen loaded(Game::NewVegas);
+        FalloutScript::SaveReader in(out.bytes());
+        loaded.read(in, FalloutScript::chargenSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(loaded.female(), std::optional<bool>(true));
+        EXPECT_EQ(loaded.race(), 0x19u);
+        ASSERT_TRUE(loaded.look().has_value());
+        EXPECT_EQ(*loaded.look(), look);
+    }
+
+    TEST(FalloutScriptChargenTest, a_character_that_picked_nothing_saves_nothing_but_the_flags)
+    {
+        Chargen chargen(Game::NewVegas);
+        FalloutScript::SaveWriter out;
+        chargen.write(out);
+        Chargen loaded(Game::NewVegas);
+        loaded.setFemale(true);
+        FalloutScript::SaveReader in(out.bytes());
+        loaded.read(in, FalloutScript::chargenSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_FALSE(loaded.female().has_value());
+        EXPECT_EQ(loaded.race(), 0u);
+        EXPECT_FALSE(loaded.look().has_value());
     }
 }

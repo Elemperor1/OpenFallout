@@ -147,6 +147,10 @@ namespace OFClass
         static const ESM4::Npc* getTraitsRecord(const OFWorld::Ptr& ptr);
         static const ESM4::Race* getRace(const OFWorld::Ptr& ptr);
         static bool isFemale(const OFWorld::Ptr& ptr);
+        /// The character looks as `traits` say (its race, sex, hair, eyes, head parts and face numbers) in place of the
+        /// record it was made from, and wears nothing: what the screen of the face shows of the player, whose own
+        /// record is not what the player picked. `traits` must outlive the character.
+        static void setLook(const OFWorld::Ptr& ptr, const ESM4::Npc& traits);
         /// The half extents of the body that the character is solid as (the cylinder of its physics body), from the
         /// height of its race
         static osg::Vec3f getBodyHalfExtents(const OFWorld::Ptr& ptr);

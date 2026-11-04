@@ -1,5 +1,7 @@
 #include "chargen.hpp"
 
+#include "savestate.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -93,6 +95,7 @@ namespace FalloutScript
         mName.clear();
         mFemale.reset();
         mRace = 0;
+        mLook.reset();
         mAttributes.fill(5);
         mTagSlots.clear();
         mTraits.clear();
@@ -287,6 +290,8 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mFemale = female;
+        if (mLook)
+            mLook->mFemale = female;
     }
 
     std::optional<bool> Chargen::female() const
@@ -299,12 +304,29 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mRace = race;
+        if (mLook)
+            mLook->mRace = race;
     }
 
     FormId Chargen::race() const
     {
         const std::lock_guard lock(mMutex);
         return mRace;
+    }
+
+    void Chargen::setLook(const FaceLook& look)
+    {
+        const std::lock_guard lock(mMutex);
+        mLook = look;
+        mFemale = look.mFemale;
+        if (look.mRace != 0)
+            mRace = look.mRace;
+    }
+
+    std::optional<FaceLook> Chargen::look() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mLook;
     }
 
     int Chargen::attribute(int number) const
@@ -505,6 +527,83 @@ namespace FalloutScript
         mGivenTraits = std::move(traits);
     }
 
+    void Chargen::write(SaveWriter& out) const
+    {
+        const std::lock_guard lock(mMutex);
+        out.boolean(mFemale.has_value());
+        out.boolean(mFemale.value_or(false));
+        out.form(mRace);
+        out.boolean(mLook.has_value());
+        if (!mLook)
+            return;
+        const FaceLook& look = *mLook;
+        out.form(look.mRace);
+        out.boolean(look.mFemale);
+        out.form(look.mHair);
+        out.f32(look.mHairLength);
+        out.form(look.mEyes);
+        for (const std::uint8_t channel : look.mHairColour)
+            out.u8(channel);
+        out.count(look.mHeadParts.size());
+        for (const FormId part : look.mHeadParts)
+            out.form(part);
+        for (const std::vector<float>* numbers : { &look.mShape, &look.mAsymmetric, &look.mTone })
+        {
+            out.count(numbers->size());
+            for (const float number : *numbers)
+                out.f32(number);
+        }
+    }
+
+    void Chargen::read(SaveReader& in, std::uint32_t)
+    {
+        std::optional<bool> female;
+        const bool hasFemale = in.boolean();
+        const bool femaleValue = in.boolean();
+        if (hasFemale)
+            female = femaleValue;
+        // A form of a plugin that is not loaded any more is none: the record's own race, hair or eyes show again
+        const FormId race = in.form().value_or(0);
+        std::optional<FaceLook> look;
+        if (in.boolean())
+        {
+            FaceLook read;
+            read.mRace = in.form().value_or(0);
+            read.mFemale = in.boolean();
+            read.mHair = in.form().value_or(0);
+            read.mHairLength = in.f32();
+            read.mEyes = in.form().value_or(0);
+            for (std::uint8_t& channel : read.mHairColour)
+                channel = in.u8();
+            const std::size_t parts = in.count(4);
+            for (std::size_t i = 0; i < parts; ++i)
+                if (const std::optional<FormId> part = in.form(); part && *part != 0)
+                    read.mHeadParts.push_back(*part);
+            // The numbers of the face are as many as the face has; what a save has beyond is not kept
+            const std::array<std::pair<std::vector<float>*, std::size_t>, 3> lists = { {
+                { &read.mShape, static_cast<std::size_t>(FaceLook::shapeCount) },
+                { &read.mAsymmetric, static_cast<std::size_t>(FaceLook::asymmetricCount) },
+                { &read.mTone, static_cast<std::size_t>(FaceLook::toneCount) },
+            } };
+            for (const auto& [numbers, size] : lists)
+            {
+                const std::size_t saved = in.count(4);
+                numbers->assign(size, 0.f);
+                for (std::size_t i = 0; i < saved; ++i)
+                {
+                    const float number = in.f32();
+                    if (i < size)
+                        (*numbers)[i] = number;
+                }
+            }
+            look = std::move(read);
+        }
+        const std::lock_guard lock(mMutex);
+        mFemale = female;
+        mRace = race;
+        mLook = std::move(look);
+    }
+
     void addChargenCommands(Interpreter& interpreter, Chargen& chargen, std::function<void()> opened)
     {
         using namespace ChargenMenu;
@@ -540,6 +639,19 @@ namespace FalloutScript
         interpreter.setHandler("GetPlayerName", open({ { ChargenPage::Name }, textEditMenu }));
         interpreter.setHandler("ShowNameMenu", open({ { ChargenPage::Name }, textEditMenu }));
         interpreter.setHandler("ShowRaceMenu", open({ { ChargenPage::Race }, raceSexMenu }));
+        // The barber and the plastic surgeon are the same menu in two other modes (2 and 3: the screen starts on the hair
+        // or the face, and the race and sex are not changed; no cost, which the scripts of the games see to): the
+        // mode is the screen's one value (FalloutNV.exe 0x705870, Mac round 12AY R2 D)
+        const auto lookMenu = [&chargen, opened](double mode) {
+            return [&chargen, opened, mode](CallContext&) {
+                chargen.open({ ChargenPage::Race }, { mode }, raceSexMenu);
+                if (opened)
+                    opened();
+                return 0.0;
+            };
+        };
+        interpreter.setHandler("ShowBarberMenu", lookMenu(raceSexBarber));
+        interpreter.setHandler("ShowPlasticSurgeonMenu", lookMenu(raceSexSurgeon));
         // The Gene Projector of Tale of Two Wastelands is the menu of the face and the race, called where Fallout 3
         // calls ShowRaceMenu (its own interface is the extender's, so this is the menu the engine has)
         interpreter.setHandler("TTW_ShowGeneProjector", open({ { ChargenPage::Race }, raceSexMenu }));

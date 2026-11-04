@@ -5,6 +5,7 @@
 
 #include <components/esm/refid.hpp>
 #include <components/falloutscript/chargen.hpp>
+#include <components/falloutscript/facelook.hpp>
 #include <components/lua/luastate.hpp>
 #include <components/lua/util.hpp>
 
@@ -74,6 +75,85 @@ namespace OFLua
             { "AVAgility", "Agility" },
             { "AVLuck", "Luck" },
         };
+
+        using FalloutScript::FaceKind;
+
+        FaceKind parseKind(std::string_view text)
+        {
+            if (text == "shape")
+                return FaceKind::Shape;
+            if (text == "tone")
+                return FaceKind::Tone;
+            throw std::runtime_error("\"" + std::string(text) + "\" is not a kind of slider (\"shape\" or \"tone\")");
+        }
+
+        sol::table choiceRows(const sol::state_view& lua, const std::vector<OFScript::FalloutScripts::LookChoice>& rows)
+        {
+            sol::table result(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::LookChoice& entry : rows)
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idText(entry.mId);
+                row["name"] = entry.mName;
+                row["selected"] = entry.mSelected;
+                result[index++] = row;
+            }
+            return result;
+        }
+
+        sol::table look(const sol::state_view& lua)
+        {
+            OFScript::FalloutScripts& host = scripts();
+            const FalloutScript::FaceLook face = host.playerLook();
+            const OFScript::FalloutScripts::LookCatalog catalog = host.lookCatalog();
+
+            sol::table result(lua, sol::create);
+            result["female"] = face.mFemale;
+            result["race"] = face.mRace == 0 ? std::string() : idText(face.mRace);
+            result["hair"] = face.mHair == 0 ? std::string() : idText(face.mHair);
+            result["hairLength"] = face.mHairLength;
+            result["eyes"] = face.mEyes == 0 ? std::string() : idText(face.mEyes);
+            sol::table colour(lua, sol::create);
+            colour["red"] = static_cast<int>(face.mHairColour[0]);
+            colour["green"] = static_cast<int>(face.mHairColour[1]);
+            colour["blue"] = static_cast<int>(face.mHairColour[2]);
+            result["hairColour"] = colour;
+            sol::table parts(lua, sol::create);
+            int index = 1;
+            for (const FormId part : face.mHeadParts)
+                parts[index++] = idText(part);
+            result["headParts"] = parts;
+            sol::table lists(lua, sol::create);
+            lists["races"] = choiceRows(lua, catalog.mRaces);
+            lists["hairs"] = choiceRows(lua, catalog.mHairs);
+            lists["eyes"] = choiceRows(lua, catalog.mEyes);
+            lists["facialHair"] = choiceRows(lua, catalog.mFacialHair);
+            lists["presets"] = choiceRows(lua, catalog.mPresets);
+            result["lists"] = lists;
+            return result;
+        }
+
+        /// The sliders of the face lists with the whole number each shows now
+        sol::table faceSliderRows(const sol::state_view& lua)
+        {
+            OFScript::FalloutScripts& host = scripts();
+            sol::table result(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::FaceSlider& slider : FalloutScript::faceSliders())
+            {
+                sol::table row(lua, sol::create);
+                row["kind"] = slider.mKind == FaceKind::Shape ? "shape" : "tone";
+                row["control"] = slider.mControl;
+                row["list"] = slider.mList;
+                row["setting"] = slider.mSetting;
+                row["minimum"] = slider.mMinimum;
+                row["maximum"] = slider.mMaximum;
+                row["value"] = host.lookSlider(slider.mKind, slider.mControl);
+                result[index++] = row;
+            }
+            return result;
+        }
 
         sol::table state(const sol::state_view& lua)
         {
@@ -189,12 +269,26 @@ namespace OFLua
         api["state"] = [lua]() { return state(lua); };
         // The name is cleaned and cut to fit; the one that is kept is told
         api["setName"] = [](std::string_view name) { return scripts().chargen().setName(name); };
-        api["setFemale"] = [](bool female) { scripts().chargen().setFemale(female); };
-        api["setRace"] = [](std::string_view race) { scripts().chargen().setRace(parseId(race)); };
+        // The sex and race clicked also take the head parts off, put the first face of the kind on and change a hair or
+        // eyes that the kind does not have (the screen of the face; the older screens keep only the choice)
+        api["setFemale"] = [](bool female) { scripts().lookSetSex(female); };
+        api["setRace"] = [](std::string_view race) { scripts().lookSetRace(parseId(race)); };
         // Gives (or with a negative amount takes) points of an attribute; false when they can not be given
         api["adjust"] = [](int attribute, int delta) { return scripts().chargen().adjustAttribute(attribute, delta); };
         api["toggleTag"] = [](int skill) { return scripts().chargen().toggleTag(skill); };
         api["toggleTrait"] = [](std::string_view trait) { return scripts().chargen().toggleTrait(parseId(trait)); };
+        // The look of the player (the screen of the sex, race and face): what it has now, with the lists to pick from
+        api["look"] = [lua]() { return look(lua); };
+        api["setHair"] = [](std::string_view hair) { scripts().lookSetHair(parseId(hair)); };
+        api["setEyes"] = [](std::string_view eyes) { scripts().lookSetEyes(parseId(eyes)); };
+        api["setHairColour"] = [](int red, int green, int blue) { scripts().lookSetHairColour(red, green, blue); };
+        api["toggleFacialHair"] = [](std::string_view part) { scripts().lookToggleFacialHair(parseId(part)); };
+        api["setPreset"] = [](int number) { return scripts().lookSetPreset(number); };
+        api["randomize"] = []() { scripts().lookRandomize(); };
+        // The sliders of the lists of the face, each with the whole number it shows
+        api["sliders"] = [lua]() { return faceSliderRows(lua); };
+        api["setSlider"]
+            = [](std::string_view kind, int control, int value) { scripts().lookSetSlider(parseKind(kind), control, value); };
         // The player is done with the screen: what it picked becomes the character and the next screen opens
         api["finish"] = []() { scripts().finishChargenPage(); };
         return LuaUtil::makeReadOnly(api);

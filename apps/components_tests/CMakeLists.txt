@@ -195,6 +195,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testlevelling.cpp
     falloutscript/testlockpick.cpp
     falloutscript/testspecialscreen.cpp
+    falloutscript/testfacelook.cpp
     falloutscript/testlimbs.cpp
     falloutscript/testpipboy.cpp
     falloutscript/testperks.cpp
