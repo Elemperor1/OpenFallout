@@ -329,11 +329,18 @@ namespace OFScript
             if (reference != 0)
             {
                 result.mBroken = mLockBroken.count(reference) > 0;
+                const ESM4::Reference* record
+                    = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
+                // A door the reference marks as inaccessible says so, and has no verb (FalloutNV.exe 0x57B460, Mac
+                // round 12AN B7: the flag 0x100 of the reference of a door)
+                if (type == ESM4::Door::sRecordId && record != nullptr && (record->mFlags & ESM4::Rec_NoAccess) != 0)
+                {
+                    result.mInaccessible = true;
+                    result.mVerb.clear();
+                }
                 if (mReferenceState.isLocked(reference))
                 {
                     result.mLocked = true;
-                    const ESM4::Reference* record
-                        = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
                     result.mHasKey = record != nullptr && !record->mKey.isZeroOrUnset()
                         && mActors.itemCount(mPlayer, record->mKey.toUint32()) > 0;
                     const Interaction::Setting setting
@@ -350,7 +357,9 @@ namespace OFScript
                     // A door the player cannot open is picked; one that stands open is closed (FalloutNV.exe
                     // 0x7772AC, Mac round 12BA G1)
                     settleDoor(target, reference);
-                    if (result.mLocked && !result.mHasKey)
+                    if (result.mInaccessible)
+                        result.mVerb.clear();
+                    else if (result.mLocked && !result.mHasKey)
                         result.mVerb = "sPick";
                     else if (!result.mLocked && mOpenStates.restsOpen(reference))
                         result.mVerb = "sCloseButton";

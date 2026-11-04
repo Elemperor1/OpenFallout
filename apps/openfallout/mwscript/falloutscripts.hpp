@@ -1502,6 +1502,8 @@ namespace OFScript
             double mValue = 0;
             /// Its lock is broken (forcing it failed)
             bool mBroken = false;
+            /// It is a door that the reference marks as inaccessible (after the broken lock in the order of the text)
+            bool mInaccessible = false;
             /// It is locked, whether the player carries its key, the setting that holds the word for how hard the lock
             /// is, and whether only the key opens it
             bool mLocked = false;

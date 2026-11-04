@@ -33,9 +33,9 @@ namespace FalloutScript::SettingText
         // are the words that fit the length and the capitals the executables give them (the audio volumes are one
         // word each, the switch words and two of the colours are in capitals).
         // The words of the text under the crosshair (the verbs sTargetType*, sSearch, sPickpocket, sSteal, sPick,
-        // sDisarmMine, the lock's sLocked, sHUDUseKey, sTo and the names of the lock classes) are string settings of
-        // the executables with no plugin record behind them; the executables' defaults were compared with these byte
-        // for byte (Mac round 12BB G1: all equal)
+        // sDisarmMine, the lock's sLocked, sHUDUseKey, sTo, the names of the lock classes and the two whole lines
+        // sBroken and sInaccessible) are string settings of the executables with no plugin record behind them; the
+        // executables' defaults were compared with these byte for byte (Mac rounds 12BB G1 and H: all equal)
         constexpr std::array entries = {
             Entry{ "sAccept", "Accept" },
             Entry{ "sActorFade", "Actor Fade" },
@@ -47,6 +47,7 @@ namespace FalloutScript::SettingText
             Entry{ "sBack", "Back" },
             Entry{ "sBlue", "Blue" },
             Entry{ "sBrightness", "Brightness" },
+            Entry{ "sBroken", "[Locked - Broken]" },
             Entry{ "sCWheelTitle", "Companion Wheel" },
             Entry{ "sCameraPitch", "Invert Y" },
             Entry{ "sCancel", "Cancel" },
@@ -86,6 +87,7 @@ namespace FalloutScript::SettingText
             Entry{ "sHardcore", "Hardcore Mode" },
             Entry{ "sHitPointsShort", "HP" },
             Entry{ "sHowMany", "How many?" },
+            Entry{ "sInaccessible", "[INACCESSIBLE]" },
             Entry{ "sIngredients", "Ingredients" },
             Entry{ "sInventoryCaps", "Caps" },
             Entry{ "sInventoryCondition", "CND" },

@@ -881,12 +881,12 @@ its older drawing for a data folder that lacks the file.
   executable's test, 0x579690, is longer and was not read to its end, and the port does not ask the owner of the cell),
   `sPick` (a door that is locked when the player has no key for it) and `sCloseButton` (a door that stands open); a
   character that fights, and a creature that is alive, have no word. The lock line is, as the executable writes it,
-  `sBroken` for a lock that forcing broke (the setting is a whole line with its brackets), else for a locked thing
-  `[sLocked - sHUDUseKey]` when the player carries the key, `[<class word>]` when only a key opens it, and
+  `sBroken` for a lock that forcing broke (the setting is a whole line with its brackets), else `sInaccessible` for a
+  door whose reference has the inaccessible flag (also a whole line; the door has no verb; the words of both were compared
+  with the executable in Mac round 12BB H), else for a locked thing `[sLocked - sHUDUseKey]` when the player carries the key, `[<class word>]` when only a key opens it, and
   `[sLocked - <class word>]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
   object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
-  disarming a mine (`sDisarmMine`; the port has no placed mines to look at), `sInaccessible` (a thing the player cannot
-  reach), the weight and value row for containers, doors and characters (the executable has none for them), and the colour
+  disarming a mine (`sDisarmMine`; the port has no placed mines to look at), the weight and value row for containers, doors and characters (the executable has none for them), and the colour
   that marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
   executable's rule is in B4). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
   below).

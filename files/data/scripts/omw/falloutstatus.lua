@@ -434,11 +434,13 @@ local function infoState()
         keyText = info.keyText,
         pad = info.pad,
     }
-    -- What the lock says, as the executable does (FalloutNV.exe 0x775A00, Mac rounds 12BA G1 and 12BB G1): broken first
-    -- (the setting is a whole line), then "locked" and after it the word for using the key, or the class of the lock; a
-    -- lock that only a key opens says its class alone, in brackets
+    -- What the lock says, as the executable does (FalloutNV.exe 0x775A00, Mac rounds 12BA G1, 12BB G1 and 12BB H): broken
+    -- first and then inaccessible (both settings are whole lines), then "locked" and after it the word for using the key,
+    -- or the class of the lock; a lock that only a key opens says its class alone, in brackets
     if info.broken then
-        result.status = word('sBroken', 'Broken')
+        result.status = word('sBroken', '[Broken]')
+    elseif info.inaccessible then
+        result.status = word('sInaccessible', '[Inaccessible]')
     elseif info.locked then
         local locked = word('sLocked', 'Locked')
         if info.hasKey then
