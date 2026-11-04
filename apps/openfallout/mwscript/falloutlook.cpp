@@ -143,21 +143,12 @@ namespace OFScript
 
     FaceLook FalloutScripts::playerLook()
     {
+        // A race, hair or eyes of a plugin that is not loaded now were lost by the load: the record's own stand then. A
+        // look that has none on purpose (a preset without hair) keeps it
+        if (mChargen.hasLostForms())
+            mChargen.resolveLostForms(recordLook());
         if (std::optional<FaceLook> picked = mChargen.look())
-        {
-            // A race, hair or eyes of a plugin that is not loaded now read as none: the record's own stand then
-            if (picked->mRace == 0 || picked->mHair == 0 || picked->mEyes == 0)
-            {
-                const FaceLook record = recordLook();
-                if (picked->mRace == 0)
-                    picked->mRace = record.mRace;
-                if (picked->mHair == 0)
-                    picked->mHair = record.mHair;
-                if (picked->mEyes == 0)
-                    picked->mEyes = record.mEyes;
-            }
             return *picked;
-        }
         return recordLook();
     }
 

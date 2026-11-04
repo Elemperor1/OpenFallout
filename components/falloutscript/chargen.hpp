@@ -159,6 +159,12 @@ namespace FalloutScript
         /// The sex and race of it are the ones above.
         void setLook(const FaceLook& look);
         std::optional<FaceLook> look() const;
+        /// A save that names a race, hair or eyes of a plugin that is not loaded now gives the look none of it. That is
+        /// not the same as a look that has none on purpose (a hairless face): the forms that were lost stay marked until
+        /// the look is given the record's own with resolveLostForms, or is set again
+        bool hasLostForms() const;
+        /// Puts the race, hair and eyes of the record in the place of the ones that a load lost (and no others)
+        void resolveLostForms(const FaceLook& record);
 
         /// The attributes by their numbers as actor values (5 to 11); a number that is none gives 0
         int attribute(int number) const;
@@ -240,6 +246,8 @@ namespace FalloutScript
         std::optional<bool> mFemale;
         FormId mRace = 0;
         std::optional<FaceLook> mLook;
+        /// The forms of the look that a load found no plugin for: 1 race, 2 hair, 4 eyes (not saved)
+        unsigned mLostForms = 0;
         std::array<int, attributeCount> mAttributes;
         std::vector<int> mTagSlots; // the tagged skills in their places, 0 for a place with none
         std::vector<FormId> mTraits;
