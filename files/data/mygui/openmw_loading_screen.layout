@@ -17,5 +17,10 @@
     </Widget>
 
     <Widget name="Scene" layer="Scene" type="BackgroundImage" skin="ImageBox" position="0 0 300 300" align="Stretch" />
+    <!-- The loading screen of Fallout 3 and New Vegas: the head-up display is not drawn while it is up, so the last frame of
+         the world is drawn above the layer of the display (Backdrop is black under it, for when it fades out), and the
+         pictures of the loading menu are over both. They are made before Splash, which is over them in this layer. -->
+    <Widget name="Backdrop" layer="LoadingScreenBackground" type="Widget" skin="FullBlackBG" position="0 0 300 300" align="Stretch" />
+    <Widget name="World" layer="LoadingScreenBackground" type="BackgroundImage" skin="ImageBox" position="0 0 300 300" align="Stretch" />
     <Widget name="Splash" layer="LoadingScreenBackground" type="BackgroundImage" skin="ImageBox" position="0 0 300 300" align="Stretch" />
 </MyGUI>

@@ -49,6 +49,10 @@ namespace OFGui
         getWidget(mLoadingBox, "LoadingBox");
         getWidget(mSceneImage, "Scene");
         getWidget(mSplashImage, "Splash");
+        getWidget(mBackdrop, "Backdrop");
+        getWidget(mWorldImage, "World");
+        mBackdrop->setVisible(false);
+        mWorldImage->setVisible(false);
 
         mProgressBar->setScrollViewPage(1);
 
@@ -111,6 +115,11 @@ namespace OFGui
         WindowBase::setVisible(visible);
         mSplashImage->setVisible(visible);
         mSceneImage->setVisible(visible);
+        if (!visible)
+        {
+            mBackdrop->setVisible(false);
+            mWorldImage->setVisible(false);
+        }
     }
 
     double LoadingScreen::getTargetFrameRate() const
@@ -189,6 +198,7 @@ namespace OFGui
             = mFalloutLoading && mFalloutLoading->begin(mShowWallpaper, destination, mTimer.time_m() / 1000.0);
         mDestination = Destination();
         mSceneImage->setAlpha(1.f);
+        mWorldImage->setAlpha(1.f);
 
         if (mShowWallpaper)
         {
@@ -223,6 +233,7 @@ namespace OFGui
             mFalloutLoading->end();
         mFalloutActive = false;
         mSceneImage->setAlpha(1.f);
+        mWorldImage->setAlpha(1.f);
 
         setVisible(false);
 
@@ -345,10 +356,15 @@ namespace OFGui
         mSplashImage->setBackgroundImage({});
         mSplashImage->setVisible(false);
 
-        mSceneImage->setRenderItemTexture(mGuiTexture.get());
+        // The loading screen of the games hides the head-up display: the last frame of the world is drawn above its
+        // layer, on black, and the pictures of the loading menu are over that (Mac round 12AZ E1)
+        BackgroundImage* world = mFalloutActive ? mWorldImage : mSceneImage;
+        mSceneImage->setVisible(false);
+        mBackdrop->setVisible(mFalloutActive);
+        world->setRenderItemTexture(mGuiTexture.get());
         // The widget is Y-down, the RTT image is Y-up, so this UV is inverted
-        mSceneImage->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
-        mSceneImage->setVisible(true);
+        world->getSubWidgetMain()->_setUVSet(MyGUI::FloatRect(0.f, 1.f, 1.f, 0.f));
+        world->setVisible(true);
     }
 
     void LoadingScreen::draw()
@@ -359,7 +375,7 @@ namespace OFGui
         if (mFalloutActive)
         {
             mFalloutLoading->update(mTimer.time_m() / 1000.0);
-            mSceneImage->setAlpha(mFalloutLoading->worldAlpha());
+            mWorldImage->setAlpha(mFalloutLoading->worldAlpha());
         }
         else if (mShowWallpaper && mTimer.time_m() > mLastWallpaperChangeTime + 5000 * 1)
         {

@@ -104,6 +104,9 @@ namespace OFGui
         MyGUI::ScrollBar* mProgressBar;
         BackgroundImage* mSplashImage;
         BackgroundImage* mSceneImage;
+        // The loading screen of the games draws the last frame of the world above the head-up display, which it hides
+        MyGUI::Widget* mBackdrop;
+        BackgroundImage* mWorldImage;
 
         std::vector<std::string> mSplashScreens;
 
