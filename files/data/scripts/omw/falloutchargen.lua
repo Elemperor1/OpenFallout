@@ -783,9 +783,12 @@ function render()
     }
 end
 
-local function sync(seconds)
+local function sync()
+    -- The game stands still while a screen is up and the engine hands onFrame a step of 0 then: the time of the frame is
+    -- the real one (Mac round 12AZ E)
+    local seconds = core.getRealFrameDuration()
     if special.isOpen() then
-        special.update(seconds or 0)
+        special.update(seconds)
     end
     -- A menu drawn from a file keeps the window size it was opened with until it is told the window changed
     if shown then
