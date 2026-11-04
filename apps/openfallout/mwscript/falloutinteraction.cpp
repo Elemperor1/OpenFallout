@@ -991,7 +991,7 @@ namespace OFScript
         const std::string refusal = restRefusalText(sleeping, bed);
         if (!refusal.empty())
         {
-            tellPlayer(refusal);
+            tellPlayer(refusal, 2);
             return;
         }
         const std::lock_guard lock(mInteractionMutex);
@@ -1029,7 +1029,7 @@ namespace OFScript
         const std::string refusal = restRefusalText(sleeping, bed);
         if (!refusal.empty())
         {
-            tellPlayer(refusal);
+            tellPlayer(refusal, 2);
             return refusal;
         }
         if (sleeping && bed != 0)

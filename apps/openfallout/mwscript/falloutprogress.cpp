@@ -450,8 +450,9 @@ namespace OFScript
                 name = skill.mName;
         const long points = std::lround(result.mGained);
         const std::string format = gameSettingText("sSkillIncreasedNum");
-        tellPlayer(format.empty() ? name + " increased by " + std::to_string(points)
-                                  : fillPlaces(format, name, points));
+        // (the very happy face, and no sound of its own: Mac round 12BA E)
+        tellPlayer(
+            format.empty() ? name + " increased by " + std::to_string(points) : fillPlaces(format, name, points), 1);
         return result;
     }
 }

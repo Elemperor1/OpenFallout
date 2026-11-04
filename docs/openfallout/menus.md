@@ -840,8 +840,12 @@ its older drawing for a data folder that lacks the file.
   names of the other faces were not read in full). A message may bring the name of a sound that plays as it comes on (the
   karma messages `UIKarmaUp` and `UIKarmaDown`, the worn weapon or armor `WPNBreak` with the sad face and four seconds), and
   a message with the front flag ends the one that is shown at once and comes next (the executable puts it at the head of the
-  queue; where exactly was not followed; Mac round 12AV S4, 12AY R5). Not there: the messages for the chems, reputation,
-  challenges, a map marker or a radio signal, which need the systems behind them.
+  queue; where exactly was not followed; Mac round 12AV S4, 12AY R5). The callers choose the face (Mac round 12BA E: of 198 calls
+  the kind is 0 at 178, very happy at 4 and sad at 16, and 59 refusals bring a sad picture of their own): the port gives the very
+  happy face to a skill book's gain, to a payout of a casino and to a gain on the positive side of a reputation (the sad one on
+  the negative side), and the sad face to the refusal to sleep or wait. Not there: the faces of the other refusals, the
+  messages for the chems, challenges, a map marker or a radio signal, which need the systems behind them, the pictures of the
+  locks (padlock, key) and the loss of a reputation.
 - The compass is a strip of 360 degrees of the interface atlas (1023 texels) of which 345 texels, about 121 degrees, are
   shown. The executable shifts the texture of the strip by the heading over 360 less 0.15 (and adds 1 when that is below
   0); the menu engine scrolls a picture with the trait `_sourcex` (a window of the texture at its natural size from that

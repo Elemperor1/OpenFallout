@@ -2280,7 +2280,9 @@ namespace OFScript
         void applyDisabledAlone(FalloutScript::FormId reference, bool disabled);
         /// Who has whom for an enable parent, read from the records the first time it is asked for
         const FalloutScript::EnableParents& enableParents();
-        void tellPlayer(const std::string& text);
+        /// (`kind` is the face a message without a picture gets: 0 neutral, 1 very happy, 2 sad; the executable's
+        /// callers choose it, Mac round 12BA E)
+        void tellPlayer(const std::string& text, int kind = 0);
         /// A box with the text and no button of its own: it shows for `seconds` (0 until the player closes it)
         void showNotice(const std::string& text, double seconds);
 

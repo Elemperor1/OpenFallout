@@ -1271,12 +1271,12 @@ namespace OFScript
         return mEnableParents;
     }
 
-    void FalloutScripts::tellPlayer(const std::string& text)
+    void FalloutScripts::tellPlayer(const std::string& text, int kind)
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
         // notes during a conversation of Morrowind is hidden
         // The head-up display prints it in the corner (the display of Fallout takes what is said from the line)
-        mHudMessages.push(text);
+        mHudMessages.push(text, {}, 0, kind);
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -1525,7 +1525,10 @@ namespace OFScript
         if (!text.empty())
         {
             Log(Debug::Info) << "Reputation: " << text;
-            tellPlayer(escapeTags(text));
+            // The picture is the setting's (sRepPositiveGainIcon, sRepNegativeGainIcon: the plugins have none, and the
+            // executable's default faces are very happy for the positive side and sad for the negative, Mac round
+            // 12BA E)
+            tellPlayer(escapeTags(text), bump.mSide == 1 ? 1 : 2);
         }
         if (!bump.mLevelChanged)
             return;
