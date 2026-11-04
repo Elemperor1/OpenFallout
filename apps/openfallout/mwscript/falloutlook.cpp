@@ -108,8 +108,13 @@ namespace OFScript
 
     FaceLook FalloutScripts::playerLook()
     {
-        if (const std::optional<FaceLook> picked = mChargen.look())
+        if (std::optional<FaceLook> picked = mChargen.look())
+        {
+            // A race of a plugin that is not loaded now reads as none: the record's own race stands then
+            if (picked->mRace == 0)
+                picked->mRace = recordLook().mRace;
             return *picked;
+        }
         return recordLook();
     }
 
@@ -332,10 +337,7 @@ namespace OFScript
     void FalloutScripts::lookRandomize()
     {
         FaceLook look = playerLook();
-        double variation = 0.5;
-        const std::map<std::string, double>& settings = gameSettingValues();
-        if (const auto found = settings.find("fnpcgeneticvariation"); found != settings.end())
-            variation = found->second;
+        const double variation = gameSetting("fNPCGeneticVariation", 0.5);
         FalloutScript::Gauss gauss([this]() {
             return std::uniform_real_distribution<double>(0.0, 1.0)(mLookRandom);
         });

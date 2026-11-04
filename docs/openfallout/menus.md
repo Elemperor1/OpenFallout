@@ -357,10 +357,17 @@ panel is at the right edge of the window and in its middle (the window is 960 un
 is shown (a click on a link waits for the next frame, the row it is on is in the click's way) and their values are written to
 the existing tiles after every change, so a drag of the marker (the file's `draggable` is set on it) keeps its tile.
 
-Not done: the head the player turns (the device, the lights and the head of the character, drag and wheel on `RSM_Face_Grab`),
-the age slider (it is in the list, dim: the age is a fan control of `facegen\si.ctl` and the file is not read yet, so the shape
-and tone sliders have no controls either), the keys of the pad, and the glyphs on the ends of a slider's bar (guess: `<` and
-`>`).
+The head the player turns is a scene of the menus (`core.menuScene`, the `FacePreview` of `mwrender`): the character is made
+from the look that is picked (`core.menuScene.updateHead`, again a short time after each change), the camera's frustum is cut so
+that the head stands in the middle of the file's hotrect `RSM_Face_Grab` (an off-centre frustum: the middle of the picture is
+not the camera's axis), a drag over the hotrect turns the head about its vertical axis and the wheel moves the camera nearer
+or farther (`setHeadView`). The barber and the plastic surgeon have the one tab they start at (the hair, the face), where Next
+reads `Done`. The head has not been seen in the running game yet: the bone it is aimed at, the lights and the alignment of the
+drag and the wheel with the picture are checked in the offline harness only.
+
+Not done: the age slider (it is in the list, dim: the age is a fan control of `facegen\si.ctl` and the file is not read yet, so
+the shape and tone sliders have no controls either), the keys of the pad, and the glyphs on the ends of a slider's bar (guess:
+`<` and `>`).
 
 ### The level-up screen
 

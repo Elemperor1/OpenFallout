@@ -132,8 +132,9 @@ local function refreshLook()
     end
 end
 
+-- The last tab: the one that the barber (hair) and the plastic surgeon (face) start at is the only one they have
 local function lastTab()
-    return mode >= 2 and mode or 3
+    return mode == 2 and 3 or mode == 3 and 2 or 3
 end
 
 -- ---- The lists ----
@@ -496,7 +497,11 @@ local function confirmDone()
 end
 
 local function goTab(delta)
-    if mode >= 2 then return end
+    if mode >= 2 then
+        -- The barber and the plastic surgeon have one tab: Next is Done
+        if delta > 0 then confirmDone() end
+        return
+    end
     local target = tab + delta
     if target < 0 then return end
     if target > lastTab() then
