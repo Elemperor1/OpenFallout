@@ -233,21 +233,67 @@ namespace
         EXPECT_EQ(shapeOf(shapes, "P1_PointsRemainDigit2:0")->mTexture, "textures/terminals/bbnumber0.dds");
     }
 
-    TEST(FalloutScriptSpecialScreenTest, theButtonsShowOnlyWhatTheyCanDo)
+    TEST(FalloutScriptSpecialScreenTest, theRowsOfTheIndexShowOnlyWhatTheyCanDo)
     {
         Screen screen(Kind::Tester, 36, { 1, 10, 5, 5, 5, 5, 5 });
         auto shapes = screen.shapes();
         // Strength is at the bottom, and 36 of 36 are given
-        EXPECT_FALSE(shapeOf(shapes, "P1_Decrease_Btn:0")->mVisible);
-        EXPECT_FALSE(shapeOf(shapes, "P1_Increase_Btn:0")->mVisible);
+        EXPECT_FALSE(shapeOf(shapes, "Index_StrengthDecrease_Btn:0")->mVisible);
+        EXPECT_FALSE(shapeOf(shapes, "Index_StrengthIncrease_Btn:0")->mVisible);
         EXPECT_TRUE(shapeOf(shapes, "Index_PerceptionDecrease_Btn:0")->mVisible);
         EXPECT_FALSE(shapeOf(shapes, "Index_PerceptionIncrease_Btn:0")->mVisible);
         EXPECT_EQ(shapeOf(shapes, "Index_PerceptionPointVal:0")->mTexture, "textures/terminals/bbnumber10.dds");
 
         Screen room(Kind::Tester, 40, fives);
         shapes = room.shapes();
-        EXPECT_TRUE(shapeOf(shapes, "P1_Decrease_Btn:0")->mVisible);
-        EXPECT_TRUE(shapeOf(shapes, "P1_Increase_Btn:0")->mVisible);
+        EXPECT_TRUE(shapeOf(shapes, "Index_StrengthDecrease_Btn:0")->mVisible);
+        EXPECT_TRUE(shapeOf(shapes, "Index_StrengthIncrease_Btn:0")->mVisible);
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theButtonsOfThePanelOfTheTesterAreNeverTouched)
+    {
+        // They have no attribute to look at in the executable (-1), whatever the page and the value are
+        Screen screen(Kind::Tester, 35, { 1, 10, 5, 5, 5, 5, 4 });
+        EXPECT_EQ(shapeOf(screen.shapes(), "P1_Decrease_Btn:0"), nullptr);
+        EXPECT_EQ(shapeOf(screen.shapes(), "P1_Increase_Btn:0"), nullptr);
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theFacesOfTheTesterAreLitWhilePointsAreLeftOnTheIndex)
+    {
+        Screen screen(Kind::Tester, 40, fives);
+        auto shapes = screen.shapes();
+        // On an attribute's page the right trigger is dim, and the one that leaves is lit while points are left
+        EXPECT_EQ(shapeOf(shapes, "P1_RT_Btn:0")->mTexture, "textures/terminals/pc/bbrtoff.dds");
+        EXPECT_EQ(shapeOf(shapes, "P1_LT_Btn:0")->mTexture, "textures/terminals/pc/bbltoff.dds");
+        EXPECT_EQ(shapeOf(shapes, "LookInside_Btn:0")->mTexture, "textures/terminals/pc/bbrtoff.dds");
+        EXPECT_EQ(shapeOf(shapes, "AllDone_Btn:0")->mTexture, "textures/terminals/pc/bbrton.dds");
+
+        for (int page = 1; page < 8; ++page)
+        {
+            settle(screen);
+            screen.next();
+        }
+        settle(screen);
+        ASSERT_EQ(screen.page(), 8);
+        shapes = screen.shapes();
+        EXPECT_EQ(shapeOf(shapes, "P1_RT_Btn:0")->mTexture, "textures/terminals/pc/bbrton.dds");
+
+        // With every point spent both are dim
+        Screen spent(Kind::Tester, 35, fives);
+        EXPECT_EQ(shapeOf(spent.shapes(), "AllDone_Btn:0")->mTexture, "textures/terminals/pc/bbrtoff.dds");
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theFacesComeFromTheFolderOfTheDeviceTheScreenOpenedFor)
+    {
+        Screen pad(Kind::Tester, 40, fives, true);
+        EXPECT_EQ(shapeOf(pad.shapes(), "P1_LT_Btn:0")->mTexture, "textures/terminals/xbox/bbltoff.dds");
+        // The executable loads them once: a key afterwards changes nothing
+        pad.setPad(false);
+        EXPECT_EQ(shapeOf(pad.shapes(), "P1_LT_Btn:0")->mTexture, "textures/terminals/xbox/bbltoff.dds");
+
+        Screen keys(Kind::Book, 40, fives);
+        keys.setPad(true);
+        EXPECT_EQ(shapeOf(keys.shapes(), "P1_LT_Btn:0")->mTexture, "textures/terminals/pc/bbltoff.dds");
     }
 
     TEST(FalloutScriptSpecialScreenTest, theLampsOfTheCabinetGlowUpToTheValue)
@@ -268,6 +314,67 @@ namespace
         // None on the cover
         Screen cover(Kind::Book, 40, fives);
         EXPECT_EQ(shapeOf(cover.shapes(), "P1_PointVal_01_GLOW:4"), nullptr);
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theLampsOfTheIndexFollowTheCursorOfAPadAndAreOutWithoutOne)
+    {
+        // The index is the eighth page
+        auto onIndex = [](bool pad) {
+            Screen screen(Kind::Tester, 40, { 3, 7, 5, 5, 5, 5, 5 }, pad);
+            for (int page = 1; page < 8; ++page)
+            {
+                settle(screen);
+                screen.next();
+            }
+            settle(screen);
+            return screen;
+        };
+        Screen keys = onIndex(false);
+        ASSERT_EQ(keys.page(), 8);
+        EXPECT_FALSE(shapeOf(keys.shapes(), "P1_PointVal_01_GLOW:4")->mVisible);
+
+        Screen pad = onIndex(true);
+        // The cursor is on Strength (3)
+        EXPECT_TRUE(shapeOf(pad.shapes(), "P1_PointVal_03_GLOW:5")->mVisible);
+        EXPECT_FALSE(shapeOf(pad.shapes(), "P1_PointVal_04_GLOW:5")->mVisible);
+        pad.moveCursor(1);
+        EXPECT_TRUE(shapeOf(pad.shapes(), "P1_PointVal_07_GLOW:4")->mVisible);
+        EXPECT_FALSE(shapeOf(pad.shapes(), "P1_PointVal_08_GLOW:4")->mVisible);
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theBookHasNoDigitsLeftWhenNoPointsAreLeftAndNoTensUnderTen)
+    {
+        Screen screen(Kind::Book, 40, fives);
+        auto shapes = screen.shapes();
+        // 5 left: only the ones
+        EXPECT_FALSE(shapeOf(shapes, "P2_PointsRemainDigit1:0")->mVisible);
+        EXPECT_TRUE(shapeOf(shapes, "P2_PointsRemainDigit2:0")->mVisible);
+        EXPECT_FALSE(shapeOf(shapes, "Index_PointsRemainDigit1:0")->mVisible);
+
+        Screen many(Kind::Book, 55, fives);
+        shapes = many.shapes();
+        // 20 left: both
+        EXPECT_TRUE(shapeOf(shapes, "P2_PointsRemainDigit1:0")->mVisible);
+        EXPECT_EQ(shapeOf(shapes, "P2_PointsRemainDigit1:0")->mTexture, "textures/terminals/bbnumber2.dds");
+        EXPECT_TRUE(shapeOf(shapes, "P2_PointsRemainDigit2:0")->mVisible);
+
+        Screen none(Kind::Book, 35, fives);
+        shapes = none.shapes();
+        // none left: neither
+        EXPECT_FALSE(shapeOf(shapes, "P2_PointsRemainDigit1:0")->mVisible);
+        EXPECT_FALSE(shapeOf(shapes, "P2_PointsRemainDigit2:0")->mVisible);
+        EXPECT_FALSE(shapeOf(shapes, "Index_PointsRemainDigit2:0")->mVisible);
+    }
+
+    TEST(FalloutScriptSpecialScreenTest, theLeaveButtonOfTheBookIsLitWhilePointsAreLeft)
+    {
+        Screen screen(Kind::Book, 40, fives);
+        EXPECT_EQ(shapeOf(screen.shapes(), "AllDone_Btn:0")->mTexture, "textures/terminals/pc/bbxon.dds");
+        EXPECT_EQ(shapeOf(screen.shapes(), "P3_RT_Btn:0")->mTexture, "textures/terminals/pc/bbrtoff.dds");
+        EXPECT_EQ(shapeOf(screen.shapes(), "Index_LT_Btn:0")->mTexture, "textures/terminals/pc/bbltoff.dds");
+
+        Screen spent(Kind::Book, 35, fives);
+        EXPECT_EQ(shapeOf(spent.shapes(), "AllDone_Btn:0")->mTexture, "textures/terminals/pc/bbxoff.dds");
     }
 
     TEST(FalloutScriptSpecialScreenTest, theBookHasAPanelForEachAttributeAndAMessageByThePointsLeft)

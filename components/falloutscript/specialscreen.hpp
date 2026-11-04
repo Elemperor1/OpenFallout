@@ -123,6 +123,9 @@ namespace FalloutScript::SpecialScreen
         int mLimit;
         std::array<int, attributeCount> mValues;
         bool mPad;
+        /// The folder of the faces of the buttons (the Xbox ones or the PC ones) is the device in use when the screen opens, and
+        /// is not changed after (the executable loads them once)
+        bool mFacePad;
         int mPage = 0;
         int mCursor = 0;
         std::string mSequence;
