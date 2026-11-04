@@ -1347,7 +1347,12 @@ The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use th
 `components/falloutscript/loadscreens` has these rules (the window, the choice, the slide show; tested) and `loadingmenu` puts
 them on the menu file; `mwgui/falloutloading` draws the pieces of the menu as widgets under the loading box of the engine, over
 the frame the engine keeps of the world, and takes the pictures from the `LoadScreen` and `LoadScreenType` stores. A game
-without load screens or without the menu file keeps the screens of the engine.
+without load screens or without the menu file keeps the screens of the engine. Two things from the running game (Mac rounds
+12BD C5 and 12BE C): the engine begins a loading screen for each step of a change of place (three within a second and a half for
+one door, each with another picture and tip), where the game shows one for all of it, so a screen that begins within a second of
+the end of another goes on with that one; and the widgets of the pieces are made again, with all after them, when one of them is
+given another picture, because reused image boxes drew only a third to four fifths of the letters of a tip (every glyph is one
+piece and one box; fresh boxes drew nearly all, 94 to 96 per cent, and the cause in MyGUI was not found).
 
 The pinwheel (Mac round 12AY R3): the model is `Meshes\Interface\Circular Loading\loading01.nif` (tile `loading_pinwheel`, id 11;
 not `LoadingAnim01.NIF`, whose tile 0 is static and only gives the duration and the sounds `UILoadScreenInitial` and

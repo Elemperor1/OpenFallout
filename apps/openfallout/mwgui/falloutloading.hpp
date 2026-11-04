@@ -47,8 +47,10 @@ namespace OFGui
         bool begin(bool mainMenu, const FalloutScript::LoadScreens::Destination& destination, double now);
         /// Move the pictures on and draw the menu at `now`
         void update(double now);
-        /// The load is over
-        void end();
+        /// The load is over at `now`. A load that begins within a second of this one's end goes on with its picture and
+        /// tip (the engine begins a loading screen for each of the steps of a change of place, up to three in a second,
+        /// where the game shows one: Mac round 12BE C4)
+        void end(double now);
 
         bool active() const { return mActive; }
         /// How much of the last frame of the world still shows under the menu (1 to 0)
@@ -106,6 +108,10 @@ namespace OFGui
         FalloutScript::LoadScreens::SlideShow mShow;
         bool mActive = false;
         double mStart = 0;
+        /// When the last screen ended, whether it was a screen of this menu and from the main menu
+        double mEndedAt = 0;
+        bool mCanResume = false;
+        bool mLastMainMenu = false;
         float mWorldAlpha = 1.f;
 
         MyGUI::Widget* mRoot = nullptr;

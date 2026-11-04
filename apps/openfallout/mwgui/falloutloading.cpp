@@ -30,6 +30,8 @@ namespace OFGui
         constexpr double menuFade = LS::menuFadeSeconds;
         // The pictures of the main menu change this often (the pictures of a place every ten seconds)
         constexpr double mainMenuSeconds = 4.0;
+        // A load that begins this soon after the end of another is the same loading screen
+        constexpr double resumeSeconds = 1.0;
 
         MyGUI::IntSize viewSize()
         {
@@ -118,6 +120,18 @@ namespace OFGui
 
     bool FalloutLoading::begin(bool mainMenu, const LS::Destination& destination, double now)
     {
+        // The engine begins a loading screen for each step of a change of place (three within a second and a half for one
+        // door, Mac round 12BE C4), each with another picture and tip that the player has no time to read; the game shows
+        // one screen for all of it, so a screen that begins as the last one ended goes on with it
+        if (mCanResume && mainMenu == mLastMainMenu && now - mEndedAt <= resumeSeconds && mRoot != nullptr && mMenu)
+        {
+            mCanResume = false;
+            mActive = true;
+            mRoot->setVisible(true);
+            update(now);
+            return true;
+        }
+        mCanResume = false;
         mActive = false;
         mWorldAlpha = 1.f;
         if (mStore == nullptr)
@@ -156,6 +170,7 @@ namespace OFGui
         }
         mStart = now;
         mActive = true;
+        mLastMainMenu = mainMenu;
         update(now);
         return true;
     }
@@ -215,11 +230,37 @@ namespace OFGui
     void FalloutLoading::draw()
     {
         const std::vector<FalloutMenu::Piece> pieces = mMenu->pieces();
+        const auto drawn = [](const FalloutMenu::Piece& piece) {
+            return piece.mWidth > 0 && piece.mHeight > 0 && piece.mSourceWidth > 0 && piece.mSourceHeight > 0
+                && !piece.mTexture.empty();
+        };
+        // A box that is given another picture is made again, with every box after it (the boxes are drawn in the order they
+        // were made): boxes that were reused for other pictures showed only a third to four fifths of the letters of a tip
+        // in the running game, and new ones nearly all (Mac round 12BE C)
+        {
+            std::size_t place = 0;
+            std::size_t changed = mShapes.size();
+            for (const FalloutMenu::Piece& piece : pieces)
+            {
+                if (!drawn(piece))
+                    continue;
+                if (place < mShapes.size() && !mShapes[place].mKey.empty() && mShapes[place].mKey != keyOf(piece))
+                {
+                    changed = place;
+                    break;
+                }
+                ++place;
+            }
+            while (mShapes.size() > changed)
+            {
+                MyGUI::Gui::getInstance().destroyWidget(mShapes.back().mBox);
+                mShapes.pop_back();
+            }
+        }
         std::size_t used = 0;
         for (const FalloutMenu::Piece& piece : pieces)
         {
-            if (piece.mWidth <= 0 || piece.mHeight <= 0 || piece.mSourceWidth <= 0 || piece.mSourceHeight <= 0
-                || piece.mTexture.empty())
+            if (!drawn(piece))
                 continue;
             Shape& slot = shape(used++);
             const std::string key = keyOf(piece);
@@ -408,8 +449,10 @@ namespace OFGui
             ballDegrees * turned, alpha, unitsX, unitsY);
     }
 
-    void FalloutLoading::end()
+    void FalloutLoading::end(double now)
     {
+        mCanResume = mActive;
+        mEndedAt = now;
         mActive = false;
         mWorldAlpha = 1.f;
         if (mRoot != nullptr)
@@ -419,7 +462,6 @@ namespace OFGui
         for (Turning& piece : mWheel)
             if (piece.mBox != nullptr)
                 piece.mBox->setVisible(false);
-        if (mMenu)
-            mMenu->clear();
+        // (the menu keeps its picture and tip for a screen that goes on with this one, and is cleared when another begins)
     }
 }
