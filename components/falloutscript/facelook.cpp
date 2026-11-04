@@ -48,16 +48,36 @@ namespace FalloutScript
         return control >= 0 && control < count(kind);
     }
 
+    float faceDot(const std::vector<float>& direction, const std::vector<float>& coefficients)
+    {
+        // The executable keeps the sum as a float after every term (0x6584A3), the product of a term it does not round
+        float sum = 0.f;
+        const std::size_t length = std::min(direction.size(), coefficients.size());
+        for (std::size_t i = 0; i < length; ++i)
+            sum = static_cast<float>(static_cast<double>(sum) + static_cast<double>(direction[i]) * coefficients[i]);
+        return sum;
+    }
+
+    namespace
+    {
+        /// coefficients += direction * scale, each term rounded to a float and so is the sum (0x658260 and 0x6586C0)
+        void addAlong(const std::vector<float>& direction, float scale, std::vector<float>& coefficients)
+        {
+            if (coefficients.size() < direction.size())
+                coefficients.resize(direction.size(), 0.f);
+            for (std::size_t i = 0; i < direction.size(); ++i)
+            {
+                const float term = direction[i] * scale;
+                coefficients[i] = coefficients[i] + term;
+            }
+        }
+    }
+
     float FaceControls::value(FaceKind kind, int control, const std::vector<float>& coefficients) const
     {
         if (!has(kind, control))
             return 0.f;
-        const std::vector<float>& row = mRows[static_cast<std::size_t>(kind)][static_cast<std::size_t>(control)];
-        double sum = 0.0;
-        const std::size_t length = std::min(row.size(), coefficients.size());
-        for (std::size_t i = 0; i < length; ++i)
-            sum += static_cast<double>(row[i]) * coefficients[i];
-        return static_cast<float>(sum);
+        return faceDot(mRows[static_cast<std::size_t>(kind)][static_cast<std::size_t>(control)], coefficients);
     }
 
     bool FaceControls::move(FaceKind kind, int control, float value, std::vector<float>& coefficients) const
@@ -66,17 +86,106 @@ namespace FalloutScript
             return false;
         const std::vector<float>& row = mRows[static_cast<std::size_t>(kind)][static_cast<std::size_t>(control)];
         const float difference = value - this->value(kind, control, coefficients);
-        if (coefficients.size() < row.size())
-            coefficients.resize(row.size(), 0.f);
-        for (std::size_t i = 0; i < row.size(); ++i)
-            coefficients[i] += difference * row[i];
+        addAlong(row, difference, coefficients);
         return true;
+    }
+
+    void FaceAge::set(FaceKind kind, int group, std::vector<float> direction, float offset)
+    {
+        if (group < 0 || group >= groups)
+            return;
+        Fan& fan = mFans[static_cast<std::size_t>(kind)][static_cast<std::size_t>(group)];
+        fan.mDirection = std::move(direction);
+        fan.mOffset = offset;
+    }
+
+    void FaceAge::finish()
+    {
+        mLoaded = true;
+        for (std::size_t kind = 0; kind < mFans.size(); ++kind)
+        {
+            const std::vector<float>& first = mFans[kind][0].mDirection;
+            const std::vector<float>& second = mFans[kind][1].mDirection;
+            if (first.empty() || second.empty())
+            {
+                mLoaded = false;
+                continue;
+            }
+            // The matrix of the dot products of the two directions, and its inverse (0xAADD20: the determinant is a
+            // float, and each entry is divided by it)
+            const float a = faceDot(first, first);
+            const float b = faceDot(first, second);
+            const float c = faceDot(second, first);
+            const float d = faceDot(second, second);
+            const float determinant = static_cast<float>(static_cast<double>(a) * d - static_cast<double>(b) * c);
+            if (determinant == 0.f)
+            {
+                mLoaded = false;
+                continue;
+            }
+            mInverse[kind] = { d / determinant, -b / determinant, -c / determinant, a / determinant };
+        }
+    }
+
+    float FaceAge::value(int group, FaceKind kind, const std::vector<float>& coefficients) const
+    {
+        if (!mLoaded || group < 0 || group >= groups)
+            return 0.f;
+        const Fan& fan = mFans[static_cast<std::size_t>(kind)][static_cast<std::size_t>(group)];
+        return static_cast<float>(static_cast<double>(faceDot(fan.mDirection, coefficients)) + fan.mOffset);
+    }
+
+    void FaceAge::move(int group, FaceKind kind, float value, std::vector<float>& coefficients) const
+    {
+        if (!mLoaded || group < 0 || group >= groups)
+            return;
+        const std::size_t index = static_cast<std::size_t>(kind);
+        // Both groups are asked for: the one that is set takes the value, the other the value it has now (0x652470)
+        const std::array<float, groups> wanted = { group == 0 ? value : this->value(0, kind, coefficients),
+            group == 1 ? value : this->value(1, kind, coefficients) };
+        const std::array<float, groups> low = { minimumYears, minimumSecond };
+        const std::array<float, groups> high = { maximumYears, maximumSecond };
+        std::array<float, groups> difference{};
+        for (int g = 0; g < groups; ++g)
+        {
+            const float kept = std::min(std::max(wanted[g], low[g]), high[g]);
+            difference[g] = kept - this->value(g, kind, coefficients);
+        }
+        const std::array<float, 4>& inverse = mInverse[index];
+        const std::array<float, groups> along = {
+            static_cast<float>(
+                static_cast<double>(inverse[0]) * difference[0] + static_cast<double>(inverse[1]) * difference[1]),
+            static_cast<float>(
+                static_cast<double>(inverse[2]) * difference[0] + static_cast<double>(inverse[3]) * difference[1]),
+        };
+        for (int g = 0; g < groups; ++g)
+            addAlong(mFans[index][static_cast<std::size_t>(g)].mDirection, along[g], coefficients);
+    }
+
+    bool FaceAge::setAge(float years, std::vector<float>& shape, std::vector<float>& tone) const
+    {
+        if (!mLoaded)
+            return false;
+        const float shapeNow = value(0, FaceKind::Shape, shape);
+        const float toneNow = value(0, FaceKind::Tone, tone);
+        // The tone moves with the shape: it stays as much older or younger than the shape as it was (0x7B4ED2)
+        const float toneYears = toneNow - shapeNow + years;
+        const auto kept = [](float age) { return std::min(std::max(age, minimumYears), maximumYears); };
+        move(0, FaceKind::Shape, kept(years), shape);
+        move(0, FaceKind::Tone, kept(toneYears), tone);
+        return true;
+    }
+
+    int faceAgeYears(int slider)
+    {
+        // ftol(slider * 5.55f + 9.45f) with the two floats widened: 1 to 10 gives 15, 20, 26, 31, 37, 42, 48, 53, 59,
+        // 64
+        return static_cast<int>(slider * static_cast<double>(5.55f) + static_cast<double>(9.45f));
     }
 
     int faceSliderInteger(float value)
     {
-        // (guess) the slider's whole number is the value times ten, rounded to the nearest
-        return static_cast<int>(std::lround(static_cast<double>(value) * 10.0));
+        return static_cast<int>(static_cast<double>(value) * 10.0);
     }
 
     float faceSliderValue(int integer)
@@ -97,7 +206,8 @@ namespace FalloutScript
         std::vector<FaceSlider> makeSliders()
         {
             std::vector<FaceSlider> sliders;
-            const auto shape = [&sliders](int list, int control, int option, int minimum = -50, int maximum = 50) {
+            const auto shape = [&sliders](int list, int control, int option, int minimum = faceSliderDefaultMinimum,
+                                   int maximum = faceSliderDefaultMaximum) {
                 FaceSlider slider;
                 slider.mKind = FaceKind::Shape;
                 slider.mControl = control;
@@ -129,8 +239,8 @@ namespace FalloutScript
             shape(14, 44, 45);
             shape(14, 45, 46);
             shape(14, 47, 48);
-            shape(14, 49, 50, -50, 30);
-            shape(14, 53, 54, -50, 30);
+            shape(14, 49, 50, faceSliderDefaultMinimum, 30);
+            shape(14, 53, 54, faceSliderDefaultMinimum, 30);
             // Mouth
             shape(15, 35, 36);
             shape(15, 39, 40);

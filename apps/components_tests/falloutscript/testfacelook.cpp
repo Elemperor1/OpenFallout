@@ -81,13 +81,35 @@ namespace
         EXPECT_FLOAT_EQ(controls.value(FaceKind::Tone, 0, coefficients), 0.f);
     }
 
-    TEST(FalloutScriptFaceLookTest, sliderIntegersAreTenthsOfTheControl)
+    TEST(FalloutScriptFaceLookTest, sliderIntegersAreTenthsOfTheControlTruncatedTowardsZero)
     {
-        EXPECT_EQ(faceSliderInteger(1.25f), 13);
-        EXPECT_EQ(faceSliderInteger(-1.25f), -13);
+        // Not rounded and not floored (FalloutNV.exe 0x7B181A, Mac round 12BB B)
+        EXPECT_EQ(faceSliderInteger(1.25f), 12);
+        EXPECT_EQ(faceSliderInteger(-1.25f), -12);
         EXPECT_EQ(faceSliderInteger(0.f), 0);
+        EXPECT_EQ(faceSliderInteger(0.55f), 5);
+        EXPECT_EQ(faceSliderInteger(-0.55f), -5);
+        EXPECT_EQ(faceSliderInteger(-0.05f), 0);
         EXPECT_FLOAT_EQ(faceSliderValue(-37), -3.7f);
-        EXPECT_FLOAT_EQ(faceSliderValue(50), 5.f);
+        EXPECT_FLOAT_EQ(faceSliderValue(35), 3.5f);
+    }
+
+    TEST(FalloutScriptFaceLookTest, theAgeSliderStandsForYearsThatAreTruncated)
+    {
+        const int expected[] = { 15, 20, 26, 31, 37, 42, 48, 53, 59, 64 };
+        for (int slider = 1; slider <= 10; ++slider)
+            EXPECT_EQ(faceAgeYears(slider), expected[slider - 1]) << slider;
+    }
+
+    TEST(FalloutScriptFaceLookTest, theSumOfADotProductIsKeptAsAFloatAfterEveryTerm)
+    {
+        // 1 + 2^-25 twice: each sum rounds back to 1 as a float, where a sum kept in a double would give 1 + 2^-24
+        const std::vector<float> direction{ 1.f, 1.f, 1.f };
+        const std::vector<float> coefficients{ 1.f, 0.0000000298023224f, 0.0000000298023224f };
+        EXPECT_EQ(faceDot(direction, coefficients), 1.f);
+        // The shorter of the two decides how many terms there are
+        EXPECT_EQ(faceDot({ 2.f, 3.f }, { 5.f }), 10.f);
+        EXPECT_EQ(faceDot({}, { 5.f }), 0.f);
     }
 
     TEST(FalloutScriptFaceLookTest, slidersAreThirtyOneOfShapeAndTwelveOfTone)
@@ -126,13 +148,14 @@ namespace
             }
             else if (slider.mControl == 49 || slider.mControl == 53)
             {
-                EXPECT_EQ(slider.mMinimum, -50);
+                EXPECT_EQ(slider.mMinimum, -35);
                 EXPECT_EQ(slider.mMaximum, 30);
             }
             else
             {
-                EXPECT_EQ(slider.mMinimum, -50);
-                EXPECT_EQ(slider.mMaximum, 50);
+                // The usual range is the games' INI value of 3.5 either way, times ten
+                EXPECT_EQ(slider.mMinimum, -35);
+                EXPECT_EQ(slider.mMaximum, 35);
             }
         }
     }
