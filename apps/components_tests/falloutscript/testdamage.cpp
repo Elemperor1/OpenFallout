@@ -69,6 +69,24 @@ namespace
         EXPECT_NEAR(hit(weapon, {}, 100, 0, 0, settings).mDamage, 20 * (0.5 + 0.5 * 0.5), 1e-9);
     }
 
+    TEST(FalloutScriptDamageTest, the_condition_factor_is_what_a_blow_takes_from_the_wear_of_the_weapon)
+    {
+        WeaponDamage weapon;
+        weapon.mDamage = 20;
+        EXPECT_DOUBLE_EQ(Damage::conditionFactor(DamageSettings(), weapon), 1.0);
+        weapon.mCondition = 0.5;
+        EXPECT_NEAR(Damage::conditionFactor(DamageSettings(), weapon), 0.8325, 1e-9);
+
+        DamageSettings settings;
+        settings.mExeConditionCurve = false;
+        EXPECT_NEAR(Damage::conditionFactor(settings, weapon), 0.66 + 0.34 * 0.5, 1e-9);
+        weapon.mMelee = true;
+        EXPECT_NEAR(Damage::conditionFactor(settings, weapon), 0.5 + 0.5 * 0.5, 1e-9);
+        // A condition outside 0 to 1 is held to it
+        weapon.mCondition = 3;
+        EXPECT_DOUBLE_EQ(Damage::conditionFactor(settings, weapon), 1.0);
+    }
+
     TEST(FalloutScriptDamageTest, the_skill_with_the_weapon_changes_the_blow)
     {
         WeaponDamage weapon;

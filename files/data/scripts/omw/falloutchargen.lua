@@ -820,11 +820,12 @@ return {
         onFrame = sync,
         -- The buttons of a pad on the model screens of SPECIAL
         onControllerButtonPress = function(button)
-            -- A box over the screen has the pad, as it has the keys
+            -- A box over the screen has the pad, as it has the keys; so has the pause menu (Escape opens it over the
+            -- Vigor Tester and the book, and the mode is the main menu then)
             if messageOpen() then
                 return
             end
-            if special.isOpen() then
+            if special.isOpen() and I.UI.getMode() == 'Interface' then
                 special.pad(button)
             end
         end,
@@ -833,7 +834,9 @@ return {
                 return
             end
             if special.isOpen() then
-                special.press(key.code, key.symbol)
+                if I.UI.getMode() == 'Interface' then
+                    special.press(key.code, key.symbol)
+                end
                 return
             end
             if not shownPage or not (element or shown) then
