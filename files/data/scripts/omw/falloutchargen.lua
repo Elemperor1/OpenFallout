@@ -796,8 +796,9 @@ local function sync()
     -- The game stands still while a screen is up and the engine hands onFrame a step of 0 then: the time of the frame is
     -- the real one (Mac round 12AZ E)
     local seconds = core.getRealFrameDuration()
-    if special.isOpen() then
-        special.update(seconds)
+    if special.isOpen() and special.update(seconds) then
+        -- The screen of the model failed: the page is shown by the stand-in
+        render()
     end
     if face.isOpen() then
         face.update(seconds or 0)

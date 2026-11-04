@@ -234,21 +234,25 @@ local function frame(seconds)
     answer()
 end
 
+-- A frame of the screen. True when the screen failed and was closed: the page is then to be shown again by the stand-in
+-- (ending the character here would leave the points unspent)
 function module.update(seconds)
-    if not open then return end
+    if not open then return false end
     local ok, problem = pcall(frame, seconds)
     if not ok then
-        -- A screen that fails is left with the character as it is, not kept
         print('The SPECIAL screen failed: ' .. tostring(problem))
         module.close()
-        chargen.finish()
+        module.failed = true
+        return true
     end
+    return false
 end
 
 -- Shows the screen for the page of core.chargen (`page.menu` says which of the two) with the character as it is now
 -- (`state`). False when this install cannot: the menu file or the scenes are not there, and the stand-in is to be shown.
 function module.start(page, state)
     if open then return true end
+    if module.failed then return false end
     local kind = page.menu == MENU_TESTER and 'tester' or (page.menu == MENU_BOOK and 'book' or nil)
     if not kind or core.specialScreen == nil or not sceneModule.available() then
         return false
