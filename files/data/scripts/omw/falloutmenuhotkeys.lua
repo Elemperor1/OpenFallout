@@ -172,17 +172,19 @@ function Keys:step(dt, allowed)
             self.heldFor = self.heldFor + dt
             if not self.wheel and self.heldFor > self.down then
                 self.wheel = true
-                self.rows = self.env.slots()
             end
-            -- While the wheel is up the time of the picture is made new every frame
-            if self.wheel then self.showLeft = self.show end
+            -- While the wheel is up the time of the picture is made new every frame, and its rows are what the slots hold
+            -- now (a script can put another item in a slot while the key is held)
+            if self.wheel then
+                self.rows = self.env.slots()
+                self.showLeft = self.show
+            end
         else
             -- Let go: the item of the key is used, quickly or from the wheel
             local slot = self.held
             self.held, self.heldFor = nil, 0
             local wasUp = self.wheel
-            local rows = wasUp and self.rows or self.env.slots()
-            local row = rows[slot + 1]
+            local row = self.env.slots()[slot + 1]
             local used = row ~= nil and row.id ~= ''
             if used then
                 local outcome = self.env.use(row.id)

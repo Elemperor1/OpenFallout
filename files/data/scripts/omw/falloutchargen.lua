@@ -326,7 +326,9 @@ local function specialPage(state, add, width)
             end, { onFocus = text, enabled = attribute.value < state.maximum and state.pointsLeft > 0 }), 28)))
     end
     add(descriptionBox(width, ''))
-    add(doneButton(finishPage))
+    -- The page is done with when every point is spent, as the file's screen has it (this page is also what a failed
+    -- screen of the model falls back to)
+    add(doneButton(finishPage, state.pointsLeft <= 0))
 end
 
 local function skillsPage(state, add, width)
@@ -879,8 +881,9 @@ return {
             if key.code == input.KEY.Enter then
                 if shownPage == 'name' then
                     if chargen.setName(typed or '') ~= '' then finishPage() end
-                elseif shown and not doneReady() then
-                    -- The Done button of the file is dim until the points are spent or the tags are put: so is Enter
+                elseif (shown or shownPage == 'special') and not doneReady() then
+                    -- The Done button of the file is dim until the points are spent or the tags are put: so is Enter (and
+                    -- on the stand-in of the SPECIAL page)
                     return
                 else
                     finishPage()
