@@ -178,6 +178,13 @@ end
 
 -- The click of the player: which button of the model is under the pointer is asked of the scene, and the answer comes in
 -- a later frame
+-- The device the player used last, told by the script that sees every key and button (also while no screen is open)
+local lastPad = false
+
+function module.noteDevice(pad)
+    lastPad = pad
+end
+
 -- The device in use: a button of the pad puts the cursor on the index page, a key or the pointer takes it away again
 local function usePad(on)
     if open and open.padMode ~= on then
@@ -271,9 +278,11 @@ function module.start(page, state)
     for i, attribute in ipairs(state.attributes) do
         values[i] = attribute.value
     end
+    -- The pictures of the buttons are chosen once, when the screen opens, by the device the player used last (the pad's
+    -- or the keyboard's)
     open = {
-        kind = kind, shown = shown, scene = scene, values = values, applied = {},
-        screen = core.specialScreen.new { kind = kind, limit = page.limit, values = values, pad = false },
+        kind = kind, shown = shown, scene = scene, values = values, applied = {}, padMode = lastPad,
+        screen = core.specialScreen.new { kind = kind, limit = page.limit, values = values, pad = lastPad },
     }
     trace(string.format('%s opened with %d points and the attributes %s, window %dx%d', kind, page.limit,
         table.concat(values, ' '), ui.screenSize().x, ui.screenSize().y))

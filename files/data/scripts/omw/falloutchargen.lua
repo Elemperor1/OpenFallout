@@ -833,6 +833,7 @@ return {
         onFrame = sync,
         -- The buttons of a pad on the model screens of SPECIAL
         onControllerButtonPress = function(button)
+            special.noteDevice(true)
             -- A box over the screen has the pad, as it has the keys; so has the pause menu (Escape opens it over the
             -- Vigor Tester and the book, and the mode is the main menu then)
             if messageOpen() then
@@ -842,7 +843,11 @@ return {
                 special.pad(button)
             end
         end,
+        onMouseButtonPress = function()
+            special.noteDevice(false)
+        end,
         onKeyPress = function(key)
+            special.noteDevice(false)
             if messageOpen() then
                 return
             end
