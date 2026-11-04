@@ -135,6 +135,12 @@ namespace OFGui
         {
             mRoot = MyGUI::Gui::getInstance().createWidgetReal<MyGUI::Widget>("Widget", MyGUI::FloatCoord(0, 0, 1, 1),
                 MyGUI::Align::Stretch, "LoadingScreenBackground", "FalloutLoading");
+            mSlides = mRoot->createWidgetReal<MyGUI::Widget>(
+                "Widget", MyGUI::FloatCoord(0, 0, 1, 1), MyGUI::Align::Stretch);
+            mSlides->setNeedMouseFocus(false);
+            mTurning = mRoot->createWidgetReal<MyGUI::Widget>(
+                "Widget", MyGUI::FloatCoord(0, 0, 1, 1), MyGUI::Align::Stretch);
+            mTurning->setNeedMouseFocus(false);
         }
         mRoot->setVisible(true);
 
@@ -194,8 +200,8 @@ namespace OFGui
         while (mShapes.size() <= index)
         {
             Shape made;
-            made.mBox
-                = mRoot->createWidget<MyGUI::ImageBox>("ImageBox", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default);
+            made.mBox = mSlides->createWidget<MyGUI::ImageBox>(
+                "ImageBox", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default);
             made.mBox->setNeedMouseFocus(false);
             made.mBox->setVisible(false);
             mShapes.push_back(std::move(made));
@@ -269,7 +275,7 @@ namespace OFGui
     {
         if (piece.mBox == nullptr)
         {
-            piece.mBox = mRoot->createWidget<MyGUI::ImageBox>(
+            piece.mBox = mTurning->createWidget<MyGUI::ImageBox>(
                 "RotatingSkin", MyGUI::IntCoord(0, 0, 1, 1), MyGUI::Align::Default);
             piece.mBox->setNeedMouseFocus(false);
             piece.mBox->setVisible(false);
@@ -315,7 +321,7 @@ namespace OFGui
     void FalloutLoading::drawWheel(double seconds, float alpha)
     {
         const FalloutScript::LoadScreens::LoadingMenu::Pinwheel wheel = mMenu->pinwheel();
-        if (!wheel.mPresent || mRoot == nullptr)
+        if (!wheel.mPresent || mTurning == nullptr)
             return;
         // Menu units to pixels
         const double unitsX = mMenu->designWidth() > 0 ? mMenu->pixelWidth() / mMenu->designWidth() : 1.0;

@@ -101,6 +101,10 @@ namespace OFGui
         float mWorldAlpha = 1.f;
 
         MyGUI::Widget* mRoot = nullptr;
+        /// The pictures and the pinwheel are in a widget each, made in this order: the wheel is in front of every picture,
+        /// whenever a picture's widget is made
+        MyGUI::Widget* mSlides = nullptr;
+        MyGUI::Widget* mTurning = nullptr;
         std::vector<Shape> mShapes;
         // The bars on the left and the right, the wheel and the ball
         std::array<Turning, 4> mWheel;
