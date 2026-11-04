@@ -866,28 +866,34 @@ its older drawing for a data folder that lacks the file.
   number in brackets for a stack), a row of weight and value (a number of nothing is two dashes, a value under 1 has a
   decimal; the executable's builder, Mac round 12AO B4, shows it for armor, miscellaneous things, aid and item mods, for a
   weapon or ammunition only when it is playable, and not for a book, an ingredient or a key: the name alone), and a line for
-  its lock. The words are the game's settings: `sTargetTypeTake`
-  (also for a book that lies in the world), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
+  its lock. The words are the game's settings, string settings of the executables with no record in the plugins (the
+  port's table, `settingtext.cpp`, holds the defaults, compared with the executables byte for byte in Mac round 12BB G1):
+  `sTargetTypeTake` (also for a book that lies in the world: the executable says Take for a book, Read only for the
+  Pip-Boy's prompt), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
   `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
   the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
-  not fight the player), `sSearch` (a body); a character that fights, and a
-  creature that is alive, have no word. The lock line is, as the executable writes it, `sBroken` for a lock that forcing
-  broke, else for a locked thing `[sHUDUseKey - sLocked]` when the player carries the key, `[<class word>]` when only a key
-  opens it, and `[<class word> - sLocked]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
+  not fight the player), `sPickpocket` (the same character while the player sneaks), `sSearch` (a body), `sSteal` (a thing
+  to take whose reference is owned by a character that is not the player, or by a faction the player is not in; the
+  executable's test, 0x579690, is longer and was not read to its end, and the port does not ask the owner of the cell),
+  `sPick` (a door that is locked when the player has no key for it) and `sCloseButton` (a door that stands open); a
+  character that fights, and a creature that is alive, have no word. The lock line is, as the executable writes it,
+  `sBroken` for a lock that forcing broke (the setting is a whole line with its brackets), else for a locked thing
+  `[sLocked - sHUDUseKey]` when the player carries the key, `[<class word>]` when only a key opens it, and
+  `[sLocked - <class word>]` (the words `sLockLevelName*`). `core.hud.info` gives the engine's side, the
   object is the one of the focus ray (what the activation would hit). A thing with no name has no text. Not there:
-  pickpocket, steal and pick (the port has no
-  such actions yet), disarming a mine, the weight and value
-  row for containers, doors and characters (the executable has none for them), and the colour that
-  marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
-  executable's rule is in B4, but the port has no ownership yet). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
+  disarming a mine (`sDisarmMine`; the port has no placed mines to look at), `sInaccessible` (a thing the player cannot
+  reach), the weight and value row for containers, doors and characters (the executable has none for them), and the colour
+  that marks a thing that is owned (system colour 2 when taking it is theft or the target is a follower in some cases: the
+  executable's rule is in B4). The key hint on the PC is the file's own `PCShortcutLabel` (see the rules of an expression
   below).
 - Subtitles (`Subtitles`, Mac rounds 12AO B3 and 12AQ B3, FalloutNV.exe 0x774FD0, 0x7711F4 and 0x775230): the tile is 800 by
   110 and empty in the file; the code makes a centred text in it, 50 above the block of the text under the crosshair (the
   executable moves it up with that block when the block's text is taller; the port's block does not move). A line a character
   says outside of a conversation (the voice of the data, or the text alone when it has no voice) is an entry: it stays from the
   moment it was said for the length of its text times `fNoticeTextTimePerCharacter` (0.06 in the executable, 0.08 in the files),
-  and is taken when subtitles are on, the line has no voice or a script forced it, and the speaker is near enough to hear. The
-  text is the response alone: the executable puts no name before it. Every 200 ms the display drops the entries that are
+  and is taken when subtitles are on (they are on by default, as New Vegas ships them), the line has no voice or a script forced it.
+  The executable tests no distance when a line is taken (Mac round 12BB G4): a line of a speaker out of reach waits among the
+  entries and is chosen if the player comes within 500 units before it is over. The text is the response alone: the executable puts no name before it. Every 200 ms the display drops the entries that are
   over, and when none is shown it chooses one: the entries in the order they were said, a forced one takes over whatever was
   chosen, any other is chosen when its speaker is within 500 units and nearer than the one chosen (and the one chosen is not
   the player's own line while this is another's: `kind` 0 is the player's, 2 another's). The tile is shown in the modes of the

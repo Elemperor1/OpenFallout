@@ -116,6 +116,25 @@ namespace
         EXPECT_EQ(SettingText::standIn("sTraitMenuCounterSingular"), "%d TRAIT LEFT");
     }
 
+    TEST(FalloutSettingText, the_words_under_the_crosshair_have_the_lengths_the_executables_give_them)
+    {
+        // The verbs, the lock's words and the lock classes are string settings of FalloutNV.exe with no record behind
+        // them (Mac rounds 12BA G1 and 12BB G1: the length of each default, and every word here equal to it)
+        const std::pair<const char*, size_t> lengths[] = { { "sTargetTypeTake", 4 }, { "sTargetTypeOpen", 4 },
+            { "sTargetTypeSit", 3 }, { "sTargetTypeActivate", 8 }, { "sTargetTypeSleep", 5 }, { "sTargetTypeRead", 4 },
+            { "sTargetTypeTalk", 4 }, { "sTargetTypeOpenDoor", 4 }, { "sTargetTypeEquip", 5 },
+            { "sTargetTypeUnequip", 7 }, { "sTargetTypeDrink", 5 }, { "sTargetTypeEat", 3 },
+            { "sTargetTypeRecharge", 8 }, { "sTargetTypeBrew", 4 }, { "sTargetTypeApply", 5 },
+            { "sTargetTypeRepair", 6 }, { "sSearch", 6 }, { "sPickpocket", 10 }, { "sSteal", 5 }, { "sPick", 4 },
+            { "sCloseButton", 5 }, { "sDisarmMine", 11 }, { "sLocked", 6 }, { "sHUDUseKey", 7 }, { "sTo", 2 },
+            { "sLockLevelNameVeryEasy", 9 }, { "sLockLevelNameEasy", 4 }, { "sLockLevelNameAverage", 7 },
+            { "sLockLevelNameHard", 4 }, { "sLockLevelNameVeryHard", 9 }, { "sLockLevelNameImpossible", 12 } };
+        for (const auto& [name, length] : lengths)
+            EXPECT_EQ(SettingText::standIn(name).size(), length) << name;
+        // The word of a door is the word of a container
+        EXPECT_EQ(SettingText::standIn("sTargetTypeOpenDoor"), SettingText::standIn("sTargetTypeOpen"));
+    }
+
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)
     {
         // The menu files spell some of the names two ways (sOK and sOk, sQuit and squit)
