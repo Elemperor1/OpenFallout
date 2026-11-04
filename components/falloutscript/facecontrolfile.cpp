@@ -1,6 +1,8 @@
 #include "facecontrolfile.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -49,7 +51,8 @@ namespace FalloutScript
                 if (count > 0)
                     std::memcpy(values.data(), mBytes.data() + mPosition, count * sizeof(float));
                 mPosition += count * sizeof(float);
-                return true;
+                // A number that is not one (the file is data of the player's disk) would reach the face and the saved look
+                return std::all_of(values.begin(), values.end(), [](float value) { return std::isfinite(value); });
             }
             bool atEnd() const { return mPosition == mBytes.size(); }
 

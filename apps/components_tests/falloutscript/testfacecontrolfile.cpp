@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <string>
 
 #include <components/falloutscript/facecontrolfile.hpp>
@@ -102,6 +103,26 @@ namespace
         // The rows are 50, 30, 50 and 0 long
         wrong = good;
         wrong[16] = 40;
+        EXPECT_FALSE(readFaceControlFile(wrong).has_value());
+    }
+
+    TEST(FalloutScriptFaceControlFileTest, aNumberThatIsNotFiniteIsRefused)
+    {
+        const std::string good = makeFile();
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        const float infinity = std::numeric_limits<float>::infinity();
+        // The first number of the first control, and the first of the age directions (after the fan controls' start)
+        std::string wrong = good;
+        std::memcpy(&wrong[36], &nan, sizeof(nan));
+        EXPECT_FALSE(readFaceControlFile(wrong).has_value());
+        const std::size_t ageStart = good.size() - (20 * 101 * 4 + 5 * (100 + 10000 + 2500 + 2500) * 4)
+            - 5 * 2 * 2 * (50 + 1) * 4;
+        wrong = good;
+        std::memcpy(&wrong[ageStart], &infinity, sizeof(infinity));
+        EXPECT_FALSE(readFaceControlFile(wrong).has_value());
+        // The offset after a row
+        wrong = good;
+        std::memcpy(&wrong[ageStart + 50 * 4], &nan, sizeof(nan));
         EXPECT_FALSE(readFaceControlFile(wrong).has_value());
     }
 
