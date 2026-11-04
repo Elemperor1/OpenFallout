@@ -457,6 +457,9 @@ local function showButtons()
         -- Back goes up a list, or to the tab before; with nowhere to go it is not shown (guess: the executable's)
         local canBack = PARENT[active] ~= nil or (mode < 2 and tab > 0)
         opened:set('RSM_back_button', 'visible', canBack)
+        -- Next is there on a tab that has another after it and on the last tab (where it is Done), and in no list under a
+        -- tab (round 12BB F: visible when the list has a next list or is the last tab)
+        opened:set('RSM_next_button', 'visible', active == tab and (atLast or mode < 2))
     end)
 end
 
@@ -562,6 +565,9 @@ end
 
 local function scroll(delta)
     local before = first
+    -- A step is one row (the lists have rows of one height); the arrow that scrolls further is not there once every row
+    -- shows, so the wheel does not go on either
+    if delta > 0 and lastShown() >= #rows then return end
     first = clamp(first + delta, 1, math.max(1, #rows))
     if first ~= before then place() end
 end
