@@ -118,7 +118,7 @@ GUI Settings
    :title: subtitles
    :type: boolean
    :range: true, false
-   :default: false
+   :default: true
 
    Enable or disable subtitles for NPC dialog and some sound effects.
    Subtitles appear in a tooltip box at screen lower center.
