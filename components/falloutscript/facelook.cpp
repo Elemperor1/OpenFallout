@@ -118,12 +118,20 @@ namespace FalloutScript
             const float c = faceDot(second, first);
             const float d = faceDot(second, second);
             const float determinant = static_cast<float>(static_cast<double>(a) * d - static_cast<double>(b) * c);
-            if (determinant == 0.f)
+            // Directions that are finite but so large that a product overflows give no matrix to turn around
+            if (!std::isfinite(a) || !std::isfinite(b) || !std::isfinite(c) || !std::isfinite(d)
+                || !std::isfinite(determinant) || determinant == 0.f)
             {
                 mLoaded = false;
                 continue;
             }
-            mInverse[kind] = { d / determinant, -b / determinant, -c / determinant, a / determinant };
+            const std::array<float, 4> inverse = { d / determinant, -b / determinant, -c / determinant, a / determinant };
+            if (!std::all_of(inverse.begin(), inverse.end(), [](float value) { return std::isfinite(value); }))
+            {
+                mLoaded = false;
+                continue;
+            }
+            mInverse[kind] = inverse;
         }
     }
 

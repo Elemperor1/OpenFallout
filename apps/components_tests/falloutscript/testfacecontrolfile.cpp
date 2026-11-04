@@ -206,6 +206,39 @@ namespace
         EXPECT_NEAR(file->mAge.value(1, FaceKind::Tone, tone), 2.f, 1e-4f);
     }
 
+    TEST(FalloutScriptFaceControlFileTest, directionsSoLargeThatTheirProductsOverflowGiveNoAge)
+    {
+        for (const FaceKind kind : { FaceKind::Shape, FaceKind::Tone })
+        {
+            // Finite numbers, but 1e30 squared is no float
+            std::vector<float> huge(50, 0.f);
+            huge[0] = 1e30f;
+            std::vector<float> other(50, 0.f);
+            other[1] = 1.f;
+            FaceAge age;
+            for (const FaceKind each : { FaceKind::Shape, FaceKind::Tone })
+            {
+                age.set(each, 0, each == kind ? huge : other, 0.f);
+                age.set(each, 1, other, 0.f);
+            }
+            age.finish();
+            EXPECT_FALSE(age.loaded());
+        }
+        // The same directions at a size the matrix can hold give an age
+        std::vector<float> first(50, 0.f);
+        first[0] = 1.f;
+        std::vector<float> second(50, 0.f);
+        second[1] = 1.f;
+        FaceAge fine;
+        for (const FaceKind each : { FaceKind::Shape, FaceKind::Tone })
+        {
+            fine.set(each, 0, first, 0.f);
+            fine.set(each, 1, second, 0.f);
+        }
+        fine.finish();
+        EXPECT_TRUE(fine.loaded());
+    }
+
     TEST(FalloutScriptFaceControlFileTest, noAgeWithoutTheDirections)
     {
         FaceAge age;
