@@ -159,9 +159,9 @@ namespace OFScript
         for (const FalloutScript::FormId holder : barterSources(vendor))
         {
             // A trader does not sell what it wears: the copies like the one on are not for sale
-            const int worn = holder == vendor ? mEquipment.equippedCondition(vendor, item) : -1;
+            const int worn = holder == vendor ? mEquipment.equippedCopy(vendor, item) : -1;
             for (const FalloutScript::ActorState::ConditionStack& stack : mActors.conditions(holder, item))
-                if (stack.mCondition != worn && (condition < 0 || stack.mCondition == condition))
+                if (stack.copy() != worn && (condition < 0 || stack.copy() == condition))
                     total += stack.mCount;
         }
         return total;
@@ -174,14 +174,14 @@ namespace OFScript
         int moved = 0;
         for (const FalloutScript::FormId holder : barterSources(vendor))
         {
-            const int worn = holder == vendor ? mEquipment.equippedCondition(vendor, item) : -1;
+            const int worn = holder == vendor ? mEquipment.equippedCopy(vendor, item) : -1;
             for (const FalloutScript::ActorState::ConditionStack& stack : mActors.conditions(holder, item))
             {
                 if (moved >= count)
                     break;
-                if (stack.mCondition == worn || (condition >= 0 && stack.mCondition != condition))
+                if (stack.copy() == worn || (condition >= 0 && stack.copy() != condition))
                     continue;
-                moved += transferItems(holder, to, item, count - moved, stack.mCondition);
+                moved += transferItems(holder, to, item, count - moved, stack.copy());
             }
         }
         return moved;
@@ -207,11 +207,11 @@ namespace OFScript
                                     int worn) {
                 for (const FalloutScript::ActorState::ConditionStack& stack : more)
                 {
-                    if (stack.mCondition == worn)
+                    if (stack.copy() == worn)
                         continue;
                     const auto same = std::find_if(stacks.begin(), stacks.end(),
                         [&stack](const FalloutScript::ActorState::ConditionStack& listed) {
-                            return listed.mCondition == stack.mCondition;
+                            return listed.copy() == stack.copy();
                         });
                     if (same != stacks.end())
                         same->mCount += stack.mCount;
@@ -223,23 +223,27 @@ namespace OFScript
             {
                 for (const FalloutScript::FormId holder : barterSources(menu->mVendor))
                     gather(mActors.conditions(holder, pick.mItem),
-                        holder == menu->mVendor ? mEquipment.equippedCondition(holder, pick.mItem) : -1);
+                        holder == menu->mVendor ? mEquipment.equippedCopy(holder, pick.mItem) : -1);
             }
             else
                 gather(mActors.conditions(mPlayer, pick.mItem), -1);
             std::stable_sort(stacks.begin(), stacks.end(),
                 [](const FalloutScript::ActorState::ConditionStack& left,
-                    const FalloutScript::ActorState::ConditionStack& right) { return left.mCondition > right.mCondition; });
+                    const FalloutScript::ActorState::ConditionStack& right) {
+                    // The best first; of one condition the copy with fewer mods
+                    return left.mCondition != right.mCondition ? left.mCondition > right.mCondition
+                                                               : left.mMods < right.mMods;
+                });
             int left = pick.mCount;
             for (const FalloutScript::ActorState::ConditionStack& stack : stacks)
             {
-                int& already = taken[{ pick.mItem, stack.mCondition }];
+                int& already = taken[{ pick.mItem, stack.copy() }];
                 const int going = std::min(left, stack.mCount - already);
                 if (going <= 0)
                     continue;
                 already += going;
                 left -= going;
-                result.push_back({ pick.mItem, going, stack.mCondition });
+                result.push_back({ pick.mItem, going, stack.copy() });
             }
             // More than there is: a pick that is no deal
             if (left > 0)
@@ -297,7 +301,11 @@ namespace OFScript
         const FalloutScript::Barter::Settings settings = barterSettings();
         const FalloutScript::Barter::Factors factors
             = FalloutScript::Barter::factors(settings, mActorValues.current(mPlayer, AV::barter));
-        const double base = FalloutScript::Barter::baseValue(value, conditionTenths(condition), settings);
+        double base = FalloutScript::Barter::baseValue(value, conditionTenths(FalloutScript::copyCondition(condition)), settings);
+        // Each mod installed in a weapon adds its own worth, and the sum is rounded up to a tenth (FalloutNV.exe 0x4BD400,
+        // Mac round 12AX R3b)
+        if (const int mods = FalloutScript::copyMods(condition); mods != 0)
+            base = std::ceil((base + modsValue(item, mods)) * 10.0 - 1e-9) / 10.0;
         const auto perk = [this, &menu, item](double price) {
             return mPerks.apply(FalloutScript::EntryPoint::buyPrice, mPlayer, price,
                 FalloutScript::PerkEngine::Context{ menu.mVendor, item });
@@ -324,7 +332,7 @@ namespace OFScript
                 if (vendorSide && holder == menu->mVendor && item.mEquipped)
                     continue;
                 const auto same = std::find_if(items.begin(), items.end(), [&item](const PipboyItem& listed) {
-                    return listed.mId == item.mId && listed.mCondition == item.mCondition;
+                    return listed.mId == item.mId && listed.mCondition == item.mCondition && listed.mMods == item.mMods;
                 });
                 if (same != items.end())
                     same->mCount += item.mCount;
@@ -338,9 +346,10 @@ namespace OFScript
         {
             if (!item.mHasCondition)
                 continue;
-            item.mStack = item.mCondition != FalloutScript::ActorState::fullCondition
+            item.mStack = item.mCondition != FalloutScript::ActorState::fullCondition || item.mMods != 0
                 || std::any_of(items.begin(), items.end(), [&item](const PipboyItem& other) {
-                       return other.mId == item.mId && other.mCondition != item.mCondition;
+                       return other.mId == item.mId
+                           && (other.mCondition != item.mCondition || other.mMods != item.mMods);
                    });
         }
         for (PipboyItem& item : items)
@@ -350,7 +359,7 @@ namespace OFScript
             if (item.mId == caps || item.mValue <= 0 || (!vendorSide && (item.mKey || item.mHidden)))
                 continue;
             BarterRow row;
-            row.mPrice = barterPrice(*menu, item.mId, vendorSide, item.mCondition);
+            row.mPrice = barterPrice(*menu, item.mId, vendorSide, FalloutScript::copyOf(item.mCondition, item.mMods));
             row.mItem = std::move(item);
             rows.push_back(std::move(row));
         }
@@ -384,7 +393,7 @@ namespace OFScript
                     have = barterStock(vendor, pick.mItem, pick.mCondition);
                 else
                     for (const FalloutScript::ActorState::ConditionStack& stack : mActors.conditions(mPlayer, pick.mItem))
-                        if (stack.mCondition == pick.mCondition)
+                        if (stack.copy() == pick.mCondition)
                             have = stack.mCount;
                 int& total = asked[{ pick.mItem, pick.mCondition }];
                 if (pick.mCount <= 0 || itemValue(pick.mItem) <= 0 || have - total < pick.mCount)

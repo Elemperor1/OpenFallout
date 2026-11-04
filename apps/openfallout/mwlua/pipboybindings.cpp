@@ -49,14 +49,15 @@ namespace OFLua
         }
 
         /// The id of a row of a list. Copies of a weapon or armor that differ in condition are rows of their own, and
-        /// the row tells which: the form, then "~" and the condition in tenths of a percent of the health. Every
+        /// the row tells which: the form, then "~" and the number of the copy (the condition in tenths of a percent of
+        /// the health, with the mask of the installed mods over its ten low bits). Every
         /// function that takes the id of a row takes either kind (a plain form names no copy: the best, or the one
         /// that is on).
         std::string rowId(const OFScript::FalloutScripts::PipboyItem& item)
         {
             std::string text = idText(item.mId);
             if (item.mStack)
-                text += "~" + std::to_string(item.mCondition);
+                text += "~" + std::to_string(FalloutScript::copyOf(item.mCondition, item.mMods));
             return text;
         }
 
@@ -117,6 +118,8 @@ namespace OFLua
             // Weapons and armor: the condition in tenths of a percent of the health (1000 is full)
             row["hasCondition"] = item.mHasCondition;
             row["condition"] = item.mCondition;
+            // The mask of the mods installed in a weapon (1, 2 and 4 for the slots); the games add a plus to its name
+            row["mods"] = item.mMods;
             row["weight"] = item.mWeight;
             row["value"] = item.mValue;
             row["category"] = FalloutScript::Pipboy::categoryName(item.mCategory);
@@ -418,13 +421,13 @@ namespace OFLua
                 table["threshold"] = stat.mThreshold;
                 return table;
             };
-            const auto idOf = [](FormId form, int condition) {
-                return idText(form) + "~" + std::to_string(condition);
+            const auto idOf = [](FormId form, int condition, int mods) {
+                return idText(form) + "~" + std::to_string(FalloutScript::copyOf(condition, mods));
             };
             sol::table result(lua, sol::create);
             result["skill"] = view->mSkill;
             sol::table copy(lua, sol::create);
-            copy["id"] = idOf(view->mItem, view->mCondition);
+            copy["id"] = idOf(view->mItem, view->mCondition, view->mMods);
             copy["form"] = idText(view->mItem);
             copy["name"] = view->mName;
             copy["icon"] = view->mIcon;
@@ -437,7 +440,7 @@ namespace OFLua
             for (const OFScript::FalloutScripts::RepairDonor& donor : view->mDonors)
             {
                 sol::table row(lua, sol::create);
-                row["id"] = idOf(donor.mItem, donor.mCondition);
+                row["id"] = idOf(donor.mItem, donor.mCondition, donor.mMods);
                 row["form"] = idText(donor.mItem);
                 row["name"] = donor.mName;
                 row["condition"] = donor.mCondition;
@@ -487,7 +490,7 @@ namespace OFLua
             for (const OFScript::FalloutScripts::ServiceRow& entry : view->mRows)
             {
                 sol::table row(lua, sol::create);
-                row["id"] = idText(entry.mItem) + "~" + std::to_string(entry.mCondition);
+                row["id"] = idText(entry.mItem) + "~" + std::to_string(FalloutScript::copyOf(entry.mCondition, entry.mMods));
                 row["name"] = entry.mName;
                 row["condition"] = entry.mCondition;
                 row["worn"] = entry.mWorn;
@@ -516,6 +519,61 @@ namespace OFLua
             return scripts().repairService(key.mItem, key.mCondition, worn.value_or(false), all.value_or(false));
         };
         api["closeRepairServices"] = []() { scripts().closeRepairServices(); };
+
+        // ---- Item mods ----
+        // The screen of one weapon: the copy (id, name, icon, condition, mods, what a shot does) and the lines of the list
+        // (the mod, its name, picture and description, whether it is installed in the weapon)
+        const auto modTable = [lua](const OFScript::FalloutScripts::ModView& view) {
+            sol::table result(lua, sol::create);
+            sol::table copy(lua, sol::create);
+            copy["id"] = idText(view.mItem) + "~" + std::to_string(FalloutScript::copyOf(view.mCondition, view.mMods));
+            copy["form"] = idText(view.mItem);
+            copy["name"] = view.mName;
+            copy["icon"] = view.mIcon;
+            copy["condition"] = view.mCondition;
+            copy["mods"] = view.mMods;
+            copy["damage"] = view.mDamage;
+            result["item"] = copy;
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::ModRow& entry : view.mRows)
+            {
+                sol::table row(lua, sol::create);
+                row["mod"] = idText(entry.mMod);
+                row["name"] = entry.mName;
+                row["icon"] = entry.mIcon;
+                row["description"] = entry.mDescription;
+                row["installed"] = entry.mInstalled;
+                rows[index++] = row;
+            }
+            result["rows"] = rows;
+            return result;
+        };
+        // The player opens the screen for a copy (the weapon that is on comes off until it closes); nothing for a thing
+        // that is not a weapon of the player
+        api["modOpen"] = [modTable](std::string_view item) -> sol::object {
+            const RowKey key = parseRowId(item);
+            const std::optional<OFScript::FalloutScripts::ModView> view = scripts().openItemMods(key.mItem, key.mCondition);
+            return view ? sol::object(modTable(*view)) : sol::object(sol::nil);
+        };
+        // The same, as the copy is now
+        api["modView"] = [modTable](std::string_view item) -> sol::object {
+            const RowKey key = parseRowId(item);
+            const std::optional<OFScript::FalloutScripts::ModView> view = scripts().modView(key.mItem, key.mCondition);
+            return view ? sol::object(modTable(*view)) : sol::object(sol::nil);
+        };
+        // The mod is installed in the copy and one copy of the mod item is used up; the row id of the copy as it is now,
+        // an empty text when nothing was done
+        api["modInstall"] = [](std::string_view item, std::string_view mod) -> std::string {
+            const RowKey key = parseRowId(item);
+            const int copy = scripts().installMod(key.mItem, key.mCondition, parseId(mod));
+            return copy < 0 ? std::string() : idText(key.mItem) + "~" + std::to_string(copy);
+        };
+        // The player is done with the screen: the weapon that came off when it opened is put on again
+        api["modClose"] = [](std::string_view item) {
+            const RowKey key = parseRowId(item);
+            scripts().closeItemMods(key.mItem, key.mCondition);
+        };
 
         // The barter menu a script showed (a conversation that ends in ShowBarterMenu): the character that trades, the
         // holder of what it sells, its name, the percent the script gave, and a number that is another for each time a

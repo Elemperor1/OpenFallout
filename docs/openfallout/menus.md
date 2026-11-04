@@ -141,11 +141,36 @@ once. The engine's rule that the menu keeps the count of the list's children mak
 over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
 
 Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
-scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mark `+` of a thing with
-mods and the mods of the things that repair (no mods yet); the Jury Rigging rule for armor (the executable's class function 0x514410
+scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the Jury Rigging rule for armor (the executable's class function 0x514410
 was not read); the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
 Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
-generic menu does; the item mod screen (`item_mod_menu.xml`, 0x425).
+generic menu does.
+
+### Item mods: the item mod screen (Mac rounds 12AX R3 and R3b, FalloutNV.exe 0x783310 to 0x784A40; New Vegas only)
+
+The Mod button of the items page (key X, shown for a weapon of the player that has a mod to take or one installed) opens
+`item_mod_menu.xml` (`falloutpipboymods.lua`, in the box of the Pip-Boy). A weapon record names up to three mods (`WMI1` to
+`WMI3`) and what each does (the `DNAM` effect numbers and values); the list has the mods the copy holds first (dim, with the
+file's marker) and then one row for each unit of those mods in the player's pack that goes into a free slot of the copy. A click
+installs at once (there is no apply button on the PC): one copy of the mod item is used up, the statistic 0x21 ("weapons
+modified") goes up, the sound is `UIItemGunsSmallUp` and the screen stays open. A weapon that is worn comes off while the screen
+is open and goes on again when it closes (Cancel, key E). The pointer on a row changes the words under the list (the mod's
+description) and the picture; the card of the weapon shows its health and the damage of a shot with its mods.
+
+The effects are worked out when the weapon is used, from the numbers of the slots in the weapon record: effect 1 adds to the
+damage (before the 1.3 of effect 12 when that is there), 2 the clip size, 3 takes from the spread (never below none), 4 changes the
+weight, 10 the maximum condition (the health of the copy goes up with it), and the value of a weapon with mods adds the value of each mod item (rounded up to
+a tenth). The names of weapons with mods get a `+` (`%s+`, `%s+ (%d)`). The copy is a whole of its own for the engine: two
+copies with other mods are different rows and different stacks, in the items page, in barter, in the repair screens and in
+the saves (the mods are kept with the condition in the key of the copy, so older saves read as copies with none). Fallout 3 has
+no mods, so the screen and the Mod button are New Vegas only.
+
+Not there: the pad; the cards of the file that would compare a mod with the weapon (the executable never fills them); the rate of
+fire (effect 8) and the effects 5, 6, 9, 11, 14 and 16 (they are in the records but their use was not read); the models of the
+weapon per mask of mods (the engine shows the weapon's one model); the bump of the maximum condition for a copy that is whole
+was read as one point less than the effect says, which is the executable's way but unverified on screen; two copies that a
+merged stack of the executable counts as one are not told apart; the health that wear takes is counted on the base health of
+the weapon, not the one with a mod of maximum condition; the things that repair a weapon do not carry their mods.
 
 ### The stats page of the Pip-Boy
 

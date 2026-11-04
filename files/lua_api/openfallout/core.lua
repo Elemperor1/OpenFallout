@@ -2559,13 +2559,15 @@
 ---
 -- @type PipboyItem
 -- @field #string id The id of the row: the form, and for a row of the copies of a weapon or armor that have one condition
--- "~" and that condition, when the item has copies of more than one condition or a single stack that is not whole (a lone
--- damaged stack has the suffix too). The functions that take the id of a row (`use`, `drop`, `transfer`, the piles of a
+-- and the same mods "~" and the number of the copy (the condition in tenths of a percent, plus 1024 times the mods mask:
+-- 1 for the first mod slot, 2 the second, 4 the third), when the item has copies of more than one kind or a single stack
+-- that is not whole or has a mod (a lone damaged stack has the suffix too). The functions that take the id of a row (`use`, `drop`, `transfer`, the piles of a
 -- barter) take either kind. The form alone names no copy: `use` takes the copy that is on, else the best; `drop` and
 -- `transfer` take the best copy; a barter pile takes the best copies first.
 -- @field #string form The form alone.
 -- @field #boolean hasCondition Weapons and armor: they have a condition.
 -- @field #number condition Their condition in tenths of a percent of the health (1000 is full).
+-- @field #number mods Weapons: which of their mod slots hold a mod (1 for the first, 2 the second, 4 the third); 0 for none.
 -- @field #string name
 -- @field #number count
 -- @field #number weight What one weighs.
@@ -2757,6 +2759,57 @@
 ---
 -- The player is done with the repair services.
 -- @function [parent=#Pipboy] closeRepairServices
+
+---
+-- The item mod screen for one copy of a weapon of the player (a row id of `items`): the copy and the lines of the list, the
+-- mods that are installed in it first and then one line for each unit of the mods in the player's pack that the weapon
+-- takes in a free slot. A weapon that is worn comes off until `modClose`. FalloutNV.exe 0x783310..0x784A40; Fallout 3 has
+-- no mods.
+-- @function [parent=#Pipboy] modOpen
+-- @param #string item A row id of `items`.
+-- @return #PipboyModView Nil for a thing that is not a weapon of the player.
+
+---
+-- The same as `modOpen` for the copy as it is now, without taking a worn weapon off.
+-- @function [parent=#Pipboy] modView
+-- @param #string item A row id of `items`.
+-- @return #PipboyModView
+
+---
+-- @type PipboyModView
+-- @field #PipboyModItem item The copy.
+-- @field #list<#PipboyModRow> rows The lines of the list.
+
+---
+-- @type PipboyModItem
+-- @field #string id Row id of the copy as it is now.
+-- @field #string form
+-- @field #string name
+-- @field #string icon Path of the inventory icon.
+-- @field #number condition In tenths of a percent of the health (a mod of maximum condition can raise it above 1000).
+-- @field #number mods The mods mask.
+-- @field #number damage What one shot does with its mods.
+
+---
+-- @type PipboyModRow
+-- @field #string mod Form id of the mod item.
+-- @field #string name
+-- @field #string icon
+-- @field #string description What the mod does, in the game's words.
+-- @field #boolean installed Whether the weapon already holds it.
+
+---
+-- The player installs a mod in a copy: one copy of the mod item is used up and the weapon takes what the mod gives (more
+-- damage, a bigger clip, less spread, a different weight or maximum condition); no caps, skill or experience are involved.
+-- @function [parent=#Pipboy] modInstall
+-- @param #string item Row id of the copy.
+-- @param #string mod Form id of the mod item.
+-- @return #string The row id of the copy as it is now; "" when nothing was done (no free slot that takes the mod, or none in the pack).
+
+---
+-- The player is done with the item mod screen: the weapon that `modOpen` took off is put on again.
+-- @function [parent=#Pipboy] modClose
+-- @param #string item Row id of the copy as it is now.
 
 ---
 -- The barter menu that a conversation opened (the response of a dialogue line that calls `ShowBarterMenu`): who trades,

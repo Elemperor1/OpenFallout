@@ -23,16 +23,24 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         const auto found = mConditions.find(reference);
-        return found == mConditions.end() ? 1000 : found->second;
+        return found == mConditions.end() ? 1000 : found->second & 1023;
     }
 
-    void ReferenceState::setCondition(FormId reference, int condition)
+    int ReferenceState::mods(FormId reference) const
     {
         const std::lock_guard lock(mMutex);
-        if (condition >= 1000)
+        const auto found = mConditions.find(reference);
+        return found == mConditions.end() ? 0 : found->second >> 10;
+    }
+
+    void ReferenceState::setCondition(FormId reference, int condition, int mods)
+    {
+        const std::lock_guard lock(mMutex);
+        const int key = std::clamp(condition, 0, 1000) | (std::clamp(mods, 0, 7) << 10);
+        if (key == 1000)
             mConditions.erase(reference);
         else
-            mConditions[reference] = std::max(condition, 0);
+            mConditions[reference] = key;
     }
 
     void ReferenceState::lockOf(FormId reference, bool& locked, int& level)

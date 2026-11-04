@@ -226,6 +226,68 @@ namespace
         EXPECT_EQ(state.removeItem(player, stimpak, 1, 999), 0);
     }
 
+    TEST(FalloutScriptActorStateTest, copies_with_other_mods_are_stacks_of_their_own)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 3);
+        // One copy of full condition gets the mod of the first slot, another at 600 the mods of two slots
+        EXPECT_EQ(state.setCopy(player, stimpak, 1000, 0, 1000, 1), 1);
+        EXPECT_EQ(state.setCopy(player, stimpak, 1000, 0, 600, 3), 1);
+        EXPECT_EQ(state.itemCount(player, stimpak), 3);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(player, stimpak);
+        ASSERT_EQ(stacks.size(), 3u);
+        // The best condition first, and of one condition the copy with fewer mods
+        EXPECT_EQ(stacks[0].mCondition, 1000);
+        EXPECT_EQ(stacks[0].mMods, 0);
+        EXPECT_EQ(stacks[1].mCondition, 1000);
+        EXPECT_EQ(stacks[1].mMods, 1);
+        EXPECT_EQ(stacks[2].mCondition, 600);
+        EXPECT_EQ(stacks[2].mMods, 3);
+        EXPECT_EQ(stacks[2].copy(), ActorState::allMods == 7 ? (600 | (3 << 10)) : 0);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_copy_with_mods_is_taken_by_its_mods)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 2);
+        state.addItem(player, stimpak, 1, 1000, 2);
+        // The plain copies and the modded one are not the same copy
+        EXPECT_EQ(state.removeItem(player, stimpak, 5, 1000, 4), 0);
+        EXPECT_EQ(state.removeItem(player, stimpak, 5, 1000, 2), 1);
+        EXPECT_EQ(state.itemCount(player, stimpak), 2);
+        EXPECT_EQ(state.removeItem(player, stimpak, 5, 1000), 2);
+        EXPECT_TRUE(state.conditions(player, stimpak).empty());
+    }
+
+    TEST(FalloutScriptActorStateTest, removing_without_a_copy_takes_the_ones_with_mods_last)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 1, 1000, 1);
+        state.addItem(player, stimpak, 1, 900);
+        state.addItem(player, stimpak, 1);
+        EXPECT_EQ(state.removeItem(player, stimpak, 2), 2);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(player, stimpak);
+        ASSERT_EQ(stacks.size(), 1u);
+        EXPECT_EQ(stacks[0].mMods, 1);
+    }
+
+    TEST(FalloutScriptActorStateTest, a_copy_with_mods_wears_and_is_mended_and_keeps_its_mods)
+    {
+        FakeRecords records;
+        ActorState state(records);
+        state.addItem(player, stimpak, 1, 1000, 5);
+        EXPECT_EQ(state.setCondition(player, stimpak, 1000, 800, 1, 5), 1);
+        const std::vector<ActorState::ConditionStack> stacks = state.conditions(player, stimpak);
+        ASSERT_EQ(stacks.size(), 1u);
+        EXPECT_EQ(stacks[0].mCondition, 800);
+        EXPECT_EQ(stacks[0].mMods, 5);
+        // The same condition without the mods is another copy, and none is there
+        EXPECT_EQ(state.setCondition(player, stimpak, 800, 700), 0);
+    }
+
     TEST(FalloutScriptActorStateTest, copies_wear_and_are_mended_without_changing_how_many_there_are)
     {
         FakeRecords records;

@@ -171,6 +171,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testactorvalues.cpp
     falloutscript/testanimationcommands.cpp
     falloutscript/testbarter.cpp
+    falloutscript/testitemmods.cpp
     falloutscript/testrepair.cpp
     falloutscript/testwear.cpp
     falloutscript/testchargen.cpp

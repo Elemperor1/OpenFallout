@@ -8,6 +8,7 @@
 #include <set>
 #include <vector>
 
+#include "itemcopy.hpp"
 #include "saveaccess.hpp"
 #include "script.hpp"
 
@@ -101,15 +102,32 @@ namespace FalloutScript
         /// Puts the item on. A weapon takes the place of the weapon held, armor the place of the armor that covers
         /// any of the same body parts, and ammunition the place of the ammunition chosen. `condition` says which copy of
         /// the item goes on (the condition it has, as ActorState counts it); a negative one is the best copy. A copy of
-        /// the item that is on already is put in place of by the other copy (it is not a change of what is worn).
-        Outcome equip(FormId actor, FormId item, int condition = -1);
+        /// the item that is on already is put in place of by the other copy (it is not a change of what is worn). A weapon
+        /// with mods installed is another copy than one without them: `mods` is the mask of the copy that is asked for.
+        Outcome equip(FormId actor, FormId item, int condition = -1, int mods = 0);
         /// Takes the item off; false when it was not on
         bool unequip(FormId actor, FormId item);
         bool isEquipped(FormId actor, FormId item);
-        /// Whether that copy of the item (the one at that condition) is the one on
-        bool isEquipped(FormId actor, FormId item, int condition);
+        /// Whether that copy of the item (the one at that condition, with those mods) is the one on
+        bool isEquipped(FormId actor, FormId item, int condition, int mods = 0);
         /// The condition of the copy that is on, -1 when the item is not on. Ammunition has none: it is full.
         int equippedCondition(FormId actor, FormId item);
+        /// The mods installed in the weapon that is on (a mask of its slots); 0 when the item is not on or has none
+        int equippedMods(FormId actor, FormId item);
+        /// The same copies as the numbers a list names them by (see copyOf); -1 for the copy that is on when none is
+        int equippedCopy(FormId actor, FormId item)
+        {
+            const int condition = equippedCondition(actor, item);
+            return condition < 0 ? -1 : copyOf(condition, equippedMods(actor, item));
+        }
+        bool isEquippedCopy(FormId actor, FormId item, int copy)
+        {
+            return isEquipped(actor, item, copyCondition(copy), copyMods(copy));
+        }
+        Outcome equipCopy(FormId actor, FormId item, int copy = -1)
+        {
+            return equip(actor, item, copyCondition(copy), copyMods(copy));
+        }
         /// The copy of the item that is on wears out or is mended to that condition (the copy in ActorState goes with
         /// it). False when the item is not on.
         bool setEquippedCondition(FormId actor, FormId item, int condition);
@@ -179,6 +197,7 @@ namespace FalloutScript
             std::vector<FormId> mArmor; // in the order it was put on
             /// The condition of the copies that are on (a copy of full condition is not listed for armor)
             int mWeaponCondition = 1000;
+            int mWeaponMods = 0; // the mods installed in the weapon that is on
             std::map<FormId, int> mArmorConditions;
             bool mDrawn = false;
             bool mSeeded = false; // what the character wears at the start is in mArmor
@@ -196,8 +215,9 @@ namespace FalloutScript
         /// The condition that the copy of the item that is on has, in the copies that the actor holds. The caller holds
         /// the lock.
         int conditionOn(const Worn& worn, FormId item) const;
-        /// Which copy: the condition asked for if the actor has a copy like that, else the best (-1 for no copy).
-        int chooseCopy(FormId actor, FormId item, int asked);
+        /// Which copy: the condition and mods asked for if the actor has a copy like that, else the best (-1 for no copy).
+        /// `mods` is the mods of the copy that is chosen.
+        int chooseCopy(FormId actor, FormId item, int asked, int askedMods, int& mods);
 
         void noteChange(FormId actor, FormId item, bool worn);
 

@@ -239,7 +239,7 @@ end
 
 -- What a row of a list says: the name, and how many there are of it
 local function rowText(item)
-    return item.name .. (item.count > 1 and (' (' .. item.count .. ')') or '')
+    return item.name .. ((item.mods or 0) ~= 0 and '+' or '') .. (item.count > 1 and (' (' .. item.count .. ')') or '')
 end
 
 -- The things one side lists, in the order of the name: the player's side leaves out the keys (they are on the keyring)

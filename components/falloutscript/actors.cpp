@@ -145,12 +145,18 @@ namespace FalloutScript
         return held - before;
     }
 
-    void ActorState::addItem(FormId id, FormId item, int count, int condition)
+    int ActorState::copyKey(int condition, int mods)
+    {
+        return std::clamp(condition, 0, int(fullCondition)) | (std::clamp(mods, 0, int(allMods)) << 10);
+    }
+
+    void ActorState::addItem(FormId id, FormId item, int count, int condition, int mods)
     {
         const std::lock_guard lock(mMutex);
         const int added = addCountLocked(id, item, count);
-        if (added > 0 && condition < fullCondition)
-            holder(id).mWorn[item][std::max(condition, 0)] += added;
+        const int key = copyKey(condition, mods);
+        if (added > 0 && key != fullCondition)
+            holder(id).mWorn[item][key] += added;
     }
 
     std::map<int, int> ActorState::wornLocked(FormId id, FormId item)
@@ -162,16 +168,18 @@ namespace FalloutScript
         // The worn copies are some of the copies there are: when there are fewer, the best of the worn ones are the ones
         // that are not there
         std::int64_t excess = -std::int64_t(heldLocked(id, item));
-        for (const auto& [condition, number] : found->second)
+        for (const auto& [key, number] : found->second)
             excess += number;
-        for (auto it = found->second.end(); excess > 0 && it != found->second.begin();)
+        for (const int key : orderedKeys(found->second))
         {
-            --it;
-            const int taken = static_cast<int>(std::min<std::int64_t>(excess, it->second));
-            it->second -= taken;
+            if (excess <= 0)
+                break;
+            int& number = found->second[key];
+            const int taken = static_cast<int>(std::min<std::int64_t>(excess, number));
+            number -= taken;
             excess -= taken;
-            if (it->second <= 0)
-                it = found->second.erase(it);
+            if (number <= 0)
+                found->second.erase(key);
         }
         if (found->second.empty())
         {
@@ -181,29 +189,43 @@ namespace FalloutScript
         return found->second;
     }
 
-    int ActorState::availableLocked(FormId id, FormId item, int condition)
+    std::vector<int> ActorState::orderedKeys(const std::map<int, int>& worn)
+    {
+        std::vector<int> keys;
+        keys.reserve(worn.size());
+        for (const auto& [key, number] : worn)
+            keys.push_back(key);
+        std::stable_sort(keys.begin(), keys.end(), [](int a, int b) {
+            if (keyMods(a) != keyMods(b))
+                return keyMods(a) < keyMods(b);
+            return keyCondition(a) > keyCondition(b);
+        });
+        return keys;
+    }
+
+    int ActorState::availableLocked(FormId id, FormId item, int key)
     {
         const std::map<int, int> worn = wornLocked(id, item);
-        if (condition >= fullCondition)
+        if (key == fullCondition)
         {
             int total = 0;
             for (const auto& [at, number] : worn)
                 total += number;
             return std::max(0, heldLocked(id, item) - total);
         }
-        const auto found = worn.find(std::max(condition, 0));
+        const auto found = worn.find(key);
         return found == worn.end() ? 0 : found->second;
     }
 
-    void ActorState::takeWornLocked(FormId id, FormId item, int condition, int count)
+    void ActorState::takeWornLocked(FormId id, FormId item, int key, int count)
     {
-        if (condition >= fullCondition)
+        if (key == fullCondition)
             return;
         Holder& entry = holder(id);
         const auto stored = entry.mWorn.find(item);
         if (stored == entry.mWorn.end())
             return;
-        const auto stack = stored->second.find(std::max(condition, 0));
+        const auto stack = stored->second.find(key);
         if (stack == stored->second.end())
             return;
         stack->second -= count;
@@ -220,39 +242,52 @@ namespace FalloutScript
         const int held = heldLocked(id, item);
         const std::map<int, int> worn = wornLocked(id, item);
         int total = 0;
-        for (const auto& [condition, number] : worn)
+        for (const auto& [key, number] : worn)
             total += number;
         if (held - total > 0)
-            stacks.push_back({ fullCondition, held - total });
-        for (auto it = worn.rbegin(); it != worn.rend(); ++it)
-            stacks.push_back({ it->first, it->second });
+            stacks.push_back({ fullCondition, held - total, 0 });
+        // The best first; of two of one condition the one with fewer mods
+        std::vector<int> keys = orderedKeys(worn);
+        std::stable_sort(keys.begin(), keys.end(), [](int a, int b) {
+            if (keyCondition(a) != keyCondition(b))
+                return keyCondition(a) > keyCondition(b);
+            return keyMods(a) < keyMods(b);
+        });
+        for (const int key : keys)
+            stacks.push_back({ keyCondition(key), worn.at(key), keyMods(key) });
         return stacks;
     }
 
-    int ActorState::removeItem(FormId id, FormId item, int count, int condition)
+    int ActorState::removeItem(FormId id, FormId item, int count, int condition, int mods)
     {
         const std::lock_guard lock(mMutex);
         if (item == 0 || count <= 0)
             return 0;
-        const int taken = std::min(count, availableLocked(id, item, condition));
+        const int key = copyKey(condition, mods);
+        const int taken = std::min(count, availableLocked(id, item, key));
         if (taken <= 0)
             return 0;
-        takeWornLocked(id, item, condition, taken);
+        takeWornLocked(id, item, key, taken);
         return removeCountLocked(id, item, taken);
     }
 
-    int ActorState::setCondition(FormId id, FormId item, int from, int to, int count)
+    int ActorState::setCondition(FormId id, FormId item, int from, int to, int count, int mods)
+    {
+        return setCopy(id, item, from, mods, to, mods, count);
+    }
+
+    int ActorState::setCopy(FormId id, FormId item, int fromCondition, int fromMods, int toCondition, int toMods, int count)
     {
         const std::lock_guard lock(mMutex);
-        from = std::clamp(from, 0, fullCondition);
-        to = std::clamp(to, 0, fullCondition);
+        const int from = copyKey(fromCondition, fromMods);
+        const int to = copyKey(toCondition, toMods);
         if (item == 0 || count <= 0 || from == to)
             return 0;
         const int changed = std::min(count, availableLocked(id, item, from));
         if (changed <= 0)
             return 0;
         takeWornLocked(id, item, from, changed);
-        if (to < fullCondition)
+        if (to != fullCondition)
             holder(id).mWorn[item][to] += changed;
         return changed;
     }
@@ -283,18 +318,21 @@ namespace FalloutScript
     {
         if (item == 0 || count <= 0)
             return 0;
-        // Which copies go: those of full condition first, then the worn ones from the best to the worst
+        // Which copies go: those of full condition first, then the worn ones from the best to the worst, and the ones with
+        // mods last
         const std::map<int, int> worn = wornLocked(id, item);
         int wornTotal = 0;
-        for (const auto& [condition, number] : worn)
+        for (const auto& [key, number] : worn)
             wornTotal += number;
         const int full = std::max(0, heldLocked(id, item) - wornTotal);
         const int removed = removeCountLocked(id, item, count);
         int fromWorn = std::max(0, removed - full);
-        for (auto it = worn.rbegin(); fromWorn > 0 && it != worn.rend(); ++it)
+        for (const int key : orderedKeys(worn))
         {
-            const int taken = std::min(fromWorn, it->second);
-            takeWornLocked(id, item, it->first, taken);
+            if (fromWorn <= 0)
+                break;
+            const int taken = std::min(fromWorn, worn.at(key));
+            takeWornLocked(id, item, key, taken);
             fromWorn -= taken;
         }
         return removed;
@@ -574,9 +612,9 @@ namespace FalloutScript
                 // Each stack of copies goes with the condition it has
                 for (const ActorState::ConditionStack& stack : state.conditions(call.mReference, item))
                 {
-                    const int removed = state.removeItem(call.mReference, item, stack.mCount, stack.mCondition);
+                    const int removed = state.removeItem(call.mReference, item, stack.mCount, stack.mCondition, stack.mMods);
                     if (target != 0 && target != call.mReference)
-                        state.addItem(target, item, removed, stack.mCondition);
+                        state.addItem(target, item, removed, stack.mCondition, stack.mMods);
                 }
             }
             return 0.0;
@@ -588,7 +626,7 @@ namespace FalloutScript
                 return 0.0;
             for (const auto& entry : held)
                 for (const ActorState::ConditionStack& stack : state.conditions(call.mReference, entry.first))
-                    state.addItem(target, entry.first, stack.mCount, stack.mCondition);
+                    state.addItem(target, entry.first, stack.mCount, stack.mCondition, stack.mMods);
             return 0.0;
         });
         interpreter.setHandler("GetDead",

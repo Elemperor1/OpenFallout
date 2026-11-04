@@ -2246,7 +2246,8 @@ namespace OFScript
         if (!itemInfo(form, info))
             return false;
         // A weapon or armor lying in the world is as worn as it was when it was dropped (or placed)
-        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1), mReferenceState.condition(reference));
+        mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1), mReferenceState.condition(reference),
+            mReferenceState.mods(reference));
         setDisabled(reference, true);
         return true;
     }
@@ -2352,13 +2353,17 @@ namespace OFScript
     }
 
     FalloutScript::WeaponDamage FalloutScripts::describeWeapon(
-        FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition)
+        FalloutScript::FormId weapon, FalloutScript::FormId attacker, int condition, int mods)
     {
         namespace AV = FalloutScript::ActorValue;
         FalloutScript::WeaponDamage damage;
-        // The copy in the hands does as much as its condition lets it (a weapon that is not in the hands is whole)
+        // The copy in the hands does as much as its condition lets it (a weapon that is not in the hands is whole) and has
+        // the mods that are installed in it
         if (condition < 0 && weapon != 0 && attacker != 0)
+        {
             condition = mEquipment.equippedCondition(attacker, weapon);
+            mods = mEquipment.equippedMods(attacker, weapon);
+        }
         if (condition >= 0)
             damage.mCondition = static_cast<double>(condition) / FalloutScript::ActorState::fullCondition;
         const ESM4::Weapon* record = weapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(weapon)) : nullptr;
@@ -2390,6 +2395,20 @@ namespace OFScript
         if (record != nullptr)
         {
             damage.mDamage = record->mData.damage;
+            // The mods add to the damage of the record, and the one of the effect 12 multiplies the sum (FalloutNV.exe
+            // 0x645380, Mac round 12AX R3b)
+            if (mods != 0)
+            {
+                FalloutScript::ItemMods::Slots slots;
+                if (modSlotsOf(weapon, slots))
+                {
+                    if (const std::optional<double> added
+                        = FalloutScript::ItemMods::installedValue(mods, slots, FalloutScript::ItemMods::Damage))
+                        damage.mDamage += *added;
+                    if (FalloutScript::ItemMods::installedValue(mods, slots, FalloutScript::ItemMods::DamageMultiplied))
+                        damage.mDamage *= 1.3;
+                }
+            }
             if (record->mHasCritical)
             {
                 damage.mCriticalDamage = record->mCritical.mDamage;
@@ -2408,10 +2427,10 @@ namespace OFScript
         return damage;
     }
 
-    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon, int condition)
+    double FalloutScripts::weaponCardDamage(FalloutScript::FormId weapon, int condition, int mods)
     {
         // A shot with no armor in the way and no critical hit; the perks of the player work on it as they do in a fight
-        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer, condition);
+        const FalloutScript::WeaponDamage blow = describeWeapon(weapon, mPlayer, condition, mods);
         const FalloutScript::PerkEngine::Context context{ 0, weapon };
         if (mGame != FalloutScript::Game::NewVegas)
         {
@@ -2466,7 +2485,7 @@ namespace OFScript
     }
 
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-        FalloutScript::FormId weapon, int limb, double roll, int condition)
+        FalloutScript::FormId weapon, int limb, double roll, int condition, int mods)
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
@@ -2480,7 +2499,7 @@ namespace OFScript
             return result;
         if (weapon == 0 && attacker != 0)
             weapon = mEquipment.weapon(attacker);
-        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker, condition);
+        FalloutScript::WeaponDamage blow = describeWeapon(weapon, attacker, condition, mods);
         if (roll < 0)
         {
             const std::lock_guard lock(mCombatRandomMutex);
@@ -2796,6 +2815,7 @@ namespace OFScript
         // The copy in the hands as it is before this shot: the blow works out with it, also when the shot is the one that
         // breaks the weapon (a weapon that is used up comes out of the hands at once)
         const int conditionBefore = mEquipment.equippedCondition(attacker, stats.mWeapon);
+        const int modsBefore = mEquipment.equippedMods(attacker, stats.mWeapon);
         // A gun loses health with a shot, whether or not it hits (once for a shot, whatever the number of pellets)
         if (!stats.mMelee)
             wearWeaponOfShot(attacker, stats);
@@ -2828,7 +2848,7 @@ namespace OFScript
             wearWeaponOfShot(attacker, stats);
         if (victim == mPlayer || isCharacterOrCreature(target))
         {
-            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore);
+            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore);
             return result;
         }
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
