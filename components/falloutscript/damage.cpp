@@ -41,6 +41,16 @@ namespace FalloutScript
         return std::clamp(attackerChance * weapon.mCriticalChanceMultiplier, 0.0, 100.0);
     }
 
+    double Damage::conditionFactor(const DamageSettings& settings, const WeaponDamage& weapon)
+    {
+        const double condition = std::clamp(weapon.mCondition, 0.0, 1.0);
+        if (settings.mExeConditionCurve)
+            return Wear::weaponDamageFactor(condition);
+        if (weapon.mMelee)
+            return settings.mMeleeConditionBase + settings.mMeleeConditionMult * condition;
+        return settings.mGunConditionBase + settings.mGunConditionMult * condition;
+    }
+
     HitResult Damage::resolve(const DamageSettings& settings, const WeaponDamage& weapon, double attackerChance,
         double meleeBonus, const Defense& defense, double roll)
     {
@@ -48,14 +58,8 @@ namespace FalloutScript
         result.mCritical = roll < criticalChance(weapon, attackerChance);
 
         double blow = std::max(weapon.mDamage, 0.0);
-        const double condition = std::clamp(weapon.mCondition, 0.0, 1.0);
         const double skill = std::clamp(weapon.mSkill, 0.0, 100.0) / 100.0;
-        if (settings.mExeConditionCurve)
-            blow *= Wear::weaponDamageFactor(condition);
-        else if (weapon.mMelee)
-            blow *= settings.mMeleeConditionBase + settings.mMeleeConditionMult * condition;
-        else
-            blow *= settings.mGunConditionBase + settings.mGunConditionMult * condition;
+        blow *= conditionFactor(settings, weapon);
         blow *= settings.mSkillBase + settings.mSkillMult * skill;
         if (weapon.mMelee && settings.mMeleeStrengthBonus)
             blow += std::max(meleeBonus, 0.0);

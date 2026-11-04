@@ -85,8 +85,10 @@ namespace OFInput
                 return;
             }
 
-            // Disallow binding reserved keys
-            if (key == SDL_SCANCODE_F3 || key == SDL_SCANCODE_F4 || key == SDL_SCANCODE_F10)
+            // Disallow binding reserved keys (F1 to F3 are the pages of the Pip-Boy, and a key bound here is answered
+            // before a script sees it)
+            if (key == SDL_SCANCODE_F1 || key == SDL_SCANCODE_F2 || key == SDL_SCANCODE_F3 || key == SDL_SCANCODE_F4
+                || key == SDL_SCANCODE_F10)
                 return;
 
 #ifndef __APPLE__
@@ -177,6 +179,21 @@ namespace OFInput
         mListener = std::make_unique<BindingsListener>(mInputBinder.get(), this);
         mInputBinder->setDetectingBindingListener(mListener.get());
 
+        // F1 and F2 were the defaults of the quick keys menu and the post-processing HUD of the engine this one comes
+        // from, and a configuration saved by an earlier version has them. They are the games' keys for the pages of the
+        // Pip-Boy now (falloutpipboy.lua), and a key bound here is answered before a script sees it: the old two are
+        // let go, so that a key does one thing (the window of the bindings takes neither key any more, so what is let
+        // go is only what an earlier version saved)
+        const auto letGo = [this](int action, SDL_Scancode key) {
+            if (mInputBinder->getChannel(action)->getControlsCount() == 0)
+                return;
+            ICS::Control* control = mInputBinder->getChannel(action)->getAttachedControls().front().control;
+            if (mInputBinder->getKeyBinding(control, ICS::Control::INCREASE) == key)
+                mInputBinder->removeKeyBinding(key);
+        };
+        letGo(A_QuickKeysMenu, SDL_SCANCODE_F1);
+        letGo(A_TogglePostProcessorHUD, SDL_SCANCODE_F2);
+
         loadKeyDefaults();
         loadControllerDefaults();
 
@@ -265,7 +282,8 @@ namespace OFInput
         defaultKeyBindings[A_CycleWeaponLeft] = SDL_SCANCODE_LEFTBRACKET;
         defaultKeyBindings[A_CycleWeaponRight] = SDL_SCANCODE_RIGHTBRACKET;
 
-        defaultKeyBindings[A_QuickKeysMenu] = SDL_SCANCODE_F1;
+        // (F1, F2 and F3 are the games' keys for the pages of the Pip-Boy: the quick keys menu and the post-processing
+        // HUD are unbound by default; a player's own binding of them is kept)
         defaultKeyBindings[A_Console] = SDL_SCANCODE_GRAVE;
         defaultKeyBindings[A_Run] = SDL_SCANCODE_LSHIFT;
         defaultKeyBindings[A_Sneak] = SDL_SCANCODE_LCTRL;
@@ -292,7 +310,6 @@ namespace OFInput
         defaultKeyBindings[A_AlwaysRun] = SDL_SCANCODE_CAPSLOCK;
         defaultKeyBindings[A_QuickSave] = SDL_SCANCODE_F5;
         defaultKeyBindings[A_QuickLoad] = SDL_SCANCODE_F9;
-        defaultKeyBindings[A_TogglePostProcessorHUD] = SDL_SCANCODE_F2;
 
         std::map<int, int> defaultMouseButtonBindings;
         defaultMouseButtonBindings[A_Inventory] = SDL_BUTTON_RIGHT;

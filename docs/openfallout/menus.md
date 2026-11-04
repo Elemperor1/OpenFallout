@@ -103,8 +103,15 @@ player is told (`sWeaponLowCond`, `sArmorLowCond`, with the sound `WPNBreak` and
 a weapon that reaches nothing is put away with `sWeaponBreak`, armor stays on with no message, and a thing with no health does
 not go on (`sCantEquipBrokenItem`). The weapon commands `GetWeaponHealthPerc`, `SetWeaponHealthPerc` (lowering goes through the
 wear, raising stops a point short of the most) and `ModWeaponHealthPerc` work on the weapon in the hands, `AddItemHealthPercent`
-gives copies at a fraction of their health. Fallout 3 does not wear (its code is not read; it has no `fDamageToWeaponValue`) and
-keeps the damage curve of its settings. Not done: the effects of the condition of the weapon on jams (the exe's tables:
+gives copies at a fraction of their health. Fallout 3 wears the same way with other numbers (Mac round 12AY R4, `Fallout3.exe` 0x582640, 0x583A40, 0x582720): a shot
+(or a swing that reaches) takes the damage of the weapon's record times a number by the kind of weapon (`fDamageToWeaponGunMult`
+0.03 for types 3, 5 and 6, `...EnergyMult` 0.04 for 4 and 7, `...LauncherMult` 0.06 for 8 and 9, `...MeleeMult` 0.05 for 0 to 2;
+a weapon whose flags2 has bit 7 uses its own number, DNAM byte 84; a thing that is thrown or laid, 1.0), the ammunition has no
+effect on it, a weapon does `fDamageGunWeapCondBase + Mult * condition` of its damage (0.66 + 0.34 c, melee 0.5 + 0.5 c, from the
+settings, with no knee), armor gives `fArmorRatingBase + (fArmorRatingMax - fArmorRatingBase) * c` of its rating (0.2 + 0.8 c; a
+broken piece still gives a fifth), the rating of a piece is rounded, there is no threshold, and the player gets no message at a
+quarter (only `sWeaponBreak` with `WPNBreak` when a weapon breaks). Armor wears as in New Vegas (the same formula with
+`fDamageToArmorPercentage` 0.35 and the player as the only victim). Not done: the effects of the condition of the weapon on jams (the exe's tables:
 reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
 `fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
 records (COED) and of the ones that are placed.
@@ -118,8 +125,9 @@ The Repair button of the items page (key R, shown for a weapon or a piece of arm
 repair it with) opens `repair_menu.xml` (`falloutpipboyrepair.lua`, in the box of the Pip-Boy). The list has the copy first, with
 the file's brackets round it, and under it each thing the player carries that can repair it: a thing the item's repair list
 (`REPL`) names (the lists of the games hold the item itself, so another copy of it repairs it), and, for a weapon, any playable
-weapon with the same skill and way of being held when the player has the perk of the entry point 48 (Jury Rigging in the games'
-words); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
+weapon with the same skill and way of being held, and for armor any playable piece of the same weight class (the general flag 0x80
+heavy, 0x08 medium, else light) and the same equipment type (`ETYP`: body or head wear), when the player has the perk of the entry
+point 48 (Jury Rigging in the games' words; `FalloutNV.exe` 0x47BB50, Mac round 12AY R4); a quest item is not offered, and the copy that is repaired is not its own donor. The worn ones come first among equals,
 the weakest first. The pointer on a thing shows the health the copy would have
 (the cards of the right: the health bar, `+N%` and the gain of damage, threshold or resistance), the copy itself says to select
 an item (`sSelectItemToRepair`). A click repairs: the player's Repair skill (actor value 39) gives the new health of the copy
@@ -141,8 +149,7 @@ once. The engine's rule that the menu keeps the count of the list's children mak
 over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
 
 Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
-scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the Jury Rigging rule for armor (the executable's class function 0x514410
-was not read); the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
+scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
 Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
 generic menu does.
 
@@ -272,6 +279,47 @@ description is the perk's own and the picture its `ICON`. The title is `sTraitMe
 counter is never hidden. The executable's own limit is `iTraitMenuMaxNumTraits` (3 by default; the engine keeps its limit of
 two) and its list is every perk with the trait flag in the order the data handler has them (the engine lists them by name),
 with the conditions of the perk checked for the player (the engine does not check them).
+
+*The Vigor Tester and the SPECIAL book (Mac rounds 12AW S5 and S6 and 12AY R1, FalloutNV.exe 0x7915F0 and 0x7C5FC0).* When a
+script asks for SPECIAL with `ShowLoveTesterMenu` (menu 1074; `VCG01VigorTesterSCRIPT`, 40 points, at Doc Mitchell's) or
+`ShowSPECIALBookMenu` (menu 1060; Fallout 3's `CG01SpecialBookSCRIPT`, 40 points), the screen is not a menu file: the files
+`love_tester_menu.xml` and `specialbookmenu.xml` hold a hot rectangle over the whole window (id 5, which takes every click) and a
+few images the pad is tied to, and everything that is seen is a model that the executable turns page by page with its sequences:
+`Meshes\architecture\Goodsprings\NV_VitoMaticVigorTester_Activate.NIF` with its `_Cabinet.NIF`, or `Meshes\Terminals\Babybook02.NIF`.
+`falloutspecialscreen.lua` draws them on the scene of `core.menuScene` (`keepShapes`: the loader keeps the nodes of these files
+apart, so that each button and digit can be named), with the camera `Surgery3DCamera` at (0, 0, 1) looking along -Z and a frustum
+1.810 wide on its near plane (the tester) or 0.2925 (the book, a narrow lens) and as high as the window is; the tester's two
+models are turned by the matrix of rows (-1, 0, 0), (0, -0.12533, 0.99212), (0, 0.99212, 0.12533) and put at (0, -85, -85) (-75 in a
+window 640 wide or less), the book's at (0, 0, -60) at scale 0.05 with a quarter turn about X and the light of its file at
+(-7.7, -139.9, 92.1). The rules are `components/falloutscript/specialscreen` (`core.specialScreen`, tested):
+
+- The pages: 0 the cover (a button), 1 to 7 one attribute each, 8 the index of all seven with its Done button, and the book has a
+  ninth with nothing on it. The tester opens on page 1 (its clip `Forward` plays and the page-turn sound comes with it; the cover is
+  reached only by going back); the book opens on its cover. A turn plays the clip of the page it goes to (forward: Forward, Backward,
+  Left, Right, FastForward, FastBackward, FastLeft, FastRight, and TurnLeft for the book's ninth; back: AimUp, Aim, Holster,
+  JumpLand, JumpLoop, JumpStart, TurnRight, TurnLeft, and Attack2 and Attack1 first for the book) from its start, 1.3 s for the
+  tester's Forward and 1.2667 for the others, 0.5 and 0.4667 for the book's. A page turns only when the clip has reached its end
+  (the cover is always ready). The right trigger on the tester's last page is its exit.
+- The points: the attributes come to the script's limit, each between 1 and 10; the screen writes the attribute of the player at
+  once on each change (no cancel). A button to raise one gives the sound of a rise (`OBJBookSpecialNumber`) in the tester whenever
+  the attribute is below 10, even with no point to give, and a key gives nothing then; the book sounds only when something
+  changed, and with the same sound for lowering (the tester's is `OBJBookSpecialNumberDown`). Done is allowed when the total is
+  the limit exactly (the tester then plays `OBJBookSpecialNumberFinished`, the book is silent); else `UIActivateNothing` and the
+  screen stays. Nothing else closes it: Escape opens the pause menu over it, Tab does nothing, a click that misses does nothing.
+- The pictures are textures put on named shapes: the points left as two digits (`Textures\terminals\BBNumber0..10.dds`, the first
+  digit the tens, 9 at most, 0 when the points are over), the value of each attribute on the index and (book) on its page, the
+  book's message by the points left (`english\BBMessage03` for more than one, `04` for one, `02` for none), and the lamps of the
+  tester's cabinet (`P1_PointVal_NN_GLOW:4/:5` shown while the value reaches NN). The buttons to lower and raise show only while
+  they can act. Keys: Left and Right turn the pages, Up and Down raise and lower (the tester also takes + = and - _), A leaves; a
+  pad's right and left raise and lower, up and down move the index cursor, the shoulders turn pages, X leaves.
+- A click casts a ray from the camera through the pointer (`core.menuScene.pick`) at the buttons of the page; the first it meets
+  does what its button does.
+
+Not verified in the running game (written from the executables only): the names of the shapes of the index (`Index_<Attribute>`
+with the attribute in full is a guess), which shapes the book's messages and digits sit on, the light of the tester (the games' is
+a point light at the scene's origin; a light from the camera stands for it), the book's turn about X, the faces of the buttons
+(`BBRTOn`, `BBLTOff` and the others are left as the model has them), and the mode of the pad's index cursor (not wired). A game
+that lacks the model files or the menu file keeps the stand-in of the points of SPECIAL.
 
 ### The level-up screen
 
@@ -561,9 +609,11 @@ files were not heard in the running game.
   page. F1, F2 and F3 (raw keys) go to Stats, Inventory and Data: closed they open the Pip-Boy on that page, open they switch
   to it directly, and the key of the page that is up closes it. Escape does not close the Pip-Boy: it puts the pause menu on
   top (the Pip-Boy stays under it), and with the pause menu open it closes only that.
-- The port's own differences, none changed yet: the engine's Tab binding opens and closes it at once (no light), Left and Right
-  change the page, F1 and F2 are the engine's quick keys and post-processing keys, and Escape closes the screen. The 28 numbered
-  controls and their defaults are in `mac-12ah-results.md` (Part A3).
+- The port's own differences: the engine's Tab binding opens and closes it at once (no light), Left and Right change the page, and
+  Escape closes the screen (the game puts the pause menu over it; seen in play, Mac round 12AZ B6). F1, F2 and F3 are the game's:
+  they open the Pip-Boy on Stats, Items and Data, switch to the page when it is open and shut it from the page that is up (the
+  engine's own F1 and F2, the quick keys and the post-processing, are no longer bound by default: F2 showed a message box about the
+  post-processor in play, Mac round 12AZ B). The 28 numbered controls and their defaults are in `mac-12ah-results.md` (Part A3).
 
 ### Trading (barter)
 
@@ -729,7 +779,14 @@ its older drawing for a data folder that lacks the file.
   least one tick; the health bar grows from the left, the action points bar from the right, the enemy bar from its middle (in
   steps of two ticks, so the halves are whole).
 - Messages are one at a time: a message is shown for the seconds it came with (2), fades in and out in 0.35 seconds, waits behind
-  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings.
+  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings; a message
+  without one gets the face of the Vault Boy of its kind (0 neutral, 1 very happy, 2 sad, 3 in pain: `Interface\Icons\Message
+  Icons\`, the first named `glow_message_vaultboy_neutral`; the script uses the first file of three spellings that exists, the
+  names of the other faces were not read in full). A message may bring the name of a sound that plays as it comes on (the
+  karma messages `UIKarmaUp` and `UIKarmaDown`, the worn weapon or armor `WPNBreak` with the sad face and four seconds), and
+  a message with the front flag ends the one that is shown at once and comes next (the executable puts it at the head of the
+  queue; where exactly was not followed; Mac round 12AV S4, 12AY R5). Not there: the messages for the chems, reputation,
+  challenges, a map marker or a radio signal, which need the systems behind them.
 - The compass is a strip of 360 degrees of the interface atlas (1023 texels) of which 345 texels, about 121 degrees, are
   shown. The executable shifts the texture of the strip by the heading over 360 less 0.15 (and adds 1 when that is below
   0); the menu engine scrolls a picture with the trait `_sourcex` (a window of the texture at its natural size from that
@@ -1160,10 +1217,14 @@ The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use th
 
 - The menu fades in over `menufade` (0.75 s) over the last frame of the world, which fades out as the menu comes (every tile's
   alpha is `p * 255`, the world image's `(1 - p) * 255`).
-- It picks the pictures when the load begins: from the `LSCR` whose picture is for the main menu (record flag 0x400) when the load
-  is from the main menu, else from those that are not for one place only (no `LNAM` locations), `iMaxScreens:Loading` (4) of
-  them (20 from the main menu), at random, none twice (the same file is the same picture). A load of an interior cell shows the
-  pinwheel and no picture.
+- It picks the pictures when the load begins (Mac round 12AY R3, 0x78A5A0): from the `LSCR` whose picture is for the main menu
+  (record flag 0x400) when the load is from the main menu (20 of them), else `iMaxScreens:Loading` (4) in all, of which at most
+  `iNumLocationSpecificScreens:Loading` (1) are for the place the load goes to and the rest are general ones (no `LNAM`
+  locations), at random, none twice (the same file is the same picture). A picture is for a place when one of its `LNAM`
+  entries is the cell (an interior), the world (an exterior), or a grid cell of the world that is the one the player arrives in.
+  A load that goes nowhere in particular (a saved game, the main menu) takes general pictures only; when the pictures of the
+  place and the general ones do not fill the four, the pass over the general ones takes what is left. An interior has pictures like
+  an exterior has (the pictures of its cell, then general ones).
 - The first picture is on the screen at once, on slide 1; every ten seconds (four from the main menu) the next picture is put on
   the other slide and cross-fades over the one before in 2.2 s (`p = clamp((now - stamp) * 0.00045)`; its tip and matte fade
   with it). The picture is `Textures\<ICON>` of the record and the tip its `DESC`.
@@ -1177,10 +1238,19 @@ The data of the games asks for the tips only: all 208 `LSCR` of New Vegas use th
 `components/falloutscript/loadscreens` has these rules (the window, the choice, the slide show; tested) and `loadingmenu` puts
 them on the menu file; `mwgui/falloutloading` draws the pieces of the menu as widgets under the loading box of the engine, over
 the frame the engine keeps of the world, and takes the pictures from the `LoadScreen` and `LoadScreenType` stores. A game
-without load screens or without the menu file keeps the screens of the engine. Not done: the pinwheel (a 3D scene; its NIF
-and what the code moves in it were not read) and the pictures of a place in particular (the executable's choice of those whose
-locations match the destination was not read; they are left out), so the box of the engine (the label and the progress bar)
-stays at the bottom as a stand-in. Seen only in the offline harness and in tests, not in the running game.
+without load screens or without the menu file keeps the screens of the engine.
+
+The pinwheel (Mac round 12AY R3): the model is `Meshes\Interface\Circular Loading\loading01.nif` (tile `loading_pinwheel`, id 11;
+not `LoadingAnim01.NIF`, whose tile 0 is static and only gives the duration and the sounds `UILoadScreenInitial` and
+`MicroFiche01`). The tile's x and y are where the model's origin stands, in the units of the menu, and the scale is
+`fLoadingWheelScale` (2); the centre of the wheel is the origin plus the scale times (-80.2141, +74.6074). The wheel turns
+clockwise at 67.5 degrees a second and the ball counter-clockwise at 135, a loop of 5.3333 s. We draw it as three textures
+(`load_roulette_bars`, `load_roulette_wheel`, `load_roulette_ball`) turned by widgets, with the numbers read from the model, not
+the model itself. Not verified in the game: the folder of the textures (the code tries `Textures\Interface\Loading\`,
+`\Circular Loading\`, `\Main\` and `\Interface\`), the layering (bars at the back, the wheel, the ball on top) and the
+direction of the turn. Not done: the mode of a new game, which shows the wheel and no picture; the pictures of the other
+kinds of load screen (objective, level progress, stats, plate). The box of the engine (the label and the progress bar) stays at
+the bottom. Seen only in the offline harness and in tests, not in the running game.
 
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 

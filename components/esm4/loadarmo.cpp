@@ -207,6 +207,12 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("REPL"): // the list of the things that mend it
                 reader.getFormId(mRepairList);
                 break;
+            case ESM::fourCC("ETYP"):
+                if (subHdr.dataSize == sizeof(mEquipmentType))
+                    reader.get(mEquipmentType);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("MO2B"):
             case ESM::fourCC("MO3B"):
@@ -223,7 +229,6 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("TNAM"):
             case ESM::fourCC("BAMT"):
             case ESM::fourCC("BIDS"):
-            case ESM::fourCC("ETYP"):
             case ESM::fourCC("BMCT"):
             case ESM::fourCC("EAMT"):
             case ESM::fourCC("EITM"):

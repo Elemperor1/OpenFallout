@@ -627,6 +627,30 @@ namespace
         EXPECT_EQ(setup.mEquipment.wornArmor(guard).front().mCondition, 250);
     }
 
+    TEST(FalloutScriptEquipmentWearTest, fallout_3_armor_gives_less_all_the_way_down_to_a_fifth)
+    {
+        Wardrobe setup;
+        FalloutScript::Wear::Settings fallout3;
+        fallout3.mFallout3 = true;
+        fallout3.mArmorBase = 0.2;
+        fallout3.mArmorMax = 1.0;
+        setup.mEquipment.setWearSettings([&fallout3]() -> const FalloutScript::Wear::Settings& { return fallout3; });
+        setup.mRecords.mInfo[vest].mHealth = 400;
+        ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 20);
+
+        // 0.75 of the health: 0.8 of the rating (16), where New Vegas still gives the whole
+        setup.mEquipment.wear(guard, vest, 100);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 16);
+        // a half: 0.6 (12)
+        setup.mEquipment.wear(guard, vest, 100);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 12);
+        // broken: a fifth of the rating is left
+        setup.mEquipment.wear(guard, vest, 1000);
+        EXPECT_EQ(setup.mEquipment.wornArmor(guard).front().mCondition, 0);
+        EXPECT_DOUBLE_EQ(setup.mEquipment.armorRating(guard), 4);
+    }
+
     TEST(FalloutScriptEquipmentWearTest, items_are_given_with_a_share_of_their_health)
     {
         Wardrobe setup;

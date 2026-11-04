@@ -95,6 +95,10 @@ namespace FalloutScript
 
         /// The chance of a critical hit with the weapon in percent, for an attacker with that chance
         double criticalChance(const WeaponDamage& weapon, double attackerChance);
+
+        /// What the condition of the weapon makes of its damage (1 for a whole weapon): the curve of the executable in
+        /// New Vegas, the settings of the guns and of the melee weapons in Fallout 3
+        double conditionFactor(const DamageSettings& settings, const WeaponDamage& weapon);
     }
 }
 

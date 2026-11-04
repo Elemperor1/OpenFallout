@@ -87,7 +87,9 @@ namespace OFRender
         void setClearColour(const osg::Vec4f& colour);
 
         /// Loads the model under `name` (a name that is taken is replaced). False when the model cannot be loaded.
-        bool addModel(const std::string& name, VFS::Path::NormalizedView path);
+        /// `keepShapes` keeps the optimizer from merging the shapes of the file or folding its nodes into one another, so
+        /// that a script can name each of them (the model is cached apart from the ordinary one of the file).
+        bool addModel(const std::string& name, VFS::Path::NormalizedView path, bool keepShapes = false);
         void removeModel(const std::string& name);
         bool hasModel(const std::string& name) const;
 
@@ -107,6 +109,15 @@ namespace OFRender
         /// given the pictures that the casino's record names. Only that shape changes (the picture of the other
         /// shapes that shared its state stays). False when the model or the shape is not there or has no picture.
         bool setTexture(const std::string& name, const std::string& shape, VFS::Path::NormalizedView path);
+
+        /// Shows or hides the shape of the model (the node of the file, by its name; the shapes under it go with it).
+        /// False when the model or the shape is not there.
+        bool setShapeVisible(const std::string& name, const std::string& shape, bool visible);
+
+        /// The shape of the picture under the point (`x` across and `y` down, from 0 to 1 over the whole texture): the
+        /// first of `shapes` (names of nodes of the models) that the ray from the camera through the point meets, nearest
+        /// first, in the form it was given; an empty text when it meets none. The shapes that are hidden are not met.
+        std::string pick(float x, float y, const std::vector<std::string>& shapes) const;
 
         struct Sequence
         {

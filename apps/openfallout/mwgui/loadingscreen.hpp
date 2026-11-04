@@ -1,6 +1,7 @@
 #ifndef MWGUI_LOADINGSCREEN_H
 #define MWGUI_LOADINGSCREEN_H
 
+#include <cstdint>
 #include <memory>
 
 #include <osg/Timer>
@@ -44,6 +45,7 @@ namespace OFGui
 
         /// Overridden from Loading::Listener, see the Loading::Listener documentation for usage details
         void setLabel(const std::string& label, bool important) override;
+        void setDestination(std::uint32_t object, std::uint32_t world, bool exterior, int gridX, int gridY) override;
         void loadingOn() override;
         void loadingOff() override;
         void setProgressRange(size_t range) override;
@@ -74,8 +76,17 @@ namespace OFGui
         double mLoadingOnTime;
 
         bool mImportantLabel;
-        /// The label that was set last is the one of an interior cell that is about to load
-        bool mInteriorLabel = false;
+        /// Where the load that is about to begin goes (the pictures of a place are for it), until it begins
+        struct Destination
+        {
+            bool mSet = false;
+            std::uint32_t mObject = 0;
+            std::uint32_t mWorld = 0;
+            bool mExterior = false;
+            int mGridX = 0;
+            int mGridY = 0;
+        };
+        Destination mDestination;
         std::unique_ptr<FalloutLoading> mFalloutLoading;
         bool mFalloutActive = false;
 
@@ -93,6 +104,9 @@ namespace OFGui
         MyGUI::ScrollBar* mProgressBar;
         BackgroundImage* mSplashImage;
         BackgroundImage* mSceneImage;
+        // The loading screen of the games draws the last frame of the world above the head-up display, which it hides
+        MyGUI::Widget* mBackdrop;
+        BackgroundImage* mWorldImage;
 
         std::vector<std::string> mSplashScreens;
 

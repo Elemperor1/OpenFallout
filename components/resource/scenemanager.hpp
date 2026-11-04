@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 
 #include <osg/Texture>
@@ -127,7 +128,8 @@ namespace Resource
         /// @note If the given filename does not exist or fails to load, an error marker mesh will be used instead.
         ///  If even the error marker mesh can not be found, an exception is thrown.
         /// @note Thread safe.
-        osg::ref_ptr<const osg::Node> getTemplate(VFS::Path::NormalizedView path, bool compile = true);
+        osg::ref_ptr<const osg::Node> getTemplate(
+            VFS::Path::NormalizedView path, bool compile = true, bool keepShapes = false);
 
         /// Clone osg::Node safely.
         /// @note Thread safe.
@@ -205,6 +207,12 @@ namespace Resource
         /// What is done to the files of the distant land of the games when they are loaded, to look into how it is
         /// drawn. To be called before they are first loaded.
         void setLodDebug(const SceneUtil::LodDebug& debug) { mLodDebug = debug; }
+
+        /// An instance of the model in the file with the optimizer kept from merging its shapes or folding its nodes
+        /// into one another, so that each shape stays a node of its own with its name (a menu scene changes one shape of
+        /// a model by its name: the digits and buttons of the Vigor Tester). The template is cached apart from the one
+        /// that getInstance and getTemplate give, so it does not matter whether the file was loaded before.
+        osg::ref_ptr<osg::Node> getInstanceKeepingShapes(VFS::Path::NormalizedView path);
 
     private:
         osg::ref_ptr<osg::Node> loadSpeedTree(VFS::Path::NormalizedView path);

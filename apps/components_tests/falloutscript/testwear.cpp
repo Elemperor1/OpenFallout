@@ -86,4 +86,100 @@ namespace
         EXPECT_DOUBLE_EQ(settings.mArmorShare, 0.5);
         EXPECT_DOUBLE_EQ(settings.mMaxRating, 85);
     }
+
+    Wear::Settings fallout3()
+    {
+        // The values of Fallout3.esm (12AY R4)
+        const Wear::Settings settings = Wear::Settings::fromGameSettings([](std::string_view name) -> std::optional<double> {
+            if (name == "fDamageToWeaponGunMult")
+                return 0.03;
+            if (name == "fDamageToWeaponEnergyMult")
+                return 0.04;
+            if (name == "fDamageToWeaponLauncherMult")
+                return 0.06;
+            if (name == "fDamageToWeaponMeleeMult")
+                return 0.05;
+            if (name == "fArmorRatingBase")
+                return 0.2;
+            if (name == "fArmorRatingMax")
+                return 1.0;
+            return std::nullopt;
+        });
+        Wear::Settings result = settings;
+        result.mFallout3 = true;
+        return result;
+    }
+
+    TEST(FalloutScriptWearTest, fallout_3_reads_the_numbers_of_its_kinds_of_weapon_and_its_armor_line)
+    {
+        const Wear::Settings settings = fallout3();
+        EXPECT_DOUBLE_EQ(settings.mGunMult, 0.03);
+        EXPECT_DOUBLE_EQ(settings.mEnergyMult, 0.04);
+        EXPECT_DOUBLE_EQ(settings.mLauncherMult, 0.06);
+        EXPECT_DOUBLE_EQ(settings.mMeleeMult, 0.05);
+        EXPECT_DOUBLE_EQ(settings.mArmorBase, 0.2);
+        EXPECT_DOUBLE_EQ(settings.mArmorMax, 1.0);
+        // What the executable has when the data says nothing
+        const Wear::Settings bare;
+        EXPECT_DOUBLE_EQ(bare.mGunMult, 0.01);
+        EXPECT_DOUBLE_EQ(bare.mArmorBase, 0.35);
+        EXPECT_FALSE(bare.mFallout3);
+    }
+
+    TEST(FalloutScriptWearTest, fallout_3_takes_the_damage_of_the_record_times_the_number_of_the_kind_of_weapon)
+    {
+        const Wear::Settings settings = fallout3();
+        // A 10 mm pistol of 20 damage (type 3), a plasma pistol (4), a rifle (5), a minigun (8), a launcher (9), a knife (1)
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 3, false, 1.0 }), 0.6, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 4, false, 1.0 }), 0.8, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 30, 5, false, 1.0 }), 0.9, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 30, 6, false, 1.0 }), 0.9, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 30, 7, false, 1.0 }), 1.2, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 10, 8, false, 1.0 }), 0.6, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 100, 9, false, 1.0 }), 6.0, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 1, false, 1.0 }), 1.0, 1e-9);
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 2, false, 1.0 }), 1.0, 1e-9);
+        // A thing that is thrown or laid keeps the whole damage
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 10, false, 1.0 }), 20.0, 1e-9);
+    }
+
+    TEST(FalloutScriptWearTest, fallout_3_uses_the_number_of_the_record_when_the_record_has_one_of_its_own)
+    {
+        const Wear::Settings settings = fallout3();
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 3, true, 0.005 }), 0.1, 1e-9);
+        // A weapon with 0 never wears
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, { 20, 3, true, 0.0 }), 0.0);
+        // The number of the record is ignored when its flag is not set
+        EXPECT_NEAR(Wear::shotPoints(settings, { 20, 3, false, 0.005 }), 0.6, 1e-9);
+    }
+
+    TEST(FalloutScriptWearTest, new_vegas_keeps_its_flat_shot_whatever_the_record_says)
+    {
+        Wear::Settings settings;
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, { 20, 3, false, 1.0 }), 0.2);
+        EXPECT_DOUBLE_EQ(Wear::shotPoints(settings, { 200, 9, true, 0.5 }), 0.2);
+    }
+
+    TEST(FalloutScriptWearTest, fallout_3_armor_gives_a_line_of_its_rating_from_a_fifth_to_the_whole)
+    {
+        const Wear::Settings settings = fallout3();
+        EXPECT_DOUBLE_EQ(Wear::armorFactor(settings, 1.0), 1.0);
+        EXPECT_NEAR(Wear::armorFactor(settings, 0.5), 0.6, 1e-9);
+        EXPECT_NEAR(Wear::armorFactor(settings, 0.0), 0.2, 1e-9);
+        EXPECT_NEAR(Wear::armorFactor(settings, -3.0), 0.2, 1e-9);
+        // The rating of a piece is rounded; the card shows the same whole number
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 25, 0.5), 15);
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 17, 0.5), 10); // 10.2
+        EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 17, 0.7), 13); // 17 * 0.76 = 12.92
+        EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 40, 0.0), 8);
+    }
+
+    TEST(FalloutScriptWearTest, new_vegas_armor_keeps_its_curve_and_cuts_what_a_card_shows)
+    {
+        const Wear::Settings settings;
+        EXPECT_DOUBLE_EQ(Wear::armorFactor(settings, 0.8), 1.0);
+        EXPECT_DOUBLE_EQ(Wear::armorFactor(settings, 0.25), 0.75);
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 17, 0.25), 12.75);
+        EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 17, 0.25), 12);
+    }
 }

@@ -12,7 +12,7 @@ namespace FalloutScript::Hud
         return std::clamp(read, messageSeconds, 8.f);
     }
 
-    void MessageLine::push(std::string text, std::string icon, float seconds)
+    void MessageLine::push(std::string text, std::string icon, float seconds, int kind, std::string sound, bool front)
     {
         if (text.empty())
             return;
@@ -20,6 +20,9 @@ namespace FalloutScript::Hud
         message.mSeconds = seconds > 0 ? seconds : secondsFor(text);
         message.mText = std::move(text);
         message.mIcon = std::move(icon);
+        message.mKind = std::clamp(kind, 0, 3);
+        message.mSound = std::move(sound);
+        message.mFront = front;
         const std::lock_guard lock(mMutex);
         mMessages.push_back(std::move(message));
         while (mMessages.size() > capacity)

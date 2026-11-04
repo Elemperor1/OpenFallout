@@ -1,6 +1,7 @@
 #ifndef COMPONENTS_LOADINGLISTENER_H
 #define COMPONENTS_LOADINGLISTENER_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -16,6 +17,15 @@ namespace Loading
         /// that the implementation decided not to show a loading screen at all. "important" labels
         /// will show in a separate message-box if the loading screen was not shown.
         virtual void setLabel(const std::string& label, bool important = false) {}
+
+        /// Say where the next loading sequence goes, for a load screen with pictures of places: the record number of
+        /// the cell (an interior) or of the world (an exterior), the world and, for an exterior, the grid cell the
+        /// player arrives in. Call it before loadingOn(); the next loadingOn() takes it, and a sequence that follows
+        /// with no destination of its own goes nowhere in particular.
+        virtual void setDestination(
+            std::uint32_t object, std::uint32_t world, bool exterior, int gridX, int gridY)
+        {
+        }
 
         /// Start a loading sequence. Must call loadingOff() when done.
         /// @note To get the loading screen to actually update, you must call setProgress / increaseProgress

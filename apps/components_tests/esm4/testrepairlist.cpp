@@ -36,6 +36,31 @@ namespace
         EXPECT_EQ(records[0].mIconMale, "a.dds");
     }
 
+    // What an armor is worn as (ETYP) and its general flags (BMDT, whose class bits say heavy or medium) are what the
+    // Jury Rigging rule compares
+    TEST(ESM4RepairListTest, armorReadsItsEquipmentTypeAndGeneralFlags)
+    {
+        std::string bmdt;
+        for (std::uint32_t value : { 0x00000004u, 0x00000088u })
+            bmdt.append(reinterpret_cast<const char*>(&value), sizeof(value));
+        const std::string data = zString("EDID", "TestArmor") + subRecord("BMDT", bmdt)
+            + valueSubRecord<std::uint32_t>("ETYP", 8) + zString("ICON", "a.dds");
+        const std::vector<ESM4::Armor> records = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 5, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].mEquipmentType, 8);
+        EXPECT_NE(records[0].mGeneralFlags & ESM4::Armor::FO3_HeavyArmor, 0u);
+        EXPECT_NE(records[0].mGeneralFlags & 0x08, 0u);
+        EXPECT_EQ(records[0].mIconMale, "a.dds");
+    }
+
+    TEST(ESM4RepairListTest, armorWithoutEtypHasNoEquipmentType)
+    {
+        const std::string data = zString("EDID", "TestArmor") + zString("ICON", "a.dds");
+        const std::vector<ESM4::Armor> records = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 5, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].mEquipmentType, -1);
+    }
+
     TEST(ESM4RepairListTest, weaponReadsItsRepairList)
     {
         const std::string data = zString("EDID", "TestWeapon") + valueSubRecord<std::uint32_t>("REPL", 0x00123456);

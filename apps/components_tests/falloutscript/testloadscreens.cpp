@@ -85,7 +85,8 @@ namespace
             picture.mIcon = icon;
             picture.mText = icon;
             picture.mMainMenu = mainMenu;
-            picture.mLocal = local;
+            if (local)
+                picture.mPlaces.push_back({ 0x100, 0, 0, 0 });
             pictures.push_back(picture);
         };
         add("interface\\loading\\a.dds", false, false);
@@ -118,6 +119,102 @@ namespace
         ASSERT_EQ(other.size(), 2u);
         EXPECT_EQ(other[0], 6u);
         EXPECT_EQ(other[1], 5u);
+    }
+
+    // A pool of pictures for places: g and h are general, i is for the interior 0x500, j for the world 0x900, k for the grid
+    // cell (3, -4) of the world 0x900, l for the interior 0x500 too (and with the same file as i)
+    std::vector<Picture> placePool()
+    {
+        std::vector<Picture> pictures;
+        const auto add = [&pictures](const char* icon, std::vector<LoadScreens::Place> places) {
+            Picture picture;
+            picture.mIcon = icon;
+            picture.mText = icon;
+            picture.mPlaces = std::move(places);
+            pictures.push_back(std::move(picture));
+        };
+        add("g.dds", {});
+        add("h.dds", {});
+        add("i.dds", { { 0x500, 0, 0, 0 } });
+        add("j.dds", { { 0x900, 0, 0, 0 } });
+        add("k.dds", { { 0, 0x900, 3, -4 } });
+        add("I.dds", { { 0x500, 0, 0, 0 } });
+        add("m.dds", {});
+        add("n.dds", {});
+        return pictures;
+    }
+
+    TEST(FalloutScriptLoadScreensTest, a_picture_is_for_the_cell_of_an_interior_or_the_world_of_an_exterior)
+    {
+        const std::vector<Picture> pictures = placePool();
+        LoadScreens::Destination interior;
+        interior.mSet = true;
+        interior.mObject = 0x500;
+        EXPECT_FALSE(LoadScreens::isForPlace(pictures[0], interior));
+        EXPECT_TRUE(LoadScreens::isForPlace(pictures[2], interior));
+        EXPECT_FALSE(LoadScreens::isForPlace(pictures[3], interior));
+        LoadScreens::Destination exterior;
+        exterior.mSet = true;
+        exterior.mObject = 0x900;
+        exterior.mWorld = 0x900;
+        exterior.mExterior = true;
+        exterior.mGridX = 3;
+        exterior.mGridY = -4;
+        EXPECT_TRUE(LoadScreens::isForPlace(pictures[3], exterior));
+        // The grid cell of the world matches when the player arrives in it
+        EXPECT_TRUE(LoadScreens::isForPlace(pictures[4], exterior));
+        exterior.mGridX = 4;
+        EXPECT_FALSE(LoadScreens::isForPlace(pictures[4], exterior));
+        // A destination that was not set is no place
+        EXPECT_FALSE(LoadScreens::isForPlace(pictures[2], LoadScreens::Destination()));
+        // A grid does not match in an interior
+        LoadScreens::Destination other;
+        other.mSet = true;
+        other.mObject = 0x777;
+        other.mWorld = 0x900;
+        other.mGridX = 3;
+        other.mGridY = -4;
+        EXPECT_FALSE(LoadScreens::isForPlace(pictures[4], other));
+    }
+
+    TEST(FalloutScriptLoadScreensTest, a_load_to_a_place_takes_one_picture_of_the_place_and_general_ones_for_the_rest)
+    {
+        const std::vector<Picture> pictures = placePool();
+        const auto first = [](int low, int) { return low; };
+        LoadScreens::Destination interior;
+        interior.mSet = true;
+        interior.mObject = 0x500;
+        const std::vector<std::size_t> chosen = LoadScreens::choosePictures(pictures, false, interior, 4, 1, first);
+        // one for the place (the other with the same file is not taken), then the general ones in order
+        ASSERT_EQ(chosen.size(), 4u);
+        EXPECT_EQ(chosen[0], 2u);
+        EXPECT_EQ(chosen[1], 0u);
+        EXPECT_EQ(chosen[2], 1u);
+        EXPECT_EQ(chosen[3], 6u);
+        // More pictures of the place when the executable's setting says so (the file taken is not taken twice)
+        const std::vector<std::size_t> more = LoadScreens::choosePictures(pictures, false, interior, 4, 3, first);
+        ASSERT_EQ(more.size(), 4u);
+        EXPECT_EQ(more[0], 2u);
+        EXPECT_EQ(more[1], 0u);
+        // No place picture for the place: general ones only
+        LoadScreens::Destination nowhere;
+        nowhere.mSet = true;
+        nowhere.mObject = 0x777;
+        const std::vector<std::size_t> general = LoadScreens::choosePictures(pictures, false, nowhere, 3, 1, first);
+        ASSERT_EQ(general.size(), 3u);
+        EXPECT_EQ(general[0], 0u);
+        // A load that goes nowhere takes general pictures
+        const std::vector<std::size_t> none
+            = LoadScreens::choosePictures(pictures, false, LoadScreens::Destination(), 4, 1, first);
+        ASSERT_EQ(none.size(), 4u);
+        EXPECT_EQ(none[0], 0u);
+        EXPECT_EQ(none[3], 7u);
+        // The main menu takes its own whatever the place
+        std::vector<Picture> menu = placePool();
+        menu[1].mMainMenu = true;
+        const std::vector<std::size_t> fromMenu = LoadScreens::choosePictures(menu, true, interior, 20, 1, first);
+        ASSERT_EQ(fromMenu.size(), 1u);
+        EXPECT_EQ(fromMenu[0], 1u);
     }
 
     TEST(FalloutScriptLoadScreensTest, the_main_menu_takes_the_pictures_that_are_marked_for_it)

@@ -5,7 +5,8 @@
 -- and the tags of the skills on its character making menu (chargen/char_gen_menu.xml), each drawn from the file; a screen
 -- whose file the install lacks, the traits (which of the game's two trait menus is opened for them is not read yet) and the
 -- screen of the sex and race (a menu with a rendered head and sliders, which has nothing to show here) are the stand-in
--- widgets of this script.
+-- widgets of this script. The points of SPECIAL asked for by ShowLoveTesterMenu (the Vigor Tester) or ShowSPECIALBookMenu
+-- are not a menu file but a model whose pages the player turns: falloutspecialscreen.lua draws them.
 -- The face of the character is not made here (no sliders, no head to turn).
 local core = require('openfallout.core')
 local input = require('openfallout.input')
@@ -20,6 +21,8 @@ local function messageOpen()
 end
 
 local menuModule = require('scripts.omw.falloutmenu')
+-- The screens of SPECIAL that are a model whose pages the player turns (the Vigor Tester, the SPECIAL book)
+local special = require('scripts.omw.falloutspecialscreen')
 
 local chargen = core.chargen
 local pipboy = core.pipboy
@@ -69,6 +72,7 @@ local function closeShown()
 end
 
 local function destroyElement()
+    special.close()
     if element then
         element:destroy()
         element = nil
@@ -738,6 +742,10 @@ function render()
     end
     shownPage = page.page
     local state = chargen.state()
+    -- The Vigor Tester and the SPECIAL book are models that the player turns; the rest of the screens are menu files
+    if page.page == 'special' and special.start(page, state) then
+        return
+    end
     if menuPages[page.page] then
         local ok, drawn = pcall(menuPages[page.page], state)
         if ok and drawn then return end
@@ -776,6 +784,12 @@ function render()
 end
 
 local function sync()
+    -- The game stands still while a screen is up and the engine hands onFrame a step of 0 then: the time of the frame is
+    -- the real one (Mac round 12AZ E)
+    local seconds = core.getRealFrameDuration()
+    if special.isOpen() then
+        special.update(seconds)
+    end
     -- A menu drawn from a file keeps the window size it was opened with until it is told the window changed
     if shown then
         shown:checkSize()
@@ -804,8 +818,28 @@ return {
     engineHandlers = {
         -- The game stands still while a screen is open, and the screens of the engine open between frames
         onFrame = sync,
+        -- The buttons of a pad on the model screens of SPECIAL
+        onControllerButtonPress = function(button)
+            -- A box over the screen has the pad, as it has the keys; so has the pause menu (Escape opens it over the
+            -- Vigor Tester and the book, and the mode is the main menu then)
+            if messageOpen() then
+                return
+            end
+            if special.isOpen() and I.UI.getMode() == 'Interface' then
+                special.pad(button)
+            end
+        end,
         onKeyPress = function(key)
-            if messageOpen() or not shownPage or not (element or shown) then
+            if messageOpen() then
+                return
+            end
+            if special.isOpen() then
+                if I.UI.getMode() == 'Interface' then
+                    special.press(key.code, key.symbol)
+                end
+                return
+            end
+            if not shownPage or not (element or shown) then
                 return
             end
             if shown and controls and shownPage ~= 'name' and key.code ~= input.KEY.Enter then
@@ -838,6 +872,12 @@ return {
         -- A screen that is left (Escape) is done with what it has so far; the main menu on top of it is not leaving it
         UiModeChanged = function(data)
             if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then
+                if special.isOpen() then
+                    -- Escape does not leave the Vigor Tester or the book (it opens the pause menu over them): the mode stays
+                    modeOpen = false
+                    openMode()
+                    return
+                end
                 modeOpen = false
                 destroyElement()
                 if chargen.page() then

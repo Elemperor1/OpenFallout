@@ -63,7 +63,8 @@ namespace OFLua
         sol::table api(lua, sol::create);
 
         // The messages that were printed since this was last called, oldest first: the text, the path of the picture
-        // that goes with it ("" for none) and the seconds it stays
+        // that goes with it ("" for none), the seconds it stays, the face of the Vault Boy for one with no picture (0 to 3),
+        // the name of the sound that plays when it comes on ("" for none) and whether it goes before the ones that wait
         api["takeMessages"] = [lua]() {
             sol::table rows(lua, sol::create);
             int index = 1;
@@ -73,6 +74,9 @@ namespace OFLua
                 row["text"] = message.mText;
                 row["icon"] = message.mIcon;
                 row["seconds"] = message.mSeconds;
+                row["kind"] = message.mKind;
+                row["sound"] = message.mSound;
+                row["front"] = message.mFront;
                 rows[index++] = row;
             }
             return rows;

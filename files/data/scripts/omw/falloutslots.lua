@@ -526,9 +526,10 @@ local function onPad(button)
     end
 end
 
-local function onFrame(dt)
+-- The game stands still while this screen is up and the engine hands onFrame a step of 0 then: the time of the frame is the real one
+local function onFrame()
     sync()
-    if shown then stepFrame(dt or 0) end
+    if shown then stepFrame(core.getRealFrameDuration()) end
 end
 
 return {

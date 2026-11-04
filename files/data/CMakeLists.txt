@@ -177,6 +177,7 @@ set(BUILTIN_DATA_FILES
     scripts/omw/falloutitemcards.lua
     scripts/omw/falloutlevelup.lua
     scripts/omw/falloutlockpick.lua
+    scripts/omw/falloutspecialscreen.lua
     scripts/omw/falloutloot.lua
     scripts/omw/falloutmenu.lua
     scripts/omw/falloutmenuhotkeys.lua

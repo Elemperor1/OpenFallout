@@ -21,6 +21,19 @@ namespace FalloutScript::Wear
         double mArmorShare = 0.35;
         double mMaxRating = 85;
 
+        /// Fallout 3 wears and rates things in another way (Mac round 12AY R4, `Fallout3.exe`): a weapon loses the damage
+        /// of its record times a number by its kind (fDamageToWeaponGunMult, ...EnergyMult, ...LauncherMult,
+        /// ...MeleeMult: 0.01 in the executable, 0.03, 0.04, 0.06 and 0.05 in the data) and armor gives
+        /// base + (max - base) * condition of its rating (fArmorRatingBase, fArmorRatingMax: 0.35 and 1.0 in the
+        /// executable, 0.2 and 1.0 in the data). It has no low-condition message.
+        bool mFallout3 = false;
+        double mGunMult = 0.01;
+        double mEnergyMult = 0.01;
+        double mLauncherMult = 0.01;
+        double mMeleeMult = 0.01;
+        double mArmorBase = 0.35;
+        double mArmorMax = 1.0;
+
         using Lookup = std::function<std::optional<double>(std::string_view)>;
         static Settings fromGameSettings(const Lookup& lookup);
     };
@@ -36,12 +49,37 @@ namespace FalloutScript::Wear
     /// a half and the condition (0.75 at a quarter, a half at nothing)
     double armorFactor(double condition);
 
+    /// What the condition of armor makes of its rating in the game of the settings: the curve of New Vegas above, or the
+    /// line of Fallout 3 from `mArmorBase` at nothing to `mArmorMax` at the whole
+    double armorFactor(const Settings& settings, double condition);
+
+    /// A rating (or threshold) of `value` at `condition`. New Vegas leaves the number as it is; Fallout 3 rounds it to
+    /// the nearest whole one (0x47D400).
+    double armorValue(const Settings& settings, double value, double condition);
+
+    /// What a card or a list shows of a whole `value` at `condition`: New Vegas cuts the product to a whole number
+    /// (0x646360), Fallout 3 rounds it
+    double armorShown(const Settings& settings, double value, double condition);
+
     /// What the effect of an ammunition does to a number: its operation is 0 to add, 1 to multiply, 2 to subtract (the kinds of
     /// effect of the executable are 0 damage, 1 resistance, 2 threshold, 3 spread, 4 condition and 5 fatigue)
     double applyAmmoEffect(double value, std::uint32_t operation, double amount);
 
     /// The health points that a shot takes off the weapon that fires it, before the effects of its ammunition
     double shotPoints(const Settings& settings);
+
+    /// What Fallout 3 takes off a weapon for a shot (or a swing that reaches): the damage of the record times the number
+    /// of its kind of weapon, or the number of the record when it has one of its own (0x582640). `type` is the animation
+    /// type of the weapon: 0 to 2 melee, 3, 5 and 6 guns, 4 and 7 energy, 8 and 9 launchers, a thing that is thrown or laid
+    /// 1.
+    struct WeaponWear
+    {
+        std::uint32_t mDamage = 0;
+        std::uint32_t mType = 0;
+        bool mOverridden = false;
+        double mOverride = 1.0;
+    };
+    double shotPoints(const Settings& settings, const WeaponWear& weapon);
 
     /// The health points that armor loses to a blow of `damage` points that the armor takes `resistance` percent of
     /// (the executable's 0x9B5A30: the share times the damage times what the armor takes, which is cut at the most that

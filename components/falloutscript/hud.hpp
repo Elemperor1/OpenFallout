@@ -14,13 +14,18 @@
 
 namespace FalloutScript::Hud
 {
-    /// A line of the message area of the head-up display: the text, the icon that goes with it (a path of a texture,
-    /// empty for none) and the seconds it stays
+    /// A line of the message area of the head-up display: the text, the icon that goes with it (a path of a texture; the
+    /// kind of face below when it is empty), the seconds it stays, the sound that plays when it comes on, and whether it
+    /// goes before the ones that wait (FalloutNV.exe 0x7052F0: Mac round 12AV S4)
     struct Message
     {
         std::string mText;
         std::string mIcon;
         float mSeconds = 0;
+        /// The face of the Vault Boy that a message without a picture gets: 0 neutral, 1 very happy, 2 sad, 3 in pain
+        int mKind = 0;
+        std::string mSound;
+        bool mFront = false;
     };
 
     /// The seconds that a message without a time of its own stays (the karma messages of the games pass 2)
@@ -37,7 +42,8 @@ namespace FalloutScript::Hud
     public:
         static constexpr std::size_t capacity = 8;
 
-        void push(std::string text, std::string icon = {}, float seconds = 0);
+        void push(std::string text, std::string icon = {}, float seconds = 0, int kind = 0, std::string sound = {},
+            bool front = false);
         /// The messages that were said since the last time, oldest first
         std::vector<Message> take();
         std::size_t size();

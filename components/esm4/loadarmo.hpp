@@ -176,6 +176,7 @@ namespace ESM4
         std::uint32_t mGeneralFlags;
         ESM::FormId mScriptId;
         ESM::FormId mRepairList; // REPL, the list of the items that repair it (Fallout 3 and New Vegas)
+        std::int32_t mEquipmentType = -1; // ETYP, what it is worn as (New Vegas: 7 body, 8 head), -1 when the record has none
         std::uint16_t mEnchantmentPoints;
         ESM::FormId mEnchantment;
 

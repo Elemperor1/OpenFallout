@@ -1032,9 +1032,13 @@ namespace Resource
         return static_cast<osg::Node*>(mErrorMarker->clone(osg::CopyOp::DEEP_COPY_ALL));
     }
 
-    osg::ref_ptr<const osg::Node> SceneManager::getTemplate(VFS::Path::NormalizedView path, bool compile)
+    osg::ref_ptr<const osg::Node> SceneManager::getTemplate(
+        VFS::Path::NormalizedView path, bool compile, bool keepShapes)
     {
-        osg::ref_ptr<osg::Object> obj = mCache->getRefFromObjectCache(path);
+        // The template that keeps the shapes apart is a different object from the ordinary one of the file
+        const std::string shapesKey = keepShapes ? std::string(path.value()) + "#shapes" : std::string();
+        osg::ref_ptr<osg::Object> obj
+            = keepShapes ? mCache->getRefFromObjectCache(shapesKey) : mCache->getRefFromObjectCache(path);
         if (obj)
             return osg::ref_ptr<const osg::Node>(static_cast<osg::Node*>(obj.get()));
         else
@@ -1077,7 +1081,12 @@ namespace Resource
                 optimizer.setSharedStateManager(mSharedStateManager, &mSharedStateMutex);
                 optimizer.setIsOperationPermissibleForObjectCallback(new CanOptimizeCallback);
 
-                optimizer.optimize(loaded, getMeshOptimizationOptions(*mVFS, path));
+                unsigned int options = getMeshOptimizationOptions(*mVFS, path);
+                if (keepShapes)
+                    options &= ~static_cast<unsigned int>(SceneUtil::Optimizer::MERGE_GEOMETRY
+                        | SceneUtil::Optimizer::REMOVE_REDUNDANT_NODES
+                        | SceneUtil::Optimizer::FLATTEN_STATIC_TRANSFORMS);
+                optimizer.optimize(loaded, options);
             }
             else
                 shareState(loaded);
@@ -1087,7 +1096,7 @@ namespace Resource
             else
                 loaded->getBound();
 
-            mCache->addEntryToObjectCache(path.value(), loaded);
+            mCache->addEntryToObjectCache(keepShapes ? shapesKey : std::string(path.value()), loaded);
             return loaded;
         }
     }
@@ -1126,6 +1135,11 @@ namespace Resource
     osg::ref_ptr<osg::Node> SceneManager::getInstance(VFS::Path::NormalizedView path)
     {
         return getInstance(getTemplate(path));
+    }
+
+    osg::ref_ptr<osg::Node> SceneManager::getInstanceKeepingShapes(VFS::Path::NormalizedView path)
+    {
+        return getInstance(getTemplate(path, true, true));
     }
 
     osg::ref_ptr<osg::Node> SceneManager::cloneNode(const osg::Node* base)

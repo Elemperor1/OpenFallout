@@ -8,6 +8,8 @@
 #include <osg/FrontFace>
 #include <osg/MatrixTransform>
 #include <osg/Texture2D>
+#include <osgUtil/IntersectionVisitor>
+#include <osgUtil/LineSegmentIntersector>
 
 #include <components/debug/debuglog.hpp>
 #include <components/misc/resourcehelpers.hpp>
@@ -186,6 +188,8 @@ namespace OFRender
 
         float nearPlane() const { return mNear; }
         float farPlane() const { return mFar; }
+        const osg::Matrixf& view() const { return mView; }
+        const osg::Matrixf& projection() const { return mProjection; }
 
         osg::ref_ptr<osg::Group> mGroup = new osg::Group;
 
@@ -224,6 +228,8 @@ namespace OFRender
         std::string mActiveSequence;
         // The picture each shape was given by setTexture (by the shape's name in lower case)
         std::map<std::string, std::string> mTextures;
+        // The masks of the shapes that setShapeVisible hid, as they were (by the shape's name in lower case)
+        std::map<std::string, osg::Node::NodeMask> mHidden;
     };
 
     MenuScene::MenuScene(osg::Group* parent, Resource::ResourceSystem* resourceSystem, int width, int height)
@@ -359,14 +365,15 @@ namespace OFRender
         return find(name) != nullptr;
     }
 
-    bool MenuScene::addModel(const std::string& name, VFS::Path::NormalizedView path)
+    bool MenuScene::addModel(const std::string& name, VFS::Path::NormalizedView path, bool keepShapes)
     {
         removeModel(name);
 
         osg::ref_ptr<osg::Node> instance;
         try
         {
-            instance = mResourceSystem->getSceneManager()->getInstance(path);
+            instance = keepShapes ? mResourceSystem->getSceneManager()->getInstanceKeepingShapes(path)
+                                  : mResourceSystem->getSceneManager()->getInstance(path);
         }
         catch (const std::exception& e)
         {
@@ -394,7 +401,7 @@ namespace OFRender
             size_t count = 0;
             for (const auto& entry : model->mNodes)
             {
-                if (++count > 60)
+                if (++count > 1500)
                     break;
                 names += " " + entry.first;
             }
@@ -555,6 +562,88 @@ namespace OFRender
         }
         model->mTextures[key] = std::string(path.value());
         return true;
+    }
+
+    bool MenuScene::setShapeVisible(const std::string& name, const std::string& shape, bool visible)
+    {
+        Model* model = find(name);
+        if (model == nullptr)
+            return false;
+        const auto found = model->mNodes.find(shape);
+        if (found == model->mNodes.end())
+            return false;
+        const std::string key = Misc::StringUtils::lowerCase(shape);
+        osg::Node* node = found->second;
+        const auto hidden = model->mHidden.find(key);
+        if (visible)
+        {
+            if (hidden != model->mHidden.end())
+            {
+                node->setNodeMask(hidden->second);
+                model->mHidden.erase(hidden);
+            }
+        }
+        else if (hidden == model->mHidden.end())
+        {
+            model->mHidden[key] = node->getNodeMask();
+            node->setNodeMask(0);
+        }
+        return true;
+    }
+
+    namespace
+    {
+        /// The point of the scene that a point of the picture shows at the depth `depth` of the projection
+        osg::Vec3d unproject(const osg::Matrixd& inverse, double x, double y, double depth)
+        {
+            return osg::Vec3d(x, y, depth) * inverse;
+        }
+    }
+
+    std::string MenuScene::pick(float x, float y, const std::vector<std::string>& shapes) const
+    {
+        if (shapes.empty())
+            return {};
+        const osg::Matrixd view = mRTTNode->view();
+        const osg::Matrixd inverseView = osg::Matrixd::inverse(view);
+        const osg::Matrixd inverse = osg::Matrixd::inverse(view * osg::Matrixd(mRTTNode->projection()));
+        // The picture is drawn upside down (see upsideDown), so its top is the bottom of the projection's picture
+        const double ndcX = 2.0 * x - 1.0;
+        const double ndcY = 2.0 * y - 1.0;
+        const osg::Vec3d eye = inverseView.getTrans();
+        // Any point of the picture's ray that is in front of the camera: the ray goes through the eye
+        osg::Vec3d through = unproject(inverse, ndcX, ndcY, 0.5);
+        osg::Vec3d direction = through - eye;
+        if (direction.length2() == 0.0)
+            return {};
+        direction.normalize();
+        const double reach = std::max(static_cast<double>(mRTTNode->farPlane()), 1.0);
+
+        osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector
+            = new osgUtil::LineSegmentIntersector(osgUtil::Intersector::MODEL, eye, eye + direction * reach);
+        osgUtil::IntersectionVisitor visitor(intersector);
+        mRTTNode->mGroup->accept(visitor);
+
+        std::vector<std::string> wanted;
+        wanted.reserve(shapes.size());
+        for (const std::string& shape : shapes)
+            wanted.push_back(Misc::StringUtils::lowerCase(shape));
+
+        // The hits come nearest first; a hit on anything under a wanted node counts for that node
+        for (const osgUtil::LineSegmentIntersector::Intersection& hit : intersector->getIntersections())
+        {
+            for (auto node = hit.nodePath.rbegin(); node != hit.nodePath.rend(); ++node)
+            {
+                const std::string& named = (*node)->getName();
+                if (named.empty())
+                    continue;
+                const std::string lower = Misc::StringUtils::lowerCase(named);
+                for (size_t i = 0; i < wanted.size(); ++i)
+                    if (wanted[i] == lower)
+                        return shapes[i];
+            }
+        }
+        return {};
     }
 
     std::vector<MenuScene::Sequence> MenuScene::sequences(const std::string& name) const

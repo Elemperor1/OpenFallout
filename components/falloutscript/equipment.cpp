@@ -477,15 +477,28 @@ namespace FalloutScript
         return pieces;
     }
 
+    void Equipment::setWearSettings(WearSettings settings)
+    {
+        const std::lock_guard lock(mMutex);
+        mWearSettings = std::move(settings);
+    }
+
     template <class Pick>
     double Equipment::sumOfWornArmor(FormId actor, Pick pick)
     {
+        WearSettings provider;
+        {
+            const std::lock_guard lock(mMutex);
+            provider = mWearSettings;
+        }
+        const Wear::Settings newVegas;
         double total = 0;
         for (const WornPiece& piece : wornArmor(actor))
         {
             ItemInfo info;
             if (mRecords.itemInfo(piece.mItem, info))
-                total += pick(info) * Wear::armorFactor(static_cast<double>(piece.mCondition) / ActorState::fullCondition);
+                total += Wear::armorValue(provider ? provider() : newVegas, pick(info),
+                    static_cast<double>(piece.mCondition) / ActorState::fullCondition);
         }
         return total;
     }
