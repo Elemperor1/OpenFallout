@@ -289,6 +289,10 @@ namespace OFLua
         api["sliders"] = [lua]() { return faceSliderRows(lua); };
         api["setSlider"]
             = [](std::string_view kind, int control, int value) { scripts().lookSetSlider(parseKind(kind), control, value); };
+        // The age slider (1 to 10): moves the whole face along the age directions of the face file; false when the file
+        // has none
+        api["hasAge"] = []() { return scripts().lookHasAge(); };
+        api["setAge"] = [](int value) { return scripts().lookSetAge(value); };
         // The player is done with the screen: what it picked becomes the character and the next screen opens
         api["finish"] = []() { scripts().finishChargenPage(); };
         return LuaUtil::makeReadOnly(api);

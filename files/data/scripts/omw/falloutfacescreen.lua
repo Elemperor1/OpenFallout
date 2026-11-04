@@ -71,6 +71,10 @@ local bounds = { top = DEFAULT_TOP, bottom = DEFAULT_BOTTOM }
 local sliderTiles = {}
 local look = nil
 local sliderValues = {}
+-- The face slider that was just moved keeps the number it was moved to when the face is read again; the others show
+-- what the face now gives (FalloutNV.exe leaves the active slider out of the re-read, 0x7B1887: it would show one step
+-- nearer zero now and then, because the controls are not at right angles). It is for the next reading only.
+local held = nil
 -- What the sliders that the host does not keep show: the number of the preset and the age
 local presetValue = 1
 local ageValue = 5
@@ -130,6 +134,10 @@ local function refreshLook()
     for _, slider in ipairs(chargen.sliders()) do
         sliderValues[slider.kind .. slider.control] = slider.value
     end
+    if held then
+        sliderValues[held.key] = held.value
+        held = nil
+    end
 end
 
 -- The last tab: the one that the barber (hair) and the plastic surgeon (face) start at is the only one they have
@@ -170,7 +178,10 @@ local function faceSliders(list)
             local kind, control = entry.kind, entry.control
             made[#made + 1] = slider(word(entry.setting, entry.setting), entry.minimum, entry.maximum, 0.25,
                 function() return sliderValues[key] or 0 end,
-                function(value) chargen.setSlider(kind, control, value) end)
+                function(value)
+                    chargen.setSlider(kind, control, value)
+                    held = { key = key, value = value }
+                end)
         end
     end
     return made
@@ -231,10 +242,13 @@ local function listRows(list)
             end
             randomize()
         end)
-        -- The age moves the whole face along the age directions of the face file (the fan controls); the host has not
-        -- got them yet, so the slider is there and dim
+        -- The age moves the whole face along the age directions of the face file (the fan controls); without the file
+        -- the slider is there and dim
         made[#made + 1] = slider(word('sRSMAge', 'Age'), 1, 10, 0.25, function() return ageValue end,
-            function(value) ageValue = value end, nil, false)
+            function(value)
+                ageValue = value
+                chargen.setAge(value)
+            end, nil, chargen.hasAge())
     elseif list == 3 then
         made[#made + 1] = link(5)
         made[#made + 1] = link(6)

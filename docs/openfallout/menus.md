@@ -349,11 +349,19 @@ facial hair for a man), 4 customize (links: shape, tone, eye colour), 5 hair sty
 10 to 18 the shape sliders (general, forehead, brow, eyes, nose, mouth, cheeks, jaw, chin) and 19 the tone sliders. A link row
 is its list's name followed by ` >`. The first four lists are the tabs (`1. Sex`, `2. Race`, `3. Face`, `4. Hair`, numbered only
 for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` in a box; Back and
-Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten (-50 to
-50; the controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -50 to 30) and writes nothing beside its
+Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten, cut towards zero (-35 to 35, the INI value of both games, 3.5; the
+controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -35 to 30) and writes nothing beside its
 label; moving the slider by its arrows is one step, by the halves of its bar a jump of a quarter of its range (an eighth for
-the colours). The sliders are the controls of `facegen\si.ctl`: one slider moves all fifty coefficients along its direction
-(`FaceControls`), and the tone sliders do the same for the skin. Randomize (after the box `sRSMConfirmRandomize`) gives each
+the colours). The sliders are the controls of `facegen\si.ctl` (read by `readFaceControlFile`, which takes only the exact layout
+of the games' file: 56 shape, 26 asymmetric and 33 tone controls and the fan controls): a slider's value is the dot product of
+its direction with the numbers of the whole face (the race's for the sex plus the character's own, which are what the record
+keeps), and moving it adds the difference along the direction (`FaceControls`; the sum is kept as a float after every term, as
+the executable does). The directions are not at right angles to each other, so the other sliders move with it; the slider that
+was moved keeps its number and the others read the face again (the executable leaves the active slider out, so it never shows
+a step nearer zero). The age slider (1 to 10) stands for 15, 20, 26, 31, 37, 42, 48, 53, 59 and 64 years and moves the face along
+the two age directions of the file (`FaceAge`): the age in years for the shape, and for the tone the same shift, so that the tone
+stays as much older or younger than the shape as it was; the second number of the age directions only the random face redraws.
+Randomize (after the box `sRSMConfirmRandomize`) gives each
 shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times 1.5 and zeroes the asymmetric ones; the hair,
 eyes and colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
 race when none has it), by name; choosing one puts its hair, eyes, colour, head parts and face on. A click on the sex or race
@@ -372,9 +380,18 @@ or farther (`setHeadView`). The barber and the plastic surgeon have the one tab 
 reads `Done`. The head has not been seen in the running game yet: the bone it is aimed at, the lights and the alignment of the
 drag and the wheel with the picture are checked in the offline harness only.
 
-Not done: the age slider (it is in the list, dim: the age is a fan control of `facegen\si.ctl` and the file is not read yet, so
-the shape and tone sliders have no controls either), the keys of the pad, and the glyphs on the ends of a slider's bar (guess:
-`<` and `>`).
+The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
+at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
+the race's order. A hair is a row when it is playable, the race lists it and the sex can wear it (the second flag bit must be
+clear for a man, the third for a woman); eyes the same with the race's eyes; the facial hair rows (a man only) are every playable
+head part, whatever the race. The lit facial hair row is the character's first part in its list, which is the last the record
+names; a click on it takes it off and a click on another takes all the character's parts away (the eyebrows too) and puts that one
+on. The presets are sorted by name byte by byte (capitals first). A hair that the new sex or race cannot have is replaced by the
+race's own for the sex, and only when the race has none by the first of its hairs that fits (Mac round 12BB C1 and C2).
+
+Not done: the keys of the pad, the glyphs on the ends of a slider's bar (guess: `<` and `>`), the scrolling of the long lists by
+the executable's rules (one row's height a click, rows cut by the window hidden), the colour presets of the hair, the second age
+number in the random face, and the real-game check of the rows' order (it is read from the executable's loading code).
 
 ### The level-up screen
 

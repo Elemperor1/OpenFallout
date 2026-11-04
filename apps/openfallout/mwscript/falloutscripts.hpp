@@ -34,27 +34,26 @@
 #include <components/falloutscript/caravan.hpp>
 #include <components/falloutscript/casino.hpp>
 #include <components/falloutscript/chargen.hpp>
-#include <components/falloutscript/facelook.hpp>
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/combatstate.hpp>
 #include <components/falloutscript/commandtable.hpp>
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
-#include <components/falloutscript/itemmods.hpp>
-#include <components/falloutscript/repair.hpp>
-#include <components/falloutscript/wear.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/detection.hpp>
 #include <components/falloutscript/dialogue.hpp>
 #include <components/falloutscript/enableparents.hpp>
 #include <components/falloutscript/equipment.hpp>
+#include <components/falloutscript/facecontrolfile.hpp>
+#include <components/falloutscript/facelook.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
 #include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
+#include <components/falloutscript/itemmods.hpp>
 #include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/limbs.hpp>
 #include <components/falloutscript/magic.hpp>
@@ -74,6 +73,7 @@
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
 #include <components/falloutscript/regionline.hpp>
+#include <components/falloutscript/repair.hpp>
 #include <components/falloutscript/reputation.hpp>
 #include <components/falloutscript/roulette.hpp>
 #include <components/falloutscript/saveaccess.hpp>
@@ -83,6 +83,7 @@
 #include <components/falloutscript/vanillacommands.hpp>
 #include <components/falloutscript/vats.hpp>
 #include <components/falloutscript/voicefiles.hpp>
+#include <components/falloutscript/wear.hpp>
 
 #include <osg/Vec3f>
 
@@ -1800,6 +1801,10 @@ namespace OFScript
         /// The whole number a slider shows for the control, and moving the slider to one
         int lookSlider(FalloutScript::FaceKind kind, int control);
         void lookSetSlider(FalloutScript::FaceKind kind, int control, int value);
+        /// The age slider (1 to 10) moved to a number: the whole face along the age directions of the face file. False
+        /// when the file has none.
+        bool lookSetAge(int slider);
+        bool lookHasAge();
         /// How many controls of facegen\si.ctl the screen has (none when the file was not read)
         int lookControlCount(FalloutScript::FaceKind kind);
         /// A character that has the look of the player, for the head the screen shows: the record of a character of the
@@ -2514,10 +2519,11 @@ namespace OFScript
         std::optional<FalloutScript::DamageSettings> mDamageSettings;
         std::optional<FalloutScript::Wear::Settings> mWearSettings;
         std::optional<FalloutScript::Repair::Settings> mRepairSettings;
-        /// The controls of facegen\si.ctl, read when the face screen first needs them
-        const FalloutScript::FaceControls& faceControls();
+        /// The controls and the age of facegen\si.ctl, read when the face screen first needs them (without the controls
+        /// when the file is not there or is not the layout)
+        const FalloutScript::FaceControlFile& faceControls();
         std::mutex mFaceControlsMutex;
-        std::optional<FalloutScript::FaceControls> mFaceControls;
+        std::optional<FalloutScript::FaceControlFile> mFaceControls;
         /// The numbers of the generator of the random faces
         std::mt19937 mLookRandom{ std::random_device{}() };
         std::optional<FalloutScript::FurnitureDeltas> mFurnitureDeltas;

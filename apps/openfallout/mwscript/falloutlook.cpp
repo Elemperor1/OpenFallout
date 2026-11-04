@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadeyes.hpp>
@@ -10,7 +11,10 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrace.hpp>
 #include <components/misc/strings/lower.hpp>
+#include <components/resource/resourcesystem.hpp>
+#include <components/vfs/manager.hpp>
 
+#include "../mwbase/environment.hpp"
 #include "../mwclass/esm4base.hpp"
 #include "../mwclass/esm4sources.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -23,9 +27,10 @@ namespace OFScript
         using FalloutScript::FaceLook;
         using FalloutScript::FormId;
 
-        /// The flags of a hair, a head part and eyes: the first is that the player can have it. A hair also says which
-        /// sex cannot wear it (the second: not a man's, the third: not a woman's), as the games before it do (guess:
-        /// the executable's own tests are +0x48 bit 1 and bit 2 of the form, 12AW S7; the census of 12BB settles it).
+        /// The flags of a hair, a head part and eyes: the first is that the player can have it. A hair and eyes also
+        /// say which sex cannot have them (the second: not a man's, the third: not a woman's), as the executable tests
+        /// them
+        /// (+0x48 of a hair and +0x30 of eyes: bit 1 for a man and bit 2 for a woman; Mac round 12BB C2).
         constexpr std::uint8_t playableFlag = 0x01;
         constexpr std::uint8_t notMaleFlag = 0x02;
         constexpr std::uint8_t notFemaleFlag = 0x04;
@@ -55,17 +60,47 @@ namespace OFScript
             return full.empty() ? editor : full;
         }
 
-        bool hairFits(const ESM4::Hair& hair, bool female)
+        /// The sex a hair or eyes are for: the flags say which sex cannot have them (the second bit: not a man's, the
+        /// third: not a woman's; FalloutNV.exe 0x5FDF60, 0x5FDF80, 0x5FC530 and 0x5FC590, Mac round 12BB C2)
+        bool sexFits(std::uint8_t flags, bool female)
         {
-            const std::uint8_t flags = hair.mData.flags;
-            return (flags & playableFlag) != 0 && (flags & (female ? notFemaleFlag : notMaleFlag)) == 0;
+            return (flags & (female ? notFemaleFlag : notMaleFlag)) == 0;
         }
 
+        bool hairFits(const ESM4::Hair& hair, bool female)
+        {
+            return (hair.mData.flags & playableFlag) != 0 && sexFits(hair.mData.flags, female);
+        }
+
+        bool eyesFit(const ESM4::Eyes& eyes, bool female)
+        {
+            return (eyes.mData.flags & playableFlag) != 0 && sexFits(eyes.mData.flags, female);
+        }
+
+        bool listed(const std::vector<ESM::FormId>& list, FormId id)
+        {
+            return std::any_of(
+                list.begin(), list.end(), [id](const ESM::FormId& entry) { return numberOf(entry) == id; });
+        }
+
+        /// The records of a kind as the executable's own lists have them: the newest first, because every new form is
+        /// put at the head of its list (FalloutNV.exe 0x4603B0 and 0x5AE3D0, Mac round 12BB C1 and C2). The rows of the
+        /// hair, eyes and facial hair lists are in this order, not sorted.
+        template <class T>
+        std::vector<const T*> newestFirst(const OFWorld::ESMStore& store)
+        {
+            std::vector<const T*> all;
+            for (const T& record : store.get<T>())
+                all.push_back(&record);
+            std::reverse(all.begin(), all.end());
+            return all;
+        }
+
+        /// The names as the executable's sort has them: byte by byte, capitals before small letters (strcmp, 0x603220)
         bool lessByName(const std::string& left, FormId leftId, const std::string& right, FormId rightId)
         {
-            const std::string a = Misc::StringUtils::lowerCase(left);
-            const std::string b = Misc::StringUtils::lowerCase(right);
-            return a != b ? a < b : leftId < rightId;
+            const int order = left.compare(right);
+            return order != 0 ? order < 0 : leftId < rightId;
         }
     }
 
@@ -155,36 +190,34 @@ namespace OFScript
         if (race == nullptr)
             return catalog;
 
-        for (const ESM::FormId& id : race->mHairChoices)
+        // The hairs the race has and the sex can wear, and the eyes the same way, in the order of the data (12BB C2)
+        for (const ESM4::Hair* hair : newestFirst<ESM4::Hair>(mStore))
         {
-            const ESM4::Hair* hair = mStore.get<ESM4::Hair>().search(id);
-            if (hair == nullptr || !hairFits(*hair, look.mFemale))
+            const FormId number = numberOf(hair->mId);
+            if (!hairFits(*hair, look.mFemale) || !listed(race->mHairChoices, number))
                 continue;
-            catalog.mHairs.push_back(
-                { numberOf(hair->mId), nameOf(hair->mFullName, hair->mEditorId), numberOf(hair->mId) == look.mHair });
+            catalog.mHairs.push_back({ number, nameOf(hair->mFullName, hair->mEditorId), number == look.mHair });
         }
-        for (const ESM::FormId& id : race->mEyeChoices)
+        for (const ESM4::Eyes* eyes : newestFirst<ESM4::Eyes>(mStore))
         {
-            const ESM4::Eyes* eyes = mStore.get<ESM4::Eyes>().search(id);
-            if (eyes == nullptr || (eyes->mData.flags & playableFlag) == 0)
+            const FormId number = numberOf(eyes->mId);
+            if (!eyesFit(*eyes, look.mFemale) || !listed(race->mEyeChoices, number))
                 continue;
-            catalog.mEyes.push_back(
-                { numberOf(eyes->mId), nameOf(eyes->mFullName, eyes->mEditorId), numberOf(eyes->mId) == look.mEyes });
+            catalog.mEyes.push_back({ number, nameOf(eyes->mFullName, eyes->mEditorId), number == look.mEyes });
         }
         if (!look.mFemale)
         {
-            for (const ESM4::HeadPart& part : mStore.get<ESM4::HeadPart>())
+            // Every head part the player can have, whatever the race (there is no other test, 0x7AD312). The row that
+            // is lit is the one the character has first in its list, which is the last of the record's parts (they are
+            // put at the head of the list one after the other, 0x602D4C).
+            const FormId first = look.mHeadParts.empty() ? 0 : look.mHeadParts.back();
+            for (const ESM4::HeadPart* part : newestFirst<ESM4::HeadPart>(mStore))
             {
-                if ((part.mData & playableFlag) == 0)
+                if ((part->mData & playableFlag) == 0)
                     continue;
-                const FormId number = numberOf(part.mId);
-                const bool worn = std::find(look.mHeadParts.begin(), look.mHeadParts.end(), number) != look.mHeadParts.end();
-                catalog.mFacialHair.push_back({ number, nameOf(part.mFullName, part.mEditorId), worn });
+                const FormId number = numberOf(part->mId);
+                catalog.mFacialHair.push_back({ number, nameOf(part->mFullName, part->mEditorId), number == first });
             }
-            std::sort(catalog.mFacialHair.begin(), catalog.mFacialHair.end(),
-                [](const LookChoice& left, const LookChoice& right) {
-                    return lessByName(left.mName, left.mId, right.mName, right.mId);
-                });
         }
 
         ESM::FormId playerBase;
@@ -244,34 +277,33 @@ namespace OFScript
             const ESM4::Race* race = store.get<ESM4::Race>().search(refId(look.mRace));
             if (race == nullptr)
                 return;
+            // A hair that the new race or sex cannot have is replaced by the race's own for the sex, and only when the
+            // race has none by the first of its hairs that fits (0x7B1CA0)
             const auto hairIsFit = [&](FormId id) {
-                if (id == 0)
-                    return false;
-                if (std::find_if(race->mHairChoices.begin(), race->mHairChoices.end(),
-                        [id](const ESM::FormId& choice) { return numberOf(choice) == id; })
-                    == race->mHairChoices.end())
+                if (id == 0 || !listed(race->mHairChoices, id))
                     return false;
                 const ESM4::Hair* hair = store.get<ESM4::Hair>().search(refId(id));
-                return hair != nullptr && hairFits(*hair, look.mFemale);
+                return hair != nullptr && sexFits(hair->mData.flags, look.mFemale);
             };
             if (!hairIsFit(look.mHair))
             {
-                look.mHair = 0;
-                for (const ESM::FormId& id : race->mHairChoices)
+                look.mHair = numberOf(race->mDefaultHair[look.mFemale ? 1 : 0]);
+                if (look.mHair == 0)
                 {
-                    if (hairIsFit(numberOf(id)))
+                    for (const ESM::FormId& id : race->mHairChoices)
                     {
-                        look.mHair = numberOf(id);
-                        break;
+                        const ESM4::Hair* hair = store.get<ESM4::Hair>().search(id);
+                        if (hair != nullptr && hairFits(*hair, look.mFemale))
+                        {
+                            look.mHair = numberOf(id);
+                            break;
+                        }
                     }
                 }
-                if (look.mHair == 0)
-                    look.mHair = numberOf(race->mDefaultHair[look.mFemale ? 1 : 0]);
             }
-            const bool eyesAreFit = look.mEyes != 0
-                && std::find_if(race->mEyeChoices.begin(), race->mEyeChoices.end(),
-                       [&look](const ESM::FormId& choice) { return numberOf(choice) == look.mEyes; })
-                    != race->mEyeChoices.end();
+            const ESM4::Eyes* current = look.mEyes == 0 ? nullptr : store.get<ESM4::Eyes>().search(refId(look.mEyes));
+            const bool eyesAreFit = current != nullptr && listed(race->mEyeChoices, look.mEyes)
+                && sexFits(current->mData.flags, look.mFemale);
             if (!eyesAreFit)
                 look.mEyes = race->mEyeChoices.empty() ? 0 : numberOf(race->mEyeChoices.front());
             (void)host;
@@ -327,7 +359,9 @@ namespace OFScript
     void FalloutScripts::lookToggleFacialHair(FormId part)
     {
         FaceLook look = playerLook();
-        const bool worn = std::find(look.mHeadParts.begin(), look.mHeadParts.end(), part) != look.mHeadParts.end();
+        // The row that is lit is the part first in the character's list (the last of the record's); a click on it takes
+        // it off, and a click on another takes the whole list away and puts that part on
+        const bool worn = !look.mHeadParts.empty() && look.mHeadParts.back() == part;
         look.mHeadParts.clear();
         if (!worn && part != 0)
             look.mHeadParts.push_back(part);
@@ -383,48 +417,143 @@ namespace OFScript
         return true;
     }
 
-    const FalloutScript::FaceControls& FalloutScripts::faceControls()
+    const FalloutScript::FaceControlFile& FalloutScripts::faceControls()
     {
         const std::lock_guard lock(mFaceControlsMutex);
         if (!mFaceControls)
         {
-            // (the file's layout is read by the next round: until it is, the screen has no controls)
-            mFaceControls = FalloutScript::FaceControls();
+            mFaceControls = FalloutScript::FaceControlFile();
+            std::string bytes;
+            if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+            {
+                Files::IStreamPtr stream = resources->getVFS()->find(VFS::Path::Normalized("facegen/si.ctl"));
+                if (stream && stream->peek() != std::istream::traits_type::eof())
+                {
+                    std::ostringstream content;
+                    content << stream->rdbuf();
+                    bytes = content.str();
+                }
+            }
+            if (std::optional<FalloutScript::FaceControlFile> file = FalloutScript::readFaceControlFile(bytes))
+            {
+                mFaceControls = std::move(*file);
+                Log(Debug::Info) << "Face controls: " << mFaceControls->mControls.count(FaceKind::Shape) << " shape, "
+                                 << mFaceControls->mControls.count(FaceKind::Tone) << " tone";
+            }
+            else
+                Log(Debug::Warning)
+                    << "Face controls: facegen/si.ctl is missing or is not the layout of the games' file";
         }
         return *mFaceControls;
     }
 
     int FalloutScripts::lookControlCount(FaceKind kind)
     {
-        return faceControls().count(kind);
+        return faceControls().mControls.count(kind);
+    }
+
+    namespace
+    {
+        /// The face numbers of a character on the screen: those of its race for its sex and its own on top (the record
+        /// keeps only the difference), which is what the sliders read and move (FalloutNV.exe 0x603AD0, 0x7AF770)
+        struct FaceNumbers
+        {
+            std::vector<float> mShape;
+            std::vector<float> mTone;
+        };
+
+        std::vector<float> sum(const std::vector<float>& race, const std::vector<float>& own, std::size_t count)
+        {
+            std::vector<float> result = sized(race, count);
+            const std::vector<float> added = sized(own, count);
+            for (std::size_t i = 0; i < count; ++i)
+                result[i] = result[i] + added[i];
+            return result;
+        }
+
+        /// What the numbers of the race are taken off again
+        std::vector<float> difference(
+            const std::vector<float>& absolute, const std::vector<float>& race, std::size_t count)
+        {
+            std::vector<float> result = sized(absolute, count);
+            const std::vector<float> taken = sized(race, count);
+            for (std::size_t i = 0; i < count; ++i)
+                result[i] = result[i] - taken[i];
+            return result;
+        }
+
+        /// The numbers of the face of the race for the sex of the look (none when the race is not there)
+        const std::vector<float>& raceNumbers(const OFWorld::ESMStore& store, const FaceLook& look, FaceKind kind)
+        {
+            static const std::vector<float> none;
+            const ESM4::Race* race = store.get<ESM4::Race>().search(refId(look.mRace));
+            if (race == nullptr)
+                return none;
+            if (kind == FaceKind::Shape)
+                return look.mFemale ? race->mSymShapeModeCoeffFemale : race->mSymShapeModeCoefficients;
+            return look.mFemale ? race->mSymTextureModeCoeffFemale : race->mSymTextureModeCoefficients;
+        }
+
+        std::pair<int, int> rangeOf(FaceKind kind, int control)
+        {
+            for (const FalloutScript::FaceSlider& slider : FalloutScript::faceSliders())
+            {
+                if (slider.mKind == kind && slider.mControl == control)
+                    return { slider.mMinimum, slider.mMaximum };
+            }
+            return { FalloutScript::faceSliderDefaultMinimum, FalloutScript::faceSliderDefaultMaximum };
+        }
     }
 
     int FalloutScripts::lookSlider(FaceKind kind, int control)
     {
         const FaceLook look = playerLook();
-        const std::vector<float>& coefficients = kind == FaceKind::Shape ? look.mShape : look.mTone;
-        return FalloutScript::faceSliderInteger(faceControls().value(kind, control, coefficients));
+        const bool shape = kind == FaceKind::Shape;
+        const std::vector<float> absolute = sum(raceNumbers(mStore, look, kind), shape ? look.mShape : look.mTone,
+            shape ? FaceLook::shapeCount : FaceLook::toneCount);
+        // The number a slider shows is the control times ten, cut towards zero, and kept to the slider's range
+        const auto [minimum, maximum] = rangeOf(kind, control);
+        return std::clamp(FalloutScript::faceSliderInteger(faceControls().mControls.value(kind, control, absolute)),
+            minimum, maximum);
     }
 
     void FalloutScripts::lookSetSlider(FaceKind kind, int control, int value)
     {
-        // The slider keeps to its own range (the list of sliders has it; a control it does not name has the usual one)
-        int minimum = -50;
-        int maximum = 50;
-        for (const FalloutScript::FaceSlider& slider : FalloutScript::faceSliders())
-        {
-            if (slider.mKind == kind && slider.mControl == control)
-            {
-                minimum = slider.mMinimum;
-                maximum = slider.mMaximum;
-                break;
-            }
-        }
+        const auto [minimum, maximum] = rangeOf(kind, control);
         value = std::clamp(value, minimum, maximum);
         FaceLook look = playerLook();
-        std::vector<float>& coefficients = kind == FaceKind::Shape ? look.mShape : look.mTone;
-        if (!faceControls().move(kind, control, FalloutScript::faceSliderValue(value), coefficients))
+        const bool shape = kind == FaceKind::Shape;
+        const std::vector<float>& base = raceNumbers(mStore, look, kind);
+        const std::size_t count = shape ? FaceLook::shapeCount : FaceLook::toneCount;
+        // The slider is set in the numbers of the whole face, and what the record keeps is what is left of them when
+        // the race's are taken off (0x7AF770)
+        std::vector<float> absolute = sum(base, shape ? look.mShape : look.mTone, count);
+        if (!faceControls().mControls.move(kind, control, FalloutScript::faceSliderValue(value), absolute))
             return;
+        (shape ? look.mShape : look.mTone) = difference(absolute, base, count);
         mChargen.setLook(look);
+    }
+
+    bool FalloutScripts::lookHasAge()
+    {
+        return faceControls().mAge.loaded();
+    }
+
+    bool FalloutScripts::lookSetAge(int slider)
+    {
+        const FalloutScript::FaceAge& age = faceControls().mAge;
+        if (!age.loaded())
+            return false;
+        FaceLook look = playerLook();
+        const std::vector<float>& baseShape = raceNumbers(mStore, look, FaceKind::Shape);
+        const std::vector<float>& baseTone = raceNumbers(mStore, look, FaceKind::Tone);
+        std::vector<float> shape = sum(baseShape, look.mShape, FaceLook::shapeCount);
+        std::vector<float> tone = sum(baseTone, look.mTone, FaceLook::toneCount);
+        if (!age.setAge(static_cast<float>(FalloutScript::faceAgeYears(std::clamp(slider, 1, 10))), shape, tone))
+            return false;
+        look.mShape = difference(shape, baseShape, FaceLook::shapeCount);
+        look.mTone = difference(tone, baseTone, FaceLook::toneCount);
+        mChargen.setLook(look);
+        return true;
     }
 }
