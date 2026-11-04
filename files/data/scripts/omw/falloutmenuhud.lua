@@ -29,6 +29,7 @@
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
 -- threshold).
 local ui = require('openfallout.ui')
+local vfs = require('openfallout.vfs')
 local menuModule = require('scripts.omw.falloutmenu')
 local hotKeys = require('scripts.omw.falloutmenuhotkeys')
 local subtitles = require('scripts.omw.falloutmenusubtitles')
@@ -294,12 +295,25 @@ function Hud:put(tile, trait, value)
     self.shown.menu:set(tile, trait, value)
 end
 
--- A message is taken in when the one queued last is not the same, and waits for its turn
+-- A message is taken in when the one queued last is not the same, and waits for its turn. One that asks to go before the
+-- others (the executable's front flag, Mac round 12AV S4) ends the one that is on at once and comes next.
 function Hud:queueMessages(messages)
     for _, message in ipairs(messages) do
         local last = self.queue[#self.queue]
         if not (last and last.text == message.text) then
-            self.queue[#self.queue + 1] = { text = message.text, icon = message.icon, seconds = message.seconds or 2 }
+            local entry = {
+                text = message.text,
+                icon = message.icon,
+                kind = message.kind or 0,
+                sound = message.sound,
+                seconds = message.seconds or 2,
+            }
+            if message.front and last then
+                self.queue[1].seconds = 0
+                table.insert(self.queue, 2, entry)
+            else
+                self.queue[#self.queue + 1] = entry
+            end
         end
     end
 end
@@ -333,8 +347,34 @@ function Hud:stepMessages(dt)
     return nil, 0
 end
 
-local function iconPath(icon)
-    if type(icon) ~= 'string' or icon == '' then return nil end
+-- The face of the Vault Boy that a message without a picture gets (the executable's jump table 0x775658; a path wins).
+-- The executable's notes name the first one in full (glow_message_vaultboy_neutral) and the others by their kind; the file
+-- that exists is the one used.
+local KIND_NAMES = { [0] = 'neutral', 'very_happy', 'sad', 'in_pain' }
+local MESSAGE_ICONS = 'Interface/Icons/Message Icons/'
+local kindIcons = {}
+
+local function kindIcon(kind)
+    kind = KIND_NAMES[kind or 0] and kind or 0
+    local found = kindIcons[kind]
+    if found == nil then
+        found = false
+        local name = KIND_NAMES[kind]
+        for _, candidate in ipairs({ 'glow_message_vaultboy_' .. name, 'glow_message_' .. name, name }) do
+            local path = MESSAGE_ICONS .. candidate .. '.dds'
+            local has, present = pcall(vfs.fileExists, path)
+            if has and present then
+                found = path
+                break
+            end
+        end
+        kindIcons[kind] = found
+    end
+    return found or nil
+end
+
+local function iconPath(icon, kind)
+    if type(icon) ~= 'string' or icon == '' then return kindIcon(kind) end
     return icon
 end
 
@@ -342,7 +382,12 @@ function Hud:showMessage(dt)
     local t = self.tiles
     local message, fade = self:stepMessages(dt)
     local alpha = message and math.floor(255 * fade + 0.5) or 0
-    local icon = message and iconPath(message.icon)
+    local icon = message and iconPath(message.icon, message.kind)
+    -- The sound of a message plays when it comes on
+    if message and message.sound and message.sound ~= '' and not message.played then
+        message.played = true
+        self.shown:playSound(message.sound)
+    end
     self:put(t.messageText, 'string', message and message.text or '')
     self:put(t.messageText, 'alpha', alpha)
     self:put(t.messageBracket, 'alpha', alpha)

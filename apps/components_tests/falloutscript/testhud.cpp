@@ -30,6 +30,26 @@ namespace
         EXPECT_TRUE(line.take().empty());
     }
 
+    TEST(FalloutScriptHudTest, a_message_carries_its_face_its_sound_and_whether_it_goes_first)
+    {
+        Hud::MessageLine line;
+        line.push("plain");
+        line.push("worn", {}, 4.f, 2, "WPNBreak", true);
+        line.push("odd", {}, 0.f, 9);
+        line.push("odder", {}, 0.f, -3);
+        const std::vector<Hud::Message> taken = line.take();
+        ASSERT_EQ(taken.size(), 4u);
+        EXPECT_EQ(taken[0].mKind, 0);
+        EXPECT_TRUE(taken[0].mSound.empty());
+        EXPECT_FALSE(taken[0].mFront);
+        EXPECT_EQ(taken[1].mKind, 2);
+        EXPECT_EQ(taken[1].mSound, "WPNBreak");
+        EXPECT_TRUE(taken[1].mFront);
+        // The executable has four faces
+        EXPECT_EQ(taken[2].mKind, 3);
+        EXPECT_EQ(taken[3].mKind, 0);
+    }
+
     TEST(FalloutScriptHudTest, the_message_line_keeps_the_newest_and_ignores_empty_text)
     {
         Hud::MessageLine line;

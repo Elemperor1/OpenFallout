@@ -736,7 +736,14 @@ its older drawing for a data folder that lacks the file.
   least one tick; the health bar grows from the left, the action points bar from the right, the enemy bar from its middle (in
   steps of two ticks, so the halves are whole).
 - Messages are one at a time: a message is shown for the seconds it came with (2), fades in and out in 0.35 seconds, waits behind
-  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings.
+  the one shown, and is dropped when it is the same as the one queued last. The icon is the one the message brings; a message
+  without one gets the face of the Vault Boy of its kind (0 neutral, 1 very happy, 2 sad, 3 in pain: `Interface\Icons\Message
+  Icons\`, the first named `glow_message_vaultboy_neutral`; the script uses the first file of three spellings that exists, the
+  names of the other faces were not read in full). A message may bring the name of a sound that plays as it comes on (the
+  karma messages `UIKarmaUp` and `UIKarmaDown`, the worn weapon or armor `WPNBreak` with the sad face and four seconds), and
+  a message with the front flag ends the one that is shown at once and comes next (the executable puts it at the head of the
+  queue; where exactly was not followed; Mac round 12AV S4, 12AY R5). Not there: the messages for the chems, reputation,
+  challenges, a map marker or a radio signal, which need the systems behind them.
 - The compass is a strip of 360 degrees of the interface atlas (1023 texels) of which 345 texels, about 121 degrees, are
   shown. The executable shifts the texture of the strip by the heading over 360 less 0.15 (and adds 1 when that is below
   0); the menu engine scrolls a picture with the trait `_sourcex` (a window of the texture at its natural size from that

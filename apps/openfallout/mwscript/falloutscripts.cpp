@@ -456,8 +456,9 @@ namespace OFScript
         mProgress.setKarmaNotice([this](int amount) {
             const bool major = std::abs(amount) >= gameSetting("iKarmaChangeThreshold", 250);
             const std::string kind = std::string(major ? "Major" : "Minor") + (amount < 0 ? "Lost" : "Gained");
+            // The sound is UIKarmaUp or UIKarmaDown (FalloutNV.exe 0x94FD30)
             mHudMessages.push(gameSettingText("sKarma" + kind), gameSettingText("sKarma" + kind + "Image"),
-                FalloutScript::Hud::messageSeconds);
+                FalloutScript::Hud::messageSeconds, 0, amount < 0 ? "UIKarmaDown" : "UIKarmaUp");
         });
         mItemUse.setPerks(&mPerks);
         mItemUse.setPlayer(player);
@@ -3461,13 +3462,12 @@ namespace OFScript
         FalloutScript::ItemInfo info;
         const bool weapon = itemInfo(item, info) && info.mKind == FalloutScript::ItemKind::Weapon;
         constexpr float warningSeconds = 4.f;
+        // The message has the sad face of the Vault Boy and the sound WPNBreak, which the display plays as it comes on
+        // (FalloutNV.exe 0x891360: kind 2, four seconds)
         const auto say = [&](const std::string& text) {
             if (text.empty())
                 return;
-            mHudMessages.push(text, {}, warningSeconds);
-            // A script can change the health of an item from a thread that is not the frame's, and the sound manager is the
-            // frame's
-            runOnMainThread([this] { playInterfaceSound("WPNBreak"); });
+            mHudMessages.push(text, {}, warningSeconds, 2, "WPNBreak");
         };
         // (Fallout 3 only tells that a weapon broke, Mac round 12AY R4)
         if (mGame == FalloutScript::Game::NewVegas && FalloutScript::Wear::crossedLow(before, after))

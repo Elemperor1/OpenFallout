@@ -467,6 +467,8 @@ end
 local function updateLines(dt)
     for _, message in ipairs(hud.takeMessages()) do
         lines[#lines + 1] = { text = message.text, icon = message.icon, left = message.seconds }
+        -- The sound of a message plays as it comes on (the display from the file plays it itself)
+        if message.sound and message.sound ~= '' then pipboy.playSoundNamed(message.sound) end
     end
     -- The stand-in has no tile for the subtitles: a line that is said is a message
     for _, said in ipairs(hud.takeSubtitles()) do

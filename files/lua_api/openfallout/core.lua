@@ -1682,6 +1682,9 @@
 -- @field #string text
 -- @field #string icon The path of the picture that goes with the text, "" for none.
 -- @field #number seconds How long the line stays.
+-- @field #number kind The face of the Vault Boy that a line without a picture gets: 0 neutral, 1 very happy, 2 sad, 3 in pain.
+-- @field #string sound The name of the sound that plays when the line comes on, "" for none.
+-- @field #boolean front The line goes before the ones that wait and ends the one that is on at once.
 
 ---
 -- The meters that are not the stats of the player.
