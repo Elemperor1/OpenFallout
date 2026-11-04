@@ -94,7 +94,7 @@ local pending = nil
 local SCENE = 'face'
 local FACE_GRAB = 'RSM_Face_Grab'
 local scene = nil
-local view = { yaw = 0, zoom = 0.35 }
+local view = { yaw = 0, zoom = 0 }
 local headDirty = false
 local headWait = 0
 local viewFor = nil
@@ -106,12 +106,17 @@ local cameraAsked = false
 -- camera at the two ends of the zoom, the half of the angle it sees upwards (a quarter of the 45 degrees of the
 -- games' field of view, as the lock's scene has it), the planes of the frustum, and the turn the pointer makes per
 -- unit of the menu that it moves
-local NEAREST, FARTHEST = 55, 135
+local NEAREST, FARTHEST = 60, 180
 local HALF_ANGLE = 0.19635
 local NEAR_PLANE, FAR_PLANE = 5.0, 2000.0
 local YAW_PER_UNIT = 0.012
-local MAX_YAW = 1.6
 local ZOOM_PER_NOTCH = 0.1
+-- Where the head starts, as the executable has it (12BB): the camera at 0 looks at the right side of the head, and a quarter
+-- of a turn more faces it, so the head starts a half-radian-and-a-bit (0.5236, thirty degrees) short of facing the viewer.
+-- The head turns all the way round (the executable keeps no limit on it)
+local START_YAW = math.pi / 2 - 0.5236
+local START_ZOOM = 0.5
+local TURN = 2 * math.pi
 -- At most so often the head is made again while sliders are moved (seconds), and how long after that the camera is
 -- said again
 local HEAD_EVERY = 0.12
@@ -498,8 +503,8 @@ function module.activate(index)
         changed()
         -- A choice of sex or race changes what the other lists hold, which are made again when they are shown
     elseif row.kind == 'action' then
+        -- The row says itself when the face changed (a box is asked first, and the look is not touched on No)
         row.click(changed)
-        changed()
     end
 end
 
@@ -669,7 +674,7 @@ local function openScene()
     headDirty = true
     headWait = 0
     cameraWait = CAMERA_AFTER
-    view = { yaw = 0, zoom = 0.35 }
+    view = { yaw = START_YAW, zoom = START_ZOOM }
     lastDragX = nil
     placeFrustum()
     placeCamera()
@@ -704,7 +709,7 @@ local function turn()
     if not at then return end
     if lastDragX ~= nil then
         local units = (at.x - lastDragX) * 960 / math.max(1, ui.screenSize().y)
-        view.yaw = clamp(view.yaw + units * YAW_PER_UNIT, -MAX_YAW, MAX_YAW)
+        view.yaw = (view.yaw + units * YAW_PER_UNIT) % TURN
         cameraAsked = true
     end
     lastDragX = at.x
