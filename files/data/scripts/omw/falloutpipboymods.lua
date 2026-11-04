@@ -97,7 +97,6 @@ end
 local function leave()
     local callback = options.close
     local id = view and view.item.id
-    if id then pipboy.modClose(id) end
     module.hide()
     pipboy.playSoundNamed('UIMenuMode')
     if callback then callback(id) end
@@ -152,8 +151,11 @@ function module.show(rowId, opened)
     return true
 end
 
+-- The screen goes, however it goes (Cancel, another page of the Pip-Boy, the Pip-Boy closed): the engine puts the weapon that
+-- was on back on and drops the view
 function module.hide()
     if shown then shown:close() end
+    if view then pipboy.modClose(view.item.id) end
     shown, list, view, cardRow = nil, nil, nil, nil
 end
 
