@@ -93,6 +93,7 @@ namespace FalloutScript
         mName.clear();
         mFemale.reset();
         mRace = 0;
+        mLook.reset();
         mAttributes.fill(5);
         mTagSlots.clear();
         mTraits.clear();
@@ -287,6 +288,8 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mFemale = female;
+        if (mLook)
+            mLook->mFemale = female;
     }
 
     std::optional<bool> Chargen::female() const
@@ -299,12 +302,29 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mRace = race;
+        if (mLook)
+            mLook->mRace = race;
     }
 
     FormId Chargen::race() const
     {
         const std::lock_guard lock(mMutex);
         return mRace;
+    }
+
+    void Chargen::setLook(const FaceLook& look)
+    {
+        const std::lock_guard lock(mMutex);
+        mLook = look;
+        mFemale = look.mFemale;
+        if (look.mRace != 0)
+            mRace = look.mRace;
+    }
+
+    std::optional<FaceLook> Chargen::look() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mLook;
     }
 
     int Chargen::attribute(int number) const

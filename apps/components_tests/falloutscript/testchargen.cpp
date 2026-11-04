@@ -214,6 +214,30 @@ namespace
         EXPECT_EQ(chargen.race(), 0u);
     }
 
+    TEST(FalloutScriptChargenTest, the_look_the_player_picked_keeps_step_with_the_sex_and_race)
+    {
+        Chargen chargen;
+        EXPECT_FALSE(chargen.look().has_value());
+        FalloutScript::FaceLook look;
+        look.mRace = 0x19;
+        look.mFemale = true;
+        look.mHair = 0x44;
+        look.mShape[3] = 0.5f;
+        chargen.setLook(look);
+        EXPECT_EQ(chargen.female(), std::optional<bool>(true));
+        EXPECT_EQ(chargen.race(), 0x19u);
+        ASSERT_TRUE(chargen.look().has_value());
+        EXPECT_EQ(chargen.look()->mHair, 0x44u);
+        EXPECT_FLOAT_EQ(chargen.look()->mShape[3], 0.5f);
+        // The sex and race that a script sets are in the look too
+        chargen.setFemale(false);
+        chargen.setRace(0x20);
+        EXPECT_FALSE(chargen.look()->mFemale);
+        EXPECT_EQ(chargen.look()->mRace, 0x20u);
+        chargen.clear();
+        EXPECT_FALSE(chargen.look().has_value());
+    }
+
     TEST(FalloutScriptChargenTest, the_screens_of_a_menu_come_one_after_the_other)
     {
         Chargen chargen;

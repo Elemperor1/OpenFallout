@@ -11,6 +11,7 @@
 #include <string_view>
 #include <vector>
 
+#include "facelook.hpp"
 #include "script.hpp"
 #include "vanillacommands.hpp"
 
@@ -144,6 +145,11 @@ namespace FalloutScript
         void setRace(FormId race);
         FormId race() const;
 
+        /// The whole look the player picked (the screen of the sex, race and face), none until the screen has set it.
+        /// The sex and race of it are the ones above.
+        void setLook(const FaceLook& look);
+        std::optional<FaceLook> look() const;
+
         /// The attributes by their numbers as actor values (5 to 11); a number that is none gives 0
         int attribute(int number) const;
         /// Starts the attributes from the ones the player has now (each is kept within the limits)
@@ -218,6 +224,7 @@ namespace FalloutScript
         std::string mName;
         std::optional<bool> mFemale;
         FormId mRace = 0;
+        std::optional<FaceLook> mLook;
         std::array<int, attributeCount> mAttributes;
         std::vector<int> mTagSlots; // the tagged skills in their places, 0 for a place with none
         std::vector<FormId> mTraits;
