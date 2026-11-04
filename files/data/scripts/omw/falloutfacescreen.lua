@@ -303,11 +303,10 @@ local function listRows(list)
     elseif list == 7 then
         for _, part in ipairs(look.lists.facialHair) do
             local id = part.id
+            -- The row that is lit is the character's first part in its list, the last of the record's (the click takes it off,
+            -- and a click on another row takes every part away and puts that one on)
             made[#made + 1] = choice(part.name, function()
-                for _, worn in ipairs(look.headParts) do
-                    if worn == id then return true end
-                end
-                return false
+                return #look.headParts > 0 and look.headParts[#look.headParts] == id
             end, function() chargen.toggleFacialHair(id); fresh = false end)
         end
     elseif list == 8 then
