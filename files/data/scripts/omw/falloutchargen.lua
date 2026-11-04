@@ -820,6 +820,10 @@ return {
         onFrame = sync,
         -- The buttons of a pad on the model screens of SPECIAL
         onControllerButtonPress = function(button)
+            -- A box over the screen has the pad, as it has the keys
+            if messageOpen() then
+                return
+            end
             if special.isOpen() then
                 special.pad(button)
             end
