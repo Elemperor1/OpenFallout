@@ -97,6 +97,7 @@ namespace OFLua
             return outcomeTable(lua, numbered(self.decrease(fromKey.value_or(false))));
         };
         type["exit"] = [lua, numbered](Screen& self) { return outcomeTable(lua, numbered(self.exitAttempt())); };
+        type["setPad"] = [](Screen& self, bool pad) { self.setPad(pad); };
         type["moveCursor"] = [lua, numbered](Screen& self, int delta) {
             return outcomeTable(lua, numbered(self.moveCursor(delta)));
         };

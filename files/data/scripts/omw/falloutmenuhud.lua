@@ -362,7 +362,8 @@ local function kindIcon(kind)
         local name = KIND_NAMES[kind]
         for _, candidate in ipairs({ 'glow_message_vaultboy_' .. name, 'glow_message_' .. name, name }) do
             local path = MESSAGE_ICONS .. candidate .. '.dds'
-            local has, present = pcall(vfs.fileExists, path)
+            -- (the file is under textures/; the menus add that folder themselves, so the path kept is without it)
+            local has, present = pcall(vfs.fileExists, 'textures/' .. path)
             if has and present then
                 found = path
                 break

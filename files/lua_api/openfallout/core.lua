@@ -1846,6 +1846,13 @@
 -- @return #table
 
 ---
+-- Tells the screen which device the player uses: with a pad (true) the index page has a cursor and the attribute under it
+-- is the one the D-pad changes; with the keys or the pointer (false) it has none.
+-- @function [parent=#SpecialScreenObject] setPad
+-- @param self
+-- @param #boolean pad
+
+---
 -- @function [parent=#SpecialScreenObject] moveCursor
 -- @param self
 -- @param #number delta

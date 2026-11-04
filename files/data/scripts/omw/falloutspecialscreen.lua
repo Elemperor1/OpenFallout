@@ -178,8 +178,17 @@ end
 
 -- The click of the player: which button of the model is under the pointer is asked of the scene, and the answer comes in
 -- a later frame
+-- The device in use: a button of the pad puts the cursor on the index page, a key or the pointer takes it away again
+local function usePad(on)
+    if open and open.padMode ~= on then
+        open.padMode = on
+        open.screen:setPad(on)
+    end
+end
+
 local function click()
     if not open or open.asking then return end
+    usePad(false)
     local at = open.shown:pointerAt()
     local size = ui.screenSize()
     if not at or size.x <= 0 or size.y <= 0 then return end
@@ -281,6 +290,7 @@ end
 -- tester), A is the exit (the executable reads it as a key of its own). True when the key was the screen's.
 function module.press(code, symbol)
     if not open then return false end
+    usePad(false)
     local K = input.KEY
     local tester = open.kind == 'tester'
     if code == K.LeftArrow then
@@ -303,6 +313,7 @@ end
 -- move the cursor of the index, the shoulders turn the pages, X leaves
 function module.pad(button)
     if not open then return false end
+    usePad(true)
     local B = input.CONTROLLER_BUTTON
     if button == B.DPadRight then
         handle(open.screen:increase())

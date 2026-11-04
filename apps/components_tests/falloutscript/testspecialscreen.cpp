@@ -205,6 +205,14 @@ namespace
         EXPECT_EQ(pad.increase().mAttribute, 1);
         EXPECT_EQ(pad.moveCursor(-1).mSound, Sound::Focus);
         EXPECT_EQ(pad.moveCursor(-1).mSound, Sound::None);
+
+        // The device can change while the screen is open: a key puts the cursor away, the next pad button brings it back
+        pad.setPad(false);
+        EXPECT_EQ(pad.moveCursor(1).mSound, Sound::None);
+        EXPECT_EQ(pad.increase().mAttribute, -1);
+        pad.setPad(true);
+        EXPECT_EQ(pad.moveCursor(1).mSound, Sound::Focus);
+        EXPECT_EQ(pad.increase().mAttribute, 1);
     }
 
     TEST(FalloutScriptSpecialScreenTest, thePointsLeftAreShownInTwoDigits)

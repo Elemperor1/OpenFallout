@@ -72,6 +72,8 @@ namespace FalloutScript::SpecialScreen
         int left() const { return mLimit - total(); }
         int value(int attribute) const;
         bool pad() const { return mPad; }
+        /// The device in use changes (a pad's first button, then a key or the pointer): the index page has its cursor with a pad
+        void setPad(bool pad) { mPad = pad; }
 
         /// The page the model shows: 0 the cover (a button that opens the book), 1 to 7 one attribute each, 8 the index
         /// of all seven, and in the book a 9th that is empty
