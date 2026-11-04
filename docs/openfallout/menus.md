@@ -89,7 +89,12 @@ rows of their own (the best first; the row id carries the condition after a `~`)
 bar (`ConditionInfo`, its meter reads `user5`, 0 to 1, under the word of `sInventoryCondition`, with no number: the executable
 sets none; the pip image on the bar is fixed by `user6`, 1 for a weapon at three quarters and 0 for armor at a half, the places
 where their effects start, Mac round 12AX R4), and use, drop, take and barter work on the copies of that row. The numbers of a
-card are those of the copy at its condition (a weapon's damage by the curve below, armor's rating and threshold).
+card are those of the copy at its condition (a weapon's damage by the curve below, armor's rating and threshold). The cards of
+armor follow the executables' filler (Mac round 12BE B1, `FalloutNV.exe` 0x708958): in New Vegas the resistance card is shown
+when its number is not 0 and the threshold card when its number is not 0, and when both are 0 the resistance card shows two
+dashes and nothing else; the file puts the two cards in the same place, so the one piece of the game's data that has both shows
+them on top of each other in the game too. Fallout 3 (`Fallout3.exe` 0x61BFA6) has the resistance card only and shows 0. Both
+numbers are whole (`%d`); the "DT 6.0" of the headline above the list is a different tile with one decimal.
 
 What condition does (Mac rounds 12AW S12 and 12AX R4, `FalloutNV.exe`; `components/falloutscript/wear.*`, `equipment.cpp`):
 only the player's things wear. A gun that is fired loses `fDamageToWeaponValue` points of its health (0.2) once for a shot,

@@ -70,11 +70,22 @@ local function cardsOf(item, nv)
         add('AmmoInfo', ammo, word('sInventoryAmmo', 'AMMO'))
         condition(true)
     elseif item.category == 'apparel' then
-        if item.rating > 0 or item.threshold > 0 then
-            add('DamageResistInfo', string.format('%d', math.floor(item.rating)))
-            if nv and item.threshold > 0 then
-                add('DamageThresholdInfo', string.format('%d', math.floor(item.threshold)))
+        -- The cards of armor as the executables fill them (Mac round 12BE B1: FalloutNV.exe 0x708958, Fallout3.exe 0x61BFA6).
+        -- New Vegas: neither resistance nor threshold gives the resistance card with two dashes and no other; else the
+        -- resistance card is there when its number is not 0 and the threshold card when its number is not 0 (the file puts
+        -- both in the same place, so a piece that has both has them on top of each other in the game too). Fallout 3 has
+        -- the resistance card only, and shows 0
+        local resistance = math.floor(item.rating)
+        local threshold = nv and math.floor(item.threshold) or 0
+        if nv then
+            if resistance == 0 and threshold == 0 then
+                add('DamageResistInfo', '--')
+            else
+                if resistance ~= 0 then add('DamageResistInfo', string.format('%d', resistance)) end
+                if threshold ~= 0 then add('DamageThresholdInfo', string.format('%d', threshold)) end
             end
+        else
+            add('DamageResistInfo', string.format('%d', resistance))
         end
         weight()
         value()
