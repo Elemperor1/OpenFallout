@@ -76,6 +76,7 @@ namespace FalloutScript
         const double resisted = std::clamp(defense.mResistance, 0.0, settings.mMaxResistance) / 100.0;
         blow *= 1.0 - resisted;
         blow -= std::max(defense.mThreshold, 0.0);
+        result.mAfterThreshold = blow;
         if (settings.mMinimumDamage)
             blow = std::max(blow, entering * std::clamp(settings.mMinimumThroughThreshold, 0.0, 1.0));
         result.mDamage = std::max(blow, 0.0);

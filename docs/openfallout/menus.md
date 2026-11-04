@@ -95,8 +95,15 @@ What condition does (Mac rounds 12AW S12 and 12AX R4, `FalloutNV.exe`; `componen
 only the player's things wear. A gun that is fired loses `fDamageToWeaponValue` points of its health (0.2) once for a shot,
 whether or not it hits, changed by the effects of its ammunition that are of the condition kind (the shot of a shotgun is one
 shot); a melee weapon or one of the hands loses the same when a swing reaches a victim; the hands with no weapon, a thrown
-weapon and a weapon that is not playable or embedded lose nothing. A blow at the player wears one piece of its armor by
-`fDamageToArmorPercentage` (0.35) of what it stopped (the head for a blow at a place 1 or 2, else the upper body). A weapon that
+weapon and a weapon that is not playable or embedded lose nothing. A blow at the player wears one piece of its armor (the head for a blow at a place 1 or 2, else the upper body) by
+`fDamageToArmorPercentage` (0.35) of two things (Mac round 12BA A, `FalloutNV.exe` 0x9B5A30): the share of the blow that the
+resistance took (`D0 * a`, `D0` the blow as it met the armor, `a` the resistance of all that is worn, at most 0.85), and the smaller
+of the threshold of all that is worn and what is left of the blow after both, less `fMinDamMultiplier` (0.2) of the blow
+(`min(T, D2 - 0.2 * D0)`, which can be negative, and then the armor does not wear). So armor that has only a threshold wears (a
+blow of 22 against a threshold of 10 takes 2.66 health, a blow of 12 nothing), armor with neither never does, and the
+amount is not split between the pieces: the body armor is worn by the threshold of the helmet too. In V.A.T.S. the amount is
+times `fVATSPlayerDamageMult`. A piece gives its whole rating (and threshold) times the factor of its condition, to the next whole
+number up, and the card prints that number. A weapon that
 is below three quarters of its health does the damage of its record times one less two thirds of what is missing from three
 quarters (a half: 0.8325, nothing: 0.4975); armor below a half gives a half and its condition of its rating and threshold. The
 player is told (`sWeaponLowCond`, `sArmorLowCond`, with the sound `WPNBreak` and four seconds) when an item goes below a quarter;
@@ -110,8 +117,8 @@ a weapon whose flags2 has bit 7 uses its own number, DNAM byte 84; a thing that 
 effect on it, a weapon does `fDamageGunWeapCondBase + Mult * condition` of its damage (0.66 + 0.34 c, melee 0.5 + 0.5 c, from the
 settings, with no knee), armor gives `fArmorRatingBase + (fArmorRatingMax - fArmorRatingBase) * c` of its rating (0.2 + 0.8 c; a
 broken piece still gives a fifth), the rating of a piece is rounded, there is no threshold, and the player gets no message at a
-quarter (only `sWeaponBreak` with `WPNBreak` when a weapon breaks). Armor wears as in New Vegas (the same formula with
-`fDamageToArmorPercentage` 0.35 and the player as the only victim). Not done: the effects of the condition of the weapon on jams (the exe's tables:
+quarter (only `sWeaponBreak` with `WPNBreak` when a weapon breaks). Armor wears by its rating only, as there is no threshold (`Fallout3.exe` 0x7C2990: `fDamageToArmorPercentage` of the blow
+as it met the armor times the resistance, the player as the only victim; armor with no rating never wears). Not done: the effects of the condition of the weapon on jams (the exe's tables:
 reloads jam below half, a shot never in New Vegas), a weapon hit at the place 14 (the hit damage, times
 `fVATSDamageToWeaponMult` in V.A.T.S.), the weapon an NPC drops when it breaks, and the health of the things in the lists of the
 records (COED) and of the ones that are placed.

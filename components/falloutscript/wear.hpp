@@ -53,12 +53,11 @@ namespace FalloutScript::Wear
     /// line of Fallout 3 from `mArmorBase` at nothing to `mArmorMax` at the whole
     double armorFactor(const Settings& settings, double condition);
 
-    /// A rating (or threshold) of `value` at `condition`. New Vegas leaves the number as it is; Fallout 3 rounds it to
-    /// the nearest whole one (0x47D400).
+    /// A rating (or threshold) of `value` at `condition`. New Vegas gives its whole number times the factor, to the next
+    /// whole number up (0x4BDF90); Fallout 3 rounds the product to the nearest whole one (0x47D400).
     double armorValue(const Settings& settings, double value, double condition);
 
-    /// What a card or a list shows of a whole `value` at `condition`: New Vegas cuts the product to a whole number
-    /// (0x646360), Fallout 3 rounds it
+    /// What a card or a list shows of a whole `value` at `condition`: the same number the piece gives
     double armorShown(const Settings& settings, double value, double condition);
 
     /// What the effect of an ammunition does to a number: its operation is 0 to add, 1 to multiply, 2 to subtract (the kinds of
@@ -85,6 +84,14 @@ namespace FalloutScript::Wear
     /// (the executable's 0x9B5A30: the share times the damage times what the armor takes, which is cut at the most that
     /// armor can take)
     double armorPoints(const Settings& settings, double damage, double resistance);
+
+    /// The same with the threshold of the armor (New Vegas; Fallout 3 has none, and the first overload is the whole of it):
+    /// besides the share of the blow that the resistance took, armor loses the share of the smaller of the threshold and
+    /// what is left of the blow after the resistance and the threshold, less `floorShare` of the blow (fMinDamMultiplier)
+    /// (FalloutNV.exe 0x9B62CD, Mac round 12BA A). `remaining` is the blow after both, before the floor is applied; the
+    /// result can be negative, and then the armor does not wear.
+    double armorPoints(const Settings& settings, double damage, double resistance, double threshold, double remaining,
+        double floorShare);
 
     /// What `points` of health are of an item whose most health is `maxHealth`, in tenths of a percent. The part of a tenth
     /// that is left goes in `remainder`, which the caller keeps for the next time (a weapon is worn a fraction of a tenth at

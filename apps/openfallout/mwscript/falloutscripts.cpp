@@ -2580,9 +2580,11 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
-        // The armor that the player wears is worn out by what it stopped
+        // The armor that the player wears is worn out by what it stopped (the resistance by the share of the blow it took,
+        // the threshold by what it took of the rest), by less in V.A.T.S. as the blow is
         if (victim == mPlayer)
-            wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance);
+            wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance, defense.mThreshold, hit.mAfterThreshold,
+                mVatsOpen ? std::max(gameSetting("fVATSPlayerDamageMult", 1.0), 0.0) : 1.0);
         // The blow that hurts the player flashes the screen red, as the fall and the drowning of the engine do
         if (victim == mPlayer && dealt > 0)
         {
@@ -3507,13 +3509,18 @@ namespace OFScript
         mEquipment.wear(attacker, stats.mWeapon, points);
     }
 
-    void FalloutScripts::wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance)
+    void FalloutScripts::wearArmorOfHit(FalloutScript::FormId victim, int limb, double damage, double resistance,
+        double threshold, double remaining, double scale)
     {
         // Only the armor of the player wears, one piece for a blow: the head for a blow at the head (the parts 1 and 2), the
         // upper body for any other (Mac round 12AW S12)
         if (victim != mPlayer)
             return;
-        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance);
+        // New Vegas wears armor by its threshold too, so armor that only has a threshold wears (FalloutNV.exe 0x9B5A30, Mac
+        // round 12BA A); Fallout 3's armor has the resistance only
+        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance, threshold, remaining,
+                                  damageSettings().mMinimumThroughThreshold)
+            * scale;
         if (points <= 0)
             return;
         const bool head = limb == 1 || limb == 2;

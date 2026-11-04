@@ -174,12 +174,41 @@ namespace
         EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 40, 0.0), 8);
     }
 
-    TEST(FalloutScriptWearTest, new_vegas_armor_keeps_its_curve_and_cuts_what_a_card_shows)
+    TEST(FalloutScriptWearTest, new_vegas_armor_keeps_its_curve_and_gives_the_next_whole_number_up)
     {
         const Wear::Settings settings;
         EXPECT_DOUBLE_EQ(Wear::armorFactor(settings, 0.8), 1.0);
         EXPECT_DOUBLE_EQ(Wear::armorFactor(settings, 0.25), 0.75);
-        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 17, 0.25), 12.75);
-        EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 17, 0.25), 12);
+        // 17 * 0.75 = 12.75: a piece gives 13, and the card shows the same
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 17, 0.25), 13);
+        EXPECT_DOUBLE_EQ(Wear::armorShown(settings, 17, 0.25), 13);
+        // the whole number of the rating is what the factor works on, and a product that is whole stays so
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 10.9, 0.5), 10);
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 20, 0.35), 20 * 0.85);
+        EXPECT_DOUBLE_EQ(Wear::armorValue(settings, 20, 0.8), 20);
+    }
+
+    TEST(FalloutScriptWearTest, a_threshold_wears_armor_that_has_no_rating_by_the_smaller_of_itself_and_what_is_left)
+    {
+        const Wear::Settings settings;
+        // (the first number of each: the blow, the resistance, the threshold, what is left of the blow after both, the
+        // share of the blow that is the floor), from the worked cases of the executable
+        EXPECT_NEAR(Wear::armorPoints(settings, 22, 0, 10, 12, 0.2), 0.35 * 7.6, 1e-9); // min(10, 12 - 4.4) = 7.6: 2.66
+        EXPECT_NEAR(Wear::armorPoints(settings, 50, 0, 10, 40, 0.2), 0.35 * 10, 1e-9); // the threshold is the most: 3.5
+        EXPECT_NEAR(Wear::armorPoints(settings, 14, 0, 10, 4, 0.2), 0.35 * (4 - 2.8), 1e-9); // 0.42
+        // a blow that the threshold took down to under the floor takes from the share and the armor does not wear
+        EXPECT_LT(Wear::armorPoints(settings, 12, 0, 10, 2, 0.2), 0);
+        EXPECT_LT(Wear::armorPoints(settings, 22, 0, 30, -8, 0.2), 0);
+        // the resistance and the threshold wear together
+        EXPECT_NEAR(Wear::armorPoints(settings, 100, 50, 10, 40, 0.2), 0.35 * (100 * 0.5 + 10), 1e-9);
+        // a negative threshold is none
+        EXPECT_NEAR(Wear::armorPoints(settings, 20, 50, -4, 10, 0.2), 0.35 * 20 * 0.5, 1e-9);
+        // armor with nothing (no rating and no threshold) never wears
+        EXPECT_DOUBLE_EQ(Wear::armorPoints(settings, 22, 0, 0, 22, 0.2), 0);
+        // Fallout 3 has no threshold and wears by the resistance only
+        Wear::Settings fallout3;
+        fallout3.mFallout3 = true;
+        EXPECT_DOUBLE_EQ(Wear::armorPoints(fallout3, 22, 0, 10, 12, 0.2), 0);
+        EXPECT_NEAR(Wear::armorPoints(fallout3, 20, 50, 10, 0, 0.2), 0.35 * 20 * 0.5, 1e-9);
     }
 }
