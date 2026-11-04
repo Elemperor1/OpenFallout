@@ -1036,7 +1036,10 @@ switched off: a key that is let go before `fHotKeyDownTimer` (half a second) use
 on or, when it is on, taken off; an aid item is used; a stimpak at full health is refused with the word `sFullHealth` and the
 sound `UIVATSInsufficientAP`); a key that is held longer shows the wheel of the eight slots with the held one lit
 (`HK_SelectionBox`), and the picture and the name of the item (`%s (%d)` with the count when there is more than one) are on the
-screen for `fHotKeyShowTimer` (a second and a half) after the key. All of it is in the file: the block `Hokeys` of
+screen with it and stay, the wheel too, for `fHotKeyShowTimer` (a second and a half) after the last frame of the hold. A quick tap
+shows neither the picture nor the name for any kind of item (Mac round 12BA G3: a press only loads them into the tiles; the tiles
+are made visible when the key has been held longer than the timer), and a stimpak tapped at full health gives the message and is
+not used (the key is let go, 0x701E80). All of it is in the file: the block `Hokeys` of
 `hud_main_menu.xml` (300 by 300, over the action points) holds `template_hotkey_selector` (which includes the wheel of
 `prefabs/hotkeys.xml`, with the big picture `hotkey_icon`) and a line of text for the name.
 
