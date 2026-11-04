@@ -342,8 +342,21 @@ namespace OFScript
         mChargen.setLook(look);
     }
 
+    namespace
+    {
+        bool isChoice(const std::vector<FalloutScripts::LookChoice>& choices, FormId id)
+        {
+            return std::any_of(choices.begin(), choices.end(),
+                [id](const FalloutScripts::LookChoice& choice) { return choice.mId == id; });
+        }
+    }
+
     void FalloutScripts::lookSetHair(FormId hair)
     {
+        // Only a hair the lists hold for this sex and race: a row of the screen is always one, and a call with another
+        // leaves the look as it is
+        if (!isChoice(lookCatalog().mHairs, hair))
+            return;
         FaceLook look = playerLook();
         look.mHair = hair;
         mChargen.setLook(look);
@@ -351,6 +364,8 @@ namespace OFScript
 
     void FalloutScripts::lookSetEyes(FormId eyes)
     {
+        if (!isChoice(lookCatalog().mEyes, eyes))
+            return;
         FaceLook look = playerLook();
         look.mEyes = eyes;
         mChargen.setLook(look);
