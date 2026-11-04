@@ -345,17 +345,30 @@ of the lists are children of the panel; the menu's own `user0` is the number of 
 the list it is in. The lists (twenty, in the executable's order): 0 sex (two rows), 1 race (a row for each playable race),
 2 face (the preset slider, the link `Customize`, the row `Randomize`, the age slider), 3 hair (links: hair style, hair colour,
 facial hair for a man), 4 customize (links: shape, tone, eye colour), 5 hair style (a row for each hair of the race and sex),
-6 hair colour (a preset slider 0 to 15 and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
+6 hair colour (a preset slider 0 to 15, whose colours are the settings `iHairColor00` to `iHairColor15` and else the
+executable's own, and R, G and B sliders 0 to 255), 7 facial hair, 8 eye colour, 9 shape (nine links),
 10 to 18 the shape sliders (general, forehead, brow, eyes, nose, mouth, cheeks, jaw, chin) and 19 the tone sliders. A link row
 is its list's name followed by ` >`. The first four lists are the tabs (`1. Sex`, `2. Race`, `3. Face`, `4. Hair`, numbered only
-for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` in a box; Back and
-Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten (-50 to
-50; the controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -50 to 30) and writes nothing beside its
+for a new character); Next goes to the next tab and is `Done` on the last, which asks `sRSMConfirmDone` followed by the word for what is being done (`sRSMCharacter` for a new
+character, `sRSMHair` at the barber, `sRSMFace` at the surgeon: by the mode, not the tab) and a question mark in a box that
+lists No first and Yes second; Back and Escape go up a list, and Shift with Left or Right changes the tab. A face slider shows the control's value times ten, cut towards zero (-35 to 35, the INI value of both games, 3.5; the
+controls 21 and 23 of `facegen\si.ctl` run -20 to 20, the controls 49 and 53 -35 to 30) and writes nothing beside its
 label; moving the slider by its arrows is one step, by the halves of its bar a jump of a quarter of its range (an eighth for
-the colours). The sliders are the controls of `facegen\si.ctl`: one slider moves all fifty coefficients along its direction
-(`FaceControls`), and the tone sliders do the same for the skin. Randomize (after the box `sRSMConfirmRandomize`) gives each
-shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times 1.5 and zeroes the asymmetric ones; the hair,
-eyes and colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
+the colours). The sliders are the controls of `facegen\si.ctl` (read by `readFaceControlFile`, which takes only the exact layout
+of the games' file: 56 shape, 26 asymmetric and 33 tone controls and the fan controls): a slider's value is the dot product of
+its direction with the numbers of the whole face (the race's for the sex plus the character's own, which are what the record
+keeps), and moving it adds the difference along the direction (`FaceControls`; the sum is kept as a float after every term, as
+the executable does). The directions are not at right angles to each other, so the other sliders move with it; the slider that
+was moved keeps its number and the others read the face again (the executable leaves the active slider out, so it never shows
+a step nearer zero). The age slider (1 to 10) stands for 15, 20, 26, 31, 37, 42, 48, 53, 59 and 64 years and moves the face along
+the two age directions of the file (`FaceAge`): the age in years for the shape, and for the tone the same shift, so that the tone
+stays as much older or younger than the shape as it was; the second number of the age directions only the random face redraws.
+The age slider and the preset slider both open at 1 whatever the face is. Randomize (after the box `sRSMConfirmRandomize`, with
+No first and Yes second; a face that Randomize or the age slider just made is not asked about again, until a sex, race, hair,
+eyes, facial hair or preset click) gives each shape and tone coefficient a normal number times `fNPCGeneticVariation` (0.5) times
+1.5 and zeroes the asymmetric ones, then settles the fan controls (`FaceAge::settleRandom`: the shape keeps the age the draw gave
+it, the tone stays as much older or younger as before, the second number is drawn again between -2 and 2); the hair, eyes and
+colour stay. A preset is a character of the data of the same sex and race (`Is CharGen Face Preset`, or all of the
 race when none has it), by name; choosing one puts its hair, eyes, colour, head parts and face on. A click on the sex or race
 takes the head parts off, puts the first preset on and changes a hair or eyes the new kind does not have.
 
@@ -369,12 +382,34 @@ from the look that is picked (`core.menuScene.updateHead`, again a short time af
 that the head stands in the middle of the file's hotrect `RSM_Face_Grab` (an off-centre frustum: the middle of the picture is
 not the camera's axis), a drag over the hotrect turns the head about its vertical axis and the wheel moves the camera nearer
 or farther (`setHeadView`). The barber and the plastic surgeon have the one tab they start at (the hair, the face), where Next
-reads `Done`. The head has not been seen in the running game yet: the bone it is aimed at, the lights and the alignment of the
-drag and the wheel with the picture are checked in the offline harness only.
+reads `Done`. The head was seen in the running game in Mac round 12BC: it is made again 0.17 seconds after each change, a drag
+of 200 pixels turned it by a quarter of a turn, and a wheel event is one step of the zoom. That round showed the first view
+too close (the camera aimed at the bone `Bip01 Head`, the base of the skull, so the top of the hair was cut by the window):
+the head now starts thirty degrees short of facing the viewer (the executable's start, Mac round 12BB D and E), turns all the way
+round, and is seen from 120 units (the zoom runs from 70 to 170). Round 12BD found three things: the head started seen from the
+back (the camera at yaw 0 looks at the head's right side and the face is seen a quarter of a turn before that, at -pi/2, not
+after it; a drag to the right now turns the face towards the panel, one full turn is about 650 pixels at 1080 lines), the head
+sat 39 pixels below the middle of the file's `RSM_Face_Grab` (the camera now aims 6.5 units above the bone, from 8) and at the
+nearest zoom it was taller than that hotrect (800 pixels against 698; the nearest is now 70 units). The tone sliders change their
+number and marker but not the picture: the port has no texture morph (the `.egt` file of the head, see the gap audit), so the
+tone of a face made on the screen shows only in its saved numbers.
 
-Not done: the age slider (it is in the list, dim: the age is a fan control of `facegen\si.ctl` and the file is not read yet, so
-the shape and tone sliders have no controls either), the keys of the pad, and the glyphs on the ends of a slider's bar (guess:
-`<` and `>`).
+The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
+at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
+the race's order. A hair is a row when it is playable, the race lists it and the sex can wear it (the second flag bit must be
+clear for a man, the third for a woman); eyes the same with the race's eyes; the facial hair rows (a man only) are every playable
+head part, whatever the race. The lit facial hair row is the character's first part in its list, which is the last the record
+names; a click on it takes it off and a click on another takes all the character's parts away (the eyebrows too) and puts that one
+on. The presets are sorted by name byte by byte (capitals first). A hair that the new sex or race cannot have is replaced by the
+race's own for the sex, and only when the race has none by the first of its hairs that fits (Mac round 12BB C1 and C2).
+
+The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
+12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
+it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
+of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the face as a picture (the `.egt` texture morph), the Pip-Boy still has no pause
+menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
+by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
+executable's loading code).
 
 ### The level-up screen
 
@@ -876,7 +911,8 @@ its older drawing for a data folder that lacks the file.
   Pip-Boy's prompt), `sTargetTypeOpen` (container), `sTargetTypeOpenDoor`, `sTargetTypeActivate`,
   `sTargetTypeSleep` and `sTargetTypeSit` (a piece of furniture with a marker of that kind switched on: the kinds are
   the port's reading of the marker numbers, 1 to 6 sleeping and 10 to 20 sitting), `sTargetTypeTalk` (a character that does
-  not fight the player), `sPickpocket` (the same character while the player sneaks), `sSearch` (a body), `sSteal` (a thing
+  not fight the player), `sPickpocket` (the same character while the player sneaks: the word is shown, but activating the
+  character still talks to them, the pickpocket screen is not built), `sSearch` (a body), `sSteal` (a thing
   to take whose reference is owned by a character that is not the player, or by a faction the player is not in; the
   executable's test, 0x579690, is longer and was not read to its end, and the port does not ask the owner of the cell),
   `sPick` (a door that is locked when the player has no key for it) and `sCloseButton` (a door that stands open); a

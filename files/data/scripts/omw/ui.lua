@@ -112,7 +112,9 @@ local function onUiModeChanged(changedByLua, arg)
     end
     local mode = newStack[#newStack]
     if mode then
-        if not changedByLua then
+        -- (the pause menu that the engine puts over a mode and takes away again does not give the windows back that a
+        -- script hid in that mode: a screen that hid them all, as a face screen does, stays as it was)
+        if not changedByLua and mode ~= MODE.MainMenu and oldMode ~= MODE.MainMenu then
             updateHidden(mode)
         end
         for _, w in pairs(ui._getAllowedWindows(mode)) do

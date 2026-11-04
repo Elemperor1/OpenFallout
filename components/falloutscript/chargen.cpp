@@ -306,6 +306,7 @@ namespace FalloutScript
         mRace = race;
         if (mLook)
             mLook->mRace = race;
+        mLostForms &= ~1u;
     }
 
     FormId Chargen::race() const
@@ -318,6 +319,7 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         mLook = look;
+        mLostForms = 0;
         mFemale = look.mFemale;
         if (look.mRace != 0)
             mRace = look.mRace;
@@ -327,6 +329,27 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         return mLook;
+    }
+
+    bool Chargen::hasLostForms() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mLook && mLostForms != 0;
+    }
+
+    void Chargen::resolveLostForms(const FaceLook& record)
+    {
+        const std::lock_guard lock(mMutex);
+        if (mLook)
+        {
+            if ((mLostForms & 1u) != 0)
+                mLook->mRace = record.mRace;
+            if ((mLostForms & 2u) != 0)
+                mLook->mHair = record.mHair;
+            if ((mLostForms & 4u) != 0)
+                mLook->mEyes = record.mEyes;
+        }
+        mLostForms = 0;
     }
 
     int Chargen::attribute(int number) const
@@ -562,17 +585,26 @@ namespace FalloutScript
         const bool femaleValue = in.boolean();
         if (hasFemale)
             female = femaleValue;
-        // A form of a plugin that is not loaded any more is none: the record's own race, hair or eyes show again
+        // A form of a plugin that is not loaded any more is none, and the look marks it as lost: the record's own race, hair
+        // or eyes show again (resolveLostForms)
         const FormId race = in.form().value_or(0);
         std::optional<FaceLook> look;
+        unsigned lost = 0;
         if (in.boolean())
         {
             FaceLook read;
-            read.mRace = in.form().value_or(0);
+            // A form that has no plugin any more is marked as lost; the null form is a look without one, on purpose
+            const auto lookForm = [&in, &lost](unsigned flag) {
+                const std::optional<FormId> form = in.form();
+                if (!form)
+                    lost |= flag;
+                return form.value_or(0);
+            };
+            read.mRace = lookForm(1);
             read.mFemale = in.boolean();
-            read.mHair = in.form().value_or(0);
+            read.mHair = lookForm(2);
             read.mHairLength = in.f32();
-            read.mEyes = in.form().value_or(0);
+            read.mEyes = lookForm(4);
             for (std::uint8_t& channel : read.mHairColour)
                 channel = in.u8();
             const std::size_t parts = in.count(4);
@@ -602,6 +634,7 @@ namespace FalloutScript
         mFemale = female;
         mRace = race;
         mLook = std::move(look);
+        mLostForms = lost;
     }
 
     void addChargenCommands(Interpreter& interpreter, Chargen& chargen, std::function<void()> opened)

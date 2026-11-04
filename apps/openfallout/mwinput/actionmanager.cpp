@@ -211,6 +211,14 @@ namespace OFInput
             OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
             if (windows->getMode() == OFGui::GM_MainMenu && windows->isMainMenuEscapeLua())
                 return;
+            // A screen of the game that Lua draws on the mode of the interface (the Vigor Tester, the screen of the face)
+            // does not close with Escape: the pause menu opens over it, and the screen goes on when the menu is left
+            const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            if (windows->getMode() == OFGui::GM_Inventory && scripts != nullptr && scripts->luaEscapeClaimed())
+            {
+                windows->pushGuiMode(OFGui::GM_MainMenu);
+                return;
+            }
             windows->exitCurrentGuiMode();
         }
     }

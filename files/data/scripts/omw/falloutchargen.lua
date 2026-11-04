@@ -798,6 +798,8 @@ local function sync()
     -- The game stands still while a screen is up and the engine hands onFrame a step of 0 then: the time of the frame is
     -- the real one (Mac round 12AZ E)
     local seconds = core.getRealFrameDuration()
+    -- Escape does not leave the Vigor Tester, the book or the screen of the face: the pause menu opens over it
+    if chargen.claimEscape then chargen.claimEscape(special.isOpen() or face.isOpen()) end
     if special.isOpen() and special.update(seconds) then
         -- The screen of the model failed: the page is shown by the stand-in
         render()
@@ -860,7 +862,10 @@ return {
                 return
             end
             if face.isOpen() then
-                face.press(key.code, key.symbol, key.withShift)
+                -- (the pause menu that Escape opens over the screen has the keys then)
+                if I.UI.getMode() == 'Interface' then
+                    face.press(key.code, key.symbol, key.withShift)
+                end
                 return
             end
             if not shownPage or not (element or shown) then

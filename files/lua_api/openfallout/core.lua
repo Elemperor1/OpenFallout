@@ -1319,6 +1319,12 @@
 -- @return #boolean Whether the pick changed.
 
 ---
+-- Said every frame by a screen that Escape does not leave: the pause menu opens over it (as in the game) while the claim is
+-- fresh (a second), instead of the mode of the screen being closed.
+-- @function [parent=#Chargen] claimEscape
+-- @param #boolean claimed
+
+---
 -- The player is done with the screen that is open: what it picked becomes the character (the attributes and the skills
 -- that come from them and the tags, the traits as perks), and the next screen of the menu opens. Nothing happens when
 -- no screen is open.

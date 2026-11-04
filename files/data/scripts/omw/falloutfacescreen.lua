@@ -71,9 +71,18 @@ local bounds = { top = DEFAULT_TOP, bottom = DEFAULT_BOTTOM }
 local sliderTiles = {}
 local look = nil
 local sliderValues = {}
+-- The face slider that was just moved keeps the number it was moved to when the face is read again; the others show
+-- what the face now gives (FalloutNV.exe leaves the active slider out of the re-read, 0x7B1887: it would show one step
+-- nearer zero now and then, because the controls are not at right angles). It is for the next reading only.
+local held = nil
 -- What the sliders that the host does not keep show: the number of the preset and the age
 local presetValue = 1
-local ageValue = 5
+-- Both sliders open at 1 whatever the face is (FalloutNV.exe makes them with the lowest number as their start and does not
+-- read the NPC back)
+local ageValue = 1
+-- Whether the face on the screen came from Randomize or the age and nothing was picked since (the executable's dirty bit
+-- 7): the next Randomize then runs at once, without the question
+local fresh = false
 -- The colour preset of the hair colour list, and whether a colour was set by hand since (the list then says custom)
 local colourPreset = 0
 local custom = false
@@ -85,7 +94,7 @@ local pending = nil
 local SCENE = 'face'
 local FACE_GRAB = 'RSM_Face_Grab'
 local scene = nil
-local view = { yaw = 0, zoom = 0.35 }
+local view = { yaw = 0, zoom = 0 }
 local headDirty = false
 local headWait = 0
 local viewFor = nil
@@ -97,12 +106,20 @@ local cameraAsked = false
 -- camera at the two ends of the zoom, the half of the angle it sees upwards (a quarter of the 45 degrees of the
 -- games' field of view, as the lock's scene has it), the planes of the frustum, and the turn the pointer makes per
 -- unit of the menu that it moves
-local NEAREST, FARTHEST = 55, 135
+local NEAREST, FARTHEST = 70, 170
 local HALF_ANGLE = 0.19635
 local NEAR_PLANE, FAR_PLANE = 5.0, 2000.0
 local YAW_PER_UNIT = 0.012
-local MAX_YAW = 1.6
 local ZOOM_PER_NOTCH = 0.1
+-- Where the head starts, as the executable has it (12BB): thirty degrees (0.5236) short of facing the viewer, on the side
+-- the head turns towards (to the panel on the right). The camera at 0 looks at the right side of the head and the face
+-- is seen from the front a quarter of a turn BEFORE that (Mac round 12BD: with the quarter turn after it the head showed
+-- its back, and a drag to the right went back, left side, front), so the head starts at a quarter of a turn less
+-- thirty degrees, and a drag to the right turns it towards the panel. The head turns all the way round (the executable
+-- keeps no limit on it)
+local START_YAW = -(math.pi / 2 - 0.5236)
+local START_ZOOM = 0.5
+local TURN = 2 * math.pi
 -- At most so often the head is made again while sliders are moved (seconds), and how long after that the camera is
 -- said again
 local HEAD_EVERY = 0.12
@@ -129,6 +146,10 @@ local function refreshLook()
     sliderValues = {}
     for _, slider in ipairs(chargen.sliders()) do
         sliderValues[slider.kind .. slider.control] = slider.value
+    end
+    if held then
+        sliderValues[held.key] = held.value
+        held = nil
     end
 end
 
@@ -170,14 +191,24 @@ local function faceSliders(list)
             local kind, control = entry.kind, entry.control
             made[#made + 1] = slider(word(entry.setting, entry.setting), entry.minimum, entry.maximum, 0.25,
                 function() return sliderValues[key] or 0 end,
-                function(value) chargen.setSlider(kind, control, value) end)
+                function(value)
+                    chargen.setSlider(kind, control, value)
+                    held = { key = key, value = value }
+                end)
         end
     end
     return made
 end
 
+-- The colours of the sixteen hair colour presets when no data has the settings iHairColor00 to iHairColor15 (neither game's
+-- data does: these are the executable's own, 0x00BBGGRR, the same in both games, round 12BB C1)
+local DEFAULT_COLOURS = {
+    [0] = 0x7E7E7E, 0x373739, 0x1F1F21, 0x41727A, 0x476C85, 0x36495C, 0x33474D, 0x2B2F4D, 0x2D3E66, 0x416A81, 0x0F436A,
+    0x1E1F40, 0x2D2322, 0x222C31, 0x6E6E6E, 0x52667C,
+}
+
 local function colourOf(preset)
-    local packed = pipboy.setting(string.format('iHairColor%02d', preset))
+    local packed = pipboy.setting(string.format('iHairColor%02d', preset)) or DEFAULT_COLOURS[preset]
     if packed == nil then return nil end
     packed = math.floor(packed)
     return packed % 256, math.floor(packed / 256) % 256, math.floor(packed / 65536) % 256
@@ -200,14 +231,14 @@ local function listRows(list)
     local made = {}
     if list == 0 then
         made[#made + 1] = choice(word('sMale', 'Male'), function() return not look.female end,
-            function() chargen.setFemale(false); presetValue = 1 end)
+            function() chargen.setFemale(false); presetValue = 1; fresh = false end)
         made[#made + 1] = choice(word('sFemale', 'Female'), function() return look.female end,
-            function() chargen.setFemale(true); presetValue = 1 end)
+            function() chargen.setFemale(true); presetValue = 1; fresh = false end)
     elseif list == 1 then
         for _, race in ipairs(look.lists.races) do
             local id = race.id
             made[#made + 1] = choice(race.name, function() return look.race == id end,
-                function() chargen.setRace(id); presetValue = 1 end)
+                function() chargen.setRace(id); presetValue = 1; fresh = false end)
         end
     elseif list == 2 then
         local count = #look.lists.presets
@@ -215,6 +246,7 @@ local function listRows(list)
             function() return presetValue end,
             function(value)
                 presetValue = value
+                fresh = false
                 chargen.setPreset(value)
             end,
             function() return tostring(presetValue) end, count > 0)
@@ -223,18 +255,25 @@ local function listRows(list)
             local ask = I.FalloutMessage and I.FalloutMessage.ask
             local function randomize()
                 chargen.randomize()
+                fresh = true
                 done()
             end
-            if ask and ask(word('sRSMConfirmRandomize', 'Randomize the face?'), { word('sYes', 'Yes'), word('sNo', 'No') },
-                function(button) if button == 1 then randomize() end end) then
+            -- A face that Randomize or the age just made is not asked about again (FalloutNV.exe skips the box when its
+            -- dirty bit 7 is set). The box lists No first and Yes second (the stored answer is the place of the button)
+            if not fresh and ask and ask(word('sRSMConfirmRandomize', 'Randomize the face?'),
+                { word('sNo', 'No'), word('sYes', 'Yes') }, function(button) if button == 2 then randomize() end end) then
                 return
             end
             randomize()
         end)
-        -- The age moves the whole face along the age directions of the face file (the fan controls); the host has not
-        -- got them yet, so the slider is there and dim
+        -- The age moves the whole face along the age directions of the face file (the fan controls); without the file
+        -- the slider is there and dim
         made[#made + 1] = slider(word('sRSMAge', 'Age'), 1, 10, 0.25, function() return ageValue end,
-            function(value) ageValue = value end, nil, false)
+            function(value)
+                ageValue = value
+                fresh = true
+                chargen.setAge(value)
+            end, nil, chargen.hasAge())
     elseif list == 3 then
         made[#made + 1] = link(5)
         made[#made + 1] = link(6)
@@ -246,7 +285,8 @@ local function listRows(list)
     elseif list == 5 then
         for _, hair in ipairs(look.lists.hairs) do
             local id = hair.id
-            made[#made + 1] = choice(hair.name, function() return look.hair == id end, function() chargen.setHair(id) end)
+            made[#made + 1] = choice(hair.name, function() return look.hair == id end,
+                function() chargen.setHair(id); fresh = false end)
         end
     elseif list == 6 then
         made[#made + 1] = slider(word('sRSMHairColor', 'Hair Color'), 0, 15, 0.25,
@@ -266,17 +306,17 @@ local function listRows(list)
     elseif list == 7 then
         for _, part in ipairs(look.lists.facialHair) do
             local id = part.id
+            -- The row that is lit is the character's first part in its list, the last of the record's (the click takes it off,
+            -- and a click on another row takes every part away and puts that one on)
             made[#made + 1] = choice(part.name, function()
-                for _, worn in ipairs(look.headParts) do
-                    if worn == id then return true end
-                end
-                return false
-            end, function() chargen.toggleFacialHair(id) end)
+                return #look.headParts > 0 and look.headParts[#look.headParts] == id
+            end, function() chargen.toggleFacialHair(id); fresh = false end)
         end
     elseif list == 8 then
         for _, eyes in ipairs(look.lists.eyes) do
             local id = eyes.id
-            made[#made + 1] = choice(eyes.name, function() return look.eyes == id end, function() chargen.setEyes(id) end)
+            made[#made + 1] = choice(eyes.name, function() return look.eyes == id end,
+                function() chargen.setEyes(id); fresh = false end)
         end
     elseif list == 9 then
         for index = 10, 18 do made[#made + 1] = link(index) end
@@ -424,6 +464,9 @@ local function showButtons()
         -- Back goes up a list, or to the tab before; with nowhere to go it is not shown (guess: the executable's)
         local canBack = PARENT[active] ~= nil or (mode < 2 and tab > 0)
         opened:set('RSM_back_button', 'visible', canBack)
+        -- Next is there on a tab that has another after it and on the last tab (where it is Done), and in no list under a
+        -- tab (round 12BB F: visible when the list has a next list or is the last tab)
+        opened:set('RSM_next_button', 'visible', active == tab and (atLast or mode < 2))
     end)
 end
 
@@ -462,8 +505,8 @@ function module.activate(index)
         changed()
         -- A choice of sex or race changes what the other lists hold, which are made again when they are shown
     elseif row.kind == 'action' then
+        -- The row says itself when the face changed (a box is asked first, and the look is not touched on No)
         row.click(changed)
-        changed()
     end
 end
 
@@ -483,13 +526,22 @@ local function sliderOf(tile)
     return nil
 end
 
--- The next tab, or the box that asks whether the player is done on the last one
+-- The word the box names what the player is done with: by the mode of the screen, not the tab (FalloutNV.exe builds the
+-- question once when the menu opens, from the format "%s %s?" with sRSMConfirmDone first and this word second, round 12BB F
+-- reading of the argument order): the character for a new one, the hair at the barber, the face at the surgeon
+local function doneTitle()
+    if mode == 2 then return word('sRSMHair', 'Hair') end
+    if mode == 3 then return word('sRSMFace', 'Face') end
+    return word('sRSMCharacter', 'character')
+end
+
+-- The next tab, or the box that asks whether the player is done on the last one: the box lists No first and Yes second
 local function confirmDone()
     local done = callbacks and callbacks.done
     local ask = I.FalloutMessage and I.FalloutMessage.ask
-    local text = titleOf(lastTab()) .. ' ' .. word('sRSMConfirmDone', 'Are you done?')
-    if ask and ask(text, { word('sYes', 'Yes'), word('sNo', 'No') }, function(button)
-        if button == 1 and done then done() end
+    local text = word('sRSMConfirmDone', 'Are you done with your') .. ' ' .. doneTitle() .. '?'
+    if ask and ask(text, { word('sNo', 'No'), word('sYes', 'Yes') }, function(button)
+        if button == 2 and done then done() end
     end) then
         return
     end
@@ -520,6 +572,9 @@ end
 
 local function scroll(delta)
     local before = first
+    -- A step is one row (the lists have rows of one height); the arrow that scrolls further is not there once every row
+    -- shows, so the wheel does not go on either
+    if delta > 0 and lastShown() >= #rows then return end
     first = clamp(first + delta, 1, math.max(1, #rows))
     if first ~= before then place() end
 end
@@ -621,7 +676,7 @@ local function openScene()
     headDirty = true
     headWait = 0
     cameraWait = CAMERA_AFTER
-    view = { yaw = 0, zoom = 0.35 }
+    view = { yaw = START_YAW, zoom = START_ZOOM }
     lastDragX = nil
     placeFrustum()
     placeCamera()
@@ -656,7 +711,7 @@ local function turn()
     if not at then return end
     if lastDragX ~= nil then
         local units = (at.x - lastDragX) * 960 / math.max(1, ui.screenSize().y)
-        view.yaw = clamp(view.yaw + units * YAW_PER_UNIT, -MAX_YAW, MAX_YAW)
+        view.yaw = (view.yaw + units * YAW_PER_UNIT) % TURN
         cameraAsked = true
     end
     lastDragX = at.x
@@ -739,8 +794,8 @@ function module.start(page, state, options)
     placedFor = nil
     placePanel()
     setTop()
-    presetValue, colourPreset, custom = 1, 0, false
-    -- The glyphs on the ends of a slider's bar (the menu's `user1` and `user2`: guess, the executable's are not read)
+    presetValue, ageValue, colourPreset, custom, fresh = 1, 1, 0, false, false
+    -- The glyphs on the ends of a slider's bar (the menu's `user1` and `user2`: "<" and ">" in the executable, round 12BB F)
     opened:io('user1', '<')
     opened:io('user2', '>')
     refreshLook()

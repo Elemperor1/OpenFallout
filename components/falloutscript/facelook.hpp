@@ -63,7 +63,10 @@ namespace FalloutScript
     /// The controls of the face screen: directions in the space of the coefficients (facegen\si.ctl, read by the
     /// executable at 0xAAA7D0). A slider's value is the dot product of its direction with the coefficients, and moving
     /// the slider adds the difference, along the direction, to every coefficient (0x652320: coef += (value - current) *
-    /// row). The directions are what the file holds; this class only does the arithmetic.
+    /// row). The directions are what the file holds; this class only does the arithmetic, in the executable's own order
+    /// and precision: the sum of the dot product is kept as a float after every term (0x658360), the product of the
+    /// terms is not. The rows are not at right angles to each other, and the ones of the tone are not exactly of length
+    /// 1 (12BB A): nothing here makes them so.
     class FaceControls
     {
     public:
@@ -81,10 +84,70 @@ namespace FalloutScript
         std::array<std::vector<std::vector<float>>, 2> mRows;
     };
 
-    /// What a slider of the face shows as a whole number: the control's value times ten, as FalloutNV.exe does
-    /// (0x7AF7E5: the slider's integer divided by 10.0 is what it writes). The rounding of the other way is a guess.
+    /// The dot product of a direction and the coefficients, as the executable sums it (0x658360)
+    float faceDot(const std::vector<float>& direction, const std::vector<float>& coefficients);
+
+    /// The age of a face: two directions of the shape and two of the tone (the fan controls of facegen\si.ctl,
+    /// FalloutNV.exe 0xAAAF10, Mac round 12BB A). Group 0 is the age in years (15 to 65), group 1 a second number that
+    /// only the random face draws (-4 to 4). A group's value is the dot product of its direction with the coefficients
+    /// of the kind plus an offset. To set one, the difference of both groups from what they should be is turned into a
+    /// move along both directions with the inverse of the matrix of their dot products, so that the one that is not
+    /// asked for keeps its value (0xAAC170).
+    class FaceAge
+    {
+    public:
+        static constexpr int groups = 2;
+        static constexpr float minimumYears = 15.f;
+        static constexpr float maximumYears = 65.f;
+        static constexpr float minimumSecond = -4.f;
+        static constexpr float maximumSecond = 4.f;
+
+        /// The direction and the offset of a group for a kind of coefficients
+        void set(FaceKind kind, int group, std::vector<float> direction, float offset);
+        /// Works out the inverse matrices once the four directions are there
+        void finish();
+        bool loaded() const { return mLoaded; }
+
+        float value(int group, FaceKind kind, const std::vector<float>& coefficients) const;
+        /// Sets one group of a kind to a value (kept to the group's range; the other group keeps its value)
+        void move(int group, FaceKind kind, float value, std::vector<float>& coefficients) const;
+        /// The age slider (0x7B4B50): the age in years for the shape, the same age moved by what the tone is older or
+        /// younger than the shape for the tone, both kept to 15 to 65. Nothing when the directions are not there.
+        bool setAge(float years, std::vector<float>& shape, std::vector<float>& tone) const;
+        /// What Randomize (0x601830) does after it has put the new numbers in: `shape` and `tone` hold the new face and
+        /// the `old` ones the face from before. The age of the new shape is kept (kept to 15 to 65) and the tone stays
+        /// as much older or younger than it as the old tone was; the second number is drawn again, `uniform` (0 to 1)
+        /// times four less two for the shape, and the tone keeps its distance from the shape as before, both kept to -2
+        /// to 2. Nothing when the directions are not there.
+        bool settleRandom(const std::vector<float>& oldShape, const std::vector<float>& oldTone,
+            std::vector<float>& shape, std::vector<float>& tone, double uniform) const;
+
+    private:
+        struct Fan
+        {
+            std::vector<float> mDirection;
+            float mOffset = 0.f;
+        };
+        std::array<std::array<Fan, groups>, 2> mFans;
+        /// The inverse of the matrix of the dot products of the two directions of a kind, row by row
+        std::array<std::array<float, 4>, 2> mInverse{};
+        bool mLoaded = false;
+    };
+
+    /// The years the age slider's whole number (1 to 10) stands for: truncated, as FalloutNV.exe does (0x7B4E05)
+    int faceAgeYears(int slider);
+
+    /// What a slider of the face shows as a whole number: the control's value times ten, truncated towards zero, as
+    /// FalloutNV.exe does (0x7B181A, Mac round 12BB B: not rounded, not floored). The slider's number divided by ten is
+    /// what a move writes (0x7AF7E5).
     int faceSliderInteger(float value);
     float faceSliderValue(int integer);
+
+    /// The numbers of the sliders of the face lists whose range is not the usual one, and the usual one: the executable
+    /// reads fRSMFaceSliderDefaultMin and fRSMFaceSliderDefaultMax from the INI, and the INI files of both games say
+    /// -3.5 and 3.5 (the executable's own defaults, -5 and 5, apply only when the keys are missing)
+    constexpr int faceSliderDefaultMinimum = -35;
+    constexpr int faceSliderDefaultMaximum = 35;
 
     /// One slider of the screen's face lists
     struct FaceSlider
@@ -97,8 +160,8 @@ namespace FalloutScript
         /// The editor setting that names the slider (`sRSMShapeOptionNN` for NN = the number given, or one of the plain
         /// names of the tone list), and the number in it
         std::string mSetting;
-        int mMinimum = -50;
-        int mMaximum = 50;
+        int mMinimum = faceSliderDefaultMinimum;
+        int mMaximum = faceSliderDefaultMaximum;
     };
     /// The 30 sliders of the shape lists and the 12 of the tone list, in the order the screen shows them (12AW S7)
     const std::vector<FaceSlider>& faceSliders();

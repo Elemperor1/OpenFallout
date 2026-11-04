@@ -836,6 +836,81 @@ namespace
         EXPECT_EQ(*loaded.look(), look);
     }
 
+    TEST(FalloutScriptChargenTest, a_form_of_a_plugin_that_is_not_loaded_is_lost_and_a_hairless_look_is_not)
+    {
+        Chargen chargen(Game::NewVegas);
+        FalloutScript::FaceLook look;
+        look.mRace = 0x19;
+        look.mHair = 0x44;
+        look.mEyes = 0x55;
+        chargen.setLook(look);
+        FalloutScript::SaveWriter out;
+        chargen.write(out);
+
+        // The plugin of the hair is gone: the hair is lost and the record's own stands when it is asked for
+        Chargen loaded(Game::NewVegas);
+        FalloutScript::SaveReader in(
+            out.bytes(), [](FalloutScript::FormId form) -> std::optional<FalloutScript::FormId> {
+                if (form == 0x44)
+                    return std::nullopt;
+                return form;
+            });
+        loaded.read(in, FalloutScript::chargenSectionVersion);
+        ASSERT_TRUE(loaded.look().has_value());
+        EXPECT_EQ(loaded.look()->mHair, 0u);
+        EXPECT_TRUE(loaded.hasLostForms());
+        FalloutScript::FaceLook record;
+        record.mRace = 0x1;
+        record.mHair = 0x66;
+        record.mEyes = 0x77;
+        loaded.resolveLostForms(record);
+        EXPECT_FALSE(loaded.hasLostForms());
+        EXPECT_EQ(loaded.look()->mHair, 0x66u);
+        // What was not lost is kept
+        EXPECT_EQ(loaded.look()->mRace, 0x19u);
+        EXPECT_EQ(loaded.look()->mEyes, 0x55u);
+
+        // A look that has no hair on purpose (the null form) keeps it, saved and loaded and asked for
+        look.mHair = 0;
+        chargen.setLook(look);
+        FalloutScript::SaveWriter hairless;
+        chargen.write(hairless);
+        Chargen kept(Game::NewVegas);
+        FalloutScript::SaveReader again(hairless.bytes());
+        kept.read(again, FalloutScript::chargenSectionVersion);
+        EXPECT_FALSE(kept.hasLostForms());
+        kept.resolveLostForms(record);
+        EXPECT_EQ(kept.look()->mHair, 0u);
+    }
+
+    TEST(FalloutScriptChargenTest, a_new_look_ends_what_a_load_lost)
+    {
+        Chargen chargen(Game::NewVegas);
+        FalloutScript::FaceLook look;
+        look.mRace = 0x19;
+        look.mHair = 0x44;
+        look.mEyes = 0x55;
+        chargen.setLook(look);
+        FalloutScript::SaveWriter out;
+        chargen.write(out);
+        Chargen loaded(Game::NewVegas);
+        FalloutScript::SaveReader in(
+            out.bytes(), [](FalloutScript::FormId form) -> std::optional<FalloutScript::FormId> {
+                return form == 0x44 ? std::nullopt : std::optional<FalloutScript::FormId>(form);
+            });
+        loaded.read(in, FalloutScript::chargenSectionVersion);
+        ASSERT_TRUE(loaded.hasLostForms());
+        // The screen sets a look that has no hair on purpose: that is not lost
+        FalloutScript::FaceLook bald = *loaded.look();
+        bald.mHair = 0;
+        loaded.setLook(bald);
+        EXPECT_FALSE(loaded.hasLostForms());
+        FalloutScript::FaceLook record;
+        record.mHair = 0x66;
+        loaded.resolveLostForms(record);
+        EXPECT_EQ(loaded.look()->mHair, 0u);
+    }
+
     TEST(FalloutScriptChargenTest, a_character_that_picked_nothing_saves_nothing_but_the_flags)
     {
         Chargen chargen(Game::NewVegas);

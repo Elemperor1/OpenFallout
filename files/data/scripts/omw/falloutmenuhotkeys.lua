@@ -129,9 +129,10 @@ function Keys:stepPad(dt, directions)
         self.heldFor = self.heldFor + dt
         if not self.wheel and self.heldFor > self.down then
             self.wheel = true
-            self.rows = self.env.slots()
         end
-        if self.wheel then self.rows = self.env.slots() end
+        -- While the wheel is up its rows, and the picture and name of the held slot, are what the slots hold now (a script
+        -- can put another item in a slot while it is held)
+        if self.wheel then self:loadPreview(selected) end
     elseif self.padMode then
         -- Let go (or none chosen): what the last chosen slot holds is used
         local slot = self.held
@@ -176,7 +177,7 @@ function Keys:step(dt, allowed)
             -- While the wheel is up the time of the picture is made new every frame, and its rows are what the slots hold
             -- now (a script can put another item in a slot while the key is held)
             if self.wheel then
-                self.rows = self.env.slots()
+                self:loadPreview(self.held)
                 self.showLeft = self.show
             end
         else
