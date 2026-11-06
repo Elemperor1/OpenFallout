@@ -61,6 +61,9 @@ jobs:
     - name: Test incremental cache invalidation
       run: python3 -m unittest discover -s CI -p test_build_cache.py -v
 
+    - name: Test coverage and JUnit report collection
+      run: python3 -m unittest discover -s CI -p test_test_reports.py -v
+
     - name: Cache dependency downloads
       uses: actions/cache@v5
       with:
@@ -125,36 +128,26 @@ jobs:
         -D CMAKE_INSTALL_PREFIX=install
 
     - name: Build
+      id: build
       run: cmake --build build --parallel "$(nproc)"
 
-    - name: Clear previous coverage counters
-      # Keep .gcno metadata and compiled objects for incremental builds.
-      run: find build -type f -name '*.gcda' -delete
-
     - name: Run components tests
-      run: ./build/components-tests
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      run: python3 CI/test_reports.py run components
 
     - name: Run OpenFallout tests
-      run: ./build/openfallout-tests
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      run: python3 CI/test_reports.py run openfallout
 
     - name: Run OpenFallout-CS tests
-      run: ./build/openfallout-cs-tests
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      run: python3 CI/test_reports.py run editor
 
-    - name: Generate coverage report
-      run: |
-        gcovr --root . build \
-          --exclude 'extern/' \
-          --exclude 'build/' \
-          --exclude 'apps/[^/]*_tests/' \
-          --merge-mode-functions merge-use-line-max \
-          --exclude-unreachable-branches \
-          --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
-          --xml-pretty \
-          --print-summary \
-          --output coverage.xml
-
-    - name: Remove coverage counters before caching
-      run: find build -type f -name '*.gcda' -delete
+    - name: Merge suite coverage reports
+      if: >-
+        !cancelled() && hashFiles('coverage/components.json') != '' &&
+        hashFiles('coverage/openfallout.json') != '' && hashFiles('coverage/editor.json') != ''
+      run: python3 CI/test_reports.py merge
 
     - name: Record source timestamps
       run: python3 CI/build_cache.py snapshot
@@ -166,24 +159,84 @@ jobs:
         path: build
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
-    - name: Keep coverage report
+    - name: Keep coverage reports
+      if: ${{ !cancelled() && hashFiles('coverage/*.xml') != '' }}
       uses: actions/upload-artifact@v4
       with:
         name: ubuntu-coverage
-        path: coverage.xml
+        path: |
+          coverage.xml
+          coverage/*.xml
+          coverage/*.json
         if-no-files-found: error
 
-    - name: Upload coverage to Codecov
-      # Fork and Dependabot pull requests cannot access Actions secrets.
+    - name: Keep test results
+      if: ${{ !cancelled() && hashFiles('test-results/*.xml') != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubuntu-test-results
+        path: test-results/*.xml
+        if-no-files-found: error
+
+    - name: Upload test results to Codecov Test Analytics
       if: >-
-        github.event_name != 'pull_request' ||
+        !cancelled() && hashFiles('test-results/*.junit.xml') != '' &&
+        (github.event_name != 'pull_request' ||
         (github.event.pull_request.head.repo.full_name == github.repository &&
-        github.actor != 'dependabot[bot]')
+        github.actor != 'dependabot[bot]'))
       uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: coverage.xml
+        report_type: test_results
+        files: test-results/components.junit.xml,test-results/openfallout.junit.xml,test-results/editor.junit.xml
         disable_search: true
+        plugins: noop
+        fail_ci_if_error: true
+
+    - name: Upload components coverage to Codecov
+      # Fork and Dependabot pull requests cannot access Actions secrets.
+      if: >-
+        !cancelled() && hashFiles('coverage/components.xml') != '' &&
+        (github.event_name != 'pull_request' ||
+        (github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]'))
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage/components.xml
+        flags: components
+        disable_search: true
+        plugins: noop
+        fail_ci_if_error: true
+
+    - name: Upload OpenFallout coverage to Codecov
+      if: >-
+        !cancelled() && hashFiles('coverage/openfallout.xml') != '' &&
+        (github.event_name != 'pull_request' ||
+        (github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]'))
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage/openfallout.xml
+        flags: openfallout
+        disable_search: true
+        plugins: noop
+        fail_ci_if_error: true
+
+    - name: Upload editor coverage to Codecov
+      if: >-
+        !cancelled() && hashFiles('coverage/editor.xml') != '' &&
+        (github.event_name != 'pull_request' ||
+        (github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]'))
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage/editor.xml
+        flags: editor
+        disable_search: true
+        plugins: noop
         fail_ci_if_error: true
 
     - name: Limit stored compiler cache

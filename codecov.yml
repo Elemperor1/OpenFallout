@@ -1,0 +1,17 @@
+codecov:
+  notify:
+    # The overall report is the union of these three independent suite uploads.
+    after_n_builds: 3
+
+flag_management:
+  default_rules:
+    # All three suites run on each code change; do not hide missing uploads.
+    carryforward: false
+  individual_flags:
+    - name: components
+    - name: openfallout
+    - name: editor
+
+comment:
+  layout: "diff, flags, files"
+  after_n_builds: 3
