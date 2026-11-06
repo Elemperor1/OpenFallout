@@ -16,7 +16,7 @@ jobs:
     name: ${{ inputs.image }}
     runs-on: ${{ inputs.image }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - run: echo "CMAKE_BUILD_TYPE=${{ inputs.build-type }}" >> "$GITHUB_ENV"
 
     - run: echo "MACOS_AMD64=true" >> "$GITHUB_ENV"
@@ -36,7 +36,7 @@ jobs:
 
     - name: Cache building dependencies
       id: deps-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: |
           /tmp/Qt
@@ -61,7 +61,7 @@ jobs:
 
     - name: Prime ccache
       id: compiler-cache
-      uses: hendrikmuhs/ccache-action@v1.2.22
+      uses: hendrikmuhs/ccache-action@v1.2.24
       with:
         install: 'no'
         key: ${{ inputs.image }}-${{ inputs.build-type }}
@@ -77,7 +77,7 @@ jobs:
 
     - name: Restore incremental build
       id: build-cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         path: |
           build/*
@@ -99,7 +99,7 @@ jobs:
 
     - name: Save incremental build
       if: steps.build-cache.outputs.cache-hit != 'true' && (inputs.build-type == 'Release' || github.ref == 'refs/heads/master')
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         path: |
           build/*
@@ -129,7 +129,7 @@ jobs:
         done
 
     - name: Store dmg
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-macos-dmg-${{ env.DMG_IDENTIFIER }}-${{ github.sha }}
         path: |

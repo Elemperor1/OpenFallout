@@ -1,0 +1,38 @@
+name: Documentation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - docs/**
+      - .readthedocs.yaml
+      - .github/workflows/docs.yml
+  pull_request:
+    paths:
+      - docs/**
+      - .readthedocs.yaml
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  HTML:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the documentation image
+        run: docker build --tag openfallout-docs docs
+      - name: Check documentation dependencies
+        run: docker run --rm openfallout-docs python -m pip check
+      - name: Build HTML
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/openfallout" openfallout-docs \
+            sphinx-build -b html /openfallout/docs/source /openfallout/docs/build

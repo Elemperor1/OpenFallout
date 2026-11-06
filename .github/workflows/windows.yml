@@ -35,7 +35,7 @@ jobs:
       if: ${{ inputs.package }}
       run: choco install nsis
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - shell: bash
       name: Add deps version env to GITHUB_ENV, stripping comments
@@ -59,7 +59,7 @@ jobs:
 
     - name: Cache prebuilt vcpkg dependencies
       id: vcpkg-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}
         key: vcpkg-${{ inputs.image }}-${{ inputs.msvc }}-${{ runner.arch }}-${{ env.VCPKG_TAG }}-${{ steps.deps-manifest.outputs.digest }}
@@ -89,7 +89,7 @@ jobs:
 
     - name: Cache Qt
       id: qt-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ${{ github.workspace }}/deps/Qt/${{ env.QT_VER }}/msvc2019_64
         key: qt-cache-${{ env.QT_VER }}-msvc2019_64-v1
@@ -143,7 +143,7 @@ jobs:
 
     - name: Prime compiler cache
       id: compiler-cache
-      uses: hendrikmuhs/ccache-action@v1.2.22
+      uses: hendrikmuhs/ccache-action@v1.2.24
       with:
         install: 'no'
         variant: ${{ inputs.package && 'sccache' || 'ccache' }}
@@ -162,7 +162,7 @@ jobs:
 
     - name: Restore incremental build
       id: build-cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         path: |
           build/*
@@ -216,7 +216,7 @@ jobs:
 
     - name: Save incremental build
       if: steps.build-cache.outputs.cache-hit != 'true' && (inputs.package || github.ref == 'refs/heads/master')
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         path: |
           build/*
@@ -299,26 +299,26 @@ jobs:
 
     - name: Store OpenFallout archived pdb files
       if: ${{ inputs.package }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-pdb-${{ github.sha }}
         path: ${{ github.workspace }}/pdb/*
 
     - name: Store OpenFallout build artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-${{ github.sha }}
         path: ${{ github.workspace }}/install/*
 
     - name: Store symbol server artifacts
       if: ${{ inputs.package }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-sym-store-${{ github.sha }}
         path: ${{ github.workspace }}/SymStore/*
 
     - name: Store log etc. artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-logs-and-stuff-${{ github.sha }}
         path: |

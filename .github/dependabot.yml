@@ -10,10 +10,9 @@ updates:
       timezone: America/New_York
     open-pull-requests-limit: 5
     groups:
-      actions-minor-and-patch:
-        update-types:
-          - minor
-          - patch
+      actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: pip
     directory: /docs
@@ -24,10 +23,15 @@ updates:
       timezone: America/New_York
     open-pull-requests-limit: 5
     groups:
-      docs-minor-and-patch:
-        update-types:
-          - minor
-          - patch
+      docs:
+        patterns:
+          - "*"
+    # The OpenMW theme supports Sphinx <9; Sphinx 8 requires Docutils <0.22.
+    ignore:
+      - dependency-name: sphinx
+        versions: [">=9"]
+      - dependency-name: docutils
+        versions: [">=0.22"]
 
   - package-ecosystem: docker
     directories:
