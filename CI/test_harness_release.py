@@ -91,6 +91,10 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ReleaseError):
             create_tag(api, release_plan(api, "master", TAG))
         self.assertEqual(api.writes, [])
+        api.ref = {"object": {"type": "tag", "sha": SHA}}
+        with self.assertRaises(ReleaseError):
+            create_tag(api, release_plan(api, "master", TAG))
+        self.assertEqual(api.writes, [])
 
     def test_missing_empty_or_wrong_architecture_assets_block_publish(self):
         for index in range(3):
@@ -98,6 +102,10 @@ class ReleaseTests(unittest.TestCase):
             release["assets"][index]["size"] = 0
             with self.assertRaises(ReleaseError):
                 verify_assets(release)
+        release = copy.deepcopy(RELEASE)
+        release["assets"][1]["name"] = "OpenFallout-unknown.dmg"
+        with self.assertRaises(ReleaseError):
+            verify_assets(release)
 
     def test_failed_packaging_blocks_publishing(self):
         api = FakeGitHub()

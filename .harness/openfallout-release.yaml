@@ -26,7 +26,7 @@ pipeline:
     - name: tag
       type: String
       description: Unique openfallout- tag. Preview never creates it.
-      value: <+input>.default(openfallout-preview)
+      value: <+input>
   stages:
     - stage:
         name: Desktop release

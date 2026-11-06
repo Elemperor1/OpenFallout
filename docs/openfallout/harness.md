@@ -55,7 +55,7 @@ Run it with these variables:
 | --- | --- | --- |
 | `mode` | `preview`, `draft`, `publish` | `preview` |
 | `source_ref` | Tested commit on master; use an immutable SHA | `master` |
-| `tag` | Unique `openfallout-` tag, e.g. `openfallout-0.1.0-rc1` | `openfallout-preview` |
+| `tag` | Unique `openfallout-` tag, e.g. `openfallout-0.1.0-rc1` | Required |
 
 `preview` only reads GitHub and prints readiness, source SHA, CI link, and blockers.
 It saves that SHA in an ephemeral workspace file, so later phases keep using the
