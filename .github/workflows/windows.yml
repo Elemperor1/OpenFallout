@@ -299,26 +299,26 @@ jobs:
 
     - name: Store OpenFallout archived pdb files
       if: ${{ inputs.package }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-pdb-${{ github.sha }}
         path: ${{ github.workspace }}/pdb/*
 
     - name: Store OpenFallout build artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-${{ github.sha }}
         path: ${{ github.workspace }}/install/*
 
     - name: Store symbol server artifacts
       if: ${{ inputs.package }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-sym-store-${{ github.sha }}
         path: ${{ github.workspace }}/SymStore/*
 
     - name: Store log etc. artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-windows-${{ inputs.msvc }}-${{ inputs.build-type }}-logs-and-stuff-${{ github.sha }}
         path: |

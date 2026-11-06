@@ -129,7 +129,7 @@ jobs:
         done
 
     - name: Store dmg
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: openfallout-macos-dmg-${{ env.DMG_IDENTIFIER }}-${{ github.sha }}
         path: |
