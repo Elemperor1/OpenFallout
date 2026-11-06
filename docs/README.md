@@ -15,8 +15,8 @@ cd ..
 
 This step needs to be repeated only if any dependencies were changed.
 
-The image is based on `readthedocs/build:latest` that is newer than the image readthedocs uses by default (`readthedocs/build:stable`).
-So if after some readthedocs update the documentation will stop building, there is a chance to detect it before the online docs will break.
+The image and Read the Docs configuration use Python 3.12. The Documentation
+workflow builds this image and the HTML when documentation dependencies change.
 
 ### Generating HTML
 
@@ -36,10 +36,16 @@ Building documentation without Docker is more complicated as it requires multipl
 
 ### Installation of required python packages
 
-From OpenMW source directory
+Use Python 3.12 from the OpenFallout source directory:
 ```bash
-pip3 install -r docs/requirements.txt
+python3.12 -m venv .venv-docs
+source .venv-docs/bin/activate
+python -m pip install -r docs/requirements.txt
 ```
+
+The OpenMW theme currently requires Sphinx below 9. Sphinx 8.2.3 and
+Docutils 0.21.2 are pinned together; update these constraints and the theme
+together before enabling Sphinx 9 or Docutils 0.22 and later.
 
 ### Installation of openmwluadocumentor:
 
