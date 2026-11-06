@@ -35,7 +35,7 @@ jobs:
       if: ${{ inputs.package }}
       run: choco install nsis
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - shell: bash
       name: Add deps version env to GITHUB_ENV, stripping comments

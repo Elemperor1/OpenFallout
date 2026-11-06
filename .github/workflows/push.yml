@@ -35,7 +35,7 @@ jobs:
       code: ${{ steps.classify.outputs.code }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Test the rule for skipping builds
       run: python3 -m unittest discover -s CI -p test_changed_paths.py -v
@@ -56,7 +56,7 @@ jobs:
       BUILD_TYPE: Debug
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Test incremental cache invalidation
       run: python3 -m unittest discover -s CI -p test_build_cache.py -v
