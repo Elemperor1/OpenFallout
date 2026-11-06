@@ -40,6 +40,9 @@ jobs:
     - name: Test the rule for skipping builds
       run: python3 -m unittest discover -s CI -p test_changed_paths.py -v
 
+    - name: Test Harness release orchestration
+      run: python3 -m unittest discover -s CI -p test_harness_release.py -v
+
     - name: Decide whether the platform builds are needed
       id: classify
       env:

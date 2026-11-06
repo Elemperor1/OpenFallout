@@ -1,0 +1,121 @@
+pipeline:
+  name: OpenFallout CI
+  identifier: openfallout_ci
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  description: Ubuntu build and GoogleTest results alongside the GitHub Actions platform matrix.
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.connector_Github_7cd1
+        repoName: Elemperor1/OpenFallout
+        persistCredentials: false
+        build: <+input>
+  variables:
+    - name: preflight_only
+      type: String
+      description: Validate the GitHub connection and build VM without compiling.
+      value: <+input>.default(false).allowedValues(true,false)
+  stages:
+    - stage:
+        name: Build and test
+        identifier: build_test
+        type: CI
+        timeout: 90m
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec:
+              imageName: ubuntu-22.04
+              size: medium
+          caching:
+            enabled: true
+            key: openfallout-linux-ccache-v1
+            paths:
+              - .ccache
+            policy: '<+codebase.branch == "master" ? "pull-push" : "pull">'
+          execution:
+            steps:
+              - step:
+                  name: Check build environment
+                  identifier: preflight
+                  type: Run
+                  spec:
+                    shell: Bash
+                    command: |
+                      set -euo pipefail
+                      mkdir -p .ccache
+                      git rev-parse HEAD
+                      cat /etc/os-release
+                      cmake --version
+                      gcc --version
+                      python3 --version
+              - step:
+                  name: Install dependencies
+                  identifier: dependencies
+                  type: Run
+                  timeout: 20m
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.preflight_only> == "false"
+                  spec:
+                    shell: Bash
+                    command: |
+                      set -euo pipefail
+                      sudo add-apt-repository -y ppa:openmw/openmw
+                      sudo apt-get update
+                      sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
+              - step:
+                  name: Configure and build
+                  identifier: build
+                  type: Run
+                  timeout: 60m
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.preflight_only> == "false"
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      CCACHE_DIR: /harness/.ccache
+                    command: |
+                      set -euo pipefail
+                      ccache --max-size=2G
+                      cmake -S . -B build \
+                        -D CMAKE_BUILD_TYPE=Debug \
+                        -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+                        -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                        -D OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION=OFF \
+                        -D USE_SYSTEM_TINYXML=ON \
+                        -D BUILD_COMPONENTS_TESTS=ON \
+                        -D BUILD_OPENFALLOUT_TESTS=ON \
+                        -D BUILD_OPENCS_TESTS=ON \
+                        -D CMAKE_INSTALL_PREFIX=install
+                      cmake --build build --parallel 4
+                      ccache --show-stats
+              - step:
+                  name: Run all GoogleTest suites
+                  identifier: tests
+                  type: Run
+                  timeout: 15m
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.preflight_only> == "false"
+                  spec:
+                    shell: Bash
+                    command: |
+                      set -euo pipefail
+                      mkdir -p test-results
+                      result=0
+                      for suite in components-tests openfallout-tests openfallout-cs-tests; do
+                        "./build/$suite" --gtest_output="xml:test-results/$suite.xml" || result=1
+                      done
+                      exit "$result"
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - test-results/*.xml

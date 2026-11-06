@@ -1,0 +1,83 @@
+pipeline:
+  name: OpenFallout Security
+  identifier: openfallout_security
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  description: SAST, secret scanning, and a CycloneDX SBOM for the C++ source tree.
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.connector_Github_7cd1
+        repoName: Elemperor1/OpenFallout
+        persistCredentials: false
+        build: <+input>
+  stages:
+    - stage:
+        name: Source and supply-chain security
+        identifier: security
+        type: CI
+        timeout: 45m
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec:
+              imageName: ubuntu-22.04
+              size: small
+          execution:
+            steps:
+              - step:
+                  name: Semgrep SAST
+                  identifier: semgrep
+                  type: Semgrep
+                  timeout: 20m
+                  spec:
+                    mode: orchestration
+                    config: default
+                    target:
+                      type: repository
+                      detection: auto
+                    advanced:
+                      fail_on_severity: none
+              - step:
+                  name: Gitleaks secret scan
+                  identifier: gitleaks
+                  type: Gitleaks
+                  timeout: 15m
+                  when:
+                    stageStatus: All
+                  spec:
+                    mode: orchestration
+                    config: default
+                    target:
+                      type: repository
+                      detection: auto
+                    advanced:
+                      fail_on_severity: none
+                      args:
+                        cli: --redact
+              - step:
+                  name: C and Cpp dependency SBOM
+                  identifier: sbom
+                  type: SscaOrchestration
+                  timeout: 20m
+                  when:
+                    stageStatus: All
+                  spec:
+                    mode: generation
+                    source:
+                      type: repository
+                      spec:
+                        url: https://github.com/Elemperor1/OpenFallout
+                        path: .
+                        variant_type: commit
+                        variant: <+codebase.commitSha>
+                        cloned_codebase: /harness
+                    tool:
+                      type: cdxgen
+                      spec:
+                        format: cyclonedx-json
+                        cli_flags: --type cpp --project-name OpenFallout --project-version <+codebase.commitSha> --no-install-deps
