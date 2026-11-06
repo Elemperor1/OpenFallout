@@ -59,7 +59,7 @@ jobs:
 
     - name: Cache prebuilt vcpkg dependencies
       id: vcpkg-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ${{ github.workspace }}/deps/vcpkg-x64-windows-${{ inputs.msvc }}-${{ env.VCPKG_TAG }}
         key: vcpkg-${{ inputs.image }}-${{ inputs.msvc }}-${{ runner.arch }}-${{ env.VCPKG_TAG }}-${{ steps.deps-manifest.outputs.digest }}
@@ -89,7 +89,7 @@ jobs:
 
     - name: Cache Qt
       id: qt-cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ${{ github.workspace }}/deps/Qt/${{ env.QT_VER }}/msvc2019_64
         key: qt-cache-${{ env.QT_VER }}-msvc2019_64-v1
@@ -162,7 +162,7 @@ jobs:
 
     - name: Restore incremental build
       id: build-cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         path: |
           build/*
@@ -216,7 +216,7 @@ jobs:
 
     - name: Save incremental build
       if: steps.build-cache.outputs.cache-hit != 'true' && (inputs.package || github.ref == 'refs/heads/master')
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         path: |
           build/*

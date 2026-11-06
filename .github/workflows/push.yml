@@ -65,7 +65,7 @@ jobs:
       run: python3 -m unittest discover -s CI -p test_test_reports.py -v
 
     - name: Cache dependency downloads
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: apt-cache/*.deb
         key: apt-${{ runner.arch }}-${{ hashFiles('CI/install_debian_deps.sh') }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -103,7 +103,7 @@ jobs:
 
     - name: Restore incremental build
       id: build-cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         path: build
         # Never restore ordinary build objects into an instrumented build.
@@ -154,7 +154,7 @@ jobs:
 
     - name: Save incremental build
       if: steps.build-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         path: build
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
