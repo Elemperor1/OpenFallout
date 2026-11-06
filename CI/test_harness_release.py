@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from harness_release import ReleaseError, create_tag, finish_release, release_plan, validate_tag, verify_assets
+from harness_release import ReleaseError, create_tag, find_release, finish_release, release_plan, validate_tag, verify_assets
 
 
 SHA = "a" * 40
@@ -23,6 +23,7 @@ class FakeGitHub:
         self.ref = None
         self.packaging = dict(RUN, head_branch=TAG)
         self.release = copy.deepcopy(RELEASE)
+        self.release_pages = None
 
     def request(self, path, method="GET", data=None, missing_ok=False):
         if method != "GET":
@@ -40,8 +41,10 @@ class FakeGitHub:
             return self.ref
         if path.startswith("actions/workflows/release.yml/"):
             return {"workflow_runs": [self.packaging]}
-        if path.startswith("releases/tags/"):
-            return self.release
+        if path.startswith("releases?"):
+            if self.release_pages is not None:
+                return self.release_pages[int(path.rsplit("=", 1)[1]) - 1]
+            return [self.release]
         raise AssertionError(path)
 
 
@@ -106,6 +109,14 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(api.writes, [])
         finish_release(api, plan, publish=True)
         self.assertEqual(api.writes, [("releases/7", "PATCH", {"draft": False, "prerelease": True})])
+
+    def test_draft_lookup_paginates_and_missing_release_fails(self):
+        api = FakeGitHub()
+        api.release_pages = [[dict(RELEASE, tag_name=f"other-{i}") for i in range(100)], [RELEASE]]
+        self.assertEqual(find_release(api, TAG)["id"], 7)
+        api.release_pages = [[]]
+        with self.assertRaises(ReleaseError):
+            find_release(api, TAG)
 
 
 if __name__ == "__main__":

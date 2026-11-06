@@ -1,0 +1,31 @@
+trigger:
+  name: OpenFallout security master
+  identifier: openfallout_security_master
+  enabled: true
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  pipelineIdentifier: openfallout_security
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: account.connector_Github_7cd1
+          repoName: Elemperor1/OpenFallout
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+          - key: targetBranch
+            operator: Equals
+            value: master
+  inputYaml: |
+    pipeline:
+      identifier: openfallout_security
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: <+trigger.targetBranch>

@@ -1,0 +1,38 @@
+trigger:
+  name: OpenFallout security pr
+  identifier: openfallout_security_pr
+  enabled: true
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  pipelineIdentifier: openfallout_security
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: PullRequest
+        spec:
+          connectorRef: account.connector_Github_7cd1
+          repoName: Elemperor1/OpenFallout
+          autoAbortPreviousExecutions: true
+          payloadConditions:
+          - key: targetBranch
+            operator: Equals
+            value: master
+          actions:
+          - Open
+          - Reopen
+          - Synchronize
+          - ReadyForReview
+          jexlCondition: <+trigger.payload.pull_request.head.repo.full_name> == "Elemperor1/OpenFallout"
+            && <+trigger.payload.pull_request.draft> == false
+  inputYaml: |
+    pipeline:
+      identifier: openfallout_security
+      properties:
+        ci:
+          codebase:
+            build:
+              type: PR
+              spec:
+                number: <+trigger.prNumber>

@@ -108,12 +108,28 @@ def verify_assets(release):
             raise ReleaseError(f"Release is missing its macOS {arch} disk image")
 
 
+def find_release(api, tag):
+    # The tag endpoint only promises published releases. Authenticated listings
+    # include drafts, including older drafts beyond the first page.
+    page = 1
+    while True:
+        releases = api.request(f"releases?per_page=100&page={page}")
+        matches = [release for release in releases if release["tag_name"] == tag]
+        if matches:
+            if len(matches) != 1:
+                raise ReleaseError("More than one release matches the tag")
+            return matches[0]
+        if len(releases) < 100:
+            raise ReleaseError("Packaging completed without a matching release")
+        page += 1
+
+
 def finish_release(api, plan, publish=False):
     require_ready(plan)
     run = packaging_run(api, plan)
     if run["status"] != "completed" or run["conclusion"] != "success":
         raise ReleaseError("Release packaging must finish successfully before verifying or publishing assets")
-    release = api.request(f"releases/tags/{quote(plan['tag'], safe='')}")
+    release = find_release(api, plan["tag"])
     if release["tag_name"] != plan["tag"] or not release["prerelease"]:
         raise ReleaseError("Expected the selected tag's prerelease")
     verify_assets(release)
