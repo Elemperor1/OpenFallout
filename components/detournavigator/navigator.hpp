@@ -81,7 +81,8 @@ namespace DetourNavigator
          * Keep the returned guard alive while passing guard.get() to operations on this same Navigator. The guard
          * keeps that manager's mutex locked until it is destroyed, so it can cover a group of scene changes and the
          * corresponding update call. Destroy it on the thread that acquired it, and keep the Navigator alive until
-         * then. A guard from another Navigator is not valid here. Do not acquire another guard or call methods
+         * then. Serialize all calls using the same guard: a non-null token skips internal locking and does not
+         * protect concurrent callers sharing it. A guard from another Navigator is not valid here. Do not acquire another guard or call methods
          * that lock this manager internally without accepting the guard while holding it (the mutex is not recursive).
          * Release the guard before wait(): background mesh generation needs the same mutex.
          *

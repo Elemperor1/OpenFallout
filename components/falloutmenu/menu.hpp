@@ -40,7 +40,8 @@ namespace FalloutMenu
 
     /// A tile of a menu that is shown: a part of the tree that a file describes. Tiles in a Menu are owned by the Menu.
     /// Pointers and references to a tile are borrowed and become invalid when that tile or an ancestor is removed, when
-    /// removeChildren is called on an ancestor, or when the Menu is destroyed.
+    /// removeChildren is called on an ancestor, when a different Menu is move-assigned to their owning Menu, or when
+    /// their owning Menu is destroyed.
     class Tile
     {
     public:

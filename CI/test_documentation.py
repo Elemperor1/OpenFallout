@@ -49,10 +49,12 @@ class DocumentationLinkTest(unittest.TestCase):
     def test_sphinx_doc_roles_and_toctree_resolve_rst_files(self):
         text = """See :doc:`Reference <reference>`.
 
-.. toctree::
-   :maxdepth: 2
+.. dropdown:: Contents
 
-   reference
+   .. toctree::
+      :maxdepth: 2
+
+      reference
 """
         self.assertEqual(
             check_documentation.check_sphinx_targets(
@@ -63,9 +65,11 @@ class DocumentationLinkTest(unittest.TestCase):
     def test_sphinx_reports_missing_doc_role_and_toctree_entries(self):
         text = """See :doc:`missing`.
 
-.. toctree::
+.. dropdown:: Contents
 
-   absent
+   .. toctree::
+
+      absent
 """
         errors = check_documentation.check_sphinx_targets(
             text, Path("docs/source/index.rst"), self.root)
