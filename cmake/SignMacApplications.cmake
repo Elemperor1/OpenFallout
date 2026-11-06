@@ -3,13 +3,9 @@
 
 # Obviously, we only need to run this on Apple targets.
 if (APPLE)
-    set(OPENFALLOUT_APP "OpenFallout")
-    set(OPENFALLOUT_CS_APP "OpenFallout-CS")
-
-    set(APPLICATIONS "${OPENFALLOUT_APP}" "${OPENFALLOUT_CS_APP}")
-    foreach(app_name IN LISTS APPLICATIONS)
-        set(FULL_APP_PATH "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/ALL_IN_ONE/${app_name}.app")
-        message(STATUS "Re-signing ${app_name}.app")
+    foreach(app_name IN LISTS CPACK_OPENFALLOUT_APPLICATIONS)
+        set(FULL_APP_PATH "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/ALL_IN_ONE/${app_name}")
+        message(STATUS "Re-signing ${app_name}")
         # Apple's codesign utility does not like directories with periods (.) in their names, so we'll remove it and
         # create a symlink using the original name, which codesign is fine with.
         file(GLOB OSG_PLUGINS_DIR "${FULL_APP_PATH}/Contents/PlugIns/osgPlugins*")

@@ -27,6 +27,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - name: Test Lua documentation failure handling
+        run: python3 -m unittest discover -s docs -p test_luadoc.py -v
       - name: Build the documentation image
         run: docker build --tag openfallout-docs docs
       - name: Check documentation dependencies

@@ -189,10 +189,7 @@ html_css_files = [
 #html_theme_path = []
 
 def setup(app):
-    try:
-        subprocess.call(['bash', project_root + '/docs/source/generate_luadoc.sh'])
-    except Exception as e:
-        print('Can\'t generate Lua API documentation:', e)
+    subprocess.run(['bash', project_root + '/docs/source/generate_luadoc.sh'], check=True)
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
