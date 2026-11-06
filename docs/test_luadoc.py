@@ -62,10 +62,28 @@ esac
         self.assertEqual(len(self.calls()), 3)
         self.assertTrue(self.calls()[-1].endswith("two.lua"))
 
+    def test_api_check_treats_checkout_path_as_literal(self):
+        checkout = self.root / "checkout [1]"
+        checkout.symlink_to(self.root, target_is_directory=True)
+        result = subprocess.run([str(self.bin / "bash"),
+                                 str(checkout / "docs/source/generate_luadoc.sh")],
+                                cwd=self.root, env=self.environment,
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.calls()), 3)
+
     def test_api_failure_stops_before_data_pages(self):
         result = self.run_generator(FAIL_ON="core.lua")
         self.assertEqual(result.returncode, 23, result.stderr)
         self.assertEqual(len(self.calls()), 1)
+
+    def test_no_api_files_fails_before_invoking_documentor(self):
+        (self.root / "files/lua_api/openfallout/core.lua").unlink()
+        (self.root / "files/lua_api/openfallout/README.txt").touch()
+        result = self.run_generator()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("No Lua API files found", result.stderr)
+        self.assertEqual(self.calls(), [])
 
     def test_data_failure_stops_before_later_pages(self):
         result = self.run_generator(FAIL_ON="one.lua")
