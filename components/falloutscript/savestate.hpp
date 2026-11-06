@@ -80,6 +80,7 @@ namespace FalloutScript
         /// place now, or no longer be loaded (none). Without one the ids are what they were saved as.
         using FormMapping = std::function<std::optional<FormId>(FormId)>;
 
+        /// `bytes` is borrowed; its storage must remain alive and unchanged while this reader is used.
         explicit SaveReader(std::string_view bytes, FormMapping mapping = {})
             : mBytes(bytes)
             , mMapping(std::move(mapping))

@@ -7,6 +7,16 @@ OpenFallout is at an early stage. Start with the [roadmap](docs/openfallout/gap-
 * Format C++ with the repository's `.clang-format`.
 * Keep the GPLv3 license and the copyright notices on everything inherited from OpenMW. New files are GPLv3 too.
 
+### Documentation and evidence
+
+Update the project guides when a change alters behavior or a contract that users, modders, or maintainers rely on. This includes public APIs and script commands, plugin or load-order rules, configuration and build instructions, compatibility constraints, save data, supported workflows, and documented limitations. A behavior-preserving internal refactor does not need new prose. Start with the [developer map](docs/openfallout/architecture.md) to find the owning code and the relevant guide.
+
+Keep user-facing status current when a change affects the project's scope, a roadmap milestone, a known gap, supported compatibility, or a documented release/build path. Describe what changed and what remains incomplete in the relevant guide; do not present planned or partially implemented work as available behavior. In the pull request description, summarize the change and list the checks actually run, including any important checks that could not be run.
+
+For reverse-engineered behavior, tie each claim to inspectable evidence and state its limits. Separate implementation observed in source, cases covered by unit tests, automated in-game evidence, and manual play. Identify the game/data and setup where that matters, distinguish inference and assumptions from observations, and name unresolved behavior. Do not infer engine parity from similar source code, isolated tests, or an automated run.
+
+Run `python3 CI/check_documentation.py` and `python3 -m unittest discover -s CI -p test_documentation.py` for the lightweight entrypoint checks. These check selected local link targets, not anchors, external availability, prose accuracy, or a full Sphinx build.
+
 The rest of this file is OpenMW's contribution guide, inherited unchanged. Its links point at OpenMW's own GitLab, wiki and forum, and its scope rules are written for a Morrowind engine, so treat it as background until OpenFallout has its own.
 
 ---

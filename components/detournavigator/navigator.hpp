@@ -75,6 +75,28 @@ namespace DetourNavigator
     {
         virtual ~Navigator() = default;
 
+        /**
+         * @brief Acquire the update lock used by NavigatorImpl to protect its recast mesh manager.
+         *
+         * Keep the returned guard alive while passing guard.get() to operations on this same Navigator. The guard
+         * keeps that manager's mutex locked until it is destroyed, so it can cover a group of scene changes and the
+         * corresponding update call. Destroy it on the thread that acquired it, and keep the Navigator alive until
+         * then. A guard from another Navigator is not valid here. Do not acquire another guard or call methods
+         * that lock this manager internally without accepting the guard while holding it (the mutex is not recursive).
+         * Release the guard before wait(): background mesh generation needs the same mutex.
+         *
+         * In NavigatorImpl, passing nullptr lets the recast mesh manager lock selected critical sections internally;
+         * it does not hold the lock across a complete operation or a group of calls. Use nullptr only when those
+         * operations cannot race with other access to the same scene. Background navmesh work does not make the rest
+         * of the Navigator interface thread-safe. NavigatorStub returns a null guard.
+         *
+         * @code
+         * auto guard = navigator.makeUpdateGuard();
+         * navigator.addObject(id, shapes, transform, guard.get());
+         * navigator.update(playerPosition, guard.get());
+         * guard.reset(); // release before waiting for background mesh generation
+         * @endcode
+         */
         virtual ScopedUpdateGuard makeUpdateGuard() = 0;
 
         /**

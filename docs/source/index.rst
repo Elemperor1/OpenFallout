@@ -6,6 +6,10 @@ OpenFallout is built on OpenMW and is being renamed from it in stages. These pag
 This documentation covers all aspects of development, scripting, and content creation.
 Use the categorized sections below to quickly access technical references, modding tools, and installation guides.
 
+OpenFallout's developer map and project-specific guidance are collected on the
+:doc:`OpenFallout page <openfallout>`. Its Markdown guides live in the source
+tree and are linked from that page.
+
 .. dropdown:: Table of Contents
     :icon: book
 
@@ -31,6 +35,7 @@ Use the categorized sections below to quickly access technical references, moddi
         :titlesonly:
         :maxdepth: 4
 
+        openfallout
         manuals/installation/index
         manuals/openmw-cs/index
         manuals/documentationHowTo

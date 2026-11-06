@@ -38,6 +38,10 @@ namespace DetourNavigator
     public:
         explicit TileCachedRecastMeshManager(const RecastSettings& settings);
 
+        // Locks this manager's mutex and returns a scoped handle to its member token. The mutex remains locked until
+        // the handle is destroyed; pass its token only to operations using this manager and release it on this thread.
+        // A non-null token is trusted (its origin is not checked) and makes MaybeLockGuard skip its own lock. A null
+        // token makes those guarded sections lock locally, but does not cover work outside them or multiple calls.
         ScopedUpdateGuard makeUpdateGuard()
         {
             mMutex.lock();

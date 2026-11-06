@@ -81,6 +81,8 @@ def restore(root, build):
         return
     try:
         state = json.loads((build / STATE_FILE).read_text())
+        # This snapshot binds source timestamps to a checkout root, not to the
+        # compiler or configure options; the caller's cache key owns that check.
         if state["version"] != 1 or state["root"] != str(root.resolve()):
             raise ValueError("incompatible source snapshot")
         files = state["files"]
@@ -91,6 +93,8 @@ def restore(root, build):
                 for value in files.values()):
             raise ValueError("invalid source snapshot")
     except (OSError, ValueError, KeyError, TypeError):
+        # Without trustworthy metadata, none of the restored build tree is safe
+        # to reuse. The next configure/build recreates it from scratch.
         shutil.rmtree(build)
         print("Discarded incomplete/incompatible build cache")
         return
