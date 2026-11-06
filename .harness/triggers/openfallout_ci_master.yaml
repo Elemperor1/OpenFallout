@@ -1,0 +1,35 @@
+trigger:
+  name: OpenFallout ci master
+  identifier: openfallout_ci_master
+  enabled: true
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  pipelineIdentifier: openfallout_ci
+  source:
+    type: Webhook
+    spec:
+      type: Github
+      spec:
+        type: Push
+        spec:
+          connectorRef: account.connector_Github_7cd1
+          repoName: Elemperor1/OpenFallout
+          autoAbortPreviousExecutions: false
+          payloadConditions:
+          - key: targetBranch
+            operator: Equals
+            value: master
+  inputYaml: |
+    pipeline:
+      identifier: openfallout_ci
+      properties:
+        ci:
+          codebase:
+            build:
+              type: branch
+              spec:
+                branch: <+trigger.targetBranch>
+      variables:
+      - name: preflight_only
+        type: String
+        value: 'false'

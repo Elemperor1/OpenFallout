@@ -1,0 +1,84 @@
+pipeline:
+  name: OpenFallout CI
+  identifier: openfallout_ci
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  description: Ubuntu build and GoogleTest results alongside the GitHub Actions platform
+    matrix.
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.connector_Github_7cd1
+        repoName: Elemperor1/OpenFallout
+        persistCredentials: false
+        build: <+input>
+  variables:
+  - name: preflight_only
+    type: String
+    description: Validate the GitHub connection and build VM without compiling.
+    value: <+input>.default(false).allowedValues(true,false)
+  stages:
+  - stage:
+      name: Build and test
+      identifier: build_test
+      type: CI
+      timeout: 120m
+      spec:
+        cloneCodebase: true
+        platform:
+          os: Linux
+          arch: Amd64
+        runtime:
+          type: Cloud
+          spec:
+            imageName: ubuntu-22.04
+            size: medium
+        caching:
+          enabled: true
+          key: openfallout-ubuntu24-ccache-v2
+          paths:
+          - .ccache
+          policy: '<+codebase.branch == "master" ? "pull-push" : "pull">'
+        execution:
+          steps:
+          - step:
+              name: Check build environment
+              identifier: preflight
+              type: Run
+              spec:
+                shell: Bash
+                command: |
+                  set -euo pipefail
+                  mkdir -p .ccache
+                  git rev-parse HEAD
+                  docker --version
+          - step:
+              name: Build and test on Ubuntu 24
+              identifier: build_tests
+              type: Run
+              timeout: 110m
+              when:
+                stageStatus: Success
+                condition: <+pipeline.variables.preflight_only> == "false"
+              spec:
+                shell: Bash
+                command: |
+                  set -euo pipefail
+                  harness_ci_driver=CI/harness_ci.sh
+                  if [ ! -f "$harness_ci_driver" ]; then
+                    harness_ci_driver="$(mktemp)"
+                    trap 'rm -f "$harness_ci_driver"' EXIT
+                    curl --fail --location --retry 3 \
+                      https://raw.githubusercontent.com/Elemperor1/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh \
+                      --output "$harness_ci_driver"
+                  fi
+                  docker run --rm -i \
+                    --volume "$PWD:/harness" \
+                    --workdir /harness \
+                    --env CCACHE_DIR=/harness/.ccache \
+                    ubuntu:24.04 bash -s < "$harness_ci_driver"
+                reports:
+                  type: JUnit
+                  spec:
+                    paths:
+                    - test-results/*.xml

@@ -1,0 +1,140 @@
+pipeline:
+  name: OpenFallout Release
+  identifier: openfallout_release
+  orgIdentifier: default
+  projectIdentifier: OpenBethesda
+  description: Preview, build a draft, or publish verified Windows and macOS prerelease assets.
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.connector_Github_7cd1
+        repoName: Elemperor1/OpenFallout
+        persistCredentials: false
+        # Privileged release code is immutable; source_ref selects the application separately.
+        build:
+          type: commitSha
+          spec:
+            commitSha: 31c9a6fe1772713e813da5403df19c12a55b6e69
+  variables:
+    - name: mode
+      type: String
+      value: <+input>.default(preview).allowedValues(preview,draft,publish)
+    - name: source_ref
+      type: String
+      description: A tested master commit SHA is recommended for reproducible releases.
+      value: <+input>.default(master)
+    - name: tag
+      type: String
+      description: Unique openfallout- tag. Preview never creates it.
+      value: <+input>
+  stages:
+    - stage:
+        name: Desktop release
+        identifier: release
+        type: CI
+        timeout: 210m
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec:
+              imageName: ubuntu-22.04
+              size: small
+          execution:
+            steps:
+              - step:
+                  name: Preview release readiness
+                  identifier: preview
+                  type: Run
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GH_TOKEN: <+secrets.getValue("account.harnessoauthaccesstoken_github_1793966100622")>
+                      RELEASE_SOURCE: <+pipeline.variables.source_ref>
+                      RELEASE_TAG: <+pipeline.variables.tag>
+                    command: |
+                      set -euo pipefail
+                      gh --version
+                      python3 CI/harness_release.py preview
+              - step:
+                  name: Create or resume release tag
+                  identifier: tag
+                  type: Run
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.mode> != "preview"
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GH_TOKEN: <+secrets.getValue("account.harnessoauthaccesstoken_github_1793966100622")>
+                      RELEASE_SOURCE: <+pipeline.variables.source_ref>
+                      RELEASE_TAG: <+pipeline.variables.tag>
+                    command: |
+                      set -euo pipefail
+                      python3 CI/harness_release.py tag
+              - step:
+                  name: Wait for Windows and macOS packages
+                  identifier: packages
+                  type: Run
+                  timeout: 180m
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.mode> != "preview"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: Retry
+                          spec:
+                            retryCount: 5
+                            retryIntervals:
+                              - 30s
+                            onRetryFailure:
+                              action:
+                                type: MarkAsFailure
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GH_TOKEN: <+secrets.getValue("account.harnessoauthaccesstoken_github_1793966100622")>
+                      RELEASE_SOURCE: <+pipeline.variables.source_ref>
+                      RELEASE_TAG: <+pipeline.variables.tag>
+                    command: |
+                      set -euo pipefail
+                      gh --version
+                      python3 CI/harness_release.py wait
+              - step:
+                  name: Verify draft release assets
+                  identifier: verify
+                  type: Run
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.mode> != "preview"
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GH_TOKEN: <+secrets.getValue("account.harnessoauthaccesstoken_github_1793966100622")>
+                      RELEASE_SOURCE: <+pipeline.variables.source_ref>
+                      RELEASE_TAG: <+pipeline.variables.tag>
+                    command: |
+                      set -euo pipefail
+                      python3 CI/harness_release.py verify
+              - step:
+                  name: Publish prerelease
+                  identifier: publish
+                  type: Run
+                  when:
+                    stageStatus: Success
+                    condition: <+pipeline.variables.mode> == "publish"
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GH_TOKEN: <+secrets.getValue("account.harnessoauthaccesstoken_github_1793966100622")>
+                      RELEASE_SOURCE: <+pipeline.variables.source_ref>
+                      RELEASE_TAG: <+pipeline.variables.tag>
+                    command: |
+                      set -euo pipefail
+                      python3 CI/harness_release.py publish

@@ -11,6 +11,7 @@ prebuilt
 ## build process
 /deps
 /MSVC*
+/.harness-release-state.json
 
 ## doxygen
 Doxygen
