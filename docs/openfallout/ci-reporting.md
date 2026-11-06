@@ -52,3 +52,15 @@ python3 CI/test_reports.py merge
 References: [Codecov flags](https://docs.codecov.com/docs/flags),
 [Test Analytics](https://docs.codecov.com/docs/test-analytics), and
 [gcovr trace merging](https://gcovr.com/en/8.3/guide/merging.html).
+
+## Dependabot
+
+`.github/dependabot.yml` checks GitHub Actions, `docs/requirements.txt`, and the
+Dockerfiles under `docker/` and `docs/` every Monday at 09:00 America/New_York.
+Minor and patch updates are grouped per ecosystem; major updates get separate
+PRs. Each ecosystem permits up to five open version-update PRs. Dependabot
+starts using this configuration after it reaches the default branch.
+
+CMake FetchContent pins and packages installed by shell commands, such as the
+inline gcovr version, still need manual updates. The current Docker base images
+use floating tags, so they may not produce version-update PRs until pinned.
