@@ -1,0 +1,47 @@
+codecov:
+  notify:
+    # Three suite flags plus the unflagged combined report for complete branch data.
+    after_n_builds: 4
+
+flag_management:
+  default_rules:
+    # All three suites run on each code change; do not hide missing uploads.
+    carryforward: false
+  individual_flags:
+    - name: components
+    - name: openfallout
+    - name: editor
+
+component_management:
+  individual_components:
+    - component_id: engine
+      name: OpenFallout engine
+      paths:
+        - apps/openfallout/**
+    - component_id: shared_libraries
+      name: Shared libraries
+      paths:
+        - components/**
+    - component_id: editor
+      name: Construction Set editor
+      paths:
+        - apps/opencs/**
+    - component_id: desktop_ui
+      name: Launcher and installation wizard
+      paths:
+        - apps/launcher/**
+        - apps/wizard/**
+    - component_id: tools
+      name: Data and navigation tools
+      paths:
+        - apps/bsatool/**
+        - apps/bulletobjecttool/**
+        - apps/esmtool/**
+        - apps/essimporter/**
+        - apps/mwiniimporter/**
+        - apps/navmeshtool/**
+        - apps/niftest/**
+
+comment:
+  layout: "diff, flags, components, files"
+  after_n_builds: 4
