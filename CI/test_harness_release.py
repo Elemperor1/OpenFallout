@@ -1,7 +1,9 @@
 import copy
 import unittest
+import tempfile
+from pathlib import Path
 
-from harness_release import ReleaseError, create_tag, find_release, finish_release, release_plan, validate_tag, verify_assets
+from harness_release import ReleaseError, create_tag, find_release, finish_release, plan_phase, release_plan, validate_tag, verify_assets
 
 
 SHA = "a" * 40
@@ -24,13 +26,15 @@ class FakeGitHub:
         self.packaging = dict(RUN, head_branch=TAG)
         self.release = copy.deepcopy(RELEASE)
         self.release_pages = None
+        self.master_sha = SHA
 
     def request(self, path, method="GET", data=None, missing_ok=False):
         if method != "GET":
             self.writes.append((path, method, data))
             return dict(self.release, **data) if path.startswith("releases/") else {}
         if path.startswith("commits/"):
-            return {"sha": SHA}
+            ref = path.split("/", 1)[1]
+            return {"sha": ref if len(ref) == 40 else self.master_sha}
         if path.startswith("compare/"):
             return {"status": self.comparison}
         if path.startswith("contents/"):
@@ -117,6 +121,29 @@ class ReleaseTests(unittest.TestCase):
         api.release_pages = [[]]
         with self.assertRaises(ReleaseError):
             find_release(api, TAG)
+
+    def test_master_advancing_does_not_change_source_between_phases(self):
+        api = FakeGitHub()
+        with tempfile.TemporaryDirectory() as directory:
+            state_file = Path(directory) / "source.json"
+            preview = plan_phase(api, "preview", "master", TAG, state_file)
+            api.master_sha = "b" * 40
+            api.ref = {"object": {"type": "commit", "sha": SHA}}
+            for phase in ("tag", "wait", "verify", "publish"):
+                plan = plan_phase(api, phase, "master", TAG, state_file)
+                self.assertEqual(plan["sha"], preview["sha"])
+                self.assertTrue(plan["ready"])
+            self.assertEqual(api.writes, [])
+
+    def test_later_phases_reject_missing_or_mismatched_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_file = Path(directory) / "source.json"
+            api = FakeGitHub()
+            with self.assertRaises(ReleaseError):
+                plan_phase(api, "tag", "master", TAG, state_file)
+            plan_phase(api, "preview", "master", TAG, state_file)
+            with self.assertRaises(ReleaseError):
+                plan_phase(api, "publish", "master", "openfallout-other", state_file)
 
 
 if __name__ == "__main__":

@@ -58,6 +58,8 @@ Run it with these variables:
 | `tag` | Unique `openfallout-` tag, e.g. `openfallout-0.1.0-rc1` | `openfallout-preview` |
 
 `preview` only reads GitHub and prints readiness, source SHA, CI link, and blockers.
+It saves that SHA in an ephemeral workspace file, so later phases keep using the
+same source even if master advances while packaging runs.
 The hosted preview was tested successfully. It correctly blocks release creation
 until this setup is merged into master. No tag or release is created by preview.
 

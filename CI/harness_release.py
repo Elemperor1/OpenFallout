@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -83,6 +84,21 @@ def require_ready(plan):
         raise ReleaseError("; ".join(plan["problems"]))
 
 
+def plan_phase(api, phase, source_ref, tag, state_file):
+    if phase == "preview":
+        plan = release_plan(api, source_ref, tag)
+        state_file.write_text(json.dumps({"sha": plan["sha"], "source_ref": source_ref, "tag": tag}))
+        return plan
+    try:
+        state = json.loads(state_file.read_text())
+    except (OSError, ValueError):
+        raise ReleaseError("Run the preview phase first to resolve and save the source commit") from None
+    if (state.get("source_ref") != source_ref or state.get("tag") != tag
+            or not re.fullmatch(r"[0-9a-f]{40}", state.get("sha", ""))):
+        raise ReleaseError("Saved release source is invalid or belongs to different inputs")
+    return release_plan(api, state["sha"], tag)
+
+
 def create_tag(api, plan):
     require_ready(plan)
     if not plan["tag_exists"]:
@@ -143,9 +159,10 @@ def main():
     parser.add_argument("phase", choices=("preview", "tag", "wait", "verify", "publish"))
     parser.add_argument("--source-ref", default=os.environ.get("RELEASE_SOURCE", "master"))
     parser.add_argument("--tag", default=os.environ.get("RELEASE_TAG"), required=not os.environ.get("RELEASE_TAG"))
+    parser.add_argument("--state-file", type=Path, default=Path(".harness-release-state.json"))
     args = parser.parse_args()
     api = GitHub()
-    plan = release_plan(api, args.source_ref, args.tag)
+    plan = plan_phase(api, args.phase, args.source_ref, args.tag, args.state_file)
     if args.phase == "preview":
         print(json.dumps(plan, indent=2))
     elif args.phase == "tag":
