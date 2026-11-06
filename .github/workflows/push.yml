@@ -51,6 +51,9 @@ jobs:
     needs: Changes
     if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     runs-on: ubuntu-latest
+    env:
+      # Collect coverage without optimizer-induced changes to executable lines.
+      BUILD_TYPE: Debug
 
     steps:
     - uses: actions/checkout@v6
@@ -69,13 +72,21 @@ jobs:
       run: sudo add-apt-repository ppa:openmw/openmw; sudo apt-get update
 
     - name: Install Building Dependencies
-      run: sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
+      run: sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic openmw-coverage
+
+    - name: Install coverage tools
+      env:
+        PIPX_BIN_DIR: ${{ runner.temp }}/coverage-bin
+      run: |
+        pipx install gcovr==8.3
+        echo "$PIPX_BIN_DIR" >> "$GITHUB_PATH"
+        "$PIPX_BIN_DIR/gcovr" --version
 
     - name: Prime ccache
       id: compiler-cache
       uses: hendrikmuhs/ccache-action@v1.2.22
       with:
-        key: ubuntu-${{ runner.arch }}-${{ env.BUILD_TYPE }}
+        key: ubuntu-coverage-v1-${{ runner.arch }}-${{ env.BUILD_TYPE }}
         max-size: 1000M
         # Only master builds store caches, so that pull request runs do not push
         # the caches pull requests start from out of the 10 GB budget.
@@ -92,8 +103,9 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: build
-        key: build-linux-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
-        restore-keys: build-linux-v1-${{ steps.build-env.outputs.key }}-
+        # Never restore ordinary build objects into an instrumented build.
+        key: build-linux-coverage-v1-${{ steps.build-env.outputs.key }}-${{ github.sha }}
+        restore-keys: build-linux-coverage-v1-${{ steps.build-env.outputs.key }}-
 
     - name: Restore unchanged source timestamps
       run: python3 CI/build_cache.py restore
@@ -104,6 +116,7 @@ jobs:
         -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
         -D CMAKE_C_COMPILER_LAUNCHER=ccache
         -D CMAKE_CXX_COMPILER_LAUNCHER=ccache
+        -D BUILD_WITH_CODE_COVERAGE=ON
         -D OPENFALLOUT_USE_SYSTEM_RECASTNAVIGATION=ON
         -D USE_SYSTEM_TINYXML=ON
         -D BUILD_COMPONENTS_TESTS=ON
@@ -114,6 +127,10 @@ jobs:
     - name: Build
       run: cmake --build build --parallel "$(nproc)"
 
+    - name: Clear previous coverage counters
+      # Keep .gcno metadata and compiled objects for incremental builds.
+      run: find build -type f -name '*.gcda' -delete
+
     - name: Run components tests
       run: ./build/components-tests
 
@@ -122,6 +139,22 @@ jobs:
 
     - name: Run OpenFallout-CS tests
       run: ./build/openfallout-cs-tests
+
+    - name: Generate coverage report
+      run: |
+        gcovr --root . build \
+          --exclude 'extern/' \
+          --exclude 'build/' \
+          --exclude 'apps/[^/]*_tests/' \
+          --merge-mode-functions merge-use-line-max \
+          --exclude-unreachable-branches \
+          --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
+          --xml-pretty \
+          --print-summary \
+          --output coverage.xml
+
+    - name: Remove coverage counters before caching
+      run: find build -type f -name '*.gcda' -delete
 
     - name: Record source timestamps
       run: python3 CI/build_cache.py snapshot
@@ -132,6 +165,26 @@ jobs:
       with:
         path: build
         key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+    - name: Keep coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubuntu-coverage
+        path: coverage.xml
+        if-no-files-found: error
+
+    - name: Upload coverage to Codecov
+      # Fork and Dependabot pull requests cannot access Actions secrets.
+      if: >-
+        github.event_name != 'pull_request' ||
+        (github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]')
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: coverage.xml
+        disable_search: true
+        fail_ci_if_error: true
 
     - name: Limit stored compiler cache
       if: always() && steps.compiler-cache.outcome == 'success'
