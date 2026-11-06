@@ -20,6 +20,9 @@ workflow builds this image and the HTML when documentation dependencies change.
 
 ### Generating HTML
 
+Both build methods stop if Lua page generation fails. The Docker image includes
+LuaDocumentor; for a local build, install it as described below.
+
 Run the following command from OpenFallout source directory to generate the documentation:
 ```bash
 docker run --user "$(id -u)":"$(id -g)" --volume "$PWD":/openfallout openfallout_doc \
