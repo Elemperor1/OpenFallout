@@ -25,7 +25,8 @@ trigger:
           - Synchronize
           - ReadyForReview
           jexlCondition: <+trigger.payload.pull_request.head.repo.full_name> == "Elemperor1/OpenFallout"
-            && <+trigger.payload.pull_request.draft> == false
+            && <+trigger.payload.pull_request.draft> == false && <+trigger.payload.pull_request.user.login>
+            != "dependabot[bot]"
   inputYaml: |
     pipeline:
       identifier: openfallout_ci

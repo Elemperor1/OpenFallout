@@ -43,7 +43,10 @@ Review findings in the pipeline execution's **Security** tab before selecting a
 blocking threshold.
 
 Both CI and Security have enabled GitHub webhook triggers for master pushes and
-non-draft, same-repository pull requests targeting master. PR updates abort the
+non-draft, same-repository pull requests targeting master. The duplicate Harness
+C++ build excludes Dependabot PRs, which retain the GitHub Actions platform matrix
+and Harness Security scans. This prevents the initial dependency-update burst
+from exhausting Harness's execution queue. PR updates abort the
 previous execution. Fork PRs are excluded. The registered GitHub webhook was
 verified active with a successful response. Trigger definitions live under
 `.harness/triggers/`.
