@@ -20,8 +20,11 @@ excluded from coverage.
 `CI/test_reports.py` clears `.gcda` execution counters before and after each
 suite, keeping compiled objects and `.gcno` metadata reusable. This separates
 the three reports even when the build was restored from a cache. gcovr JSON
-traces are merged into `coverage.xml` for a combined artifact; Codecov merges
-the three flagged uploads into the overall coverage report.
+traces are merged into `coverage.xml`, which is uploaded without a flag and
+retained as an artifact. This combined upload preserves complete branch data:
+two suites may exercise opposite sides of a branch, while each separate XML
+report only describes partial coverage. The combined upload does not affect
+the individual flags.
 
 GoogleTest XML is normalized to JUnit, preserving test names, durations,
 failure details, and skipped/disabled tests. Source paths inside the checkout
@@ -34,8 +37,8 @@ coverage and test results are uploaded even after a test failure. Cancelled runs
 stop reporting. Fork and Dependabot PRs keep their artifacts without using the
 repository upload secret.
 
-`codecov.yml` lists the three flags, disables carryforward, and waits for three
-coverage uploads before producing the coverage notification and PR comment.
+`codecov.yml` lists the three flags, disables carryforward, and waits for all
+four coverage uploads before producing the coverage notification and PR comment.
 There are no new per-flag coverage thresholds. Test Analytics needs successive
 uploads to establish timing, failure-rate, and flakiness history.
 

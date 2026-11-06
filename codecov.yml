@@ -1,7 +1,7 @@
 codecov:
   notify:
-    # The overall report is the union of these three independent suite uploads.
-    after_n_builds: 3
+    # Three suite flags plus the unflagged combined report for complete branch data.
+    after_n_builds: 4
 
 flag_management:
   default_rules:
@@ -14,4 +14,4 @@ flag_management:
 
 comment:
   layout: "diff, flags, files"
-  after_n_builds: 3
+  after_n_builds: 4
