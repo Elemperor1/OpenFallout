@@ -67,6 +67,14 @@ esac
         self.assertEqual(result.returncode, 23, result.stderr)
         self.assertEqual(len(self.calls()), 1)
 
+    def test_no_api_files_fails_before_invoking_documentor(self):
+        (self.root / "files/lua_api/openfallout/core.lua").unlink()
+        (self.root / "files/lua_api/openfallout/README.txt").touch()
+        result = self.run_generator()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("No Lua API files found", result.stderr)
+        self.assertEqual(self.calls(), [])
+
     def test_data_failure_stops_before_later_pages(self):
         result = self.run_generator(FAIL_ON="one.lua")
         self.assertEqual(result.returncode, 23, result.stderr)

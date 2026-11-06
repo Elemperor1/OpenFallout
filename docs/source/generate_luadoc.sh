@@ -22,6 +22,11 @@ then
     exit 1
 fi
 
+if ! compgen -G "$FILES_DIR/lua_api/openfallout/*lua" > /dev/null; then
+    echo "No Lua API files found matching '$FILES_DIR/lua_api/openfallout/*lua'." >&2
+    exit 1
+fi
+
 rm -f "$OUTPUT_DIR"/*.html
 
 data_paths=$("$DOCS_SOURCE_DIR/luadoc_data_paths.sh")

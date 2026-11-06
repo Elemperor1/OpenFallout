@@ -64,6 +64,9 @@ luarocks --local install openmwluadocumentor-0.2.0-1.src.rock
 
 **Windows**
 
+- Install Bash and make sure `bash` is available on `PATH` in the environment
+  used to run `sphinx-build`. Sphinx invokes the Lua documentation generator
+  through its Bash script.
 - install LuaRocks (heavily recommended to use the standalone package)
   https://github.com/luarocks/luarocks/wiki/Installation-instructions-for-Windows
 - `git clone https://gitlab.com/ptmikheev/openmw-luadocumentor.git`
