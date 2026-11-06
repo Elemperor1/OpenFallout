@@ -22,7 +22,7 @@ then
     exit 1
 fi
 
-if ! compgen -G "$FILES_DIR/lua_api/openfallout/*lua" > /dev/null; then
+if ! (cd "$FILES_DIR/lua_api" && compgen -G 'openfallout/*lua' > /dev/null); then
     echo "No Lua API files found matching '$FILES_DIR/lua_api/openfallout/*lua'." >&2
     exit 1
 fi
