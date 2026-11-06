@@ -12,10 +12,11 @@ the inline definitions. Apply reviewed changes in Harness too.
 ## Build and test
 
 `openfallout_ci` supplements the Windows/macOS/Linux GitHub Actions matrix with
-an Ubuntu 22.04 build on Harness Cloud. It installs the repository's Debian
-dependencies plus the separately packaged Qt translation tools, uses bundled
-RecastNavigation because Jammy's package lacks the required CMake configuration,
-builds in Debug, and runs all three GoogleTest suites with JUnit ingestion.
+an Ubuntu 24.04 container build on Harness Cloud. The host VM remains on Harness's
+GA Ubuntu 22.04 image; Docker provides the same Ubuntu generation used by GitHub
+Actions. `CI/harness_ci.sh` installs the repository's Debian dependencies and Qt
+translation tools, builds in Debug with eight compiler jobs, and runs all three
+GoogleTest suites with JUnit ingestion.
 
 The `.ccache` compiler cache is separate from GitHub Actions caches. Master builds
 may save it; PR builds only restore it. Build output and test results are not
