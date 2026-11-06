@@ -64,11 +64,13 @@ pipeline:
                 shell: Bash
                 command: |
                   set -euo pipefail
-                  docker run --rm \
+                  curl --fail --location --retry 3 \
+                    https://raw.githubusercontent.com/Elemperor1/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh | \
+                  docker run --rm -i \
                     --volume "$PWD:/harness" \
                     --workdir /harness \
                     --env CCACHE_DIR=/harness/.ccache \
-                    ubuntu:24.04 bash CI/harness_ci.sh
+                    ubuntu:24.04 bash -s
                 reports:
                   type: JUnit
                   spec:

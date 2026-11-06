@@ -18,6 +18,11 @@ Actions. `CI/harness_ci.sh` installs the repository's Debian dependencies and Qt
 translation tools, builds in Debug with eight compiler jobs, and runs all three
 GoogleTest suites with JUnit ingestion.
 
+The build driver is fetched from the immutable GitHub commit pinned in the
+pipeline YAML, so source branches predating this setup can build too. When
+changing `CI/harness_ci.sh`, push the reviewed driver first, then update that pin
+in the versioned and inline pipeline definitions.
+
 The `.ccache` compiler cache is separate from GitHub Actions caches. Master builds
 may save it; PR builds only restore it. Build output and test results are not
 cached. `preflight_only=true` checks checkout and the VM without compiling.
