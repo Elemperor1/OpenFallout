@@ -42,6 +42,26 @@ four coverage uploads before producing the coverage notification and PR comment.
 There are no new per-flag coverage thresholds. Test Analytics needs successive
 uploads to establish timing, failure-rate, and flakiness history.
 
+## Source components
+
+The Components view groups production source files independently of the test
+suite flags. The component IDs in `codecov.yml` are stable so coverage history
+can continue across display-name changes.
+
+| Component | Source paths |
+| --- | --- |
+| OpenFallout engine | `apps/openfallout/` |
+| Shared libraries | `components/` |
+| Construction Set editor | `apps/opencs/` |
+| Launcher and installation wizard | `apps/launcher/`, `apps/wizard/` |
+| Data and navigation tools | BSA, Bullet, ESM, ESS, INI, navigation, and NIF tools under `apps/` |
+
+These five groups cover the production files in the coverage report without
+overlapping one another. They are included in PR comments and do not add new
+coverage thresholds. To see this configuration in the default-branch view,
+merge the PR and allow its `master` coverage run to finish. Codecov may offer
+**Enable Component Analytics** to backfill historical component trends.
+
 With an instrumented GCC build in `build/` and gcovr 8.3 on `PATH`, the same
 reporting commands can be run locally:
 
