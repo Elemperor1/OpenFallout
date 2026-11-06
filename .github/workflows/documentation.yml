@@ -1,0 +1,27 @@
+name: Documentation links
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Test documentation link checker
+        run: python3 -m unittest discover -s CI -p test_documentation.py -v
+      - name: Check documentation entrypoint links
+        run: python3 CI/check_documentation.py

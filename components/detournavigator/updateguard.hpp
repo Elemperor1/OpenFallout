@@ -6,6 +6,10 @@
 
 namespace DetourNavigator
 {
+    // A non-owning mutex token. TileCachedRecastMeshManager owns one bound to its mutex and returns its address from
+    // makeUpdateGuard. ScopedUpdateGuard points to that manager-owned token; its deleter unlocks the referenced mutex
+    // and does not delete the token. Keep the manager alive, use the token only with that manager, and destroy the
+    // scoped handle on the locking thread.
     class UpdateGuard
     {
     public:

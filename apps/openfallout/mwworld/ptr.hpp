@@ -14,7 +14,7 @@ namespace OFWorld
     class CellStore;
     struct LiveCellRefBase;
 
-    /// \brief Pointer to a LiveCellRef
+    /// \brief Non-owning pointer to a LiveCellRef and its cell or container location; it does not keep them alive
     /// @note PtrBase is never used directly and needed only to define Ptr and ConstPtr
     template <template <class> class TypeTransform>
     class PtrBase
@@ -159,9 +159,12 @@ namespace OFWorld
         }
     };
 
-    // SafePtr holds Ptr and automatically updates it via WorldModel if the Ptr becomes invalid.
-    // Uses ESM::RefNum as an unique id. Can not be used for Ptrs without RefNum.
-    // Note: WorldModel automatically assignes RefNum to all registered Ptrs.
+    // SafePtr does not own the referenced object. It keeps its RefNum; ptrOrEmpty() and toString() refresh its cached
+    // Ptr when the WorldModel registry changes. On refresh, an id with no registered reference resolves to an empty
+    // Ptr. Copies of the cached Ptr remain non-owning and do not refresh. SafePtr uses ESM::RefNum as its identity, so
+    // it cannot track a Ptr without one. WorldModel assigns RefNums to registered Ptrs.
+    // Construct from a registered Ptr so destruction is detected on refresh. An unregistered object can be destroyed
+    // without changing the registry revision, leaving its cached Ptr dangling.
     class SafePtr
     {
     public:
@@ -178,6 +181,9 @@ namespace OFWorld
 
         std::string toString() const;
 
+        /// Refreshes and returns this SafePtr's cached Ptr; the returned reference refers to a member of this SafePtr
+        /// and is invalid after its destruction. Its value may change on a later call after the registry changes.
+        /// After a registry change, call ptrOrEmpty() again and check for an empty Ptr before accessing the object.
         const Ptr& ptrOrEmpty() const
         {
             update();

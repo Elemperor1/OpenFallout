@@ -121,9 +121,10 @@ namespace ESM4
         // value = adjusted mod index based on all the files loaded so far
         std::vector<std::uint32_t> parentFileIndices;
 
-        std::size_t recHeaderSize; // normally should be already set correctly, but just in
-        //  case the file was re-opened.  default = TES5 size,
-        //  can be reduced for TES4 by setRecHeaderSize()
+        // Number of bytes read for each record/group header: 24 by default, or 20 for TES4.
+        // The stream constructor probes the four bytes at offset 20: HEDR selects 20-byte headers; otherwise it uses
+        // 24. Callers using another setup must select the size before reading a record header.
+        std::size_t recHeaderSize;
 
         std::streampos filePos; // assume that the record header will be re-read once
         //  the context is restored
@@ -195,15 +196,11 @@ namespace ESM4
 
         void getLocalizedStringImpl(const ESM::FormId stringId, std::string& str);
 
-        // Close the file, resets all information.
-        // After calling close() the structure may be reused to load a new file.
-        // void close();
-
-        // Raw opening. Opens the file and sets everything up but doesn't parse the header.
+        // Attach a stream, record its filename and size, and seek to its beginning. Does not parse the TES4 header.
         void openRaw(Files::IStreamPtr&& stream, const std::filesystem::path& filename);
 
-        // Load ES file from a new stream, parses the header.
-        // Closes the currently open file first, if any.
+        // Legacy stream opener. Its current implementation probes the stream but does not finish loading it; after
+        // the minimum-size check it throws "Unknown file format" even when the TES4 signature was found.
         void open(Files::IStreamPtr&& stream, const std::filesystem::path& filename);
 
         Reader() = default;
@@ -211,11 +208,15 @@ namespace ESM4
         bool getStringImpl(std::string& str, std::size_t size, std::istream& stream, bool hasNull = false);
 
     public:
+        // Opens an already-created stream, selecting 20-byte record headers when the four bytes at offset 20 are
+        // HEDR, and 24-byte headers otherwise. Reads the TES4 header and builds the localized-string index when
+        // applicable. A non-TES4 first record or rejected TES4 header data can raise an exception.
         Reader(Files::IStreamPtr&& esmStream, const std::filesystem::path& filename, VFS::Manager const* vfs,
             const ToUTF8::StatelessUtf8Encoder* encoder, bool ignoreMissingLocalizedStrings = false);
 
         ~Reader();
 
+        // Uses the legacy stream opener above; currently does not complete loading and throws.
         void open(const std::filesystem::path& filename);
 
         void close();
@@ -238,9 +239,12 @@ namespace ESM4
         inline std::size_t getFileOffset() const { return mSavedStream ? mSavedStream->tellg() : mStream->tellg(); }
 
         // Methods added for saving/restoring context
-        ReaderContext getContext(); // WARN: must be called immediately after reading the record header
+        // Capture the position/context for the current record. Call immediately after a successful getRecordHeader().
+        ReaderContext getContext();
 
-        bool restoreContext(const ReaderContext& ctx); // returns the result of re-reading the header
+        // Restore a captured context and re-read its record header; returns whether that header was read in full.
+        // The caller must have reopened the same file if needed.
+        bool restoreContext(const ReaderContext& ctx);
 
         template <typename T>
         inline void get(T& t)
@@ -265,7 +269,7 @@ namespace ESM4
             return mStream->gcount() == (std::streamsize)size; // FIXME: try/catch block needed?
         }
 
-        // NOTE: must be called before calling getRecordHeader()
+        // Select the number of bytes getRecordHeader() reads. Set before that call.
         void setRecHeaderSize(const std::size_t size);
 
         inline unsigned int esmVersion() const { return mHeader.mData.version.ui; }
@@ -282,20 +286,26 @@ namespace ESM4
         void buildLStringIndex();
         void getLocalizedString(std::string& str);
 
-        // Read 24 bytes of header. The caller can then decide whether to process or skip the data.
+        // Read the selected record/group header (20 bytes for TES4, 24 bytes otherwise). Returns true only when the
+        // full selected size was read; check the result before using hdr(). After a record header, read or skip its
+        // data before requesting the next header. After a group header, enter or skip the group.
+        // A short read still mutates the header and byte counters; false is not a rollback or a clean-EOF guarantee.
         bool getRecordHeader();
 
         inline const RecordHeader& hdr() const { return mCtx.recordHeader; }
 
         const GroupTypeHeader& grp(std::size_t pos = 0) const;
 
-        // The object setting up this reader needs to supply the file's load order index
-        // so that the formId's in this file can be adjusted with the file (i.e. mod) index.
+        // Supply this file's load-order index before reading/adjusting form IDs. updateModIndices() also needs to be
+        // called first when references to the file's masters must be remapped.
         void setModIndex(std::uint32_t index) { mCtx.modIndex = index; }
         std::uint32_t modIndex() const { return mCtx.modIndex; }
+
+        // Map each TES4 master to its already-loaded file index. Throws std::runtime_error if any listed master is
+        // absent from fileToModIndex.
         void updateModIndices(const std::map<std::string, int>& fileToModIndex);
 
-        // Maybe should throw an exception if called when not valid?
+        // Throws std::runtime_error until a valid cell grid has been set.
         const CellGrid& currCellGrid() const;
 
         inline bool hasCellGrid() const { return mCtx.cellGridValid; }
@@ -324,24 +334,23 @@ namespace ESM4
 
         inline ESM::FormId currWorld() const { return mCtx.currWorld; }
 
-        // Get the data part of a record
-        // Note: assumes the header was read correctly and nothing else was read
+        // Prepare the record payload for reading. Call after a successful getRecordHeader() and before reading any
+        // payload bytes. Compressed payloads are inflated here; decompression failures can throw.
         void getRecordData(bool dump = false);
 
-        // Skip the data part of a record
-        // Note: assumes the header was read correctly (partial skip is allowed)
+        // Skip the unread part of the current record. Call after its header; a partial skip is allowed. Throws if
+        // sub-record accounting says more bytes have been consumed than the record contains.
         void skipRecordData();
 
-        // Skip the rest of a record after a loader gave up on it part-way through, for instance by throwing.
-        // skipRecordData() cannot be used then: the size of a sub record is counted when its header is read, so
-        // whatever the loader never reached would be left in the stream.
-        // Note: recordStart must come from getContext() called right after the record header was read
+        // Skip to the end of a record after a loader gave up part-way through (for example, by throwing). Use this
+        // instead of skipRecordData(): sub-record accounting includes a whole payload when its header is read, even
+        // if the loader did not consume that payload. recordStart must have been captured immediately after the
+        // record header; the operation positions the file stream after the record and marks its data consumed.
         void skipFailedRecord(const ReaderContext& recordStart);
 
-        // Go back to the first sub-record of the current record, to read it a second time. A compressed record is
-        // inflated again if getRecordData() has not been called for it.
-        // Note: recordStart must come from getContext() called right after the record header was read, and the
-        // record data must not have been given up since (by skipFailedRecord() or by reading the next header)
+        // Return to the first sub-record to read the current record again. recordStart must have been captured
+        // immediately after its header, and the record data must not have been given up with skipFailedRecord() or
+        // by requesting the next header. A compressed record is inflated again when needed.
         void rewindRecordData(const ReaderContext& recordStart);
 
         // Skip the remaining part of the group
@@ -353,9 +362,11 @@ namespace ESM4
         // (expected to be used during development only while some groups are not yet supported)
         void skipGroup();
 
-        // Read 6 bytes of header. The caller can then decide whether to process or skip the data.
-        // Note: a sub-record that a XXXX sub-record gave an extended size is skipped together with the XXXX, and the
-        // header of the sub-record after it is returned, see skippedExtendedSubRecords()
+        // Advance to the next sub-record header. Call after the record payload is ready and after the preceding
+        // sub-record's data has been read or skipped. Returns true for a readable header and false when no complete
+        // header is available (including end of record or a truncated file); do not use subRecordHeader() on false.
+        // A sub-record whose size was extended by XXXX is skipped with its XXXX header, and the following header is
+        // returned; see skippedExtendedSubRecords().
         bool getSubRecordHeader();
 
         // The type and the extended size of each sub-record that the last getSubRecordHeader() skipped. They come
@@ -376,10 +387,9 @@ namespace ESM4
             return mCtx.recordRead <= mCtx.recordHeader.record.dataSize + slack;
         }
 
-        // How many bytes of the current record were still unread when the last getSubRecordHeader() was called. A
-        // record that is read in full leaves none. getSubRecordHeader() also returns false when fewer bytes are left
-        // than a sub-record header, and when the file ends inside the header, so only this tells that apart from the
-        // end of the record.
+        // Bytes remaining in the record payload when the last sub-record header read was attempted. This can be
+        // nonzero when getSubRecordHeader() returns false because fewer than 6 bytes remain, and can help distinguish
+        // that case from a clean end of record. It does not guarantee that a partial header or payload was read.
         inline std::uint32_t unreadRecordBytes() const { return mUnreadRecordBytes; }
 
         // Skip the data part of a subrecord
@@ -400,13 +410,19 @@ namespace ESM4
             return get(t);
         }
 
-        // ModIndex adjusted formId according to master file dependencies
+        // Remap a raw form ID using the master-file index map and this file's mod index. Set the load-order index
+        // and, when needed, the master map before adjusting IDs.
         void adjustFormId(ESM::FormId& id) const;
 
         // Temporary. Doesn't support mod index > 255
         void adjustFormId(ESM::FormId32& id) const;
 
+        // Read a 32-bit form ID at the current payload position and adjust it. Returns false if all four bytes could
+        // not be read; in that case id is unchanged.
         bool getFormId(ESM::FormId& id);
+
+        // Return the current record header's form ID after load-order adjustment. Requires a successfully read record
+        // header and is for record headers, not group headers.
         ESM::FormId getFormIdFromHeader() const;
 
         void adjustGRUPFormId();
@@ -431,7 +447,7 @@ namespace ESM4
         // for debugging only
         size_t stackSize() const { return mCtx.groupStack.size(); }
 
-        // Used for error handling
+        // Throw std::runtime_error with file/record/sub-record context; does not return.
         [[noreturn]] void fail(const std::string& msg);
 
         void setGlobalReaderList(std::vector<Reader*>* list) { mGlobalReaderList = list; }
