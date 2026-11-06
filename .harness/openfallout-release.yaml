@@ -14,7 +14,7 @@ pipeline:
         build:
           type: commitSha
           spec:
-            commitSha: 93221a23a62c31473c71e5627455c699dfa6dc91
+            commitSha: 31c9a6fe1772713e813da5403df19c12a55b6e69
   variables:
     - name: mode
       type: String
