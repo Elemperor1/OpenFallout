@@ -18,10 +18,9 @@ Actions. `CI/harness_ci.sh` installs the repository's Debian dependencies and Qt
 translation tools, builds in Debug with eight compiler jobs, and runs all three
 GoogleTest suites with JUnit ingestion.
 
-The build driver is fetched from the immutable GitHub commit pinned in the
-pipeline YAML, so source branches predating this setup can build too. When
-changing `CI/harness_ci.sh`, push the reviewed driver first, then update that pin
-in the versioned and inline pipeline definitions.
+The checked-out `CI/harness_ci.sh` is used when present, so PRs exercise their
+driver changes. Older source branches use an immutable fallback driver pinned in
+the pipeline YAML, allowing master builds before this setup is merged.
 
 The `.ccache` compiler cache is separate from GitHub Actions caches. Master builds
 may save it; PR builds only restore it. Build output and test results are not
@@ -72,7 +71,10 @@ The hosted preview was tested successfully. It correctly blocks release creation
 until this setup is merged into master. No tag or release is created by preview.
 
 `draft` requires the source to be on master, this setup to exist at that commit,
-and its latest master **Build and test** push run to have passed. It creates a
+and its latest master **Build and test** push or manual run to have passed all
+four platform jobs. A green docs-only run with skipped platform jobs does not
+qualify; run the full workflow manually on that master commit if necessary.
+It creates a
 lightweight tag, waits for release packaging through `gh run watch`, and verifies
 nonempty uploaded Windows `.exe`, macOS `arm64.dmg`, and macOS `x86_64.dmg` assets.
 GitHub Actions leaves the release as a draft prerelease. Harness retries the wait

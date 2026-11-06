@@ -64,13 +64,19 @@ pipeline:
                 shell: Bash
                 command: |
                   set -euo pipefail
-                  curl --fail --location --retry 3 \
-                    https://raw.githubusercontent.com/Elemperor1/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh | \
+                  harness_ci_driver=CI/harness_ci.sh
+                  if [ ! -f "$harness_ci_driver" ]; then
+                    harness_ci_driver="$(mktemp)"
+                    trap 'rm -f "$harness_ci_driver"' EXIT
+                    curl --fail --location --retry 3 \
+                      https://raw.githubusercontent.com/Elemperor1/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh \
+                      --output "$harness_ci_driver"
+                  fi
                   docker run --rm -i \
                     --volume "$PWD:/harness" \
                     --workdir /harness \
                     --env CCACHE_DIR=/harness/.ccache \
-                    ubuntu:24.04 bash -s
+                    ubuntu:24.04 bash -s < "$harness_ci_driver"
                 reports:
                   type: JUnit
                   spec:

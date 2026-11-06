@@ -14,6 +14,12 @@ from urllib.request import Request, urlopen
 
 REPOSITORY = "Elemperor1/OpenFallout"
 MARKER = ".harness/openfallout-release.yaml"
+PLATFORM_JOBS = {
+    "Ubuntu",
+    "Windows (2022) / windows-2022",
+    "MacOS (macos-26) / macos-26",
+    "MacOS (macos-26-intel) / macos-26-intel",
+}
 
 
 class ReleaseError(RuntimeError):
@@ -65,12 +71,18 @@ def release_plan(api, source_ref, tag):
     marker = api.request(f"contents/{MARKER}?ref={sha}", missing_ok=True)
     if marker is None:
         problems.append("Merge the Harness release setup into master first")
-    query = urlencode({"head_sha": sha, "event": "push", "per_page": 100})
+    query = urlencode({"head_sha": sha, "per_page": 100})
     runs = api.request(f"actions/workflows/push.yml/runs?{query}")["workflow_runs"]
-    latest = max((run for run in runs if run["head_branch"] == "master"),
+    latest = max((run for run in runs if run["head_branch"] == "master"
+                  and run["event"] in ("push", "workflow_dispatch")),
                  key=lambda run: (run["run_number"], run.get("run_attempt", 1)), default=None)
     if not latest or latest["status"] != "completed" or latest["conclusion"] != "success":
         problems.append("The latest master Build and test run for this commit must pass")
+    else:
+        jobs = api.request(f"actions/runs/{latest['id']}/jobs?filter=latest&per_page=100")["jobs"]
+        passed = {job["name"] for job in jobs if job["conclusion"] == "success"}
+        if not PLATFORM_JOBS.issubset(passed):
+            problems.append("All four platform jobs must pass; run the full Build and test workflow on this master commit")
     ref = api.request(f"git/ref/tags/{quote(tag, safe='')}", missing_ok=True)
     if ref and (ref["object"]["type"] != "commit" or ref["object"]["sha"] != sha):
         problems.append("Existing tag does not point directly to the selected commit; tags are never overwritten")

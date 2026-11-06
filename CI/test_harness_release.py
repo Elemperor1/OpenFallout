@@ -3,12 +3,12 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from harness_release import ReleaseError, create_tag, find_release, finish_release, plan_phase, release_plan, validate_tag, verify_assets
+from harness_release import PLATFORM_JOBS, ReleaseError, create_tag, find_release, finish_release, plan_phase, release_plan, validate_tag, verify_assets
 
 
 SHA = "a" * 40
 TAG = "openfallout-0.1.0-test"
-RUN = {"id": 42, "head_branch": "master", "head_sha": SHA, "run_number": 1,
+RUN = {"id": 42, "head_branch": "master", "head_sha": SHA, "run_number": 1, "event": "push",
        "status": "completed", "conclusion": "success", "html_url": "https://example.invalid/run"}
 RELEASE = {"id": 7, "tag_name": TAG, "draft": True, "prerelease": True,
            "html_url": "https://example.invalid/release", "assets": [
@@ -27,6 +27,7 @@ class FakeGitHub:
         self.release = copy.deepcopy(RELEASE)
         self.release_pages = None
         self.master_sha = SHA
+        self.jobs = [{"name": name, "conclusion": "success"} for name in PLATFORM_JOBS]
 
     def request(self, path, method="GET", data=None, missing_ok=False):
         if method != "GET":
@@ -45,6 +46,8 @@ class FakeGitHub:
             return self.ref
         if path.startswith("actions/workflows/release.yml/"):
             return {"workflow_runs": [self.packaging]}
+        if path.startswith("actions/runs/"):
+            return {"jobs": self.jobs}
         if path.startswith("releases?"):
             if self.release_pages is not None:
                 return self.release_pages[int(path.rsplit("=", 1)[1]) - 1]
@@ -78,6 +81,18 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(ReleaseError):
                 create_tag(api, release_plan(api, "master", TAG))
             self.assertEqual(api.writes, [])
+
+    def test_docs_only_success_with_skipped_platform_jobs_blocks_release(self):
+        api = FakeGitHub()
+        api.jobs[0]["conclusion"] = "skipped"
+        with self.assertRaises(ReleaseError):
+            create_tag(api, release_plan(api, "master", TAG))
+        self.assertEqual(api.writes, [])
+
+    def test_full_manual_master_build_can_qualify_a_docs_only_commit(self):
+        api = FakeGitHub()
+        api.builds = [dict(RUN, event="workflow_dispatch")]
+        self.assertTrue(release_plan(api, "master", TAG)["ready"])
 
     def test_create_tag_once_and_never_overwrite(self):
         api = FakeGitHub()
