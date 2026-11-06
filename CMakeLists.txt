@@ -803,7 +803,7 @@ endif()
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CUSTOM_CPACK_OS_NAME}-${CUSTOM_CPACK_ARCHITECTURE}")
 
 # Apple bundling
-if (APPLE)
+if (APPLE AND (BUILD_OPENFALLOUT OR BUILD_OPENCS))
     if(CMAKE_VERSION VERSION_LESS 3.19)
         message(FATAL_ERROR "macOS packaging requires CMake 3.19 or higher to sign macOS app bundles.")
     endif()
@@ -811,53 +811,47 @@ if (APPLE)
         message(FATAL_ERROR "Only x86_64 OR arm64 is accepted for CMAKE_OSX_ARCHITECTURES")
     endif()
 
-    get_property(QT_COCOA_PLUGIN_PATH TARGET Qt${QT_VERSION_MAJOR}::QCocoaIntegrationPlugin PROPERTY LOCATION_RELEASE)
-    get_filename_component(QT_COCOA_PLUGIN_DIR "${QT_COCOA_PLUGIN_PATH}" DIRECTORY)
-    get_filename_component(QT_COCOA_PLUGIN_GROUP "${QT_COCOA_PLUGIN_DIR}" NAME)
-    get_filename_component(QT_COCOA_PLUGIN_NAME "${QT_COCOA_PLUGIN_PATH}" NAME)
-    configure_file("${QT_COCOA_PLUGIN_PATH}" "${APP_BUNDLE_DIR}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}" COPYONLY)
-
-    get_property(QT_QMACSTYLE_PLUGIN_PATH TARGET Qt${QT_VERSION_MAJOR}::QMacStylePlugin PROPERTY LOCATION_RELEASE)
-    get_filename_component(QT_QMACSTYLE_PLUGIN_DIR "${QT_QMACSTYLE_PLUGIN_PATH}" DIRECTORY)
-    get_filename_component(QT_QMACSTYLE_PLUGIN_GROUP "${QT_QMACSTYLE_PLUGIN_DIR}" NAME)
-    get_filename_component(QT_QMACSTYLE_PLUGIN_NAME "${QT_QMACSTYLE_PLUGIN_PATH}" NAME)
-    configure_file("${QT_QMACSTYLE_PLUGIN_PATH}" "${APP_BUNDLE_DIR}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}" COPYONLY)
-
-    get_property(QT_QSVG_PLUGIN_PATH TARGET Qt${QT_VERSION_MAJOR}::QSvgPlugin PROPERTY LOCATION_RELEASE)
-    get_filename_component(QT_QSVG_PLUGIN_DIR "${QT_QSVG_PLUGIN_PATH}" DIRECTORY)
-    get_filename_component(QT_QSVG_PLUGIN_GROUP "${QT_QSVG_PLUGIN_DIR}" NAME)
-    get_filename_component(QT_QSVG_PLUGIN_NAME "${QT_QSVG_PLUGIN_PATH}" NAME)
-    configure_file("${QT_QSVG_PLUGIN_PATH}" "${APP_BUNDLE_DIR}/Contents/PlugIns/${QT_QSVG_PLUGIN_GROUP}/${QT_QSVG_PLUGIN_NAME}" COPYONLY)
-
-    get_property(QT_QSVG_ICON_PLUGIN_PATH TARGET Qt${QT_VERSION_MAJOR}::QSvgIconPlugin PROPERTY LOCATION_RELEASE)
-    get_filename_component(QT_QSVG_ICON_PLUGIN_DIR "${QT_QSVG_ICON_PLUGIN_PATH}" DIRECTORY)
-    get_filename_component(QT_QSVG_ICON_PLUGIN_GROUP "${QT_QSVG_ICON_PLUGIN_DIR}" NAME)
-    get_filename_component(QT_QSVG_ICON_PLUGIN_NAME "${QT_QSVG_ICON_PLUGIN_PATH}" NAME)
-    configure_file("${QT_QSVG_ICON_PLUGIN_PATH}" "${APP_BUNDLE_DIR}/Contents/PlugIns/${QT_QSVG_ICON_PLUGIN_GROUP}/${QT_QSVG_ICON_PLUGIN_NAME}" COPYONLY)
-
-    configure_file("${OpenFallout_SOURCE_DIR}/files/mac/qt.conf" "${APP_BUNDLE_DIR}/Contents/Resources/qt.conf" COPYONLY)
-
+    set(CPACK_OPENFALLOUT_APPLICATIONS "")
+    if (BUILD_OPENFALLOUT)
+        list(APPEND CPACK_OPENFALLOUT_APPLICATIONS "${APP_BUNDLE_NAME}")
+        install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "." COMPONENT Runtime)
+    endif()
     if (BUILD_OPENCS)
         get_property(OPENCS_BUNDLE_NAME_TMP TARGET openfallout-cs PROPERTY OUTPUT_NAME)
         set(OPENCS_BUNDLE_NAME "${OPENCS_BUNDLE_NAME_TMP}.app")
-        configure_file("${QT_COCOA_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}" COPYONLY)
-        configure_file("${QT_QMACSTYLE_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}" COPYONLY)
-        configure_file("${QT_QSVG_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QSVG_PLUGIN_GROUP}/${QT_QSVG_PLUGIN_NAME}" COPYONLY)
-        configure_file("${QT_QSVG_ICON_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/PlugIns/${QT_QSVG_ICON_PLUGIN_GROUP}/${QT_QSVG_ICON_PLUGIN_NAME}" COPYONLY)
-        configure_file("${OpenFallout_SOURCE_DIR}/files/mac/qt.conf" "${OPENCS_BUNDLE_NAME}/Contents/Resources/qt.conf" COPYONLY)
-    endif ()
+        list(APPEND CPACK_OPENFALLOUT_APPLICATIONS "${OPENCS_BUNDLE_NAME}")
+    endif()
 
-    install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "." COMPONENT Runtime)
+    set(QT_BUNDLE_PLUGINS "")
+    if (USE_QT)
+        foreach (QT_PLUGIN QCocoaIntegrationPlugin QMacStylePlugin QSvgPlugin QSvgIconPlugin)
+            get_property(QT_PLUGIN_PATH TARGET Qt${QT_VERSION_MAJOR}::${QT_PLUGIN} PROPERTY LOCATION_RELEASE)
+            get_filename_component(QT_PLUGIN_DIR "${QT_PLUGIN_PATH}" DIRECTORY)
+            get_filename_component(QT_PLUGIN_GROUP "${QT_PLUGIN_DIR}" NAME)
+            get_filename_component(QT_PLUGIN_NAME "${QT_PLUGIN_PATH}" NAME)
+            set(QT_PLUGIN_RELATIVE "Contents/PlugIns/${QT_PLUGIN_GROUP}/${QT_PLUGIN_NAME}")
+            list(APPEND QT_BUNDLE_PLUGINS "${QT_PLUGIN_RELATIVE}")
+            foreach (BUNDLE_NAME IN LISTS CPACK_OPENFALLOUT_APPLICATIONS)
+                configure_file("${QT_PLUGIN_PATH}" "${OpenFallout_BINARY_DIR}/${BUNDLE_NAME}/${QT_PLUGIN_RELATIVE}" COPYONLY)
+            endforeach()
+        endforeach()
+        foreach (BUNDLE_NAME IN LISTS CPACK_OPENFALLOUT_APPLICATIONS)
+            configure_file("${OpenFallout_SOURCE_DIR}/files/mac/qt.conf" "${OpenFallout_BINARY_DIR}/${BUNDLE_NAME}/Contents/Resources/qt.conf" COPYONLY)
+        endforeach()
+    endif()
 
     set(CPACK_GENERATOR "DragNDrop")
-
-    set(INSTALLED_OPENFALLOUT_APP "\${CMAKE_INSTALL_PREFIX}/${APP_BUNDLE_NAME}")
-    set(INSTALLED_OPENCS_APP "\${CMAKE_INSTALL_PREFIX}/${OPENCS_BUNDLE_NAME}")
 
     install(CODE "
         set(BU_CHMOD_BUNDLE_ITEMS ON)
         set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
         include(BundleUtilities)
+
+        function(gp_item_default_embedded_path_override item default_embedded_path_var)
+            if (\${item} MATCHES osgPlugins-${OPENSCENEGRAPH_VERSION})
+                set(\${default_embedded_path_var} \"@executable_path/../PlugIns/osgPlugins-${OPENSCENEGRAPH_VERSION}\" PARENT_SCOPE)
+            endif()
+        endfunction()
     " COMPONENT Runtime)
 
     set(ABSOLUTE_PLUGINS "")
@@ -904,30 +898,21 @@ if (APPLE)
         set(${plugins_var} ${PLUGINS} PARENT_SCOPE)
     endfunction (install_plugins_for_bundle)
 
-    install_plugins_for_bundle("${APP_BUNDLE_NAME}" PLUGINS)
-    install_plugins_for_bundle("${OPENCS_BUNDLE_NAME}" OPENCS_PLUGINS)
+    foreach (BUNDLE_NAME IN LISTS CPACK_OPENFALLOUT_APPLICATIONS)
+        install_plugins_for_bundle("${BUNDLE_NAME}" PLUGINS)
+        set(INSTALLED_APP "\${CMAKE_INSTALL_PREFIX}/${BUNDLE_NAME}")
+        foreach (QT_PLUGIN_RELATIVE IN LISTS QT_BUNDLE_PLUGINS)
+            list(APPEND PLUGINS "${INSTALLED_APP}/${QT_PLUGIN_RELATIVE}")
+        endforeach()
+        install(CODE "fixup_bundle(\"${INSTALLED_APP}\" \"${PLUGINS}\" \"\")" COMPONENT Runtime)
+    endforeach()
 
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/CHANGELOG.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/README.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/LICENSE" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
-    INSTALL(FILES "${OpenFallout_SOURCE_DIR}/AUTHORS.md" DESTINATION "/${INSTALLED_OPENFALLOUT_APP}/..")
-
-    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENFALLOUT_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
-    set(PLUGINS ${PLUGINS} "${INSTALLED_OPENFALLOUT_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
-    set(OPENCS_PLUGINS ${OPENCS_PLUGINS} "${INSTALLED_OPENCS_APP}/Contents/PlugIns/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
-    set(OPENCS_PLUGINS ${OPENCS_PLUGINS} "${INSTALLED_OPENCS_APP}/Contents/PlugIns/${QT_QMACSTYLE_PLUGIN_GROUP}/${QT_QMACSTYLE_PLUGIN_NAME}")
-
-    install(CODE "
-        function(gp_item_default_embedded_path_override item  default_embedded_path_var)
-            if (\${item} MATCHES ${OSG_PLUGIN_PREFIX_DIR})
-              set(path \"@executable_path/../PlugIns/${OSG_PLUGIN_PREFIX_DIR}\")
-              set(\${default_embedded_path_var} \"\${path}\" PARENT_SCOPE)
-            endif()
-        endfunction()
-
-        fixup_bundle(\"${INSTALLED_OPENFALLOUT_APP}\" \"${PLUGINS}\" \"\")
-        fixup_bundle(\"${INSTALLED_OPENCS_APP}\" \"${OPENCS_PLUGINS}\" \"\")
-        " COMPONENT Runtime)
+    install(FILES
+        "${OpenFallout_SOURCE_DIR}/CHANGELOG.md"
+        "${OpenFallout_SOURCE_DIR}/README.md"
+        "${OpenFallout_SOURCE_DIR}/LICENSE"
+        "${OpenFallout_SOURCE_DIR}/AUTHORS.md"
+        DESTINATION "." COMPONENT Runtime)
 
     set(CPACK_PRE_BUILD_SCRIPTS ${CMAKE_SOURCE_DIR}/cmake/SignMacApplications.cmake)
 
