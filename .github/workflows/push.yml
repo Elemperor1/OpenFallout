@@ -75,7 +75,12 @@ jobs:
       run: sudo CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic openmw-coverage
 
     - name: Install coverage tools
-      run: pipx install gcovr==8.3
+      env:
+        PIPX_BIN_DIR: ${{ runner.temp }}/coverage-bin
+      run: |
+        pipx install gcovr==8.3
+        echo "$PIPX_BIN_DIR" >> "$GITHUB_PATH"
+        "$PIPX_BIN_DIR/gcovr" --version
 
     - name: Prime ccache
       id: compiler-cache
@@ -137,7 +142,7 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        "$HOME/.local/bin/gcovr" --root . build \
+        gcovr --root . build \
           --exclude 'extern/' \
           --exclude 'build/' \
           --exclude 'apps/[^/]*_tests/' \
