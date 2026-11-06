@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Test documentation link checker
         run: python3 -m unittest discover -s CI -p test_documentation.py -v
       - name: Check documentation entrypoint links
