@@ -234,7 +234,7 @@ namespace OFGui
         mViewer->getSceneData()->dirtyBound();
 
         if (mFalloutActive)
-            mFalloutLoading->end();
+            mFalloutLoading->end(mTimer.time_m() / 1000.0);
         mFalloutActive = false;
         mSceneImage->setAlpha(1.f);
         mWorldImage->setAlpha(1.f);
