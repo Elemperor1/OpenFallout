@@ -462,7 +462,9 @@ def record_libraries(census, structs, stored):
 
 
 def menu_libraries(rows):
-    """The libraries of the menu files of the games, from the tracker table menus.csv."""
+    """The libraries of the menu files of the games, from the tracker table menus.csv. A file that the executable never
+    loads (a screen) or that no file the executable loads includes (a block) is dead: it is in the table with its
+    evidence and left out of the units, as the dead perk entry points are, since nothing could ever draw it."""
     libraries = {}
     for row in rows:
         name, library = row["name"].strip(), row["library"].strip()
@@ -471,6 +473,10 @@ def menu_libraries(rows):
             raise SystemExit("A row of %s has a value that is not allowed: %r" % (TRACKER_MENUS, row))
         if read == "read" and not row["evidence"].strip():
             raise SystemExit("The menu %s is marked read with no evidence" % name)
+        if row["dead"].strip():
+            if read != "read" or state != TODO:
+                raise SystemExit("The menu %s is dead, so it must be read and not done" % name)
+            continue
         where = "Fallout 3 and New Vegas" if row["games"].strip() == "both" else "New Vegas only"
         item = unit(name, state, row["note"].strip(), {"c": row["kind"].strip() + ".xml", "w": where})
         if read == "read":
