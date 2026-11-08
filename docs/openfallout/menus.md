@@ -656,8 +656,13 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   glyphs), and then the file shows the Delete button (`main_defaults_button`, the Y button; its `_target` is the code's
   "a save is lit", and with a PC layout the file never shows it, because its `_line_alpha` and `target` both ask for
   `io()` user5, "using a 360 controller"): it asks `sConfirmDelete` and takes the save away on Yes (Mac round 12BH part 8
-  names the question and the three states of the game's confirm box, 0x100 load, 0x200 save, 0x400 delete). The save's
-  picture, its version line, and the sorting the game uses (not read) are not here.
+  names the question and the three states of the game's confirm box; round 12BI part D corrects it: 0x200 is load, 0x400
+  save, 0x800 delete, 0x100 Continue and 0x80 new game). A Yes on delete removes the `.fos` of the save and nothing else
+  (no picture file: the picture is inside the save), and there is no key that deletes. The game orders the list, and
+  decides which save Continue loads, by the last write time of the file (the newest first), as the port does by the time
+  the save was made. The title screen, which is the engine's own here, has the rules the file's list does not: its Continue
+  and Load rows exist only when a save does, and Continue there asks `sConfirmContinue` first (the pause menu's Continue
+  asks nothing). The save's picture and its version line are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
   `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
