@@ -234,12 +234,6 @@
 -- @param openfallout.util#Vector2 normalizedScreenPos
 -- @return openfallout.util#Vector3
 
---- The size of the viewport in pixels, which is the unit of the places that worldToViewportVector gives.
--- It is not the size of the screen of the interface (openfallout.ui screenSize), which is divided by the scale of the
--- interface.
--- @function [parent=#camera] getViewportSize
--- @return openfallout.util#Vector2
-
 --- Get a vector from the world to the viewport for the given point in the world space.
 -- (0, 0) is the top left corner of the screen.
 -- The z component of the return value holds the distance from the camera to the position, in world space

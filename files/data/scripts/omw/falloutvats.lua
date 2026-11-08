@@ -308,16 +308,18 @@ local function buildScreen()
     return true
 end
 
--- Where a point of the world is on the screen in the menu's units (nil when it is behind the viewer)
+-- Where a point of the world is on the screen in the menu's units (nil when it is behind the viewer). It is worked out from
+-- the view transform and the field of view and not from camera.worldToViewportVector, whose places are pixels of the
+-- video resolution while the menu's size is that of the interface (the window divided by its scale): Mac round 12BJ
+-- measured 1920x1080 against 960x540 and the brackets off the screen. The view space has x to the right, y up and the
+-- viewer looking down -z.
 local function project(position)
-    local from = camera.getPosition()
-    local forward = camera.viewportToWorldVector(v2(0.5, 0.5))
-    if (position - from):dot(forward) <= 0 then return nil end
-    local point = camera.worldToViewportVector(position)
-    -- The place is in pixels of the viewport; the menu's units are 960 to the height of the screen, whatever the
-    -- interface is scaled by
-    local scale = HEIGHT / camera.getViewportSize().y
-    return point.x * scale, point.y * scale
+    local view = camera.getViewTransform():apply(position)
+    local depth = -view.z
+    if depth <= 0 then return nil end
+    local half = math.tan(camera.getFieldOfView() / 2)
+    local aspect = tiles.size.x / tiles.size.y
+    return (0.5 + 0.5 * view.x / (depth * half * aspect)) * tiles.width, (0.5 - 0.5 * view.y / (depth * half)) * HEIGHT
 end
 
 -- Where the bracket of a part goes: the executable's offsets by part (0x7F2874), the box it is kept in and the passes that
