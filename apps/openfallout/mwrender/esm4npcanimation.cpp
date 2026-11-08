@@ -318,9 +318,9 @@ namespace OFRender
         // out of the list, and the skin that shows from the piece still has to have the tone
         if (images.mBodyTint == nullptr && !images.mTone.empty())
         {
-            const std::string bodyModel = OFClass::falloutBodyModel(*race, isFemale);
-            if (!bodyModel.empty())
-                images.mBodyTint = makeBodyToneImage(*mResourceSystem->getVFS(), bodyModel, isFemale, images.mTone);
+            // A race with no model of its body has the executable's human body of the sex (makeBodyToneImage)
+            images.mBodyTint = makeBodyToneImage(
+                *mResourceSystem->getVFS(), OFClass::falloutBodyModel(*race, isFemale), isFemale, images.mTone);
         }
         // A colour of black is the colour of a record that has none, which then keeps the picture it has
         if (traits.mHairColour.red != 0 || traits.mHairColour.green != 0 || traits.mHairColour.blue != 0)
