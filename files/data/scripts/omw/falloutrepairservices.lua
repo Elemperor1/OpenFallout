@@ -5,9 +5,9 @@
 -- gets the caps are the engine's (core.pipboy.serviceRows and serviceRepair, from FalloutNV.exe 0x7B7570 to 0x7B8B30, Mac
 -- round 12AX R2); this script draws the list and gives the choices back.
 --
--- Not there: the pad.
 local core = require('openfallout.core')
 local input = require('openfallout.input')
+local pad = require('scripts.omw.falloutpad')
 local I = require('openfallout.interfaces')
 
 local menuModule = require('scripts.omw.falloutmenu')
@@ -293,12 +293,17 @@ local function sync()
     end
 end
 
+-- The pad: the D-pad stands for the arrows, the bumpers for the pages, Y for Enter (A is the engine's click, B leaves)
+local onPad = pad.handler('repairservices',
+    function() return shown ~= nil and I.UI.getMode() == 'Interface' and not messageOpen() end, press)
+
 return {
     engineHandlers = {
         onFrame = sync,
         onKeyPress = function(key)
             press(key.code, key.symbol)
         end,
+        onControllerButtonPress = onPad,
     },
     eventHandlers = {
         -- However the screen is left (the button, Escape, a script), what was open is closed, and the dialogue under it is

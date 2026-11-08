@@ -6,7 +6,8 @@
 -- how far (core.pipboy.repairView and repair); this module draws it and gives the player's choices back. It is a module of
 -- falloutpipboyitems.lua, not a script.
 --
--- Not there: the pulse of the "select an item" text (what the executable's alpha animation does is a guess), and the pad.
+-- Not there: the pulse of the "select an item" text (what the executable's alpha animation does is a guess). The pad reaches
+-- `press` through the handler of the Pip-Boy.
 --
 --   local page = require('scripts.omw.falloutpipboyrepair')
 --   page.show(rowId, { close = function(rowId) ... end })   -- true when the screen is up

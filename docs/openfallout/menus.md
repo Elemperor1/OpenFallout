@@ -160,7 +160,7 @@ and makes the sound of a refusal. When the screen is left the character says a l
 once. The engine's rule that the menu keeps the count of the list's children makes the file's expression for an empty list show
 over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
 
-Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
+The pad works through the Pip-Boy's own handler on the items page (the D-pad moves the row, the bumpers page, Y is Enter) and, for the repair services, through the screen's own. Not there: the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
 scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
 Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
 generic menu does.
@@ -184,7 +184,7 @@ copies with other mods are different rows and different stacks, in the items pag
 the saves (the mods are kept with the condition in the key of the copy, so older saves read as copies with none). Fallout 3 has
 no mods, so the screen and the Mod button are New Vegas only.
 
-Not there: the pad; the cards of the file that would compare a mod with the weapon (the executable never fills them); the rate of
+The pad works through the Pip-Boy's handler, as for the repair screen. Not there: the cards of the file that would compare a mod with the weapon (the executable never fills them); the rate of
 fire (effect 8) and the effects 5, 6, 9, 11, 14 and 16 (they are in the records but their use was not read); the models of the
 weapon per mask of mods (the engine shows the weapon's one model); the bump of the maximum condition for a copy that is whole
 was read as one point less than the effect says, which is the executable's way but unverified on screen; two copies that a
@@ -439,7 +439,7 @@ race's own for the sex, and only when the race has none by the first of its hair
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
 12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
 it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
-of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the body's skin, the Pip-Boy still has no pause
+of leaving it; the pad's B and the Back button go up one list). The pad (`falloutfacescreen.lua`, `module.pad`): the D-pad moves the lit row up and down and a slider left and right, the bumpers change the list (they stand for Shift and the arrows), Y is Enter; A is the engine's click where its pointer is, and B goes up one list. The jump of a bar by the triggers is not wired. Not done: the Pip-Boy still has no pause
 menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
 by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
 executable's loading code).
