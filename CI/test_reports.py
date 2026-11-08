@@ -94,6 +94,10 @@ def collect_suite(root, suite, gcovr="gcovr"):
             "--exclude", "apps/[^/]*_tests/",
             "--merge-mode-functions", "merge-use-line-max",
             "--exclude-unreachable-branches",
+            # The compiler adds a hidden exception exit to every call that may throw. No test takes it, and
+            # Codecov counts a line with an untaken branch as partial, not covered. gcovr drops these branches
+            # only while it reads the gcov data, so the traces that the merge reads must be made with this flag.
+            "--exclude-throw-branches",
             "--gcov-ignore-parse-errors=negative_hits.warn_once_per_file",
             "-j", str(os.cpu_count() or 1),
             "--xml-pretty", "--xml", str(xml), "--json", str(trace), "--print-summary",

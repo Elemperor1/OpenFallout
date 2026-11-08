@@ -87,6 +87,19 @@ class TestReportsTests(unittest.TestCase):
         for extension in ("gcno", "o"):
             self.assertEqual((self.build / f"keep.{extension}").read_text(), "keep")
 
+    def test_suite_coverage_leaves_out_the_exception_branches_of_the_compiler(self):
+        commands = []
+
+        def record(command, cwd):
+            commands.append(command)
+            return self.fake_run(command, cwd)
+        with patch.object(reports.subprocess, "run", side_effect=record):
+            self.assertEqual(reports.collect_suite(self.root, "components"), 0)
+        gcovr = [command for command in commands if command[0] == "gcovr"]
+        self.assertEqual(len(gcovr), 1)
+        # gcovr applies the flag while it reads gcov data; a merge of saved traces cannot add it later
+        self.assertIn("--exclude-throw-branches", gcovr[0])
+
     def test_failing_tests_still_produce_junit_and_coverage_and_fail_the_job(self):
         with patch.object(reports.subprocess, "run", side_effect=lambda command, cwd:
                           self.fake_run(command, cwd, test_exit=7)):
