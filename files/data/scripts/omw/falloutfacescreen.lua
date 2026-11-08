@@ -102,15 +102,17 @@ local lastDragX = nil
 -- How much longer the camera is said again after the head was made (the bone it aims at is found when the head is up)
 local cameraWait = 0
 local cameraAsked = false
--- How the camera sees the head (a guess: the executable's camera is not read): the distances from the head to the
--- camera at the two ends of the zoom, the half of the angle it sees upwards (a quarter of the 45 degrees of the
--- games' field of view, as the lock's scene has it), the planes of the frustum, and the turn the pointer makes per
--- unit of the menu that it moves
+-- How the camera sees the head. Read from the executable (Mac round 12BF B2): the half of the angle it sees upwards,
+-- 0.15 of the 75 degrees of the games' field of view (11.25 degrees, 0.19635), the near plane 5, the turn of a drag
+-- (the pointer's way over the tile RSM_Face_Grab, 680 units wide, is a whole turn: 2 pi over 680 per unit) and the
+-- zoom (a wheel notch moves it an eighth of the way). The distances from the head to the camera at the two ends of
+-- the zoom are the port's own (the executable's are 60 and 140 units from the head on a picture of its own that is
+-- laid over the screen differently, so the two do not give the same size on the screen), and so is the far plane
 local NEAREST, FARTHEST = 70, 170
 local HALF_ANGLE = 0.19635
 local NEAR_PLANE, FAR_PLANE = 5.0, 2000.0
-local YAW_PER_UNIT = 0.012
-local ZOOM_PER_NOTCH = 0.1
+local YAW_PER_UNIT = 2 * math.pi / 680
+local ZOOM_PER_NOTCH = 0.125
 -- Where the head starts, as the executable has it (12BB): thirty degrees (0.5236) short of facing the viewer, on the side
 -- the head turns towards (to the panel on the right). The camera at 0 looks at the right side of the head and the face
 -- is seen from the front a quarter of a turn BEFORE that (Mac round 12BD: with the quarter turn after it the head showed

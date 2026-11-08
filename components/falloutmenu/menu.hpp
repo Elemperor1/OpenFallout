@@ -32,6 +32,9 @@ namespace FalloutMenu
         /// The distance from one line to the next in a font (1 to 9); a text with marks (`ishtml`) needs it, and
         /// `mTextSize` for the width of a line
         std::function<float(int font)> mLineHeight;
+        /// The size of the tile of a text with no characters in a font (1 to 9): the games lay it out as one space.
+        /// Without it, an empty text has no size
+        std::function<TextSize(int font)> mEmptyTextSize;
         /// The colour of a system colour: red, green and blue from 0 to 255
         std::function<std::optional<std::array<float, 3>>(int id)> mSystemColor;
     };

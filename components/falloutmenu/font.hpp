@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTMENU_FONT_H
 
 #include <array>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,6 +69,13 @@ namespace FalloutMenu
         /// The distance from one line to the next
         float lineHeight() const { return mSize; }
         float baseline() const { return mBaseline; }
+        /// The size of the tile that a text with no characters is in. The games lay an empty text out as one space (a
+        /// tile that is not shown keeps it too), so it is one line high and one space wide, the same as a line with
+        /// characters in it (FalloutNV.exe 0xA12FB0, Mac round 12BF B1: the executable's line is as high as the
+        /// tallest picture of the font, 32 for font 2 and 38 for font 6, which the port does not model: it keeps the
+        /// file's line height for every line, so an empty tile and a line agree here as they do there).
+        float emptyHeight() const { return mSize; }
+        float emptyWidth() const { return std::round(advance(' ')); }
         /// How far above the top of its line a text is drawn, in design units, compared with a baseline as far below
         /// the top as the tallest character reaches. Not read from the executable (the text of the files was placed
         /// against it): every list row of the games puts its text at y 20 in a row that is 20 taller than the text, and
