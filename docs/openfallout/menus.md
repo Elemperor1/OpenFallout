@@ -45,7 +45,11 @@ these from the pointer, and the renderer sets them:
   is visible and takes the pointer. `Shown:pcButton(symbol)` does that; the rest, level-up and (to come) barter screens use
   it. The other screens still have only the keys of the port.
 - A tile that has `target` is what the pointer hits. A tile with `clips` is cut to the nearest ancestor with a `clipwindow`,
-  and so are its children.
+  and so are its children. This is the port's rule, made for the lists; the executable applies the rectangle to a tile whose own
+  `clips` is set and the files copy `clips` from the parent into each child where they want it (`horiz_floating_scroll.xml`; Mac
+  round 12BJ B1), so the text in a row that does not ask is not cut in the game. Whether the text of the rows of the other lists
+  (the dialogue's scrolled lines, for one) is cut there was not looked at; a screen that must not cut sets `clips` to 0 on its
+  rows (the V.A.T.S. queue does).
 - A scrollbar keeps its value when its marker is let go and when the wheel turns (the files only give the drag).
 
 Screens drawn from their file so far: the hours to wait or sleep (`sleep_wait_menu.xml`), the dialogue
@@ -160,7 +164,7 @@ and makes the sound of a refusal. When the screen is left the character says a l
 once. The engine's rule that the menu keeps the count of the list's children makes the file's expression for an empty list show
 over rows (`_num_filtered` is set to the row count), so the script sets the words of an empty list itself.
 
-Not there: the pad; the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
+The pad works through the Pip-Boy's own handler on the items page (the D-pad moves the row, the bumpers page, Y is Enter) and, for the repair services, through the screen's own. Not there: the pulse of the choose text (the executable's alpha animation is a guess); the brackets when the list is
 scrolled are placed by the script from the row's place each frame (an approximation of the executable); the mods of the things that repair; the repair filter, the hover and the sort of Fallout 3 are the New Vegas ones (the formulas are the same in the
 Fallout 3 settings, the rest was not compared); the skill of the vendor includes its buffs (a guess); Escape and Tab do what the
 generic menu does.
@@ -184,7 +188,7 @@ copies with other mods are different rows and different stacks, in the items pag
 the saves (the mods are kept with the condition in the key of the copy, so older saves read as copies with none). Fallout 3 has
 no mods, so the screen and the Mod button are New Vegas only.
 
-Not there: the pad; the cards of the file that would compare a mod with the weapon (the executable never fills them); the rate of
+The pad works through the Pip-Boy's handler, as for the repair screen. Not there: the cards of the file that would compare a mod with the weapon (the executable never fills them); the rate of
 fire (effect 8) and the effects 5, 6, 9, 11, 14 and 16 (they are in the records but their use was not read); the models of the
 weapon per mask of mods (the engine shows the weapon's one model); the bump of the maximum condition for a copy that is whole
 was read as one point less than the effect says, which is the executable's way but unverified on screen; two copies that a
@@ -405,7 +409,7 @@ nearest zoom it was taller than that hotrect (800 pixels against 698; the neares
 move the colour of the face with the texture morph of the head's `.egt` file (`FREGT003`: 50 modes of a scale and three 256 by 256
 pictures of signed bytes; Mac round 12BE B3): the base mod is the sum of coefficient times scale times byte, taken in whole
 numbers as `BSFaceGenModel` at 0x65B410 takes it (the coefficient and the scale times 256 cut towards zero, the sum divided by
-65536), which is how many of the 256 steps of each colour the face moves there; the mod keeps half of it above mid grey (the
+65536, over the first 30 modes at most: the setting `uiEGTClampSize`, which no INI file has), which is how many of the 256 steps of each colour the face moves there; the mod keeps half of it above mid grey (the
 executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0.5) and the skin shader doubles it, so it goes
 where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
 the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
@@ -417,8 +421,15 @@ characters that have a texture of the editor, how far the picture made from thei
 they are and turned over (`FaceGen tone check`), and for six characters the mean difference was 1.3 to 1.8 steps turned over, 3.7 to 5.5
 as they are and 7 to 40 with no coefficients; with the rows as they are the head of the face screen showed a smear across the nose and jaw at every
 slider position, and with them turned over it did not. Moving the twelve tone sliders from one end to the other takes the head from a dark
-red-brown through natural skin to a pale grey-white. Not done: the body: the
-skin of the body and the hands keep the colour of the race whatever the tone sliders say.
+red-brown through natural skin to a pale grey-white. The skin of the body, the hands and the skin that shows from clothes has
+a tone the same way (Mac round 12BG B1: the games build one texture for the three from the `.egt` file of the body's model, a file of 32 by 32
+pictures that are one flat colour for a human or a child and vary for a ghoul or an old person, with the coefficients of FGTS and the
+formula of the head, and take a `bodymods` texture of the editor, which is one flat colour of 8 by 8, when the archives hold one for the
+character; the games' skin shaders for the head, the hands and the body are the same, so the tone is added to the skin picture alike):
+a character with no `bodymods` texture, and the player, gets it made from the `.egt` of its body model (the human body of its sex when that
+has none), the hands take its average. Not read in the executable: which sampler the tone texture lands on in the shader. The face
+screen has no hair length or head size slider in the games' executable (Mac round 12BG C1: the sliders are the shape and tone
+coefficients, and the hair length of a character is a morph of its hair model that no menu moves), so there is none here.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
@@ -432,7 +443,7 @@ race's own for the sex, and only when the race has none by the first of its hair
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
 12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
 it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
-of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the body's skin, the Pip-Boy still has no pause
+of leaving it; the pad's B and the Back button go up one list). The pad (`falloutfacescreen.lua`, `module.pad`): the D-pad moves the lit row up and down and a slider left and right, the bumpers change the list (they stand for Shift and the arrows), Y is Enter; A is the engine's click where its pointer is, and B goes up one list. The jump of a bar by the triggers is not wired. Not done: the Pip-Boy still has no pause
 menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
 by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
 executable's loading code).
@@ -645,7 +656,17 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   template `lb_newsave_template`, so a row of a list can name its template: `_template`), the rows of the saves
   (`lb_saveload_template`: `#0003` and the place, or the abbreviation of the quick or the automatic save). The panel
   shows the name, the level and the time played of the save that is lit. Writing over a save and loading one ask first.
-  The save's picture, its version line, deleting a save, and the sorting the game uses (not read) are not here.
+  With a pad connected the menu opens as the file's `&xbox;` layout (the list 20 units further in, the buttons with their
+  glyphs), and then the file shows the Delete button (`main_defaults_button`, the Y button; its `_target` is the code's
+  "a save is lit", and with a PC layout the file never shows it, because its `_line_alpha` and `target` both ask for
+  `io()` user5, "using a 360 controller"): it asks `sConfirmDelete` and takes the save away on Yes (Mac round 12BH part 8
+  names the question and the three states of the game's confirm box; round 12BI part D corrects it: 0x200 is load, 0x400
+  save, 0x800 delete, 0x100 Continue and 0x80 new game). A Yes on delete removes the `.fos` of the save and nothing else
+  (no picture file: the picture is inside the save), and there is no key that deletes. The game orders the list, and
+  decides which save Continue loads, by the last write time of the file (the newest first), as the port does by the time
+  the save was made. The title screen, which is the engine's own here, has the rules the file's list does not: its Continue
+  and Load rows exist only when a save does, and Continue there asks `sConfirmContinue` first (the pause menu's Continue
+  asks nothing). The save's picture and its version line are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
   `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
@@ -1391,6 +1412,20 @@ the model itself. Not verified in the game: the folder of the textures (the code
 direction of the turn. Not done: the mode of a new game, which shows the wheel and no picture; the pictures of the other
 kinds of load screen (objective, level progress, stats, plate). The box of the engine (the label and the progress bar) stays at
 the bottom. Seen only in the offline harness and in tests, not in the running game.
+
+### V.A.T.S. (Mac rounds 12BH and 12BI, FalloutNV.exe `VATSMenu` create 0x7E9200, click dispatch 0x7EECB0, layout 0x7F1840; `falloutvats.lua`)
+
+`vats_menu.xml` is the whole screen; the file leaves three blocks empty (`HitPoints`, `ActionPoints`, `EnemyHealth`), has a template for the bracket of a body part (`body_part_percent`) and the list of the queue (`queued_actions`, rows from `queued_action`), and the code of the game does the rest. The menu is 960 units high, the safe zone 15 on each side, and `falloutvats.lua` makes these things:
+
+- **Health** (360 by 127, left): the left bracket, a bar (`_OriginalX` 20, y 41) and the word `sHitPointsShort` right-justified at x 53, y 8. There is no number.
+- **Action points** (386 by 127, right, x = W - 2 x 30 - 386 + 30): the right bracket at x -37, two bars at `_OriginalX` 326 that grow to the left, the word `sActionPointsShort` at x 315, y 8, the text `sVATSMessageLowAP` at x 270 (hidden until the points do not reach), and the rounds at x 315, y 80 (font 7). The bars are rows of whole ticks, as the HUD's. The points of the queued attacks are paid already; the bar in front is what the next attack leaves, the half-lit one behind it (alpha 128) what is left before it. When the points do not reach the next attack the bar in front shows its cost and the one behind nothing.
+- **Enemy** (350 by 52, x = W/2 - 175, y = H - 2 x 30 - 88): the bracket, a bar that grows from its middle (`_OriginalX` 171, `_TotalWidth` 240) and the name centred at x 170, y 35, `systemcolor` 2 (hostile). The executable adds the health and the damage threshold under the name when the player has a perk (entry point 0x2F); that is not done, and a target that is not hostile is not told apart.
+- **A bracket for each part** of the picked target (the slot of a bracket is the type of the part, 0 to 14: 0 torso, 1 and 2 head, 3 and 4 left arm, 5 and 6 right arm, 7 to 9 left leg, 10 to 12 right leg, 13 brain, 14 weapon; the place of the part in the target's list of parts, which is the number an attack names it by, can differ from its type, so the screen keys brackets and groups by type and queues by place): the template is made once for each slot, at the place the bone of the part has on the screen (`core.vats.partPosition`: the world position of the bone named by the part, projected to the menu's units from the view transform and the field of view of the camera, not from `camera.worldToViewportVector`, whose places are pixels of the video resolution while the menu's size is the interface's (Mac round 12BJ on a window at interface scale 2: 1920x1080 against 960x540, and every bracket off the screen); a body without that bone puts the part at a height by its type). The offset by part is the executable's (0x7F2874): the head 100 up when it is in the upper half and 100 down when it is in the lower, an arm, a leg or the weapon 100 to the side (away from the middle) and 50 up or down, the torso and the brain as they are. The bracket is kept inside the box from 130 to W - 180 across and from 130 to H - 236 down, and two brackets closer than 150 by 100 are pushed apart by half the overlap each (30 passes at most; the axis it overlaps least is taken, which the executable's code left open). The picture follows the side of the screen the bracket is on, not the limb: a bracket on the left half has the right-hand bracket picture (justify right) and one on the right half the left-hand one; the torso has the chest picture and the head the head picture. It shows the chance (at most 95, as `fVATSMaxChance`; a part with no chance shows 0), the condition of the part as a bar and, only for the parts of the picked group, its name; the group of a part is the actor value of its condition (byte 7 of the part's BPND: 25 head, 26 torso, 27 and 28 the arms, 29 and 30 the legs, 31 the brain), which parts of one body can share (a Handy's three arm parts are all 28), so a human's parts are each a group of their own (Mac round 12BJ B3; `core.vats.parts` gives it as `group`). A crippled part shows an empty bar and nothing else. The alpha of a bracket goes to 255 over 1.0 s for the picked group, 0.2 s for the others, and to 0 over 0.5 s when it is off the screen (Mac round 12BI A2 reads these as probable, not proven).
+- **The queue** is the file's list: a row for each attack, "name of the target: name of the part", the newest at the bottom, and nothing to click or light. The text of a row (`ListItemText`, right-justified at x 15, 20 under the top of its row) is not cut at the list's rectangle in the game, because it has no `clips` of its own (Mac round 12BJ B1), so it lies mostly to the left of the list; the port's rows are set to `clips` 0 so that nothing cuts them. The row's height is the height of its text, whatever the text's y (B2). The file's formula for the y of a row puts the last row's top at the bottom of the list's rectangle, which would put its text over the action point text of the block below it; the formula counts the list's children, which this list has more of than the executable's, so the rows are placed by the port's rule instead, the last row's text ending at the bottom of the list's rectangle (the executable's own y was not worked out). The accept button takes no click (its `target` is 0) until there is something queued.
+
+Input follows the executable (round 12BI A4 and A5): **A** and **D** (or the file's two arrows) pick the previous and next target, and play the sound of a refusal when there is only one; **W** and **S** or the wheel pick the part, one part for a press, in the order of the target's body part data (W or the wheel up the next, S or the wheel down the previous, round the ends, a part whose bracket is off the screen stepped over; Mac round 12BJ B3, the executable's loop at 0x7F57F7 and its keys at 0x7F3070); the pick starts on the first part of the torso's group, or the first part (the executable also starts on the head when it is less than 300 units from the player, which was not traced to the end), and a change of target picks the torso's group again; a click where no tile takes it is the attack control and queues an attack on the picked part, as does Space; **E** or Enter accepts, which leaves the screen (a fade of 0.25 s, `explorefade`) and carries the queue out, and **B** or the right button takes the last attack off the queue (its points come back) and leaves the screen when there is none. An attack that has no chance is refused with the message `sVATSMessageZeroChance` and the sound `UIVATSEnterFail`; one the points do not pay for with `UIVATSInsufficientAP`. Sounds: `UIVATSEnter` when the screen opens, `UIVATSMove` when an attack is queued, `UIMenuCancel` when one is taken off, `UIVATSExit` and, with a queue, `UIVATSReady` when the screen is left with Accept. With a pad the file is drawn in its pad layout (the hints for Select, Target and Body Part; the arrows are hidden) and the buttons stand for keys: Y queues, X accepts, the left bumper picks the part and the right one the target.
+
+Not done: the camera of V.A.T.S. (the view is the player's own) and the slow motion, the special attacks (the two buttons of the file stay hidden; they need the weapon's cost and the unarmed skill), the bar of the weapon's condition, the compass, the row for a reload that follows a shot that empties the magazine, the bracket of the target's weapon, and the perk that shows the target's health and threshold. The world stands still while the screen is up (the screen is a window of the interface); the executable never slows time in the selection (Mac round 12BJ B4: no caller of the time-scale setter in the opening or the selection, and the menu's `user15` 0.25 is never read; only the playback scales time), so a plain pause is the reading the port keeps. The attacks of a queue come 0.7 s apart.
 
 ### The rules of an expression with a text in it (Mac round 12AO B1, FalloutNV.exe 0xA09410)
 

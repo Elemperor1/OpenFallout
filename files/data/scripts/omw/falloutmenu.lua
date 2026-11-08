@@ -224,6 +224,16 @@ function Shown:onWheel(handler)
     self.wheelHandler = handler
 end
 
+-- Call `handler()` when the left button is clicked where no tile of the menu takes it (the attack control of V.A.T.S.),
+-- and `handler()` when the right button is released anywhere in the window
+function Shown:onBackgroundClick(handler)
+    self.backgroundClick = handler
+end
+
+function Shown:onRightClick(handler)
+    self.rightClick = handler
+end
+
 -- Where the pointer last was in the window, in pixels (what `rect` gives positions in), and where the button went down
 function Shown:pointerAt()
     return self.pointer
@@ -460,10 +470,15 @@ function module.open(file, options)
             mousePress = async:callback(function(e)
                 if e.button ~= 1 then return end
                 shown.pointer = { x = e.offset.x, y = e.offset.y, startX = e.offset.x, startY = e.offset.y }
-                shown.menu:pointerPressed(e.offset.x, e.offset.y)
+                shown.pressedOn = shown.menu:pointerPressed(e.offset.x, e.offset.y)
                 shown:refresh()
             end),
             mouseRelease = async:callback(function(e)
+                -- The right button is the script's own where it asked for it (V.A.T.S. takes it for Return)
+                if e.button == 3 then
+                    if shown.rightClick then shown.rightClick() end
+                    return
+                end
                 if e.button ~= 1 then return end
                 shown.pointer = { x = e.offset.x, y = e.offset.y, startX = shown.pointer and shown.pointer.startX,
                     startY = shown.pointer and shown.pointer.startY }
@@ -472,7 +487,13 @@ function module.open(file, options)
                 local kept = hook and hook.read()
                 local tile = shown.menu:pointerReleased(e.offset.x, e.offset.y)
                 if hook then hook.apply(kept) end
-                if tile then shown:dispatch(tile) end
+                if tile then
+                    shown:dispatch(tile)
+                elseif shown.pressedOn == nil and shown.backgroundClick then
+                    -- a click that began and ended where the file has no tile that takes it
+                    shown.backgroundClick()
+                end
+                shown.pressedOn = nil
                 shown:refresh()
             end),
             mouseWheel = async:callback(function(e)

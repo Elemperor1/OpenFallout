@@ -4,6 +4,8 @@
 #include <components/sceneutil/material.hpp>
 #include <components/sceneutil/riggeometry.hpp>
 #include <components/sceneutil/texturetype.hpp>
+#include <components/testing/util.hpp>
+#include <components/vfs/manager.hpp>
 
 #include <gtest/gtest.h>
 
@@ -15,6 +17,7 @@
 #include <osg/Uniform>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -381,6 +384,58 @@ namespace
         root->addChild(noHat);
         root->addChild(hat);
         return root;
+    }
+
+    // A .egt file of one mode (scale 1) with pictures of one pixel: the given bytes for red, green and blue
+    std::string makeToneFile(std::int8_t red, std::int8_t green, std::int8_t blue)
+    {
+        std::string out("FREGT003");
+        for (const std::uint32_t value : { 1u, 1u, 1u, 0u, 81u, 0u })
+            out.append(reinterpret_cast<const char*>(&value), sizeof(value));
+        out.append(64 - out.size(), '\0');
+        const float scale = 1.f;
+        out.append(reinterpret_cast<const char*>(&scale), sizeof(scale));
+        for (const std::int8_t value : { red, green, blue })
+            out.push_back(static_cast<char>(value));
+        return out;
+    }
+
+    constexpr VFS::Path::NormalizedView sOwnFile("meshes/characters/_male/bodyofarace.egt");
+    constexpr VFS::Path::NormalizedView sWomanFile("meshes/characters/_male/upperbodyhumanfemale.egt");
+    constexpr VFS::Path::NormalizedView sManFile("meshes/characters/_male/upperbodyhumanmale.egt");
+
+    TEST(OpenFalloutRenderMakeBodyToneImage, takesTheFileOfTheModelOfTheBodyWhenItHasOne)
+    {
+        TestingOpenMW::VFSTestFile own(makeToneFile(50, 0, 0));
+        TestingOpenMW::VFSTestFile human(makeToneFile(-50, 0, 0));
+        const auto vfs = TestingOpenMW::createTestVFS({ { sOwnFile, &own }, { sWomanFile, &human } });
+
+        const osg::ref_ptr<osg::Image> image
+            = makeBodyToneImage(*vfs, "Characters\\_Male\\BodyOfARace.nif", true, { 1.f });
+        ASSERT_NE(image, nullptr);
+        EXPECT_GT(image->data()[0], 128);
+    }
+
+    TEST(OpenFalloutRenderMakeBodyToneImage, takesTheHumanBodyOfTheSexWhenTheModelHasNoFile)
+    {
+        // The model of the human woman's skin, as a race names it (femaleupperbody.nif has no .egt in the games)
+        TestingOpenMW::VFSTestFile woman(makeToneFile(50, 0, 0));
+        TestingOpenMW::VFSTestFile man(makeToneFile(-50, 0, 0));
+        const auto vfs = TestingOpenMW::createTestVFS({ { sWomanFile, &woman }, { sManFile, &man } });
+
+        const osg::ref_ptr<osg::Image> forWoman
+            = makeBodyToneImage(*vfs, "Characters\\_Male\\FemaleUpperBody.nif", true, { 1.f });
+        ASSERT_NE(forWoman, nullptr);
+        EXPECT_GT(forWoman->data()[0], 128);
+
+        const osg::ref_ptr<osg::Image> forMan
+            = makeBodyToneImage(*vfs, "Characters\\_Male\\MaleUpperBody.nif", false, { 1.f });
+        ASSERT_NE(forMan, nullptr);
+        EXPECT_LT(forMan->data()[0], 128);
+
+        // a race that names no body at all has the human one too (the files are kept by their path for the whole run,
+        // so what a missing file gives cannot be tested after these, which have made the human files)
+        EXPECT_NE(makeBodyToneImage(*vfs, std::string(), true, { 1.f }), nullptr);
     }
 
     TEST(OpenFalloutRenderChooseHairShape, keepsTheShapeForABareHeadOrForAHat)

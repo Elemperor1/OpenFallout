@@ -18,6 +18,7 @@ local I = require('openfallout.interfaces')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local menuModule = require('scripts.omw.falloutmenu')
+local pad = require('scripts.omw.falloutpad')
 local sceneModule = require('scripts.omw.falloutscene')
 
 local chargen = core.chargen
@@ -615,6 +616,22 @@ function module.press(code, symbol, shift)
         return false
     end
     return true
+end
+
+-- The buttons of a pad: the D-pad stands for the arrows (up and down move the lit row, left and right move a slider), the
+-- bumpers for Shift and the left or right arrow (the previous and the next list), Y for Enter (what the row asks for). A
+-- is the engine's own click where the pointer is, and B goes up one list (`escape`).
+function module.pad(button)
+    if not opened then return false end
+    local B, K = input.CONTROLLER_BUTTON, input.KEY
+    if button == B.LeftShoulder or button == B.RightShoulder then
+        pad.log('face', button, 'tab')
+        return module.press(button == B.LeftShoulder and K.LeftArrow or K.RightArrow, nil, true)
+    end
+    local code = pad.key(button)
+    if code == nil then return false end
+    pad.log('face', button, code)
+    return module.press(code, nil, false)
 end
 
 -- The slider that is dragged follows the pointer along its bar

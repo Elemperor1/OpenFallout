@@ -166,6 +166,8 @@ local function hidePanel()
             'saveload_screenshot' }) do
             shown:set(tile, 'visible', 0)
         end
+        -- no save is lit, so the Delete button cannot be clicked (the code of the game sets its `_target` trait)
+        shown:set('main_defaults_button', '_target', 0)
     end)
 end
 
@@ -179,6 +181,8 @@ local function showScreen(name)
         fade('options_container', name == 'options')
         -- the question has its own way out (its last choice), so Back is only in the lists of saves and of the settings
         fade('main_back_button', name == 'save' or name == 'load' or name == 'settings' or name == 'options')
+        -- the button that is Defaults with the options is Delete with the saves (the file shows it when its code says so)
+        shown:set('main_defaults_button', 'user0', (name == 'save' or name == 'load') and 1 or 0)
     end)
     -- the panel of the save that is lit goes with the list of saves (the file shows it only while that is shown): the
     -- question that comes after a pick is not drawn over it
@@ -463,6 +467,24 @@ local function pickSave(row)
     end
 end
 
+-- The Delete button of the lists of saves (the game's StartMenu asks first, with the question of its setting sConfirmDelete,
+-- and takes the save away when the answer is yes; the list shows what is left)
+local function askDelete()
+    local kind = screen
+    if kind ~= 'save' and kind ~= 'load' then return end
+    local row = lists.saves.selected()
+    local entry = row and row > 0 and saveRows[row] or nil
+    if not (entry and entry.save) then return end
+    lastSaveRow = row
+    ask(word('sConfirmDelete'), kind, {
+        { label = word('sYes'), action = function()
+            engine.deleteGame(entry.save.dir, entry.save.file)
+            showSaves(kind, lastSaveRow)
+        end },
+        { label = word('sNo'), action = function() showSaves(kind, lastSaveRow) end },
+    })
+end
+
 -- The choice of the question or the item of the list that was picked
 local function pickItem(row)
     local item = items[row]
@@ -496,6 +518,7 @@ local function updatePanel()
         shown:set('saveload_playername', 'visible', on)
         shown:set('saveload_playerlevel', 'visible', on)
         shown:set('saveload_playtime', 'visible', on)
+        shown:set('main_defaults_button', '_target', on)
     end)
 end
 
@@ -513,7 +536,9 @@ local function open()
             ignorePointerEvents = true,
         },
     }
-    local opened = menuModule.open(FILE, { layer = LAYER })
+    -- With a pad connected the file is the one of the 360 controller (`&xbox;`): the glyphs of the buttons are on the
+    -- tiles that they press, and the Delete button of a list of saves is there (the file shows it only to a pad)
+    local opened = menuModule.open(FILE, { layer = LAYER, pad = engine.controllerConnected() })
     local made = opened and {
         main = opened:list('main_container', 'lb_item_template'),
         saves = opened:list('saveload_container', 'lb_saveload_template'),
@@ -537,8 +562,10 @@ local function open()
     lists.options.onClick(optionClick)
     lists.saves.onClick(pickSave)
     shown:onClick('main_back_button', back)
+    shown:onClick('main_defaults_button', askDelete)
     shown:batch(function()
         shown:set('main_back_button', 'string', word('sBack'))
+        shown:set('main_defaults_button', 'string', word('sDelete'))
         -- The Defaults button of the settings (the file shows it with the options) resets the bindings of the controls,
         -- which are not drawn yet, so it is left out: the file's own "additional visibility check" is what says it
         shown:set('main_defaults_button', 'user0', 0)
@@ -633,6 +660,9 @@ local function onPad(button)
         end
     elseif button == PAD.A then
         onKey({ code = input.KEY.Enter })
+    elseif button == PAD.Y then
+        -- the Delete button of a list of saves has the Y button of the pad on it (the file's `_xbox_button`)
+        askDelete()
     elseif button == PAD.B then
         if screen ~= 'list' then back() end
     elseif button == PAD.Start then

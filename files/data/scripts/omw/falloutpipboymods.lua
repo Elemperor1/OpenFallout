@@ -10,7 +10,7 @@
 -- the file that would compare a mod with the weapon are never filled by the executable and are not here either. What a
 -- mod is for (its description) and its picture show for the line that is under the pointer.
 --
--- Not there: the pad.
+-- The pad reaches `press` through the handler of the Pip-Boy.
 --
 --   local page = require('scripts.omw.falloutpipboymods')
 --   page.show(rowId, { close = function(rowId) ... end })   -- true when the screen is up

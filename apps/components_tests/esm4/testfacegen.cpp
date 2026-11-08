@@ -519,6 +519,48 @@ namespace
             "Meshes\\Characters\\Head\\HeadFemale.egt");
         EXPECT_EQ(ESM4::faceTexturePath("meshes/head"), "");
         EXPECT_EQ(ESM4::faceTexturePath(""), "");
+        // A body has its file the same way (the women's is in the folder of the men's, as its model is)
+        EXPECT_EQ(ESM4::faceTexturePath("meshes/characters/_male/upperbodyhumanfemale.nif"),
+            "meshes/characters/_male/upperbodyhumanfemale.egt");
+    }
+
+    TEST(ESM4FaceToneTest, onlyTheFirstThirtyModesAreSummed)
+    {
+        // 31 modes of the same flat picture: a coefficient of the 31st mode changes nothing, one of the 30th does
+        const std::vector<float> scales(31, 1.f);
+        const std::string bytes
+            = textureFile(1, 1, scales, std::vector<std::vector<std::int8_t>>(31, flatPlanes(1, 40, 40, 40)));
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(bytes, morphs, error)) << error;
+        std::vector<float> coefficients(31, 0.f);
+        const ESM4::SkinImage none = ESM4::makeFaceToneImage(morphs, coefficients, false);
+        coefficients[30] = 1.f;
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, coefficients, false).mPixels, none.mPixels);
+        coefficients[30] = 0.f;
+        coefficients[29] = 1.f;
+        EXPECT_NE(ESM4::makeFaceToneImage(morphs, coefficients, false).mPixels, none.mPixels);
+    }
+
+    TEST(ESM4FaceToneTest, aBodyFileOfFlatPicturesMakesOneFlatColourOverTheWholeBody)
+    {
+        // The upper bodies of humans have the same byte over the whole picture for each colour, so every pixel of
+        // the base mod of such a body is the same
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(
+            textureFile(32, 32, { 2.f }, { flatPlanes(32 * 32, 40, -20, 10) }), morphs, error))
+            << error;
+        const ESM4::SkinImage tone = ESM4::makeFaceToneImage(morphs, { 0.5f }, true);
+        ASSERT_EQ(tone.mWidth, 32);
+        ASSERT_EQ(tone.mHeight, 32);
+        ASSERT_EQ(tone.mPixels.size(), 32u * 32u * 3u);
+        for (std::size_t i = 3; i < tone.mPixels.size(); ++i)
+            EXPECT_EQ(tone.mPixels[i], tone.mPixels[i % 3]) << i;
+        // Positive for the first colour, negative for the second: the base mod moves from mid grey the way the file
+        // says
+        EXPECT_GT(tone.mPixels[0], 128);
+        EXPECT_LT(tone.mPixels[1], 128);
     }
 
     TEST(ESM4FaceGenTest, readsATextureFile)

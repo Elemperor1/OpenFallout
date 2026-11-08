@@ -302,13 +302,26 @@ namespace OFRender
         // character of the data with the numbers of the player's look on top): a texture of the editor for such a
         // record, if the archives hold one, is the face of the record as it ships and not the one made
         if (traits.mId.mIndex == 0x7 || OFClass::ESM4Npc::isLookGiven(mPtr))
+        {
             images.mFaceTint = nullptr;
+            images.mBodyTint = nullptr;
+        }
         if (eyes != nullptr)
             images.mEyes = loadFalloutImage(OFClass::falloutTexturePath(eyes->mIcon));
 
         const OFClass::FalloutNpcParts parts
             = OFClass::falloutNpcParts(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr));
         images.mHat = parts.mHatOn;
+        // A body with no texture of the editor gets its tone from the coefficients as the face does, from the .egt of
+        // the model of its body; the hands and the skin of the clothes take the one picture (as in the games). The
+        // model is the race's, not the one in the list of parts: a piece that covers the upper body takes that part
+        // out of the list, and the skin that shows from the piece still has to have the tone
+        if (images.mBodyTint == nullptr && !images.mTone.empty())
+        {
+            // A race with no model of its body has the executable's human body of the sex (makeBodyToneImage)
+            images.mBodyTint = makeBodyToneImage(
+                *mResourceSystem->getVFS(), OFClass::falloutBodyModel(*race, isFemale), isFemale, images.mTone);
+        }
         // A colour of black is the colour of a record that has none, which then keeps the picture it has
         if (traits.mHairColour.red != 0 || traits.mHairColour.green != 0 || traits.mHairColour.blue != 0)
             images.mHairColour = osg::Vec3f(

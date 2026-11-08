@@ -131,8 +131,14 @@ class TreeTest(unittest.TestCase):
                 self.assertTrue(named and named[0] in screens, row["name"])
             if row["read"] == "read":
                 self.assertTrue(row["evidence"].strip(), row["name"])
+        # A file that the executable never loads is in the table with its evidence and is not a unit
+        dead = [row for row in rows if row["dead"].strip()]
+        for row in dead:
+            self.assertEqual(row["read"], "read", row["name"])
+            self.assertEqual(row["implemented"], coverage.TODO, row["name"])
+            self.assertTrue(row["evidence"].strip(), row["name"])
         menu_units = sum(len(lib["units"]) for lib in self.data["libraries"] if lib["family"] == "menu")
-        self.assertEqual(menu_units, 121)
+        self.assertEqual(menu_units, 121 - len(dead))
 
     def test_the_perk_table_agrees_with_perks_hpp(self):
         rows = coverage.read_tracker(coverage.TRACKER_PERKS)

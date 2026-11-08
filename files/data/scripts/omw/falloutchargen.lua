@@ -845,6 +845,8 @@ return {
             end
             if special.isOpen() and I.UI.getMode() == 'Interface' then
                 special.pad(button)
+            elseif face.isOpen() and I.UI.getMode() == 'Interface' then
+                face.pad(button)
             end
         end,
         onMouseButtonPress = function()
