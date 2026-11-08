@@ -5,39 +5,39 @@ prefabs/book_line,Building blocks,piece,both,listed,todo,,
 prefabs/bottom_bracket,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/bottom_tab_bar,Building blocks,piece,both,listed,todo,,
 prefabs/box,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
-prefabs/bracket_vert,Building blocks,piece,both,listed,todo,,
+prefabs/bracket_vert,Building blocks,piece,both,read,done,"M12: drawn as part of the screens that include it (item_mod, repair)",
 prefabs/brightness,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/button_basic,Building blocks,piece,both,listed,todo,,
 prefabs/button_box,Building blocks,piece,both,listed,todo,,
-prefabs/button_companion_wheel,Building blocks,piece,nv,listed,todo,,
+prefabs/button_companion_wheel,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (companion_wheel),
 prefabs/button_floating,Building blocks,piece,both,listed,todo,,
 prefabs/button_floating_2,Building blocks,piece,both,listed,todo,,
 prefabs/button_floating_3,Building blocks,piece,both,listed,todo,,
 prefabs/button_long,Building blocks,piece,both,listed,todo,,
 prefabs/button_no_background,Building blocks,piece,both,listed,todo,,
-prefabs/button_short,Building blocks,piece,both,listed,todo,,
+prefabs/button_short,Building blocks,piece,both,read,done,M12: drawn as part of the screens that include it (book),
 prefabs/button_simple,Building blocks,piece,both,listed,todo,,
 prefabs/button_xbox_hint,Building blocks,piece,both,listed,todo,,
 prefabs/button_xtralong,Building blocks,piece,both,listed,todo,,
-prefabs/caravan_bet_menu,Building blocks,piece,nv,listed,todo,,
-prefabs/caravan_builddeck_menu,Building blocks,piece,nv,listed,todo,,
-prefabs/caravan_game_menu,Building blocks,piece,nv,listed,todo,,
-prefabs/caravan_results_menu,Building blocks,piece,nv,listed,todo,,
+prefabs/caravan_bet_menu,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (caravan),
+prefabs/caravan_builddeck_menu,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (caravan),
+prefabs/caravan_game_menu,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (caravan),
+prefabs/caravan_results_menu,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (caravan),
 prefabs/card_info,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/color,Building blocks,piece,both,listed,todo,,
-prefabs/compassicon,Building blocks,piece,both,listed,todo,,
+prefabs/compassicon,Building blocks,piece,both,read,done,M12: drawn as part of the screens that include it (hud_main),
 prefabs/fade_line,Building blocks,piece,both,listed,todo,,
 prefabs/fade_line_down,Building blocks,piece,both,listed,todo,,
 prefabs/fade_line_up,Building blocks,piece,both,listed,todo,,
 prefabs/fill_bar,Building blocks,piece,both,listed,todo,,
 prefabs/focus_box,Building blocks,piece,both,listed,todo,,
 prefabs/generic_background,Building blocks,piece,both,listed,todo,,
-prefabs/horiz_floating_scroll,Building blocks,piece,both,listed,todo,,
+prefabs/horiz_floating_scroll,Building blocks,piece,both,read,done,M12: drawn as part of the screens that include it (caravan_builddeck),
 prefabs/horizontal_scroll,Building blocks,piece,both,listed,todo,,
 prefabs/hotkey,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
 prefabs/hotkeys,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
-prefabs/hudtemplates,Building blocks,piece,both,listed,todo,,
-prefabs/icon_companion_wheel,Building blocks,piece,nv,listed,todo,,
+prefabs/hudtemplates,Building blocks,piece,both,read,done,M12: drawn as part of the screens that include it (hud_main),
+prefabs/icon_companion_wheel,Building blocks,piece,nv,read,done,M12: drawn as part of the screens that include it (companion_wheel),
 prefabs/infopiece,Building blocks,piece,both,listed,todo,,
 prefabs/item_listing,Building blocks,piece,both,listed,todo,,
 prefabs/item_stats_display,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
@@ -66,50 +66,50 @@ prefabs/top_corner_title,Building blocks,piece,both,listed,todo,,
 prefabs/trait_select_checkbox,Building blocks,piece,nv,listed,todo,,
 prefabs/vert_floating_scroll,Building blocks,piece,both,listed,todo,,
 prefabs/vertical_fade_line,Building blocks,piece,both,read,done,"M12 (PR 100): drawn as part of the screens that include it (container, quantity, dialogue, wait, crafting, Pip-Boy ITEMS and STAT)",
-prefabs/vertical_scroll,Building blocks,piece,both,listed,todo,,
+prefabs/vertical_scroll,Building blocks,piece,both,read,done,M12: drawn as part of the screens that include it (book),
 prefabs/xbox_floating_hint,Building blocks,piece,both,listed,todo,,
-black_jack_menu,Casino and caravan menus,screen,nv,listed,todo,,
-caravan_bet_menu,Casino and caravan menus,screen,nv,listed,todo,,
-caravan_builddeck_menu,Casino and caravan menus,screen,nv,listed,todo,,
-caravan_game_menu,Casino and caravan menus,screen,nv,listed,todo,,
-caravan_menu,Casino and caravan menus,screen,nv,listed,todo,,
-caravan_results_menu,Casino and caravan menus,screen,nv,listed,todo,,
-roulette_menu,Casino and caravan menus,screen,nv,listed,todo,,
-slot_machine_menu,Casino and caravan menus,screen,nv,listed,todo,,
+black_jack_menu,Casino and caravan menus,screen,nv,read,done,"M12: falloutblackjack.lua draws the file (the bet, the chips, the casino, the buttons that the rules allow, the status text); rules read in Mac rounds 12AO B6 and 12AQ B6 (state machine 0x734DB0); checked in the offline harness, not in the running game","the cards are plain tiles, not the 3D models of the table"
+caravan_bet_menu,Casino and caravan menus,screen,nv,read,done,M12: falloutcaravan.lua draws the stake; read in Mac rounds 12AS E3 and E4 (FalloutNV.exe 0x73D650 to 0x752E20) and 12AV S2; not seen in the running game,
+caravan_builddeck_menu,Casino and caravan menus,screen,nv,read,done,M12: falloutcaravan.lua draws the deck; read in Mac rounds 12AS E3 and E4 (FalloutNV.exe 0x73D650 to 0x752E20) and 12AV S2; not seen in the running game,
+caravan_game_menu,Casino and caravan menus,screen,nv,read,done,M12: falloutcaravan.lua draws the match; read in Mac rounds 12AS E3 and E4 (FalloutNV.exe 0x73D650 to 0x752E20) and 12AV S2; not seen in the running game,"the cards and caravans are plain tiles, not the 3D models"
+caravan_menu,Casino and caravan menus,screen,nv,read,done,M12: falloutcaravan.lua draws the shell that includes the four screens; read in Mac rounds 12AS E3 and E4 (FalloutNV.exe 0x73D650 to 0x752E20) and 12AV S2; not seen in the running game,
+caravan_results_menu,Casino and caravan menus,screen,nv,read,done,M12: falloutcaravan.lua draws the result; read in Mac rounds 12AS E3 and E4 (FalloutNV.exe 0x73D650 to 0x752E20) and 12AV S2; not seen in the running game,
+roulette_menu,Casino and caravan menus,screen,nv,read,done,"M12: falloutroulette.lua draws the file with a betting cloth of the 159 places the executable has; read in Mac rounds 12AO B6 and B7 (FalloutNV.exe 0x7BBE20, 0x7BF670); not seen in the running game","the cloth stands in for the 3D table; the wheel is not drawn, the pocket that came up is written beside the cloth"
+slot_machine_menu,Casino and caravan menus,screen,nv,read,done,"M12: falloutslots.lua draws the file over the machine and its reels in 3D; read in Mac rounds 12AO B7, 12AQ B7, 12AR and 12AS E1 (FalloutNV.exe 0x7C0A40 to 0x7C58F0); not seen in the running game",
 chargen/char_gen_menu,Characters and dialogue,screen,both,read,done,"M12: the SPECIAL points and the skill tags are laid out and drawn from the file in the offline harness (list, arrows, reset, done that waits for every point, the description and the counter), New Vegas and Fallout 3; the titles, the counters (hidden when none are left), the picture of the selection (the record's ICON) and the list's top (y 105 and 65) are what the executables set; not seen in the running game",falloutchargen.lua: S.P.E.C.I.A.L. and tagged skills
-chargen/love_tester_menu,Characters and dialogue,screen,nv,listed,todo,,
-chargen/race_sex_menu,Characters and dialogue,screen,both,listed,stand-in,,"falloutchargen.lua: sex and race; the face is not made (no sliders, no head to turn)"
-chargen/specialbookmenu,Characters and dialogue,screen,both,listed,todo,,
+chargen/love_tester_menu,Characters and dialogue,screen,nv,read,done,"M12: falloutspecialscreen.lua (a module of falloutchargen.lua): the file holds nothing to see, the screen is the Vitomatic Vigor Tester model turned page by page; read in Mac rounds 12AW S5 and S6 and 12AY R1; not seen in the running game",the screen is not reached in play unless quest VCG01 is at stage 60
+chargen/race_sex_menu,Characters and dialogue,screen,both,read,done,"M12: falloutfacescreen.lua draws the file (panel, rows, sliders) over a head that the engine makes again from the look; read in Mac rounds 12AW S7 and 12AY R2 (FalloutNV.exe 0x7AC730), checked in the running game in rounds 12BC to 12BE (sliders, age, head view, Escape)","not done: hair length and head size sliders, the pad; tone sliders change the face picture since PR 143 (row order of the .egt pictures unverified)"
+chargen/specialbookmenu,Characters and dialogue,screen,both,read,done,M12: falloutspecialscreen.lua: the SPECIAL book of Fallout 3 (a model turned page by page); read in Mac rounds 12AW S5 and S6 and 12AY R1; not seen in the running game,
 dialog/dialog_menu,Characters and dialogue,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutdialogue.lua fills the topics and the reply; the layout is the file's
 dialog/texteditmenu,Characters and dialogue,screen,both,read,done,"M12 (this PR): the name of the character is entered on it, drawn from the file in the offline harness; not seen in the running game",falloutchargen.lua: the name (typed with the keys of the keyboard)
-surgerymenu,Characters and dialogue,screen,both,listed,todo,,
+surgerymenu,Characters and dialogue,screen,both,read,todo,Mac round 12AY R2: surgerymenu.xml is dead in New Vegas (the executable never loads it); the barber and the surgeon use race_sex_menu.xml,
 trait_menu,Characters and dialogue,screen,nv,read,done,"M12: the traits are laid out and drawn from the file in the offline harness (the list with a square on each that is picked, pick and take back, Reset, Continue that is lit whatever the number picked, the description and the picture of the perk, the title and counter formats from the executables); New Vegas opens this menu for traits (VCG04ActivatorScript); not seen in the running game",falloutchargen.lua: the traits
-trait_select_menu,Characters and dialogue,screen,nv,listed,todo,"New Vegas has the menu but no script of FalloutNV.esm opens it (ShowTraitSelectMenu is never called); the traits use trait_menu",
+trait_select_menu,Characters and dialogue,screen,nv,read,todo,New Vegas has the menu but no script of FalloutNV.esm opens it (ShowTraitSelectMenu is never called); the traits use trait_menu,
 barter_menu,Items and trading,screen,both,read,done,"M12: laid out and drawn from its own file in the offline harness (both lists with the six tabs, a thing in a pile shows in the other list with a square, the arrow with the caps, Accept dimmed until a deal can be made, the cancel question); the prices, checks and deal as the executable has them (round 12AG); not seen in the running game; no sounds; things are at full condition",falloutbarter.lua draws it; core.pipboy.barter* and FalloutScript::Barter are the engine side
-book_menu,Items and trading,screen,both,listed,todo,,
+book_menu,Items and trading,screen,both,read,done,"M12: falloutbook.lua draws the file (two pages and arrows, or a scroll); read in Mac round 12AM B4 (FalloutNV.exe)",nothing in play opens it: as in the executable only the console shows it
 container_menu,Items and trading,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutloot.lua fills the two lists and the item cards; things move both ways
-item_mod_menu,Items and trading,screen,nv,listed,todo,,
+item_mod_menu,Items and trading,screen,nv,read,done,M12: falloutpipboymods.lua (a module of the items page); read in Mac rounds 12AX R3 and R3b (FalloutNV.exe 0x783310 to 0x784A40),not done: the pad
 quantity_menu,Items and trading,screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)",falloutquantity.lua keeps the amount for the container and the Pip-Boy drop
 recipe_menu,Items and trading,screen,nv,read,done,M12 (PR 100): laid out and drawn from its own file; run offline against the real menu code and the extracted New Vegas data; not yet seen in the running game (no bench was reached in Mac round 12A),falloutcraft.lua lists the recipes of a bench or campfire in the file's lists
-repair_menu,Items and trading,screen,both,listed,todo,,no repair yet (falloutpipboy.lua says so)
-repair_services_menu,Items and trading,screen,both,listed,todo,,
+repair_menu,Items and trading,screen,both,read,done,M12: falloutpipboyrepair.lua (a module of the items page); read in Mac rounds 12AW S12 and 12AX R1 (FalloutNV.exe 0x7B5400 to 0x7B7F70),"not done: the pulse of the ""select an item"" text, the pad"
+repair_services_menu,Items and trading,screen,both,read,done,M12: falloutrepairservices.lua (the menu ShowRepairMenu opens); read in Mac round 12AX R2 (FalloutNV.exe 0x7B7570 to 0x7B8B30),not done: the pad
 computers_menu,"Locks, terminals and rest",screen,both,read,done,"M12: the introduction, the menu with its lines and Back below the first, the result line and the pages of a note of text are drawn from the file in the offline harness, New Vegas and Fallout 3; rules read from the executable in rounds 12R, 12S and 12U; no sounds; not seen in the running game",falloutterminal.lua: the menu of a terminal
 hacking_menu,"Locks, terminals and rest",screen,both,read,done,"M12: the introduction, the header with the attempt blocks, the 34 rows of the dump, the lit unit and the echo, the log, the lock-out slide and the locked message are drawn from the file in the offline harness; the rules (Science thresholds, words, attempts, likeness, brackets, lock-out) are in components/falloutscript/hacking.* and were read in rounds 12R, 12S, 12T and 12U; no sounds, no keyboard or pad on the dump; not seen in the running game",falloutterminalhack.lua: the game of hacking
-lockpick_menu,"Locks, terminals and rest",screen,both,listed,stand-in,,falloutinteraction.lua: the lock with bobby pins
+lockpick_menu,"Locks, terminals and rest",screen,both,read,done,M12: falloutlockpick.lua draws the file over the lock and the bobby pin models; read in Mac rounds 12AI and 12AJ,
 sleep_wait_menu,"Locks, terminals and rest",screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)","falloutinteraction.lua opens it for the hours to wait or sleep; the hours, the buttons and the meter are the file's"
-loading_menu,Options and saving,screen,both,listed,todo,,
-options/credits_menu,Options and saving,screen,both,listed,todo,,
+loading_menu,Options and saving,screen,both,read,done,"M12: FalloutLoading (apps/openfallout/mwgui/falloutloading.cpp) draws the file with the tip, the picture and the wheel; read in Mac round 12AR C2 (FalloutNV.exe 0x788CC0); one screen for the three of a door since PR 129","not done: the cross-fade of the snapshot, the pinwheel tint and mirrored bars"
+options/credits_menu,Options and saving,screen,both,read,done,M12: falloutcredits.lua draws the file; read in Mac round 12AO B5 (FalloutNV.exe 0x75FB90 and 0x75F9B8),not seen in the running game
 options/load_menu,Options and saving,screen,both,listed,todo,,
-options/main_menu,Options and saving,screen,both,read,todo,,"the exe never loads this file: the main menu is start_menu.xml (round 12Q)"
-options/pause_menu,Options and saving,screen,both,read,todo,,"the exe never loads this file: the pause menu and the main menu are both start_menu.xml (round 12Q); the engine shows the Morrowind pause window"
+options/main_menu,Options and saving,screen,both,read,todo,the exe never loads this file: the main menu is start_menu.xml (round 12Q),
+options/pause_menu,Options and saving,screen,both,read,todo,the exe never loads this file: the pause menu and the main menu are both start_menu.xml (round 12Q); the engine shows the Morrowind pause window,
 options/save_menu,Options and saving,screen,both,listed,todo,,
-options/start_menu,Options and saving,screen,both,read,stand-in,"M12: the pause menu (list, list of saves with the panel, the question) is drawn from the file in the offline harness, New Vegas and Fallout 3; read in rounds 12Q and 12V; the settings submenus (Gameplay, Display, Audio, Controls; 34 items, 10 written to the engine, the rest kept) are drawn too, read in rounds 12W, 12Y and 12Z; not drawn: the title screen, rebinding of the controls, downloads, the credits switcher, the picture and version of a save, deleting a save, sounds; not seen in the running game","falloutstart.lua: the pause menu (a script of the menu context)"
+options/start_menu,Options and saving,screen,both,read,stand-in,"M12: the pause menu (list, list of saves with the panel, the question) is drawn from the file in the offline harness, New Vegas and Fallout 3; read in rounds 12Q and 12V; the settings submenus (Gameplay, Display, Audio, Controls; 34 items, 10 written to the engine, the rest kept) are drawn too, read in rounds 12W, 12Y and 12Z; not drawn: the title screen, rebinding of the controls, downloads, the credits switcher, the picture and version of a save, deleting a save, sounds; not seen in the running game",falloutstart.lua: the pause menu (a script of the menu context)
 breath_meter_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
-companion_wheel_menu,"Pip-Boy, HUD and pop-ups",screen,nv,listed,todo,,
+companion_wheel_menu,"Pip-Boy, HUD and pop-ups",screen,nv,read,done,M12: falloutcompanion.lua draws the file (eight slices); read in Mac round 12AN B3 (FalloutNV.exe 0x754DE0),"not done: what Back Up does, the fade the wheel closes with"
 generic/quest_added,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
 generic/skill_perk,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
 levelup_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12: the skills page (rows with the arrows, the counter, Reset, Continue that waits for every point, the description, picture and weapon badge) and the perk page (single pick, requirement text, dim perks, Back, Done) are laid out and drawn from the file in the offline harness, New Vegas and Fallout 3; title, counters, skills and points read from the executables; not seen in the running game",falloutlevelup.lua: level up
-main/hud_main_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,"the head-up display is drawn by falloutstatus.lua on its own widgets; its sizes follow the menu file, the layout is not evaluated"
+main/hud_main_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12: falloutmenuhud.lua draws the containers of the file the way the executable places them and fills them (HUDMainMenu create 0x76BFE0, update 0x770430), read in Mac rounds 12AL, 12AM and 12AW S11","not drawn: the armour icons, the weapon name and condition, the needs of hardcore mode and the breath meter; falloutstatus.lua keeps the older drawing for a data folder that lacks the file"
 main/inventory_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12 (PR 100): laid out and drawn from its own file; seen in the running game on the Mac, round 12A onward, New Vegas and Fallout 3 (by key; mouse path and pad focus not seen)","falloutpipboyitems.lua: the ITEMS page of the Pip-Boy (list, tabs, cards, drop)"
 main/map_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12 (this PR): laid out and drawn from its own file in the offline harness, New Vegas and Fallout 3, with a test run of the world map, quests and tabs (not seen in the running game yet; no local map tab, no quest markers, the player arrow does not turn, notes and radio are empty lists, mouse path and pad focus not seen)","falloutpipboydata.lua: the DATA page (world map with the places found, quests with objectives, notes, radio)"
 main/quickkeys_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,no hot keys yet (falloutpipboy.lua says so)
@@ -118,5 +118,5 @@ main/stats_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12 (PR 100): 
 message_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,"M12: drawn by falloutmessage.lua from the file (width, justify, buttons, scroll, timed close, keys as read in round 12Q); offline harness only, New Vegas and Fallout 3; no icon and no sounds yet",
 reputation_menu,"Pip-Boy, HUD and pop-ups",screen,nv,listed,todo,,
 select_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
-tutorial_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,todo,,
+tutorial_menu,"Pip-Boy, HUD and pop-ups",screen,both,read,done,M12: falloutmanual.lua draws the help manual on the file (a module of the pause menu); read in Mac round 12AN B4 (FalloutNV.exe 0x7E8890),the hints that come by themselves while the player plays are not here
 vats_menu,"Pip-Boy, HUD and pop-ups",screen,both,listed,stand-in,,falloutvats.lua lists the targets and parts; no slow motion and no camera
