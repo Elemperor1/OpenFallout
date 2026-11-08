@@ -587,10 +587,10 @@ namespace OFRender
         if (osg::ref_ptr<osg::Image> image = makeFaceToneImage(vfs, bodyModel, coefficients))
             return image;
         // The model of the body has no .egt file: the executable names the human body's of the sex (both are in the
-        // folder of the men's models)
+        // folder of the men's models). The models are named as the records name them, without the folder of the
+        // meshes, which makeFaceToneImage puts in front: a name that had it would be looked for in meshes/meshes
         return makeFaceToneImage(vfs,
-            female ? "meshes/characters/_male/upperbodyhumanfemale.nif"
-                   : "meshes/characters/_male/upperbodyhumanmale.nif",
+            female ? "characters/_male/upperbodyhumanfemale.nif" : "characters/_male/upperbodyhumanmale.nif",
             coefficients);
     }
 
