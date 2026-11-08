@@ -1378,6 +1378,10 @@ namespace OFScript
         {
             int mIndex = 0; // the number of the part in the body part data, which the screen and vatsAttack use
             int mType = -1; // the type of the part, which strike and GetHitLocation use
+            /// The actor value that is the condition of the part (25 head, 26 torso, 27 and 28 the arms, 29 and 30 the
+            /// legs, 31 the brain), which V.A.T.S. takes for the group the part is in: the parts that share it are
+            /// picked out together. -1 for a part that has none
+            int mGroup = -1;
             std::string mName;
             std::string mTarget;
             double mChance = 0;

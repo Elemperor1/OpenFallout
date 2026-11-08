@@ -263,6 +263,7 @@ namespace OFScript
             VatsPart part;
             part.mIndex = static_cast<int>(i);
             part.mType = parts[i].mType;
+            part.mGroup = parts[i].mCondition;
             part.mName = parts[i].mName;
             part.mTarget = parts[i].mTarget;
             shot.partToHit = parts[i].mToHit;

@@ -71,7 +71,8 @@ namespace OFLua
 
         // The parts of the body of the target that can be aimed at, each with the number the engine knows it by, its
         // name, what V.A.T.S. calls it, the chance in percent of a hit with the weapon the player holds, and the
-        // condition of the part in percent
+        // condition of the part in percent; `group` is the actor value of the condition of the part (the parts that
+        // share one are a group)
         api["parts"] = [lua](sol::optional<LObject> target) {
             sol::table list(lua, sol::create);
             if (!target)
@@ -82,6 +83,7 @@ namespace OFLua
                 sol::table row(lua, sol::create);
                 row["index"] = part.mIndex;
                 row["type"] = part.mType;
+                row["group"] = part.mGroup;
                 row["name"] = part.mName;
                 row["target"] = part.mTarget;
                 row["chance"] = part.mChance;

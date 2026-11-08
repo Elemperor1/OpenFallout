@@ -62,8 +62,6 @@ local HEIGHT, SAFE = 960, 15
 local FADE_SECONDS = 0.25
 -- The justification of a bracket in the file: left, right, up and down (up is the head, down the chest)
 local LEFT, RIGHT, UP, DOWN = 1, 4, 5, 6
--- How far the list of the queue is made wider to the left (and its rows moved to the right), see buildScreen
-local QUEUE_SHIFT = 340
 -- How far under the top of its row the text of a row of the queue is (the file's y of ListItemText)
 local QUEUE_TEXT_Y = 20
 -- The most the chance on a bracket shows (fVATSMaxChance)
@@ -152,17 +150,16 @@ local function spent()
     return #queue * vats.state().cost
 end
 
--- The groups of the parts of a body: the part a bracket stands for is one of the body part slots of the target (the number
--- the engine gives it), and the keys pick a group of them (the executable's 0x7F3BF0). Head, torso, the two arms, the two
--- legs and the weapon, in the order the keys step through them (head first).
-local GROUPS = { 'head', 'torso', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'weapon' }
-local GROUP_OF = {
-    [0] = 'torso', [1] = 'head', [2] = 'head', [13] = 'head', [3] = 'left_arm', [4] = 'left_arm', [5] = 'right_arm',
-    [6] = 'right_arm', [7] = 'left_leg', [8] = 'left_leg', [9] = 'left_leg', [10] = 'right_leg', [11] = 'right_leg',
-    [12] = 'right_leg', [14] = 'weapon',
+-- The part a bracket stands for is one of the body part slots of the target (its type, 0 to 14), and the parts are picked
+-- out one at a time in the order of the target's body part data (the executable's loop at 0x7F57F7 and its keys at
+-- 0x7F3070). The group of a part is the actor value of its condition, which parts of one body can share (the three arm
+-- parts of a Handy are all 28): the parts of the group of the picked one are shown together. 26 is the torso's.
+local TORSO_GROUP = 26
+-- Where a part is taken to be when its bone is not in the model: how high above the feet of a character, by its type
+local FALLBACK_HEIGHT = {
+    [0] = 100, [1] = 150, [2] = 150, [13] = 150, [3] = 105, [4] = 105, [5] = 105, [6] = 105, [7] = 40, [8] = 40, [9] = 40,
+    [10] = 40, [11] = 40, [12] = 40, [14] = 90,
 }
--- How high above the feet of a character a part is taken to be when its bone is not in the model
-local FALLBACK_HEIGHT = { head = 150, torso = 100, left_arm = 105, right_arm = 105, left_leg = 40, right_leg = 40, weapon = 90 }
 
 -- The slot a part stands in is its type (the body part type of the part record, 0 torso to 14 weapon); the index of a
 -- part is its place in the list of parts of the body, which is only the number an attack names it by
@@ -170,22 +167,10 @@ local function slotOf(part)
     return part.type or part.index
 end
 
+-- The key of the group of a part: its condition's actor value, or the part alone when it has none
 local function groupOf(part)
-    return GROUP_OF[slotOf(part)] or 'torso'
-end
-
--- The groups the picked target has, in order, each with the place of its first part in the list of parts
-local function groupsOf(parts)
-    local first = {}
-    for index, part in ipairs(parts) do
-        local group = groupOf(part)
-        if first[group] == nil then first[group] = index end
-    end
-    local list = {}
-    for _, group in ipairs(GROUPS) do
-        if first[group] then list[#list + 1] = { group = group, first = first[group] } end
-    end
-    return list
+    if part.group ~= nil and part.group >= 0 then return part.group end
+    return 'part' .. tostring(part.index)
 end
 
 local function partName(part)
@@ -287,13 +272,7 @@ local function buildScreen()
         for slot = 0, 14 do
             t.limb[slot] = make(t.glow, 'body_part_percent', 'vats_limb' .. slot, { alpha = 0 })
         end
-        -- The rows of the queue are text that is right-justified a little to the right of the list's left edge, so most of each
-        -- lies to its left; the menu clips a list's rows to the list's rectangle, which would cut them off. The list is
-        -- made wider to the left by as much as the rows are moved to the right, so that the text stays where the file
-        -- puts it.
         local list = find('queued_actions')
-        m:set(list, 'x', m:getNumber(list, 'x') - QUEUE_SHIFT)
-        m:set(list, 'width', m:getNumber(list, 'width') + QUEUE_SHIFT)
         t.list = opened:list('queued_actions', 'queued_action')
         t.listVisible = m:getNumber(list, '_number_of_visible_items')
         local line = m:measure(7, 'Ag', 2048)
@@ -332,7 +311,7 @@ local function layout(target, parts)
         local position = vats.partPosition(target, part.target)
         if position == nil then
             local base = target.position
-            position = v3(base.x, base.y, base.z + (FALLBACK_HEIGHT[groupOf(part)] or 100))
+            position = v3(base.x, base.y, base.z + (FALLBACK_HEIGHT[slotOf(part)] or 100))
         end
         x, y = project(position)
         local item = { slot = slotOf(part), onScreen = false, x = 0, y = 0 }
@@ -496,10 +475,15 @@ end
 local function showQueue()
     local t = tiles
     local rows = {}
-    -- The rows stand one over the other from the bottom of the list, the newest last. The text of a row is 20 below the row's
-    -- top, so the last row is raised by that much to keep its text inside the list (the clip would cut it off otherwise)
+    -- The rows stand one over the other from the bottom of the list, the newest last. The text of a row (the file's
+    -- ListItemText, right-justified at x 15) lies mostly to the left of the list's rectangle and is not cut off in the game,
+    -- because the text has no `clips` of its own (Mac round 12BJ B1); the menu here cuts what is in a row that clips, so the
+    -- row is set not to. The file's formula for a row's y puts the last row's top at the bottom of the list's rectangle and
+    -- its text (20 under the top) over the action point text of the block below, which cannot be how the game looks; the
+    -- formula counts the list's children, which this list has more of than the executable's, so the rows are placed by the
+    -- port's rule instead: the last row's text ends at the bottom of the list's rectangle.
     for index, attack in ipairs(queue) do
-        rows[index] = { string = attack.row, x = QUEUE_SHIFT,
+        rows[index] = { string = attack.row, clips = 0,
             y = t.listVisible * t.lineHeight - (#queue - index + 1) * t.lineHeight - QUEUE_TEXT_Y }
     end
     if t.list then t.list.rows(rows) end
@@ -658,10 +642,11 @@ end
 
 local cycle, movePart, queuePicked, accept, giveBack
 
--- The part that the pick starts on: the torso when the target has one
+-- The part that the pick starts on: the first of the torso's group when the target has one, else the first part (the
+-- executable also starts on the head when it is less than 300 units from the player; that rule was not traced to the end)
 local function startPart()
     for index, part in ipairs(shownParts) do
-        if groupOf(part) == 'torso' then return index end
+        if part.group == TORSO_GROUP then return index end
     end
     return 1
 end
@@ -696,7 +681,8 @@ local function open(offered)
         screen:onClick('return_button', function() giveBack() end)
         screen:onBackgroundClick(function() queuePicked() end)
         screen:onRightClick(function() giveBack() end)
-        screen:onWheel(function(notches) movePart(notches) end)
+        -- the file counts the wheel the other way round (up is -1); the wheel up picks the next part, as W does
+        screen:onWheel(function(notches) movePart(-notches) end)
         sound('UIVATSEnter')
         showQueue()
         updateScreen(0)
@@ -723,22 +709,25 @@ function cycle(by)
     render()
 end
 
--- Moves the pick to the next part of the picked character (down when `by` is positive). On the screen the pick steps through
--- the groups of parts (head first, then the torso, the arms, the legs and the weapon); the widgets step through the parts.
+-- Moves the pick one part on in the target's list of parts (the next when `by` is positive, the previous when it is
+-- negative), round the ends as the executable does; a part whose bracket is not on the screen is stepped over. The keys are
+-- W for the next and S for the previous, the wheel up the next. The widgets step through the parts and stop at the ends.
 function movePart(by)
     if not modeOpen then return end
     local target = targets[picked]
     if screen then
-        local parts = shownParts
-        local groups = groupsOf(parts)
-        if #groups == 0 then return end
-        local current = parts[partPicked] and groupOf(parts[partPicked]) or nil
-        local place = 1
-        for index, entry in ipairs(groups) do
-            if entry.group == current then place = index end
+        local count = #shownParts
+        if count == 0 then return end
+        local step = by > 0 and 1 or -1
+        local at = partPicked
+        for _ = 1, count do
+            at = (at - 1 + step) % count + 1
+            local item = shownParts[at].item
+            if item == nil or item.onScreen then
+                partPicked = at
+                break
+            end
         end
-        place = math.max(1, math.min(#groups, place + by))
-        partPicked = groups[place].first
         render()
         return
     end
@@ -873,9 +862,10 @@ local function press(code)
     elseif code == input.KEY.LeftArrow or code == input.KEY.A or code == input.KEY.PageUp then
         cycle(-1)
     elseif code == input.KEY.DownArrow or code == input.KEY.S then
-        movePart(1)
+        -- on the screen S is the executable's previous part (and W the next); the widgets go down the list with S
+        movePart(screen and -1 or 1)
     elseif code == input.KEY.UpArrow or code == input.KEY.W then
-        movePart(-1)
+        movePart(screen and 1 or -1)
     end
 end
 
