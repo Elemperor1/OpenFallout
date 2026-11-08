@@ -2,10 +2,16 @@
 
 #include <cmath>
 
+#include <osg/Matrixd>
+#include <osg/Node>
+#include <osg/Transform>
+
 #include <components/lua/luastate.hpp>
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/world.hpp"
+#include "../mwrender/animation.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
@@ -83,6 +89,24 @@ namespace OFLua
                 list[index++] = row;
             }
             return list;
+        };
+
+        // Where a bone of the target is in the world (nil when its model has no bone of that name): the screen of
+        // V.A.T.S. puts the bracket of a part of the body where the game projects the node of that part (the name is
+        // the `target` of a part)
+        api["partPosition"] = [](sol::optional<LObject> target, std::string_view bone) -> sol::optional<osg::Vec3f> {
+            if (!target)
+                return sol::nullopt;
+            const OFRender::Animation* animation = OFBase::Environment::get().getWorld()->getAnimation(target->ptr());
+            if (animation == nullptr)
+                return sol::nullopt;
+            const osg::Node* node = animation->getNode(bone);
+            if (node == nullptr)
+                return sol::nullopt;
+            const osg::NodePathList paths = node->getParentalNodePaths();
+            if (paths.empty())
+                return sol::nullopt;
+            return osg::Vec3f(osg::computeLocalToWorld(paths.front()).getTrans());
         };
 
         // The player attacks the part of the target: the action points are spent and the blow struck when the roll is
