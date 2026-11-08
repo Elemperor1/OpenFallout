@@ -1,6 +1,9 @@
 #include "falloutface.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstdlib>
 #include <iterator>
 #include <map>
 #include <mutex>
@@ -142,6 +145,7 @@ namespace OFRender
         std::mutex sCacheMutex;
         std::map<std::string, osg::observer_ptr<osg::Image>> sTintedSkins;
         std::map<std::string, std::shared_ptr<const ESM4::FaceMorphs>> sMorphCache;
+        std::map<std::string, std::shared_ptr<const ESM4::FaceTextureMorphs>> sToneMorphCache;
 
         std::unique_ptr<ESM4::FaceTextureIndex> sTextures;
     }
@@ -525,6 +529,81 @@ namespace OFRender
         }
         sMorphCache.emplace(morphPath, result);
         return result;
+    }
+
+    std::shared_ptr<const ESM4::FaceTextureMorphs> getFaceTextureMorphs(const VFS::Manager& vfs, std::string_view model)
+    {
+        const VFS::Path::Normalized mesh = Misc::ResourceHelpers::correctMeshPath(VFS::Path::Normalized(model));
+        const std::string texturePath = ESM4::faceTexturePath(mesh.value());
+        if (texturePath.empty())
+            return nullptr;
+
+        const std::lock_guard lock(sCacheMutex);
+        const auto cached = sToneMorphCache.find(texturePath);
+        if (cached != sToneMorphCache.end())
+            return cached->second;
+
+        std::shared_ptr<const ESM4::FaceTextureMorphs> result;
+        const VFS::Path::Normalized path(texturePath);
+        if (vfs.exists(path))
+        {
+            Files::IStreamPtr stream = vfs.get(path);
+            const std::string bytes((std::istreambuf_iterator<char>(*stream)), std::istreambuf_iterator<char>());
+            ESM4::FaceTextureMorphs morphs;
+            std::string error;
+            if (ESM4::readFaceTextureMorphs(bytes, morphs, error))
+                result = std::make_shared<const ESM4::FaceTextureMorphs>(std::move(morphs));
+            else
+                Log(Debug::Warning) << "FaceGen: cannot use " << texturePath << ": " << error;
+        }
+        sToneMorphCache.emplace(texturePath, result);
+        return result;
+    }
+
+    namespace
+    {
+        // Whether the pictures of a .egt file are stored with the last row of the face first. Not read from the
+        // executable; see reportFaceToneCheck
+        constexpr bool sToneRowsFlipped = false;
+    }
+
+    osg::ref_ptr<osg::Image> makeFaceToneImage(
+        const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients)
+    {
+        const std::shared_ptr<const ESM4::FaceTextureMorphs> morphs = getFaceTextureMorphs(vfs, model);
+        if (morphs == nullptr)
+            return nullptr;
+        return makeImage(ESM4::makeFaceToneImage(*morphs, coefficients, sToneRowsFlipped), std::string());
+    }
+
+    void reportFaceToneCheck(const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients,
+        const osg::Image& written, std::uint32_t formId)
+    {
+        static std::atomic<int> sReported{ 0 };
+        constexpr int most = 6;
+        if (sReported.load() >= most)
+            return;
+        const std::shared_ptr<const ESM4::FaceTextureMorphs> morphs = getFaceTextureMorphs(vfs, model);
+        ESM4::SkinImage baked;
+        if (morphs == nullptr || !decodeImage(written, baked) || sReported.fetch_add(1) >= most)
+            return;
+        const ESM4::SkinImage straight = ESM4::makeFaceToneImage(*morphs, coefficients, false);
+        const ESM4::SkinImage flipped = ESM4::makeFaceToneImage(*morphs, coefficients, true);
+        const ESM4::SkinImage none = ESM4::makeFaceToneImage(*morphs, {}, false);
+        const auto difference = [&](const ESM4::SkinImage& computed) -> double {
+            if (computed.mPixels.empty() || computed.mWidth != baked.mWidth || computed.mHeight != baked.mHeight)
+                return -1.0;
+            double sum = 0.0;
+            for (std::size_t i = 0; i < computed.mPixels.size(); ++i)
+                sum += std::abs(static_cast<int>(computed.mPixels[i]) - static_cast<int>(baked.mPixels[i]));
+            return sum / static_cast<double>(computed.mPixels.size());
+        };
+        Log(Debug::Info) << "FaceGen tone check: character " << std::hex << formId << std::dec << " " << model
+                         << ": the editor's " << baked.mWidth << "x" << baked.mHeight << " texture, ours "
+                         << straight.mWidth << "x" << straight.mHeight
+                         << "; mean difference, rows as the file has them " << difference(straight) << ", turned over "
+                         << difference(flipped) << ", no coefficients " << difference(none)
+                         << " (-1 when the sizes differ)";
     }
 
     const ESM4::FaceTextureIndex& getFaceTextures(const VFS::Manager& vfs)

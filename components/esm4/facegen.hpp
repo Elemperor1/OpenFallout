@@ -52,6 +52,25 @@ namespace ESM4
     // no extension.
     std::string faceMorphPath(std::string_view modelPath);
 
+    // How the colour of the face can change: the .egt file beside the model ("FREGT003") holds, for each coefficient of
+    // FGTS, a scale and three pictures (red, green and blue) of signed bytes. The coefficient times the scale times the
+    // byte of a pixel is how many of the 256 steps of that colour the face moves there.
+    struct FaceTextureMorphs
+    {
+        int mWidth = 0;
+        int mHeight = 0;
+        std::vector<float> mScales; // one for each coefficient
+        std::vector<std::int8_t>
+            mPlanes; // for each coefficient the red, green and blue pictures, one row after the other
+    };
+
+    // Reads a .egt file. False if it is not one that fits together, and then error says what is wrong.
+    bool readFaceTextureMorphs(std::string_view bytes, FaceTextureMorphs& morphs, std::string& error);
+
+    // The .egt file that goes with a model (as faceMorphPath names the .egm file). Empty if the file name has no
+    // extension.
+    std::string faceTexturePath(std::string_view modelPath);
+
     // The colours of a character's skin. The texture that the editor writes for a character (see FaceTextureIndex) is
     // not a picture of the skin: its colours sit around mid grey (the averages of the real files are 84..141 of 255),
     // so in the place of the skin it paints the whole character grey. It is a factor of two on the skin of the race
@@ -82,6 +101,15 @@ namespace ESM4
     // first, as DDS files hold it). False when the size or the data do not fit the picture.
     bool decodeSkinImage(
         SkinPixelFormat format, const std::uint8_t* data, std::size_t size, int width, int height, SkinImage& image);
+
+    // The base mod of a face that the game makes while it runs, for the coefficients of FGTS (those of the race and of
+    // the character added): the sum over the coefficients of coefficient * scale * the picture of the mode, which the
+    // executable takes in whole numbers (the coefficient and the scale times 256 cut towards zero, the products added
+    // and divided by 65536, as BSFaceGenModel at 0x65B410 does), is how many steps each colour of the skin moves, and
+    // the mod keeps half of it above mid grey so that the skin shader can double it (the steps are held between -255
+    // and 255). The pictures are stored the way the file has them; `flipRows` turns them over. An empty picture when
+    // the morphs hold no picture.
+    SkinImage makeFaceToneImage(const FaceTextureMorphs& morphs, const std::vector<float>& coefficients, bool flipRows);
 
     // The skin as the skin shaders of the games draw it with the base mod of a character (its facemods or bodymods
     // file): the shader adds `scale` times (mod - 127.5) to each channel of the skin (the shaders: skin + 2 * (mod -

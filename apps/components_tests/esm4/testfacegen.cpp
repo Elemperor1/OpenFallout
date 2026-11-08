@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -36,6 +37,38 @@ namespace
                 for (const std::int16_t delta : deltas)
                     append<std::int16_t>(out, delta);
             }
+        return out;
+    }
+
+    // A .egt file: the header of 64 bytes, then the modes; a mode is the scale and the red, green and blue pictures
+    // (each one row after the other) of signed bytes. `planes` has the three pictures of each mode.
+    std::string textureFile(std::uint32_t width, std::uint32_t height, const std::vector<float>& scales,
+        const std::vector<std::vector<std::int8_t>>& planes, std::uint32_t asymmetric = 0)
+    {
+        std::string out("FREGT003");
+        append<std::uint32_t>(out, width);
+        append<std::uint32_t>(out, height);
+        append<std::uint32_t>(out, static_cast<std::uint32_t>(scales.size()));
+        append<std::uint32_t>(out, asymmetric);
+        append<std::uint32_t>(out, 81);
+        append<std::uint32_t>(out, 0);
+        out.append(64 - out.size(), '\0');
+        for (std::size_t mode = 0; mode < scales.size(); ++mode)
+        {
+            append<float>(out, scales[mode]);
+            for (const std::int8_t value : planes[mode])
+                append<std::int8_t>(out, value);
+        }
+        return out;
+    }
+
+    // The three pictures of a mode for pictures of width by height: the same byte everywhere in the red, the green
+    // and the blue
+    std::vector<std::int8_t> flatPlanes(std::size_t pixels, std::int8_t red, std::int8_t green, std::int8_t blue)
+    {
+        std::vector<std::int8_t> out;
+        for (const std::int8_t value : { red, green, blue })
+            out.insert(out.end(), pixels, value);
         return out;
     }
 
@@ -476,5 +509,180 @@ namespace
         EXPECT_EQ(ESM4::averageColour({}), (std::array<float, 3>{ 0.f, 0.f, 0.f }));
         EXPECT_TRUE(ESM4::addSkinMod({}, mean, 2.f, noGain).mPixels.empty());
         EXPECT_TRUE(ESM4::addSkinMod(flatImage(1, 1, 1, 1, 1), ESM4::SkinImage{}, 2.f, noGain).mPixels.empty());
+    }
+
+    TEST(ESM4FaceGenTest, namesTheTextureFileOfAModel)
+    {
+        EXPECT_EQ(
+            ESM4::faceTexturePath("meshes/characters/head/headhuman.nif"), "meshes/characters/head/headhuman.egt");
+        EXPECT_EQ(ESM4::faceTexturePath("Meshes\\Characters\\Head\\HeadFemale.NIF"),
+            "Meshes\\Characters\\Head\\HeadFemale.egt");
+        EXPECT_EQ(ESM4::faceTexturePath("meshes/head"), "");
+        EXPECT_EQ(ESM4::faceTexturePath(""), "");
+    }
+
+    TEST(ESM4FaceGenTest, readsATextureFile)
+    {
+        const std::string bytes
+            = textureFile(2, 2, { 0.5f, 2.f }, { flatPlanes(4, 1, 2, 3), flatPlanes(4, -4, -5, -6) });
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(bytes, morphs, error)) << error;
+        EXPECT_EQ(morphs.mWidth, 2);
+        EXPECT_EQ(morphs.mHeight, 2);
+        EXPECT_THAT(morphs.mScales, ElementsAre(0.5f, 2.f));
+        ASSERT_EQ(morphs.mPlanes.size(), 24u);
+        EXPECT_EQ(morphs.mPlanes[0], 1);
+        EXPECT_EQ(morphs.mPlanes[4], 2);
+        EXPECT_EQ(morphs.mPlanes[8], 3);
+        EXPECT_EQ(morphs.mPlanes[12], -4);
+        EXPECT_EQ(morphs.mPlanes[23], -6);
+    }
+
+    TEST(ESM4FaceGenTest, refusesTextureFilesThatDoNotFitTogether)
+    {
+        const std::string good = textureFile(2, 2, { 1.f }, { flatPlanes(4, 1, 2, 3) });
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(good, morphs, error)) << error;
+
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs("FREGT", morphs, error));
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs("", morphs, error));
+        std::string version = good;
+        version[7] = '2';
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(version, morphs, error));
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(good.substr(0, good.size() - 1), morphs, error));
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(good + "x", morphs, error));
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(textureFile(0, 2, {}, {}), morphs, error));
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(textureFile(2, 0, {}, {}), morphs, error));
+        // A size that no file this long could hold is refused before anything is made for it
+        EXPECT_FALSE(ESM4::readFaceTextureMorphs(textureFile(65536, 65536, { 1.f }, { { 1 } }), morphs, error));
+        EXPECT_FALSE(error.empty());
+        // Modes for FGTA that the file lists but does not hold
+        EXPECT_FALSE(
+            ESM4::readFaceTextureMorphs(textureFile(2, 2, { 1.f }, { flatPlanes(4, 1, 2, 3) }, 1), morphs, error));
+    }
+
+    TEST(ESM4FaceGenTest, keepsOnlyTheModesForFgtsOfATextureFile)
+    {
+        // A file that holds a mode for FGTA after the one for FGTS: the FGTA mode is skipped over, not used
+        const std::string bytes = textureFile(1, 1, { 1.f, 3.f }, { flatPlanes(1, 7, 8, 9), flatPlanes(1, 1, 1, 1) });
+        std::string asymmetric = bytes;
+        std::uint32_t one = 1;
+        std::memcpy(asymmetric.data() + 16, &one, sizeof(one));
+        std::memcpy(asymmetric.data() + 20, &one, sizeof(one));
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(asymmetric, morphs, error)) << error;
+        EXPECT_THAT(morphs.mScales, ElementsAre(1.f));
+        EXPECT_EQ(morphs.mPlanes.size(), 3u);
+        EXPECT_EQ(morphs.mPlanes[0], 7);
+    }
+
+    TEST(ESM4FaceToneTest, aFaceWithNoCoefficientsIsMidGreyThatChangesNothing)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(
+            ESM4::readFaceTextureMorphs(textureFile(2, 1, { 1.f }, { flatPlanes(2, 50, -50, 100) }), morphs, error));
+        for (const std::vector<float>& coefficients : { std::vector<float>{}, std::vector<float>{ 0.f } })
+        {
+            const ESM4::SkinImage tone = ESM4::makeFaceToneImage(morphs, coefficients, false);
+            ASSERT_EQ(tone.mWidth, 2);
+            ASSERT_EQ(tone.mHeight, 1);
+            ASSERT_EQ(tone.mPixels.size(), 6u);
+            for (const std::uint8_t value : tone.mPixels)
+                EXPECT_EQ(value, 128);
+        }
+    }
+
+    TEST(ESM4FaceToneTest, aCoefficientMovesEachColourByItsScaleAndByteAndTheModKeepsHalfOfThat)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(
+            ESM4::readFaceTextureMorphs(textureFile(1, 1, { 1.f }, { flatPlanes(1, 40, -40, 0) }), morphs, error));
+        const ESM4::SkinImage tone = ESM4::makeFaceToneImage(morphs, { 1.f }, false);
+        ASSERT_EQ(tone.mPixels.size(), 3u);
+        // 40 steps are 20 of the mod above its middle (127.5): the skin shader doubles that
+        EXPECT_EQ(tone.mPixels[0], 148);
+        EXPECT_EQ(tone.mPixels[1], 108);
+        EXPECT_EQ(tone.mPixels[2], 128);
+
+        // Twice the scale, half the coefficient: the same
+        ASSERT_TRUE(
+            ESM4::readFaceTextureMorphs(textureFile(1, 1, { 2.f }, { flatPlanes(1, 40, -40, 0) }), morphs, error));
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { 0.5f }, false).mPixels, tone.mPixels);
+    }
+
+    TEST(ESM4FaceToneTest, theModesAddAndTheStepsAreHeldBetweenMinusAndPlus255)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(
+            textureFile(1, 1, { 1.f, 1.f }, { flatPlanes(1, 20, 20, 20), flatPlanes(1, 20, -20, 120) }), morphs,
+            error));
+        const ESM4::SkinImage added = ESM4::makeFaceToneImage(morphs, { 1.f, 1.f }, false);
+        EXPECT_EQ(added.mPixels[0], 148); // 40 steps
+        EXPECT_EQ(added.mPixels[1], 128); // 0
+        EXPECT_EQ(added.mPixels[2], 198); // 140 steps
+        const ESM4::SkinImage held = ESM4::makeFaceToneImage(morphs, { 10.f, -10.f }, false);
+        EXPECT_EQ(held.mPixels[0], 128); // 200 - 200 steps
+        EXPECT_EQ(held.mPixels[1], 255); // 400 steps held at 255
+        EXPECT_EQ(held.mPixels[2], 0); // -1000 steps held at -255
+    }
+
+    TEST(ESM4FaceToneTest, theExecutableCutsTheCoefficientAndTheScaleTowardsZeroAfterTimes256)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(
+            ESM4::readFaceTextureMorphs(textureFile(1, 1, { 1.f }, { flatPlanes(1, 127, 127, 127) }), morphs, error));
+        // Under 1/256 the whole number is 0 and nothing moves, though 0.0039 * 127 is about half a step
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { 0.0039f }, false).mPixels[0], 128);
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { -0.0039f }, false).mPixels[0], 128);
+        // 1/256 is a whole 1: 127 / 256 = 0.496 of a step, half of it kept
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { 1.f / 256.f }, false).mPixels[0], 128);
+        // 0.999 is 255, not 256: 127 * 255 / 256 = 126.5 steps, 63.25 above the middle
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { 0.999f }, false).mPixels[0], 191);
+    }
+
+    TEST(ESM4FaceToneTest, aNumberThatIsNotANumberMovesNothingAndCoefficientsBeyondTheModesAreLeftOut)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(
+            ESM4::readFaceTextureMorphs(textureFile(1, 1, { 1.f }, { flatPlanes(1, 40, 40, 40) }), morphs, error));
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        const float infinity = std::numeric_limits<float>::infinity();
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { nan }, false).mPixels[0], 128);
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { infinity }, false).mPixels[0], 128);
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, { 1.f, 5.f, 7.f }, false).mPixels[0], 148);
+    }
+
+    TEST(ESM4FaceToneTest, theRowsCanBeTurnedOver)
+    {
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        // Two rows of one pixel: the red byte is 40 in the first and -40 in the second
+        std::vector<std::int8_t> planes{ 40, -40, 0, 0, 0, 0 };
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(textureFile(1, 2, { 1.f }, { planes }), morphs, error));
+        const ESM4::SkinImage straight = ESM4::makeFaceToneImage(morphs, { 1.f }, false);
+        const ESM4::SkinImage flipped = ESM4::makeFaceToneImage(morphs, { 1.f }, true);
+        EXPECT_EQ(straight.mPixels[0], 148);
+        EXPECT_EQ(straight.mPixels[3], 108);
+        EXPECT_EQ(flipped.mPixels[0], 108);
+        EXPECT_EQ(flipped.mPixels[3], 148);
+    }
+
+    TEST(ESM4FaceToneTest, aMorphSetThatDoesNotFitItsPicturesGivesNoPicture)
+    {
+        EXPECT_TRUE(ESM4::makeFaceToneImage({}, { 1.f }, false).mPixels.empty());
+        ESM4::FaceTextureMorphs morphs;
+        morphs.mWidth = 2;
+        morphs.mHeight = 2;
+        morphs.mScales = { 1.f };
+        morphs.mPlanes.assign(5, 1);
+        EXPECT_TRUE(ESM4::makeFaceToneImage(morphs, { 1.f }, false).mPixels.empty());
     }
 }
