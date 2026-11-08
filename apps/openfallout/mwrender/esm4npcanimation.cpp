@@ -138,6 +138,16 @@ namespace OFRender
             case Kind::Head:
                 skin = true;
                 tint = images.mFaceTint;
+                if (tint == nullptr && !images.mTone.empty())
+                {
+                    // A face with no texture of the editor (the player's, made by the game itself, and any character
+                    // whose files are not in the archives) gets its colour from the coefficients of FGTS
+                    // (the picture has no file name, so that the skin made with it is not shared with a face that
+                    // has other coefficients)
+                    tint = makeFaceToneImage(*mResourceSystem->getVFS(), model, images.mTone);
+                }
+                else if (tint != nullptr && !images.mTone.empty())
+                    reportFaceToneCheck(*mResourceSystem->getVFS(), model, images.mTone, *tint, images.mFormId);
                 break;
             case Kind::Body:
                 skin = true;
@@ -203,7 +213,9 @@ namespace OFRender
         {
             look.mTexture = source + (look.mTexture.empty() ? "" : " in colour");
             if (tint != nullptr)
-                look.mTexture += (average ? " + average of " : " + ") + tint->getFileName();
+                look.mTexture += (average ? " + average of " : " + ")
+                    + (tint->getFileName().empty() ? std::string("the face tone of its coefficients")
+                                                   : tint->getFileName());
         }
         return look;
     }
@@ -254,6 +266,10 @@ namespace OFRender
         // saved the character last, so a plugin that changes the character has its own, and for a character that no
         // plugin changed it is the plugin that made it
         FalloutLookImages images;
+        images.mTone
+            = ESM4::addFaceCoefficients(isFemale ? race->mSymTextureModeCoeffFemale : race->mSymTextureModeCoefficients,
+                traits.mSymTextureModeCoefficients);
+        images.mFormId = traits.mId.mIndex;
         {
             const std::vector<std::string>& contentFiles = OFBase::Environment::get().getWorld()->getContentFiles();
             const auto pluginOf = [&](std::int32_t contentFile) {
@@ -281,6 +297,12 @@ namespace OFRender
             images.mBodyTint
                 = find(isFemale ? ESM4::FaceTextureIndex::Kind::BodyFemale : ESM4::FaceTextureIndex::Kind::BodyMale);
         }
+        // The player (the record 7 of the master) is the one character the game makes the face of while it runs, from
+        // the numbers the player chose, and so is a character whose look the screen of the face gave (it shows a
+        // character of the data with the numbers of the player's look on top): a texture of the editor for such a
+        // record, if the archives hold one, is the face of the record as it ships and not the one made
+        if (traits.mId.mIndex == 0x7 || OFClass::ESM4Npc::isLookGiven(mPtr))
+            images.mFaceTint = nullptr;
         if (eyes != nullptr)
             images.mEyes = loadFalloutImage(OFClass::falloutTexturePath(eyes->mIcon));
 

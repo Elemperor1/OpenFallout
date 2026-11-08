@@ -4,6 +4,7 @@
 #include <components/esm4/facegen.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -97,6 +98,26 @@ namespace OFRender
     /// model and the shape ("hairmessy01nohat.egm"): `variant` is the end of the name before the extension.
     std::shared_ptr<const ESM4::FaceMorphs> getFaceMorphs(
         const VFS::Manager& vfs, std::string_view model, std::string_view variant = {});
+
+    /// The morphs of the .egt file that goes with a model (the colour of the face as a function of the coefficients of
+    /// FGTS). The file is read once. Null when there is none, or when it is not valid, which is said once in the log.
+    std::shared_ptr<const ESM4::FaceTextureMorphs> getFaceTextureMorphs(
+        const VFS::Manager& vfs, std::string_view model);
+
+    /// The base mod of a face that is made while the game runs, as the games make it for a character that has no
+    /// texture of its own written by the editor: the sum of the pictures of the .egt file of the head model by the
+    /// coefficients (those of the race and of the character added). It goes where a facemods texture would, to
+    /// `tintSkinImage`. Null when the model has no .egt file. The picture has no file name, so nothing shares it.
+    osg::ref_ptr<osg::Image> makeFaceToneImage(
+        const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients);
+
+    /// A check of that against the editor's own: for a character that has a texture written by the editor, how far
+    /// the picture that the coefficients make is from it (the mean of the differences of the colours, in steps of 256),
+    /// with the rows as the file has them, turned over, and for a face with no coefficients. Said in the log for the
+    /// first few characters only. This is how the order of the rows in the files, which nothing here has been able to
+    /// read, is found out.
+    void reportFaceToneCheck(const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients,
+        const osg::Image& written, std::uint32_t formId);
 
     /// The textures that the archives hold for single characters, found when first asked for
     const ESM4::FaceTextureIndex& getFaceTextures(const VFS::Manager& vfs);

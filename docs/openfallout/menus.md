@@ -395,9 +395,19 @@ round, and is seen from 120 units (the zoom runs from 70 to 170). Round 12BD fou
 back (the camera at yaw 0 looks at the head's right side and the face is seen a quarter of a turn before that, at -pi/2, not
 after it; a drag to the right now turns the face towards the panel, one full turn is about 650 pixels at 1080 lines), the head
 sat 39 pixels below the middle of the file's `RSM_Face_Grab` (the camera now aims 6.5 units above the bone, from 8) and at the
-nearest zoom it was taller than that hotrect (800 pixels against 698; the nearest is now 70 units). The tone sliders change their
-number and marker but not the picture: the port has no texture morph (the `.egt` file of the head, see the gap audit), so the
-tone of a face made on the screen shows only in its saved numbers.
+nearest zoom it was taller than that hotrect (800 pixels against 698; the nearest is now 70 units). The tone sliders
+move the colour of the face with the texture morph of the head's `.egt` file (`FREGT003`: 50 modes of a scale and three 256 by 256
+pictures of signed bytes; Mac round 12BE B3): the base mod is the sum of coefficient times scale times byte, taken in whole
+numbers as `BSFaceGenModel` at 0x65B410 takes it (the coefficient and the scale times 256 cut towards zero, the sum divided by
+65536), which is how many of the 256 steps of each colour the face moves there; the mod keeps half of it above mid grey (the
+executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0.5) and the skin shader doubles it, so it goes
+where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
+the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
+itself, and the head the face screen shows, which is a character of the data with the numbers of the player's look on top). Not read from the executable: whether the
+rows of the pictures are stored with the last row of the face first (the port takes them as they are), and the body: the
+skin of the body and the hands keep the colour of the race whatever the tone sliders say. The log says, for the first six
+characters that have a texture of the editor, how far the picture made from their coefficients is from it, with the rows as
+they are and turned over (`FaceGen tone check`), which is how the order is found out in the running game.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
@@ -411,7 +421,7 @@ race's own for the sex, and only when the race has none by the first of its hair
 The glyphs on the ends of a slider's bar are `<` and `>` (the menu's `user1` and `user2`, read from the executable in Mac round
 12BB F). Escape opens the pause menu over the screen, as the executable does (Mac round 12BB F; the screen says every frame that
 it keeps Escape, `core.chargen.claimEscape`, and the window manager pushes the main menu over the mode of the interface instead
-of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the face as a picture (the `.egt` texture morph), the Pip-Boy still has no pause
+of leaving it; the pad's B and the Back button go up one list). Not done: the keys of the pad, the tone of the body's skin, the Pip-Boy still has no pause
 menu over it (Escape closes it), the hair's length (a vertex morph of the hair model by the record's length) and the head's size
 by the executable's formulas (Mac round 12BB D and E), and the real-game check of the rows' order (it is read from the
 executable's loading code).

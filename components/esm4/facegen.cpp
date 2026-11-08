@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstring>
 
 #include <components/misc/strings/algorithm.hpp>
@@ -147,6 +148,59 @@ namespace ESM4
         return true;
     }
 
+    namespace
+    {
+        // "FREGT003", the width and the height of the pictures, the number of modes for FGTS and for FGTA and more
+        // numbers that are not used, zeros to 64 bytes
+        constexpr std::size_t sTextureHeaderSize = 64;
+        constexpr std::uint32_t sMaxTextureSide = 4096;
+    }
+
+    bool readFaceTextureMorphs(std::string_view bytes, FaceTextureMorphs& morphs, std::string& error)
+    {
+        if (bytes.size() < sTextureHeaderSize)
+            return fail(error, "the file is shorter than its header");
+        if (bytes.substr(0, 8) != "FREGT003")
+            return fail(error, "the file is not a FaceGen texture file of the version 003");
+
+        const std::uint32_t width = readAt<std::uint32_t>(bytes, 8);
+        const std::uint32_t height = readAt<std::uint32_t>(bytes, 12);
+        const std::uint32_t symmetric = readAt<std::uint32_t>(bytes, 16);
+        const std::uint32_t asymmetric = readAt<std::uint32_t>(bytes, 20);
+        if (width == 0 || height == 0 || width > sMaxTextureSide || height > sMaxTextureSide)
+            return fail(error, "the pictures are " + std::to_string(width) + " by " + std::to_string(height));
+        if (symmetric > sMaxMorphs || asymmetric > sMaxMorphs)
+            return fail(
+                error, "the file has " + std::to_string(symmetric) + " and " + std::to_string(asymmetric) + " modes");
+
+        // The modes fill the rest of the file (those for FGTA come after the others and are not used), and the sizes
+        // must add up to all of it
+        const std::size_t planeSize = static_cast<std::size_t>(width) * height * 3;
+        const std::size_t modeSize = sizeof(float) + planeSize;
+        const std::size_t modesSize = (static_cast<std::size_t>(symmetric) + asymmetric) * modeSize;
+        if (bytes.size() != sTextureHeaderSize + modesSize)
+            return fail(error,
+                "the file has " + std::to_string(bytes.size()) + " bytes, but pictures of " + std::to_string(width)
+                    + " by " + std::to_string(height) + " and " + std::to_string(symmetric + asymmetric)
+                    + " modes need " + std::to_string(sTextureHeaderSize + modesSize));
+
+        FaceTextureMorphs result;
+        result.mWidth = static_cast<int>(width);
+        result.mHeight = static_cast<int>(height);
+        result.mScales.resize(symmetric);
+        result.mPlanes.resize(static_cast<std::size_t>(symmetric) * planeSize);
+        std::size_t offset = sTextureHeaderSize;
+        for (std::size_t mode = 0; mode < symmetric; ++mode)
+        {
+            result.mScales[mode] = readAt<float>(bytes, offset);
+            offset += sizeof(float);
+            std::memcpy(result.mPlanes.data() + mode * planeSize, bytes.data() + offset, planeSize);
+            offset += planeSize;
+        }
+        morphs = std::move(result);
+        return true;
+    }
+
     std::vector<float> addFaceCoefficients(const std::vector<float>& race, const std::vector<float>& character)
     {
         std::vector<float> result(std::max(race.size(), character.size()), 0.f);
@@ -191,6 +245,14 @@ namespace ESM4
             return {};
         std::string result(modelPath.substr(0, dot));
         result += ".egm";
+        return result;
+    }
+
+    std::string faceTexturePath(std::string_view modelPath)
+    {
+        std::string result = faceMorphPath(modelPath);
+        if (!result.empty())
+            result.back() = 't';
         return result;
     }
 
@@ -559,6 +621,53 @@ namespace ESM4
             const std::size_t channel = i % 3;
             result.mPixels[i] = clampByte(
                 (static_cast<float>(skin.mPixels[i]) + (mod[channel] - sModNeutral) * scale) * gain[channel]);
+        }
+        return result;
+    }
+
+    SkinImage makeFaceToneImage(const FaceTextureMorphs& morphs, const std::vector<float>& coefficients, bool flipRows)
+    {
+        SkinImage result;
+        if (morphs.mWidth <= 0 || morphs.mHeight <= 0)
+            return result;
+        const std::size_t width = static_cast<std::size_t>(morphs.mWidth);
+        const std::size_t height = static_cast<std::size_t>(morphs.mHeight);
+        const std::size_t pixels = width * height;
+        if (morphs.mPlanes.size() != morphs.mScales.size() * pixels * 3)
+            return result;
+
+        // The whole numbers of the executable: the coefficient and the scale times 256, cut towards zero
+        const auto fixed = [](float value) -> std::int64_t {
+            if (!std::isfinite(value))
+                return 0;
+            return static_cast<std::int64_t>(std::clamp(value * 256.f, -1.0e7f, 1.0e7f));
+        };
+        std::vector<std::int64_t> sum(pixels * 3, 0);
+        for (std::size_t mode = 0; mode < morphs.mScales.size() && mode < coefficients.size(); ++mode)
+        {
+            const std::int64_t weight = fixed(coefficients[mode]) * fixed(morphs.mScales[mode]);
+            if (weight == 0)
+                continue;
+            const std::int8_t* plane = morphs.mPlanes.data() + mode * pixels * 3;
+            for (std::size_t i = 0; i < pixels * 3; ++i)
+                sum[i] += weight * plane[i];
+        }
+
+        result.mWidth = morphs.mWidth;
+        result.mHeight = morphs.mHeight;
+        result.mPixels.resize(pixels * 3);
+        for (std::size_t y = 0; y < height; ++y)
+        {
+            const std::size_t row = flipRows ? height - 1 - y : y;
+            for (std::size_t x = 0; x < width; ++x)
+                for (std::size_t channel = 0; channel < 3; ++channel)
+                {
+                    // The steps this pixel moves, between -255 and 255, and half of them above the mid grey of a mod
+                    const float steps = std::clamp(
+                        static_cast<float>(static_cast<double>(sum[channel * pixels + row * width + x]) / 65536.0),
+                        -255.f, 255.f);
+                    result.mPixels[(y * width + x) * 3 + channel] = clampByte(sModNeutral + steps * 0.5f);
+                }
         }
         return result;
     }

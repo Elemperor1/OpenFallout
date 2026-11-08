@@ -41,6 +41,12 @@ namespace OFRender
             osg::ref_ptr<osg::Image> mFaceTint;
             /// The same for the body, which the hands take the average of
             osg::ref_ptr<osg::Image> mBodyTint;
+            /// The coefficients of FGTS of the face (those of the race for the sex, and the character's on top): the
+            /// colour of a face that has no texture written by the editor is made from them. Empty when the
+            /// character has none.
+            std::vector<float> mTone;
+            /// The record of the character (for the log only)
+            std::uint32_t mFormId = 0;
             /// The picture of the eyes that the character has
             osg::ref_ptr<osg::Image> mEyes;
             /// Whether the hair is the one that fits under a hat
