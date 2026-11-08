@@ -194,6 +194,8 @@ namespace OFClass
         const ESM4::Npc* mSkeletonRecord = nullptr;
         const ESM4::Race* mRace;
         bool mIsFemale;
+        // Whether the game gave the look (setLook): its face is made while the game runs, not the one of the record
+        bool mLookGiven = false;
 
         // TODO: Use InventoryStore instead (currently doesn't support ESM4 objects)
         std::vector<const ESM4::Armor*> mEquippedArmor;
@@ -332,11 +334,17 @@ namespace OFClass
         return getCustomData(ptr).mIsFemale;
     }
 
+    bool ESM4Npc::isLookGiven(const OFWorld::Ptr& ptr)
+    {
+        return getCustomData(ptr).mLookGiven;
+    }
+
     void ESM4Npc::setLook(const OFWorld::Ptr& ptr, const ESM4::Npc& traits)
     {
         ESM4NpcCustomData& data = getCustomData(ptr);
         const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
         data.mTraits = &traits;
+        data.mLookGiven = true;
         if (const ESM4::Race* race = store->get<ESM4::Race>().search(traits.mRace))
             data.mRace = race;
         data.mIsFemale = traits.mIsFONV ? (traits.mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0

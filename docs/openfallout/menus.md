@@ -403,7 +403,7 @@ numbers as `BSFaceGenModel` at 0x65B410 takes it (the coefficient and the scale 
 executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0.5) and the skin shader doubles it, so it goes
 where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
 the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
-itself). Not read from the executable: whether the
+itself, and the head the face screen shows, which is a character of the data with the numbers of the player's look on top). Not read from the executable: whether the
 rows of the pictures are stored with the last row of the face first (the port takes them as they are), and the body: the
 skin of the body and the hands keep the colour of the race whatever the tone sliders say. The log says, for the first six
 characters that have a texture of the editor, how far the picture made from their coefficients is from it, with the rows as

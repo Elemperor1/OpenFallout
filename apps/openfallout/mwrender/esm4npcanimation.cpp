@@ -298,9 +298,10 @@ namespace OFRender
                 = find(isFemale ? ESM4::FaceTextureIndex::Kind::BodyFemale : ESM4::FaceTextureIndex::Kind::BodyMale);
         }
         // The player (the record 7 of the master) is the one character the game makes the face of while it runs, from
-        // the numbers the player chose: a texture of the editor for that record, if the archives hold one, is the
-        // face of the record as it ships and not the player's
-        if (traits.mId.mIndex == 0x7)
+        // the numbers the player chose, and so is a character whose look the screen of the face gave (it shows a
+        // character of the data with the numbers of the player's look on top): a texture of the editor for such a
+        // record, if the archives hold one, is the face of the record as it ships and not the one made
+        if (traits.mId.mIndex == 0x7 || OFClass::ESM4Npc::isLookGiven(mPtr))
             images.mFaceTint = nullptr;
         if (eyes != nullptr)
             images.mEyes = loadFalloutImage(OFClass::falloutTexturePath(eyes->mIcon));

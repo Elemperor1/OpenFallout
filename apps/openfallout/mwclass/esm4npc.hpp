@@ -147,6 +147,9 @@ namespace OFClass
         static const ESM4::Npc* getTraitsRecord(const OFWorld::Ptr& ptr);
         static const ESM4::Race* getRace(const OFWorld::Ptr& ptr);
         static bool isFemale(const OFWorld::Ptr& ptr);
+        /// Whether `setLook` gave the character its look: the face is then the one the numbers of that look make, and a
+        /// texture that the editor wrote for the record the character was made from is not the face
+        static bool isLookGiven(const OFWorld::Ptr& ptr);
         /// The character looks as `traits` say (its race, sex, hair, eyes, head parts and face numbers) in place of the
         /// record it was made from, and wears nothing: what the screen of the face shows of the player, whose own
         /// record is not what the player picked. `traits` must outlive the character.
