@@ -403,11 +403,15 @@ numbers as `BSFaceGenModel` at 0x65B410 takes it (the coefficient and the scale 
 executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0.5) and the skin shader doubles it, so it goes
 where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
 the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
-itself, and the head the face screen shows, which is a character of the data with the numbers of the player's look on top). Not read from the executable: whether the
-rows of the pictures are stored with the last row of the face first (the port takes them as they are), and the body: the
-skin of the body and the hands keep the colour of the race whatever the tone sliders say. The log says, for the first six
+itself, and the head the face screen shows, which is a character of the data with the numbers of the player's look on top). The
+rows of the pictures are stored with the last row of the face first, and the port turns them over (`sToneRowsFlipped` in
+`falloutface.cpp`). That is not read from the executable but found in the running game (Mac round 12BF): the log says, for the first six
 characters that have a texture of the editor, how far the picture made from their coefficients is from it, with the rows as
-they are and turned over (`FaceGen tone check`), which is how the order is found out in the running game.
+they are and turned over (`FaceGen tone check`), and for six characters the mean difference was 1.3 to 1.8 steps turned over, 3.7 to 5.5
+as they are and 7 to 40 with no coefficients; with the rows as they are the head of the face screen showed a smear across the nose and jaw at every
+slider position, and with them turned over it did not. Moving the twelve tone sliders from one end to the other takes the head from a dark
+red-brown through natural skin to a pale grey-white. Not done: the body: the
+skin of the body and the hands keep the colour of the race whatever the tone sliders say.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in

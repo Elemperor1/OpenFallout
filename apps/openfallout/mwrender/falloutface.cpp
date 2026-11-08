@@ -562,9 +562,12 @@ namespace OFRender
 
     namespace
     {
-        // Whether the pictures of a .egt file are stored with the last row of the face first. Not read from the
-        // executable; see reportFaceToneCheck
-        constexpr bool sToneRowsFlipped = false;
+        // Whether the pictures of a .egt file are stored with the last row of the face first. They are: not read from
+        // the executable, but found in a running game (Mac round 12BF) with reportFaceToneCheck, which for six
+        // characters made the picture of the editor's coefficients 1.3 to 1.8 steps from the editor's own texture with
+        // the rows turned over and 3.7 to 5.5 with the rows as they are (7 to 40 with no coefficients), and the head
+        // showed a smear across the jaw and the nose with the rows as they are, none turned over
+        constexpr bool sToneRowsFlipped = true;
     }
 
     osg::ref_ptr<osg::Image> makeFaceToneImage(
