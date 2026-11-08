@@ -643,7 +643,11 @@ namespace ESM4
             return static_cast<std::int64_t>(std::clamp(value * 256.f, -1.0e7f, 1.0e7f));
         };
         std::vector<std::int64_t> sum(pixels * 3, 0);
-        for (std::size_t mode = 0; mode < morphs.mScales.size() && mode < coefficients.size(); ++mode)
+        // At most this many of the modes are summed: the setting uiEGTClampSize of the executable, which no INI file
+        // of the games has (Mac round 12BG B1)
+        constexpr std::size_t clampSize = 30;
+        const std::size_t modes = std::min({ morphs.mScales.size(), coefficients.size(), clampSize });
+        for (std::size_t mode = 0; mode < modes; ++mode)
         {
             const std::int64_t weight = fixed(coefficients[mode]) * fixed(morphs.mScales[mode]);
             if (weight == 0)

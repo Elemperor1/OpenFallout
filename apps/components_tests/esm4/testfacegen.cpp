@@ -524,6 +524,24 @@ namespace
             "meshes/characters/_male/upperbodyhumanfemale.egt");
     }
 
+    TEST(ESM4FaceToneTest, onlyTheFirstThirtyModesAreSummed)
+    {
+        // 31 modes of the same flat picture: a coefficient of the 31st mode changes nothing, one of the 30th does
+        const std::vector<float> scales(31, 1.f);
+        const std::string bytes
+            = textureFile(1, 1, scales, std::vector<std::vector<std::int8_t>>(31, flatPlanes(1, 40, 40, 40)));
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(bytes, morphs, error)) << error;
+        std::vector<float> coefficients(31, 0.f);
+        const ESM4::SkinImage none = ESM4::makeFaceToneImage(morphs, coefficients, false);
+        coefficients[30] = 1.f;
+        EXPECT_EQ(ESM4::makeFaceToneImage(morphs, coefficients, false).mPixels, none.mPixels);
+        coefficients[30] = 0.f;
+        coefficients[29] = 1.f;
+        EXPECT_NE(ESM4::makeFaceToneImage(morphs, coefficients, false).mPixels, none.mPixels);
+    }
+
     TEST(ESM4FaceToneTest, aBodyFileOfFlatPicturesMakesOneFlatColourOverTheWholeBody)
     {
         // The upper bodies of humans have the same byte over the whole picture for each colour, so every pixel of

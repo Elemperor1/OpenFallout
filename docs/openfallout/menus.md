@@ -405,7 +405,7 @@ nearest zoom it was taller than that hotrect (800 pixels against 698; the neares
 move the colour of the face with the texture morph of the head's `.egt` file (`FREGT003`: 50 modes of a scale and three 256 by 256
 pictures of signed bytes; Mac round 12BE B3): the base mod is the sum of coefficient times scale times byte, taken in whole
 numbers as `BSFaceGenModel` at 0x65B410 takes it (the coefficient and the scale times 256 cut towards zero, the sum divided by
-65536), which is how many of the 256 steps of each colour the face moves there; the mod keeps half of it above mid grey (the
+65536, over the first 30 modes at most: the setting `uiEGTClampSize`, which no INI file has), which is how many of the 256 steps of each colour the face moves there; the mod keeps half of it above mid grey (the
 executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0.5) and the skin shader doubles it, so it goes
 where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
 the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
