@@ -387,7 +387,7 @@ from the look that is picked (`core.menuScene.updateHead`, again a short time af
 that the head stands in the middle of the file's hotrect `RSM_Face_Grab` (an off-centre frustum: the middle of the picture is
 not the camera's axis), a drag over the hotrect turns the head about its vertical axis and the wheel moves the camera nearer
 or farther (`setHeadView`); what the executable has for that camera (Mac round 12BF B2) is a half angle of 11.25 degrees (0.15 of the 75
-degrees of `fDefaultFOV`), a near plane of 5, a drag of one whole turn over the 680 units of the hotrect (`2 pi / 680` of a turn per unit, no
+degrees of `fDefaultFOV`), a near plane of 5, a drag of one whole turn over the 680 units of the hotrect (`2 pi / 680` radians per unit, no
 limit, the angle wraps) and a wheel notch of an eighth of the zoom (eight notches from end to end; the start is at 0.7 of the way); the
 screen's script has the angle, the plane, the turn and the notch now and keeps its own start; the camera is 55 units from the pivot that the head turns about at the nearest and 135 at the farthest (with
 the player's origin 5 units off the pivot), and it aims at 0.84 and 0.80 of the height of the player (110.9 and 105.6 units, the head bone is at
