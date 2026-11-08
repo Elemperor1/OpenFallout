@@ -581,6 +581,19 @@ namespace OFRender
         return makeImage(ESM4::makeFaceToneImage(*morphs, coefficients, sToneRowsFlipped), std::string());
     }
 
+    osg::ref_ptr<osg::Image> makeBodyToneImage(
+        const VFS::Manager& vfs, std::string_view bodyModel, bool female, const std::vector<float>& coefficients)
+    {
+        if (osg::ref_ptr<osg::Image> image = makeFaceToneImage(vfs, bodyModel, coefficients))
+            return image;
+        // The model of the body has no .egt file: the executable names the human body's of the sex (both are in the
+        // folder of the men's models)
+        return makeFaceToneImage(vfs,
+            female ? "meshes/characters/_male/upperbodyhumanfemale.nif"
+                   : "meshes/characters/_male/upperbodyhumanmale.nif",
+            coefficients);
+    }
+
     void reportFaceToneCheck(const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients,
         const osg::Image& written, std::uint32_t formId)
     {

@@ -519,6 +519,30 @@ namespace
             "Meshes\\Characters\\Head\\HeadFemale.egt");
         EXPECT_EQ(ESM4::faceTexturePath("meshes/head"), "");
         EXPECT_EQ(ESM4::faceTexturePath(""), "");
+        // A body has its file the same way (the women's is in the folder of the men's, as its model is)
+        EXPECT_EQ(ESM4::faceTexturePath("meshes/characters/_male/upperbodyhumanfemale.nif"),
+            "meshes/characters/_male/upperbodyhumanfemale.egt");
+    }
+
+    TEST(ESM4FaceToneTest, aBodyFileOfFlatPicturesMakesOneFlatColourOverTheWholeBody)
+    {
+        // The upper bodies of humans have the same byte over the whole picture for each colour, so every pixel of
+        // the base mod of such a body is the same
+        ESM4::FaceTextureMorphs morphs;
+        std::string error;
+        ASSERT_TRUE(ESM4::readFaceTextureMorphs(
+            textureFile(32, 32, { 2.f }, { flatPlanes(32 * 32, 40, -20, 10) }), morphs, error))
+            << error;
+        const ESM4::SkinImage tone = ESM4::makeFaceToneImage(morphs, { 0.5f }, true);
+        ASSERT_EQ(tone.mWidth, 32);
+        ASSERT_EQ(tone.mHeight, 32);
+        ASSERT_EQ(tone.mPixels.size(), 32u * 32u * 3u);
+        for (std::size_t i = 3; i < tone.mPixels.size(); ++i)
+            EXPECT_EQ(tone.mPixels[i], tone.mPixels[i % 3]) << i;
+        // Positive for the first colour, negative for the second: the base mod moves from mid grey the way the file
+        // says
+        EXPECT_GT(tone.mPixels[0], 128);
+        EXPECT_LT(tone.mPixels[1], 128);
     }
 
     TEST(ESM4FaceGenTest, readsATextureFile)

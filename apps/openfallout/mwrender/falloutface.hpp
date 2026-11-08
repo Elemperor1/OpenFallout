@@ -111,6 +111,14 @@ namespace OFRender
     osg::ref_ptr<osg::Image> makeFaceToneImage(
         const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients);
 
+    /// The same for the skin of the body, which the hands and the skin that shows from clothes take too: the base mod
+    /// that the games make for a character that has no `bodymods` texture of the editor, from the .egt file of the
+    /// model of the body (a file of 32 by 32 pictures) and the same coefficients as the face. The games use the one
+    /// picture for the body and both hands; when the model has no .egt file they take that of the human body of the
+    /// sex of the character (Mac round 12BG B1). Null when there is none.
+    osg::ref_ptr<osg::Image> makeBodyToneImage(
+        const VFS::Manager& vfs, std::string_view bodyModel, bool female, const std::vector<float>& coefficients);
+
     /// A check of that against the editor's own: for a character that has a texture written by the editor, how far
     /// the picture that the coefficients make is from it (the mean of the differences of the colours, in steps of 256),
     /// with the rows as the file has them, turned over, and for a face with no coefficients. Said in the log for the

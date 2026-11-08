@@ -417,8 +417,15 @@ characters that have a texture of the editor, how far the picture made from thei
 they are and turned over (`FaceGen tone check`), and for six characters the mean difference was 1.3 to 1.8 steps turned over, 3.7 to 5.5
 as they are and 7 to 40 with no coefficients; with the rows as they are the head of the face screen showed a smear across the nose and jaw at every
 slider position, and with them turned over it did not. Moving the twelve tone sliders from one end to the other takes the head from a dark
-red-brown through natural skin to a pale grey-white. Not done: the body: the
-skin of the body and the hands keep the colour of the race whatever the tone sliders say.
+red-brown through natural skin to a pale grey-white. The skin of the body, the hands and the skin that shows from clothes has
+a tone the same way (Mac round 12BG B1: the games build one texture for the three from the `.egt` file of the body's model, a file of 32 by 32
+pictures that are one flat colour for a human or a child and vary for a ghoul or an old person, with the coefficients of FGTS and the
+formula of the head, and take a `bodymods` texture of the editor, which is one flat colour of 8 by 8, when the archives hold one for the
+character; the games' skin shaders for the head, the hands and the body are the same, so the tone is added to the skin picture alike):
+a character with no `bodymods` texture, and the player, gets it made from the `.egt` of its body model (the human body of its sex when that
+has none), the hands take its average. Not read in the executable: which sampler the tone texture lands on in the shader. The face
+screen has no hair length or head size slider in the games' executable (Mac round 12BG C1: the sliders are the shape and tone
+coefficients, and the hair length of a character is a morph of its hair model that no menu moves), so there is none here.
 
 The rows of the hair, eyes and facial hair lists follow the executable's own lists of the records, which put every new record
 at the head: the newest first (a plugin after the master puts its hairs and eyes before the master's), not sorted and not in
