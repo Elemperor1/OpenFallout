@@ -209,22 +209,34 @@ local function barWidth(total, tick, share, least)
     return math.max(width, tick * least)
 end
 
+-- How wide the menu is (it is 960 high, and as wide as the screen's shape makes it)
+local function menuWidth(size)
+    return size.y > size.x and 1280 or math.floor(size.x / size.y * HEIGHT)
+end
+
+-- The three blocks: health bottom left, action points bottom right, the enemy between them
+local function placeBlocks(m, t)
+    local hpY = HEIGHT - 2 * SAFE - 127
+    local function place(tile, x, y)
+        m:set(tile, 'x', x)
+        m:set(tile, 'y', y)
+    end
+    place(t.hitPoints, 2 * SAFE + 10, hpY)
+    place(t.actionPoints, t.width - 2 * SAFE - 386 + 30, hpY)
+    place(t.enemy, math.floor(t.width / 2) - 175, HEIGHT - 2 * SAFE - 88)
+end
+
 local function buildScreen()
     local opened = menuModule.open(FILE, { layer = 'Windows', pad = padInUse() })
     if not opened then return false end
     local ok, problem = pcall(function()
         local m = opened.menu
         local size = ui.screenSize()
-        local width = size.y > size.x and 1280 or math.floor(size.x / size.y * HEIGHT)
-        local t = { width = width, size = size }
+        local t = { width = menuWidth(size), size = size }
         local function find(name)
             local id = m:find(name)
             if not id then error('the file has no tile ' .. name, 0) end
             return id
-        end
-        local function place(tile, x, y)
-            m:set(tile, 'x', x)
-            m:set(tile, 'y', y)
         end
         local function make(parent, template, name, traits)
             local tile = opened:instantiate(parent, template, name)
@@ -241,13 +253,9 @@ local function buildScreen()
         t.accept = find('accept_button')
         m:set(t.accept, 'target', 0)
 
-        -- The three blocks: health bottom left, action points bottom right, the enemy between them
         local hitPoints, actionPoints, enemy = find('HitPoints'), find('ActionPoints'), find('EnemyHealth')
-        local hpY = HEIGHT - 2 * SAFE - 127
-        place(hitPoints, 2 * SAFE + 10, hpY)
-        place(actionPoints, width - 2 * SAFE - 386 + 30, hpY)
-        place(enemy, math.floor(width / 2) - 175, HEIGHT - 2 * SAFE - 88)
         t.hitPoints, t.actionPoints, t.enemy = hitPoints, actionPoints, enemy
+        placeBlocks(m, t)
 
         make(hitPoints, 'template_left_bracket', 'vats_hp_bracket', { brightness = 255 })
         t.hpMeter = make(hitPoints, 'template_meter', 'vats_hp_meter', { _OriginalX = 20, x = 20, y = 41, brightness = 175 })
@@ -904,6 +912,15 @@ local function onFrame()
         end
     end
     if screen and modeOpen then
+        -- A window that changes its size gives the menu its new size, and the blocks that sit by the edges of the screen
+        -- (the file leaves them for the code to place) move with it
+        local size = ui.screenSize()
+        if size.x ~= tiles.size.x or size.y ~= tiles.size.y then
+            screen:checkSize()
+            tiles.size = size
+            tiles.width = menuWidth(size)
+            placeBlocks(screen.menu, tiles)
+        end
         updateScreen(dt)
     end
 end
