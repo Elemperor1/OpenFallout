@@ -212,7 +212,13 @@ local function placeBlocks(m, t)
 end
 
 local function buildScreen()
-    local opened = menuModule.open(FILE, { layer = 'Windows', pad = padInUse() })
+    -- Opening can raise as well as return nil (the pictures are made by the interface module): either way the older
+    -- screen takes over, as the mode and the pause were already set when this is called
+    local good, opened = pcall(menuModule.open, FILE, { layer = 'Windows', pad = padInUse() })
+    if not good then
+        print('V.A.T.S. is not drawn from its file: ' .. tostring(opened))
+        return false
+    end
     if not opened then return false end
     local ok, problem = pcall(function()
         local m = opened.menu
