@@ -341,6 +341,31 @@ namespace
         EXPECT_NEAR(tall.designWidth(), 576.f, 0.01f);
     }
 
+    TEST(FalloutMenuEvaluationTest, a_text_with_no_characters_is_the_size_of_one_space_when_the_environment_says_so)
+    {
+        // Without a size for it an empty text has none; with one, the tile has it, whether it is shown or not
+        {
+            Fixture f;
+            Menu& menu = f.open("<menu name=\"M\"><text name=\"E\"><font> 6 </font></text></menu>");
+            EXPECT_FLOAT_EQ(numberOf(menu, "E", "width"), 0.f);
+            EXPECT_FLOAT_EQ(numberOf(menu, "E", "height"), 0.f);
+        }
+        Fixture f;
+        f.mEnvironment.mEmptyTextSize
+            = [](int font) { return TextSize{ font == 6 ? 14.f : 7.f, font == 6 ? 38.f : 32.f }; };
+        Menu& menu = f.open(
+            "<menu name=\"M\"><text name=\"E\"><font> 6 </font></text>"
+            "<text name=\"H\"><font> 2 </font><visible> 0 </visible></text>"
+            "<text name=\"T\"><font> 6 </font><string> abcd </string></text></menu>");
+        EXPECT_FLOAT_EQ(numberOf(menu, "E", "width"), 14.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "E", "height"), 38.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "H", "width"), 7.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "H", "height"), 32.f);
+        // A text with characters is measured as before
+        EXPECT_FLOAT_EQ(numberOf(menu, "T", "width"), 40.f);
+        EXPECT_FLOAT_EQ(numberOf(menu, "T", "height"), 20.f);
+    }
+
     TEST(FalloutMenuEvaluationTest, the_size_of_a_text_and_of_an_image_follow_from_what_they_show)
     {
         Fixture f;

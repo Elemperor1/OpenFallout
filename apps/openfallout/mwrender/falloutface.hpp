@@ -115,7 +115,8 @@ namespace OFRender
     /// the picture that the coefficients make is from it (the mean of the differences of the colours, in steps of 256),
     /// with the rows as the file has them, turned over, and for a face with no coefficients. Said in the log for the
     /// first few characters only. This is how the order of the rows in the files, which nothing here has been able to
-    /// read, was found out (turned over: the pictures are stored with the last row of the face first).
+    /// read, was found out (turned over: the executable keeps the rows as the file has them and an image of OSG starts
+    /// at its bottom row).
     void reportFaceToneCheck(const VFS::Manager& vfs, std::string_view model, const std::vector<float>& coefficients,
         const osg::Image& written, std::uint32_t formId);
 

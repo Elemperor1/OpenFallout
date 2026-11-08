@@ -191,6 +191,12 @@ namespace FalloutMenu
             const Font::Layout layout = font->layout(text, wrapWidth, 1);
             return { layout.mWidth, layout.mHeight };
         };
+        environment.mEmptyTextSize = [shared](int number) -> TextSize {
+            const Font* font = shared->fonts().get(number);
+            if (font == nullptr)
+                return {};
+            return { font->emptyWidth(), font->emptyHeight() };
+        };
         environment.mLineHeight = [shared](int number) -> float {
             const Font* font = shared->fonts().get(number);
             return font != nullptr ? font->lineHeight() : 0.f;

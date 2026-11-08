@@ -186,9 +186,16 @@ namespace FalloutMenu
             if (tile.mType == TileType::Text)
             {
                 const std::string text = get(tile, "string").text();
-                if (text.empty())
-                    return 0.f;
                 const int font = static_cast<int>(get(tile, "font").number());
+                // A text with no characters is one space in the games, so it has the size of one, whether the tile is
+                // shown or not; with no way to say what that is, it has none
+                if (text.empty())
+                {
+                    if (!mEnvironment.mEmptyTextSize)
+                        return 0.f;
+                    const TextSize empty = mEnvironment.mEmptyTextSize(font);
+                    return isWidth ? empty.mWidth : empty.mHeight;
+                }
                 const float wrap = get(tile, "wrapwidth").number();
                 TextSize size{ 8.f * static_cast<float>(text.size()), 16.f };
                 if (mEnvironment.mTextSize)

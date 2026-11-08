@@ -562,11 +562,13 @@ namespace OFRender
 
     namespace
     {
-        // Whether the pictures of a .egt file are stored with the last row of the face first. They are: not read from
-        // the executable, but found in a running game (Mac round 12BF) with reportFaceToneCheck, which for six
-        // characters made the picture of the editor's coefficients 1.3 to 1.8 steps from the editor's own texture with
-        // the rows turned over and 3.7 to 5.5 with the rows as they are (7 to 40 with no coefficients), and the head
-        // showed a smear across the jaw and the nose with the rows as they are, none turned over
+        // Whether the pictures of a .egt file are turned over for the image that goes to the skin. They are: the
+        // executable does not reorder the rows (Mac round 12BF B3: the rows of the file go to the rows of its
+        // texture as they are, top row first as Direct3D has them), and an image of OSG starts at its bottom row. Found
+        // in a running game with reportFaceToneCheck, which for six characters made the picture of the editor's
+        // coefficients 1.3 to 1.8 steps from the editor's own texture with the rows turned over and 3.7 to 5.5 with the
+        // rows as they are (7 to 40 with no coefficients); the head showed a smear across the jaw and the nose with the
+        // rows as they are, and none turned over
         constexpr bool sToneRowsFlipped = true;
     }
 

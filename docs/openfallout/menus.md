@@ -386,14 +386,20 @@ The head the player turns is a scene of the menus (`core.menuScene`, the `FacePr
 from the look that is picked (`core.menuScene.updateHead`, again a short time after each change), the camera's frustum is cut so
 that the head stands in the middle of the file's hotrect `RSM_Face_Grab` (an off-centre frustum: the middle of the picture is
 not the camera's axis), a drag over the hotrect turns the head about its vertical axis and the wheel moves the camera nearer
-or farther (`setHeadView`). The barber and the plastic surgeon have the one tab they start at (the hair, the face), where Next
+or farther (`setHeadView`); what the executable has for that camera (Mac round 12BF B2) is a half angle of 11.25 degrees (0.15 of the 75
+degrees of `fDefaultFOV`), a near plane of 5, a drag of one whole turn over the 680 units of the hotrect (`2 pi / 680` of a turn per unit, no
+limit, the angle wraps) and a wheel notch of an eighth of the zoom (eight notches from end to end; the start is at 0.7 of the way); the
+screen's script has the angle, the plane, the turn and the notch now and keeps its own start; the camera is 55 units from the pivot that the head turns about at the nearest and 135 at the farthest (with
+the player's origin 5 units off the pivot), and it aims at 0.84 and 0.80 of the height of the player (110.9 and 105.6 units, the head bone is at
+111) instead of 6.5 above the bone, but the picture of the executable
+is laid on the screen differently from this one, so the port keeps its own 70 to 170 and the aim it was fitted with. The barber and the plastic surgeon have the one tab they start at (the hair, the face), where Next
 reads `Done`. The head was seen in the running game in Mac round 12BC: it is made again 0.17 seconds after each change, a drag
 of 200 pixels turned it by a quarter of a turn, and a wheel event is one step of the zoom. That round showed the first view
 too close (the camera aimed at the bone `Bip01 Head`, the base of the skull, so the top of the hair was cut by the window):
 the head now starts thirty degrees short of facing the viewer (the executable's start, Mac round 12BB D and E), turns all the way
 round, and is seen from 120 units (the zoom runs from 70 to 170). Round 12BD found three things: the head started seen from the
 back (the camera at yaw 0 looks at the head's right side and the face is seen a quarter of a turn before that, at -pi/2, not
-after it; a drag to the right now turns the face towards the panel, one full turn is about 650 pixels at 1080 lines), the head
+after it; a drag to the right now turns the face towards the panel, one full turn was about 650 pixels at 1080 lines, and is now the executable's 680 units, 765 pixels there), the head
 sat 39 pixels below the middle of the file's `RSM_Face_Grab` (the camera now aims 6.5 units above the bone, from 8) and at the
 nearest zoom it was taller than that hotrect (800 pixels against 698; the nearest is now 70 units). The tone sliders
 move the colour of the face with the texture morph of the head's `.egt` file (`FREGT003`: 50 modes of a scale and three 256 by 256
@@ -404,8 +410,9 @@ executable hands the sum to 0x64CEB0 with the range -255 to 255 and the factor 0
 where the editor's `facemods` texture goes, to `tintSkinImage`. It is made only for a face that has no `facemods` texture of
 the editor (any character whose files are not in the archives, and always the player, record 7, whose face the game makes
 itself, and the head the face screen shows, which is a character of the data with the numbers of the player's look on top). The
-rows of the pictures are stored with the last row of the face first, and the port turns them over (`sToneRowsFlipped` in
-`falloutface.cpp`). That is not read from the executable but found in the running game (Mac round 12BF): the log says, for the first six
+rows of the pictures are turned over by the port (`sToneRowsFlipped` in `falloutface.cpp`): the executable does not reorder them (the rows
+of the file go to the rows of its texture as they are, top row first, as Direct3D has them; Mac round 12BF B3), and an image of OSG starts at
+its bottom row. The need for it was found in the running game: the log says, for the first six
 characters that have a texture of the editor, how far the picture made from their coefficients is from it, with the rows as
 they are and turned over (`FaceGen tone check`), and for six characters the mean difference was 1.3 to 1.8 steps turned over, 3.7 to 5.5
 as they are and 7 to 40 with no coefficients; with the rows as they are the head of the face screen showed a smear across the nose and jaw at every
@@ -496,7 +503,12 @@ said every frame, tells the engine that the script draws the boxes, so that it m
   The text of a text tile reports at least the room it is wrapped in, so the width of the longest line is measured with
   `menu:measure(font, text, wrap)`.
 - The title and the words are both centred (justify 2) when the words are one line and both to the left (1) when they are
-  more. A box with no name has no title.
+  more. A box with no name has no title, and its title tile (not shown) is still one line high, because the executable lays an empty
+  text out as one space (Mac round 12BF B1: the code at 0xA12FB0 swaps it, and the layout runs whether the tile is shown or
+  not; the message menu only hides the title without setting a string), so the words start as far down as in a box with a title
+  (`MM_MessageText` is at the title's y, plus its height, plus `_verbuf` (20), less 5). The same goes for every text tile of
+  every menu file: with no characters it is one line high and one space wide (the port's line is the file's line height, a
+  few units less than the executable's, 31 against 32 in font 2 and 34 against 38 in font 6, for lines with characters too).
 - The buttons are the rows of `MM_ButtonTemplate`, in the order of the record, one click id for all (7); the list is as
   high as the rows are together, up to the file's 420, and scrolls beyond that. The file's own scrollbar rule counts every
   row as one step of 26 units, which shows the bar for a box that fits, so the script says when it is shown.

@@ -112,6 +112,19 @@ namespace
         EXPECT_FLOAT_EQ(font->lineWidth("\xE9"), 12.f);
     }
 
+    TEST(FalloutMenuFontTest, a_text_with_no_characters_is_one_line_high_and_as_wide_as_the_space)
+    {
+        std::string bytes = testFont();
+        // The space is 6 wide after rounding
+        putGlyph(bytes, ' ', 0.f, 0.f, 0.f, 6.4f, 0.f);
+        const std::optional<Font> font = Font::parse(bytes);
+        ASSERT_TRUE(font);
+        EXPECT_FLOAT_EQ(font->emptyWidth(), 6.f);
+        // The same height as a line with characters in it
+        EXPECT_FLOAT_EQ(font->emptyHeight(), font->layout("A").mHeight);
+        EXPECT_FLOAT_EQ(font->emptyHeight(), 30.f);
+    }
+
     TEST(FalloutMenuFontTest, a_line_is_laid_out_character_by_character_from_the_top_left)
     {
         const std::optional<Font> font = Font::parse(testFont());
