@@ -27,10 +27,12 @@ report only describes partial coverage. The combined upload does not affect
 the individual flags.
 
 gcovr runs with `--exclude-throw-branches`. The compiler adds a hidden exit for exceptions
-to every call that may throw, gcov reports it as a branch, no test takes it, and Codecov counts
-a line with an untaken branch as partial, which is not covered. Dropping those branches changes
-the percentages only, not which tests run. gcovr applies the flag while it reads the gcov data,
-so it belongs on the per-suite run; the merge of the saved traces cannot add it later.
+to every call that may throw, and gcov reports it as a branch. Almost no test takes these exits,
+and Codecov counts a line with an untaken branch as partial, which is not covered. gcovr drops
+them whether or not a test took them, so the reports no longer count the exception exits of any
+call; the lines of a `catch` block still count as lines. This changes the percentages only, not
+which tests run. gcovr applies the flag while it reads the gcov data, so it belongs on the
+per-suite run; the merge of the saved traces cannot add it later.
 
 GoogleTest XML is normalized to JUnit, preserving test names, durations,
 failure details, and skipped/disabled tests. Source paths inside the checkout
@@ -47,8 +49,8 @@ repository upload secret.
 four coverage uploads before producing the coverage notification and PR comment.
 There are no per-flag coverage thresholds. Every status it defines is informational,
 so Codecov shows the numbers and cannot turn a PR red: the project total, a patch
-status for new code under `components/` (target 80%), a patch status for `apps/`
-and a project status for each component. It also ignores the Fallout 4 archive
+status for new code under `components/` (target 80%, which the 5% threshold lets
+pass down to 75%), a patch status for `apps/` and a project status for each component. It also ignores the Fallout 4 archive
 readers (`components/bsa/ba2*`) and the two Morrowind-only importers. The targets
 behind this, and how to turn the statuses into gates, are in
 [Test coverage targets](coverage-targets.md). Test Analytics needs successive
@@ -82,8 +84,8 @@ historical component trends.
 ## Python tests of the helper scripts
 
 The `Changes` job of `push.yml` runs the unit tests under `scripts/openfallout/`
-on every push and pull request, including the documentation-only ones that skip
-the platform builds. They read the Lua scripts and the coverage tracker, so
+on every pull request and every push to `master`, including the documentation-only
+ones that skip the platform builds. They read the Lua scripts and the coverage tracker, so
 they check that those still agree. The job installs a `luajit` executable and
 `lupa` (pinned in the workflow, so Dependabot does not update it); without
 them the Lua tests skip. To run them locally:

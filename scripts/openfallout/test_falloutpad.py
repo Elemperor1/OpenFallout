@@ -8,9 +8,14 @@ import unittest
 from pathlib import Path
 
 try:
-    from lupa import LuaRuntime
+    # The game runs its scripts on LuaJIT. The default runtime of lupa is the newest Lua, which refuses some code that
+    # LuaJIT accepts, such as an assignment to the variable of a for loop.
+    from lupa.luajit21 import LuaRuntime
 except ImportError:  # pragma: no cover
-    LuaRuntime = None
+    try:
+        from lupa import LuaRuntime
+    except ImportError:
+        LuaRuntime = None
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "files" / "data" / "scripts" / "omw"
 

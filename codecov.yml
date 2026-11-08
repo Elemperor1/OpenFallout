@@ -13,8 +13,9 @@ coverage:
         # rendering, GUI and editor code that unit tests cannot reach.
         informational: true
     patch:
-      # New code under components/ is the code that unit tests can reach. Informational for now;
-      # drop the line below to make it a gate once the numbers have settled (docs/openfallout/coverage-targets.md).
+      # New code under components/ is the code that unit tests can reach. Informational for now. This one 80% target
+      # is a stand-in (with the 5% threshold it passes down to 75%): before it becomes a gate, split it by tier and
+      # set the threshold to 0, as docs/openfallout/coverage-targets.md describes.
       default:
         paths:
           - components/
@@ -47,8 +48,9 @@ flag_management:
 component_management:
   default_rules:
     statuses:
-      # No drop of more than 1 point. Informational until a component is over its target in
-      # docs/openfallout/coverage-targets.md, then a number replaces "auto" and the line goes.
+      # No drop of more than 1 point, informational for every component. Do not remove the line below to gate one:
+      # that gates all of them. Give the component its own statuses entry with its number from
+      # docs/openfallout/coverage-targets.md and no informational line.
       - type: project
         target: auto
         threshold: 1%
