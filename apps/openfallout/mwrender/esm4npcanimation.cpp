@@ -318,11 +318,9 @@ namespace OFRender
         // out of the list, and the skin that shows from the piece still has to have the tone
         if (images.mBodyTint == nullptr && !images.mTone.empty())
         {
-            const std::vector<ESM4::Race::BodyPart>& raceBody
-                = isFemale ? race->mBodyPartsFemale : race->mBodyPartsMale;
-            if (!raceBody.empty() && !raceBody[0].mesh.empty())
-                images.mBodyTint
-                    = makeBodyToneImage(*mResourceSystem->getVFS(), raceBody[0].mesh, isFemale, images.mTone);
+            const std::string bodyModel = OFClass::falloutBodyModel(*race, isFemale);
+            if (!bodyModel.empty())
+                images.mBodyTint = makeBodyToneImage(*mResourceSystem->getVFS(), bodyModel, isFemale, images.mTone);
         }
         // A colour of black is the colour of a record that has none, which then keeps the picture it has
         if (traits.mHairColour.red != 0 || traits.mHairColour.green != 0 || traits.mHairColour.blue != 0)

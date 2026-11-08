@@ -775,8 +775,9 @@ end
 -- Accept: the screen is left, and the queue (when there is one) is carried out
 function accept()
     if not modeOpen then return end
-    if screen and #queue == 0 then
-        -- the button takes no click while the list is empty (the file's `target`); the key is the same
+    if #queue == 0 then
+        -- the button takes no click while the list is empty (the file's `target`); the key is the same, and the
+        -- older widget screen has nothing to carry out either
         return
     end
     sound('UIVATSExit')
