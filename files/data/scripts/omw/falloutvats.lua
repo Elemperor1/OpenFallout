@@ -164,8 +164,14 @@ local GROUP_OF = {
 -- How high above the feet of a character a part is taken to be when its bone is not in the model
 local FALLBACK_HEIGHT = { head = 150, torso = 100, left_arm = 105, right_arm = 105, left_leg = 40, right_leg = 40, weapon = 90 }
 
+-- The slot a part stands in is its type (the body part type of the part record, 0 torso to 14 weapon); the index of a
+-- part is its place in the list of parts of the body, which is only the number an attack names it by
+local function slotOf(part)
+    return part.type or part.index
+end
+
 local function groupOf(part)
-    return GROUP_OF[part.index] or 'torso'
+    return GROUP_OF[slotOf(part)] or 'torso'
 end
 
 -- The groups the picked target has, in order, each with the place of its first part in the list of parts
@@ -299,9 +305,10 @@ local function project(position)
     local from = camera.getPosition()
     local forward = camera.viewportToWorldVector(v2(0.5, 0.5))
     if (position - from):dot(forward) <= 0 then return nil end
-    local size = tiles.size
     local point = camera.worldToViewportVector(position)
-    local scale = HEIGHT / size.y
+    -- The place is in pixels of the viewport; the menu's units are 960 to the height of the screen, whatever the
+    -- interface is scaled by
+    local scale = HEIGHT / camera.getViewportSize().y
     return point.x * scale, point.y * scale
 end
 
@@ -318,10 +325,10 @@ local function layout(target, parts)
             position = v3(base.x, base.y, base.z + (FALLBACK_HEIGHT[groupOf(part)] or 100))
         end
         x, y = project(position)
-        local item = { slot = part.index, onScreen = false, x = 0, y = 0 }
+        local item = { slot = slotOf(part), onScreen = false, x = 0, y = 0 }
         if x ~= nil and x > 0 and x < width and y > 0 and y < HEIGHT then
             item.onScreen = true
-            local slot = part.index
+            local slot = slotOf(part)
             if slot == 1 or slot == 2 then
                 y = y > HEIGHT / 2 and y + 100 or y - 100
             elseif slot ~= 0 and slot ~= 13 then
@@ -439,7 +446,7 @@ local function updateScreen(dt)
         end
         local present = {}
         for _, part in ipairs(shownParts) do
-            local slot = part.index
+            local slot = slotOf(part)
             local tile = t.limb[slot]
             local item = part.item
             if tile and item then

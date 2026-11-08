@@ -114,6 +114,13 @@ namespace OFLua
             return invertedViewMatrix.preMult(osg::Vec3f(x, y, -1)) - camera->getPosition();
         };
 
+        // The size, in pixels, of the viewport that worldToViewportVector gives its places in; the widgets of the
+        // interface are laid out in another unit (openfallout.ui screenSize, divided by the scale of the interface)
+        api["getViewportSize"] = []() {
+            return osg::Vec2f(
+                static_cast<float>(Settings::video().mResolutionX), static_cast<float>(Settings::video().mResolutionY));
+        };
+
         api["worldToViewportVector"] = [camera](osg::Vec3f pos) {
             const int width = Settings::video().mResolutionX;
             const int height = Settings::video().mResolutionY;

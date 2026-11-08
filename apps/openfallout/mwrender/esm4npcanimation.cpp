@@ -313,17 +313,16 @@ namespace OFRender
             = OFClass::falloutNpcParts(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr));
         images.mHat = parts.mHatOn;
         // A body with no texture of the editor gets its tone from the coefficients as the face does, from the .egt of
-        // the model of its body; the hands and the skin of the clothes take the one picture (as in the games)
+        // the model of its body; the hands and the skin of the clothes take the one picture (as in the games). The
+        // model is the race's, not the one in the list of parts: a piece that covers the upper body takes that part
+        // out of the list, and the skin that shows from the piece still has to have the tone
         if (images.mBodyTint == nullptr && !images.mTone.empty())
         {
-            for (const OFClass::FalloutNpcPart& bodyPart : parts.mParts)
-            {
-                if (bodyPart.mKind != OFClass::FalloutPartKind::Body)
-                    continue;
+            const std::vector<ESM4::Race::BodyPart>& raceBody
+                = isFemale ? race->mBodyPartsFemale : race->mBodyPartsMale;
+            if (!raceBody.empty() && !raceBody[0].mesh.empty())
                 images.mBodyTint
-                    = makeBodyToneImage(*mResourceSystem->getVFS(), bodyPart.mModel, isFemale, images.mTone);
-                break;
-            }
+                    = makeBodyToneImage(*mResourceSystem->getVFS(), raceBody[0].mesh, isFemale, images.mTone);
         }
         // A colour of black is the colour of a record that has none, which then keeps the picture it has
         if (traits.mHairColour.red != 0 || traits.mHairColour.green != 0 || traits.mHairColour.blue != 0)
