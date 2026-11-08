@@ -27,6 +27,9 @@ namespace FalloutScript
         double mMeleeDamageStrengthOffset = 0; // fAVDMeleeDamageStrengthOffset: added to the strength
         double mCritLuckBase = 0; // fAVDCritLuckBase
         double mCritLuckMult = 1; // fAVDCritLuckMult
+        double mSwimBreathBase = 10; // fActorSwimBreathBase: the seconds that a character holds its breath under water
+        double mSwimBreathMult = 0.5; // fActorSwimBreathMult: what each point of the stat adds to them
+        double mSwimBreathDamage = 0.2; // fActorSwimBreathDamage: the share of its health that it loses for each second
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 
@@ -49,6 +52,33 @@ namespace FalloutScript
         double meleeDamage(const DerivedStatSettings& settings, double strength);
         /// The chance of a critical hit in percent
         double criticalChance(const DerivedStatSettings& settings, double luck);
+
+        /// How far under water a character has to be for the breath to run out (the executables compare the share of
+        /// the body that is under the water with it: FalloutNV.exe 0x889930, Mac round 12BI B)
+        constexpr double swimSubmersion = 0.875;
+        /// The seconds that a character holds its breath: the base and a share of the stat (whole points of it)
+        double swimBreath(const DerivedStatSettings& settings, double stat);
+
+        /// What a frame under or over the water does to the breath
+        struct SwimBreathStep
+        {
+            /// The seconds of breath that are left
+            double mRemaining = 0;
+            /// The health that the frame took (the breath ran out)
+            double mDamage = 0;
+        };
+        /// The breath after a frame of `seconds`. Under water (`submersion`: the share of the body under it, from 0 to
+        /// 1) it runs down, unless the character can breathe there; out of the breath the character takes the share of
+        /// its health that the settings say for each second, and the breath stays at 0. Above the water it is full
+        /// again at once.
+        SwimBreathStep swimBreathStep(const DerivedStatSettings& settings, double remaining, double longest,
+            double submersion, bool breathesWater, double health, double seconds);
+
+        /// The ticks of the air meter that show: 16 when the breath is full, one less for each sixteenth that is gone
+        /// (the meter's sequence hides tick k at k/30 seconds and the sequence time is a sixteenth-thirtieths of the
+        /// share that is gone)
+        constexpr int airMeterTicks = 16;
+        int airMeterVisibleTicks(double remaining, double longest);
     }
 }
 

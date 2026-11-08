@@ -18,11 +18,14 @@ namespace
     using FalloutScript::FormId;
     using FalloutScript::GameDate;
     using FalloutScript::DerivedStats::actionPoints;
+    using FalloutScript::DerivedStats::airMeterVisibleTicks;
     using FalloutScript::DerivedStats::carryWeight;
     using FalloutScript::DerivedStats::criticalChance;
     using FalloutScript::DerivedStats::meleeDamage;
     using FalloutScript::DerivedStats::npcHealth;
     using FalloutScript::DerivedStats::playerHealth;
+    using FalloutScript::DerivedStats::swimBreath;
+    using FalloutScript::DerivedStats::swimBreathStep;
     namespace ActorValue = FalloutScript::ActorValue;
 
     constexpr FormId player = 0x00000014;
@@ -286,5 +289,78 @@ namespace
         EXPECT_EQ(calendar.dayNumber({ 0, 0, 1 }), 0);
         EXPECT_EQ(calendar.dayNumber({ 1, 0, 1 }), 365);
         EXPECT_EQ(calendar.dayNumber({ 0, 11, 31 }), 364);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, a_character_holds_its_breath_ten_seconds_and_half_a_second_for_each_point)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        EXPECT_DOUBLE_EQ(swimBreath(settings, 0), 10);
+        EXPECT_DOUBLE_EQ(swimBreath(settings, 5), 12.5);
+        EXPECT_DOUBLE_EQ(swimBreath(settings, 10), 15);
+        // Only whole points of the stat count
+        EXPECT_DOUBLE_EQ(swimBreath(settings, 5.9), 12.5);
+        const DerivedStatSettings changed
+            = settingsOf({ { "fActorSwimBreathBase", 20 }, { "fActorSwimBreathMult", 1 } });
+        EXPECT_DOUBLE_EQ(swimBreath(changed, 5), 25);
+        EXPECT_DOUBLE_EQ(swimBreath(settingsOf({ { "fActorSwimBreathBase", -4 } }), 0), 0);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, the_breath_runs_down_under_water_and_is_full_again_above_it)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        auto step = swimBreathStep(settings, 12.5, 12.5, 1.0, false, 200, 0.5);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 12.0);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0);
+        step = swimBreathStep(settings, step.mRemaining, 12.5, 0.9, false, 200, 1.0);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 11.0);
+        // The head out of the water fills the breath at once, however little was left, and so does a character that
+        // is not in the water at all
+        step = swimBreathStep(settings, 0.3, 12.5, 0.874, false, 200, 0.016);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 12.5);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0);
+        step = swimBreathStep(settings, 3, 12.5, 0.0, false, 200, 0.016);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 12.5);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, a_character_that_is_out_of_breath_loses_a_fifth_of_its_health_each_second)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        auto step = swimBreathStep(settings, 0.01, 12.5, 1.0, false, 200.7, 0.5);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 0);
+        // The health counts in whole points, and the frame that ran the breath out takes the whole frame's share
+        EXPECT_DOUBLE_EQ(step.mDamage, 0.2 * 200 * 0.5);
+        step = swimBreathStep(settings, step.mRemaining, 12.5, 1.0, false, 160, 0.25);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 0);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0.2 * 160 * 0.25);
+        // A breath that lasts exactly to the end of the frame does no harm yet
+        step = swimBreathStep(settings, 0.5, 12.5, 1.0, false, 200, 0.5);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 0);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, a_character_that_breathes_water_keeps_its_breath_under_it)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        const auto step = swimBreathStep(settings, 4, 12.5, 1.0, true, 200, 3.0);
+        EXPECT_DOUBLE_EQ(step.mRemaining, 4);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0);
+        // It is filled above the water all the same
+        EXPECT_DOUBLE_EQ(swimBreathStep(settings, 4, 12.5, 0.0, true, 200, 0.1).mRemaining, 12.5);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, the_air_meter_loses_a_tick_for_each_sixteenth_of_the_breath)
+    {
+        EXPECT_EQ(airMeterVisibleTicks(12.5, 12.5), 16);
+        EXPECT_EQ(airMeterVisibleTicks(6.25, 12.5), 8);
+        EXPECT_EQ(airMeterVisibleTicks(12.5 / 16, 12.5), 1);
+        // Part of a sixteenth keeps its tick; a tick goes when the sixteenth is gone
+        EXPECT_EQ(airMeterVisibleTicks(12.5 * 15.5 / 16, 12.5), 16);
+        EXPECT_EQ(airMeterVisibleTicks(12.5 * 14.99 / 16, 12.5), 15);
+        EXPECT_EQ(airMeterVisibleTicks(0.01, 12.5), 1);
+        EXPECT_EQ(airMeterVisibleTicks(0, 12.5), 0);
+        // More than there can be, less than none, and a breath with no length
+        EXPECT_EQ(airMeterVisibleTicks(20, 12.5), 16);
+        EXPECT_EQ(airMeterVisibleTicks(-1, 12.5), 0);
+        EXPECT_EQ(airMeterVisibleTicks(3, 0), 16);
     }
 }

@@ -1,6 +1,7 @@
 #include "derivedstats.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace FalloutScript
 {
@@ -37,6 +38,9 @@ namespace FalloutScript
         take(lookup, "fAVDMeleeDamageStrengthOffset", settings.mMeleeDamageStrengthOffset);
         take(lookup, "fAVDCritLuckBase", settings.mCritLuckBase);
         take(lookup, "fAVDCritLuckMult", settings.mCritLuckMult);
+        take(lookup, "fActorSwimBreathBase", settings.mSwimBreathBase);
+        take(lookup, "fActorSwimBreathMult", settings.mSwimBreathMult);
+        take(lookup, "fActorSwimBreathDamage", settings.mSwimBreathDamage);
         return settings;
     }
 
@@ -73,5 +77,41 @@ namespace FalloutScript
     double DerivedStats::criticalChance(const DerivedStatSettings& settings, double luck)
     {
         return std::clamp(settings.mCritLuckBase + luck * settings.mCritLuckMult, 0.0, 100.0);
+    }
+
+    double DerivedStats::swimBreath(const DerivedStatSettings& settings, double stat)
+    {
+        return std::max(settings.mSwimBreathBase + settings.mSwimBreathMult * std::trunc(stat), 0.0);
+    }
+
+    DerivedStats::SwimBreathStep DerivedStats::swimBreathStep(const DerivedStatSettings& settings, double remaining,
+        double longest, double submersion, bool breathesWater, double health, double seconds)
+    {
+        SwimBreathStep step;
+        step.mRemaining = remaining;
+        if (submersion < swimSubmersion)
+        {
+            step.mRemaining = longest;
+            return step;
+        }
+        if (breathesWater)
+            return step;
+        step.mRemaining = remaining - seconds;
+        if (step.mRemaining < 0)
+        {
+            step.mDamage = settings.mSwimBreathDamage * std::trunc(health) * seconds;
+            step.mRemaining = 0;
+        }
+        return step;
+    }
+
+    int DerivedStats::airMeterVisibleTicks(double remaining, double longest)
+    {
+        if (!(longest > 0))
+            return airMeterTicks;
+        const double share = std::clamp(remaining / longest, 0.0, 1.0);
+        // The share is rounded to ten thousandths first: ticks that a full breath rounds off by a hair do not go
+        return std::clamp(
+            static_cast<int>(std::ceil(std::round(share * airMeterTicks * 10000.0) / 10000.0)), 0, airMeterTicks);
     }
 }
