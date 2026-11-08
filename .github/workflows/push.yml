@@ -46,6 +46,21 @@ jobs:
     - name: Test macOS bundle selection
       run: python3 -m unittest discover -s CI -p test_mac_bundles.py -v
 
+    # These tests read the Lua scripts and the tracker, so they run on every change, including the
+    # documentation-only ones that skip the platform builds.  The Lua checks need lupa, and some tests need
+    # a luajit executable (they are skipped without one).
+    - name: Install the tools of the helper script tests
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends luajit
+        python3 -m venv "$RUNNER_TEMP/helper-tests"
+        "$RUNNER_TEMP/helper-tests/bin/pip" install lupa==2.8
+
+    - name: Test the helper scripts and the Lua scripts they read
+      run: >
+        "$RUNNER_TEMP/helper-tests/bin/python" -m unittest discover
+        -s scripts/openfallout -p 'test_*.py' -v
+
     - name: Decide whether the platform builds are needed
       id: classify
       env:

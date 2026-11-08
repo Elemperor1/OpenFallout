@@ -2,8 +2,9 @@
 """Decide whether a change needs the platform builds and the tests.
 
 Only a change that touches nothing but the notes and trackers under docs/openfallout,
-the helper scripts under scripts/openfallout (no workflow runs them) and the top-level
-README, CHANGELOG and AUTHORS may skip them.  A skipped build reports green, so every
+the helper scripts under scripts/openfallout (their Python tests run in the Changes job
+of push.yml, whatever else changed) and the top-level README, CHANGELOG and AUTHORS may
+skip them.  A skipped build reports green, so every
 doubt runs everything: an empty or unreadable list of changed files, a base commit that
 cannot be fetched, a manual run, a deleted file outside the two folders, and any change
 to CI itself.
@@ -14,7 +15,7 @@ import os
 import subprocess
 import sys
 
-# No build or test reads these folders.  The Python helpers in them are run by hand.
+# No build reads these folders, and the tests of the Python helpers run in the Changes job.
 DOCUMENTATION_TREES = ("docs/openfallout/", "scripts/openfallout/")
 # CMakeLists.txt installs these files, so changing one is harmless but removing one is not.
 DOCUMENTATION_FILES = ("README.md", "CHANGELOG.md", "AUTHORS.md")
